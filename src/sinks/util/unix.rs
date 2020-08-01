@@ -201,7 +201,7 @@ impl Sink for UnixSink {
     }
 }
 
-#[cfg(all(feature = "tokio/uds", test))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::test_util::{random_lines_with_stream, runtime, shutdown_on_idle, CountReceiver};

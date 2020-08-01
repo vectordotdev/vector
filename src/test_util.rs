@@ -412,7 +412,7 @@ impl CountReceiver<String> {
         })
     }
 
-    #[cfg(all(feature = "tokio/uds", unix))]
+    #[cfg(unix)]
     pub fn receive_lines_unix<P>(path: P) -> CountReceiver<String>
     where
         P: AsRef<Path> + Send + 'static,
