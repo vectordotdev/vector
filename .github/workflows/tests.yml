@@ -38,7 +38,7 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
   test-linux:
-    name: Unit - Linux, flaky
+    name: Unit - Linux
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -54,7 +54,7 @@ jobs:
       - run: make test
 
   test-mac:
-    name: Unit - Mac, flaky
+    name: Unit - Mac
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
@@ -73,7 +73,7 @@ jobs:
       - run: make test
 
   test-windows:
-    name: Unit - Windows, flaky
+    name: Unit - Windows
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
