@@ -265,7 +265,7 @@ fn test_reclaim_disk_space() {
     // to file. We need for the events to be written to the file before `terminate_abruptly`.
     // We can't know when exactly all of the events have been written, so we have to guess.
     // But it should be shortly after source processing all of the events.
-    std::thread::sleep(std::time::Duration::from_secs(1));
+    std::thread::sleep(std::time::Duration::from_secs(4));
     // Simulate a crash.
     terminate_abruptly(rt, topology);
 
