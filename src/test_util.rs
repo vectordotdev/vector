@@ -369,6 +369,7 @@ impl<T: Send + 'static> CountReceiver<T> {
         self.count.load(Ordering::Relaxed)
     }
 
+    /// Succeds once first connection has been maid.
     pub async fn connected(&mut self) {
         if let Some(tripwire) = self.connected.take() {
             tripwire.await.unwrap();
@@ -439,8 +440,6 @@ impl CountReceiver<String> {
         S: Stream<Item = IoResult<T>>,
         T: AsyncWrite + AsyncRead,
     {
-        tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
-
         stream
             .take_until(tripwire)
             .map_ok(|socket| FramedRead::new(socket, LinesCodec::new()))
