@@ -30,7 +30,7 @@ pub struct SyslogUdpReadError {
 
 impl InternalEvent for SyslogUdpReadError {
     fn emit_logs(&self) {
-        error!(message = "error reading datagram.", error = %self.error);
+        error!(message = "error reading datagram.", error = %self.error, rate_limit_secs = 10);
     }
 
     fn emit_metrics(&self) {
@@ -49,7 +49,7 @@ pub struct SyslogUdpUtf8Error {
 
 impl InternalEvent for SyslogUdpUtf8Error {
     fn emit_logs(&self) {
-        error!(message = "error converting bytes to utf8 string in udp mode.", error = %self.error);
+        error!(message = "error converting bytes to utf8 string in udp mode.", error = %self.error, rate_limit_secs = 10);
     }
 
     fn emit_metrics(&self) {
