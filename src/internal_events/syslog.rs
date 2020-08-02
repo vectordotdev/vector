@@ -53,7 +53,7 @@ impl InternalEvent for SyslogUdpUtf8Error {
     }
 
     fn emit_metrics(&self) {
-        counter!("udp_utf8_errors", 1,
+        counter!("udp_utf8_convert_errors", 1,
             "component_kind" => "source",
             "component_type" => "syslog",
             "mode" => "udp",
