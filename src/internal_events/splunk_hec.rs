@@ -2,6 +2,8 @@ use super::InternalEvent;
 use metrics::counter;
 use serde_json::Error;
 
+pub use self::source::*;
+
 #[derive(Debug)]
 pub struct SplunkEventSent {
     pub byte_size: usize,
