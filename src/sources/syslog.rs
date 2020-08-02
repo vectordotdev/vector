@@ -137,14 +137,7 @@ impl TcpSource for SyslogTcpSource {
     }
 
     fn build_event(&self, frame: String, host: Bytes) -> Option<Event> {
-        event_from_str(&self.host_key, Some(host), &frame).map(|event| {
-            trace!(
-                message = "Received one event.",
-                event = field::debug(&event)
-            );
-
-            event
-        })
+        event_from_str(&self.host_key, Some(host), &frame)
     }
 }
 
@@ -321,10 +314,6 @@ fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
 // octet framing (i.e. num bytes as ascii string prefix) with and without delimiters
 // null byte delimiter in place of newline
 fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Option<Event> {
-    emit!(SyslogEventReceived {
-        byte_size: line.len()
-    });
-
     let line = line.trim();
     let parsed = syslog_loose::parse_message_with_year(line, resolve_year);
     let mut event = Event::from(&parsed.msg[..]);
@@ -352,6 +341,10 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
         .insert(event::log_schema().timestamp_key().clone(), timestamp);
 
     insert_fields_from_syslog(&mut event, parsed);
+
+    emit!(SyslogEventReceived {
+        byte_size: line.len()
+    });
 
     trace!(
         message = "processing one event.",
