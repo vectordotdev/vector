@@ -198,7 +198,7 @@ impl SyslogDecoder {
             // This is certainly mallformed, and there is no recovering from this.
             Err(LinesCodecError::Io(io::Error::new(
                 io::ErrorKind::Other,
-                "frame length limit exceeded",
+                "Frame length limit exceeded",
             )))
         }
     }
@@ -250,7 +250,7 @@ pub fn udp(
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
-    let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
+    let out = out.sink_map_err(|e| error!("error sending line: {:?}.", e));
 
     Box::new(
         async move {
@@ -289,7 +289,7 @@ pub fn udp(
                 .forward(out.sink_compat())
                 .await;
 
-            info!("finished sending");
+            info!("finished sending.");
             Ok(())
         }
         .boxed()
