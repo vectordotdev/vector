@@ -15,7 +15,7 @@ pub struct KeyValueConfig {
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
     pub field: Option<Atom>,
-    #[derivative(Default(value = " "))]
+    #[derivative(Default(value = "="))]
     pub field_split: String,
     #[derivative(Default(value = "true"))]
     pub overwrite_target: bool,
@@ -44,7 +44,7 @@ impl TransformConfig for KeyValueConfig {
             conversions,
             drop_field: self.drop_field,
             field: field.clone(),
-            field_split: self.field_split.clone(),
+            field_split: Option::from(self.field_split.clone()),
             overwrite_target: self.overwrite_target,
             separator: self.separator.clone(),
             target_field: self.target_field.clone(),
@@ -70,7 +70,7 @@ pub struct KeyValue {
     conversions: HashMap<Atom, Conversion>,
     drop_field: bool,
     field: Atom,
-    field_split: String,
+    field_split: Option<String>,
     overwrite_target: bool,
     separator: String,
     target_field: Option<Atom>,
