@@ -41,3 +41,22 @@ impl InternalEvent for SyslogUdpReadError {
         );
     }
 }
+
+#[derive(Debug)]
+pub struct SyslogUdpUtf8Error {
+    pub error: std::str::Utf8Error,
+}
+
+impl InternalEvent for SyslogUdpUtf8Error {
+    fn emit_logs(&self) {
+        error!(message = "error converting bytes to utf8 string in udp mode.", error = %self.error);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("syslog_udp_utf8_errors", 1,
+            "component_kind" => "source",
+            "component_type" => "syslog",
+            "mode" => "udp",
+        );
+    }
+}

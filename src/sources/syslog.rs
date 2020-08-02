@@ -3,7 +3,7 @@ use super::util::{SocketListenAddr, TcpSource};
 use crate::sources::util::build_unix_source;
 use crate::{
     event::{self, Event, Value},
-    internal_events::{SyslogEventReceived, SyslogUdpReadError},
+    internal_events::{SyslogEventReceived, SyslogUdpReadError, SyslogUdpUtf8Error},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -272,9 +272,12 @@ pub fn udp(
                             Ok((bytes, received_from)) => {
                                 let received_from = received_from.to_string().into();
 
-                                std::str::from_utf8(&bytes).ok().and_then(|s| {
-                                    event_from_str(&host_key, Some(received_from), s).map(Ok)
-                                })
+                                std::str::from_utf8(&bytes)
+                                    .map_err(|error| emit!(SyslogUdpUtf8Error { error }))
+                                    .ok()
+                                    .and_then(|s| {
+                                        event_from_str(&host_key, Some(received_from), s).map(Ok)
+                                    })
                             }
                             Err(error) => {
                                 emit!(SyslogUdpReadError { error });
