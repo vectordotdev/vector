@@ -38,7 +38,8 @@ pub struct HecSinkConfig {
     #[serde(default)]
     pub indexed_fields: Vec<Atom>,
     pub index: Option<String>,
-    pub sourcetype: Option<Template>,
+    pub sourcetype: Option<String>,
+    pub source: Option<String>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -171,7 +172,11 @@ impl HttpSink for HecSinkConfig {
             body["index"] = json!(index);
         }
 
-        if let Some(sourcetype) = sourcetype {
+        if let Some(source) = &self.source {
+            body["source"] = json!(source);
+        }
+
+        if let Some(sourcetype) = &self.sourcetype {
             body["sourcetype"] = json!(sourcetype);
         }
 
@@ -422,6 +427,27 @@ mod integration_tests {
 
             assert_eq!(message, entry["_raw"].as_str().unwrap());
             assert!(entry.get("message").is_none());
+        });
+    }
+
+    #[test]
+    fn splunk_insert_source() {
+        let mut rt = runtime();
+        let cx = SinkContext::new_test();
+
+        rt.block_on_std(async move {
+            let mut config = config(Encoding::Text, vec![]).await;
+            config.source = Some("/var/log/syslog".to_string());
+
+            let (sink, _) = config.build(cx).unwrap();
+
+            let message = random_string(100);
+            let event = Event::from(message.clone());
+            sink.send(event).compat().await.unwrap();
+
+            let entry = find_entry(message.as_str()).await;
+
+            assert_eq!(entry["source"].as_str(), Some("/var/log/syslog"));
         });
     }
 
