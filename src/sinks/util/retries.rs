@@ -129,7 +129,7 @@ where
                         None
                     }
                 } else if error.downcast_ref::<Elapsed>().is_some() {
-                    warn!("request timedout.");
+                    warn!("request timed out.");
                     Some(self.build_retry())
                 } else {
                     error!(message = "unexpected error type.", %error);
