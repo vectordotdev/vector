@@ -99,8 +99,9 @@ impl SourceConfig for JournaldConfig {
             (false, _) => &self.include_units,
         };
 
-        let include_units: HashSet<String> = include_units.iter().map(fixup_unit).collect();
-        let exclude_units: HashSet<String> = self.exclude_units.iter().map(fixup_unit).collect();
+        let include_units: HashSet<String> = include_units.iter().map(|s| fixup_unit(&s)).collect();
+        let exclude_units: HashSet<String> =
+            self.exclude_units.iter().map(|s| fixup_unit(&s)).collect();
         if let Some(unit) = include_units
             .iter()
             .find(|unit| exclude_units.contains(&unit[..]))
@@ -227,7 +228,7 @@ fn create_event(record: Record) -> Event {
 
 /// Map the given unit name into a valid systemd unit
 /// by appending ".service" if no extension is present.
-fn fixup_unit(unit: &String) -> String {
+fn fixup_unit(unit: &str) -> String {
     if unit.contains('.') {
         unit.into()
     } else {
@@ -410,7 +411,7 @@ fn decode_record(text: &str, remap: bool) -> Result<Record, JsonError> {
     record.get_mut("MESSAGE").and_then(|message| {
         message
             .as_array()
-            .and_then(decode_array)
+            .and_then(|v| decode_array(&v))
             .map(|decoded| *message = decoded)
     });
     if remap {
@@ -419,7 +420,7 @@ fn decode_record(text: &str, remap: bool) -> Result<Record, JsonError> {
     serde_json::from_value(record)
 }
 
-fn decode_array(array: &Vec<JsonValue>) -> Option<JsonValue> {
+fn decode_array(array: &[JsonValue]) -> Option<JsonValue> {
     // From the array of values, turn all the numbers into bytes, and
     // then the bytes into a string, but return None if any value in the
     // array was not a valid byte.
