@@ -207,6 +207,8 @@ fn merge_and_fork() {
         send_lines(in_addr1, input_lines1.clone()).await.unwrap();
         send_lines(in_addr2, input_lines2.clone()).await.unwrap();
 
+        tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+
         // Shut down server
         topology.stop().compat().await.unwrap();
 
