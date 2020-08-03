@@ -131,7 +131,7 @@ nom = { version = "5.1.2", optional = true }
 uuid = { version = "0.7", features = ["serde", "v4"], optional = true }
 exitcode = "1.1.2"
 snafu = { version = "0.6", features = ["futures-01", "futures"] }
-url = "1.7"
+url = "2.1.1"
 base64 = { version = "0.10.1", optional = true }
 bollard = { version = "0.7.1", default-features = false, features = ["tls"], optional = true }
 listenfd = { version = "0.3.3", optional = true }
