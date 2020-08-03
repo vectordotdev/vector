@@ -322,7 +322,7 @@ dependencies = [
  "serde_json",
  "tokio 0.2.21",
  "tokio-util",
- "url 2.1.1",
+ "url",
  "winapi 0.3.8",
 ]
 
@@ -431,7 +431,7 @@ dependencies = [
  "semver",
  "serde",
  "toml 0.5.6",
- "url 2.1.1",
+ "url",
 ]
 
 [[package]]
@@ -1434,7 +1434,7 @@ dependencies = [
  "libc",
  "libgit2-sys",
  "log 0.4.8",
- "url 2.1.1",
+ "url",
 ]
 
 [[package]]
@@ -1715,17 +1715,6 @@ dependencies = [
 
 [[package]]
 name = "idna"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38f09e0f0b1fb55fdee1f17470ad800da77af5186a1a76c026b679358b7e844e"
-dependencies = [
- "matches",
- "unicode-bidi",
- "unicode-normalization",
-]
-
-[[package]]
-name = "idna"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02e2673c30ee86b5b96a9cb52ad15718aa1f966f5ab9ad54a8b95d5ca33120a9"
@@ -1880,11 +1869,11 @@ dependencies = [
  "bytes 0.5.4",
  "chrono",
  "http 0.2.1",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "serde",
  "serde-value",
  "serde_json",
- "url 2.1.1",
+ "url",
 ]
 
 [[package]]
@@ -2917,12 +2906,6 @@ dependencies = [
 
 [[package]]
 name = "percent-encoding"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31010dd2e1ac33d5b46a5b413495239882813e0369f8ed8a5e266f173602f831"
-
-[[package]]
-name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
@@ -3228,7 +3211,7 @@ dependencies = [
  "tokio 0.2.21",
  "tokio-native-tls",
  "tokio-util",
- "url 2.1.1",
+ "url",
 ]
 
 [[package]]
@@ -3629,14 +3612,14 @@ dependencies = [
  "mime",
  "mime_guess",
  "native-tls",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "pin-project-lite",
  "serde",
  "serde_json",
  "serde_urlencoded",
  "tokio 0.2.21",
  "tokio-tls",
- "url 2.1.1",
+ "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -3697,7 +3680,7 @@ dependencies = [
  "lazy_static 1.4.0",
  "log 0.4.8",
  "md5",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "pin-project",
  "rusoto_credential",
  "rusoto_signature",
@@ -3799,7 +3782,7 @@ dependencies = [
  "hyper",
  "log 0.4.8",
  "md5",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "pin-project",
  "rusoto_credential",
  "rustc_version",
@@ -4046,7 +4029,7 @@ dependencies = [
  "dtoa",
  "itoa",
  "serde",
- "url 2.1.1",
+ "url",
 ]
 
 [[package]]
@@ -5314,24 +5297,13 @@ checksum = "826e7639553986605ec5979c7dd957c7895e93eabed50ab2ffa7f6128a75097c"
 
 [[package]]
 name = "url"
-version = "1.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd4e7c0d531266369519a4aa4f399d748bd37043b00bde1e4ff1f60a120b355a"
-dependencies = [
- "idna 0.1.5",
- "matches",
- "percent-encoding 1.0.1",
-]
-
-[[package]]
-name = "url"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "829d4a8476c35c9bf0bbce5a3b23f4106f79728039b726d292bb93bc106787cb"
 dependencies = [
- "idna 0.2.0",
+ "idna",
  "matches",
- "percent-encoding 2.1.0",
+ "percent-encoding",
 ]
 
 [[package]]
@@ -5535,7 +5507,7 @@ dependencies = [
  "tracing-subscriber",
  "tracing-tower",
  "typetag",
- "url 1.7.2",
+ "url",
  "uuid 0.7.4",
  "vector-wasm",
  "walkdir",
