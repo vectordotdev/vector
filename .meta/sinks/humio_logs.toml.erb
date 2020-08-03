@@ -54,6 +54,17 @@ examples = ["${HUMIO_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
 required = true
 description = "Your Humio ingestion token."
 
+[sinks.humio_logs.options.type]
+type = "string"
+common = false
+examples = ["json", "none"]
+required = false
+description = """\
+The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
+
+If unset, Humio will default it to none.
+"""
+
 [sinks.humio_logs.options.host]
 type = "string"
 default = "https://cloud.humio.com"
