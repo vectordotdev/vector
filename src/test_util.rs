@@ -1,5 +1,4 @@
-use crate::runtime::Runtime;
-use crate::{event::LogEvent, Event};
+use crate::{event::LogEvent, runtime::Runtime, trace, Event};
 
 use futures::{compat::Stream01CompatExt, stream, SinkExt, Stream, StreamExt, TryStreamExt};
 use futures01::{
@@ -47,14 +46,16 @@ pub fn next_addr() -> SocketAddr {
 }
 
 pub fn trace_init() {
-    let env = std::env::var("TEST_LOG").unwrap_or_else(|_| "off".to_string());
+    #[cfg(unix)]
+    let color = atty::is(atty::Stream::Stdout);
+    // Windows: ANSI colors are not supported by cmd.exe
+    // Color is false for everything except unix.
+    #[cfg(not(unix))]
+    let color = false;
 
-    let subscriber = tracing_subscriber::FmtSubscriber::builder()
-        .with_env_filter(env)
-        .finish();
+    let levels = std::env::var("TEST_LOG").unwrap_or_else(|_| "off".to_string());
 
-    let _ = tracing_log::LogTracer::init();
-    let _ = tracing::dispatcher::set_global_default(tracing::Dispatch::new(subscriber));
+    trace::init(color, false, &levels);
 }
 
 pub async fn send_lines(
