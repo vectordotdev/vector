@@ -133,7 +133,7 @@ where
                     warn!("request timed out.");
                     Some(self.build_retry())
                 } else {
-                    warn!(message = "unexpected error type.", %error);
+                    error!(message = "unexpected error type.", %error);
                     None
                 }
             }
