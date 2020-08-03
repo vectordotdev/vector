@@ -11,7 +11,6 @@ use crate::{
     topology::config::SinkContext,
 };
 use bytes05::Bytes;
-// use futures::ready;
 use futures::{
     compat::CompatSink, future::BoxFuture, task::noop_waker_ref, FutureExt, TryFutureExt,
 };
@@ -78,7 +77,6 @@ pub struct TcpSink {
     resolver: Resolver,
     tls: MaybeTlsSettings,
     state: TcpSinkState,
-    // state2: TcpSinkState2,
     backoff: ExponentialBackoff,
     span: tracing::Span,
 }
@@ -92,14 +90,6 @@ enum TcpSinkState {
 }
 
 type TcpOrTlsStream = CompatSink<FramedWrite<MaybeTlsStream<TcpStream>, BytesCodec>, Bytes>;
-
-// enum TcpSinkState2 {
-//     Disconnected,
-//     ResolvingDns(BoxFuture<'static, Result<crate::dns::LookupIp, crate::dns::DnsError>>),
-//     Connecting(BoxFuture<'static, Result<MaybeTlsStream<TcpStream>, TlsError>>),
-//     Connected(FramedWrite<MaybeTlsStream<TcpStream>, BytesCodec>),
-//     Backoff(BoxFuture<'static, ()>),
-// }
 
 impl TcpSink {
     pub fn new(host: String, port: u16, resolver: Resolver, tls: MaybeTlsSettings) -> Self {
@@ -199,58 +189,9 @@ impl TcpSink {
             };
         }
     }
-
-    // fn poll_connection2(&mut self, cx: &mut Context) -> Poll<()> {
-    //     loop {
-    //         self.state2 = match &mut self.state2 {
-    //             TcpSinkState2::Disconnected => {
-    //                 debug!(message = "resolving dns.", host = %self.host);
-    //                 let fut = self.resolver.lookup_ip(self.host.clone());
-    //                 TcpSinkState2::ResolvingDns(fut.boxed())
-    //             }
-    //             TcpSinkState2::ResolvingDns(fut) => match ready!(fut.as_mut().poll(cx)) {
-    //                 Ok(mut ips) => {
-    //                     if let Some(ip) = ips.next() {
-    //                         let addr = SocketAddr::new(ip, self.port);
-
-    //                         debug!(message = "connecting", %addr);
-    //                         let fut = self.tls.clone().connect(self.host.clone(), addr);
-    //                         TcpSinkState2::Connecting(fut.boxed())
-    //                     } else {
-    //                         error!("DNS resolved but there were no IP addresses.");
-    //                         TcpSinkState2::Backoff(self.next_delay().boxed())
-    //                     }
-    //                 }
-    //                 Err(error) => {
-    //                     error!(message = "unable to resolve dns.", %error);
-    //                     TcpSinkState2::Backoff(self.next_delay().boxed())
-    //                 }
-    //             },
-    //             TcpSinkState2::Connecting(fut) => match ready!(fut.as_mut().poll(cx)) {
-    //                 Ok(stream) => {
-    //                     emit!(TcpConnectionEstablished {
-    //                         peer_addr: stream.peer_addr().ok(),
-    //                     });
-    //                     self.backoff = Self::fresh_backoff();
-    //                     let out = FramedWrite::new(stream, BytesCodec::new());
-    //                     TcpSinkState2::Connected(out)
-    //                 }
-    //                 Err(error) => {
-    //                     emit!(TcpConnectionFailed { error });
-    //                     TcpSinkState2::Backoff(self.next_delay().boxed())
-    //                 }
-    //             },
-    //             TcpSinkState2::Connected(_) => return Poll::Ready(()),
-    //             TcpSinkState2::Backoff(fut) => {
-    //                 let _ = ready!(fut.as_mut().poll(cx));
-    //                 debug!(message = "disconnected.");
-    //                 TcpSinkState2::Disconnected
-    //             }
-    //         };
-    //     }
-    // }
 }
 
+// New Sink trait implemented in PR#3188: https://github.com/timberio/vector/pull/3188#discussion_r463843208
 impl Sink for TcpSink {
     type SinkItem = bytes::Bytes;
     type SinkError = ();
@@ -344,110 +285,6 @@ impl Sink for TcpSink {
         }
     }
 }
-
-// impl futures::Sink<bytes::Bytes> for TcpSink {
-//     type Error = ();
-
-//     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-//         let _ = ready!(self.poll_connection2(cx));
-//         match &mut self.as_mut().state2 {
-//             TcpSinkState2::Connected(connection) => {
-//                 let stream: &mut MaybeTlsStream<TcpStream> = connection.get_mut();
-//                 match Pin::new(stream).poll_read(cx, &mut [0u8; 1]) {
-//                     Poll::Ready(Err(_)) => {
-//                         self.state2 = TcpSinkState2::Disconnected;
-//                         cx.waker().wake_by_ref();
-//                         Poll::Pending
-//                     }
-//                     Poll::Ready(Ok(0)) => {
-//                         error!("poll_ready: poll_read Poll::Ready(Ok(0))");
-//                         self.poll_close(cx)
-//                     }
-//                     _ => match ready!(Pin::new(connection).poll_ready(cx)) {
-//                         Ok(()) => Poll::Ready(Ok(())),
-//                         Err(_) => {
-//                             self.state2 = TcpSinkState2::Disconnected;
-//                             cx.waker().wake_by_ref();
-//                             Poll::Pending
-//                         }
-//                     },
-//                 }
-//             }
-//             _ => unreachable!(),
-//         }
-//     }
-
-//     fn start_send(mut self: Pin<&mut Self>, item: bytes::Bytes) -> Result<(), Self::Error> {
-//         match &mut self.as_mut().state2 {
-//             TcpSinkState2::Connected(stream) => {
-//                 let item = Bytes::copy_from_slice(&item);
-//                 Pin::new(stream).as_mut().start_send(item).map_err(|_| ())
-//             }
-//             _ => Err(()),
-//         }
-//     }
-
-//     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-//         match &mut self.as_mut().state2 {
-//             TcpSinkState2::Connected(connection) => {
-//                 let stream: &mut MaybeTlsStream<TcpStream> = connection.get_mut();
-//                 match Pin::new(stream).poll_read(cx, &mut [0u8; 1]) {
-//                     Poll::Ready(Err(_)) => {
-//                         self.state2 = TcpSinkState2::Disconnected;
-//                         cx.waker().wake_by_ref();
-//                         Poll::Pending
-//                     }
-//                     Poll::Ready(Ok(0)) => {
-//                         error!("poll_flush: poll_read Poll::Ready(Ok(0))");
-//                         self.poll_close(cx)
-//                     }
-//                     _ => match ready!(Pin::new(connection).poll_flush(cx)) {
-//                         Ok(()) => Poll::Ready(Ok(())),
-//                         Err(_) => {
-//                             self.state2 = TcpSinkState2::Disconnected;
-//                             cx.waker().wake_by_ref();
-//                             Poll::Pending
-//                         }
-//                     },
-//                 }
-//             }
-//             _ => unreachable!(),
-//         }
-//     }
-
-//     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-//         match &mut self.as_mut().state2 {
-//             TcpSinkState2::Connected(connection) => {
-//                 let stream: &mut MaybeTlsStream<TcpStream> = connection.get_mut();
-//                 match Pin::new(stream).poll_read(cx, &mut [0u8; 1]) {
-//                     Poll::Ready(Err(_)) => {
-//                         self.state2 = TcpSinkState2::Disconnected;
-//                         cx.waker().wake_by_ref();
-//                         Poll::Pending
-//                     }
-//                     Poll::Ready(Ok(0)) => {
-//                         error!("poll_close: poll_read Poll::Ready(Ok(0))");
-//                         let result = Pin::new(connection).poll_close(cx);
-//                         error!("poll_close: connection {:?}", result);
-//                         let _ = ready!(result);
-//                         self.state2 = TcpSinkState2::Disconnected;
-//                         cx.waker().wake_by_ref();
-//                         Poll::Pending
-//                     }
-//                     _ => match ready!(Pin::new(connection).poll_close(cx)) {
-//                         Ok(()) => Poll::Ready(Ok(())),
-//                         Err(_) => {
-//                             self.state2 = TcpSinkState2::Disconnected;
-//                             cx.waker().wake_by_ref();
-//                             Poll::Pending
-//                         }
-//                     },
-//                 }
-//             }
-//             _ => unreachable!(),
-//         }
-//     }
-// }
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
