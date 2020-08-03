@@ -481,9 +481,9 @@ dependencies = [
 
 [[package]]
 name = "cidr-utils"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a43c5deddb78f662a837192de8bfd1c5d5f23475aec80ce182c79577aac3f50d"
+checksum = "1daf95b7df82d8f0ad8c49f1930f2853ce4a68f1bbca29c8d84087df2c24784f"
 dependencies = [
  "debug-helper",
  "enum-ordinalize",
@@ -1020,9 +1020,9 @@ dependencies = [
 
 [[package]]
 name = "enum-ordinalize"
-version = "3.1.0"
+version = "3.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d06f2ad28be2174a108c29425212ab669080ee656504ea46f9252ac612f21ca9"
+checksum = "1676e1daadfd216bda88d3a6fedd1bf53b829a085f5cc4d81c6f3054f50ef983"
 dependencies = [
  "num-bigint",
  "num-traits",
@@ -2656,9 +2656,9 @@ dependencies = [
 
 [[package]]
 name = "num-bigint"
-version = "0.2.6"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "090c7f9998ee0ff65aa5b723e4009f7b217707f1fb5ea551329cc4d6231fb304"
+checksum = "b7f3fc75e3697059fb1bc465e3d8cca6cf92f56854f201158b3f9c77d5a3cfa0"
 dependencies = [
  "autocfg 1.0.0",
  "num-integer",
