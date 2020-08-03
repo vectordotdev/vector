@@ -1,4 +1,4 @@
-# RFC #2744 - Vicscript
+# RFC #2744 - Remapping Syntax
 
 ## Motivation
 
@@ -11,24 +11,24 @@ This gives us decent coverage for very simple use cases where only one or two na
 
 However, there's a common middle ground where more complex and oftentimes conditional mappings are needed. This is where our native transforms become cumbersome to work with, and yet a full runtime would be heavy handed and is difficult to provide support for (or often simply doesn't perform well enough).
 
-The main motivation with Vicscript (temporary name) is to introduce a tool that strikes a better balance by offering a simple language that isn't turing complete and runs as fast as our native transforms. Something that's easy to document, understand, use, diagnose and fix.
+The main motivation with the `remap` transform is to introduce a tool that strikes a better balance by offering a simple language that isn't turing complete and runs as fast as our native transforms. Something that's easy to document, understand, use, diagnose and fix.
 
 My proposal here is basically just a copy of the bits I think work well from [Bloblang](https://www.benthos.dev/docs/guides/bloblang/about), which itself is a derivative of [IDML](https://idml.io/). This is partly due to my familiarity with these languages, but I also have first hand experience of seeing them in action and know that they are easy to implement and adopt.
 
 ### Out of Scope
 
-Event expansion and reduction are within the scope, but routing events is not. For example, it would be possible to express with vicscript that an event should be expanded into several, and then at the sink level filter events (potentially using vicscript again) so that they route to different destinations based on their contents. However, vicscript itself will not have any awareness of sinks, only events.
+Event expansion and reduction are within the scope, but routing events is not. For example, it would be possible to express with `remap` that an event should be expanded into several, and then at the sink level filter events (potentially using `remap` again) so that they route to different destinations based on their contents. However, the `remap` transform itself will not have any awareness of sinks, only events.
 
-Joining events are within scope, but aggregation of those events is not. For example, it would be possible to aggregate events using a transaction transform (or wasm, etc) in a form where vicscript can be used to express exactly how the fields of those events should be joined. However, vicscript itself will not have the capability to temporarily store events and has no awareness of delivery guarantees or transactions.
+Joining events are within scope, but aggregation of those events is not. For example, it would be possible to aggregate events using a transaction transform (or wasm, etc) in a form where `remap` can be used to express exactly how the fields of those events should be joined. However, `remap` itself will not have the capability to temporarily store events and has no awareness of delivery guarantees or transactions.
 
 ## Guide Level Proposal
 
-The `vicscript` transform allows you to mutate events by defining a sequence of mapping statements. Each mapping statement describes a read-only query operation on the right hand side, and on the left hand side a destination for the query result to be mapped within the resulting event:
+The `remap` transform allows you to mutate events by defining a sequence of mapping statements. Each mapping statement describes a read-only query operation on the right hand side, and on the left hand side a destination for the query result to be mapped within the resulting event:
 
 ```toml
 [transforms.mapper]
   inputs = [ "foo" ]
-  type = "vicscript"
+  type = "remap"
   mapping = """
 .foo = "hello"
 .bar = .bar + 10
@@ -36,9 +36,7 @@ The `vicscript` transform allows you to mutate events by defining a sequence of 
 """
 ```
 
-> When executing a Vicscript mapping the source event is never mutated.
-
-The most common query type is a dot separated path, describing how to reach a target field within the input event:
+The most common mapping statement is an assignment of a query result to a dot separated path, and the most common query type is a dot separated path describing how to reach a target field within the input event:
 
 ```coffee
 .foo = .bar.baz.0.buz
@@ -59,7 +57,7 @@ And supports coalescing fields within a path with a pipe operator `|`, where if 
 .foo = .bar.(baz | buz).bev
 ```
 
-Vicscript supports float, int, boolean, string, null, array and object literals:
+The language supports float, int, boolean, string, null, array and object literals:
 
 ```coffee
 .first = 7
@@ -75,32 +73,19 @@ Boolean operators and arithmetic galore:
 .multiplied = .number * 7
 ```
 
-Perform assignments conditionally with an `if` statement:
-
-```coffee
-.id = .id
-.sorted_foo = if .foo.type() == "array" { .foo.sort() }
-```
+Remove fields with the `del` function:
 
 ```text
-In:  {"id":"first","foo":"not an array"}
-Out: {"id":"first","foo":"not an array"}
-
-In:  {"id":"second","foo":["c","a","d","b"]}
-Out: {"id":"second","foo":["c","a","d","b"],"sorted_foo":["a","b","c","d"]}
+del(.foo)
 ```
 
-Remove fields by assigning them the `delete` keyword:
-
-```text
-.foo = delete
-```
+Each mapping line is executed sequentially, with the event result of each line fed into the next.
 
 ## Prior Art
 
 ### JQ
 
-JQ is a great tool and rightfully gets a lot of love. It also basically solves the same problem as Vicscript. Unfortunately, it's common knowledge that JQ doesn't score high on readability, and therefore it doesn't scale well at all in relation to mapping size and complexity (imagine trying to solve [https://github.com/timberio/vector/issues/1965](https://github.com/timberio/vector/issues/1965) with it).
+JQ is a great tool and rightfully gets a lot of love. It also basically solves the same problem as `remap`. Unfortunately, it's common knowledge that JQ doesn't score high on readability, and therefore it doesn't scale well at all in relation to mapping size and complexity (imagine trying to solve [https://github.com/timberio/vector/issues/1965](https://github.com/timberio/vector/issues/1965) with it).
 
 The modules syntax introduced in 1.5 helps a lot by allowing you to break your mapping down, but the syntax is still difficult to learn and awkward to read.
 
@@ -128,11 +113,11 @@ However, the language itself is simple, looks clean, and is very easy to pick up
 
 A key role for us as Vector maintainers is to assist users with their configs and thereby encourage adoption. It stands to reason that making Vector as a project larger would conflict with our ability to do this. However, we already have a range of transforms for mapping and after reviewing some large example configs ([https://github.com/timberio/vector/issues/1965](https://github.com/timberio/vector/issues/1965)) I think scrapping them in favor of a more condensed and readable language would be overall beneficial to us when we're sporting our support hats.
 
-The spec for Vicscript doesn't need to be large, in fact the entire purpose of it is to remain minimal, but the reality is that this is something "more" we're going to need to learn and work with.
+The spec for the `remap` mapping language doesn't need to be large, in fact the entire purpose of it is to remain minimal, but the reality is that this is something "more" we're going to need to learn and work with.
 
 ### It's a lot of effort
 
-Vicscript is an entirely new language spec where we'll need to implement both the parser and executor, which is clearly going to be a significant chunk of work. The obvious mitigation to this is to simply try it out and put a time cap on it, then review how far along the project got. This is only a speculative drawback and it's only going to draw us back once (until we decide to rewrite it for fun).
+This is an entirely new language spec where we'll need to implement both the parser and executor, which is clearly going to be a significant chunk of work. The obvious mitigation to this is to simply try it out and put a time cap on it, then review how far along the project got. This is only a speculative drawback and it's only going to draw us back once (until we decide to rewrite it for fun).
 
 ## Rationale
 
@@ -150,4 +135,4 @@ Given most of the risk around this idea is simply how difficult it will be I'd s
 4. Since the spec is mostly a copy of Bloblang it would be sensible to share efforts for community tooling such as syntax highlighters, linters, documentation, etc. Breaking our parser out as a reference Rust implementation would help build that community.
 5. Gradually expand the language with more advanced features such as match and if statements, as a BETA transform, taking user feedback on board as we move.
 6. Once we're happy we remove the BETA flag and phase out the existing transforms that are no longer necessary, we could opt to leave the implementations in for backwards compatibility but the docs should be removed.
-7. Finally, we can start reusing vicscript in other places such as at the source/sink level.
+7. Finally, we can start reusing the mapping language in other places such as at the source/sink level.
