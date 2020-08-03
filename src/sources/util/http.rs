@@ -4,16 +4,13 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
-use futures::{
-    compat::{AsyncRead01CompatExt, Future01CompatExt, Stream01CompatExt},
-    FutureExt, TryFutureExt, TryStreamExt,
-};
+use async_trait::async_trait;
+use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::Sink;
 use serde::Serialize;
 use std::error::Error;
 use std::fmt;
 use std::net::SocketAddr;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
 use warp::{
     filters::BoxedFilter,
     http::{HeaderMap, StatusCode},
@@ -50,6 +47,7 @@ impl fmt::Debug for RejectShuttingDown {
 }
 impl warp::reject::Reject for RejectShuttingDown {}
 
+#[async_trait]
 pub trait HttpSource: Clone + Send + Sync + 'static {
     fn build_event(
         &self,
@@ -117,13 +115,12 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
         info!(message = "building http server", addr = %address);
 
-        let tls = MaybeTlsSettings::from_config(tls, true).unwrap();
-        let incoming = tls.bind(&address).unwrap().incoming();
-
+        let tls = MaybeTlsSettings::from_config(tls, true)?;
         let fut = async move {
+            let mut listener = tls.bind(&address).await.unwrap();
             let _ = warp::serve(routes)
                 .serve_incoming_with_graceful_shutdown(
-                    incoming.compat().map_ok(|s| s.compat().compat()),
+                    listener.incoming(),
                     shutdown.clone().compat().map(|_| ()),
                 )
                 .await;

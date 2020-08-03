@@ -11,10 +11,12 @@ use openssl::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::fmt::{self, Debug, Formatter};
-use std::fs::File;
-use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::{
+    fmt,
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 const PEM_START_MARKER: &str = "-----BEGIN ";
 
@@ -298,8 +300,8 @@ fn load_mac_certs(builder: &mut SslContextBuilder) -> Result<()> {
     Ok(())
 }
 
-impl Debug for TlsSettings {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+impl fmt::Debug for TlsSettings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TlsSettings")
             .field("verify_certificate", &self.verify_certificate)
             .field("verify_hostname", &self.verify_hostname)
