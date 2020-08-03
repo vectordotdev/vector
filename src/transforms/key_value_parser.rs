@@ -79,7 +79,7 @@ pub struct KeyValue {
 }
 
 fn kv_parser(
-    pair: String,
+    pair: &str,
     field_split: &str,
     trim_key: &Option<String>,
     trim_value: &Option<String>,
@@ -101,9 +101,9 @@ fn kv_parser(
         (key, val)
     } else {
         let split_index = pair.find(field_split).unwrap_or(0);
-        let (key, val) = pair.split_at(split_index);
+        let (key, _val) = pair.split_at(split_index);
         let key = key.trim();
-        let val = val.trim_start_matches(field_split).trim();
+        let val = pair[split_index + field_split.len()..].trim();
 
         if key.is_empty() || val.is_empty() {
             return None;
@@ -138,7 +138,7 @@ impl Transform for KeyValue {
             let field_split = self.field_split.as_ref();
             let pairs = value.split(&self.separator).filter_map(|pair| {
                 kv_parser(
-                    pair.to_string(),
+                    pair,
                     &field_split?,
                     &self.trim_key,
                     &self.trim_value,
@@ -329,7 +329,7 @@ mod tests {
             None,
             None,
         );
-        assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
+        assert_eq!(log[&"foo".into()], Value::Bytes("=bar".into()));
         assert_eq!(log[&"beep".into()], Value::Bytes("bop=bap".into()));
         assert_eq!(log[&"score".into()], Value::Integer(10));
     }
