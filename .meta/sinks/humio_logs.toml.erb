@@ -54,6 +54,16 @@ examples = ["${HUMIO_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
 required = true
 description = "Your Humio ingestion token."
 
+[sinks.splunk_hec.options.source]
+type = "string"
+common = false
+examples = ["/var/log/syslog", "UDP:514"]
+required = false
+description = """\
+The source of events sent to this sink. Typically the filename the logs \
+originated from. Maps to @source in Humio.
+"""
+
 [sinks.humio_logs.options.host]
 type = "string"
 default = "https://cloud.humio.com"

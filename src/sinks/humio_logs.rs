@@ -13,6 +13,7 @@ const HOST: &str = "https://cloud.humio.com";
 pub struct HumioLogsConfig {
     token: String,
     host: Option<String>,
+    source: Option<String>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -72,6 +73,7 @@ impl HumioLogsConfig {
         HecSinkConfig {
             token: self.token.clone(),
             host,
+            source: self.source.clone(),
             encoding: self.encoding.clone().transmute(),
             compression: self.compression,
             batch: self.batch,
@@ -166,6 +168,34 @@ mod integration_tests {
                     .as_str()
                     .unwrap()
             );
+            assert!(
+                entry.error.is_none(),
+                "Humio encountered an error parsing this message: {}",
+                entry.error_msg.unwrap_or("no error message".to_string())
+            );
+        });
+    }
+
+    #[test]
+    fn humio_insert_source() {
+        let mut rt = runtime();
+        let cx = SinkContext::new_test();
+
+        rt.block_on_std(async move {
+            let repo = create_repository().await;
+
+            let mut config = config(&repo.default_ingest_token);
+            config.source = Some("/var/log/syslog".to_string());
+
+            let (sink, _) = config.build(cx).unwrap();
+
+            let message = random_string(100);
+            let event = Event::from(message.clone());
+            sink.send(event).compat().await.unwrap();
+
+            let entry = find_entry(repo.name.as_str(), message.as_str()).await;
+
+            assert_eq!(entry.source, Some("/var/log/syslog".to_owned()));
             assert!(
                 entry.error.is_none(),
                 "Humio encountered an error parsing this message: {}",
@@ -303,6 +333,9 @@ mutation {{
 
         #[serde(rename = "@timezone")]
         timezone: String,
+
+        #[serde(rename = "@source")]
+        source: Option<String>,
 
         // fields parsed from ingested log
         #[serde(flatten)]
