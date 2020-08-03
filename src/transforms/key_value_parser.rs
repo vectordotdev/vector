@@ -27,10 +27,10 @@ pub struct KeyValueConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new::<KeyValueConfig>("kv_parser")
+    TransformDescription::new::<KeyValueConfig>("key_value_parser")
 }
 
-#[typetag::serde(name = "kv_parser")]
+#[typetag::serde(name = "key_value_parser")]
 impl TransformConfig for KeyValueConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let field = self
@@ -62,7 +62,7 @@ impl TransformConfig for KeyValueConfig {
     }
 
     fn transform_type(&self) -> &'static str {
-        "kv_parser"
+        "key_value_parser"
     }
 }
 
@@ -80,7 +80,7 @@ pub struct KeyValue {
 
 fn kv_parser(
     pair: String,
-    field_split: &String,
+    field_split: &str,
     trim_key: &Option<String>,
     trim_value: &Option<String>,
 ) -> Option<(Atom, String)> {
@@ -134,10 +134,11 @@ impl Transform for KeyValue {
         let value = log.get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
+            let field_split = self.field_split.as_ref();
             let pairs = value.split(&self.separator).filter_map(|pair| {
                 kv_parser(
                     pair.to_string(),
-                    &self.field_split,
+                    &field_split?,
                     &self.trim_key,
                     &self.trim_value,
                 )
@@ -238,7 +239,7 @@ mod tests {
             "foo=bar beep=bop",
             " ".to_string(),
             "=".to_string(),
-            false,
+            true,
             &[],
             None,
             None,
