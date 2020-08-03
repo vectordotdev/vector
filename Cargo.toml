@@ -32,6 +32,7 @@ members = [
   "lib/tracing-limit",
   "lib/vector-wasm",
   "lib/k8s-test-framework",
+  "lib/prometheus-parser",
 ]
 
 [dependencies]
@@ -262,7 +263,7 @@ sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["rdkafka"]
 sources-logplex = ["warp", "sources-tls"]
-sources-prometheus = []
+sources-prometheus = ["nom"]
 sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls"]
 sources-splunk_hec = ["bytesize", "warp", "sources-tls"]
 sources-statsd = ["tokio-util/udp"]

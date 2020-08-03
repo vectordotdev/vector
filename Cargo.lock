@@ -3136,6 +3136,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "prometheus-parser"
+version = "0.1.0"
+dependencies = [
+ "nom 5.1.2",
+]
+
+[[package]]
 name = "prost"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
