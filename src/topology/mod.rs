@@ -25,9 +25,8 @@ use indexmap::IndexMap;
 use std::{
     collections::{HashMap, HashSet},
     panic::AssertUnwindSafe,
-    time::{Duration, Instant},
 };
-use tokio::time::{delay_until, interval};
+use tokio::time::{delay_until, interval, Duration, Instant};
 use tracing_futures::Instrument;
 
 // TODO: Result is only for compat, remove when not needed
@@ -155,7 +154,7 @@ impl RunningTopology {
         // If we reach the deadline, this future will print out which components won't
         // gracefully shutdown since we will start to forcefully shutdown the sources.
         let mut check_handles2 = check_handles.clone();
-        let timeout = delay_until(tokio::time::Instant::from_std(deadline))
+        let timeout = delay_until(deadline)
             .map(move |_| {
                 // Remove all tasks that have shutdown.
                 check_handles2.retain(|_name, handles| {
@@ -176,7 +175,7 @@ impl RunningTopology {
             .compat();
 
         // Reports in intervals which componenets are still running.
-        let reporter = interval(tokio::time::Duration::from_secs(5))
+        let reporter = interval(Duration::from_secs(5))
             .inspect(move |_| {
                 // Remove all tasks that have shutdown.
                 check_handles.retain(|_name, handles| {
