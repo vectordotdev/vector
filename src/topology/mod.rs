@@ -154,25 +154,23 @@ impl RunningTopology {
         // If we reach the deadline, this future will print out which components won't
         // gracefully shutdown since we will start to forcefully shutdown the sources.
         let mut check_handles2 = check_handles.clone();
-        let timeout = delay_until(deadline)
-            .map(move |_| {
-                // Remove all tasks that have shutdown.
-                check_handles2.retain(|_name, handles| {
-                    retain(handles, |handle| {
-                        handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
-                    });
-                    !handles.is_empty()
+        let timeout = delay_until(deadline).map(move |_| {
+            // Remove all tasks that have shutdown.
+            check_handles2.retain(|_name, handles| {
+                retain(handles, |handle| {
+                    handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
                 });
-                let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
+                !handles.is_empty()
+            });
+            let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
 
-                error!(
-                    "Failed to gracefully shut down in time. Killing: {}",
-                    remaining_components.join(", ")
-                );
+            error!(
+                "Failed to gracefully shut down in time. Killing: {}",
+                remaining_components.join(", ")
+            );
 
-                Ok(())
-            })
-            .compat();
+            Ok(())
+        });
 
         // Reports in intervals which componenets are still running.
         let reporter = interval(Duration::from_secs(5))
@@ -201,21 +199,22 @@ impl RunningTopology {
             })
             .filter(|_| future::ready(false)) // Run indefinitely without emitting items
             .into_future()
-            .map(|_| Ok(()))
-            .compat();
+            .map(|_| Ok(()));
 
         // Finishes once all tasks have shutdown.
         let success = futures01::future::join_all(wait_handles)
             .map(|_| ())
-            .map_err(|_: futures01::future::SharedError<()>| ());
+            .map_err(|_: futures01::future::SharedError<()>| ())
+            .compat();
 
         // Aggregate future that ends once anything detectes that all tasks have shutdown.
-        let shutdown_complete_future =
-            futures01::future::select_all::<Vec<Box<dyn Future<Item = (), Error = ()> + Send>>>(
-                vec![Box::new(timeout), Box::new(reporter), Box::new(success)],
-            )
-            .map(|_| ())
-            .map_err(|_| ());
+        let shutdown_complete_future = future::select_all(vec![
+            Box::pin(timeout) as future::BoxFuture<'static, Result<(), ()>>,
+            Box::pin(reporter) as future::BoxFuture<'static, Result<(), ()>>,
+            Box::pin(success) as future::BoxFuture<'static, Result<(), ()>>,
+        ])
+        .map(|(result, _, _)| result.map(|_| ()).map_err(|_| ()))
+        .compat();
 
         // Now kick off the shutdown process by shutting down the sources.
         let source_shutdown_complete = self.shutdown_coordinator.shutdown_all(deadline);
