@@ -1,0 +1,29 @@
+[transforms.checkpoint_parser]
+  drop_field = true
+  field = "checkpoint_data"
+  field_split = ":"
+  inputs = ["prod_logstash"]
+  separator = ";"
+  target_field = "data"
+  trim_key = "\""
+  trim_value = "\""
+  type = "kv_parser"
+  types.flags = "int"
+
+
+[[tests]]
+  name = "test key value parser"
+
+  [[tests.inputs]]
+    insert_at = "key_value_parser"
+    type = "log"
+    log_fields.checkpoint_data = """
+     action:\"Accept\"; flags:\"802832\"; ifdir:\"inbound\"; ifname:\"eth2-05\"; logid:\"6\"; loguid:\"{0x5f0fa4d6,0x1,0x696ac072,0xc28d839a}\";
+    """
+
+    [[tests.outputs]]
+      extract_from = "key_value_parser"
+      [[tests.outputs.conditions]]
+        type = "check_fields"
+        "data.action.eq" = "Accept"
+        "data.flags.eq" = 802832
