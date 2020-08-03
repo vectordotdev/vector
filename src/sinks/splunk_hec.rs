@@ -37,6 +37,7 @@ pub struct HecSinkConfig {
     #[serde(default)]
     pub indexed_fields: Vec<Atom>,
     pub index: Option<String>,
+    pub sourcetype: Option<String>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -131,8 +132,6 @@ impl HttpSink for HecSinkConfig {
         };
         let timestamp = (timestamp.timestamp_millis() as f64) / 1000f64;
 
-        let sourcetype = event.get(&event::log_schema().source_type_key()).cloned();
-
         let fields = self
             .indexed_fields
             .iter()
@@ -162,8 +161,7 @@ impl HttpSink for HecSinkConfig {
             body["index"] = json!(index);
         }
 
-        if let Some(sourcetype) = sourcetype {
-            let sourcetype = sourcetype.to_string_lossy();
+        if let Some(sourcetype) = &self.sourcetype {
             body["sourcetype"] = json!(sourcetype);
         }
 
@@ -384,12 +382,11 @@ mod integration_tests {
     // It usually takes ~1 second for the event to show up in search, so poll until
     // we see it.
     async fn find_entry(message: &str) -> serde_json::value::Value {
-        let value = Some(message);
         for _ in 0..20usize {
             match recent_entries(None)
                 .await
                 .into_iter()
-                .find(|entry| entry["message"].as_str() == value)
+                .find(|entry| entry["_raw"].as_str().unwrap_or("").contains(&message))
             {
                 Some(value) => return value,
                 None => std::thread::sleep(std::time::Duration::from_millis(100)),
@@ -527,15 +524,14 @@ mod integration_tests {
 
         rt.block_on_std(async move {
             let indexed_fields = vec![Atom::from("asdf")];
-            let config = config(Encoding::Json, indexed_fields).await;
+            let mut config = config(Encoding::Json, indexed_fields).await;
+            config.sourcetype = Some("_json".to_string());
+
             let (sink, _) = config.build(cx).unwrap();
 
             let message = random_string(100);
             let mut event = Event::from(message.clone());
             event.as_mut_log().insert("asdf", "hello");
-            event
-                .as_mut_log()
-                .insert(event::log_schema().source_type_key(), "file");
             sink.send(event).compat().await.unwrap();
 
             let entry = find_entry(message.as_str()).await;
@@ -544,7 +540,7 @@ mod integration_tests {
             let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
             assert_eq!("hello", asdf);
             let sourcetype = entry["sourcetype"].as_str().unwrap();
-            assert_eq!("file", sourcetype);
+            assert_eq!("_json", sourcetype);
         });
     }
 
