@@ -164,28 +164,43 @@ fn parse_escaped_string(input: &str) -> nom::IResult<&str, String> {
 mod test {
     use super::*;
 
-    fn wrap(s: &str) -> String {
-        format!("\"{}\"", s)
-    }
-
     #[test]
     fn test_parse_escaped_string() {
-        let (_, r) = parse_escaped_string(&wrap("")).unwrap();
+        fn wrap(s: &str) -> String {
+            format!("  \t \"{}\"  .", s)
+        }
+
+        // parser should not consume more that it needed
+        let tail = "  .";
+
+        let input = wrap("");
+        let (left, r) = parse_escaped_string(&input).unwrap();
+        assert_eq!(left, tail);
         assert_eq!(r, "");
 
-        let (_, r) = parse_escaped_string(&wrap(r#"a\\ asdf"#)).unwrap();
+        let input = wrap(r#"a\\ asdf"#);
+        let (left, r) = parse_escaped_string(&input).unwrap();
+        assert_eq!(left, tail);
         assert_eq!(r, "a\\ asdf");
 
-        let (_, r) = parse_escaped_string(&wrap(r#"\"\""#)).unwrap();
+        let input = wrap(r#"\"\""#);
+        let (left, r) = parse_escaped_string(&input).unwrap();
+        assert_eq!(left, tail);
         assert_eq!(r, "\"\"");
 
-        let (_, r) = parse_escaped_string(&wrap(r#"\"\\\n"#)).unwrap();
+        let input = wrap(r#"\"\\\n"#);
+        let (left, r) = parse_escaped_string(&input).unwrap();
+        assert_eq!(left, tail);
         assert_eq!(r, "\"\\\n");
 
-        let (_, r) = parse_escaped_string(&wrap(r#"\\n"#)).unwrap();
+        let input = wrap(r#"\\n"#);
+        let (left, r) = parse_escaped_string(&input).unwrap();
+        assert_eq!(left, tail);
         assert_eq!(r, "\\n");
 
-        let (_, r) = parse_escaped_string(&wrap(r#"  😂  "#)).unwrap();
+        let input = wrap(r#"  😂  "#);
+        let (left, r) = parse_escaped_string(&input).unwrap();
+        assert_eq!(left, tail);
         assert_eq!(r, "  😂  ");
     }
 }
