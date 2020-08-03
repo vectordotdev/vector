@@ -85,26 +85,20 @@ fn kv_parser(
     trim_value: &Option<String>,
 ) -> Option<(Atom, String)> {
     let pair = pair.trim();
-    let mut field;
 
-    if field_split.is_empty() {
+    let fields = if field_split.is_empty() {
         let mut kv_pair = pair.split_whitespace();
-        let key = kv_pair.nth(0)?;
-        let val = kv_pair.nth(1)?;
-        let count = kv_pair.count();
-
-        if count < 2 {
-            return None;
-        } else if count > 2 {
+        let key = kv_pair.next()?;
+        let val = kv_pair.next()?;
+        if kv_pair.next().is_some() {
             error!(
-                message = "KV parser expected 2 values, but got {count}",
-                count = count,
+                message = "KV parser saw more than one separator",
                 rate_limit_secs = 30
             );
             return None;
         }
 
-        field = [key, val];
+        (key, val)
     } else {
         let split_index = pair.find(field_split).unwrap_or(0);
         let (key, val) = pair.split_at(split_index);
@@ -115,17 +109,24 @@ fn kv_parser(
             return None;
         }
 
-        field = [key, val];
-    }
+        (key, val)
+    };
 
-    for (i, trim) in [trim_key, trim_value].iter().enumerate() {
-        if let Some(trim) = trim {
-            let trim_chars: Vec<char> = trim.chars().collect();
-            field[i] = field[i].trim_matches(&trim_chars as &[_]);
-        }
-    }
+    let key = if let Some(trim_key) = trim_key {
+        let trim_key: Vec<char> = trim_key.chars().collect();
+        fields.0.trim_matches(&trim_key as &[_])
+    } else {
+        fields.0
+    };
 
-    Some((Atom::from(field[0]), field[1].to_string()))
+    let val = if let Some(trim_value) = trim_value {
+        let trim_val: Vec<char> = trim_value.chars().collect();
+        fields.1.trim_matches(&trim_val as &[_])
+    } else {
+        fields.1
+    };
+
+    Some((Atom::from(key), val.to_string()))
 }
 
 impl Transform for KeyValue {
