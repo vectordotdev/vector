@@ -36,11 +36,14 @@ fn pipe() {
 
     let mut rt = runtime();
     rt.block_on_std(async move {
-        let output_lines = CountReceiver::receive_lines(out_addr);
+        let mut output_lines = CountReceiver::receive_lines(out_addr);
 
         let (topology, _crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
+
+        // Wait for output to connect
+        output_lines.connected().await;
 
         let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
         send_lines(in_addr, input_lines.clone()).await.unwrap();
@@ -84,11 +87,14 @@ fn sample() {
 
     let mut rt = runtime();
     rt.block_on_std(async move {
-        let output_lines = CountReceiver::receive_lines(out_addr);
+        let mut output_lines = CountReceiver::receive_lines(out_addr);
 
         let (topology, _crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
+
+        // Wait for output to connect
+        output_lines.connected().await;
 
         let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
         send_lines(in_addr, input_lines.clone()).await.unwrap();
@@ -138,12 +144,16 @@ fn fork() {
 
     let mut rt = runtime();
     rt.block_on_std(async move {
-        let output_lines1 = CountReceiver::receive_lines(out_addr1);
-        let output_lines2 = CountReceiver::receive_lines(out_addr2);
+        let mut output_lines1 = CountReceiver::receive_lines(out_addr1);
+        let mut output_lines2 = CountReceiver::receive_lines(out_addr2);
 
         let (topology, _crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
+
+        // Wait for output to connect
+        output_lines1.connected().await;
+        output_lines2.connected().await;
 
         let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
         send_lines(in_addr, input_lines.clone()).await.unwrap();
@@ -194,13 +204,17 @@ fn merge_and_fork() {
 
     let mut rt = runtime();
     rt.block_on_std(async move {
-        let output_lines1 = CountReceiver::receive_lines(out_addr1);
-        let output_lines2 = CountReceiver::receive_lines(out_addr2);
+        let mut output_lines1 = CountReceiver::receive_lines(out_addr1);
+        let mut output_lines2 = CountReceiver::receive_lines(out_addr2);
 
         let (topology, _crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
         wait_for_tcp(in_addr1);
         wait_for_tcp(in_addr2);
+
+        // Wait for output to connect
+        output_lines1.connected().await;
+        output_lines2.connected().await;
 
         let input_lines1 = random_lines(100).take(num_lines).collect::<Vec<_>>();
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
