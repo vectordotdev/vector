@@ -41,7 +41,7 @@ pub struct HecSinkConfig {
     #[serde(default)]
     pub indexed_fields: Vec<Atom>,
     pub index: Option<String>,
-    pub sourcetype: Option<String>,
+    pub sourcetype: Option<Template>,
     pub source: Option<Template>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
@@ -188,7 +188,7 @@ impl HttpSink for HecSinkConfig {
             body["source"] = json!(source);
         }
 
-        if let Some(sourcetype) = &self.sourcetype {
+        if let Some(sourcetype) = &sourcetype {
             body["sourcetype"] = json!(sourcetype);
         }
 
