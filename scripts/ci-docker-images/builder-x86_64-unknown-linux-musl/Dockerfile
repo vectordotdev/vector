@@ -288,7 +288,7 @@ RUN mkdir -p ~/.cargo
 RUN printf "[build]\ntarget = \"$TARGET\"\n" > ~/.cargo/config
 
 # In case of non-native target, install QEMU-user to enable running `cargo test`
-RUN if [ -n "GNU_TARGET"]; then apt-get update && apt-get install -y qemu-user; fi
+RUN if [ -n "${GNU_TARGET}"]; then apt-get update && apt-get install -y qemu-user; fi
 
 # Add dependencies for running tests
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y tzdata ca-certificates
