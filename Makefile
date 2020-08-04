@@ -231,6 +231,16 @@ ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
+test-integration-humio: ## Runs Humio integration tests
+ifeq ($(AUTOSPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-humio
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features humio-integration-tests ::humio:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
+endif
+
+
 test-integration-influxdb: ## Runs InfluxDB integration tests
 ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-influxdb
@@ -276,7 +286,7 @@ ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-splunk
 	sleep 5 # Many services are very lazy... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features splunk-integration-tests ::splunk:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features splunk-integration-tests ::splunk_hec:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
@@ -454,6 +464,9 @@ release-rollback: ## Rollback pending release changes
 
 release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh
+
+release-helm: ## Package and release Helm Chart
+	@scripts/release-helm.sh
 
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read

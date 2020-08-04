@@ -4,11 +4,12 @@ use crate::{
     sources::util::{ErrorMessage, HttpSource},
     tls::TlsConfig,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    Pipeline,
 };
+use async_trait::async_trait;
 use bytes05::{Bytes, BytesMut};
 use chrono::Utc;
 use codec::BytesDelimitedCodec;
-use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::net::SocketAddr;
@@ -61,13 +62,24 @@ impl HttpSource for SimpleHttpSource {
 }
 
 #[typetag::serde(name = "http")]
+#[async_trait]
 impl SourceConfig for SimpleHttpConfig {
     fn build(
+        &self,
+        _name: &str,
+        _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
+        _out: Pipeline,
+    ) -> crate::Result<super::Source> {
+        unimplemented!()
+    }
+
+    async fn build_async(
         &self,
         _: &str,
         _: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let source = SimpleHttpSource {
             encoding: self.encoding,
@@ -205,6 +217,7 @@ mod tests {
         runtime::Runtime,
         test_util::{self, collect_n, runtime},
         topology::config::{GlobalOptions, SourceConfig},
+        Pipeline,
     };
     use futures::compat::Future01CompatExt;
     use futures01::sync::mpsc;
@@ -219,23 +232,27 @@ mod tests {
         headers: Vec<String>,
     ) -> (mpsc::Receiver<Event>, SocketAddr) {
         test_util::trace_init();
-        let (sender, recv) = mpsc::channel(100);
+        let (sender, recv) = Pipeline::new_test();
         let address = test_util::next_addr();
-        rt.spawn(
+        rt.spawn_std(async move {
             SimpleHttpConfig {
                 address,
                 encoding,
                 headers,
                 tls: None,
             }
-            .build(
+            .build_async(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 sender,
             )
-            .unwrap(),
-        );
+            .await
+            .unwrap()
+            .compat()
+            .await
+            .unwrap();
+        });
         (recv, address)
     }
 

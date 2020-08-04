@@ -102,6 +102,7 @@ jobs:
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
+      - run: echo "::add-path::/home/runner/.local/bin"
       - run: make check-component-features
 
   check-version:

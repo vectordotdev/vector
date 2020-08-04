@@ -131,7 +131,7 @@ nom = { version = "5.1.2", optional = true }
 uuid = { version = "0.7", features = ["serde", "v4"], optional = true }
 exitcode = "1.1.2"
 snafu = { version = "0.6", features = ["futures-01", "futures"] }
-url = "1.7"
+url = "2.1.1"
 base64 = { version = "0.10.1", optional = true }
 bollard = { version = "0.7.1", default-features = false, features = ["tls"], optional = true }
 listenfd = { version = "0.3.3", optional = true }
@@ -260,7 +260,7 @@ sources-generator = []
 sources-http = ["warp", "sources-tls"]
 sources-internal_metrics = []
 sources-journald = []
-sources-kafka = []
+sources-kafka = ["rdkafka"]
 sources-logplex = ["warp", "sources-tls"]
 sources-prometheus = []
 sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls"]
@@ -401,6 +401,7 @@ docker = [
   "gcp-integration-tests",
   "gcp-pubsub-integration-tests",
   "gcp-cloud-storage-integration-tests",
+  "humio-integration-tests",
   "influxdb-integration-tests",
   "kafka-integration-tests",
   "loki-integration-tests",
@@ -428,6 +429,7 @@ es-integration-tests = ["sinks-elasticsearch"]
 gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]
+humio-integration-tests = ["sinks-humio_logs"]
 influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sources-kafka", "sinks-kafka"]
 loki-integration-tests = ["sinks-loki"]
@@ -463,3 +465,6 @@ required-features = ["kubernetes-e2e-tests"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
+
+[patch.crates-io]
+warp = { git = "https://github.com/seanmonstar/warp", rev = "6777564d18b04c3d5b616a79907cfa175663c350" }

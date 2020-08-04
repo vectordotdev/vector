@@ -364,6 +364,7 @@ services:
       - dependencies-clickhouse
       - dependencies-elasticsearch
       - dependencies-gcp
+      - dependencies-humio
       - dependencies-influxdb
       - dependencies-kafka
       - dependencies-loki
@@ -397,6 +398,12 @@ services:
     command: sleep infinity
     depends_on:
       - gcloud-pubsub
+
+  dependencies-humio:
+    image: ubuntu:18.04
+    command: sleep infinity
+    depends_on:
+      - humio
 
   dependencies-influxdb:
     image: ubuntu:18.04
@@ -546,3 +553,7 @@ services:
     ports:
       - "9999:9999"
     command: influxd --reporting-disabled
+  humio:
+    image: humio/humio:1.13.1
+    ports:
+      - "8080:8080"
