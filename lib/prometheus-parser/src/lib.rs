@@ -1,6 +1,6 @@
 use nom::{
     branch::alt,
-    bytes::complete::{is_not, tag, take_while},
+    bytes::complete::{is_not, tag, take_while, take_while1},
     character::complete::char,
     combinator::{map, opt, value},
     error::ParseError,
@@ -47,7 +47,7 @@ impl MetricLine {
     fn parse_name(input: &str) -> nom::IResult<&str, String> {
         let input = trim_space(input);
         let (input, (a, b)) = pair(
-            take_while(|c: char| c.is_alphabetic() || c == '_'),
+            take_while1(|c: char| c.is_alphabetic() || c == '_'),
             take_while(|c: char| c.is_alphanumeric() || c == '_'),
         )(input)?;
         Ok((input, a.to_owned() + b))
@@ -202,5 +202,26 @@ mod test {
         let (left, r) = parse_escaped_string(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(r, "  😂  ");
+    }
+
+    #[test]
+    fn test_parse_name() {
+        fn wrap(s: &str) -> String {
+            format!("  \t {}  .", s)
+        }
+        let tail = "  .";
+
+        let input = wrap("abc_def");
+        let (left, r) = MetricLine::parse_name(&input).unwrap();
+        assert_eq!(left, tail);
+        assert_eq!(r, "abc_def");
+
+        let input = wrap("__9A0bc_def__");
+        let (left, r) = MetricLine::parse_name(&input).unwrap();
+        assert_eq!(left, tail);
+        assert_eq!(r, "__9A0bc_def__");
+
+        let input = wrap("99");
+        assert!(MetricLine::parse_name(&input).is_err());
     }
 }
