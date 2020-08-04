@@ -24,40 +24,8 @@ jobs:
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
-  check-clippy:
-    name: Clippy - Linux
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: make slim-builds
-      - run: make check-clippy
-
-  check-fmt:
-    name: Format
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: make slim-builds
-      - run: make check-fmt
-
-  check-markdown:
-    name: Markdown
+  checks:
+    name: Checks
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -71,22 +39,14 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make check-markdown
-
-  check-meta:
-    name: Meta
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: make slim-builds
       - run: make check-meta
+      - run: make check-fmt
+      - run: make check-clippy
+      - run: make check-version
+      - run: make check-scripts
+      - uses: EmbarkStudios/cargo-deny-action@v1
+        with:
+          command: check advisories
 
   check-component-features:
     name: Component Features - Linux
@@ -104,86 +64,3 @@ jobs:
       - run: make slim-builds
       - run: echo "::add-path::/home/runner/.local/bin"
       - run: make check-component-features
-
-  check-version:
-    name: Version
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v1 # v1 on purpose! v2 gives errors since it's shallow.
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: make slim-builds
-      - run: make check-version
-
-  check-scripts:
-    name: Scripts
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: make slim-builds
-      - run: make check-scripts
-
-  check-linux:
-    name: Check - Linux
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: make slim-builds
-      - run: make check
-
-  check-mac:
-    name: Check - Mac
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: bash scripts/environment/bootstrap-macos-10.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: make slim-builds
-      - run: make check
-
-  check-windows:
-    name: Check - Windows
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v1
-      - env:
-          USE_CONTAINER: none
-          RUSTFLAGS: "-D warnings"
-        run: cargo check --no-default-features --features default-msvc
-
-  check-advisories:
-    name: Advisories
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v1
-      - uses: EmbarkStudios/cargo-deny-action@v1
-        with:
-          command: check advisories
