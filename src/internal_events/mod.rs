@@ -4,7 +4,7 @@ mod blackhole;
 mod elasticsearch;
 mod file;
 mod http;
-#[cfg(all(feature = "sources-journald", feature = "unix"))]
+#[cfg(all(unix, feature = "sources-journald"))]
 mod journald;
 mod json;
 #[cfg(feature = "sources-kafka")]
@@ -34,7 +34,7 @@ pub use self::blackhole::*;
 pub use self::elasticsearch::*;
 pub use self::file::*;
 pub use self::http::*;
-#[cfg(all(feature = "sources-journald", feature = "unix"))]
+#[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
 pub use self::json::*;
 #[cfg(feature = "sources-kafka")]
