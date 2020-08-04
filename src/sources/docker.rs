@@ -1,7 +1,10 @@
 use crate::{
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
-    internal_events::{DockerContainerEventReceived, DockerEventReceived},
+    internal_events::{
+        DockerContainerEventReceived, DockerContainerUnwatch, DockerContainerWatch,
+        DockerEventReceived,
+    },
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Pipeline,
@@ -514,10 +517,9 @@ impl EventStreamBuilder {
         });
 
         let stream = self.core.docker.logs(info.id.as_str(), options);
-        info!(
-            message = "Started listening logs on docker container",
-            id = field::display(info.id.as_str())
-        );
+        emit!(DockerContainerWatch {
+            container_id: info.id.as_str()
+        });
 
         // Create event streamer
         let main_send = self.main_send.clone();
@@ -561,10 +563,9 @@ impl EventStreamBuilder {
             .await;
 
         // End of stream
-        info!(
-            message = "Stoped listening logs on docker container",
-            id = field::display(info.id.as_str())
-        );
+        emit!(DockerContainerUnwatch {
+            container_id: info.id.as_str()
+        });
 
         if let Err(error) = main_send.send(info) {
             error!(message = "Unable to return ContainerLogInfo to main", %error);

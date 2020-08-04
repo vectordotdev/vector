@@ -1,6 +1,5 @@
 use super::InternalEvent;
 use metrics::counter;
-use serde_json::Error;
 
 #[derive(Debug)]
 pub struct DockerEventReceived {
@@ -32,7 +31,7 @@ pub struct DockerContainerEventReceived<'a> {
 
 impl<'a> InternalEvent for DockerContainerEventReceived<'a> {
     fn emit_logs(&self) {
-        trace!(
+        debug!(
             message = "received one container event.",
             container_id = %self.container_id,
             action = %self.action
@@ -41,6 +40,48 @@ impl<'a> InternalEvent for DockerContainerEventReceived<'a> {
 
     fn emit_metrics(&self) {
         counter!("container_events_processed", 1,
+                 "component_kind" => "source",
+                 "component_name" => "docker",
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct DockerContainerWatch<'a> {
+    pub container_id: &'a str,
+}
+
+impl<'a> InternalEvent for DockerContainerWatch<'a> {
+    fn emit_logs(&self) {
+        info!(
+            message = "started watching for logs of container.",
+            container_id = %self.container_id,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("containers_watched", 1,
+                 "component_kind" => "source",
+                 "component_name" => "docker",
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct DockerContainerUnwatch<'a> {
+    pub container_id: &'a str,
+}
+
+impl<'a> InternalEvent for DockerContainerUnwatch<'a> {
+    fn emit_logs(&self) {
+        info!(
+            message = "stoped watching for logs of container.",
+            container_id = %self.container_id,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("containers_unwatched", 1,
                  "component_kind" => "source",
                  "component_name" => "docker",
         );
