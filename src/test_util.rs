@@ -1,6 +1,6 @@
 use crate::{event::LogEvent, runtime::Runtime, trace, Event};
 
-use futures::{compat::Stream01CompatExt, stream, SinkExt, Stream, StreamExt, TryStreamExt};
+use futures::{compat::{Stream01CompatExt, Future01CompatExt}, stream, SinkExt, Stream, StreamExt, TryStreamExt};
 use futures01::{
     future, stream as stream01, sync::mpsc, try_ready, Async, Future, Poll, Stream as Stream01,
 };
@@ -22,8 +22,8 @@ use tokio::{
     net::{TcpListener, TcpStream},
     sync::oneshot,
     task::JoinHandle,
+    time::{Duration, timeout},
 };
-use tokio01::util::FutureExt;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
 
 #[macro_export]
@@ -248,12 +248,11 @@ where
     wait_for(|| unblock(val.load(Ordering::SeqCst)))
 }
 
-pub fn shutdown_on_idle(runtime: Runtime) {
-    block_on(
-        runtime
-            .shutdown_on_idle()
-            .timeout(std::time::Duration::from_secs(10)),
-    )
+pub fn shutdown_on_idle(rt: Runtime) {
+    runtime().block_on_std(async move {
+        let fut = rt.shutdown_on_idle().compat();
+        timeout(Duration::from_secs(10), fut).await.unwrap()
+    })
     .unwrap()
 }
 
