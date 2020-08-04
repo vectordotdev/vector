@@ -301,4 +301,43 @@ mod test {
             }
         );
     }
+
+    #[test]
+    fn test_parse_value() {
+        fn wrap(s: &str) -> String {
+            format!("  \t {}  .", s)
+        }
+        let tail = "  .";
+
+        let input = wrap("+Inf");
+        let (left, r) = MetricLine::parse_value(&input).unwrap();
+        assert_eq!(left, tail);
+        assert!(r.is_infinite() && r.is_sign_positive());
+
+        let input = wrap("-Inf");
+        let (left, r) = MetricLine::parse_value(&input).unwrap();
+        assert_eq!(left, tail);
+        assert!(r.is_infinite() && r.is_sign_negative());
+
+        let input = wrap("Nan");
+        let (left, r) = MetricLine::parse_value(&input).unwrap();
+        assert_eq!(left, tail);
+        assert!(r.is_nan());
+
+        let tests = [
+            ("0", 0.0),
+            ("0.25", 0.25),
+            ("-10.25", -10.25),
+            ("-10e-25", -10e-25),
+            ("-10e+25", -10e+25),
+            ("2020", 2020.0),
+            ("1.", 1.),
+        ];
+        for (text, value) in &tests {
+            let input = wrap(text);
+            let (left, r) = MetricLine::parse_value(&input).unwrap();
+            assert_eq!(left, tail);
+            assert_eq!(r, *value);
+        }
+    }
 }
