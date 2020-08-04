@@ -754,13 +754,11 @@ mod tests {
     };
     use chrono::{TimeZone, Utc};
     use futures::compat::Future01CompatExt;
-    use futures01::{stream, sync::mpsc, Sink};
+    use futures01::{stream, sync::mpsc, Future, Sink};
     use std::net::SocketAddr;
 
     /// Splunk token
     const TOKEN: &str = "token";
-
-    const CHANNEL_CAPACITY: usize = 1000;
 
     fn source(rt: &mut Runtime) -> (mpsc::Receiver<Event>, SocketAddr) {
         source_with(rt, Some(TOKEN.to_owned()))
@@ -825,12 +823,8 @@ mod tests {
         rt: &mut Runtime,
     ) -> Vec<Event> {
         let n = messages.len();
-        assert!(
-            n <= CHANNEL_CAPACITY,
-            "To much messages for the sink channel"
-        );
         let pump = sink.send_all(stream::iter_ok(messages.into_iter().map(Into::into)));
-        let _ = rt.block_on(pump).unwrap();
+        rt.spawn(pump.map(|_| ()).map_err(|()| panic!()));
         let events = rt.block_on(collect_n(source, n)).unwrap();
 
         assert_eq!(n, events.len());
