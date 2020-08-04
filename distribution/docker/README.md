@@ -84,7 +84,7 @@ docker run timberio/vector:0.10.0-debian
 ### Architectures
 
 Vector's images are multi-arch and support the
-x86_64, ARM64, and ARMv7 architectures.
+x86_64, ARM64 architectures.
 Docker handles this transparently for you.
 
 ### Versions
