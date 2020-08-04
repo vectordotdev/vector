@@ -21,7 +21,7 @@ pub enum MetricKind {
 
 /// Each line of Prometheus text format.
 /// We discard empty lines, comments, and timestamps.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum MetricLine {
     Type {
         metric_name: String,
@@ -62,24 +62,6 @@ impl MetricLine {
             value(f64::NAN, tag("Nan")),
             double,
         ))(input)
-    }
-
-    /// `# TYPE <metric_name> <metric_type>`
-    fn parse_type(input: &str) -> nom::IResult<&str, Self> {
-        let input = trim_space(input);
-        let (input, _) = tag("#")(input)?;
-        let input = trim_space(input);
-        let (input, _) = tag("TYPE")(input)?;
-        let (input, metric_name) = Self::parse_name(input)?;
-        let input = trim_space(input);
-        let (input, kind) = alt((
-            value(MetricKind::Counter, tag("counter")),
-            value(MetricKind::Gauge, tag("gauge")),
-            value(MetricKind::Summary, tag("summary")),
-            value(MetricKind::Histogram, tag("histogram")),
-            value(MetricKind::Untyped, tag("untyped")),
-        ))(input)?;
-        Ok((input, Self::Type { metric_name, kind }))
     }
 
     fn parse_name_value(input: &str) -> nom::IResult<&str, (String, String)> {
@@ -134,8 +116,35 @@ impl MetricLine {
         ))
     }
 
-    pub fn parse(input: &str) -> nom::IResult<&str, Self> {
-        alt((Self::parse_type, Self::parse_metric))(input)
+    /// `# TYPE <metric_name> <metric_type>`
+    fn parse_type(input: &str) -> nom::IResult<&str, Self> {
+        let input = trim_space(input);
+        let (input, _) = tag("#")(input)?;
+        let input = trim_space(input);
+        let (input, _) = tag("TYPE")(input)?;
+        let (input, metric_name) = Self::parse_name(input)?;
+        let input = trim_space(input);
+        let (input, kind) = alt((
+            value(MetricKind::Counter, tag("counter")),
+            value(MetricKind::Gauge, tag("gauge")),
+            value(MetricKind::Summary, tag("summary")),
+            value(MetricKind::Histogram, tag("histogram")),
+            value(MetricKind::Untyped, tag("untyped")),
+        ))(input)?;
+        Ok((input, Self::Type { metric_name, kind }))
+    }
+
+    /// Parse a single line.
+    pub fn parse(input: &str) -> nom::IResult<&str, Option<Self>> {
+        let input = input.trim();
+        if input.is_empty() {
+            return Ok((input, None));
+        }
+        alt((
+            map(Self::parse_metric, Some),
+            map(Self::parse_type, Some),
+            value(None, char('#')),
+        ))(input)
     }
 }
 
@@ -406,5 +415,48 @@ mod test {
 
         let input = wrap(r#"{ a="b" ,, c="d" }"#);
         assert!(MetricLine::parse_labels(&input).is_err());
+    }
+
+    #[test]
+    fn test_parse_line() {
+        let input = r##"
+            # HELP http_requests_total The total number of HTTP requests.
+            # TYPE http_requests_total counter
+            http_requests_total{method="post",code="200"} 1027 1395066363000
+            http_requests_total{method="post",code="400"}    3 1395066363000
+
+            # Escaping in label values:
+            msdos_file_access_time_seconds{path="C:\\DIR\\FILE.TXT",error="Cannot find file:\n\"FILE.TXT\""} 1.458255915e9
+
+            # Minimalistic line:
+            metric_without_timestamp_and_labels 12.47
+
+            # A weird metric from before the epoch:
+            something_weird{problem="division by zero"} +Inf -3982045
+
+            # A histogram, which has a pretty complex representation in the text format:
+            # HELP http_request_duration_seconds A histogram of the request duration.
+            # TYPE http_request_duration_seconds histogram
+            http_request_duration_seconds_bucket{le="0.05"} 24054
+            http_request_duration_seconds_bucket{le="0.1"} 33444
+            http_request_duration_seconds_bucket{le="0.2"} 100392
+            http_request_duration_seconds_bucket{le="0.5"} 129389
+            http_request_duration_seconds_bucket{le="1"} 133988
+            http_request_duration_seconds_bucket{le="+Inf"} 144320
+            http_request_duration_seconds_sum 53423
+            http_request_duration_seconds_count 144320
+
+            # Finally a summary, which has a complex representation, too:
+            # HELP rpc_duration_seconds A summary of the RPC duration in seconds.
+            # TYPE rpc_duration_seconds summary
+            rpc_duration_seconds{quantile="0.01"} 3102
+            rpc_duration_seconds{quantile="0.05"} 3272
+            rpc_duration_seconds{quantile="0.5"} 4773
+            rpc_duration_seconds{quantile="0.9"} 9001
+            rpc_duration_seconds{quantile="0.99"} 76656
+            rpc_duration_seconds_sum 1.7560473e+07
+            rpc_duration_seconds_count 2693
+            "##;
+        assert!(input.lines().map(MetricLine::parse).all(|r| r.is_ok()));
     }
 }
