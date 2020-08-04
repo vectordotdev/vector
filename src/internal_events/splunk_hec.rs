@@ -6,7 +6,7 @@ use serde_json::Error;
 pub(crate) use self::source::*;
 
 #[derive(Debug)]
-pub struct SplunkEventSent {
+pub(crate) struct SplunkEventSent {
     pub byte_size: usize,
 }
 
@@ -26,7 +26,7 @@ impl InternalEvent for SplunkEventSent {
 }
 
 #[derive(Debug)]
-pub struct SplunkEventEncodeError {
+pub(crate) struct SplunkEventEncodeError {
     pub error: Error,
 }
 
@@ -55,7 +55,7 @@ mod source {
     use metrics::counter;
 
     #[derive(Debug)]
-    pub struct SplunkHECEventReceived;
+    pub(crate) struct SplunkHECEventReceived;
 
     impl InternalEvent for SplunkHECEventReceived {
         fn emit_logs(&self) {
@@ -72,7 +72,7 @@ mod source {
     }
 
     #[derive(Debug)]
-    pub struct SplunkHECRequestReceived<'a> {
+    pub(crate) struct SplunkHECRequestReceived<'a> {
         pub path: &'a str,
     }
 
@@ -95,7 +95,7 @@ mod source {
     }
 
     #[derive(Debug)]
-    pub struct SplunkHECRequestBodyInvalid {
+    pub(crate) struct SplunkHECRequestBodyInvalid {
         pub error: std::io::Error,
     }
 
@@ -112,7 +112,7 @@ mod source {
     }
 
     #[derive(Debug)]
-    pub struct SplunkHECRequestError {
+    pub(crate) struct SplunkHECRequestError {
         pub(crate) error: ApiError,
     }
 
