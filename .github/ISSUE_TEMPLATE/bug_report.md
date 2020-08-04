@@ -1,7 +1,10 @@
 ---
 name: Bug Report
 about: Let us know about an unexpected error, a crash, or an incorrect behavior.
-labels: Type: Bug
+labels: 'type: bug'
+assignees: ''
+title: ''
+
 ---
 
 <!--
