@@ -734,7 +734,7 @@ mod integration_tests {
                     let _ = sink
                         .send_all(events.map(move |mut event| {
                             if doit {
-                                event.as_mut_log().insert("message", 1);
+                                event.as_mut_log().insert("_type", 1);
                             }
                             doit = true;
                             event
