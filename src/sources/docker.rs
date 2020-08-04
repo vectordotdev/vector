@@ -724,8 +724,8 @@ impl ContainerLogInfo {
 
                 self.last_log = Some((timestamp, self.generation));
 
-                let log = splitter.next()?;
-                let remove_len = message.len() - log.len();
+                let log_len = splitter.next().map(|log| log.len()).unwrap_or(0);
+                let remove_len = message.len() - log_len;
                 bytes_message.advance(remove_len);
 
                 // Provide the timestamp.
