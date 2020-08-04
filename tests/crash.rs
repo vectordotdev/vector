@@ -73,13 +73,16 @@ fn test_sink_panic() {
 
     let mut rt = runtime();
     rt.block_on_std(async move {
-        let output_lines = CountReceiver::receive_lines(out_addr);
+        let mut output_lines = CountReceiver::receive_lines(out_addr);
 
         std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
         let (topology, crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
         std::thread::sleep(std::time::Duration::from_millis(100));
+
+        // Wait for output to connect
+        output_lines.connected().await;
 
         let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
         send_lines(in_addr, input_lines.clone()).await.unwrap();
@@ -155,12 +158,15 @@ fn test_sink_error() {
 
     let mut rt = runtime();
     rt.block_on_std(async move {
-        let output_lines = CountReceiver::receive_lines(out_addr);
+        let mut output_lines = CountReceiver::receive_lines(out_addr);
 
         let (topology, crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
         std::thread::sleep(std::time::Duration::from_millis(100));
+
+        // Wait for output to connect
+        output_lines.connected().await;
 
         let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
         send_lines(in_addr, input_lines.clone()).await.unwrap();
@@ -222,12 +228,15 @@ fn test_source_error() {
 
     let mut rt = runtime();
     rt.block_on_std(async move {
-        let output_lines = CountReceiver::receive_lines(out_addr);
+        let mut output_lines = CountReceiver::receive_lines(out_addr);
 
         let (topology, crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
         std::thread::sleep(std::time::Duration::from_millis(100));
+
+        // Wait for output to connect
+        output_lines.connected().await;
 
         let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
         send_lines(in_addr, input_lines.clone()).await.unwrap();
@@ -291,13 +300,16 @@ fn test_source_panic() {
 
     let mut rt = runtime();
     rt.block_on_std(async move {
-        let output_lines = CountReceiver::receive_lines(out_addr);
+        let mut output_lines = CountReceiver::receive_lines(out_addr);
 
         std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
         let (topology, crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
         std::thread::sleep(std::time::Duration::from_millis(100));
+
+        // Wait for output to connect
+        output_lines.connected().await;
 
         let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
         send_lines(in_addr, input_lines.clone()).await.unwrap();
