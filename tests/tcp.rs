@@ -207,6 +207,8 @@ fn merge_and_fork() {
         send_lines(in_addr1, input_lines1.clone()).await.unwrap();
         send_lines(in_addr2, input_lines2.clone()).await.unwrap();
 
+        tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+
         // Shut down server
         topology.stop().compat().await.unwrap();
 
@@ -289,7 +291,7 @@ async fn healthcheck() {
         None.into(),
     );
 
-    assert!(healthcheck.compat().await.is_ok());
+    assert!(healthcheck.await.is_ok());
 
     let bad_addr = next_addr();
     let bad_healthcheck = vector::sinks::util::tcp::tcp_healthcheck(
@@ -299,5 +301,5 @@ async fn healthcheck() {
         None.into(),
     );
 
-    assert!(bad_healthcheck.compat().await.is_err());
+    assert!(bad_healthcheck.await.is_err());
 }

@@ -107,7 +107,7 @@ where
                     }
 
                     RetryAction::DontRetry(reason) => {
-                        warn!(message = "request is not retryable; dropping the request.", %reason);
+                        error!(message = "request is not retryable; dropping the request.", %reason);
                         None
                     }
 
@@ -129,10 +129,10 @@ where
                         None
                     }
                 } else if error.downcast_ref::<Elapsed>().is_some() {
-                    warn!("request timedout.");
+                    warn!("request timed out.");
                     Some(self.build_retry())
                 } else {
-                    warn!(message = "unexpected error type.", %error);
+                    error!(message = "unexpected error type.", %error);
                     None
                 }
             }
