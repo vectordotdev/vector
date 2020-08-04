@@ -136,18 +136,14 @@ impl HttpSink for HecSinkConfig {
                 .ok()
         });
 
-        let source = self
-            .source
-            .as_ref()
-            .map(|source| {
-                source
-                    .render_string(&event)
-                    .map_err(|missing_keys| {
-                        emit!(SplunkSourceMissingKeys { keys: missing_keys });
-                    })
-                    .ok()
-            })
-            .unwrap_or(None);
+        let source = self.source.as_ref().and_then(|source| {
+            source
+                .render_string(&event)
+                .map_err(|missing_keys| {
+                    emit!(SplunkSourceMissingKeys { keys: missing_keys });
+                })
+                .ok()
+        });
 
         let mut event = event.into_log();
 
