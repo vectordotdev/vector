@@ -166,3 +166,29 @@ impl<'a> InternalEvent for DockerTimestampParseFailed<'a> {
         );
     }
 }
+
+#[derive(Debug)]
+pub struct DockerLoggingDriverUnsupported<'a> {
+    pub container_id: &'a str,
+    pub error: Error,
+}
+
+impl<'a> InternalEvent for DockerLoggingDriverUnsupported<'a> {
+    fn emit_logs(&self) {
+        error!(
+            message = r#"docker engine is not using either `jsonfile` or `journald`
+                logging driver. Please enable one of these logging drivers
+                to get logs from the docker daemon."#,
+            error = %self.error,
+            container_id = ?self.container_id,
+            rate_limit_secs = 10
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("logging_driver_errors", 1,
+                 "component_kind" => "source",
+                 "component_name" => "docker",
+        );
+    }
+}

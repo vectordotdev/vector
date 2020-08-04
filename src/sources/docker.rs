@@ -4,7 +4,7 @@ use crate::{
     internal_events::{
         DockerCommunicationError, DockerContainerEventReceived, DockerContainerMetadataFetchFailed,
         DockerContainerUnwatch, DockerContainerWatch, DockerEventReceived,
-        DockerTimestampParseFailed,
+        DockerLoggingDriverUnsupported, DockerTimestampParseFailed,
     },
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -550,11 +550,10 @@ impl EventStreamBuilder {
                             DockerErrorKind::DockerResponseServerError { status_code, .. }
                                 if *status_code == http::StatusCode::NOT_IMPLEMENTED =>
                             {
-                                error!(
-                                    r#"docker engine is not using either `jsonfile` or `journald`
-                                        logging driver. Please enable one of these logging drivers
-                                        to get logs from the docker daemon."#
-                                )
+                                emit!(DockerLoggingDriverUnsupported {
+                                    error,
+                                    container_id: info.id.as_str(),
+                                })
                             }
                             _ => emit!(DockerCommunicationError {
                                 error,
