@@ -19,38 +19,42 @@ pub enum MetricKind {
     Untyped,
 }
 
-/// Each line of Prometheus text format.
-/// We discard empty lines, comments, and timestamps.
 #[derive(Debug, Clone, PartialEq)]
-pub enum MetricLine {
-    Type {
-        metric_name: String,
-        kind: MetricKind,
-    },
-    Metric {
-        name: String,
-        labels: BTreeMap<String, String>,
-        value: f64,
-    },
+pub struct Header {
+    pub metric_name: String,
+    pub kind: MetricKind,
 }
 
-fn trim_space(input: &str) -> &str {
-    input.trim_start_matches(|c| c == ' ' || c == '\t')
+#[derive(Debug, Clone, PartialEq)]
+pub struct Metric {
+    pub name: String,
+    pub labels: BTreeMap<String, String>,
+    pub value: f64,
 }
 
-fn sp<'a, E: ParseError<&'a str>>(i: &'a str) -> nom::IResult<&'a str, &'a str, E> {
-    take_while(|c| c == ' ' || c == '\t')(i)
-}
-
-impl MetricLine {
-    /// Name matches the regex `[a-zA-Z_][a-zA-Z0-9_]*`.
-    fn parse_name(input: &str) -> nom::IResult<&str, String> {
+impl Metric {
+    /// Parse a single line with format
+    ///
+    /// ``` text
+    /// metric_name [
+    ///   "{" label_name "=" `"` label_value `"` { "," label_name "=" `"` label_value `"` } [ "," ] "}"
+    /// ] value [ timestamp ]
+    /// ```
+    ///
+    /// We don't parse timestamp.
+    fn parse(input: &str) -> nom::IResult<&str, Self> {
         let input = trim_space(input);
-        let (input, (a, b)) = pair(
-            take_while1(|c: char| c.is_alphabetic() || c == '_'),
-            take_while(|c: char| c.is_alphanumeric() || c == '_'),
-        )(input)?;
-        Ok((input, a.to_owned() + b))
+        let (input, name) = parse_name(input)?;
+        let (input, labels) = Self::parse_labels(input)?;
+        let (input, value) = Self::parse_value(input)?;
+        Ok((
+            input,
+            Metric {
+                name,
+                labels,
+                value,
+            },
+        ))
     }
 
     /// Float value, and +Inf, -Int, Nan.
@@ -67,9 +71,9 @@ impl MetricLine {
     fn parse_name_value(input: &str) -> nom::IResult<&str, (String, String)> {
         map(
             tuple((
-                Self::parse_name,
+                parse_name,
                 preceded(sp, char('=')),
-                parse_escaped_string,
+                Self::parse_escaped_string,
             )),
             |(name, _, value)| (name, value),
         )(input)
@@ -92,37 +96,57 @@ impl MetricLine {
         }
     }
 
-    /// Parse a single line with format
-    ///
-    /// ``` text
-    /// metric_name [
-    ///   "{" label_name "=" `"` label_value `"` { "," label_name "=" `"` label_value `"` } [ "," ] "}"
-    /// ] value [ timestamp ]
-    /// ```
-    ///
-    /// We don't parse timestamp.
-    fn parse_metric(input: &str) -> nom::IResult<&str, Self> {
-        let input = trim_space(input);
-        let (input, name) = Self::parse_name(input)?;
-        let (input, labels) = Self::parse_labels(input)?;
-        let (input, value) = Self::parse_value(input)?;
-        Ok((
-            input,
-            Self::Metric {
-                name,
-                labels,
-                value,
-            },
-        ))
-    }
+    /// Parse `'"' string_content '"'`. `string_content` can contain any unicode characters,
+    /// backslash (`\`), double-quote (`"`), and line feed (`\n`) characters have to be
+    /// escaped as `\\`, `\"`, and `\n`, respectively.
+    fn parse_escaped_string(input: &str) -> nom::IResult<&str, String> {
+        #[derive(Debug)]
+        enum StringFragment<'a> {
+            Literal(&'a str),
+            EscapedChar(char),
+        }
 
+        let parse_string_fragment = alt((
+            map(is_not("\"\\"), StringFragment::Literal),
+            map(
+                preceded(
+                    char('\\'),
+                    alt((
+                        value('\n', char('n')),
+                        value('"', char('"')),
+                        value('\\', char('\\')),
+                    )),
+                ),
+                StringFragment::EscapedChar,
+            ),
+        ));
+
+        let input = trim_space(input);
+
+        let build_string = fold_many0(
+            parse_string_fragment,
+            String::new(),
+            |mut result, fragment| {
+                match fragment {
+                    StringFragment::Literal(s) => result.push_str(s),
+                    StringFragment::EscapedChar(c) => result.push(c),
+                }
+                result
+            },
+        );
+
+        delimited(char('"'), build_string, char('"'))(input)
+    }
+}
+
+impl Header {
     /// `# TYPE <metric_name> <metric_type>`
-    fn parse_type(input: &str) -> nom::IResult<&str, Self> {
+    fn parse(input: &str) -> nom::IResult<&str, Self> {
         let input = trim_space(input);
         let (input, _) = tag("#")(input)?;
         let input = trim_space(input);
         let (input, _) = tag("TYPE")(input)?;
-        let (input, metric_name) = Self::parse_name(input)?;
+        let (input, metric_name) = parse_name(input)?;
         let input = trim_space(input);
         let (input, kind) = alt((
             value(MetricKind::Counter, tag("counter")),
@@ -131,63 +155,49 @@ impl MetricLine {
             value(MetricKind::Histogram, tag("histogram")),
             value(MetricKind::Untyped, tag("untyped")),
         ))(input)?;
-        Ok((input, Self::Type { metric_name, kind }))
+        Ok((input, Header { metric_name, kind }))
     }
+}
 
-    /// Parse a single line.
+/// Each line of Prometheus text format.
+/// We discard empty lines, comments, and timestamps.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Line {
+    Header(Header),
+    Metric(Metric),
+}
+
+impl Line {
+    /// Parse a single line. Return `None` if it is a comment or an empty line.
     pub fn parse(input: &str) -> nom::IResult<&str, Option<Self>> {
         let input = input.trim();
         if input.is_empty() {
             return Ok((input, None));
         }
         alt((
-            map(Self::parse_metric, Some),
-            map(Self::parse_type, Some),
+            map(Metric::parse, |r| Some(Line::Metric(r))),
+            map(Header::parse, |r| Some(Line::Header(r))),
             value(None, char('#')),
         ))(input)
     }
 }
 
-/// Parse `'"' string_content '"'`. `string_content` can contain any unicode characters,
-/// backslash (`\`), double-quote (`"`), and line feed (`\n`) characters have to be
-/// escaped as `\\`, `\"`, and `\n`, respectively.
-fn parse_escaped_string(input: &str) -> nom::IResult<&str, String> {
-    #[derive(Debug)]
-    enum StringFragment<'a> {
-        Literal(&'a str),
-        EscapedChar(char),
-    }
-
-    let parse_string_fragment = alt((
-        map(is_not("\"\\"), StringFragment::Literal),
-        map(
-            preceded(
-                char('\\'),
-                alt((
-                    value('\n', char('n')),
-                    value('"', char('"')),
-                    value('\\', char('\\')),
-                )),
-            ),
-            StringFragment::EscapedChar,
-        ),
-    ));
-
+/// Name matches the regex `[a-zA-Z_][a-zA-Z0-9_]*`.
+fn parse_name(input: &str) -> nom::IResult<&str, String> {
     let input = trim_space(input);
+    let (input, (a, b)) = pair(
+        take_while1(|c: char| c.is_alphabetic() || c == '_'),
+        take_while(|c: char| c.is_alphanumeric() || c == '_'),
+    )(input)?;
+    Ok((input, a.to_owned() + b))
+}
 
-    let build_string = fold_many0(
-        parse_string_fragment,
-        String::new(),
-        |mut result, fragment| {
-            match fragment {
-                StringFragment::Literal(s) => result.push_str(s),
-                StringFragment::EscapedChar(c) => result.push(c),
-            }
-            result
-        },
-    );
+fn trim_space(input: &str) -> &str {
+    input.trim_start_matches(|c| c == ' ' || c == '\t')
+}
 
-    delimited(char('"'), build_string, char('"'))(input)
+fn sp<'a, E: ParseError<&'a str>>(i: &'a str) -> nom::IResult<&'a str, &'a str, E> {
+    take_while(|c| c == ' ' || c == '\t')(i)
 }
 
 #[cfg(test)]
@@ -217,32 +227,32 @@ mod test {
         let tail = "  .";
 
         let input = wrap("");
-        let (left, r) = parse_escaped_string(&input).unwrap();
+        let (left, r) = Metric::parse_escaped_string(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(r, "");
 
         let input = wrap(r#"a\\ asdf"#);
-        let (left, r) = parse_escaped_string(&input).unwrap();
+        let (left, r) = Metric::parse_escaped_string(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(r, "a\\ asdf");
 
         let input = wrap(r#"\"\""#);
-        let (left, r) = parse_escaped_string(&input).unwrap();
+        let (left, r) = Metric::parse_escaped_string(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(r, "\"\"");
 
         let input = wrap(r#"\"\\\n"#);
-        let (left, r) = parse_escaped_string(&input).unwrap();
+        let (left, r) = Metric::parse_escaped_string(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(r, "\"\\\n");
 
         let input = wrap(r#"\\n"#);
-        let (left, r) = parse_escaped_string(&input).unwrap();
+        let (left, r) = Metric::parse_escaped_string(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(r, "\\n");
 
         let input = wrap(r#"  😂  "#);
-        let (left, r) = parse_escaped_string(&input).unwrap();
+        let (left, r) = Metric::parse_escaped_string(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(r, "  😂  ");
     }
@@ -255,76 +265,76 @@ mod test {
         let tail = "  .";
 
         let input = wrap("abc_def");
-        let (left, r) = MetricLine::parse_name(&input).unwrap();
+        let (left, r) = parse_name(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(r, "abc_def");
 
         let input = wrap("__9A0bc_def__");
-        let (left, r) = MetricLine::parse_name(&input).unwrap();
+        let (left, r) = parse_name(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(r, "__9A0bc_def__");
 
         let input = wrap("99");
-        assert!(MetricLine::parse_name(&input).is_err());
+        assert!(parse_name(&input).is_err());
     }
 
     #[test]
-    fn test_parse_type() {
+    fn test_parse_header() {
         fn wrap(s: &str) -> String {
             format!("  \t {}  .", s)
         }
         let tail = "  .";
 
         let input = wrap("#  TYPE abc_def counter");
-        let (left, r) = MetricLine::parse_type(&input).unwrap();
+        let (left, r) = Header::parse(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(
             r,
-            MetricLine::Type {
+            Header {
                 metric_name: "abc_def".into(),
                 kind: MetricKind::Counter,
             }
         );
 
         let input = wrap("#TYPE \t abc_def \t gauge");
-        let (left, r) = MetricLine::parse_type(&input).unwrap();
+        let (left, r) = Header::parse(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(
             r,
-            MetricLine::Type {
+            Header {
                 metric_name: "abc_def".into(),
                 kind: MetricKind::Gauge,
             }
         );
 
         let input = wrap("# TYPE abc_def histogram");
-        let (left, r) = MetricLine::parse_type(&input).unwrap();
+        let (left, r) = Header::parse(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(
             r,
-            MetricLine::Type {
+            Header {
                 metric_name: "abc_def".into(),
                 kind: MetricKind::Histogram,
             }
         );
 
         let input = wrap("# TYPE abc_def summary");
-        let (left, r) = MetricLine::parse_type(&input).unwrap();
+        let (left, r) = Header::parse(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(
             r,
-            MetricLine::Type {
+            Header {
                 metric_name: "abc_def".into(),
                 kind: MetricKind::Summary,
             }
         );
 
         let input = wrap("# TYPE abc_def untyped");
-        let (left, r) = MetricLine::parse_type(&input).unwrap();
+        let (left, r) = Header::parse(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(
             r,
-            MetricLine::Type {
+            Header {
                 metric_name: "abc_def".into(),
                 kind: MetricKind::Untyped,
             }
@@ -339,17 +349,17 @@ mod test {
         let tail = "  .";
 
         let input = wrap("+Inf");
-        let (left, r) = MetricLine::parse_value(&input).unwrap();
+        let (left, r) = Metric::parse_value(&input).unwrap();
         assert_eq!(left, tail);
         assert!(r.is_infinite() && r.is_sign_positive());
 
         let input = wrap("-Inf");
-        let (left, r) = MetricLine::parse_value(&input).unwrap();
+        let (left, r) = Metric::parse_value(&input).unwrap();
         assert_eq!(left, tail);
         assert!(r.is_infinite() && r.is_sign_negative());
 
         let input = wrap("Nan");
-        let (left, r) = MetricLine::parse_value(&input).unwrap();
+        let (left, r) = Metric::parse_value(&input).unwrap();
         assert_eq!(left, tail);
         assert!(r.is_nan());
 
@@ -364,7 +374,7 @@ mod test {
         ];
         for (text, value) in &tests {
             let input = wrap(text);
-            let (left, r) = MetricLine::parse_value(&input).unwrap();
+            let (left, r) = Metric::parse_value(&input).unwrap();
             assert_eq!(left, tail);
             assert_eq!(r, *value);
         }
@@ -378,22 +388,22 @@ mod test {
         let tail = "  .";
 
         let input = wrap("{}");
-        let (left, r) = MetricLine::parse_labels(&input).unwrap();
+        let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(r, map! {});
 
         let input = wrap(r#"{name="value"}"#);
-        let (left, r) = MetricLine::parse_labels(&input).unwrap();
+        let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(r, map! { "name" => "value" });
 
         let input = wrap(r#"{name="value",}"#);
-        let (left, r) = MetricLine::parse_labels(&input).unwrap();
+        let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
         assert_eq!(r, map! { "name" => "value" });
 
         let input = wrap(r#"{ name = "" ,b="a=b" , a="},", _c = "\""}"#);
-        let (left, r) = MetricLine::parse_labels(&input).unwrap();
+        let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(
             r,
             map! {"name" => "", "a" => "},", "b" => "a=b", "_c" => "\""}
@@ -401,20 +411,20 @@ mod test {
         assert_eq!(left, tail);
 
         let input = wrap("100");
-        let (left, r) = MetricLine::parse_labels(&input).unwrap();
+        let (left, r) = Metric::parse_labels(&input).unwrap();
         assert_eq!(left, "100".to_owned() + &tail);
         assert_eq!(r, map! {});
 
         // We don't allow these values
 
         let input = wrap(r#"{name="value}"#);
-        assert!(MetricLine::parse_labels(&input).is_err());
+        assert!(Metric::parse_labels(&input).is_err());
 
         let input = wrap(r#"{ a="b" c="d" }"#);
-        assert!(MetricLine::parse_labels(&input).is_err());
+        assert!(Metric::parse_labels(&input).is_err());
 
         let input = wrap(r#"{ a="b" ,, c="d" }"#);
-        assert!(MetricLine::parse_labels(&input).is_err());
+        assert!(Metric::parse_labels(&input).is_err());
     }
 
     #[test]
@@ -457,6 +467,6 @@ mod test {
             rpc_duration_seconds_sum 1.7560473e+07
             rpc_duration_seconds_count 2693
             "##;
-        assert!(input.lines().map(MetricLine::parse).all(|r| r.is_ok()));
+        assert!(input.lines().map(Line::parse).all(|r| r.is_ok()));
     }
 }
