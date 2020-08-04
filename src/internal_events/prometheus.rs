@@ -44,7 +44,7 @@ impl InternalEvent for PrometheusRequestCompleted {
             "component_kind" => "source",
             "component_type" => "prometheus",
         );
-        timing!("request_time", self.start,self.end,
+        timing!("request_duration_nanoseconds", self.start,self.end,
             "component_kind" => "source",
             "component_type" => "prometheus",
         );
