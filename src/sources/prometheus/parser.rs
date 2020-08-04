@@ -520,12 +520,12 @@ mod test {
     use pretty_assertions::assert_eq;
 
     macro_rules! map {
-        ($($key:expr => $value:expr),+) => {
+        ($($key:expr => $value:expr),*) => {
             {
                 let mut m = ::std::collections::BTreeMap::new();
                 $(
                     m.insert($key.into(), $value.into());
-                )+
+                )*
                 m
             }
         };

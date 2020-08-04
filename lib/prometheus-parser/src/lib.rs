@@ -4,7 +4,7 @@ use nom::{
     character::complete::char,
     combinator::{map, opt, value},
     error::ParseError,
-    multi::{fold_many0, separated_list},
+    multi::fold_many0,
     number::complete::double,
     sequence::{delimited, pair, preceded, tuple},
 };
@@ -84,22 +84,49 @@ impl MetricLine {
 
     /// Parse `{label_name="value",...}`
     fn parse_labels(input: &str) -> nom::IResult<&str, BTreeMap<String, String>> {
+        #[derive(Clone)]
+        enum TokenType {
+            Separator,
+            NameValue(String, String),
+        }
+
         let input = trim_space(input);
-        let parse_labels_inner = map(
-            separated_list(
-                preceded(sp, char(',')),
-                tuple((
-                    Self::parse_name,
-                    preceded(sp, char('=')),
-                    parse_escaped_string,
-                )),
-            ),
-            |list| list.into_iter().map(|(k, _, v)| (k, v)).collect(),
+
+        // `separated_list` does not accept empty elements at the moment.
+        // https://github.com/Geal/nom/pull/1170
+        let parse_labels_inner = fold_many0(
+            alt((
+                value(TokenType::Separator, preceded(sp, char(','))),
+                map(
+                    tuple((
+                        Self::parse_name,
+                        preceded(sp, char('=')),
+                        parse_escaped_string,
+                    )),
+                    |(name, _, value)| TokenType::NameValue(name, value),
+                ),
+            )),
+            BTreeMap::new(),
+            |mut result, token| {
+                match token {
+                    // TODO: Handle duplicated names.
+                    TokenType::NameValue(name, value) => {
+                        result.insert(name, value);
+                    }
+                    TokenType::Separator => {}
+                }
+                result
+            },
         );
+
         map(
             // TODO: `opt` replace all errors with `None`,
             // but only error in `char('{')` should be accepted.
-            opt(delimited(char('{'), parse_labels_inner, char('}'))),
+            opt(delimited(
+                char('{'), // no `preceded(sp` because we called `trim_space`.
+                parse_labels_inner,
+                preceded(sp, char('}')),
+            )),
             |r| r.unwrap_or_default(),
         )(input)
     }
@@ -177,6 +204,19 @@ fn parse_escaped_string(input: &str) -> nom::IResult<&str, String> {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    macro_rules! map {
+        ($($key:expr => $value:expr),*) => {
+            {
+                #[allow(unused_mut)]
+                let mut m = ::std::collections::BTreeMap::new();
+                $(
+                    m.insert($key.into(), $value.into());
+                )*
+                m
+            }
+        };
+    }
 
     #[test]
     fn test_parse_escaped_string() {
@@ -339,5 +379,31 @@ mod test {
             assert_eq!(left, tail);
             assert_eq!(r, *value);
         }
+    }
+
+    #[test]
+    fn test_parse_labels() {
+        fn wrap(s: &str) -> String {
+            format!("  \t {}  .", s)
+        }
+        let tail = "  .";
+
+        let input = wrap("{}");
+        let (left, r) = MetricLine::parse_labels(&input).unwrap();
+        assert_eq!(left, tail);
+        assert_eq!(r, map! {});
+
+        let input = wrap(r#"{name="value"}"#);
+        let (left, r) = MetricLine::parse_labels(&input).unwrap();
+        assert_eq!(left, tail);
+        assert_eq!(r, map! {"name" => "value"});
+
+        let input = wrap(r#"{ , name = "" ,b="a=b" , a="},", _c = "\"",,,}"#);
+        let (left, r) = MetricLine::parse_labels(&input).unwrap();
+        assert_eq!(
+            r,
+            map! {"name" => "", "a" => "},", "b" => "a=b", "_c" => "\""}
+        );
+        assert_eq!(left, tail);
     }
 }
