@@ -4,9 +4,9 @@ use nom::{
     character::complete::char,
     combinator::{map, opt, value},
     error::ParseError,
-    multi::fold_many0,
+    multi::{fold_many0, separated_list},
     number::complete::double,
-    sequence::{delimited, pair, preceded, tuple},
+    sequence::{delimited, pair, preceded, terminated, tuple},
 };
 use std::collections::BTreeMap;
 
@@ -82,56 +82,36 @@ impl MetricLine {
         Ok((input, Self::Type { metric_name, kind }))
     }
 
-    /// Parse `{label_name="value",...}`
-    fn parse_labels(input: &str) -> nom::IResult<&str, BTreeMap<String, String>> {
-        #[derive(Clone)]
-        enum TokenType {
-            Separator,
-            NameValue(String, String),
-        }
-
-        let input = trim_space(input);
-
-        // `separated_list` does not accept empty elements at the moment.
-        // https://github.com/Geal/nom/pull/1170
-        let parse_labels_inner = fold_many0(
-            alt((
-                value(TokenType::Separator, preceded(sp, char(','))),
-                map(
-                    tuple((
-                        Self::parse_name,
-                        preceded(sp, char('=')),
-                        parse_escaped_string,
-                    )),
-                    |(name, _, value)| TokenType::NameValue(name, value),
-                ),
-            )),
-            BTreeMap::new(),
-            |mut result, token| {
-                match token {
-                    // TODO: Handle duplicated names.
-                    TokenType::NameValue(name, value) => {
-                        result.insert(name, value);
-                    }
-                    TokenType::Separator => {}
-                }
-                result
-            },
-        );
-
+    fn parse_name_value(input: &str) -> nom::IResult<&str, (String, String)> {
         map(
-            // TODO: `opt` replace all errors with `None`,
-            // but only error in `char('{')` should be accepted.
-            opt(delimited(
-                char('{'), // no `preceded(sp` because we called `trim_space`.
-                parse_labels_inner,
-                preceded(sp, char('}')),
+            tuple((
+                Self::parse_name,
+                preceded(sp, char('=')),
+                parse_escaped_string,
             )),
-            |r| r.unwrap_or_default(),
+            |(name, _, value)| (name, value),
         )(input)
     }
 
+    fn parse_labels_inner(input: &str) -> nom::IResult<&str, BTreeMap<String, String>> {
+        let (input, list) = separated_list(preceded(sp, char(',')), Self::parse_name_value)(input)?;
+        let (input, _) = opt(preceded(sp, char(',')))(input)?;
+        Ok((input, list.into_iter().collect()))
+    }
+
+    /// Parse `{label_name="value",...}`
+    fn parse_labels(input: &str) -> nom::IResult<&str, BTreeMap<String, String>> {
+        let input = trim_space(input);
+
+        match opt(char('{'))(input) {
+            Ok((i, None)) => Ok((i, BTreeMap::new())),
+            Ok((i, Some(_))) => terminated(Self::parse_labels_inner, preceded(sp, char('}')))(i),
+            Err(e) => Err(e),
+        }
+    }
+
     /// Parse a single line with format
+    ///
     /// ``` text
     /// metric_name [
     ///   "{" label_name "=" `"` label_value `"` { "," label_name "=" `"` label_value `"` } [ "," ] "}"
@@ -396,14 +376,35 @@ mod test {
         let input = wrap(r#"{name="value"}"#);
         let (left, r) = MetricLine::parse_labels(&input).unwrap();
         assert_eq!(left, tail);
-        assert_eq!(r, map! {"name" => "value"});
+        assert_eq!(r, map! { "name" => "value" });
 
-        let input = wrap(r#"{ , name = "" ,b="a=b" , a="},", _c = "\"",,,}"#);
+        let input = wrap(r#"{name="value",}"#);
+        let (left, r) = MetricLine::parse_labels(&input).unwrap();
+        assert_eq!(left, tail);
+        assert_eq!(r, map! { "name" => "value" });
+
+        let input = wrap(r#"{ name = "" ,b="a=b" , a="},", _c = "\""}"#);
         let (left, r) = MetricLine::parse_labels(&input).unwrap();
         assert_eq!(
             r,
             map! {"name" => "", "a" => "},", "b" => "a=b", "_c" => "\""}
         );
         assert_eq!(left, tail);
+
+        let input = wrap("100");
+        let (left, r) = MetricLine::parse_labels(&input).unwrap();
+        assert_eq!(left, "100".to_owned() + &tail);
+        assert_eq!(r, map! {});
+
+        // We don't allow these values
+
+        let input = wrap(r#"{name="value}"#);
+        assert!(MetricLine::parse_labels(&input).is_err());
+
+        let input = wrap(r#"{ a="b" c="d" }"#);
+        assert!(MetricLine::parse_labels(&input).is_err());
+
+        let input = wrap(r#"{ a="b" ,, c="d" }"#);
+        assert!(MetricLine::parse_labels(&input).is_err());
     }
 }
