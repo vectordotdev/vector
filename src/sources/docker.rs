@@ -4,6 +4,7 @@ use crate::{
     internal_events::{
         DockerCommunicationError, DockerContainerEventReceived, DockerContainerMetadataFetchFailed,
         DockerContainerUnwatch, DockerContainerWatch, DockerEventReceived,
+        DockerTimestampParseFailed,
     },
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -484,16 +485,17 @@ impl EventStreamBuilder {
                 .inspect_container(id.as_str(), None::<InspectContainerOptions>)
                 .await
             {
-                Ok(details) => {
-                    match ContainerMetadata::from_details(details) {
-                        Ok(metadata) => {
-                            let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
-                            this.start_event_stream(info).await;
-                            return;
-                        }
-                        Err(error) => (), //TODO
+                Ok(details) => match ContainerMetadata::from_details(details) {
+                    Ok(metadata) => {
+                        let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
+                        this.start_event_stream(info).await;
+                        return;
                     }
-                }
+                    Err(error) => emit!(DockerTimestampParseFailed {
+                        error,
+                        container_id: id.as_str()
+                    }),
+                },
                 Err(error) => emit!(DockerContainerMetadataFetchFailed {
                     error,
                     container_id: id.as_str()
@@ -732,7 +734,10 @@ impl ContainerLogInfo {
             }
             Err(error) => {
                 // Recieved bad timestamp, if any at all.
-                error!(message="Didn't recieve rfc3339 timestamp from docker",%error);
+                emit!(DockerTimestampParseFailed {
+                    error,
+                    container_id: self.id.as_str()
+                });
                 // So continue normally but without a timestamp.
                 None
             }
@@ -842,7 +847,10 @@ impl ContainerLogInfo {
         // other cases were handeled earlier.
         let event = Event::Log(log_event);
 
-        emit!(DockerEventReceived { byte_size });
+        emit!(DockerEventReceived {
+            byte_size,
+            container_id: self.id.as_str()
+        });
 
         Some(event)
     }

@@ -1,15 +1,21 @@
 use super::InternalEvent;
 use bollard::errors::Error;
+use chrono::ParseError;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct DockerEventReceived {
+pub struct DockerEventReceived<'a> {
     pub byte_size: usize,
+    pub container_id: &'a str,
 }
 
-impl InternalEvent for DockerEventReceived {
+impl<'a> InternalEvent for DockerEventReceived<'a> {
     fn emit_logs(&self) {
-        trace!(message = "received one event.", byte_size = %self.byte_size);
+        trace!(
+            message = "received one event.",
+            byte_size = %self.byte_size,
+            container_id = %self.container_id
+        );
     }
 
     fn emit_metrics(&self) {
@@ -131,6 +137,30 @@ impl<'a> InternalEvent for DockerContainerMetadataFetchFailed<'a> {
 
     fn emit_metrics(&self) {
         counter!("container_metadata_fetch_failed", 1,
+                 "component_kind" => "source",
+                 "component_name" => "docker",
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct DockerTimestampParseFailed<'a> {
+    pub error: ParseError,
+    pub container_id: &'a str,
+}
+
+impl<'a> InternalEvent for DockerTimestampParseFailed<'a> {
+    fn emit_logs(&self) {
+        error!(
+            message = "failed parsing timestamp as rfc3339 timestamp.",
+            error = %self.error,
+            container_id = ?self.container_id,
+            rate_limit_secs = 10
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("timestamp_parse_errors", 1,
                  "component_kind" => "source",
                  "component_name" => "docker",
         );
