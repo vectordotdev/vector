@@ -10,7 +10,7 @@ use nom::{
 };
 use std::collections::BTreeMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum MetricKind {
     Counter,
     Gauge,
@@ -21,7 +21,7 @@ pub enum MetricKind {
 
 /// Each line of Prometheus text format.
 /// We discard empty lines, comments, and timestamps.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum MetricLine {
     Type {
         metric_name: String,
@@ -105,7 +105,7 @@ impl MetricLine {
     }
 
     /// Parse a single line with format
-    /// ```
+    /// ``` text
     /// metric_name [
     ///   "{" label_name "=" `"` label_value `"` { "," label_name "=" `"` label_value `"` } [ "," ] "}"
     /// ] value [ timestamp ]
@@ -237,5 +237,68 @@ mod test {
 
         let input = wrap("99");
         assert!(MetricLine::parse_name(&input).is_err());
+    }
+
+    #[test]
+    fn test_parse_type() {
+        fn wrap(s: &str) -> String {
+            format!("  \t {}  .", s)
+        }
+        let tail = "  .";
+
+        let input = wrap("#  TYPE abc_def counter");
+        let (left, r) = MetricLine::parse_type(&input).unwrap();
+        assert_eq!(left, tail);
+        assert_eq!(
+            r,
+            MetricLine::Type {
+                metric_name: "abc_def".into(),
+                kind: MetricKind::Counter,
+            }
+        );
+
+        let input = wrap("#TYPE \t abc_def \t gauge");
+        let (left, r) = MetricLine::parse_type(&input).unwrap();
+        assert_eq!(left, tail);
+        assert_eq!(
+            r,
+            MetricLine::Type {
+                metric_name: "abc_def".into(),
+                kind: MetricKind::Gauge,
+            }
+        );
+
+        let input = wrap("# TYPE abc_def histogram");
+        let (left, r) = MetricLine::parse_type(&input).unwrap();
+        assert_eq!(left, tail);
+        assert_eq!(
+            r,
+            MetricLine::Type {
+                metric_name: "abc_def".into(),
+                kind: MetricKind::Histogram,
+            }
+        );
+
+        let input = wrap("# TYPE abc_def summary");
+        let (left, r) = MetricLine::parse_type(&input).unwrap();
+        assert_eq!(left, tail);
+        assert_eq!(
+            r,
+            MetricLine::Type {
+                metric_name: "abc_def".into(),
+                kind: MetricKind::Summary,
+            }
+        );
+
+        let input = wrap("# TYPE abc_def untyped");
+        let (left, r) = MetricLine::parse_type(&input).unwrap();
+        assert_eq!(left, tail);
+        assert_eq!(
+            r,
+            MetricLine::Type {
+                metric_name: "abc_def".into(),
+                kind: MetricKind::Untyped,
+            }
+        );
     }
 }
