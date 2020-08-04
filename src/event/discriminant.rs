@@ -59,7 +59,7 @@ fn value_eq(this: &Value, other: &Value) -> bool {
         (Value::Null, Value::Null) => true,
         // Non-trivial.
         (Value::Float(this), Value::Float(other)) => f64_eq(this, other),
-        (Value::Array(this), Value::Array(other)) => array_eq(this, other),
+        (Value::Array(this), Value::Array(other)) => array_eq(&this, &other),
         (Value::Map(this), Value::Map(other)) => map_eq(this, other),
         // Type mismatch.
         _ => false,
@@ -82,7 +82,7 @@ fn f64_eq(this: &f64, other: &f64) -> bool {
     true
 }
 
-fn array_eq(this: &Vec<Value>, other: &Vec<Value>) -> bool {
+fn array_eq(this: &[Value], other: &[Value]) -> bool {
     if this.len() != other.len() {
         return false;
     }
@@ -126,7 +126,7 @@ fn hash_value<H: Hasher>(hasher: &mut H, value: &Value) {
         Value::Timestamp(val) => val.hash(hasher),
         // Non-trivial.
         Value::Float(val) => hash_f64(hasher, val),
-        Value::Array(val) => hash_array(hasher, val),
+        Value::Array(val) => hash_array(hasher, &val),
         Value::Map(val) => hash_map(hasher, val),
         Value::Null => hash_null(hasher),
     }
@@ -137,7 +137,7 @@ fn hash_f64<H: Hasher>(hasher: &mut H, value: &f64) {
     hasher.write(&value.to_ne_bytes());
 }
 
-fn hash_array<H: Hasher>(hasher: &mut H, array: &Vec<Value>) {
+fn hash_array<H: Hasher>(hasher: &mut H, array: &[Value]) {
     for val in array.iter() {
         hash_value(hasher, val);
     }

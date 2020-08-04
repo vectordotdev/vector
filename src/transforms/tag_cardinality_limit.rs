@@ -5,7 +5,10 @@ use crate::{
 };
 use bloom::{BloomFilter, ASMS};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::{
+    borrow::{Borrow, Cow},
+    collections::{HashMap, HashSet},
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 // TODO: add back when serde-rs/serde#1358 is addressed
@@ -113,10 +116,10 @@ impl TagValueSet {
         }
     }
 
-    fn contains(&self, val: &String) -> bool {
+    fn contains(&self, value: Cow<'_, String>) -> bool {
         match &self.storage {
-            TagValueSetStorage::Set(set) => set.contains(val),
-            TagValueSetStorage::Bloom(bloom) => bloom.contains(val),
+            TagValueSetStorage::Set(set) => set.contains(value.borrow() as &String),
+            TagValueSetStorage::Bloom(bloom) => bloom.contains(&value),
         }
     }
 
@@ -124,10 +127,10 @@ impl TagValueSet {
         self.num_elements
     }
 
-    fn insert(&mut self, val: &String) -> bool {
+    fn insert(&mut self, value: Cow<'_, String>) -> bool {
         let inserted = match &mut self.storage {
-            TagValueSetStorage::Set(set) => set.insert(val.clone()),
-            TagValueSetStorage::Bloom(bloom) => bloom.insert(val),
+            TagValueSetStorage::Set(set) => set.insert(value.into_owned()),
+            TagValueSetStorage::Bloom(bloom) => bloom.insert(&value),
         };
         if inserted {
             self.num_elements += 1
@@ -151,16 +154,16 @@ impl TagCardinalityLimit {
     /// accepted values for the key and returns true, otherwise returns false.  A false return
     /// value indicates to the caller that the value is not accepted for this key, and the
     /// configured limit_exceeded_action should be taken.
-    fn try_accept_tag(&mut self, key: &String, value: &String) -> bool {
+    fn try_accept_tag(&mut self, key: &str, value: Cow<'_, String>) -> bool {
         if !self.accepted_tags.contains_key(key) {
             self.accepted_tags.insert(
-                key.clone(),
+                key.to_string(),
                 TagValueSet::new(self.config.value_limit, &self.config.mode),
             );
         }
         let tag_value_set = self.accepted_tags.get_mut(key).unwrap();
 
-        if tag_value_set.contains(value) {
+        if tag_value_set.contains(value.clone()) {
             // Tag value has already been accepted, nothing more to do.
             return true;
         }
@@ -192,7 +195,7 @@ impl Transform for TagCardinalityLimit {
                 match self.config.limit_exceeded_action {
                     LimitExceededAction::DropEvent => {
                         for (key, value) in tags_map {
-                            if !self.try_accept_tag(key, value) {
+                            if !self.try_accept_tag(key, Cow::Borrowed(value)) {
                                 info!(
                                     message = "Rejecting Metric Event containing tag with new value after hitting configured 'value_limit'",
                                     tag_key = key.as_str(),
@@ -206,7 +209,7 @@ impl Transform for TagCardinalityLimit {
                     LimitExceededAction::DropTag => {
                         let mut to_delete = Vec::new();
                         for (key, value) in tags_map.iter() {
-                            if !self.try_accept_tag(key, value) {
+                            if !self.try_accept_tag(key, Cow::Borrowed(value)) {
                                 info!(
                                     message =
                                         "Rejecting tag after hitting configured 'value_limit'",
