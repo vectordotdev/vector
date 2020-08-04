@@ -1,10 +1,12 @@
-use crate::event::Event;
 use crate::{
+    event::Event,
+    internal_events::{HTTPBadRequest, HTTPEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
 use async_trait::async_trait;
+use bytes05::Bytes;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::Sink;
 use serde::Serialize;
@@ -73,15 +75,20 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             .and(warp::path::end())
             .and(warp::header::headers_cloned())
             .and(warp::body::bytes())
-            .and_then(move |headers: HeaderMap, body| {
+            .and_then(move |headers: HeaderMap, body: Bytes| {
                 info!("Handling http request: {:?}", headers);
 
                 let this = self.clone();
                 let out = out.clone();
 
                 async move {
+                    let body_size = body.len();
                     match this.build_event(body, headers) {
                         Ok(events) => {
+                            emit!(HTTPEventsReceived {
+                                events_count: events.len(),
+                                byte_size: body_size,
+                            });
                             out.send_all(futures01::stream::iter_ok(events))
                                 .compat()
                                 .map_err(move |e: futures01::sync::mpsc::SendError<Event>| {
@@ -94,7 +101,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 .map_ok(|_| warp::reply())
                                 .await
                         }
-                        Err(err) => Err(warp::reject::custom(err)),
+                        Err(err) => {
+                            emit!(HTTPBadRequest {
+                                error_code: err.code,
+                                error_message: err.message.as_str(),
+                            });
+                            Err(warp::reject::custom(err))
+                        }
                     }
                 }
             });
