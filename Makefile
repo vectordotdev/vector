@@ -236,7 +236,6 @@ ${VECTOR_BINARY_x86_64-unknown-linux-musl}: CXX := ${CXX_x86_64-unknown-linux-mu
 ${VECTOR_BINARY_x86_64-unknown-linux-musl}: HOST_CXX := musl-g++
 ${VECTOR_BINARY_x86_64-unknown-linux-musl}: HOST_CC := musl-gcc
 ${VECTOR_BINARY_x86_64-unknown-linux-musl}: ${MUSL_CROSS_MAKE_x86_64-unknown-linux_musl} rust-target-x86_64-unknown-linux-musl
-	echo ${CC}
 	${MAYBE_ENVIRONMENT_EXEC} \
 		cargo build --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
