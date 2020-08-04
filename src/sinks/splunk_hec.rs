@@ -453,7 +453,7 @@ mod integration_tests {
 
         rt.block_on_std(async move {
             let mut config = config(Encoding::Text, vec![]).await;
-            config.source = Some("/var/log/syslog".to_string());
+            config.source = Template::try_from("/var/log/syslog".to_string()).ok();
 
             let (sink, _) = config.build(cx).unwrap();
 
