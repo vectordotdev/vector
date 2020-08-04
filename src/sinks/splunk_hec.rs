@@ -1,6 +1,9 @@
 use crate::{
     event::{self, Event, LogEvent, Value},
-    internal_events::{SplunkEventEncodeError, SplunkEventSent, SplunkSourceTypeMissingKeys},
+    internal_events::{
+        SplunkEventEncodeError, SplunkEventSent, SplunkSourceMissingKeys,
+        SplunkSourceTypeMissingKeys,
+    },
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpClient, HttpSink},
@@ -39,7 +42,7 @@ pub struct HecSinkConfig {
     pub indexed_fields: Vec<Atom>,
     pub index: Option<String>,
     pub sourcetype: Option<String>,
-    pub source: Option<String>,
+    pub source: Option<Template>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -133,6 +136,19 @@ impl HttpSink for HecSinkConfig {
                 .ok()
         });
 
+        let source = self
+            .source
+            .as_ref()
+            .map(|source| {
+                source
+                    .render_string(&event)
+                    .map_err(|missing_keys| {
+                        emit!(SplunkSourceMissingKeys { keys: missing_keys });
+                    })
+                    .ok()
+            })
+            .unwrap_or(None);
+
         let mut event = event.into_log();
 
         let host = event.get(&self.host_key).cloned();
@@ -172,7 +188,7 @@ impl HttpSink for HecSinkConfig {
             body["index"] = json!(index);
         }
 
-        if let Some(source) = &self.source {
+        if let Some(source) = source {
             body["source"] = json!(source);
         }
 
