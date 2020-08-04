@@ -8,9 +8,11 @@ use approx::assert_relative_eq;
 use futures::compat::Future01CompatExt;
 use tokio::net::TcpListener;
 use vector::{
+    runtime::Runtime,
     sinks, sources,
     test_util::{
-        next_addr, random_lines, runtime, send_lines, shutdown_on_idle, wait_for_tcp, CountReceiver,
+        next_addr, random_lines, runtime, send_lines, shutdown_on_idle, trace_init, wait_for_tcp,
+        CountReceiver,
     },
     topology::{self, config},
     transforms,
@@ -173,6 +175,8 @@ fn fork() {
 
 #[test]
 fn merge_and_fork() {
+    trace_init();
+
     let num_lines: usize = 10000;
 
     let in_addr1 = next_addr();
@@ -202,7 +206,7 @@ fn merge_and_fork() {
         sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr2.to_string()),
     );
 
-    let mut rt = runtime();
+    let mut rt = Runtime::with_thread_count(2).unwrap();
     rt.block_on_std(async move {
         let mut output_lines1 = CountReceiver::receive_lines(out_addr1);
         let mut output_lines2 = CountReceiver::receive_lines(out_addr2);
@@ -220,8 +224,6 @@ fn merge_and_fork() {
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
         send_lines(in_addr1, input_lines1.clone()).await.unwrap();
         send_lines(in_addr2, input_lines2.clone()).await.unwrap();
-
-        tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
 
         // Shut down server
         topology.stop().compat().await.unwrap();
