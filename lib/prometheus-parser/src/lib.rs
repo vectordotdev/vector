@@ -53,6 +53,7 @@ impl MetricLine {
         Ok((input, a.to_owned() + b))
     }
 
+    /// Float value, and +Inf, -Int, Nan.
     fn parse_value(input: &str) -> nom::IResult<&str, f64> {
         let input = trim_space(input);
         alt((
@@ -81,6 +82,7 @@ impl MetricLine {
         Ok((input, Self::Type { metric_name, kind }))
     }
 
+    /// Parse `{label_name="value",...}`
     fn parse_labels(input: &str) -> nom::IResult<&str, BTreeMap<String, String>> {
         let input = trim_space(input);
         let parse_labels_inner = map(
@@ -95,17 +97,26 @@ impl MetricLine {
             |list| list.into_iter().map(|(k, _, v)| (k, v)).collect(),
         );
         map(
+            // TODO: `opt` replace all errors with `None`,
+            // but only error in `char('{')` should be accepted.
             opt(delimited(char('{'), parse_labels_inner, char('}'))),
             |r| r.unwrap_or_default(),
         )(input)
     }
 
+    /// Parse a single line with format
+    /// ```
+    /// metric_name [
+    ///   "{" label_name "=" `"` label_value `"` { "," label_name "=" `"` label_value `"` } [ "," ] "}"
+    /// ] value [ timestamp ]
+    /// ```
+    ///
+    /// We don't parse timestamp.
     fn parse_metric(input: &str) -> nom::IResult<&str, Self> {
         let input = trim_space(input);
         let (input, name) = Self::parse_name(input)?;
         let (input, labels) = Self::parse_labels(input)?;
         let (input, value) = Self::parse_value(input)?;
-        // We don't parse timestamp.
         Ok((
             input,
             Self::Metric {
@@ -121,6 +132,9 @@ impl MetricLine {
     }
 }
 
+/// Parse `'"' string_content '"'`. `string_content` can contain any unicode characters,
+/// backslash (`\`), double-quote (`"`), and line feed (`\n`) characters have to be
+/// escaped as `\\`, `\"`, and `\n`, respectively.
 fn parse_escaped_string(input: &str) -> nom::IResult<&str, String> {
     #[derive(Debug)]
     enum StringFragment<'a> {
