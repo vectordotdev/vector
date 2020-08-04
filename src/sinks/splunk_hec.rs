@@ -123,18 +123,14 @@ impl HttpSink for HecSinkConfig {
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
 
-        let sourcetype = self
-            .sourcetype
-            .as_ref()
-            .map(|sourcetype| {
-                sourcetype
-                    .render_string(&event)
-                    .map_err(|missing_keys| {
-                        emit!(SplunkSourceTypeMissingKeys { keys: missing_keys });
-                    })
-                    .ok()
-            })
-            .unwrap_or(None);
+        let sourcetype = self.sourcetype.as_ref().and_then(|sourcetype| {
+            sourcetype
+                .render_string(&event)
+                .map_err(|missing_keys| {
+                    emit!(SplunkSourceTypeMissingKeys { keys: missing_keys });
+                })
+                .ok()
+        });
 
         let mut event = event.into_log();
 
