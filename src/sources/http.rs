@@ -6,7 +6,6 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Pipeline,
 };
-use async_trait::async_trait;
 use bytes05::{Bytes, BytesMut};
 use chrono::Utc;
 use codec::BytesDelimitedCodec;
@@ -62,19 +61,8 @@ impl HttpSource for SimpleHttpSource {
 }
 
 #[typetag::serde(name = "http")]
-#[async_trait]
 impl SourceConfig for SimpleHttpConfig {
     fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
-        _out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        unimplemented!()
-    }
-
-    async fn build_async(
         &self,
         _: &str,
         _: &GlobalOptions,
@@ -234,25 +222,21 @@ mod tests {
         test_util::trace_init();
         let (sender, recv) = Pipeline::new_test();
         let address = test_util::next_addr();
-        rt.spawn_std(async move {
+        rt.spawn(
             SimpleHttpConfig {
                 address,
                 encoding,
                 headers,
                 tls: None,
             }
-            .build_async(
+            .build(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 sender,
             )
-            .await
-            .unwrap()
-            .compat()
-            .await
-            .unwrap();
-        });
+            .unwrap(),
+        );
         (recv, address)
     }
 
