@@ -141,20 +141,15 @@ mod test {
     use crate::shutdown::{ShutdownSignal, SourceShutdownCoordinator};
     use crate::sinks::util::tcp::TcpSink;
     use crate::test_util::{
-        block_on, collect_n, next_addr, random_string, runtime, send_lines, send_lines_tls,
-        trace_init, wait_for_tcp, CollectN,
+        block_on, collect_n, next_addr, runtime, send_lines, send_lines_tls, wait_for_tcp, CollectN,
     };
     use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions};
     use crate::topology::config::{GlobalOptions, SourceConfig};
     use crate::Pipeline;
     use bytes::Bytes;
     #[cfg(unix)]
-    use futures::SinkExt;
-    use futures::{
-        compat::{Future01CompatExt, Sink01CompatExt},
-        stream, StreamExt,
-    };
-    use futures01::{sync::oneshot, Stream};
+    use futures::{compat::Future01CompatExt, stream, SinkExt};
+    use futures01::{sync::oneshot, Future, Stream};
     #[cfg(unix)]
     use std::path::PathBuf;
     use std::{
@@ -361,8 +356,6 @@ mod test {
 
     #[test]
     fn tcp_shutdown_infinite_stream() {
-        trace_init();
-
         // It's important that the buffer be large enough that the TCP source doesn't have
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
@@ -382,7 +375,7 @@ mod test {
         .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
         .unwrap();
         let mut rt = Runtime::with_thread_count(2).unwrap();
-        let source_handle = rt.spawn_handle_std(server.compat());
+        let source_handle = oneshot::spawn(server, &rt.executor());
         wait_for_tcp(addr);
 
         // Spawn future that keeps sending lines to the TCP source forever.
@@ -392,15 +385,13 @@ mod test {
             Resolver,
             MaybeTlsSettings::Raw(()),
         );
-        let message = random_string(512);
-        let message_event = Bytes::from(message.clone() + "\n");
-        rt.spawn_std(async move {
-            let _ = stream::repeat(())
-                .map(move |_| Ok(message_event.clone()))
-                .forward(sink.sink_compat())
-                .await
-                .unwrap();
-        });
+        rt.spawn(
+            futures01::stream::iter_ok::<_, ()>(std::iter::repeat(()))
+                .map(|_| Bytes::from("test\n"))
+                .map_err(|_| ())
+                .forward(sink)
+                .map(|_| ()),
+        );
 
         // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
         let (_rx, events) = rt.block_on(CollectN::new(rx, 100)).ok().unwrap();
@@ -408,7 +399,7 @@ mod test {
         for event in events {
             assert_eq!(
                 event.as_log()[&event::log_schema().message_key()],
-                message.clone().into()
+                "test".into()
             );
         }
 
@@ -418,9 +409,7 @@ mod test {
         assert_eq!(true, shutdown_success);
 
         // Ensure that the source has actually shut down.
-        rt.block_on_std(async move {
-            let _ = source_handle.await.unwrap();
-        })
+        rt.block_on(source_handle).unwrap();
     }
 
     //////// UDP TESTS ////////

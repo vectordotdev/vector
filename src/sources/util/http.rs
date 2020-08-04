@@ -1,16 +1,21 @@
-use crate::event::Event;
 use crate::{
+    event::Event,
+    internal_events::{HTTPBadRequest, HTTPEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
-use async_trait::async_trait;
-use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
+use bytes05::Bytes;
+use futures::{
+    compat::{AsyncRead01CompatExt, Future01CompatExt, Stream01CompatExt},
+    FutureExt, TryFutureExt, TryStreamExt,
+};
 use futures01::Sink;
 use serde::Serialize;
 use std::error::Error;
 use std::fmt;
 use std::net::SocketAddr;
+use tokio_util::compat::FuturesAsyncReadCompatExt;
 use warp::{
     filters::BoxedFilter,
     http::{HeaderMap, StatusCode},
@@ -47,7 +52,6 @@ impl fmt::Debug for RejectShuttingDown {
 }
 impl warp::reject::Reject for RejectShuttingDown {}
 
-#[async_trait]
 pub trait HttpSource: Clone + Send + Sync + 'static {
     fn build_event(
         &self,
@@ -73,15 +77,20 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             .and(warp::path::end())
             .and(warp::header::headers_cloned())
             .and(warp::body::bytes())
-            .and_then(move |headers: HeaderMap, body| {
+            .and_then(move |headers: HeaderMap, body: Bytes| {
                 info!("Handling http request: {:?}", headers);
 
                 let this = self.clone();
                 let out = out.clone();
 
                 async move {
+                    let body_size = body.len();
                     match this.build_event(body, headers) {
                         Ok(events) => {
+                            emit!(HTTPEventsReceived {
+                                events_count: events.len(),
+                                byte_size: body_size,
+                            });
                             out.send_all(futures01::stream::iter_ok(events))
                                 .compat()
                                 .map_err(move |e: futures01::sync::mpsc::SendError<Event>| {
@@ -94,7 +103,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 .map_ok(|_| warp::reply())
                                 .await
                         }
-                        Err(err) => Err(warp::reject::custom(err)),
+                        Err(err) => {
+                            emit!(HTTPBadRequest {
+                                error_code: err.code,
+                                error_message: err.message.as_str(),
+                            });
+                            Err(warp::reject::custom(err))
+                        }
                     }
                 }
             });
@@ -115,12 +130,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
         info!(message = "building http server", addr = %address);
 
-        let tls = MaybeTlsSettings::from_config(tls, true)?;
+        let tls = MaybeTlsSettings::from_config(tls, true).unwrap();
+        let incoming = tls.bind(&address).unwrap().incoming();
+
         let fut = async move {
-            let mut listener = tls.bind(&address).await.unwrap();
             let _ = warp::serve(routes)
                 .serve_incoming_with_graceful_shutdown(
-                    listener.incoming(),
+                    incoming.compat().map_ok(|s| s.compat().compat()),
                     shutdown.clone().compat().map(|_| ()),
                 )
                 .await;
