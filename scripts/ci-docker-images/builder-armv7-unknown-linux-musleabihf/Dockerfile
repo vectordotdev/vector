@@ -4,7 +4,7 @@ ARG LLVM_VERSION=9.0.0
 # This version can be found in this file:
 # https://github.com/rust-lang/rust/blob/master/src/ci/docker/scripts/musl-toolchain.sh.
 # Exampel: "1.1.22".
-ARG MUSL_VERSION=1.1.22
+ARG MUSL_VERSION=1.1.24
 
 # LLVM target triple for Linux and MUSL. Full list of supported triples
 # can be found here:
@@ -185,7 +185,7 @@ ENV MUSL_CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include"
 ENV MUSL_CXXFLAGS="$MUSL_CFLAGS -nostdinc++ -I$LIBS_PREFIX/include/c++/v1"
 
 ENV MUSL_LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -L$LIBS_PREFIX/lib/linux -lc++ -lc++abi -lunwind -l$(basename /opt/libs/lib/linux/libclang_rt.builtins* | tail -c+4 | head -c-3) -lc"
-ENV MUSL_STARTFILES="$LIBS_PREFIX/lib/crt1.o $(find $LIBS_PREFIX/lib/linux -iname 'clang_rt.crtbegin*.o') $(find $LIBS_PREFIX/lib/linux -iname 'clang_rt.crtend*.o')"
+ENV MUSL_STARTFILES="$(find $LIBS_PREFIX/lib/linux -iname 'clang_rt.crtbegin*.o') $(find $LIBS_PREFIX/lib/linux -iname 'clang_rt.crtend*.o')"
 
 RUN mkdir -p $LIBS_PREFIX/bin
 RUN echo \

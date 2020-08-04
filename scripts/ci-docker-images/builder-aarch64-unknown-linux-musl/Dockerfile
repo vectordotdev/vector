@@ -185,7 +185,7 @@ ENV MUSL_CFLAGS="-target $TARGET -nostdinc -isystem $LIBS_PREFIX/include"
 ENV MUSL_CXXFLAGS="$MUSL_CFLAGS -nostdinc++ -I$LIBS_PREFIX/include/c++/v1"
 
 ENV MUSL_LDFLAGS="-fuse-ld=lld -static -nostdlib -nostartfiles -L$LIBS_PREFIX/lib -L$LIBS_PREFIX/lib/linux -lc++ -lc++abi -lunwind -l$(basename /opt/libs/lib/linux/libclang_rt.builtins* | tail -c+4 | head -c-3) -lc"
-ENV MUSL_STARTFILES="$LIBS_PREFIX/lib/crt1.o $(find $LIBS_PREFIX/lib/linux -iname 'clang_rt.crtbegin*.o') $(find $LIBS_PREFIX/lib/linux -iname 'clang_rt.crtend*.o')"
+ENV MUSL_STARTFILES="$(find $LIBS_PREFIX/lib/linux -iname 'clang_rt.crtbegin*.o') $(find $LIBS_PREFIX/lib/linux -iname 'clang_rt.crtend*.o')"
 
 RUN mkdir -p $LIBS_PREFIX/bin
 RUN echo \
