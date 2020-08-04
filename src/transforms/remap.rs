@@ -84,9 +84,10 @@ mod tests {
         };
 
         let conf = RemapConfig {
-            mapping: r#".foo = "bar"
-            .bar = "baz"
-            .copy = .copy_from"#
+            mapping: r#"  .foo = "bar"
+  .bar = "baz"
+  .copy = .copy_from
+"#
                 .to_string(),
             drop_on_err: true,
         };

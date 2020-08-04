@@ -258,14 +258,14 @@ mod test {
                 ]),
             ),
             (
-                ".foo = .(bar | baz)",
+                ".foo = .(bar | baz)\n",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(QueryPath::from(vec![vec!["bar", "baz"]])),
                 ))]),
             ),
             (
-                ".foo = .foo.(bar | baz)",
+                ".foo = .foo.(bar | baz)\n \n",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(QueryPath::from(vec![vec!["foo"], vec!["bar", "baz"]])),

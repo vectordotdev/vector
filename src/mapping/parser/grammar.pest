@@ -1,4 +1,4 @@
-mapping = _{ SOI ~ statement ~ (NEWLINE+ ~ statement)* ~ EOI }
+mapping = _{ SOI ~ statement ~ (NEWLINE+ ~ statement)* ~ NEWLINE* ~ EOI }
 
 statement = _{ assignment | deletion }
 
