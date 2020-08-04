@@ -465,6 +465,9 @@ release-rollback: ## Rollback pending release changes
 release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh
 
+release-helm: ## Package and release Helm Chart
+	@scripts/release-helm.sh
+
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
 
