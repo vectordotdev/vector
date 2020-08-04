@@ -338,6 +338,16 @@ ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
+test-integration-humio: ## Runs Humio integration tests
+ifeq ($(AUTOSPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-humio
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features humio-integration-tests ::humio:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
+endif
+
+
 test-integration-influxdb: ## Runs InfluxDB integration tests
 ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-influxdb
@@ -383,14 +393,14 @@ ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-splunk
 	sleep 5 # Many services are very lazy... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features splunk-integration-tests ::splunk:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features splunk-integration-tests ::splunk_hec:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
-PACKAGE_DEB_USE_CONTAINER ?= "$(USE_CONTAINER)"
-test-integration-kubernetes: ## Runs Kubernetes integration tests (Sorry, no `ENVIRONMENT=true` support)
-	PACKAGE_DEB_USE_CONTAINER="$(PACKAGE_DEB_USE_CONTAINER)" USE_CONTAINER=none $(RUN) test-integration-kubernetes
+PACKAGE_DEB_USE_CONTAINER ?= $(USE_CONTAINER)
+test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
+	PACKAGE_DEB_USE_CONTAINER="$(PACKAGE_DEB_USE_CONTAINER)" scripts/test-e2e-kubernetes.sh
 
 test-shutdown: ## Runs shutdown tests
 ifeq ($(AUTOSPAWN), true)
@@ -439,7 +449,7 @@ bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
 check: ## Run prerequisite code checks
 	${MAYBE_ENVIRONMENT_EXEC} cargo check --all --no-default-features --features ${DEFAULT_FEATURES}
 
-check-all: check-fmt check-clippy check-style check-markdown check-generate check-blog check-version check-examples check-component-features check-scripts ## Check everything
+check-all: check-fmt check-clippy check-style check-markdown check-meta check-version check-examples check-component-features check-scripts ## Check everything
 
 check-component-features: ## Check that all component features are setup properly
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-features.sh
@@ -454,11 +464,10 @@ check-style: ## Check that all files are styled properly
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh
 
 check-markdown: ## Check that markdown is styled properly
-	@echo "This requires yarn have been run in the website/ dir!"
-	${MAYBE_ENVIRONMENT_EXEC} ./website/node_modules/.bin/markdownlint .
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-markdown.sh
 
-check-generate: ## Check that no files are pending generation
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-generate.sh
+check-meta: ## Check that all /.meta file are valid
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-meta.sh
 
 check-version: ## Check that Vector's version is correct accounting for recent changes
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-version.rb
@@ -563,6 +572,9 @@ release-rollback: ## Rollback pending release changes
 release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh
 
+release-helm: ## Package and release Helm Chart
+	@scripts/release-helm.sh
+
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
 
@@ -603,15 +615,6 @@ verify-deb-artifact-on-ubuntu-19-04: package-deb-x86_64 ## Verify the deb packag
 
 verify-nixos:  ## Verify that Vector can be built on NixOS
 	$(RUN) verify-nixos
-
-##@ Website
-
-generate:  ## Generates files across the repo using the data in /.meta
-	${MAYBE_ENVIRONMENT_EXEC} bundle exec --gemfile scripts/Gemfile ./scripts/generate.rb
-
-export ARTICLE ?= true
-sign-blog: ## Sign newly added blog articles using GPG
-	$(RUN) sign-blog
 
 ##@ Utility
 

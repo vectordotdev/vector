@@ -50,9 +50,8 @@ cp "${TEMP}/grease/bin/grease" /usr/bin/grease
 locale-gen en_US.UTF-8
 dpkg-reconfigure locales
 
-# Yarn
-curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
-echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list
+# Rust
+curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
 
 # Docker
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
@@ -67,4 +66,3 @@ apt install --yes yarn docker-ce docker-ce-cli containerd.io
 
 # Remarshal is particular
 pip3 install remarshal==0.11.2
-

@@ -1,13 +1,15 @@
 use crate::{
     internal_events::TcpConnectionError,
     shutdown::ShutdownSignal,
-    stream::StreamExt01,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
-    Event,
+    Event, Pipeline,
 };
 use bytes05::Bytes;
-use futures::compat::{Compat, Compat01As03};
-use futures01::{future, stream, sync::mpsc, Async, Future, Sink, Stream};
+use futures::{
+    compat::{Compat, Compat01As03, Future01CompatExt, Stream01CompatExt},
+    StreamExt, TryStreamExt,
+};
+use futures01::{future, stream, Async, Future, Sink, Stream};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{
@@ -76,7 +78,7 @@ pub trait TcpSource: Clone + Send + 'static {
         shutdown_timeout_secs: u64,
         tls: MaybeTlsSettings,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
         let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 
@@ -108,7 +110,9 @@ pub trait TcpSource: Clone + Send + 'static {
 
             let future = listener
                 .incoming()
-                .take_until(shutdown.clone())
+                .compat()
+                .take_until(shutdown.clone().compat())
+                .compat()
                 .map_err(|error| {
                     error!(
                         message = "failed to accept socket",
@@ -197,7 +201,9 @@ fn handle_stream(
         // Actual work
         reader.poll()
     })
-    .take_until(tripwire)
+    .compat()
+    .take_until(tripwire.compat())
+    .compat()
     .filter_map(move |frame| {
         let host = host.clone();
         source.build_event(frame, host)

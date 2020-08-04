@@ -7,10 +7,7 @@ cargo build
 
 # Prepare .dockerignore so we don't send the whole dir to the docker as the
 # context.
-cat <<EOF >target/debug/.dockerignore
-**/*
-!vector
-EOF
+scripts/skaffold-dockerignore.sh
 
 # Watch for changes in he background and rebuild the vector binary.
 cargo watch -x build &

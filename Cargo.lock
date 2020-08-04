@@ -322,7 +322,7 @@ dependencies = [
  "serde_json",
  "tokio 0.2.21",
  "tokio-util",
- "url 2.1.1",
+ "url",
  "winapi 0.3.8",
 ]
 
@@ -431,7 +431,7 @@ dependencies = [
  "semver",
  "serde",
  "toml 0.5.6",
- "url 2.1.1",
+ "url",
 ]
 
 [[package]]
@@ -445,9 +445,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.58"
+version = "1.0.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9a06fb2e53271d7c279ec1efea6ab691c35a2ae67ec0d91d7acec0caf13b518"
+checksum = "95e28fa049fda1c330bcf9d723be7663a899c4679724b34c81e9f5a326aab8cd"
 dependencies = [
  "jobserver",
 ]
@@ -481,9 +481,9 @@ dependencies = [
 
 [[package]]
 name = "cidr-utils"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a43c5deddb78f662a837192de8bfd1c5d5f23475aec80ce182c79577aac3f50d"
+checksum = "1daf95b7df82d8f0ad8c49f1930f2853ce4a68f1bbca29c8d84087df2c24784f"
 dependencies = [
  "debug-helper",
  "enum-ordinalize",
@@ -1020,11 +1020,10 @@ dependencies = [
 
 [[package]]
 name = "enum-ordinalize"
-version = "3.1.6"
+version = "3.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c6cfb92d094c6019f5a41b4eb1635926af1b88a143c5025810cf7b583e359cd"
+checksum = "1676e1daadfd216bda88d3a6fedd1bf53b829a085f5cc4d81c6f3054f50ef983"
 dependencies = [
- "if_rust_version",
  "num-bigint",
  "num-traits",
  "proc-macro2 1.0.18",
@@ -1435,7 +1434,7 @@ dependencies = [
  "libc",
  "libgit2-sys",
  "log 0.4.8",
- "url 2.1.1",
+ "url",
 ]
 
 [[package]]
@@ -1716,17 +1715,6 @@ dependencies = [
 
 [[package]]
 name = "idna"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38f09e0f0b1fb55fdee1f17470ad800da77af5186a1a76c026b679358b7e844e"
-dependencies = [
- "matches",
- "unicode-bidi",
- "unicode-normalization",
-]
-
-[[package]]
-name = "idna"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02e2673c30ee86b5b96a9cb52ad15718aa1f966f5ab9ad54a8b95d5ca33120a9"
@@ -1735,12 +1723,6 @@ dependencies = [
  "unicode-bidi",
  "unicode-normalization",
 ]
-
-[[package]]
-name = "if_rust_version"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46dbcb333e86939721589d25a3557e180b52778cb33c7fdfe9e0158ff790d5ec"
 
 [[package]]
 name = "im"
@@ -1887,11 +1869,22 @@ dependencies = [
  "bytes 0.5.4",
  "chrono",
  "http 0.2.1",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "serde",
  "serde-value",
  "serde_json",
- "url 2.1.1",
+ "url",
+]
+
+[[package]]
+name = "k8s-test-framework"
+version = "0.1.0"
+dependencies = [
+ "k8s-openapi",
+ "once_cell",
+ "serde_json",
+ "tempfile",
+ "tokio 0.2.21",
 ]
 
 [[package]]
@@ -1940,12 +1933,12 @@ checksum = "3576a87f2ba00f6f106fdfcd16db1d698d648a26ad8e0573cad8537c3c362d2a"
 
 [[package]]
 name = "leveldb"
-version = "0.8.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5a2fa830c44ac4762564389a7efe22688a469c8d7b71dd11da2e35c33ae96c2"
+version = "0.8.4"
+source = "git+https://github.com/timberio/leveldb#64265815bcf1b69f30e6cb35bf687fbd6dd64afb"
 dependencies = [
  "db-key",
- "leveldb-sys",
+ "leveldb-sys 2.0.5",
+ "leveldb-sys 3.0.0",
  "libc",
 ]
 
@@ -1956,6 +1949,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71f46429bb70612c3e939aaeed27ffd31a24a773d21728a1a426e4089d6778d2"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "leveldb-sys"
+version = "3.0.0"
+source = "git+https://github.com/timberio/leveldb-sys?branch=v3.0.0#bbdd99a6fab0a7444a8c6eb0cc86a1a5a75f7fa1"
+dependencies = [
+ "cmake",
+ "libc",
+ "num_cpus",
 ]
 
 [[package]]
@@ -2903,12 +2906,6 @@ dependencies = [
 
 [[package]]
 name = "percent-encoding"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31010dd2e1ac33d5b46a5b413495239882813e0369f8ed8a5e266f173602f831"
-
-[[package]]
-name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
@@ -3214,7 +3211,7 @@ dependencies = [
  "tokio 0.2.21",
  "tokio-native-tls",
  "tokio-util",
- "url 2.1.1",
+ "url",
 ]
 
 [[package]]
@@ -3615,14 +3612,14 @@ dependencies = [
  "mime",
  "mime_guess",
  "native-tls",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "pin-project-lite",
  "serde",
  "serde_json",
  "serde_urlencoded",
  "tokio 0.2.21",
  "tokio-tls",
- "url 2.1.1",
+ "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -3683,7 +3680,7 @@ dependencies = [
  "lazy_static 1.4.0",
  "log 0.4.8",
  "md5",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "pin-project",
  "rusoto_credential",
  "rusoto_signature",
@@ -3785,7 +3782,7 @@ dependencies = [
  "hyper",
  "log 0.4.8",
  "md5",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "pin-project",
  "rusoto_credential",
  "rustc_version",
@@ -4032,7 +4029,7 @@ dependencies = [
  "dtoa",
  "itoa",
  "serde",
- "url 2.1.1",
+ "url",
 ]
 
 [[package]]
@@ -5300,24 +5297,13 @@ checksum = "826e7639553986605ec5979c7dd957c7895e93eabed50ab2ffa7f6128a75097c"
 
 [[package]]
 name = "url"
-version = "1.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd4e7c0d531266369519a4aa4f399d748bd37043b00bde1e4ff1f60a120b355a"
-dependencies = [
- "idna 0.1.5",
- "matches",
- "percent-encoding 1.0.1",
-]
-
-[[package]]
-name = "url"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "829d4a8476c35c9bf0bbce5a3b23f4106f79728039b726d292bb93bc106787cb"
 dependencies = [
- "idna 0.2.0",
+ "idna",
  "matches",
- "percent-encoding 2.1.0",
+ "percent-encoding",
 ]
 
 [[package]]
@@ -5440,6 +5426,7 @@ dependencies = [
  "inventory",
  "jemallocator",
  "k8s-openapi",
+ "k8s-test-framework",
  "lazy_static 1.4.0",
  "leveldb",
  "libc",
@@ -5520,7 +5507,7 @@ dependencies = [
  "tracing-subscriber",
  "tracing-tower",
  "typetag",
- "url 1.7.2",
+ "url",
  "uuid 0.7.4",
  "vector-wasm",
  "walkdir",

@@ -31,6 +31,7 @@ members = [
   "lib/file-source",
   "lib/tracing-limit",
   "lib/vector-wasm",
+  "lib/k8s-test-framework",
 ]
 
 [dependencies]
@@ -130,7 +131,7 @@ nom = { version = "5.1.2", optional = true }
 uuid = { version = "0.7", features = ["serde", "v4"], optional = true }
 exitcode = "1.1.2"
 snafu = { version = "0.6", features = ["futures-01", "futures"] }
-url = "1.7"
+url = "2.1.1"
 base64 = { version = "0.10.1", optional = true }
 bollard = { version = "0.7.1", default-features = false, features = ["tls"], optional = true }
 listenfd = { version = "0.3.3", optional = true }
@@ -195,6 +196,7 @@ tokio-test = "0.2"
 tokio = { version = "0.2", features = ["test-util"] }
 assert_cmd = "1.0"
 reqwest = { version = "0.10.6", features = ["json"] }
+k8s-test-framework = { version = "0.1", path = "lib/k8s-test-framework" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -254,7 +256,7 @@ sources-generator = []
 sources-http = ["warp", "sources-tls"]
 sources-internal_metrics = []
 sources-journald = []
-sources-kafka = []
+sources-kafka = ["rdkafka"]
 sources-logplex = ["warp", "sources-tls"]
 sources-prometheus = []
 sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls"]
@@ -264,7 +266,7 @@ sources-stdin = ["bytesize"]
 sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls", "syslog_loose"]
 sources-tls = []
 sources-vector = ["listenfd" ,"sources-tls"]
-sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-json_parser", "transforms-regex_parser"]
+sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser"]
 
 # Transforms
 transforms = [
@@ -395,6 +397,7 @@ docker = [
   "gcp-integration-tests",
   "gcp-pubsub-integration-tests",
   "gcp-cloud-storage-integration-tests",
+  "humio-integration-tests",
   "influxdb-integration-tests",
   "kafka-integration-tests",
   "loki-integration-tests",
@@ -422,15 +425,18 @@ es-integration-tests = ["sinks-elasticsearch"]
 gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]
+humio-integration-tests = ["sinks-humio_logs"]
 influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sources-kafka", "sinks-kafka"]
 loki-integration-tests = ["sinks-loki"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
-kubernetes-integration-tests = ["sources-kubernetes-logs"]
 
 shutdown-tests = ["sources","sinks-console","sinks-prometheus","sinks-blackhole","unix","rdkafka","transforms-log_to_metric","transforms-lua"]
 disable-resolv-conf = []
+
+# E2E tests
+kubernetes-e2e-tests = ["k8s-openapi"]
 
 [[bench]]
 name = "bench"
@@ -448,6 +454,10 @@ harness = false
 name = "wasm"
 harness = false
 required-features = ["transforms-wasm", "transforms-lua"]
+
+[[test]]
+name = "kubernetes-e2e"
+required-features = ["kubernetes-e2e-tests"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
