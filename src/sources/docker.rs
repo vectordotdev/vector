@@ -1,7 +1,7 @@
 use crate::{
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
-    internal_events::DockerEventReceived,
+    internal_events::{DockerContainerEventReceived, DockerEventReceived},
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Pipeline,
@@ -387,13 +387,8 @@ impl DockerSource {
                             let id = actor.id.unwrap();
                             let attributes = actor.attributes.unwrap();
 
-                            trace!(
-                                message = "docker event",
-                                id = field::display(&id),
-                                action = field::display(&action),
-                                timestamp = field::display(event.time.unwrap()),
-                                attributes = field::debug(&attributes),
-                            );
+                            emit!(DockerContainerEventReceived { container_id: &id, action: &action });
+
                             let id = ContainerId::new(id);
 
                             // Update container status

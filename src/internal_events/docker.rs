@@ -23,3 +23,26 @@ impl InternalEvent for DockerEventReceived {
         );
     }
 }
+
+#[derive(Debug)]
+pub struct DockerContainerEventReceived<'a> {
+    pub container_id: &'a str,
+    pub action: &'a str,
+}
+
+impl<'a> InternalEvent for DockerContainerEventReceived<'a> {
+    fn emit_logs(&self) {
+        trace!(
+            message = "received one container event.",
+            container_id = %self.container_id,
+            action = %self.action
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("container_events_processed", 1,
+                 "component_kind" => "source",
+                 "component_name" => "docker",
+        );
+    }
+}
