@@ -9,7 +9,6 @@ use crate::{
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
-use futures::TryFutureExt;
 use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
@@ -52,7 +51,7 @@ impl SinkConfig for PapertrailConfig {
 
         let sink = sink.with_flat_map(move |e| iter_ok(encode_event(e, pid, &encoding)));
 
-        Ok((Box::new(sink), Box::new(healthcheck.compat())))
+        Ok((Box::new(sink), Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {

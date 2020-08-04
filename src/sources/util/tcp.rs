@@ -6,29 +6,36 @@ use crate::{
 };
 use bytes05::Bytes;
 use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
-    future::{self, BoxFuture},
-    stream, FutureExt, Stream, StreamExt, TryFutureExt,
+    compat::{Compat, Compat01As03, Future01CompatExt, Stream01CompatExt},
+    StreamExt, TryStreamExt,
 };
-use futures01::Sink;
+use futures01::{future, stream, Async, Future, Sink, Stream};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
-use std::{fmt, future::Future, io, net::SocketAddr, pin::Pin, task::Poll, time::Duration};
-use tokio::{
-    net::{TcpListener, TcpStream},
-    time::delay_for,
+use std::{
+    fmt, io,
+    net::{Shutdown, SocketAddr},
+    time::{Duration, Instant},
 };
-use tokio_util::codec::{Decoder, FramedRead};
-use tracing::field;
+use tokio01::{
+    net::{TcpListener, TcpStream},
+    reactor::Handle,
+    timer,
+};
+use tokio_util::{
+    codec::{Decoder, FramedRead},
+    compat::FuturesAsyncReadCompatExt,
+};
+use tracing::{field, Span};
 use tracing_futures::Instrument;
 
-async fn make_listener(
+fn make_listener(
     addr: SocketListenAddr,
     mut listenfd: ListenFd,
     tls: &MaybeTlsSettings,
 ) -> Option<MaybeTlsListener> {
     match addr {
-        SocketListenAddr::SocketAddr(addr) => match tls.bind(&addr).await {
+        SocketListenAddr::SocketAddr(addr) => match tls.bind(&addr) {
             Ok(listener) => Some(listener),
             Err(err) => {
                 error!("Failed to bind to listener socket: {}", err);
@@ -36,7 +43,7 @@ async fn make_listener(
             }
         },
         SocketListenAddr::SystemdFd(offset) => match listenfd.take_tcp_listener(offset) {
-            Ok(Some(listener)) => match TcpListener::from_std(listener) {
+            Ok(Some(listener)) => match TcpListener::from_std(listener, &Handle::default()) {
                 Ok(listener) => Some(listener.into()),
                 Err(err) => {
                     error!("Failed to bind to listener socket: {}", err);
@@ -55,7 +62,7 @@ async fn make_listener(
     }
 }
 
-pub trait TcpSource: Clone + Send + Sync + 'static {
+pub trait TcpSource: Clone + Send + 'static {
     // Should be default: `std::io::Error`.
     // Right now this is unstable: https://github.com/rust-lang/rust/issues/29661
     type Error: From<io::Error> + std::fmt::Debug + std::fmt::Display;
@@ -77,9 +84,9 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
 
         let listenfd = ListenFd::from_env();
 
-        let fut = async move {
-            let mut listener = match make_listener(addr, listenfd, &tls).await {
-                None => return Err(()),
+        let source = future::lazy(move || {
+            let listener = match make_listener(addr, listenfd, &tls) {
+                None => return future::Either::B(future::err(())),
                 Some(listener) => listener,
             };
 
@@ -93,133 +100,121 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
                 )
             );
 
-            let tripwire = shutdown.clone().compat();
-            let tripwire = async move {
-                let _ = tripwire.await;
-                delay_for(Duration::from_secs(shutdown_timeout_secs)).await;
-            }
-            .shared();
-
-            listener
-                .incoming()
-                .take_until(shutdown.clone().compat())
-                .for_each(|connection| {
-                    let shutdown = shutdown.clone();
-                    let tripwire = tripwire.clone();
-                    let source = self.clone();
-                    let out = out.clone();
-
-                    async move {
-                        let socket = match connection {
-                            Ok(socket) => socket,
-                            Err(error) => {
-                                error!(
-                                    message = "failed to accept socket",
-                                    %error
-                                );
-                                return;
-                            }
-                        };
-
-                        let peer_addr = socket.peer_addr().ip().to_string();
-                        let span = info_span!("connection", %peer_addr);
-                        let host = Bytes::from(peer_addr);
-
-                        let tripwire = tripwire
-                            .map(move |_| {
-                                info!(
-                                    "Resetting connection (still open after {} seconds).",
-                                    shutdown_timeout_secs
-                                );
-                            })
-                            .boxed();
-
-                        span.in_scope(|| {
-                            let peer_addr = socket.peer_addr();
-                            debug!(message = "accepted a new connection", %peer_addr);
-
-                            let fut = handle_stream(shutdown, socket, source, tripwire, host, out);
-                            tokio::spawn(fut.instrument(span.clone()));
-                        });
-                    }
+            let tripwire = shutdown
+                .clone()
+                .and_then(move |_| {
+                    timer::Delay::new(Instant::now() + Duration::from_secs(shutdown_timeout_secs))
+                        .map_err(|err| panic!("Timer error: {:?}", err))
                 })
-                .map(Ok)
-                .await
-        };
+                .shared();
 
-        Ok(Box::new(fut.boxed().compat()))
+            let future = listener
+                .incoming()
+                .compat()
+                .take_until(shutdown.clone().compat())
+                .compat()
+                .map_err(|error| {
+                    error!(
+                        message = "failed to accept socket",
+                        %error
+                    )
+                })
+                .for_each(move |socket| {
+                    let peer_addr = socket.peer_addr().ip().to_string();
+
+                    let span = info_span!("connection", %peer_addr);
+
+                    let host = Bytes::from(peer_addr);
+
+                    let tripwire = tripwire
+                        .clone()
+                        .map(move |_| {
+                            info!(
+                                "Resetting connection (still open after {} seconds).",
+                                shutdown_timeout_secs
+                            )
+                        })
+                        .map_err(|_| ());
+
+                    let source = self.clone();
+                    span.in_scope(|| {
+                        let peer_addr = socket.peer_addr();
+                        debug!(message = "accepted a new connection", %peer_addr);
+                        handle_stream(
+                            span.clone(),
+                            shutdown.clone(),
+                            socket,
+                            source,
+                            tripwire,
+                            host,
+                            out.clone(),
+                        )
+                    });
+                    Ok(())
+                });
+            future::Either::A(future)
+        });
+
+        Ok(Box::new(source))
     }
 }
 
-async fn handle_stream(
+fn handle_stream(
+    span: Span,
     shutdown: ShutdownSignal,
-    mut socket: MaybeTlsIncomingStream<TcpStream>,
+    socket: MaybeTlsIncomingStream<TcpStream>,
     source: impl TcpSource,
-    tripwire: BoxFuture<'static, ()>,
+    tripwire: impl Future<Item = (), Error = ()> + Send + 'static,
     host: Bytes,
     out: impl Sink<SinkItem = Event, SinkError = ()> + Send + 'static,
 ) {
-    let mut shutdown = shutdown.compat();
-    tokio::select! {
-        result = socket.handshake() => {
-            if let Err(error) = result {
-                emit!(TcpConnectionError { error });
-                return;
-            }
-        },
-        _ = &mut shutdown => {
-            return;
-        }
-    };
-
-    let mut _token = None;
     let mut shutdown = Some(shutdown);
-    let mut reader = FramedRead::new(socket, source.decoder());
-    stream::poll_fn(move |cx| {
-        if let Some(fut) = shutdown.as_mut() {
-            match Pin::new(fut).poll(cx) {
-                Poll::Ready(Ok(token)) => {
+    let mut _token = None;
+    let socket = Compat01As03::new(socket).compat();
+    let mut reader = Compat::new(FramedRead::new(socket, source.decoder()));
+    let handler = stream::poll_fn(move || {
+        // Gracefull shutdown procedure
+        if let Some(future) = shutdown.as_mut() {
+            match future.poll() {
+                Ok(Async::Ready(tk)) => {
                     debug!("Start gracefull shutdown");
                     // Close our write part of TCP socket to signal the other side
                     // that it should stop writing and close the channel.
-                    let socket: Option<&TcpStream> = reader.get_ref().get_ref();
+                    let socket: Option<&TcpStream> = reader.get_ref().get_ref().get_ref().get_ref().get_ref();
                     if let Some(socket) = socket {
-                        if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
-                            warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
+                        if let Err(error) = socket.shutdown(Shutdown::Write) {
+                            warn!(message = "Failed in signalling to the other side to close the TCP channel.",%error);
                         }
                     } else {
                         // Connection hasn't yet been established so we are done here.
                         debug!("Closing connection that hasn't yet been fully established.");
-                        return Poll::Ready(None);
+                        return Ok(Async::Ready(None));
                     }
-
-                    _token = Some(token);
+                    _token = Some(tk);
                     shutdown = None;
                 }
-                Poll::Ready(Err(())) => {
-                    shutdown = None;
-                }
-                Poll::Pending => {}
+                Err(()) => shutdown = None,
+                Ok(Async::NotReady) => (),
             }
         }
 
-        Pin::new(&mut reader).poll_next(cx)
+        // Actual work
+        reader.poll()
     })
-    .take_until(tripwire)
-    .filter_map(move |frame| future::ready(match frame {
-        Ok(frame) => {
-            let host = host.clone();
-            source.build_event(frame, host).map(Ok)
-        }
-        Err(error) => {
-            warn!(message = "Failed to read data from TCP source.", %error);
-            None
-        }
-    }))
-    .forward(out.sink_compat())
-    .map_err(|_| warn!(message = "Error received while processing TCP source."))
+    .compat()
+    .take_until(tripwire.compat())
+    .compat()
+    .filter_map(move |frame| {
+        let host = host.clone();
+        source.build_event(frame, host)
+    })
+    .map_err(|error| {
+        emit!(TcpConnectionError { error });
+    })
+    .forward(out)
     .map(|_| debug!("connection closed."))
-    .await
+    .map_err(|_| warn!("Error received while processing TCP source"));
+    tokio01::spawn(handler.instrument(span));
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]

@@ -3,9 +3,12 @@ use openssl::{
     ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
 };
 use snafu::{ResultExt, Snafu};
-use std::{fmt::Debug, net::SocketAddr, path::PathBuf};
-use tokio::net::TcpStream;
-use tokio_openssl::{HandshakeError, SslStream};
+use std::fmt::Debug;
+use std::io::Error as IoError;
+use std::net::SocketAddr;
+use std::path::PathBuf;
+use tokio01::net::TcpStream;
+use tokio_openssl03::SslStream;
 
 #[cfg(feature = "sources-tls")]
 mod incoming;
@@ -16,6 +19,7 @@ mod settings;
 #[cfg(feature = "sources-tls")]
 pub(crate) use incoming::{MaybeTlsIncomingStream, MaybeTlsListener};
 pub(crate) use maybe_tls::MaybeTls;
+pub(crate) use outgoing::MaybeTlsConnector;
 pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
 
 pub type Result<T> = std::result::Result<T, TlsError>;
@@ -28,13 +32,13 @@ pub enum TlsError {
     FileOpenFailed {
         note: &'static str,
         filename: PathBuf,
-        source: std::io::Error,
+        source: IoError,
     },
     #[snafu(display("Could not read {} file {:?}: {}", note, filename, source))]
     FileReadFailed {
         note: &'static str,
         filename: PathBuf,
-        source: std::io::Error,
+        source: IoError,
     },
     #[snafu(display("Could not build TLS connector: {}", source))]
     TlsBuildConnector { source: ErrorStack },
@@ -71,9 +75,13 @@ pub enum TlsError {
     #[snafu(display("TLS configuration requires a certificate when enabled"))]
     MissingRequiredIdentity,
     #[snafu(display("TLS handshake failed: {}", source))]
-    Handshake { source: HandshakeError<TcpStream> },
+    Handshake { source: openssl::ssl::Error },
+    #[snafu(display("Not ready for I/O during TLS handshake"))]
+    HandshakeNotReady,
+    #[snafu(display("TLS handshake setup failed: {}", source))]
+    HandshakeSetup { source: ErrorStack },
     #[snafu(display("Incoming listener failed: {}", source))]
-    IncomingListener { source: tokio::io::Error },
+    IncomingListener { source: crate::Error },
     #[snafu(display("Creating the TLS acceptor failed: {}", source))]
     CreateAcceptor { source: ErrorStack },
     #[snafu(display("Error setting up the TLS certificate: {}", source))]
@@ -91,9 +99,9 @@ pub enum TlsError {
     #[snafu(display("PKCS#12 parse failed: {}", source))]
     ParsePkcs12 { source: ErrorStack },
     #[snafu(display("TCP bind failed: {}", source))]
-    TcpBind { source: tokio::io::Error },
+    TcpBind { source: IoError },
     #[snafu(display("{}", source))]
-    Connect { source: tokio::io::Error },
+    Connect { source: std::io::Error },
     #[snafu(display("Could not get peer address: {}", source))]
     PeerAddress { source: std::io::Error },
     #[snafu(display("Security Framework Error: {}", source))]
@@ -113,7 +121,7 @@ impl MaybeTlsStream<TcpStream> {
     pub fn peer_addr(&self) -> std::result::Result<SocketAddr, std::io::Error> {
         match self {
             Self::Raw(raw) => raw.peer_addr(),
-            Self::Tls(tls) => tls.get_ref().peer_addr(),
+            Self::Tls(tls) => tls.get_ref().get_ref().peer_addr(),
         }
     }
 }

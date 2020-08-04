@@ -307,7 +307,7 @@ async fn healthcheck() {
         None.into(),
     );
 
-    assert!(healthcheck.await.is_ok());
+    assert!(healthcheck.compat().await.is_ok());
 
     let bad_addr = next_addr();
     let bad_healthcheck = vector::sinks::util::tcp::tcp_healthcheck(
@@ -317,5 +317,5 @@ async fn healthcheck() {
         None.into(),
     );
 
-    assert!(bad_healthcheck.await.is_err());
+    assert!(bad_healthcheck.compat().await.is_err());
 }

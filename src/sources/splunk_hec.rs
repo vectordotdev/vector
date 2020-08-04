@@ -5,11 +5,13 @@ use crate::{
     topology::config::{DataType, GlobalOptions, SourceConfig},
     Pipeline,
 };
-use async_trait::async_trait;
 use bytes05::{buf::BufExt, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
-use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
+use futures::{
+    compat::{AsyncRead01CompatExt, Future01CompatExt, Stream01CompatExt},
+    FutureExt, TryFutureExt, TryStreamExt,
+};
 use futures01::{Async, Future, Sink, Stream};
 use http::StatusCode;
 use lazy_static::lazy_static;
@@ -21,6 +23,7 @@ use std::{
     net::{Ipv4Addr, SocketAddr},
 };
 use string_cache::DefaultAtom as Atom;
+use tokio_util::compat::FuturesAsyncReadCompatExt;
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 // Event fields unique to splunk_hec source
@@ -68,19 +71,8 @@ fn default_socket_address() -> SocketAddr {
 }
 
 #[typetag::serde(name = "splunk_hec")]
-#[async_trait]
 impl SourceConfig for SplunkConfig {
     fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
-        _out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        unimplemented!()
-    }
-
-    async fn build_async(
         &self,
         _: &str,
         _: &GlobalOptions,
@@ -107,12 +99,12 @@ impl SourceConfig for SplunkConfig {
             .or_else(finish_err);
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
-        let mut listener = tls.bind(&self.address).await?;
+        let incoming = tls.bind(&self.address)?.incoming();
 
         let fut = async move {
             let _ = warp::serve(services)
                 .serve_incoming_with_graceful_shutdown(
-                    listener.incoming(),
+                    incoming.compat().map_ok(|s| s.compat().compat()),
                     shutdown.clone().compat().map(|_| ()),
                 )
                 .await;
@@ -768,24 +760,20 @@ mod tests {
         test_util::trace_init();
         let (sender, recv) = Pipeline::new_test();
         let address = test_util::next_addr();
-        rt.spawn_std(async move {
+        rt.spawn(
             SplunkConfig {
                 address,
                 token,
                 tls: None,
             }
-            .build_async(
+            .build(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 sender,
             )
-            .await
-            .unwrap()
-            .compat()
-            .await
-            .unwrap()
-        });
+            .unwrap(),
+        );
         (recv, address)
     }
 
