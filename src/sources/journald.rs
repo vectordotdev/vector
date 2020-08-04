@@ -558,11 +558,11 @@ mod tests {
         test_util::{runtime, shutdown_on_idle},
         Pipeline,
     };
+    use futures::compat::Future01CompatExt;
     use futures01::stream::Stream;
     use std::io::{self, BufReader, Cursor};
     use std::iter::FromIterator;
     use tempfile::tempdir;
-    use futures::compat::Future01CompatExt;
     use tokio::time::{timeout, Duration};
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
