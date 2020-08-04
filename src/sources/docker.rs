@@ -1,6 +1,7 @@
 use crate::{
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
+    internal_events::DockerEventReceived,
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Pipeline,
@@ -690,6 +691,7 @@ impl ContainerLogInfo {
             _ => return None,
         };
 
+        let byte_size = bytes_message.len();
         let message = String::from_utf8_lossy(&bytes_message);
         let mut splitter = message.splitn(2, char::is_whitespace);
         let timestamp_str = splitter.next()?;
@@ -834,7 +836,9 @@ impl ContainerLogInfo {
         // Partial or not partial - we return the event we got here, because all
         // other cases were handeled earlier.
         let event = Event::Log(log_event);
-        trace!(message = "Received one event.", ?event);
+
+        emit!(DockerEventReceived { byte_size });
+
         Some(event)
     }
 }

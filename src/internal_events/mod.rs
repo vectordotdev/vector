@@ -1,6 +1,7 @@
 mod add_fields;
 mod aws_kinesis_streams;
 mod blackhole;
+mod docker;
 mod elasticsearch;
 mod file;
 #[cfg(all(feature = "sources-journald", feature = "unix"))]
@@ -30,6 +31,7 @@ pub mod kubernetes;
 pub use self::add_fields::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
+pub use self::docker::*;
 pub use self::elasticsearch::*;
 pub use self::file::*;
 #[cfg(all(feature = "sources-journald", feature = "unix"))]
