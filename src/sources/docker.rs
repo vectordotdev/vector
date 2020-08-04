@@ -126,7 +126,7 @@ impl SourceConfig for DockerConfig {
             match source.handle_running_containers().await {
                 Ok(source) => source.run().await,
                 Err(error) => {
-                    error!(message = "Listing currently running containers, failed", %error);
+                    error!(message = "listing currently running containers, failed.", %error);
                 }
             }
         };
@@ -169,7 +169,7 @@ impl DockerSourceCore {
         // Only log events created at-or-after this moment are logged.
         let now = Local::now();
         info!(
-            message = "Capturing logs from now on",
+            message = "capturing logs from now on.",
             now = %now.to_rfc3339()
         );
 
@@ -271,7 +271,7 @@ impl DockerSource {
 
         // main event stream, with whom only newly started/restarted containers will be loged.
         let events = core.docker_event_stream();
-        info!(message = "Listening docker events");
+        info!(message = "listening docker events.");
 
         // Channel of communication between main future and event_stream futures
         let (main_send, main_recv) = mpsc::unbounded_channel::<ContainerLogInfo>();
@@ -330,7 +330,7 @@ impl DockerSource {
                 let image = container.image.unwrap();
 
                 trace!(
-                    message = "Found already running container",
+                    message = "found already running container.",
                     id = field::display(&id),
                     names = field::debug(&names)
                 );
@@ -351,7 +351,7 @@ impl DockerSource {
                         }
                     }),
                 ) {
-                    trace!(message = "Container excluded", id = field::display(&id));
+                    trace!(message = "container excluded.", id = field::display(&id));
                     return;
                 }
 
@@ -377,8 +377,8 @@ impl DockerSource {
                             }
                         }
                         None => {
-                            error!(message = "docker source main stream has ended unexpectedly");
-                            info!(message = "Shuting down docker source");
+                            error!(message = "docker source main stream has ended unexpectedly.");
+                            info!(message = "shuting down docker source.");
                             return;
                         }
                     };
@@ -429,8 +429,8 @@ impl DockerSource {
                         Some(Err(error)) => emit!(DockerCommunicationError{error,container_id:None}),
                         None => {
                             // TODO: this could be fixed, but should be tryed with some timeoff and exponential backoff
-                            error!(message = "docker event stream has ended unexpectedly");
-                            info!(message = "Shuting down docker source");
+                            error!(message = "docker event stream has ended unexpectedly.");
+                            info!(message = "shuting down docker source.");
                             return;
                         }
                     };
@@ -454,7 +454,7 @@ impl DockerSource {
                 .unwrap_or(false);
             if hostname_hint || image_hint {
                 // This container is probably itself.
-                info!(message = "Detected self container", id);
+                info!(message = "setected self container.", id);
                 return false;
             }
         }
@@ -578,7 +578,7 @@ impl EventStreamBuilder {
         });
 
         if let Err(error) = self.main_send.send(info) {
-            error!(message = "Unable to return ContainerLogInfo to main", %error);
+            error!(message = "unable to return ContainerLogInfo to main.", %error);
         }
     }
 }
@@ -715,7 +715,7 @@ impl ContainerLogInfo {
                     None if self.created <= timestamp.with_timezone(&Utc) => (),
                     _ => {
                         trace!(
-                            message = "Recieved older log",
+                            message = "recieved older log.",
                             timestamp = %timestamp_str
                         );
                         return None;
@@ -990,7 +990,7 @@ mod tests {
         } else {
             // Maybe a before created container is present
             info!(
-                message = "Assums that named container remained from previous tests",
+                message = "assums that named container remained from previous tests.",
                 name = name
             );
             name.to_owned()
@@ -1006,7 +1006,7 @@ mod tests {
     ) -> Option<String> {
         pull_busybox(docker).await;
 
-        trace!("Creating container");
+        trace!("creating container.");
 
         let options = Some(CreateContainerOptions { name });
         let config = ContainerConfig {
@@ -1053,7 +1053,7 @@ mod tests {
 
     /// Returns once container has started
     async fn container_start(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
-        trace!("Starting container");
+        trace!("starting container.");
 
         let options = None::<StartContainerOptions<&str>>;
         docker.start_container(id, options).await
@@ -1061,12 +1061,12 @@ mod tests {
 
     /// Returns once container is done running
     async fn container_wait(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
-        trace!("Waiting container");
+        trace!("waiting container.");
 
         docker
             .wait_container(id, None::<WaitContainerOptions<&str>>)
             .try_for_each(|exit| async move {
-                info!("Container exited with status code: {}", exit.status_code);
+                info!("container exited with status code: {}.", exit.status_code);
                 Ok(())
             })
             .await
@@ -1074,7 +1074,7 @@ mod tests {
 
     /// Returns once container is killed
     async fn container_kill(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
-        trace!("Waiting container");
+        trace!("waiting container.");
 
         docker
             .kill_container(id, None::<KillContainerOptions<&str>>)
@@ -1088,7 +1088,7 @@ mod tests {
     }
 
     async fn container_remove(id: &str, docker: &Docker) {
-        trace!("Removing container");
+        trace!("removing container.");
 
         // Don't panick, as this is unreleated to test, and there possibly other containers that need to be removed
         let _ = docker
