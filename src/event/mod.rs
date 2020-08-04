@@ -14,7 +14,7 @@ pub mod discriminant;
 pub mod merge;
 pub mod merge_state;
 pub mod metric;
-mod util;
+pub mod util;
 
 pub use metric::{Metric, StatisticKind};
 pub(crate) use util::log::PathComponent;
