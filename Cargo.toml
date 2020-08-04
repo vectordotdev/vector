@@ -465,6 +465,3 @@ required-features = ["kubernetes-e2e-tests"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
-
-[patch.crates-io]
-warp = { git = "https://github.com/seanmonstar/warp", rev = "6777564d18b04c3d5b616a79907cfa175663c350" }
