@@ -3,6 +3,7 @@ use crate::{
     sinks::util::{
         encoding::EncodingConfigWithDefault, service2::TowerRequestConfig, BatchConfig, Compression,
     },
+    template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use serde::{Deserialize, Serialize};
@@ -13,7 +14,7 @@ const HOST: &str = "https://cloud.humio.com";
 pub struct HumioLogsConfig {
     token: String,
     host: Option<String>,
-    source: Option<String>,
+    source: Option<Template>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -136,6 +137,7 @@ mod integration_tests {
     use serde_json::json;
     use serde_json::Value as JsonValue;
     use std::collections::HashMap;
+    use std::convert::TryFrom;
 
     // matches humio container address
     const HOST: &str = "http://localhost:8080";
@@ -185,7 +187,7 @@ mod integration_tests {
             let repo = create_repository().await;
 
             let mut config = config(&repo.default_ingest_token);
-            config.source = Some("/var/log/syslog".to_string());
+            config.source = Template::try_from("/var/log/syslog".to_string()).ok();
 
             let (sink, _) = config.build(cx).unwrap();
 
