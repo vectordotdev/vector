@@ -629,7 +629,7 @@ fn raw_event(
 }
 
 #[derive(Clone, Copy, Debug, Snafu)]
-pub enum ApiError {
+pub(crate) enum ApiError {
     MissingAuthorization,
     InvalidAuthorization,
     UnsupportedEncoding,

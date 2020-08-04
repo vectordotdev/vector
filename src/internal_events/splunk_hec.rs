@@ -2,7 +2,8 @@ use super::InternalEvent;
 use metrics::counter;
 use serde_json::Error;
 
-pub use self::source::*;
+#[cfg(feature = "sources-splunk_hec")]
+pub(crate) use self::source::*;
 
 #[derive(Debug)]
 pub struct SplunkEventSent {
@@ -49,8 +50,9 @@ impl InternalEvent for SplunkEventEncodeError {
 
 #[cfg(feature = "sources-splunk_hec")]
 mod source {
-    use super::*;
+    use super::InternalEvent;
     use crate::sources::splunk_hec::ApiError;
+    use metrics::counter;
 
     #[derive(Debug)]
     pub struct SplunkHECEventReceived;
@@ -76,7 +78,11 @@ mod source {
 
     impl<'a> InternalEvent for SplunkHECRequestReceived<'a> {
         fn emit_logs(&self) {
-            debug!(message = "received one request.", %self.path, rate_limit_secs = 10);
+            debug!(
+                message = "received one request.",
+                path = %self.path,
+                rate_limit_secs = 10
+            );
         }
 
         fn emit_metrics(&self) {
@@ -95,7 +101,11 @@ mod source {
 
     impl InternalEvent for SplunkHECRequestBodyInvalid {
         fn emit_logs(&self) {
-            error!(message = "invalid request body.",%self.error, rate_limit_secs = 10);
+            error!(
+                message = "invalid request body.",
+                error = %self.error,
+                rate_limit_secs = 10
+            );
         }
 
         fn emit_metrics(&self) {}
@@ -103,12 +113,16 @@ mod source {
 
     #[derive(Debug)]
     pub struct SplunkHECRequestError {
-        pub error: ApiError,
+        pub(crate) error: ApiError,
     }
 
     impl InternalEvent for SplunkHECRequestError {
         fn emit_logs(&self) {
-            error!(message = "error processing request.",%self.error, rate_limit_secs = 10);
+            error!(
+                message = "error processing request.",
+                error = %self.error,
+                rate_limit_secs = 10
+            );
         }
 
         fn emit_metrics(&self) {
