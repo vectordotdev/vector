@@ -45,8 +45,8 @@ jobs:
       - run: make check-version
       - run: make check-scripts
       - uses: EmbarkStudios/cargo-deny-action@v1
-          with:
-            command: check advisories
+        with:
+          command: check advisories
 
   check-component-features:
     name: Component Features - Linux
