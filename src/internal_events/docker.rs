@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use bollard::errors::Error;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -82,6 +83,30 @@ impl<'a> InternalEvent for DockerContainerUnwatch<'a> {
 
     fn emit_metrics(&self) {
         counter!("containers_unwatched", 1,
+                 "component_kind" => "source",
+                 "component_name" => "docker",
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct DockerCommunicationError<'a> {
+    pub error: Error,
+    pub container_id: Option<&'a str>,
+}
+
+impl<'a> InternalEvent for DockerCommunicationError<'a> {
+    fn emit_logs(&self) {
+        error!(
+            message = "error in communication with docker daemon.",
+            error = %self.error,
+            container_id = ?self.container_id,
+            rate_limit_secs = 10
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("communication_error", 1,
                  "component_kind" => "source",
                  "component_name" => "docker",
         );

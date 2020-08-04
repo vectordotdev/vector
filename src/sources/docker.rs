@@ -2,8 +2,8 @@ use crate::{
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
     internal_events::{
-        DockerContainerEventReceived, DockerContainerUnwatch, DockerContainerWatch,
-        DockerEventReceived,
+        DockerCommunicationError, DockerContainerEventReceived, DockerContainerUnwatch,
+        DockerContainerWatch, DockerEventReceived,
     },
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -425,7 +425,7 @@ impl DockerSource {
                                 _ => {},
                             };
                         }
-                        Some(Err(error)) => error!(source = "docker events", %error),
+                        Some(Err(error)) => emit!(DockerCommunicationError{error,container_id:None}),
                         None => {
                             // TODO: this could be fixed, but should be tryed with some timeoff and exponential backoff
                             error!(message = "docker event stream has ended unexpectedly");
@@ -548,7 +548,10 @@ impl EventStreamBuilder {
                                         to get logs from the docker daemon."#
                                 )
                             }
-                            _ => error!(message = "docker API container logging error", %error),
+                            _ => emit!(DockerCommunicationError {
+                                error,
+                                container_id: Some(info.id.as_str())
+                            }),
                         };
 
                         Err(())

@@ -1,6 +1,7 @@
 mod add_fields;
 mod aws_kinesis_streams;
 mod blackhole;
+#[cfg(feature = "sources-docker")]
 mod docker;
 mod elasticsearch;
 mod file;
@@ -31,6 +32,7 @@ pub mod kubernetes;
 pub use self::add_fields::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
+#[cfg(feature = "sources-docker")]
 pub use self::docker::*;
 pub use self::elasticsearch::*;
 pub use self::file::*;
