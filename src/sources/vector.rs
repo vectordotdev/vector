@@ -5,10 +5,9 @@ use crate::{
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    Event,
+    Event, Pipeline,
 };
 use bytes05::{Bytes, BytesMut};
-use futures01::sync::mpsc;
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::LengthDelimitedCodec;
@@ -48,7 +47,7 @@ impl SourceConfig for VectorConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let vector = VectorSource;
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
@@ -104,13 +103,13 @@ mod test {
         test_util::{next_addr, runtime, wait_for_tcp, CollectCurrent},
         tls::{TlsConfig, TlsOptions},
         topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
-        Event,
+        Event, Pipeline,
     };
-    use futures01::{stream, sync::mpsc, Future, Sink};
+    use futures01::{stream, Future, Sink};
     use std::net::SocketAddr;
 
     fn stream_test(addr: SocketAddr, source: VectorConfig, sink: VectorSinkConfig) {
-        let (tx, rx) = mpsc::channel(100);
+        let (tx, rx) = Pipeline::new_test();
 
         let server = source
             .build(

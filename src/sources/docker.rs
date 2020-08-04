@@ -3,6 +3,7 @@ use crate::{
     event::{self, Event, LogEvent, Value},
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    Pipeline,
 };
 use bollard::{
     container::{InspectContainerOptions, ListContainersOptions, LogOutput, LogsOptions},
@@ -19,7 +20,6 @@ use futures::{
     sink::SinkExt,
     FutureExt, Stream, StreamExt, TryFutureExt,
 };
-use futures01::sync::mpsc as mpsc01;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::pin::Pin;
@@ -108,7 +108,7 @@ impl SourceConfig for DockerConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc01::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let source = DockerSource::new(
             self.clone().with_empty_partial_event_marker_field_as_none(),
@@ -245,7 +245,7 @@ struct DockerSource {
 impl DockerSource {
     fn new(
         config: DockerConfig,
-        out: mpsc01::Sender<Event>,
+        out: Pipeline,
         shutdown: ShutdownSignal,
     ) -> crate::Result<DockerSource> {
         // Find out it's own container id, if it's inside a docker container.
@@ -467,7 +467,7 @@ impl DockerSource {
 struct EventStreamBuilder {
     core: Arc<DockerSourceCore>,
     /// Event stream futures send events through this
-    out: mpsc01::Sender<Event>,
+    out: Pipeline,
     /// End through which event stream futures send ContainerLogInfo to main future
     main_send: mpsc::UnboundedSender<ContainerLogInfo>,
     /// Self and event streams will end on this.
@@ -893,6 +893,7 @@ mod tests {
     use super::*;
     use crate::runtime::Runtime;
     use crate::test_util::{collect_n, runtime, trace_init};
+    use crate::Pipeline;
     use bollard::{
         container::{
             Config as ContainerConfig, CreateContainerOptions, KillContainerOptions,
@@ -901,7 +902,7 @@ mod tests {
         image::{CreateImageOptions, CreateImageResults, ListImagesOptions},
     };
     use futures::{compat::Future01CompatExt, stream::TryStreamExt};
-    use futures01::{Async, Stream as Stream01};
+    use futures01::{sync::mpsc as mpsc01, Async, Stream as Stream01};
 
     /// None if docker is not present on the system
     fn source_with<'a, L: Into<Option<&'a str>>>(
@@ -922,7 +923,7 @@ mod tests {
     /// None if docker is not present on the system
     fn source_with_config(config: DockerConfig, rt: &mut Runtime) -> mpsc01::Receiver<Event> {
         // trace_init();
-        let (sender, recv) = mpsc01::channel(100);
+        let (sender, recv) = Pipeline::new_test();
         rt.spawn(
             config
                 .build(

@@ -14,12 +14,12 @@ use crate::{
     sources,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     transforms::Transform,
+    Pipeline,
 };
 use bytes05::Bytes;
 use evmap10::{self as evmap};
 use file_source::{FileServer, FileServerShutdown, Fingerprinter};
 use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
-use futures01::sync::mpsc;
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -75,7 +75,7 @@ impl SourceConfig for Config {
         name: &str,
         globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<sources::Source> {
         let source = Source::new(self, Resolver, globals, name)?;
 

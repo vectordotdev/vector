@@ -4,7 +4,6 @@
 #![allow(clippy::blocks_in_if_conditions)]
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::new_ret_no_self)]
-#![allow(clippy::ptr_arg)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::trivial_regex)]
 #![allow(clippy::type_complexity)]
@@ -38,6 +37,7 @@ pub mod kafka;
 pub mod kubernetes;
 pub mod list;
 pub mod metrics;
+pub(crate) mod pipeline;
 pub mod region;
 pub mod runtime;
 pub mod serde;
@@ -57,6 +57,7 @@ pub mod unit_test;
 pub mod validate;
 
 pub use event::Event;
+pub use pipeline::Pipeline;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 

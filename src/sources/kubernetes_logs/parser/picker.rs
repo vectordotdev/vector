@@ -30,7 +30,7 @@ impl Transform for Picker {
                     panic!("message value must be Bytes");
                 };
                 if bytes.len() > 1 && bytes[0] == b'{' {
-                    *self = Picker::Docker(Docker::new())
+                    *self = Picker::Docker(Docker)
                 } else {
                     *self = Picker::Cri(Cri::new())
                 }

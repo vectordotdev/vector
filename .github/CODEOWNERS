@@ -81,5 +81,3 @@
 /lib/file-source/src/paths_provider/glob.rs @MOZGIII
 
 /tests/buffering.rs @MOZGIII
-
-/website/ @binarylogic
