@@ -63,18 +63,16 @@ pub struct StatsdSocketError<T> {
 }
 
 impl<T> StatsdSocketError<T> {
+    fn new(r#type: StatsdSocketErrorType, error: T) -> Self {
+        Self { r#type, error }
+    }
+
     pub fn bind(error: T) -> Self {
-        StatsdSocketError {
-            r#type: StatsdSocketErrorType::Bind,
-            error,
-        }
+        Self::new(StatsdSocketErrorType::Bind, error)
     }
 
     pub fn read(error: T) -> Self {
-        StatsdSocketError {
-            r#type: StatsdSocketErrorType::Read,
-            error,
-        }
+        Self::new(StatsdSocketErrorType::Read, error)
     }
 }
 
