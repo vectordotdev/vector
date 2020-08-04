@@ -201,7 +201,7 @@ impl Sink for UnixSink {
     }
 }
 
-#[cfg(all(feature = "tokio/uds", test))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::test_util::{random_lines_with_stream, runtime, shutdown_on_idle, CountReceiver};
@@ -231,7 +231,7 @@ mod tests {
             let out_path = temp_uds_path("unix_test");
 
             // Set up server to receive events from the Sink.
-            let receiver = CountReceiver::receive_lines_unix(out_path.clone());
+            let mut receiver = CountReceiver::receive_lines_unix(out_path.clone());
 
             // Set up Sink
             let config = UnixSinkConfig::new(out_path, Encoding::Text.into());
@@ -241,6 +241,9 @@ mod tests {
             // Send the test data
             let (input_lines, events) = random_lines_with_stream(100, num_lines);
             let _ = sink.send_all(events).compat().await.unwrap();
+
+            // Wait for output to connect
+            receiver.connected().await;
 
             // Receive the data sent by the Sink to the receiver
             assert_eq!(input_lines, receiver.wait().await);
