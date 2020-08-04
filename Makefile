@@ -382,8 +382,6 @@ package-x86_64-unknown-linux-musl-all: package-archive-x86_64-unknown-linux-musl
 
 package-x86_64-unknown-linux-gnu-all: package-archive-x86_64-unknown-linux-gnu package-deb-x86_64 package-rpm-x86_64 # Build all x86_64 GNU packages
 
-package-armv7-unknown-linux-musleabihf-all: package-archive-armv7-unknown-linux-musleabihf package-deb-armv7 package-rpm-armv7  # Build all armv7 MUSL packages
-
 package-aarch64-unknown-linux-musl-all: package-archive-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
 
 # archives
@@ -399,9 +397,6 @@ package-archive-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## Bu
 package-archive-x86_64-unknown-linux-gnu: build-x86_64-unknown-linux-gnu ## Build the x86_64 archive
 	$(RUN) package-archive-x86_64-unknown-linux-gnu
 
-package-archive-armv7-unknown-linux-musleabihf: build-armv7-unknown-linux-musleabihf ## Build the armv7 archive
-	$(RUN) package-archive-armv7-unknown-linux-musleabihf
-
 package-archive-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## Build the aarch64 archive
 	$(RUN) package-archive-aarch64-unknown-linux-musl
 
@@ -415,9 +410,6 @@ package-deb-all: package-deb-x86_64 package-deb-armv7 package-deb-aarch64 ## Bui
 package-deb-x86_64: package-archive-x86_64-unknown-linux-gnu ## Build the x86_64 deb package
 	$(RUN) package-deb-x86_64
 
-package-deb-armv7: package-archive-armv7-unknown-linux-musleabihf ## Build the armv7 deb package
-	$(RUN) package-deb-armv7
-
 package-deb-aarch64: package-archive-aarch64-unknown-linux-musl  ## Build the aarch64 deb package
 	$(RUN) package-deb-aarch64
 
@@ -430,9 +422,6 @@ package-rpm-all: package-rpm-x86_64 package-rpm-armv7 package-rpm-aarch64 ## Bui
 
 package-rpm-x86_64: package-archive-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
 	$(RUN) package-rpm-x86_64
-
-package-rpm-armv7: package-archive-armv7-unknown-linux-musleabihf ## Build the armv7 rpm package
-	$(RUN) package-rpm-armv7
 
 package-rpm-aarch64: package-archive-aarch64-unknown-linux-musl ## Build the aarch64 rpm package
 	$(RUN) package-rpm-aarch64
