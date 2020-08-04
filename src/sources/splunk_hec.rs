@@ -812,7 +812,7 @@ mod tests {
     ) -> Vec<Event> {
         let n = messages.len();
         let pump = sink.send_all(stream::iter_ok(messages.into_iter().map(Into::into)));
-        rt.spawn(pump.map(|_| ()));
+        rt.spawn(pump.map(|_| ()).map_err(|()| panic!()));
         let events = rt.block_on(collect_n(source, n)).unwrap();
 
         assert_eq!(n, events.len());
