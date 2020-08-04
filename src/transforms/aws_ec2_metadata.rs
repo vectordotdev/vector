@@ -11,7 +11,7 @@ use hyper::Body;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::RandomState, HashSet};
 use string_cache::DefaultAtom as Atom;
-use tokio::time::{delay_for, Instant, Duration};
+use tokio::time::{delay_for, Duration, Instant};
 use tracing_futures::Instrument;
 
 type WriteHandle = evmap::WriteHandle<Atom, Bytes, (), RandomState>;
