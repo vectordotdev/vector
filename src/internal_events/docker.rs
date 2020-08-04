@@ -112,3 +112,27 @@ impl<'a> InternalEvent for DockerCommunicationError<'a> {
         );
     }
 }
+
+#[derive(Debug)]
+pub struct DockerContainerMetadataFetchFailed<'a> {
+    pub error: Error,
+    pub container_id: &'a str,
+}
+
+impl<'a> InternalEvent for DockerContainerMetadataFetchFailed<'a> {
+    fn emit_logs(&self) {
+        error!(
+            message = "failed fetching container metadata.",
+            error = %self.error,
+            container_id = ?self.container_id,
+            rate_limit_secs = 10
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("container_metadata_fetch_failed", 1,
+                 "component_kind" => "source",
+                 "component_name" => "docker",
+        );
+    }
+}

@@ -2,8 +2,8 @@ use crate::{
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
     internal_events::{
-        DockerCommunicationError, DockerContainerEventReceived, DockerContainerUnwatch,
-        DockerContainerWatch, DockerEventReceived,
+        DockerCommunicationError, DockerContainerEventReceived, DockerContainerMetadataFetchFailed,
+        DockerContainerUnwatch, DockerContainerWatch, DockerEventReceived,
     },
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -17,7 +17,7 @@ use bollard::{
     Docker,
 };
 use bytes05::{Buf, Bytes};
-use chrono::{DateTime, FixedOffset, Local, NaiveTime, Utc, MAX_DATE};
+use chrono::{DateTime, FixedOffset, Local, NaiveTime, ParseError, Utc, MAX_DATE};
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     future,
@@ -478,23 +478,32 @@ impl EventStreamBuilder {
     fn start(&self, id: ContainerId) -> ContainerState {
         let this = self.clone();
         tokio::spawn(async move {
-            Arc::clone(&this.core)
+            match this
+                .core
                 .docker
-                .inspect_container(id.clone().as_str(), None::<InspectContainerOptions>)
-                .map_err(|error| error!(message = "Fetching container details failed", %error))
-                .and_then(|details| async move {
-                    ContainerMetadata::from_details(details)
-                        .map_err(|error| error!(message = "Metadata extraction failed", %error))
-                })
-                .and_then(|metadata| async move {
-                    let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
-                    this.start_event_stream(info).await;
-                    Ok::<(), ()>(())
-                })
+                .inspect_container(id.as_str(), None::<InspectContainerOptions>)
                 .await
+            {
+                Ok(details) => {
+                    match ContainerMetadata::from_details(details) {
+                        Ok(metadata) => {
+                            let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
+                            this.start_event_stream(info).await;
+                            return;
+                        }
+                        Err(error) => (), //TODO
+                    }
+                }
+                Err(error) => emit!(DockerContainerMetadataFetchFailed {
+                    error,
+                    container_id: id.as_str()
+                }),
+            }
+            // In case of any error we have to notify main thread that it should try again.
+            // TODO: fix this bug.
         });
 
-        ContainerState::new()
+        ContainerState::new_running()
     }
 
     /// If info is present, restarts event stream which will run until shutdown.
@@ -522,9 +531,6 @@ impl EventStreamBuilder {
         });
 
         // Create event streamer
-        let main_send = self.main_send.clone();
-        let partial_event_marker_field = self.core.config.partial_event_marker_field.clone();
-        let auto_partial_merge = self.core.config.auto_partial_merge;
         let mut partial_event_merge_state = None;
 
         stream
@@ -532,8 +538,8 @@ impl EventStreamBuilder {
                 match value {
                     Ok(message) => Ok(info.new_event(
                         message,
-                        partial_event_marker_field.clone(),
-                        auto_partial_merge,
+                        self.core.config.partial_event_marker_field.clone(),
+                        self.core.config.auto_partial_merge,
                         &mut partial_event_merge_state,
                     )),
                     Err(error) => {
@@ -570,7 +576,7 @@ impl EventStreamBuilder {
             container_id: info.id.as_str()
         });
 
-        if let Err(error) = main_send.send(info) {
+        if let Err(error) = self.main_send.send(info) {
             error!(message = "Unable to return ContainerLogInfo to main", %error);
         }
     }
@@ -603,7 +609,7 @@ struct ContainerState {
 
 impl ContainerState {
     /// It's ContainerLogInfo pair must be created exactly once.
-    fn new() -> Self {
+    fn new_running() -> Self {
         ContainerState {
             info: None,
             running: true,
@@ -854,7 +860,7 @@ struct ContainerMetadata {
 }
 
 impl ContainerMetadata {
-    fn from_details(details: ContainerInspectResponse) -> crate::Result<Self> {
+    fn from_details(details: ContainerInspectResponse) -> Result<Self, ParseError> {
         let config = details.config.unwrap();
         let name = details.name.unwrap();
         let created = details.created.unwrap();
