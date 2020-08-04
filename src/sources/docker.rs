@@ -240,7 +240,7 @@ struct DockerSource {
     ///  mappings of seen container_id to their data
     containers: HashMap<ContainerId, ContainerState>,
     ///receives ContainerLogInfo comming from event stream futures
-    main_recv: mpsc::UnboundedReceiver<ContainerLogInfo>,
+    main_recv: mpsc::UnboundedReceiver<Result<ContainerLogInfo, ContainerId>>,
     /// It may contain shortened container id.
     hostname: Option<String>,
     /// True if self needs to be excluded
@@ -274,7 +274,8 @@ impl DockerSource {
         info!(message = "listening docker events.");
 
         // Channel of communication between main future and event_stream futures
-        let (main_send, main_recv) = mpsc::unbounded_channel::<ContainerLogInfo>();
+        let (main_send, main_recv) =
+            mpsc::unbounded_channel::<Result<ContainerLogInfo, ContainerId>>();
 
         // Starting with logs from now.
         // TODO: Is this exception acceptable?
@@ -367,13 +368,26 @@ impl DockerSource {
             tokio::select! {
                 value = self.main_recv.next() => {
                     match value {
-                        Some(info) => {
-                            let state = self
-                                .containers
-                                .get_mut(&info.id)
-                                .expect("Every ContainerLogInfo has it's ContainerState");
-                            if state.return_info(info) {
-                                self.esb.restart(state);
+                        Some(message) => {
+                            match message{
+                                Ok(info)=> {
+                                    let state = self
+                                        .containers
+                                        .get_mut(&info.id)
+                                        .expect("Every ContainerLogInfo has it's ContainerState");
+                                    if state.return_info(info) {
+                                        self.esb.restart(state);
+                                    }
+                                },
+                                Err(id)=> {
+                                    let state = self
+                                        .containers
+                                        .remove(&id)
+                                        .expect("Every started ContainerId has it's ContainerState");
+                                    if state.is_running(){
+                                        self.containers.insert(id.clone(), self.esb.start(id));
+                                    }
+                                }
                             }
                         }
                         None => {
@@ -469,7 +483,7 @@ struct EventStreamBuilder {
     /// Event stream futures send events through this
     out: Pipeline,
     /// End through which event stream futures send ContainerLogInfo to main future
-    main_send: mpsc::UnboundedSender<ContainerLogInfo>,
+    main_send: mpsc::UnboundedSender<Result<ContainerLogInfo, ContainerId>>,
     /// Self and event streams will end on this.
     shutdown: ShutdownSignal,
 }
@@ -501,8 +515,10 @@ impl EventStreamBuilder {
                     container_id: id.as_str()
                 }),
             }
-            // In case of any error we have to notify main thread that it should try again.
-            // TODO: fix this bug.
+            // In case of any error we have to notify the main thread that it should try again.
+            if let Err(error) = this.main_send.send(Err(id)) {
+                error!(message = "unable to send ContainerId to main.", %error);
+            }
         });
 
         ContainerState::new_running()
@@ -577,7 +593,7 @@ impl EventStreamBuilder {
             container_id: info.id.as_str()
         });
 
-        if let Err(error) = self.main_send.send(info) {
+        if let Err(error) = self.main_send.send(Ok(info)) {
             error!(message = "unable to return ContainerLogInfo to main.", %error);
         }
     }
@@ -625,6 +641,10 @@ impl ContainerState {
 
     fn stoped(&mut self) {
         self.running = false;
+    }
+
+    fn is_running(&self) -> bool {
+        self.running
     }
 
     /// True if it needs to be restarted.
