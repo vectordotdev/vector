@@ -290,14 +290,12 @@ impl RunningTopology {
     ) -> bool {
         let healthchecks = take_healthchecks(diff, pieces)
             .into_iter()
-            .map(|(_, task)| task.compat());
-        let healthchecks = futures01::future::join_all(healthchecks).map(|_| ());
+            .map(|(_, task)| task);
+        let healthchecks = future::try_join_all(healthchecks);
 
         info!("Running healthchecks.");
         if require_healthy {
-            let success = tokio::spawn(healthchecks.compat())
-                .await
-                .expect("Task panicked or runtime shutdown unexpectedly");
+            let success = healthchecks.await;
 
             if success.is_ok() {
                 info!("All healthchecks passed.");
@@ -307,7 +305,7 @@ impl RunningTopology {
                 false
             }
         } else {
-            tokio::spawn(healthchecks.compat());
+            tokio::spawn(healthchecks);
             true
         }
     }

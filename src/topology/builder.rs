@@ -5,7 +5,7 @@ use super::{
     ConfigDiff,
 };
 use crate::{buffers, dns::Resolver, event::Event, shutdown::SourceShutdownCoordinator, Pipeline};
-use futures::{compat::Future01CompatExt, TryFutureExt};
+use futures::{compat::Future01CompatExt, FutureExt};
 use futures01::{sync::mpsc, Future, Stream};
 use std::collections::HashMap;
 use tokio::time::{timeout, Duration};
@@ -245,8 +245,20 @@ pub async fn build_pieces(
             if enable_healthcheck {
                 let duration = Duration::from_secs(10);
                 timeout(duration, healthcheck.compat())
-                    .map_ok(|_| info!("Healthcheck: Passed."))
-                    .map_err(|error| error!("Healthcheck: Failed Reason: {}", error))
+                    .map(|result| match result {
+                        Ok(Ok(_)) => {
+                            info!("Healthcheck: Passed.");
+                            Ok(())
+                        }
+                        Ok(Err(error)) => {
+                            error!("Healthcheck: Failed Reason: {}", error);
+                            Err(())
+                        }
+                        Err(_) => {
+                            error!("Healthcheck: timeout");
+                            Err(())
+                        }
+                    })
                     .await
             } else {
                 info!("Healthcheck: Disabled.");
