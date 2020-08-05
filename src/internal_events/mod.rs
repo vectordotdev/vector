@@ -1,6 +1,8 @@
 mod add_fields;
 mod aws_kinesis_streams;
 mod blackhole;
+#[cfg(feature = "sources-docker")]
+mod docker;
 mod elasticsearch;
 mod file;
 mod http;
@@ -16,7 +18,10 @@ mod lua;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
 mod regex;
+#[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 mod splunk_hec;
+#[cfg(feature = "sources-statsd")]
+mod statsd;
 mod stdin;
 mod syslog;
 mod tcp;
@@ -31,6 +36,8 @@ pub mod kubernetes;
 pub use self::add_fields::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
+#[cfg(feature = "sources-docker")]
+pub use self::docker::*;
 pub use self::elasticsearch::*;
 pub use self::file::*;
 pub use self::http::*;
@@ -46,7 +53,10 @@ pub use self::lua::*;
 #[cfg(feature = "sources-prometheus")]
 pub use self::prometheus::*;
 pub use self::regex::*;
-pub use self::splunk_hec::*;
+#[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
+pub(crate) use self::splunk_hec::*;
+#[cfg(feature = "sources-statsd")]
+pub use self::statsd::*;
 pub use self::stdin::*;
 pub use self::syslog::*;
 pub use self::tcp::*;
