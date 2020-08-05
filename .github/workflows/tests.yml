@@ -88,6 +88,8 @@ jobs:
   build-x86_64-unknown-linux-musl:
     name: Release build - x86_64-unknown-linux-musl
     runs-on: ubuntu-20.04
+    env:
+      RELEASE: false
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -102,10 +104,17 @@ jobs:
       - run: make build-cross-x86_64-unknown-linux-musl
       - run: make clean-cross
       - run: make build-x86_64-unknown-linux-musl
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: vector-x86_64-unknown-linux-musl
+          path: target/x86_64-unknown-linux-musl/debug/vector
 
   build-aarch64-unknown-linux-musl:
     name: Release build - aarch64-unknown-linux-musl
     runs-on: ubuntu-20.04
+    env:
+      RELEASE: false
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -120,6 +129,11 @@ jobs:
       - run: make build-cross-aarch64-unknown-linux-musl
       - run: make clean-cross
       - run: make build-aarch64-unknown-linux-musl
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: vector-aarch64-unknown-linux-musl
+          path: target/aarch64-unknown-linux-musl/debug/vector
 
   test-misc:
     name: Shutdown - Linux
