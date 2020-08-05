@@ -1,4 +1,4 @@
-use crate::event::{Event, LogEvent, Metric};
+use crate::{Event, LogEvent, Metric};
 use rlua::prelude::*;
 
 impl<'a> ToLua<'a> for Event {
@@ -47,7 +47,7 @@ impl<'a> FromLua<'a> for Event {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::event::{
+    use crate::{
         metric::{MetricKind, MetricValue},
         Metric, Value,
     };

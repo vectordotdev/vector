@@ -28,6 +28,7 @@ extended-description-file = "target/debian-extended-description.txt"
 [workspace]
 members = [
   ".",
+  "lib/event",
   "lib/file-source",
   "lib/tracing-limit",
   "lib/vector-wasm",
@@ -38,6 +39,7 @@ members = [
 [dependencies]
 # Internal libs
 codec = { path = "lib/codec" }
+vector-event = { path = "lib/event" }
 file-source = { path = "lib/file-source" }
 tracing-limit = { path = "lib/tracing-limit" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
@@ -172,7 +174,6 @@ atty = "0.2"
 nix = "0.16.1"
 
 [build-dependencies]
-prost-build = "0.6.1"
 built = { version = "0.4", features = ["git2", "chrono"] }
 
 [dev-dependencies]
@@ -312,7 +313,7 @@ transforms-grok_parser = ["grok"]
 transforms-json_parser = []
 transforms-log_to_metric = []
 transforms-logfmt_parser = ["logfmt"]
-transforms-lua = ["rlua"]
+transforms-lua = ["rlua", "vector-event/lua"]
 transforms-merge = []
 transforms-regex_parser = []
 transforms-remove_fields = []

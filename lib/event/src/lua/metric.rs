@@ -1,5 +1,5 @@
 use super::util::{table_to_set, table_to_timestamp, timestamp_to_table};
-use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+use crate::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use rlua::prelude::*;
 use std::collections::BTreeMap;
 

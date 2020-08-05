@@ -155,7 +155,7 @@ impl HttpSink for InfluxDBLogsSink {
             if self.tags.contains(&key) {
                 tags.insert(key, value.to_string_lossy());
             } else {
-                fields.insert(key, value.to_field());
+                fields.insert(key, value_to_field(value));
             }
         });
 
@@ -196,14 +196,12 @@ impl InfluxDBLogsConfig {
     }
 }
 
-impl Value {
-    pub fn to_field(&self) -> Field {
-        match self {
-            Value::Integer(num) => Field::Int(*num),
-            Value::Float(num) => Field::Float(*num),
-            Value::Boolean(b) => Field::Bool(*b),
-            _ => Field::String(self.to_string_lossy()),
-        }
+fn value_to_field(value: &Value) -> Field {
+    match value {
+        Value::Integer(num) => Field::Int(*num),
+        Value::Float(num) => Field::Float(*num),
+        Value::Boolean(b) => Field::Bool(*b),
+        _ => Field::String(value.to_string_lossy()),
     }
 }
 

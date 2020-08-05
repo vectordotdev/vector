@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate tracing;
+
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
@@ -11,14 +14,16 @@ use std::{collections::BTreeMap, iter::FromIterator};
 use string_cache::DefaultAtom as Atom;
 
 pub mod discriminant;
+#[cfg(feature = "lua")]
+pub mod lua;
 pub mod merge;
 pub mod merge_state;
 pub mod metric;
 mod util;
 
 pub use metric::{Metric, StatisticKind};
-pub(crate) use util::log::PathComponent;
-pub(crate) use util::log::PathIter;
+pub use util::log::PathComponent;
+pub use util::log::PathIter;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
@@ -219,16 +224,16 @@ pub fn log_schema() -> &'static LogSchema {
 #[serde(default)]
 pub struct LogSchema {
     #[serde(default = "LogSchema::default_message_key")]
-    #[getset(get = "pub", set = "pub(crate)")]
+    #[getset(get = "pub", set = "pub")]
     message_key: Atom,
     #[serde(default = "LogSchema::default_timestamp_key")]
-    #[getset(get = "pub", set = "pub(crate)")]
+    #[getset(get = "pub", set = "pub")]
     timestamp_key: Atom,
     #[serde(default = "LogSchema::default_host_key")]
-    #[getset(get = "pub", set = "pub(crate)")]
+    #[getset(get = "pub", set = "pub")]
     host_key: Atom,
     #[serde(default = "LogSchema::default_source_type_key")]
-    #[getset(get = "pub", set = "pub(crate)")]
+    #[getset(get = "pub", set = "pub")]
     source_type_key: Atom,
 }
 

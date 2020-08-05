@@ -2,7 +2,7 @@ use super::util::{
     table_is_array, table_is_timestamp, table_to_array, table_to_map, table_to_timestamp,
     timestamp_to_table,
 };
-use crate::event::Value;
+use crate::Value;
 use rlua::prelude::*;
 
 impl<'a> ToLua<'a> for Value {

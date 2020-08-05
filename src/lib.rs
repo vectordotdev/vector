@@ -23,7 +23,6 @@ pub mod buffers;
 pub mod conditions;
 pub mod config;
 pub mod dns;
-pub mod event;
 pub mod expiring_hash_map;
 pub mod generate;
 #[cfg(feature = "wasm")]
@@ -57,8 +56,8 @@ pub mod types;
 pub mod unit_test;
 pub mod validate;
 
-pub use event::Event;
 pub use pipeline::Pipeline;
+pub use vector_event::{self as event, Event};
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 

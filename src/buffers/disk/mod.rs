@@ -1,6 +1,6 @@
 #![cfg(feature = "leveldb")]
 
-use crate::event::Event;
+use crate::Event;
 use futures01::{Async, AsyncSink, Sink, Stream};
 use snafu::Snafu;
 use std::io;

@@ -156,8 +156,8 @@ fn hash_null<H: Hasher>(hasher: &mut H) {
 
 #[cfg(test)]
 mod tests {
+    use super::LogEvent;
     use super::*;
-    use crate::event::LogEvent;
     use std::collections::{hash_map::DefaultHasher, HashMap};
 
     fn hash<H: Hash>(hash: H) -> u64 {

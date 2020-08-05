@@ -1,5 +1,5 @@
-use crate::event::merge::merge_log_event;
-use crate::event::LogEvent;
+use super::merge::merge_log_event;
+use super::LogEvent;
 use string_cache::DefaultAtom as Atom;
 
 /// Encapsulates the inductive events merging algorithm.
@@ -36,8 +36,8 @@ impl LogEventMergeState {
 
 #[cfg(test)]
 mod test {
+    use super::super::{Event, LogEvent};
     use super::LogEventMergeState;
-    use crate::event::{Event, LogEvent};
     use string_cache::DefaultAtom as Atom;
 
     fn log_event_with_message(message: &str) -> LogEvent {

@@ -5490,7 +5490,6 @@ dependencies = [
  "pretty_assertions",
  "prometheus-parser",
  "prost",
- "prost-build",
  "prost-types",
  "pulsar",
  "rand 0.5.6",
@@ -5543,9 +5542,34 @@ dependencies = [
  "typetag",
  "url",
  "uuid 0.7.4",
+ "vector-event",
  "vector-wasm",
  "walkdir",
  "warp",
+]
+
+[[package]]
+name = "vector-event"
+version = "0.1.0"
+dependencies = [
+ "bytes 0.5.6",
+ "chrono",
+ "derive_is_enum_variant",
+ "getset",
+ "lazy_static",
+ "metrics-core",
+ "metrics-runtime",
+ "once_cell",
+ "prost",
+ "prost-build",
+ "prost-types",
+ "regex",
+ "rlua",
+ "serde",
+ "serde_json",
+ "string_cache",
+ "toml 0.4.10",
+ "tracing 0.1.19 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

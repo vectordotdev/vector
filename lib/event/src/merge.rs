@@ -1,4 +1,4 @@
-use crate::event::{LogEvent, Value};
+use super::{LogEvent, Value};
 use bytes::BytesMut;
 use string_cache::DefaultAtom as Atom;
 

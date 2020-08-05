@@ -1,5 +1,3 @@
-mod interop;
-
 use crate::{
     config::CONFIG_PATHS,
     config::{DataType, TransformContext},
