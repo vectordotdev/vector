@@ -157,13 +157,12 @@ fn merge() {
 
         let input_lines1 = random_lines(100).take(num_lines).collect::<Vec<_>>();
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
-        let (a, b) = future::join(
+        future::try_join_all(vec![
             send_lines(in_addr1, input_lines1.clone()),
             send_lines(in_addr2, input_lines2.clone()),
-        )
-        .await;
-        a.unwrap();
-        b.unwrap();
+        ])
+        .await
+        .unwrap();
 
         // Shut down server
         topology.stop().compat().await.unwrap();
