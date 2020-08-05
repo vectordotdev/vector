@@ -41,52 +41,35 @@ jobs:
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
-  test-e2e-kubernetes:
-    name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime.name }}
+  # Github Actions don't support `matrix` at the job-level `if:` condition.
+  # We apply this workaround for now: instead of using matrices, we split our
+  # job in two.
+  # See https://github.community/t/feature-request-and-use-case-example-to-allow-matrix-in-if-s/126067
+  # TODO: merge the K8s E2E jobs and switch to job-level `if:` when the issue
+  # with `matrix` usage is fixed.
+  # This can also be simplified when composite actions are implemented.
+  # See https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md
+  test-e2e-kubernetes-essential:
+    name: K8s ${{ matrix.kubernetes_version }} / ${{ matrix.container_runtime }} (essential)
     runs-on: ubuntu-latest
     strategy:
       matrix:
         minikube_version:
           - "v1.11.0" # https://github.com/kubernetes/minikube/issues/8799
         kubernetes_version:
-          - version: "v1.18.6"
-            is_essential: true
-          - version: "v1.17.9"
-          - version: "v1.16.12" # v1.16.13 is broken, see https://github.com/kubernetes/minikube/issues/8840
-          - version: "v1.15.12"
-          - version: "v1.14.10"
+          - "v1.18.6"
         container_runtime:
-          - name: docker
-            is_essential: true
-          - name: containerd
-            is_essential: true
-          - name: crio
-            is_essential: true
+          - docker
+          - containerd
+          - crio
       fail-fast: false
     steps:
-      # Github Actions don't support `matrix` at the job-level `if:` condition.
-      # We apply this workaround for now.
-      # See https://github.community/t/feature-request-and-use-case-example-to-allow-matrix-in-if-s/126067
-      # TODO: switch to job-level `if:` when the issue with `matrix` usage is
-      # fixed.
-      - name: Compute the skip condition
-        id: skip-condition
-        if: |
-          (
-            matrix.kubernetes_version.is_essential &&
-            matrix.container_runtime.is_essential
-          ) || (
-            github.event.pull_request == null ||
-            contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
-          )
-        run: "true"
       - name: Setup Minikube
-        if: steps.skip-condition.conclusion == 'success'
         run: |
           set -xeuo pipefail
 
           curl -Lo kubectl \
-            'https://storage.googleapis.com/kubernetes-release/release/${{ matrix.kubernetes_version.version }}/bin/linux/amd64/kubectl'
+            'https://storage.googleapis.com/kubernetes-release/release/${{ matrix.kubernetes_version }}/bin/linux/amd64/kubectl'
           sudo install kubectl /usr/local/bin/ && rm kubectl
 
           curl -Lo minikube \
@@ -95,19 +78,66 @@ jobs:
 
           minikube config set profile minikube
           minikube config set vm-driver docker
-          minikube config set kubernetes-version '${{ matrix.kubernetes_version.version }}'
-          minikube config set container-runtime '${{ matrix.container_runtime.name }}'
+          minikube config set kubernetes-version '${{ matrix.kubernetes_version }}'
+          minikube config set container-runtime '${{ matrix.container_runtime }}'
           # Start minikube, try again once if fails and print logs if the second
           # attempt fails too.
           minikube start || minikube delete && minikube start || minikube logs
           kubectl cluster-info
       - name: Checkout
-        if: steps.skip-condition.conclusion == 'success'
         uses: actions/checkout@v1
       - run: USE_CONTAINER=none make slim-builds
-        if: steps.skip-condition.conclusion == 'success'
       - run: make test-e2e-kubernetes
-        if: steps.skip-condition.conclusion == 'success'
+        env:
+          USE_MINIKUBE_CACHE: "true"
+          PACKAGE_DEB_USE_CONTAINER: docker
+
+  test-e2e-kubernetes-extra:
+    name: K8s ${{ matrix.kubernetes_version }} / ${{ matrix.container_runtime }} (extra)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        minikube_version:
+          - "v1.11.0" # https://github.com/kubernetes/minikube/issues/8799
+        kubernetes_version:
+          - "v1.17.9"
+          - "v1.16.12" # v1.16.13 is broken, see https://github.com/kubernetes/minikube/issues/8840
+          - "v1.15.12"
+          - "v1.14.10"
+        container_runtime:
+          - docker
+          - containerd
+          - crio
+      fail-fast: false
+    # See TODO above.
+    if: |
+      github.event.pull_request == null ||
+      contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
+    steps:
+      - name: Setup Minikube
+        run: |
+          set -xeuo pipefail
+
+          curl -Lo kubectl \
+            'https://storage.googleapis.com/kubernetes-release/release/${{ matrix.kubernetes_version }}/bin/linux/amd64/kubectl'
+          sudo install kubectl /usr/local/bin/ && rm kubectl
+
+          curl -Lo minikube \
+            'https://storage.googleapis.com/minikube/releases/${{ matrix.minikube_version }}/minikube-linux-amd64'
+          sudo install minikube /usr/local/bin/ && rm minikube
+
+          minikube config set profile minikube
+          minikube config set vm-driver docker
+          minikube config set kubernetes-version '${{ matrix.kubernetes_version }}'
+          minikube config set container-runtime '${{ matrix.container_runtime }}'
+          # Start minikube, try again once if fails and print logs if the second
+          # attempt fails too.
+          minikube start || minikube delete && minikube start || minikube logs
+          kubectl cluster-info
+      - name: Checkout
+        uses: actions/checkout@v1
+      - run: USE_CONTAINER=none make slim-builds
+      - run: make test-e2e-kubernetes
         env:
           USE_MINIKUBE_CACHE: "true"
           PACKAGE_DEB_USE_CONTAINER: docker
