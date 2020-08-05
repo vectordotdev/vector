@@ -57,7 +57,7 @@ description = "Your Humio ingestion token."
 [sinks.splunk_hec.options.source]
 type = "string"
 common = false
-examples = ["/var/log/syslog", "UDP:514"]
+examples = ["{{file}}", "/var/log/syslog", "UDP:514"]
 required = false
 templateable = true
 description = """\
