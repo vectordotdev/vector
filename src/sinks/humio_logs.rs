@@ -3,6 +3,7 @@ use crate::{
     sinks::util::{
         encoding::EncodingConfigWithDefault, service2::TowerRequestConfig, BatchConfig, Compression,
     },
+    template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use serde::{Deserialize, Serialize};
@@ -18,6 +19,9 @@ pub struct HumioLogsConfig {
         default
     )]
     encoding: EncodingConfigWithDefault<Encoding>,
+
+    event_type: Option<Template>,
+
     #[serde(default)]
     pub compression: Compression,
 
@@ -72,6 +76,7 @@ impl HumioLogsConfig {
         HecSinkConfig {
             token: self.token.clone(),
             host,
+            sourcetype: self.event_type.clone(),
             encoding: self.encoding.clone().transmute(),
             compression: self.compression,
             batch: self.batch,
@@ -129,11 +134,13 @@ mod integration_tests {
         topology::config::{SinkConfig, SinkContext},
         Event,
     };
+    use chrono::Utc;
     use futures::compat::Future01CompatExt;
     use futures01::Sink;
     use serde_json::json;
     use serde_json::Value as JsonValue;
     use std::collections::HashMap;
+    use std::convert::TryFrom;
 
     // matches humio container address
     const HOST: &str = "http://localhost:8080";
@@ -171,6 +178,58 @@ mod integration_tests {
                 "Humio encountered an error parsing this message: {}",
                 entry.error_msg.unwrap_or("no error message".to_string())
             );
+        });
+    }
+
+    #[test]
+    fn humio_type() {
+        let mut rt = runtime();
+
+        rt.block_on_std(async move {
+            let repo = create_repository().await;
+
+            // sets type
+            {
+                let mut config = config(&repo.default_ingest_token);
+                config.event_type = Template::try_from("json".to_string()).ok();
+
+                let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+
+                let message = random_string(100);
+                let mut event = Event::from(message.clone());
+                // Humio expects to find an @timestamp field for JSON lines
+                // https://docs.humio.com/ingesting-data/parsers/built-in-parsers/#json
+                event
+                    .as_mut_log()
+                    .insert("@timestamp", Utc::now().to_rfc3339());
+
+                sink.send(event).compat().await.unwrap();
+
+                let entry = find_entry(repo.name.as_str(), message.as_str()).await;
+
+                assert_eq!(entry.humio_type, "json");
+                assert!(
+                    entry.error.is_none(),
+                    "Humio encountered an error parsing this message: {}",
+                    entry.error_msg.unwrap_or("no error message".to_string())
+                );
+            }
+
+            // defaults to none
+            {
+                let config = config(&repo.default_ingest_token);
+
+                let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+
+                let message = random_string(100);
+                let event = Event::from(message.clone());
+
+                sink.send(event).compat().await.unwrap();
+
+                let entry = find_entry(repo.name.as_str(), message.as_str()).await;
+
+                assert_eq!(entry.humio_type, "none");
+            }
         });
     }
 
@@ -287,7 +346,7 @@ mutation {{
         humio_type: String,
 
         #[serde(rename = "@error")]
-        error: Option<bool>,
+        error: Option<String>,
 
         #[serde(rename = "@error_msg")]
         error_msg: Option<String>,
