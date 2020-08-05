@@ -19,13 +19,14 @@ use crate::topology::{builder::Pieces, task::Task};
 
 use crate::buffers;
 use crate::shutdown::SourceShutdownCoordinator;
-use futures::compat::Future01CompatExt;
-use futures01::{future, sync::mpsc, Future, Stream};
+use futures::{compat::Future01CompatExt, future, FutureExt, StreamExt, TryFutureExt};
+use futures01::{sync::mpsc, Future};
 use indexmap::IndexMap;
-use std::collections::{HashMap, HashSet};
-use std::panic::AssertUnwindSafe;
-use std::time::{Duration, Instant};
-use tokio01::timer;
+use std::{
+    collections::{HashMap, HashSet},
+    panic::AssertUnwindSafe,
+};
+use tokio::time::{delay_until, interval, Duration, Instant};
 use tracing_futures::Instrument;
 
 // TODO: Result is only for compat, remove when not needed
@@ -140,7 +141,7 @@ impl RunningTopology {
         for (name, task) in self.tasks.into_iter().chain(self.source_tasks.into_iter()) {
             let task = futures::compat::Compat::new(task)
                 .map(|_result| ())
-                .or_else(|_| future::ok(())) // Consider an errored task to be shutdown
+                .or_else(|_| futures01::future::ok(())) // Consider an errored task to be shutdown
                 .shared();
 
             wait_handles.push(task.clone());
@@ -153,26 +154,26 @@ impl RunningTopology {
         // If we reach the deadline, this future will print out which components won't
         // gracefully shutdown since we will start to forcefully shutdown the sources.
         let mut check_handles2 = check_handles.clone();
-        let timeout = timer::Delay::new(deadline)
-            .map(move |_| {
-                // Remove all tasks that have shutdown.
-                check_handles2.retain(|_name, handles| {
-                    retain(handles, |handle| {
-                        handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
-                    });
-                    !handles.is_empty()
+        let timeout = delay_until(deadline).map(move |_| {
+            // Remove all tasks that have shutdown.
+            check_handles2.retain(|_name, handles| {
+                retain(handles, |handle| {
+                    handle.poll().map(|p| p.is_not_ready()).unwrap_or(false)
                 });
-                let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
+                !handles.is_empty()
+            });
+            let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
 
-                error!(
-                    "Failed to gracefully shut down in time. Killing: {}",
-                    remaining_components.join(", ")
-                );
-            })
-            .map_err(|err| panic!("Timer error: {:?}", err));
+            error!(
+                "Failed to gracefully shut down in time. Killing: {}",
+                remaining_components.join(", ")
+            );
+
+            Ok(())
+        });
 
         // Reports in intervals which componenets are still running.
-        let reporter = timer::Interval::new_interval(Duration::from_secs(5))
+        let reporter = interval(Duration::from_secs(5))
             .inspect(move |_| {
                 // Remove all tasks that have shutdown.
                 check_handles.retain(|_name, handles| {
@@ -196,25 +197,24 @@ impl RunningTopology {
                     time_remaining
                 );
             })
-            .filter(|_| false) // Run indefinitely without emitting items
+            .filter(|_| future::ready(false)) // Run indefinitely without emitting items
             .into_future()
-            .map(|_| ())
-            .map_err(|(err, _)| panic!("Timer error: {:?}", err));
+            .map(|_| Ok(()));
 
         // Finishes once all tasks have shutdown.
-        let success = future::join_all(wait_handles)
+        let success = futures01::future::join_all(wait_handles)
             .map(|_| ())
-            .map_err(|_: future::SharedError<()>| ());
+            .map_err(|_: futures01::future::SharedError<()>| ())
+            .compat();
 
         // Aggregate future that ends once anything detectes that all tasks have shutdown.
-        let shutdown_complete_future =
-            future::select_all::<Vec<Box<dyn Future<Item = (), Error = ()> + Send>>>(vec![
-                Box::new(timeout),
-                Box::new(reporter),
-                Box::new(success),
-            ])
-            .map(|_| ())
-            .map_err(|_| ());
+        let shutdown_complete_future = future::select_all(vec![
+            Box::pin(timeout) as future::BoxFuture<'static, Result<(), ()>>,
+            Box::pin(reporter) as future::BoxFuture<'static, Result<(), ()>>,
+            Box::pin(success) as future::BoxFuture<'static, Result<(), ()>>,
+        ])
+        .map(|(result, _, _)| result.map(|_| ()).map_err(|_| ()))
+        .compat();
 
         // Now kick off the shutdown process by shutting down the sources.
         let source_shutdown_complete = self.shutdown_coordinator.shutdown_all(deadline);
@@ -291,13 +291,11 @@ impl RunningTopology {
         let healthchecks = take_healthchecks(diff, pieces)
             .into_iter()
             .map(|(_, task)| task);
-        let healthchecks = futures01::future::join_all(healthchecks).map(|_| ());
+        let healthchecks = future::try_join_all(healthchecks);
 
         info!("Running healthchecks.");
         if require_healthy {
-            let success = tokio::spawn(healthchecks.compat())
-                .await
-                .expect("Task panicked or runtime shutdown unexpectedly");
+            let success = healthchecks.await;
 
             if success.is_ok() {
                 info!("All healthchecks passed.");
@@ -307,7 +305,7 @@ impl RunningTopology {
                 false
             }
         } else {
-            tokio::spawn(healthchecks.compat());
+            tokio::spawn(healthchecks);
             true
         }
     }
@@ -356,7 +354,7 @@ impl RunningTopology {
             );
         }
 
-        future::join_all(source_shutdown_complete_futures)
+        futures01::future::join_all(source_shutdown_complete_futures)
             .compat()
             .await
             .unwrap();
@@ -466,7 +464,7 @@ impl RunningTopology {
     fn spawn_sink(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let span = info_span!("sink", name = %task.name(), r#type = %task.typetag());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
+        let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task.compat());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             drop(previous); // detach and forget
@@ -476,7 +474,7 @@ impl RunningTopology {
     fn spawn_transform(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let span = info_span!("transform", name = %task.name(), r#type = %task.typetag());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span);
+        let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task.compat());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             drop(previous); // detach and forget
@@ -486,7 +484,7 @@ impl RunningTopology {
     fn spawn_source(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
         let span = info_span!("source", name = %task.name(), r#type = %task.typetag());
-        let task = handle_errors(task, self.abort_tx.clone()).instrument(span.clone());
+        let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span.clone());
         let spawned = tokio::spawn(task.compat());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
             drop(previous); // detach and forget
@@ -496,7 +494,8 @@ impl RunningTopology {
             .takeover_source(name, &mut new_pieces.shutdown_coordinator);
 
         let source_task = new_pieces.source_tasks.remove(name).unwrap();
-        let source_task = handle_errors(source_task, self.abort_tx.clone()).instrument(span);
+        let source_task =
+            handle_errors(source_task.compat(), self.abort_tx.clone()).instrument(span);
         self.source_tasks
             .insert(name.to_string(), tokio::spawn(source_task.compat()));
     }
@@ -835,16 +834,12 @@ mod reload_tests {
 mod source_finished_tests {
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sources::generator::GeneratorConfig;
-    use crate::test_util::runtime;
-    use crate::topology;
-    use crate::topology::config::Config;
-    use std::time::Duration;
-    use tokio01::util::FutureExt;
+    use crate::topology::{self, config::Config};
+    use futures::compat::Future01CompatExt;
+    use tokio::time::{timeout, Duration};
 
-    #[test]
-    fn sources_finished() {
-        let mut rt = runtime();
-
+    #[tokio::test]
+    async fn sources_finished() {
         let mut old_config = Config::empty();
         old_config.add_source("in", GeneratorConfig::repeat(vec!["text".to_owned()], 1));
         old_config.add_sink(
@@ -856,9 +851,11 @@ mod source_finished_tests {
             },
         );
 
-        let (topology, _crash) = rt.block_on_std(topology::start(old_config, false)).unwrap();
+        let (topology, _crash) = topology::start(old_config, false).await.unwrap();
 
-        rt.block_on(topology.sources_finished().timeout(Duration::from_secs(2)))
+        timeout(Duration::from_secs(2), topology.sources_finished().compat())
+            .await
+            .unwrap()
             .unwrap();
     }
 }
