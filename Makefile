@@ -254,10 +254,10 @@ build-aarch64-unknown-linux-musl: ${VECTOR_BINARY_aarch64-unknown-linux-musl} ##
 ${VECTOR_BINARY_aarch64-unknown-linux-musl}: ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}
 	rustup toolchain install nightly
 	rustup target add aarch64-unknown-linux-musl --toolchain nightly
-	# CC=${CC_aarch64-unknown-linux-musl} \
-	# CXX=${CXX_aarch64-unknown-linux-musl} \
-	# HOST_CXX=musl-g++ \
-	# HOST_CC=musl-gcc \
+	CC=musl-gcc \
+	CXX=musl-g++ \
+	HOST_CXX=musl-g++ \
+	HOST_CC=musl-gcc \
 	PATH=${PATH}:${MUSL_CROSS_MAKE_PATH}/bin
 	cargo +nightly build --no-default-features --features default-musl --target aarch64-unknown-linux-musl
 
