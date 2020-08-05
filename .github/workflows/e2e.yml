@@ -12,6 +12,7 @@ on:
       - "skaffold/**"
       - "src/**"
       - "tests/**"
+      - "distribution/**"
       - "Cargo.lock"
       - "Cargo.toml"
       - "build.rs"
