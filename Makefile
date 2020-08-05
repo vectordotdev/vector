@@ -94,9 +94,9 @@ export LD_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linu
 export USE_CONTAINER ?= $(CONTAINER_TOOL)
 
 # Important vars we don't really want folks changing without knowledge of what they're doing.
-export VECTOR_BINARY_x86_64_unknown_linux_gnu ?= /target/x86_64-unknown-linux-gnu/release/vector
-export VECTOR_BINARY_x86_64-unknown-linux-musl ?= /target/x86_64-unknown-linux-musl/release/vector
-export VECTOR_BINARY_aarch64-unknown-linux-musl ?= /target/aarch64-unknown-linux-musl/release/vector
+export VECTOR_BINARY_x86_64_unknown_linux_gnu ?= /target/x86_64-unknown-linux-gnu/${BUILD_MODE}/vector
+export VECTOR_BINARY_x86_64-unknown-linux-musl ?= /target/x86_64-unknown-linux-musl/${BUILD_MODE}/vector
+export VECTOR_BINARY_aarch64-unknown-linux-musl ?= /target/aarch64-unknown-linux-musl/${BUILD_MODE}/vector
 
 FORMATTING_BEGIN_YELLOW = \033[0;33m
 FORMATTING_BEGIN_BLUE = \033[36m
@@ -143,6 +143,7 @@ endif
 define ENVIRONMENT_EXEC
 	${ENVIRONMENT_PREPARE}
 	@echo "Entering environment..."
+	@mkdir -p ./target ./scripts/environment/cross
 	$(CONTAINER_TOOL) run \
 			--name vector-environment \
 			--rm \
@@ -190,17 +191,23 @@ endef
 
 define ENVIRONMENT_COPY_ARTIFACTS
 	@echo "Copying artifacts off volumes... (Docker errors below are totally okay)"
-	@mkdir -p ./target/release
-	@mkdir -p ./target/debug
-	@mkdir -p ./target/criterion
+	mkdir -p \
+		./target/criterion \
+		./target/${BUILD_MODE} \
+		./target/x86_64-unknown-linux-gnu/${BUILD_MODE} \
+		./target/x86_64-unknown-linux-musl/${BUILD_MODE} \
+		./target/aarch64-unknown-linux-musl/${BUILD_MODE} \
+		./aarch64-unknown-linux-musl
 	@$(CONTAINER_TOOL) rm -f vector-build-outputs || true
 	@$(CONTAINER_TOOL) run \
 		-d \
 		-v vector-target:/target \
 		--name vector-build-outputs \
 		busybox true
-	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/release/vector ./target/release/ || true
-	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/debug/vector ./target/debug/ || true
+	$(CONTAINER_TOOL) cp vector-build-outputs:${VECTOR_BINARY_x86_64_unknown_linux_gnu} ./target/x86_64-unknown-linux-gnu/${BUILD_MODE} || true
+	@$(CONTAINER_TOOL) cp vector-build-outputs:${VECTOR_BINARY_x86_64-unknown-linux-musl} ./target/x86_64-unknown-linux-musl/${BUILD_MODE} || true
+	@$(CONTAINER_TOOL) cp vector-build-outputs:${VECTOR_BINARY_aarch64-unknown-linux-musl} ./target/aarch64-unknown-linux-musl/${BUILD_MODE} || true
+	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/${BUILD_MODE}/vector ./target/${BUILD_MODE}/ || true
 	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/criterion ./target/criterion || true
 	@$(CONTAINER_TOOL) rm -f vector-build-outputs
 endef
@@ -277,6 +284,7 @@ ${VECTOR_BINARY_x86_64-unknown-linux-musl}:
 		PATH+=$(MUSL_CROSS_MAKE_PATH)/bin \
 		cargo +nightly build ${MAYBE_RELEASE_FLAG} --no-default-features --features default-musl --target x86_64-unknown-linux-musl \
 	"
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: build-cross-aarch64-unknown-linux-musl
 build-cross-aarch64-unknown-linux-musl: ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}
@@ -301,6 +309,7 @@ ${VECTOR_BINARY_aarch64-unknown-linux-musl}:
 		PATH+=${MUSL_CROSS_MAKE_PATH}/bin \
 		cargo +nightly build ${MAYBE_RELEASE_FLAG} --no-default-features --features default-musl --target aarch64-unknown-linux-musl \
 	"
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
