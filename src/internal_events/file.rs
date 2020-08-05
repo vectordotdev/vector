@@ -11,7 +11,8 @@ impl InternalEvent for FileEventReceived<'_> {
     fn emit_logs(&self) {
         trace!(
             message = "received one event.",
-            %self.file,
+            file = %self.file,
+            byte_size = %self.byte_size
         );
     }
 
