@@ -4,24 +4,6 @@ services:
   # Jobs
   #
 
-  build-x86_64-unknown-linux-musl:
-    build:
-      context: .
-      dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
-    environment:
-      NATIVE_BUILD: "false"
-      TARGET: x86_64-unknown-linux-musl
-      FEATURES: default-musl
-      CARGO_TERM_COLOR: always
-    volumes:
-      - $PWD:$PWD
-      - ./target/x86_64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
-      - ./target/x86_64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
-      - ./target/x86_64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
-    working_dir: $PWD
-    user: $USER
-    command: scripts/build.sh
-
   build-x86_64-unknown-linux-gnu:
     build:
       context: .
@@ -38,42 +20,6 @@ services:
       - ./target/x86_64-unknown-linux-gnu/cargo/registry:/usr/local/cargo/registry
       - ./target/x86_64-unknown-linux-gnu/cargo/git:/usr/local/cargo/git
       - ./target/x86_64-unknown-linux-gnu/rustup/tmp:/usr/local/rustup/tmp
-    working_dir: $PWD
-    user: $USER
-    command: scripts/build.sh
-
-  build-armv7-unknown-linux-musleabihf:
-    build:
-      context: .
-      dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
-    environment:
-      NATIVE_BUILD: "false"
-      TARGET: armv7-unknown-linux-musleabihf
-      FEATURES: default-musl
-      CARGO_TERM_COLOR: always
-    volumes:
-      - $PWD:$PWD
-      - ./target/armv7-unknown-linux-musleabihf/cargo/registry:/opt/rust/cargo/registry
-      - ./target/armv7-unknown-linux-musleabihf/cargo/git:/opt/rust/cargo/git
-      - ./target/armv7-unknown-linux-musleabihf/rustup/tmp:/opt/rust/rustup/tmp
-    working_dir: $PWD
-    user: $USER
-    command: scripts/build.sh
-
-  build-aarch64-unknown-linux-musl:
-    build:
-      context: .
-      dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
-    environment:
-      NATIVE_BUILD: "false"
-      TARGET: aarch64-unknown-linux-musl
-      FEATURES: default-musl
-      CARGO_TERM_COLOR: always
-    volumes:
-      - $PWD:$PWD
-      - ./target/aarch64-unknown-linux-musl/cargo/registry:/opt/rust/cargo/registry
-      - ./target/aarch64-unknown-linux-musl/cargo/git:/opt/rust/cargo/git
-      - ./target/aarch64-unknown-linux-musl/rustup/tmp:/opt/rust/rustup/tmp
     working_dir: $PWD
     user: $USER
     command: scripts/build.sh

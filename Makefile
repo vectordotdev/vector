@@ -225,15 +225,15 @@ ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}: ${MUSL_CROSS_MAKE}
 build-x86_64-unknown-linux-musl: ${VECTOR_BINARY_x86_64-unknown-linux-musl} ## Build static binary in release mode for the x86_64 architecture
 
 ${VECTOR_BINARY_x86_64-unknown-linux-musl}:
-	rustup toolchain install nightly
-	rustup target add aarch64-unknown-linux-musl --toolchain nightly
-	CROSS_COMPILE=x86_64-unknown-linux-musl \
+	${MAYBE_ENVIRONMENT_EXEC} rustup toolchain install nightly
+	${MAYBE_ENVIRONMENT_EXEC} rustup target add aarch64-unknown-linux-musl --toolchain nightly
+	${MAYBE_ENVIRONMENT_EXEC} bash -c "CROSS_COMPILE=x86_64-unknown-linux-musl \
 	CC=${CC_x86_64-unknown-linux-musl} \
 	CXX=${CXX_x86_64-unknown-linux-musl} \
 	LD=${CARGO_TARGET_x86_64-UNKOWNN_LINUX_MUSL_LINKER} \
 	HOST_CXX=musl-g++ \
 	HOST_CC=musl-gcc \
-	cargo +nightly build --no-default-features --features default-musl --target x86_64-unknown-linux-musl
+	cargo +nightly build --no-default-features --features default-musl --target x86_64-unknown-linux-musl"
 
 .PHONY: build-cross-aarch64-unknown-linux-musl
 build-cross-aarch64-unknown-linux-musl: ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}
@@ -246,16 +246,16 @@ ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}: ${MUSL_CROSS_MAKE}
 build-aarch64-unknown-linux-musl: ${VECTOR_BINARY_aarch64-unknown-linux-musl} ## Build static binary in release mode for the aarch64 architecture
 
 ${VECTOR_BINARY_aarch64-unknown-linux-musl}:
-	rustup toolchain install nightly
-	rustup target add aarch64-unknown-linux-musl
-	CROSS_COMPILE=aarch64-unknown-linux-musl \
+	${MAYBE_ENVIRONMENT_EXEC} rustup toolchain install nightly
+	${MAYBE_ENVIRONMENT_EXEC} rustup target add aarch64-unknown-linux-musl
+	${MAYBE_ENVIRONMENT_EXEC} bash -c "CROSS_COMPILE=aarch64-unknown-linux-musl \
     CC=${CC_aarch64-unknown-linux-musl} \
     CXX=${CXX_aarch64-unknown-linux-musl} \
     LD=${CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER} \
     HOST_CXX=musl-g++ \
     HOST_CC=musl-gcc \
     LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${MUSL_CROSS_MAKE_PATH}/lib/ \
-    cargo +nightly build --no-default-features --features default-musl --target aarch64-unknown-linux-musl
+    cargo +nightly build --no-default-features --features default-musl --target aarch64-unknown-linux-musl"
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
