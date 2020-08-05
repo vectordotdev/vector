@@ -2,9 +2,58 @@ use std::collections::BTreeMap;
 
 mod line;
 
+type IResult<I, O> = Result<(I, O), nom::Err<ParserError>>;
+
 #[derive(Debug, snafu::Snafu, PartialEq)]
 pub enum ParserError {
-    Error,
+    InternalError,
+    ExpectedLeTag,
+    ExpectedQuantileTag,
+    InvalidMetricKind {
+        input: String,
+    },
+    ExpectedToken {
+        expected: &'static str,
+        input: String,
+    },
+    ParseNameError {
+        input: String,
+    },
+    ParseFloatError {
+        input: String,
+    },
+    Nom {
+        input: String,
+        kind: nom::error::ErrorKind,
+    },
+}
+
+impl From<ParserError> for nom::Err<ParserError> {
+    fn from(error: ParserError) -> Self {
+        nom::Err::Error(error)
+    }
+}
+
+impl From<nom::Err<ParserError>> for ParserError {
+    fn from(error: nom::Err<ParserError>) -> Self {
+        match error {
+            nom::Err::Incomplete(_) | nom::Err::Failure(_) => ParserError::InternalError,
+            nom::Err::Error(e) => e,
+        }
+    }
+}
+
+impl<'a> nom::error::ParseError<&'a str> for ParserError {
+    fn from_error_kind(input: &str, kind: nom::error::ErrorKind) -> Self {
+        ParserError::Nom {
+            input: input.to_owned(),
+            kind,
+        }
+    }
+
+    fn append(_: &str, _: nom::error::ErrorKind, other: Self) -> Self {
+        other
+    }
 }
 
 use line::Line;
@@ -138,9 +187,11 @@ impl MetricGroup {
                 let suffix = &metric.name[self.name.len()..];
                 match suffix {
                     "_bucket" => {
-                        let bucket = metric.labels.remove("le").ok_or(ParserError::Error)?;
-                        let (_, bucket) =
-                            line::Metric::parse_value(&bucket).map_err(|_| ParserError::Error)?;
+                        let bucket = metric
+                            .labels
+                            .remove("le")
+                            .ok_or(ParserError::ExpectedLeTag)?;
+                        let (_, bucket) = line::Metric::parse_value(&bucket)?;
                         vec.push(HistogramMetric::Bucket {
                             bucket,
                             value: metric.value,
@@ -162,10 +213,11 @@ impl MetricGroup {
                 let suffix = &metric.name[self.name.len()..];
                 match suffix {
                     "" => {
-                        let quantile =
-                            metric.labels.remove("quantile").ok_or(ParserError::Error)?;
-                        let (_, quantile) =
-                            line::Metric::parse_value(&quantile).map_err(|_| ParserError::Error)?;
+                        let quantile = metric
+                            .labels
+                            .remove("quantile")
+                            .ok_or(ParserError::ExpectedQuantileTag)?;
+                        let (_, quantile) = line::Metric::parse_value(&quantile)?;
                         vec.push(SummaryMetric::Quantile {
                             quantile,
                             value: metric.value,

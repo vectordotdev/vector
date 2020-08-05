@@ -1,5 +1,6 @@
 //! Parse a single line of Prometheus text format.
 
+use crate::{IResult, ParserError};
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, take_while, take_while1},
@@ -8,11 +9,11 @@ use nom::{
     error::ParseError,
     multi::{fold_many0, separated_list},
     number::complete::double,
-    sequence::{delimited, pair, preceded, terminated, tuple},
+    sequence::{delimited, pair, preceded, tuple},
 };
 use std::collections::BTreeMap;
 
-use crate::ParserError;
+type NomError<'a> = nom::Err<(&'a str, nom::error::ErrorKind)>;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum MetricKind {
@@ -46,7 +47,7 @@ impl Metric {
     /// ```
     ///
     /// We don't parse timestamp.
-    fn parse(input: &str) -> nom::IResult<&str, Self> {
+    fn parse(input: &str) -> IResult<&str, Self> {
         let input = trim_space(input);
         let (input, name) = parse_name(input)?;
         let (input, labels) = Self::parse_labels(input)?;
@@ -62,7 +63,7 @@ impl Metric {
     }
 
     /// Float value, and +Inf, -Int, Nan.
-    pub fn parse_value(input: &str) -> nom::IResult<&str, f64> {
+    pub fn parse_value(input: &str) -> IResult<&str, f64> {
         let input = trim_space(input);
         alt((
             value(f64::INFINITY, tag("+Inf")),
@@ -70,9 +71,15 @@ impl Metric {
             value(f64::NAN, tag("Nan")),
             double,
         ))(input)
+        .map_err(|_: NomError| {
+            ParserError::ParseFloatError {
+                input: input.to_owned(),
+            }
+            .into()
+        })
     }
 
-    fn parse_name_value(input: &str) -> nom::IResult<&str, (String, String)> {
+    fn parse_name_value(input: &str) -> IResult<&str, (String, String)> {
         map(
             tuple((
                 parse_name,
@@ -83,19 +90,28 @@ impl Metric {
         )(input)
     }
 
-    fn parse_labels_inner(input: &str) -> nom::IResult<&str, BTreeMap<String, String>> {
+    fn parse_labels_inner(input: &str) -> IResult<&str, BTreeMap<String, String>> {
         let (input, list) = separated_list(preceded(sp, char(',')), Self::parse_name_value)(input)?;
         let (input, _) = opt(preceded(sp, char(',')))(input)?;
         Ok((input, list.into_iter().collect()))
     }
 
     /// Parse `{label_name="value",...}`
-    fn parse_labels(input: &str) -> nom::IResult<&str, BTreeMap<String, String>> {
+    fn parse_labels(input: &str) -> IResult<&str, BTreeMap<String, String>> {
         let input = trim_space(input);
 
         match opt(char('{'))(input) {
-            Ok((i, None)) => Ok((i, BTreeMap::new())),
-            Ok((i, Some(_))) => terminated(Self::parse_labels_inner, preceded(sp, char('}')))(i),
+            Ok((input, None)) => Ok((input, BTreeMap::new())),
+            Ok((input, Some(_))) => {
+                let (input, labels) = Self::parse_labels_inner(input)?;
+                let (input, _) = preceded(sp, char('}'))(input).map_err(|_: NomError| {
+                    ParserError::ExpectedToken {
+                        expected: "}",
+                        input: input.to_owned(),
+                    }
+                })?;
+                Ok((input, labels))
+            }
             Err(e) => Err(e),
         }
     }
@@ -103,7 +119,7 @@ impl Metric {
     /// Parse `'"' string_content '"'`. `string_content` can contain any unicode characters,
     /// backslash (`\`), double-quote (`"`), and line feed (`\n`) characters have to be
     /// escaped as `\\`, `\"`, and `\n`, respectively.
-    fn parse_escaped_string(input: &str) -> nom::IResult<&str, String> {
+    fn parse_escaped_string(input: &str) -> IResult<&str, String> {
         #[derive(Debug)]
         enum StringFragment<'a> {
             Literal(&'a str),
@@ -139,17 +155,33 @@ impl Metric {
             },
         );
 
-        delimited(char('"'), build_string, char('"'))(input)
+        fn match_quote(input: &str) -> IResult<&str, char> {
+            char('"')(input).map_err(|_: NomError| {
+                ParserError::ExpectedToken {
+                    expected: "\"",
+                    input: input.to_owned(),
+                }
+                .into()
+            })
+        }
+
+        delimited(match_quote, build_string, match_quote)(input)
     }
 }
 
 impl Header {
     /// `# TYPE <metric_name> <metric_type>`
-    fn parse(input: &str) -> nom::IResult<&str, Self> {
+    fn parse(input: &str) -> IResult<&str, Self> {
         let input = trim_space(input);
-        let (input, _) = tag("#")(input)?;
+        let (input, _) = tag("#")(input).map_err(|_: NomError| ParserError::ExpectedToken {
+            expected: "#",
+            input: input.to_owned(),
+        })?;
         let input = trim_space(input);
-        let (input, _) = tag("TYPE")(input)?;
+        let (input, _) = tag("TYPE")(input).map_err(|_: NomError| ParserError::ExpectedToken {
+            expected: "TYPE",
+            input: input.to_owned(),
+        })?;
         let (input, metric_name) = parse_name(input)?;
         let input = trim_space(input);
         let (input, kind) = alt((
@@ -158,7 +190,10 @@ impl Header {
             value(MetricKind::Summary, tag("summary")),
             value(MetricKind::Histogram, tag("histogram")),
             value(MetricKind::Untyped, tag("untyped")),
-        ))(input)?;
+        ))(input)
+        .map_err(|_: NomError| ParserError::InvalidMetricKind {
+            input: input.to_owned(),
+        })?;
         Ok((input, Header { metric_name, kind }))
     }
 }
@@ -173,7 +208,7 @@ pub enum Line {
 
 impl Line {
     /// Parse a single line. Return `None` if it is a comment or an empty line.
-    fn parse_inner(input: &str) -> nom::IResult<&str, Option<Self>> {
+    fn parse_inner(input: &str) -> IResult<&str, Option<Self>> {
         let input = input.trim();
         if input.is_empty() {
             return Ok((input, None));
@@ -185,20 +220,24 @@ impl Line {
         ))(input)
     }
 
+    // TODO: use IResult
     pub fn parse(input: &str) -> Result<Option<Self>, ParserError> {
         Self::parse_inner(input)
             .map(|(_, line)| line)
-            .map_err(|_| ParserError::Error)
+            .map_err(From::from)
     }
 }
 
 /// Name matches the regex `[a-zA-Z_][a-zA-Z0-9_]*`.
-fn parse_name(input: &str) -> nom::IResult<&str, String> {
+fn parse_name(input: &str) -> IResult<&str, String> {
     let input = trim_space(input);
     let (input, (a, b)) = pair(
         take_while1(|c: char| c.is_alphabetic() || c == '_'),
         take_while(|c: char| c.is_alphanumeric() || c == '_'),
-    )(input)?;
+    )(input)
+    .map_err(|_: NomError| ParserError::ParseNameError {
+        input: input.to_owned(),
+    })?;
     Ok((input, a.to_owned() + b))
 }
 
@@ -428,7 +467,10 @@ mod test {
         // We don't allow these values
 
         let input = wrap(r#"{name="value}"#);
-        assert!(Metric::parse_labels(&input).is_err());
+        let result = Metric::parse_labels(&input);
+        assert!(
+            result.is_err() && !matches!(result, Err(nom::Err::Error(ParserError::Nom { .. })))
+        );
 
         let input = wrap(r#"{ a="b" c="d" }"#);
         assert!(Metric::parse_labels(&input).is_err());
