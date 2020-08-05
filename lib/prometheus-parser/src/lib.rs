@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 mod line;
 
-type IResult<I, O> = Result<(I, O), nom::Err<ParserError>>;
 
 #[derive(Debug, snafu::Snafu, PartialEq)]
 pub enum ParserError {
