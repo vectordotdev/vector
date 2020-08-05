@@ -262,6 +262,7 @@ fn encode_events(
             MetricValue::Distribution {
                 values,
                 sample_rates,
+                statistic: _,
             } => {
                 let fields = encode_distribution(&values, &sample_rates);
 
@@ -353,7 +354,7 @@ fn to_fields(value: f64) -> HashMap<String, Field> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use crate::sinks::influxdb::test_util::{assert_fields, split_line_protocol, tags, ts};
     use pretty_assertions::assert_eq;
 
@@ -587,6 +588,7 @@ mod tests {
                 value: MetricValue::Distribution {
                     values: vec![1.0, 2.0, 3.0],
                     sample_rates: vec![3, 3, 2],
+                    statistic: StatisticKind::Histogram,
                 },
             },
             Metric {
@@ -597,6 +599,7 @@ mod tests {
                 value: MetricValue::Distribution {
                     values: (0..20).map(f64::from).collect::<Vec<_>>(),
                     sample_rates: vec![1; 20],
+                    statistic: StatisticKind::Histogram,
                 },
             },
             Metric {
@@ -607,6 +610,7 @@ mod tests {
                 value: MetricValue::Distribution {
                     values: (1..5).map(f64::from).collect::<Vec<_>>(),
                     sample_rates: (1..5).collect::<Vec<_>>(),
+                    statistic: StatisticKind::Histogram,
                 },
             },
         ];
@@ -683,6 +687,7 @@ mod tests {
             value: MetricValue::Distribution {
                 values: vec![],
                 sample_rates: vec![],
+                statistic: StatisticKind::Histogram,
             },
         }];
 
@@ -700,6 +705,7 @@ mod tests {
             value: MetricValue::Distribution {
                 values: vec![1.0, 2.0],
                 sample_rates: vec![0, 0],
+                statistic: StatisticKind::Histogram,
             },
         }];
 
@@ -717,6 +723,7 @@ mod tests {
             value: MetricValue::Distribution {
                 values: vec![1.0],
                 sample_rates: vec![1, 2, 3],
+                statistic: StatisticKind::Histogram,
             },
         }];
 

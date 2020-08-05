@@ -144,7 +144,7 @@ fn encode_metric_header(namespace: &str, metric: &Metric) -> String {
     let r#type = match &metric.value {
         MetricValue::Counter { .. } => "counter",
         MetricValue::Gauge { .. } => "gauge",
-        MetricValue::Distribution { .. } => "histogram",
+        MetricValue::Distribution { statistic: _, .. } => "histogram",
         MetricValue::Set { .. } => "gauge",
         MetricValue::AggregatedHistogram { .. } => "histogram",
         MetricValue::AggregatedSummary { .. } => "summary",
@@ -177,6 +177,7 @@ fn encode_metric_datum(namespace: &str, buckets: &[f64], expired: bool, metric: 
             MetricValue::Distribution {
                 values,
                 sample_rates,
+                statistic: _,
             } => {
                 // convert ditributions into aggregated histograms
                 let mut counts = Vec::new();
@@ -424,7 +425,7 @@ impl Sink for PrometheusSink {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use pretty_assertions::assert_eq;
 
     fn tags() -> BTreeMap<String, String> {
@@ -527,6 +528,7 @@ mod tests {
             value: MetricValue::Distribution {
                 values: vec![1.0, 2.0, 3.0],
                 sample_rates: vec![3, 3, 2],
+                statistic: StatisticKind::Histogram,
             },
         };
 

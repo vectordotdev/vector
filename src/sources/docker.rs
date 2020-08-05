@@ -1,6 +1,11 @@
 use crate::{
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
+    internal_events::{
+        DockerCommunicationError, DockerContainerEventReceived, DockerContainerMetadataFetchFailed,
+        DockerContainerUnwatch, DockerContainerWatch, DockerEventReceived,
+        DockerLoggingDriverUnsupported, DockerTimestampParseFailed,
+    },
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Pipeline,
@@ -13,7 +18,7 @@ use bollard::{
     Docker,
 };
 use bytes05::{Buf, Bytes};
-use chrono::{DateTime, FixedOffset, Local, NaiveTime, Utc, MAX_DATE};
+use chrono::{DateTime, FixedOffset, Local, NaiveTime, ParseError, Utc, MAX_DATE};
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     future,
@@ -121,7 +126,7 @@ impl SourceConfig for DockerConfig {
             match source.handle_running_containers().await {
                 Ok(source) => source.run().await,
                 Err(error) => {
-                    error!(message = "Listing currently running containers, failed", %error);
+                    error!(message = "listing currently running containers, failed.", %error);
                 }
             }
         };
@@ -164,7 +169,7 @@ impl DockerSourceCore {
         // Only log events created at-or-after this moment are logged.
         let now = Local::now();
         info!(
-            message = "Capturing logs from now on",
+            message = "capturing logs from now on.",
             now = %now.to_rfc3339()
         );
 
@@ -235,7 +240,7 @@ struct DockerSource {
     ///  mappings of seen container_id to their data
     containers: HashMap<ContainerId, ContainerState>,
     ///receives ContainerLogInfo comming from event stream futures
-    main_recv: mpsc::UnboundedReceiver<ContainerLogInfo>,
+    main_recv: mpsc::UnboundedReceiver<Result<ContainerLogInfo, ContainerId>>,
     /// It may contain shortened container id.
     hostname: Option<String>,
     /// True if self needs to be excluded
@@ -266,10 +271,11 @@ impl DockerSource {
 
         // main event stream, with whom only newly started/restarted containers will be loged.
         let events = core.docker_event_stream();
-        info!(message = "Listening docker events");
+        info!(message = "listening docker events.");
 
         // Channel of communication between main future and event_stream futures
-        let (main_send, main_recv) = mpsc::unbounded_channel::<ContainerLogInfo>();
+        let (main_send, main_recv) =
+            mpsc::unbounded_channel::<Result<ContainerLogInfo, ContainerId>>();
 
         // Starting with logs from now.
         // TODO: Is this exception acceptable?
@@ -325,7 +331,7 @@ impl DockerSource {
                 let image = container.image.unwrap();
 
                 trace!(
-                    message = "Found already running container",
+                    message = "found already running container.",
                     id = field::display(&id),
                     names = field::debug(&names)
                 );
@@ -346,7 +352,7 @@ impl DockerSource {
                         }
                     }),
                 ) {
-                    trace!(message = "Container excluded", id = field::display(&id));
+                    trace!(message = "container excluded.", id = field::display(&id));
                     return;
                 }
 
@@ -362,18 +368,31 @@ impl DockerSource {
             tokio::select! {
                 value = self.main_recv.next() => {
                     match value {
-                        Some(info) => {
-                            let state = self
-                                .containers
-                                .get_mut(&info.id)
-                                .expect("Every ContainerLogInfo has it's ContainerState");
-                            if state.return_info(info) {
-                                self.esb.restart(state);
+                        Some(message) => {
+                            match message{
+                                Ok(info)=> {
+                                    let state = self
+                                        .containers
+                                        .get_mut(&info.id)
+                                        .expect("Every ContainerLogInfo has it's ContainerState");
+                                    if state.return_info(info) {
+                                        self.esb.restart(state);
+                                    }
+                                },
+                                Err(id)=> {
+                                    let state = self
+                                        .containers
+                                        .remove(&id)
+                                        .expect("Every started ContainerId has it's ContainerState");
+                                    if state.is_running(){
+                                        self.containers.insert(id.clone(), self.esb.start(id));
+                                    }
+                                }
                             }
                         }
                         None => {
-                            error!(message = "docker source main stream has ended unexpectedly");
-                            info!(message = "Shuting down docker source");
+                            error!(message = "docker source main stream has ended unexpectedly.");
+                            info!(message = "shuting down docker source.");
                             return;
                         }
                     };
@@ -386,13 +405,8 @@ impl DockerSource {
                             let id = actor.id.unwrap();
                             let attributes = actor.attributes.unwrap();
 
-                            trace!(
-                                message = "docker event",
-                                id = field::display(&id),
-                                action = field::display(&action),
-                                timestamp = field::display(event.time.unwrap()),
-                                attributes = field::debug(&attributes),
-                            );
+                            emit!(DockerContainerEventReceived { container_id: &id, action: &action });
+
                             let id = ContainerId::new(id);
 
                             // Update container status
@@ -426,11 +440,11 @@ impl DockerSource {
                                 _ => {},
                             };
                         }
-                        Some(Err(error)) => error!(source = "docker events", %error),
+                        Some(Err(error)) => emit!(DockerCommunicationError{error,container_id:None}),
                         None => {
                             // TODO: this could be fixed, but should be tryed with some timeoff and exponential backoff
-                            error!(message = "docker event stream has ended unexpectedly");
-                            info!(message = "Shuting down docker source");
+                            error!(message = "docker event stream has ended unexpectedly.");
+                            info!(message = "shuting down docker source.");
                             return;
                         }
                     };
@@ -454,7 +468,7 @@ impl DockerSource {
                 .unwrap_or(false);
             if hostname_hint || image_hint {
                 // This container is probably itself.
-                info!(message = "Detected self container", id);
+                info!(message = "setected self container.", id);
                 return false;
             }
         }
@@ -469,7 +483,7 @@ struct EventStreamBuilder {
     /// Event stream futures send events through this
     out: Pipeline,
     /// End through which event stream futures send ContainerLogInfo to main future
-    main_send: mpsc::UnboundedSender<ContainerLogInfo>,
+    main_send: mpsc::UnboundedSender<Result<ContainerLogInfo, ContainerId>>,
     /// Self and event streams will end on this.
     shutdown: ShutdownSignal,
 }
@@ -479,23 +493,35 @@ impl EventStreamBuilder {
     fn start(&self, id: ContainerId) -> ContainerState {
         let this = self.clone();
         tokio::spawn(async move {
-            Arc::clone(&this.core)
+            match this
+                .core
                 .docker
-                .inspect_container(id.clone().as_str(), None::<InspectContainerOptions>)
-                .map_err(|error| error!(message = "Fetching container details failed", %error))
-                .and_then(|details| async move {
-                    ContainerMetadata::from_details(details)
-                        .map_err(|error| error!(message = "Metadata extraction failed", %error))
-                })
-                .and_then(|metadata| async move {
-                    let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
-                    this.start_event_stream(info).await;
-                    Ok::<(), ()>(())
-                })
+                .inspect_container(id.as_str(), None::<InspectContainerOptions>)
                 .await
+            {
+                Ok(details) => match ContainerMetadata::from_details(details) {
+                    Ok(metadata) => {
+                        let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
+                        this.start_event_stream(info).await;
+                        return;
+                    }
+                    Err(error) => emit!(DockerTimestampParseFailed {
+                        error,
+                        container_id: id.as_str()
+                    }),
+                },
+                Err(error) => emit!(DockerContainerMetadataFetchFailed {
+                    error,
+                    container_id: id.as_str()
+                }),
+            }
+            // In case of any error we have to notify the main thread that it should try again.
+            if let Err(error) = this.main_send.send(Err(id)) {
+                error!(message = "unable to send ContainerId to main.", %error);
+            }
         });
 
-        ContainerState::new()
+        ContainerState::new_running()
     }
 
     /// If info is present, restarts event stream which will run until shutdown.
@@ -518,15 +544,11 @@ impl EventStreamBuilder {
         });
 
         let stream = self.core.docker.logs(info.id.as_str(), options);
-        info!(
-            message = "Started listening logs on docker container",
-            id = field::display(info.id.as_str())
-        );
+        emit!(DockerContainerWatch {
+            container_id: info.id.as_str()
+        });
 
         // Create event streamer
-        let main_send = self.main_send.clone();
-        let partial_event_marker_field = self.core.config.partial_event_marker_field.clone();
-        let auto_partial_merge = self.core.config.auto_partial_merge;
         let mut partial_event_merge_state = None;
 
         stream
@@ -534,8 +556,8 @@ impl EventStreamBuilder {
                 match value {
                     Ok(message) => Ok(info.new_event(
                         message,
-                        partial_event_marker_field.clone(),
-                        auto_partial_merge,
+                        self.core.config.partial_event_marker_field.clone(),
+                        self.core.config.auto_partial_merge,
                         &mut partial_event_merge_state,
                     )),
                     Err(error) => {
@@ -544,13 +566,15 @@ impl EventStreamBuilder {
                             DockerErrorKind::DockerResponseServerError { status_code, .. }
                                 if *status_code == http::StatusCode::NOT_IMPLEMENTED =>
                             {
-                                error!(
-                                    r#"docker engine is not using either `jsonfile` or `journald`
-                                        logging driver. Please enable one of these logging drivers
-                                        to get logs from the docker daemon."#
-                                )
+                                emit!(DockerLoggingDriverUnsupported {
+                                    error,
+                                    container_id: info.id.as_str(),
+                                })
                             }
-                            _ => error!(message = "docker API container logging error", %error),
+                            _ => emit!(DockerCommunicationError {
+                                error,
+                                container_id: Some(info.id.as_str())
+                            }),
                         };
 
                         Err(())
@@ -565,13 +589,12 @@ impl EventStreamBuilder {
             .await;
 
         // End of stream
-        info!(
-            message = "Stoped listening logs on docker container",
-            id = field::display(info.id.as_str())
-        );
+        emit!(DockerContainerUnwatch {
+            container_id: info.id.as_str()
+        });
 
-        if let Err(error) = main_send.send(info) {
-            error!(message = "Unable to return ContainerLogInfo to main", %error);
+        if let Err(error) = self.main_send.send(Ok(info)) {
+            error!(message = "unable to return ContainerLogInfo to main.", %error);
         }
     }
 }
@@ -603,7 +626,7 @@ struct ContainerState {
 
 impl ContainerState {
     /// It's ContainerLogInfo pair must be created exactly once.
-    fn new() -> Self {
+    fn new_running() -> Self {
         ContainerState {
             info: None,
             running: true,
@@ -618,6 +641,10 @@ impl ContainerState {
 
     fn stoped(&mut self) {
         self.running = false;
+    }
+
+    fn is_running(&self) -> bool {
+        self.running
     }
 
     /// True if it needs to be restarted.
@@ -690,6 +717,7 @@ impl ContainerLogInfo {
             _ => return None,
         };
 
+        let byte_size = bytes_message.len();
         let message = String::from_utf8_lossy(&bytes_message);
         let mut splitter = message.splitn(2, char::is_whitespace);
         let timestamp_str = splitter.next()?;
@@ -707,7 +735,7 @@ impl ContainerLogInfo {
                     None if self.created <= timestamp.with_timezone(&Utc) => (),
                     _ => {
                         trace!(
-                            message = "Recieved older log",
+                            message = "recieved older log.",
                             timestamp = %timestamp_str
                         );
                         return None;
@@ -716,8 +744,8 @@ impl ContainerLogInfo {
 
                 self.last_log = Some((timestamp, self.generation));
 
-                let log = splitter.next()?;
-                let remove_len = message.len() - log.len();
+                let log_len = splitter.next().map(|log| log.len()).unwrap_or(0);
+                let remove_len = message.len() - log_len;
                 bytes_message.advance(remove_len);
 
                 // Provide the timestamp.
@@ -725,7 +753,10 @@ impl ContainerLogInfo {
             }
             Err(error) => {
                 // Recieved bad timestamp, if any at all.
-                error!(message="Didn't recieve rfc3339 timestamp from docker",%error);
+                emit!(DockerTimestampParseFailed {
+                    error,
+                    container_id: self.id.as_str()
+                });
                 // So continue normally but without a timestamp.
                 None
             }
@@ -834,7 +865,12 @@ impl ContainerLogInfo {
         // Partial or not partial - we return the event we got here, because all
         // other cases were handeled earlier.
         let event = Event::Log(log_event);
-        trace!(message = "Received one event.", ?event);
+
+        emit!(DockerEventReceived {
+            byte_size,
+            container_id: self.id.as_str()
+        });
+
         Some(event)
     }
 }
@@ -851,7 +887,7 @@ struct ContainerMetadata {
 }
 
 impl ContainerMetadata {
-    fn from_details(details: ContainerInspectResponse) -> crate::Result<Self> {
+    fn from_details(details: ContainerInspectResponse) -> Result<Self, ParseError> {
         let config = details.config.unwrap();
         let name = details.name.unwrap();
         let created = details.created.unwrap();
@@ -974,7 +1010,7 @@ mod tests {
         } else {
             // Maybe a before created container is present
             info!(
-                message = "Assums that named container remained from previous tests",
+                message = "assums that named container remained from previous tests.",
                 name = name
             );
             name.to_owned()
@@ -990,7 +1026,7 @@ mod tests {
     ) -> Option<String> {
         pull_busybox(docker).await;
 
-        trace!("Creating container");
+        trace!("creating container.");
 
         let options = Some(CreateContainerOptions { name });
         let config = ContainerConfig {
@@ -1037,7 +1073,7 @@ mod tests {
 
     /// Returns once container has started
     async fn container_start(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
-        trace!("Starting container");
+        trace!("starting container.");
 
         let options = None::<StartContainerOptions<&str>>;
         docker.start_container(id, options).await
@@ -1045,12 +1081,12 @@ mod tests {
 
     /// Returns once container is done running
     async fn container_wait(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
-        trace!("Waiting container");
+        trace!("waiting container.");
 
         docker
             .wait_container(id, None::<WaitContainerOptions<&str>>)
             .try_for_each(|exit| async move {
-                info!("Container exited with status code: {}", exit.status_code);
+                info!("container exited with status code: {}.", exit.status_code);
                 Ok(())
             })
             .await
@@ -1058,7 +1094,7 @@ mod tests {
 
     /// Returns once container is killed
     async fn container_kill(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
-        trace!("Waiting container");
+        trace!("waiting container.");
 
         docker
             .kill_container(id, None::<KillContainerOptions<&str>>)
@@ -1072,7 +1108,7 @@ mod tests {
     }
 
     async fn container_remove(id: &str, docker: &Docker) {
-        trace!("Removing container");
+        trace!("removing container.");
 
         // Don't panick, as this is unreleated to test, and there possibly other containers that need to be removed
         let _ = docker

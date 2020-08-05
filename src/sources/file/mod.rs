@@ -294,7 +294,7 @@ pub fn file_source(
         // logs in the queue.
         let span = current_span();
         let span2 = span.clone();
-        tokio01::spawn(
+        tokio::spawn(
             messages
                 .map(move |(msg, file): (Bytes, String)| {
                     let _enter = span2.enter();
@@ -306,6 +306,7 @@ pub fn file_source(
                 })
                 .forward(out.sink_map_err(|e| error!(%e)))
                 .map(|_| ())
+                .compat()
                 .instrument(span),
         );
 
@@ -356,7 +357,7 @@ mod tests {
         event,
         shutdown::ShutdownSignal,
         sources::file,
-        test_util::{block_on, runtime, shutdown_on_idle, trace_init},
+        test_util::{runtime, shutdown_on_idle, trace_init},
         topology::Config,
     };
     use futures01::{Future, Stream};
@@ -367,7 +368,7 @@ mod tests {
         io::{Seek, Write},
     };
     use tempfile::tempdir;
-    use tokio01::util::FutureExt;
+    use tokio::time::timeout;
 
     fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {
@@ -387,12 +388,16 @@ mod tests {
         R: Send + 'static,
         E: Send + 'static + std::fmt::Debug,
     {
-        let result = block_on(future.timeout(Duration::from_secs(5)));
-        assert!(
-            result.is_ok(),
-            "Unclosed channel: may indicate file-server could not shutdown gracefully."
-        );
-        result.unwrap()
+        runtime()
+            .block_on_std(async move {
+                let result = timeout(tokio::time::Duration::from_secs(5), future.compat()).await;
+                assert!(
+                    result.is_ok(),
+                    "Unclosed channel: may indicate file-server could not shutdown gracefully."
+                );
+                result.unwrap()
+            })
+            .unwrap()
     }
 
     fn sleep() {

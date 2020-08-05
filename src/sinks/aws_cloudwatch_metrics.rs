@@ -157,6 +157,7 @@ impl CloudWatchMetricsSvc {
                         MetricValue::Distribution {
                             values,
                             sample_rates,
+                            statistic: _,
                         } => Some(MetricDatum {
                             metric_name,
                             values: Some(values.to_vec()),
@@ -262,7 +263,7 @@ fn tags_to_dimensions(tags: BTreeMap<String, String>) -> Vec<Dimension> {
 mod tests {
     use super::*;
     use crate::dns::Resolver;
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
     use rusoto_cloudwatch::PutMetricDataInput;
@@ -376,6 +377,7 @@ mod tests {
             value: MetricValue::Distribution {
                 values: vec![11.0, 12.0],
                 sample_rates: vec![100, 50],
+                statistic: StatisticKind::Histogram,
             },
         }];
 
@@ -423,7 +425,7 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::event::Event;
+    use crate::event::{metric::StatisticKind, Event};
     use crate::region::RegionOrEndpoint;
     use crate::test_util::{random_string, runtime};
     use crate::topology::config::SinkContext;
@@ -497,6 +499,7 @@ mod integration_tests {
                 value: MetricValue::Distribution {
                     values: vec![i as f64],
                     sample_rates: vec![100],
+                    statistic: StatisticKind::Histogram,
                 },
             });
             events.push(event);
