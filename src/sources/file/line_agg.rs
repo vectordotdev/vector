@@ -62,7 +62,7 @@ pub struct Config {
 }
 
 impl Config {
-    /// Build `Config` from legacy `file` source line aggragator configurtion
+    /// Build `Config` from legacy `file` source line aggregator configuration
     /// params.
     pub fn for_legacy(marker: Regex, timeout_ms: u64) -> Self {
         let start_pattern = marker;
@@ -82,7 +82,7 @@ impl Config {
 /// Line aggregator.
 ///
 /// Provides a `Stream` implementation that reads lines from the `inner` stream
-/// and yields aggraged lines.
+/// and yields aggregated lines.
 #[pin_project(project = LineAggProj)]
 pub struct LineAgg<T, K> {
     /// The stream from which we read the lines.
