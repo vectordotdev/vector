@@ -63,16 +63,25 @@ jobs:
           - name: crio
             is_essential: true
       fail-fast: false
-    if: |
-      (
-        matrix.kubernetes_version.is_essential &&
-        matrix.container_runtime.is_essential
-      ) || (
-        github.event.pull_request == null ||
-        contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
-      )
     steps:
+      # Github Actions don't support `matrix` at the job-level `if:` condition.
+      # We apply this workaround for now.
+      # See https://github.community/t/feature-request-and-use-case-example-to-allow-matrix-in-if-s/126067
+      # TODO: switch to job-level `if:` when the issue with `matrix` usage is
+      # fixed.
+      - name: Compute the skip condition
+        id: skip-condition
+        if: |
+          (
+            matrix.kubernetes_version.is_essential &&
+            matrix.container_runtime.is_essential
+          ) || (
+            github.event.pull_request == null ||
+            contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
+          )
+        run: "true"
       - name: Setup Minikube
+        if: steps.skip-condition.conclusion == 'success'
         run: |
           set -xeuo pipefail
 
@@ -93,9 +102,12 @@ jobs:
           minikube start || minikube delete && minikube start || minikube logs
           kubectl cluster-info
       - name: Checkout
+        if: steps.skip-condition.conclusion == 'success'
         uses: actions/checkout@v1
       - run: USE_CONTAINER=none make slim-builds
+        if: steps.skip-condition.conclusion == 'success'
       - run: make test-e2e-kubernetes
+        if: steps.skip-condition.conclusion == 'success'
         env:
           USE_MINIKUBE_CACHE: "true"
           PACKAGE_DEB_USE_CONTAINER: docker
