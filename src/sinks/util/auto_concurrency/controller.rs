@@ -205,7 +205,7 @@ where
                 } else if err.downcast_ref::<Elapsed>().is_some() {
                     true
                 } else {
-                    panic!("Unhandled error response! {:?}", err)
+                    unreachable!("Unhandled error response! {:?}", err)
                 }
             }
         };
