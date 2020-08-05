@@ -42,30 +42,42 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
   test-e2e-kubernetes:
-    name: K8s ${{ matrix.kubernetes_version }} / ${{ matrix.container_runtime }}
+    name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime.name }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
         minikube_version:
           - "v1.11.0" # https://github.com/kubernetes/minikube/issues/8799
         kubernetes_version:
-          - "v1.18.6"
-          - "v1.17.9"
-          - "v1.16.12" # v1.16.13 is broken, see https://github.com/kubernetes/minikube/issues/8840
-          - "v1.15.12"
-          - "v1.14.10"
+          - version: "v1.18.6"
+            is_essential: true
+          - version: "v1.17.9"
+          - version: "v1.16.12" # v1.16.13 is broken, see https://github.com/kubernetes/minikube/issues/8840
+          - version: "v1.15.12"
+          - version: "v1.14.10"
         container_runtime:
-          - docker
-          - containerd
-          - crio
+          - name: docker
+            is_essential: true
+          - name: containerd
+            is_essential: true
+          - name: crio
+            is_essential: true
       fail-fast: false
+    if: |
+      (
+        matrix.kubernetes_version.is_essential &&
+        matrix.container_runtime.is_essential
+      ) || (
+        github.event.pull_request == null ||
+        contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
+      )
     steps:
       - name: Setup Minikube
         run: |
           set -xeuo pipefail
 
           curl -Lo kubectl \
-            'https://storage.googleapis.com/kubernetes-release/release/${{ matrix.kubernetes_version }}/bin/linux/amd64/kubectl'
+            'https://storage.googleapis.com/kubernetes-release/release/${{ matrix.kubernetes_version.version }}/bin/linux/amd64/kubectl'
           sudo install kubectl /usr/local/bin/ && rm kubectl
 
           curl -Lo minikube \
@@ -74,8 +86,8 @@ jobs:
 
           minikube config set profile minikube
           minikube config set vm-driver docker
-          minikube config set kubernetes-version '${{ matrix.kubernetes_version }}'
-          minikube config set container-runtime '${{ matrix.container_runtime }}'
+          minikube config set kubernetes-version '${{ matrix.kubernetes_version.version }}'
+          minikube config set container-runtime '${{ matrix.container_runtime.name }}'
           # Start minikube, try again once if fails and print logs if the second
           # attempt fails too.
           minikube start || minikube delete && minikube start || minikube logs
