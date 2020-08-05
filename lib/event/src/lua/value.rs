@@ -57,10 +57,10 @@ mod test {
         let pairs = vec![
             ("'⍺βγ'", Value::Bytes("⍺βγ".into())),
             ("123", Value::Integer(123)),
-            ("3.14159265359", Value::Float(3.14159265359)),
+            ("1.23456789012", Value::Float(1.23456789012)),
             ("true", Value::Boolean(true)),
             (
-                "{ x = 1, y = '2', nested = { other = 2.718281828 } }",
+                "{ x = 1, y = '2', nested = { other = 2.345678901 } }",
                 Value::Map(
                     vec![
                         ("x".into(), 1.into()),
@@ -68,7 +68,7 @@ mod test {
                         (
                             "nested".into(),
                             Value::Map(
-                                vec![("other".into(), 2.718281828.into())]
+                                vec![("other".into(), 2.345678901.into())]
                                     .into_iter()
                                     .collect(),
                             ),
@@ -124,10 +124,10 @@ mod test {
                 "#,
             ),
             (
-                Value::Float(3.14159265359),
+                Value::Float(1.23456789012),
                 r#"
                 function (value)
-                    return value == 3.14159265359
+                    return value == 1.23456789012
                 end
                 "#,
             ),
@@ -147,7 +147,7 @@ mod test {
                         (
                             "nested".into(),
                             Value::Map(
-                                vec![("other".into(), 2.718281828.into())]
+                                vec![("other".into(), 2.345678901.into())]
                                     .into_iter()
                                     .collect(),
                             ),
@@ -160,7 +160,7 @@ mod test {
                 function (value)
                     return value.x == 1 and
                         value['y'] == '2' and
-                        value.nested.other == 2.718281828
+                        value.nested.other == 2.345678901
                 end
                 "#,
             ),
