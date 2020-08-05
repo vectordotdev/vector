@@ -85,6 +85,42 @@ jobs:
           RUSTFLAGS: "-D warnings"
         run: cargo test --no-default-features --features default-msvc
 
+  build-x86_64-unknown-linux-musl:
+    name: Unit - Linux
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make build-cross-x86_64-unknown-linux-musl
+      - run: make clean-cross
+      - run: make build-x86_64-unknown-linux-musl
+
+  build-aarch64-unknown-linux-musl:
+    name: Unit - Linux
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make build-cross-aarch64-unknown-linux-musl
+      - run: make clean-cross
+      - run: make build-aarch64-unknown-linux-musl
+
   test-misc:
     name: Shutdown - Linux
     runs-on: ubuntu-20.04

@@ -211,9 +211,20 @@ build-x86_64-unknown-linux-gnu: ${VECTOR_BINARY_x86_64_unknown_linux_gnu} ## Bui
 ${VECTOR_BINARY_x86_64_unknown_linux_gnu}:
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features default --target x86_64-unknown-linux-gnu
 
+${MUSL_CROSS_MAKE}:
+	${MAYBE_ENVIRONMENT_EXEC} git clone https://github.com/richfelker/musl-cross-make.git ${MUSL_CROSS_MAKE}
+
+.PHONY: build-cross-x86_64-unknown-linux-musl
+build-cross-x86_64-unknown-linux-musl: ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}
+
+.PHONY: ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}
+${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}: ${MUSL_CROSS_MAKE}
+	${MAYBE_ENVIRONMENT_EXEC} ${MAKE} --quiet --directory ${MUSL_CROSS_MAKE} install -j${NUM_CPUS} TARGET=x86_64-linux-musl
+
+.PHONY: build-x86_64-unknown-linux-musl
 build-x86_64-unknown-linux-musl: ${VECTOR_BINARY_x86_64-unknown-linux-musl} ## Build static binary in release mode for the x86_64 architecture
 
-${VECTOR_BINARY_x86_64-unknown-linux-musl}: ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}
+${VECTOR_BINARY_x86_64-unknown-linux-musl}:
 	rustup toolchain install nightly
 	rustup target add aarch64-unknown-linux-musl --toolchain nightly
 	CROSS_COMPILE=x86_64-unknown-linux-musl \
@@ -224,24 +235,17 @@ ${VECTOR_BINARY_x86_64-unknown-linux-musl}: ${MUSL_CROSS_MAKE_x86_64-unknown-lin
 	HOST_CC=musl-gcc \
 	cargo +nightly build --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
-${MUSL_CROSS_MAKE}:
-	${MAYBE_ENVIRONMENT_EXEC} git clone https://github.com/richfelker/musl-cross-make.git ${MUSL_CROSS_MAKE}
-
-.PHONY: ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}
-${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}: ${MUSL_CROSS_MAKE}
-	${MAYBE_ENVIRONMENT_EXEC} ${MAKE} --quiet --directory ${MUSL_CROSS_MAKE} install -j${NUM_CPUS} TARGET=x86_64-linux-musl
+.PHONY: build-cross-aarch64-unknown-linux-musl
+build-cross-aarch64-unknown-linux-musl: ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}
 
 .PHONY: ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}
 ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}: ${MUSL_CROSS_MAKE}
 	${MAYBE_ENVIRONMENT_EXEC} ${MAKE} --quiet --directory ${MUSL_CROSS_MAKE} install -j${NUM_CPUS} TARGET=aarch64-linux-musl
 
-.PHONY: ${MUSL_CROSS_MAKE_armv7-unknown-linux-musl}
-${MUSL_CROSS_MAKE_armv7-unknown-linux-musl}: ${MUSL_CROSS_MAKE}
-	${MAYBE_ENVIRONMENT_EXEC} ${MAKE} --quiet --directory ${MUSL_CROSS_MAKE} install -j${NUM_CPUS} TARGET=arm-linux-musleabihf GCC_CONFIG="--with-float=softfp"
-
+.PHONY: build-aarch64-unknown-linux-musl
 build-aarch64-unknown-linux-musl: ${VECTOR_BINARY_aarch64-unknown-linux-musl} ## Build static binary in release mode for the aarch64 architecture
 
-${VECTOR_BINARY_aarch64-unknown-linux-musl}: ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}
+${VECTOR_BINARY_aarch64-unknown-linux-musl}:
 	rustup toolchain install nightly
 	rustup target add aarch64-unknown-linux-musl
 	CROSS_COMPILE=aarch64-unknown-linux-musl \
@@ -596,6 +600,9 @@ build-ci-docker-images: ## Rebuilds all Docker images used in CI
 
 clean: environment-clean ## Clean everything
 	cargo clean
+
+clean-cross:
+	${MAYBE_ENVIRONMENT_EXEC} ${MAKE} --quiet --directory ${MUSL_CROSS_MAKE} clean
 
 fmt: ## Format code
 	${MAYBE_ENVIRONMENT_EXEC} cargo fmt
