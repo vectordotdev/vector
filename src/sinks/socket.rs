@@ -175,19 +175,14 @@ mod test {
     #[cfg(feature = "sources-tls")]
     #[test]
     fn tcp_stream_detects_disconnect() {
-        use crate::tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
-        use futures::{future, FutureExt, StreamExt};
-        use std::{
-            future::Future,
-            net::Shutdown,
-            pin::Pin,
-            sync::{
-                atomic::{AtomicUsize, Ordering},
-                Arc,
-            },
-            task::Poll,
+        use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions};
+        use futures01::{Async, Stream};
+        use std::io::{ErrorKind, Read};
+        use std::net::Shutdown;
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
         };
-        use tokio::{io::AsyncRead, net::TcpStream};
 
         crate::test_util::trace_init();
 
@@ -216,8 +211,7 @@ mod test {
         let conn_counter = Arc::new(AtomicUsize::new(0));
         let conn_counter1 = Arc::clone(&conn_counter);
 
-        let (close_tx, close_rx) = tokio::sync::oneshot::channel::<()>();
-        let mut close_rx = Some(close_rx.map(|x| x.unwrap()));
+        let (mut close_tx, mut close_rx) = tokio01::sync::mpsc::unbounded_channel::<()>();
 
         let config = Some(TlsConfig {
             enabled: Some(true),
@@ -227,45 +221,37 @@ mod test {
                 ..Default::default()
             },
         });
+        let stream = MaybeTlsSettings::from_config(&config, true).unwrap();
 
         // Only accept two connections.
-        let jh = rt.spawn_handle_std(async move {
-            let tls = MaybeTlsSettings::from_config(&config, true).unwrap();
-            let mut listener = tls.bind(&addr).await.unwrap();
-            listener
-                .incoming()
-                .take(2)
-                .for_each(|connection| {
-                    let mut close_rx = close_rx.take();
+        let fut = stream
+            .bind(&addr)
+            .unwrap()
+            .incoming()
+            .take(2)
+            .for_each(move |mut socket| {
+                conn_counter1.fetch_add(1, Ordering::SeqCst);
+                loop {
+                    if let Ok(Async::Ready(_)) = close_rx.poll() {
+                        socket.get_ref().unwrap().shutdown(Shutdown::Write).unwrap();
+                    }
 
-                    conn_counter1.fetch_add(1, Ordering::SeqCst);
-                    let msg_counter1 = Arc::clone(&msg_counter1);
-
-                    let mut stream: MaybeTlsIncomingStream<TcpStream> = connection.unwrap();
-                    future::poll_fn(move |cx| loop {
-                        if let Some(fut) = close_rx.as_mut() {
-                            if let Poll::Ready(()) = Pin::new(fut).poll(cx) {
-                                stream.get_ref().unwrap().shutdown(Shutdown::Write).unwrap();
-                                close_rx = None;
+                    let mut buf = vec![0u8; 11];
+                    match socket.read(&mut buf) {
+                        Err(error) if error.kind() == ErrorKind::WouldBlock => {}
+                        Err(error) => panic!("{}", error),
+                        Ok(n) => {
+                            if n == 0 {
+                                break;
+                            } else {
+                                msg_counter1.fetch_add(1, Ordering::SeqCst);
                             }
                         }
-
-                        return match Pin::new(&mut stream).poll_read(cx, &mut [0u8; 11]) {
-                            Poll::Ready(Ok(n)) => {
-                                if n == 0 {
-                                    Poll::Ready(())
-                                } else {
-                                    msg_counter1.fetch_add(1, Ordering::SeqCst);
-                                    continue;
-                                }
-                            }
-                            Poll::Ready(Err(error)) => panic!("{}", error),
-                            Poll::Pending => Poll::Pending,
-                        };
-                    })
-                })
-                .await;
-        });
+                    };
+                }
+                Ok(())
+            });
+        let jh = rt.spawn_handle_std(fut.compat());
 
         let (_, events) = random_lines_with_stream(10, 10);
         let pump = sink.send_all(events);
@@ -278,7 +264,7 @@ mod test {
             let amnt = msg_counter.load(Ordering::SeqCst);
 
             if amnt == 10 {
-                close_tx.send(()).unwrap();
+                close_tx.try_send(()).unwrap();
                 break;
             }
 

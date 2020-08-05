@@ -1,12 +1,16 @@
 use crate::{
     event::{self, Event, LogEvent, Value},
-    internal_events::{SplunkEventEncodeError, SplunkEventSent},
+    internal_events::{
+        SplunkEventEncodeError, SplunkEventSent, SplunkSourceMissingKeys,
+        SplunkSourceTypeMissingKeys,
+    },
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpClient, HttpSink},
         service2::TowerRequestConfig,
         BatchConfig, BatchSettings, Buffer, Compression,
     },
+    template::Template,
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -37,7 +41,8 @@ pub struct HecSinkConfig {
     #[serde(default)]
     pub indexed_fields: Vec<Atom>,
     pub index: Option<String>,
-    pub sourcetype: Option<String>,
+    pub sourcetype: Option<Template>,
+    pub source: Option<Template>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -122,6 +127,24 @@ impl HttpSink for HecSinkConfig {
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
 
+        let sourcetype = self.sourcetype.as_ref().and_then(|sourcetype| {
+            sourcetype
+                .render_string(&event)
+                .map_err(|missing_keys| {
+                    emit!(SplunkSourceTypeMissingKeys { keys: missing_keys });
+                })
+                .ok()
+        });
+
+        let source = self.source.as_ref().and_then(|source| {
+            source
+                .render_string(&event)
+                .map_err(|missing_keys| {
+                    emit!(SplunkSourceMissingKeys { keys: missing_keys });
+                })
+                .ok()
+        });
+
         let mut event = event.into_log();
 
         let host = event.get(&self.host_key).cloned();
@@ -161,7 +184,11 @@ impl HttpSink for HecSinkConfig {
             body["index"] = json!(index);
         }
 
-        if let Some(sourcetype) = &self.sourcetype {
+        if let Some(source) = source {
+            body["source"] = json!(source);
+        }
+
+        if let Some(sourcetype) = &sourcetype {
             body["sourcetype"] = json!(sourcetype);
         }
 
@@ -416,6 +443,27 @@ mod integration_tests {
     }
 
     #[test]
+    fn splunk_insert_source() {
+        let mut rt = runtime();
+        let cx = SinkContext::new_test();
+
+        rt.block_on_std(async move {
+            let mut config = config(Encoding::Text, vec![]).await;
+            config.source = Template::try_from("/var/log/syslog".to_string()).ok();
+
+            let (sink, _) = config.build(cx).unwrap();
+
+            let message = random_string(100);
+            let event = Event::from(message.clone());
+            sink.send(event).compat().await.unwrap();
+
+            let entry = find_entry(message.as_str()).await;
+
+            assert_eq!(entry["source"].as_str(), Some("/var/log/syslog"));
+        });
+    }
+
+    #[test]
     fn splunk_insert_index() {
         let mut rt = runtime();
         let cx = SinkContext::new_test();
@@ -525,7 +573,7 @@ mod integration_tests {
         rt.block_on_std(async move {
             let indexed_fields = vec![Atom::from("asdf")];
             let mut config = config(Encoding::Json, indexed_fields).await;
-            config.sourcetype = Some("_json".to_string());
+            config.sourcetype = Template::try_from("_json".to_string()).ok();
 
             let (sink, _) = config.build(cx).unwrap();
 

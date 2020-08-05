@@ -1,15 +1,21 @@
 use crate::{
     event::{self, Event, LogEvent, Value},
+    internal_events::{
+        SplunkHECEventReceived, SplunkHECRequestBodyInvalid, SplunkHECRequestError,
+        SplunkHECRequestReceived,
+    },
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig},
     Pipeline,
 };
-use async_trait::async_trait;
 use bytes05::{buf::BufExt, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
-use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
+use futures::{
+    compat::{AsyncRead01CompatExt, Future01CompatExt, Stream01CompatExt},
+    FutureExt, TryFutureExt, TryStreamExt,
+};
 use futures01::{Async, Future, Sink, Stream};
 use http::StatusCode;
 use lazy_static::lazy_static;
@@ -21,6 +27,7 @@ use std::{
     net::{Ipv4Addr, SocketAddr},
 };
 use string_cache::DefaultAtom as Atom;
+use tokio_util::compat::FuturesAsyncReadCompatExt;
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 // Event fields unique to splunk_hec source
@@ -68,19 +75,8 @@ fn default_socket_address() -> SocketAddr {
 }
 
 #[typetag::serde(name = "splunk_hec")]
-#[async_trait]
 impl SourceConfig for SplunkConfig {
     fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
-        _out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        unimplemented!()
-    }
-
-    async fn build_async(
         &self,
         _: &str,
         _: &GlobalOptions,
@@ -96,6 +92,15 @@ impl SourceConfig for SplunkConfig {
 
         let services = path!("services" / "collector" / ..)
             .and(
+                warp::path::full()
+                    .map(|path: warp::filters::path::FullPath| {
+                        emit!(SplunkHECRequestReceived {
+                            path: path.as_str()
+                        });
+                    })
+                    .untuple_one(),
+            )
+            .and(
                 event_service
                     .or(raw_service)
                     .unify()
@@ -107,12 +112,12 @@ impl SourceConfig for SplunkConfig {
             .or_else(finish_err);
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
-        let mut listener = tls.bind(&self.address).await?;
+        let incoming = tls.bind(&self.address)?.incoming();
 
         let fut = async move {
             let _ = warp::serve(services)
                 .serve_incoming_with_graceful_shutdown(
-                    listener.incoming(),
+                    incoming.compat().map_ok(|s| s.compat().compat()),
                     shutdown.clone().compat().map(|_| ()),
                 )
                 .await;
@@ -375,7 +380,9 @@ impl<R: Read> Stream for EventStream<R> {
                 };
             }
             Err(error) => {
-                error!(message = "Malformed request body",%error);
+                emit!(SplunkHECRequestBodyInvalid {
+                    error: error.into()
+                });
                 return Err(ApiError::InvalidDataFormat { event: self.events }.into());
             }
         };
@@ -474,6 +481,7 @@ impl<R: Read> Stream for EventStream<R> {
             de.extract(log, &mut json);
         }
 
+        emit!(SplunkHECEventReceived);
         self.events += 1;
 
         Ok(Async::Ready(Some(event)))
@@ -576,7 +584,7 @@ fn raw_event(
             Ok(0) => return Err(ApiError::NoData.into()),
             Ok(_) => data.into(),
             Err(error) => {
-                error!(message = "Malformed request body",%error);
+                emit!(SplunkHECRequestBodyInvalid { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
             }
         }
@@ -607,11 +615,13 @@ fn raw_event(
         .as_mut_log()
         .try_insert(event::log_schema().source_type_key(), "splunk_hec");
 
+    emit!(SplunkHECEventReceived);
+
     Ok(event)
 }
 
-#[derive(Debug, Snafu)]
-enum ApiError {
+#[derive(Clone, Copy, Debug, Snafu)]
+pub(crate) enum ApiError {
     MissingAuthorization,
     InvalidAuthorization,
     UnsupportedEncoding,
@@ -665,7 +675,8 @@ fn finish_ok(_: ()) -> Response {
 }
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
-    if let Some(error) = rejection.find::<ApiError>() {
+    if let Some(&error) = rejection.find::<ApiError>() {
+        emit!(SplunkHECRequestError { error });
         Ok((match error {
             ApiError::MissingAuthorization => response_json(
                 StatusCode::UNAUTHORIZED,
@@ -690,12 +701,12 @@ async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
                 StatusCode::SERVICE_UNAVAILABLE,
                 splunk_response::SERVER_SHUTDOWN.as_ref(),
             ),
-            ApiError::InvalidDataFormat { event } => event_error("Invalid data format", 6, *event),
+            ApiError::InvalidDataFormat { event } => event_error("Invalid data format", 6, event),
             ApiError::EmptyEventField { event } => {
-                event_error("Event field cannot be blank", 13, *event)
+                event_error("Event field cannot be blank", 13, event)
             }
             ApiError::MissingEventField { event } => {
-                event_error("Event field is required", 12, *event)
+                event_error("Event field is required", 12, event)
             }
             ApiError::BadRequest => empty_response(StatusCode::BAD_REQUEST),
         },))
@@ -726,7 +737,8 @@ fn event_error(text: &str, code: u16, event: usize) -> Response {
     match serde_json::to_string(&body) {
         Ok(string) => response_json(StatusCode::BAD_REQUEST, string),
         Err(error) => {
-            error!("Error encoding json body: {}", error);
+            // This should never happen.
+            error!("error encoding json body: {}.", error);
             response_json(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 splunk_response::SERVER_ERROR.clone(),
@@ -768,24 +780,20 @@ mod tests {
         test_util::trace_init();
         let (sender, recv) = Pipeline::new_test();
         let address = test_util::next_addr();
-        rt.spawn_std(async move {
+        rt.spawn(
             SplunkConfig {
                 address,
                 token,
                 tls: None,
             }
-            .build_async(
+            .build(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 sender,
             )
-            .await
-            .unwrap()
-            .compat()
-            .await
-            .unwrap()
-        });
+            .unwrap(),
+        );
         (recv, address)
     }
 
