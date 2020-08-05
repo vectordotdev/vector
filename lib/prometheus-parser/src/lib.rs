@@ -6,22 +6,24 @@ type IResult<I, O> = Result<(I, O), nom::Err<ParserError>>;
 
 #[derive(Debug, snafu::Snafu, PartialEq)]
 pub enum ParserError {
-    InternalError,
+    #[snafu(display("Expected \"le\" tag for histogram metric"))]
     ExpectedLeTag,
+    #[snafu(display("Expected \"quantile\" tag for summary metric"))]
     ExpectedQuantileTag,
-    InvalidMetricKind {
-        input: String,
-    },
+    #[snafu(display("Invalid metric type, input: {}", input))]
+    InvalidMetricKind { input: String },
+    #[snafu(display("Expected token {}, input: {}", expected, input))]
     ExpectedToken {
         expected: &'static str,
         input: String,
     },
-    ParseNameError {
-        input: String,
-    },
-    ParseFloatError {
-        input: String,
-    },
+    #[snafu(display("Name must start with [a-zA-Z_], input: {}", input))]
+    ParseNameError { input: String },
+    #[snafu(display("Parse float value error, input: {}", input))]
+    ParseFloatError { input: String },
+    #[snafu(display("Internal parser error"))]
+    InternalError,
+    #[snafu(display("Nom error {:?}, input: {}", kind, input))]
     Nom {
         input: String,
         kind: nom::error::ErrorKind,
@@ -173,7 +175,9 @@ impl MetricGroup {
     }
 
     fn push(&mut self, mut metric: Metric) -> Result<(), ParserError> {
-        assert!(self.check_name(&metric.name));
+        if !self.check_name(&metric.name) {
+            return Err(ParserError::InternalError);
+        }
         match self.metrics {
             GroupKind::Counter(ref mut vec)
             | GroupKind::Gauge(ref mut vec)
