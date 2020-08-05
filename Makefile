@@ -73,14 +73,14 @@ export MUSL_CROSS_MAKE_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/aar
 #export LD_x86_64-unknown-linux-gnu ?= x86_64-linux-gnu-ar
 
 export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-cc
-export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc -C linker=${CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER}
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc
 export CC_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-gcc
 export CXX_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-g++
 export AR_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-ar
 export LD_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-ld
 
-export CARGO_TARGET_AARCH64-UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-ld
-export CARGO_TARGET_AARCH64-UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc -C linker=${CARGO_TARGET_AARCH64-UNKNOWN_LINUX_MUSL_LINKER}
+export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-ld
+export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc
 export CC_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-gcc
 export CXX_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-g++
 export AR_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-ar
@@ -257,7 +257,7 @@ ${VECTOR_BINARY_aarch64-unknown-linux-musl}: # ${MUSL_CROSS_MAKE_aarch64-unknown
 	CROSS_COMPILE=aarch64-unknown-linux-musl \
     CC=${CC_aarch64-unknown-linux-musl} \
     CXX=${CXX_aarch64-unknown-linux-musl} \
-    LD=${CARGO_TARGET_AARCH64-UNKNOWN_LINUX_MUSL_LINKER} \
+    LD=${CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER} \
     HOST_CXX=musl-g++ \
     HOST_CC=musl-gcc \
     cargo +nightly build --no-default-features --features default-musl --target aarch64-unknown-linux-musl
