@@ -42,6 +42,16 @@ jobs:
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
+  build-deb-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: make package-deb-x86_64
+      - uses: actions/upload-artifact@v2
+        with:
+          name: e2e-test-deb-package
+          path: target/artifacts/*
+
   # Github Actions don't support `matrix` at the job-level `if:` condition.
   # We apply this workaround for now: instead of using matrices, we split our
   # job in two.
@@ -53,6 +63,8 @@ jobs:
   test-e2e-kubernetes-essential:
     name: K8s ${{ matrix.kubernetes_version }} / ${{ matrix.container_runtime }} (essential)
     runs-on: ubuntu-latest
+    needs:
+      - build-deb-package
     strategy:
       matrix:
         minikube_version:
@@ -67,6 +79,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      - uses: actions/download-artifact@v2
+        with:
+          name: e2e-test-deb-package
+          path: target/artifacts
       - name: Setup Minikube
         run: scripts/ci-setup-minikube.sh
         env:
@@ -77,11 +93,13 @@ jobs:
       - run: make test-e2e-kubernetes
         env:
           USE_MINIKUBE_CACHE: "true"
-          PACKAGE_DEB_USE_CONTAINER: docker
+          SKIP_PACKAGE_DEB: "true"
 
   test-e2e-kubernetes-extra:
     name: K8s ${{ matrix.kubernetes_version }} / ${{ matrix.container_runtime }} (extra)
     runs-on: ubuntu-latest
+    needs:
+      - build-deb-package
     strategy:
       matrix:
         minikube_version:
@@ -103,6 +121,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      - uses: actions/download-artifact@v2
+        with:
+          name: e2e-test-deb-package
+          path: target/artifacts
       - name: Setup Minikube
         run: scripts/ci-setup-minikube.sh
         env:
@@ -113,4 +135,4 @@ jobs:
       - run: make test-e2e-kubernetes
         env:
           USE_MINIKUBE_CACHE: "true"
-          PACKAGE_DEB_USE_CONTAINER: docker
+          SKIP_PACKAGE_DEB: "true"
