@@ -3,13 +3,7 @@
 // all over the place.
 #![allow(dead_code)]
 
-use futures01::{
-    future,
-    sink::Sink,
-    stream,
-    sync::mpsc::{Receiver, Sender},
-    Async, Future, Stream,
-};
+use futures01::{future, sink::Sink, stream, sync::mpsc::Receiver, Async, Future, Stream};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::sync::{
@@ -26,17 +20,18 @@ use vector::topology::config::{
     TransformContext,
 };
 use vector::transforms::Transform;
+use vector::Pipeline;
 
-pub fn sink(channel_size: usize) -> (Receiver<Event>, MockSinkConfig<Sender<Event>>) {
-    let (tx, rx) = futures01::sync::mpsc::channel(channel_size);
+pub fn sink(channel_size: usize) -> (Receiver<Event>, MockSinkConfig<Pipeline>) {
+    let (tx, rx) = Pipeline::new_with_buffer(channel_size);
     let sink = MockSinkConfig::new(tx, true);
     (rx, sink)
 }
 
 pub fn sink_failing_healthcheck(
     channel_size: usize,
-) -> (Receiver<Event>, MockSinkConfig<Sender<Event>>) {
-    let (tx, rx) = futures01::sync::mpsc::channel(channel_size);
+) -> (Receiver<Event>, MockSinkConfig<Pipeline>) {
+    let (tx, rx) = Pipeline::new_with_buffer(channel_size);
     let sink = MockSinkConfig::new(tx, false);
     (rx, sink)
 }
@@ -45,15 +40,15 @@ pub fn sink_dead() -> MockSinkConfig<DeadSink<Event>> {
     MockSinkConfig::new(DeadSink::new(), false)
 }
 
-pub fn source() -> (Sender<Event>, MockSourceConfig) {
-    let (tx, rx) = futures01::sync::mpsc::channel(0);
+pub fn source() -> (Pipeline, MockSourceConfig) {
+    let (tx, rx) = Pipeline::new_with_buffer(0);
     let source = MockSourceConfig::new(rx);
     (tx, source)
 }
 
-pub fn source_with_event_counter() -> (Sender<Event>, MockSourceConfig, Arc<AtomicUsize>) {
+pub fn source_with_event_counter() -> (Pipeline, MockSourceConfig, Arc<AtomicUsize>) {
     let event_counter = Arc::new(AtomicUsize::new(0));
-    let (tx, rx) = futures01::sync::mpsc::channel(0);
+    let (tx, rx) = Pipeline::new_with_buffer(0);
     let source = MockSourceConfig::new_with_event_counter(rx, event_counter.clone());
     (tx, source, event_counter)
 }
@@ -104,7 +99,7 @@ impl SourceConfig for MockSourceConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: Sender<Event>,
+        out: Pipeline,
     ) -> Result<Source, vector::Error> {
         let wrapped = self.receiver.clone();
         let event_counter = self.event_counter.clone();

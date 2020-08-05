@@ -1,13 +1,16 @@
-use crate::event::Event;
 use crate::{
+    event::Event,
+    internal_events::{HTTPBadRequest, HTTPEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
+    Pipeline,
 };
+use bytes05::Bytes;
 use futures::{
     compat::{AsyncRead01CompatExt, Future01CompatExt, Stream01CompatExt},
     FutureExt, TryFutureExt, TryStreamExt,
 };
-use futures01::{sync::mpsc, Sink};
+use futures01::Sink;
 use serde::Serialize;
 use std::error::Error;
 use std::fmt;
@@ -61,7 +64,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         address: SocketAddr,
         path: &'static str,
         tls: &Option<TlsConfig>,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
         shutdown: ShutdownSignal,
     ) -> crate::Result<crate::sources::Source> {
         let mut filter: BoxedFilter<()> = warp::post().boxed();
@@ -74,18 +77,23 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             .and(warp::path::end())
             .and(warp::header::headers_cloned())
             .and(warp::body::bytes())
-            .and_then(move |headers: HeaderMap, body| {
+            .and_then(move |headers: HeaderMap, body: Bytes| {
                 info!("Handling http request: {:?}", headers);
 
                 let this = self.clone();
                 let out = out.clone();
 
                 async move {
+                    let body_size = body.len();
                     match this.build_event(body, headers) {
                         Ok(events) => {
+                            emit!(HTTPEventsReceived {
+                                events_count: events.len(),
+                                byte_size: body_size,
+                            });
                             out.send_all(futures01::stream::iter_ok(events))
                                 .compat()
-                                .map_err(move |e: mpsc::SendError<Event>| {
+                                .map_err(move |e: futures01::sync::mpsc::SendError<Event>| {
                                     // can only fail if receiving end disconnected, so we are shuting down,
                                     // probably not gracefully.
                                     error!("Failed to forward events, downstream is closed");
@@ -95,7 +103,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 .map_ok(|_| warp::reply())
                                 .await
                         }
-                        Err(err) => Err(warp::reject::custom(err)),
+                        Err(err) => {
+                            emit!(HTTPBadRequest {
+                                error_code: err.code,
+                                error_message: err.message.as_str(),
+                            });
+                            Err(warp::reject::custom(err))
+                        }
                     }
                 }
             });

@@ -4,6 +4,7 @@ use crate::{
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     trace::{current_span, Instrument},
+    Pipeline,
 };
 use bytes05::Bytes;
 use file_source::{
@@ -14,7 +15,7 @@ use futures::{
     compat::{Compat01As03Sink, Future01CompatExt},
     future::{FutureExt, TryFutureExt},
 };
-use futures01::{future, sync::mpsc, Future, Sink, Stream};
+use futures01::{future, Future, Sink, Stream};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -198,7 +199,7 @@ impl SourceConfig for FileConfig {
         name: &str,
         globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         // add the source name as a subdir, so that multiple sources can
         // operate within the same given data_dir (e.g. the global one)
@@ -230,7 +231,7 @@ pub fn file_source(
     config: &FileConfig,
     data_dir: PathBuf,
     shutdown: ShutdownSignal,
-    out: mpsc::Sender<Event>,
+    out: Pipeline,
 ) -> super::Source {
     let ignore_before = config
         .ignore_older
@@ -293,7 +294,7 @@ pub fn file_source(
         // logs in the queue.
         let span = current_span();
         let span2 = span.clone();
-        tokio01::spawn(
+        tokio::spawn(
             messages
                 .map(move |(msg, file): (Bytes, String)| {
                     let _enter = span2.enter();
@@ -305,6 +306,7 @@ pub fn file_source(
                 })
                 .forward(out.sink_map_err(|e| error!(%e)))
                 .map(|_| ())
+                .compat()
                 .instrument(span),
         );
 
@@ -355,7 +357,7 @@ mod tests {
         event,
         shutdown::ShutdownSignal,
         sources::file,
-        test_util::{block_on, runtime, shutdown_on_idle, trace_init},
+        test_util::{runtime, shutdown_on_idle, trace_init},
         topology::Config,
     };
     use futures01::{Future, Stream};
@@ -366,7 +368,7 @@ mod tests {
         io::{Seek, Write},
     };
     use tempfile::tempdir;
-    use tokio01::util::FutureExt;
+    use tokio::time::timeout;
 
     fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {
@@ -386,12 +388,16 @@ mod tests {
         R: Send + 'static,
         E: Send + 'static + std::fmt::Debug,
     {
-        let result = block_on(future.timeout(Duration::from_secs(5)));
-        assert!(
-            result.is_ok(),
-            "Unclosed channel: may indicate file-server could not shutdown gracefully."
-        );
-        result.unwrap()
+        runtime()
+            .block_on_std(async move {
+                let result = timeout(tokio::time::Duration::from_secs(5), future.compat()).await;
+                assert!(
+                    result.is_ok(),
+                    "Unclosed channel: may indicate file-server could not shutdown gracefully."
+                );
+                result.unwrap()
+            })
+            .unwrap()
     }
 
     fn sleep() {
@@ -484,7 +490,7 @@ mod tests {
     #[test]
     fn file_happy_path() {
         let n = 5;
-        let (tx, rx) = futures01::sync::mpsc::channel(2 * n);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -546,7 +552,7 @@ mod tests {
     #[test]
     fn file_truncate() {
         let n = 5;
-        let (tx, rx) = futures01::sync::mpsc::channel(2 * n);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -615,7 +621,7 @@ mod tests {
     #[test]
     fn file_rotate() {
         let n = 5;
-        let (tx, rx) = futures01::sync::mpsc::channel(2 * n);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -685,7 +691,7 @@ mod tests {
     #[test]
     fn file_multiple_paths() {
         let n = 5;
-        let (tx, rx) = futures01::sync::mpsc::channel(4 * n);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -750,7 +756,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = futures01::sync::mpsc::channel(10);
+            let (tx, rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -784,7 +790,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = futures01::sync::mpsc::channel(10);
+            let (tx, rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -819,7 +825,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = futures01::sync::mpsc::channel(10);
+            let (tx, rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -877,7 +883,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = futures01::sync::mpsc::channel(10);
+            let (tx, rx) = Pipeline::new_test();
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
             let mut rt = runtime();
             rt.spawn(source);
@@ -900,7 +906,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = futures01::sync::mpsc::channel(10);
+            let (tx, rx) = Pipeline::new_test();
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
             let mut rt = runtime();
             rt.spawn(source);
@@ -928,7 +934,7 @@ mod tests {
                 start_at_beginning: true,
                 ..test_default_file_config(&dir)
             };
-            let (tx, rx) = futures01::sync::mpsc::channel(10);
+            let (tx, rx) = Pipeline::new_test();
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
             let mut rt = runtime();
             rt.spawn(source);
@@ -965,7 +971,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = futures01::sync::mpsc::channel(10);
+            let (tx, rx) = Pipeline::new_test();
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
             let mut rt = runtime();
             rt.spawn(source);
@@ -992,7 +998,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = futures01::sync::mpsc::channel(10);
+            let (tx, rx) = Pipeline::new_test();
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
             let mut rt = runtime();
             rt.spawn(source);
@@ -1021,7 +1027,7 @@ mod tests {
         use std::time::{Duration, SystemTime};
 
         let mut rt = runtime();
-        let (tx, rx) = futures01::sync::mpsc::channel(10);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -1106,7 +1112,7 @@ mod tests {
 
     #[test]
     fn file_max_line_bytes() {
-        let (tx, rx) = futures01::sync::mpsc::channel(10);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -1166,7 +1172,7 @@ mod tests {
 
     #[test]
     fn test_multi_line_aggregation_legacy() {
-        let (tx, rx) = futures01::sync::mpsc::channel(10);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -1239,7 +1245,7 @@ mod tests {
 
     #[test]
     fn test_multi_line_aggregation() {
-        let (tx, rx) = futures01::sync::mpsc::channel(10);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -1316,7 +1322,7 @@ mod tests {
 
     #[test]
     fn test_fair_reads() {
-        let (tx, rx) = futures01::sync::mpsc::channel(10);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -1381,7 +1387,7 @@ mod tests {
 
     #[test]
     fn test_oldest_first() {
-        let (tx, rx) = futures01::sync::mpsc::channel(10);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -1446,7 +1452,7 @@ mod tests {
 
     #[test]
     fn test_gzipped_file() {
-        let (tx, rx) = futures01::sync::mpsc::channel(10);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -1493,7 +1499,7 @@ mod tests {
         let n = 5;
         let remove_after = 2;
 
-        let (tx, rx) = futures01::sync::mpsc::channel(2 * n);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();

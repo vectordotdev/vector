@@ -1,20 +1,23 @@
 use crate::{
     hyper::body_to_bytes,
-    internal_events::{PrometheusHttpError, PrometheusParseError, PrometheusRequestCompleted},
+    internal_events::{
+        PrometheusEventReceived, PrometheusHttpError, PrometheusParseError,
+        PrometheusRequestCompleted,
+    },
     shutdown::ShutdownSignal,
     topology::config::GlobalOptions,
-    Event,
+    Event, Pipeline,
 };
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     future, stream, FutureExt, StreamExt, TryFutureExt,
 };
-use futures01::{sync::mpsc, Sink};
+use futures01::Sink;
 use hyper::{Body, Client, Request};
 use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub mod parser;
 
@@ -36,7 +39,7 @@ impl crate::topology::config::SourceConfig for PrometheusConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let mut urls = Vec::new();
         for host in self.hosts.iter() {
@@ -59,7 +62,7 @@ fn prometheus(
     urls: Vec<String>,
     interval: u64,
     shutdown: ShutdownSignal,
-    out: mpsc::Sender<Event>,
+    out: Pipeline,
 ) -> super::Source {
     let task = tokio::time::interval(Duration::from_secs(interval))
         .take_until(shutdown.compat())
@@ -73,21 +76,33 @@ fn prometheus(
                 .body(Body::empty())
                 .expect("error creating request");
 
+            let start = Instant::now();
             client
                 .request(request)
                 .and_then(|response| body_to_bytes(response.into_body()))
                 .into_stream()
-                .filter_map(|response| {
+                .filter_map(move |response| {
                     future::ready(match response {
                         Ok(body) => {
-                            emit!(PrometheusRequestCompleted);
+                            emit!(PrometheusRequestCompleted {
+                                start,
+                                end: Instant::now()
+                            });
 
+                            let byte_size = body.len();
                             let packet = String::from_utf8_lossy(&body);
                             let metrics = parser::parse(&packet)
                                 .map_err(|error| {
                                     emit!(PrometheusParseError { error });
                                 })
                                 .unwrap_or_default();
+
+                            if !metrics.is_empty() {
+                                emit!(PrometheusEventReceived {
+                                    byte_size,
+                                    count: metrics.len()
+                                });
+                            }
 
                             Some(stream::iter(metrics).map(Event::Metric).map(Ok))
                         }

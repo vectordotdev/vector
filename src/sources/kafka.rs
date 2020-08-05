@@ -1,8 +1,10 @@
 use crate::{
     event::{self, Event},
+    internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::KafkaAuthConfig,
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    Pipeline,
 };
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -10,7 +12,7 @@ use futures::{
     compat::{Compat, Future01CompatExt},
     FutureExt, StreamExt,
 };
-use futures01::{sync::mpsc, Sink};
+use futures01::Sink;
 use rdkafka::{
     config::ClientConfig,
     consumer::{Consumer, StreamConsumer},
@@ -81,7 +83,7 @@ impl SourceConfig for KafkaSourceConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         kafka_source(self, shutdown, out)
     }
@@ -98,7 +100,7 @@ impl SourceConfig for KafkaSourceConfig {
 fn kafka_source(
     config: &KafkaSourceConfig,
     shutdown: ShutdownSignal,
-    out: mpsc::Sender<Event>,
+    out: Pipeline,
 ) -> crate::Result<super::Source> {
     let key_field = config.key_field.clone();
     let consumer = Arc::new(create_consumer(config)?);
@@ -113,18 +115,18 @@ fn kafka_source(
 
                 async move {
                     match message {
-                        Err(e) => {
-                            Err(error!(message = "Error reading message from Kafka", error = ?e))
+                        Err(error) => {
+                            emit!(KafkaEventFailed { error });
+                            Err(())
                         }
                         Ok(msg) => {
-                            let payload = match msg.payload_view::<[u8]>() {
+                            emit!(KafkaEventReceived {
+                                byte_size: msg.payload_len()
+                            });
+
+                            let payload = match msg.payload() {
                                 None => return Err(()), // skip messages with empty payload
-                                Some(Err(e)) => {
-                                    return Err(
-                                        error!(message = "Cannot extract payload", error = ?e),
-                                    )
-                                }
-                                Some(Ok(payload)) => Bytes::from(payload),
+                                Some(payload) => Bytes::from(payload),
                             };
                             let mut event = Event::new_empty_log();
                             let log = event.as_mut_log();
@@ -143,20 +145,18 @@ fn kafka_source(
                             log.insert(event::log_schema().source_type_key(), "kafka");
 
                             if let Some(key_field) = &key_field {
-                                match msg.key_view::<[u8]>() {
+                                match msg.key() {
                                     None => (),
-                                    Some(Err(e)) => {
-                                        return Err(
-                                            error!(message = "Cannot extract key", error = ?e),
-                                        )
-                                    }
-                                    Some(Ok(key)) => {
+                                    Some(key) => {
                                         log.insert(key_field.clone(), key);
                                     }
                                 }
                             }
 
-                            consumer.store_offset(&msg).map_err(|e| error!(message = "Cannot store offset for the message", error = ?e))?;
+                            consumer.store_offset(&msg).map_err(|error| {
+                                emit!(KafkaOffsetUpdateFailed { error });
+                            })?;
+
                             Ok(event)
                         }
                     }
@@ -221,8 +221,7 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer> 
 #[cfg(test)]
 mod test {
     use super::{kafka_source, KafkaSourceConfig};
-    use crate::shutdown::ShutdownSignal;
-    use futures01::sync::mpsc;
+    use crate::{shutdown::ShutdownSignal, Pipeline};
 
     fn make_config() -> KafkaSourceConfig {
         KafkaSourceConfig {
@@ -242,7 +241,7 @@ mod test {
     #[test]
     fn kafka_source_create_ok() {
         let config = make_config();
-        assert!(kafka_source(&config, ShutdownSignal::noop(), mpsc::channel(1).0).is_ok());
+        assert!(kafka_source(&config, ShutdownSignal::noop(), Pipeline::new_test().0).is_ok());
     }
 
     #[test]
@@ -251,7 +250,7 @@ mod test {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
             ..make_config()
         };
-        assert!(kafka_source(&config, ShutdownSignal::noop(), mpsc::channel(1).0).is_err());
+        assert!(kafka_source(&config, ShutdownSignal::noop(), Pipeline::new_test().0).is_err());
     }
 }
 
@@ -263,9 +262,9 @@ mod integration_test {
         event,
         shutdown::ShutdownSignal,
         test_util::{collect_n, random_string, runtime},
+        Pipeline,
     };
     use chrono::Utc;
-    use futures01::sync::mpsc;
     use rdkafka::{
         config::ClientConfig,
         producer::{FutureProducer, FutureRecord},
@@ -323,7 +322,7 @@ mod integration_test {
             now.timestamp_millis(),
         ));
         println!("Receiving event...");
-        let (tx, rx) = mpsc::channel(1);
+        let (tx, rx) = Pipeline::new_test();
         rt.spawn(kafka_source(&config, ShutdownSignal::noop(), tx).unwrap());
         let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
         assert_eq!(

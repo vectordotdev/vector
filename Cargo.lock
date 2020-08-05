@@ -322,7 +322,7 @@ dependencies = [
  "serde_json",
  "tokio 0.2.21",
  "tokio-util",
- "url 2.1.1",
+ "url",
  "winapi 0.3.8",
 ]
 
@@ -431,7 +431,7 @@ dependencies = [
  "semver",
  "serde",
  "toml 0.5.6",
- "url 2.1.1",
+ "url",
 ]
 
 [[package]]
@@ -481,9 +481,9 @@ dependencies = [
 
 [[package]]
 name = "cidr-utils"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a43c5deddb78f662a837192de8bfd1c5d5f23475aec80ce182c79577aac3f50d"
+checksum = "1daf95b7df82d8f0ad8c49f1930f2853ce4a68f1bbca29c8d84087df2c24784f"
 dependencies = [
  "debug-helper",
  "enum-ordinalize",
@@ -1020,9 +1020,9 @@ dependencies = [
 
 [[package]]
 name = "enum-ordinalize"
-version = "3.1.0"
+version = "3.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d06f2ad28be2174a108c29425212ab669080ee656504ea46f9252ac612f21ca9"
+checksum = "1676e1daadfd216bda88d3a6fedd1bf53b829a085f5cc4d81c6f3054f50ef983"
 dependencies = [
  "num-bigint",
  "num-traits",
@@ -1434,7 +1434,7 @@ dependencies = [
  "libc",
  "libgit2-sys",
  "log 0.4.8",
- "url 2.1.1",
+ "url",
 ]
 
 [[package]]
@@ -1715,17 +1715,6 @@ dependencies = [
 
 [[package]]
 name = "idna"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38f09e0f0b1fb55fdee1f17470ad800da77af5186a1a76c026b679358b7e844e"
-dependencies = [
- "matches",
- "unicode-bidi",
- "unicode-normalization",
-]
-
-[[package]]
-name = "idna"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02e2673c30ee86b5b96a9cb52ad15718aa1f966f5ab9ad54a8b95d5ca33120a9"
@@ -1880,11 +1869,11 @@ dependencies = [
  "bytes 0.5.4",
  "chrono",
  "http 0.2.1",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "serde",
  "serde-value",
  "serde_json",
- "url 2.1.1",
+ "url",
 ]
 
 [[package]]
@@ -2667,9 +2656,9 @@ dependencies = [
 
 [[package]]
 name = "num-bigint"
-version = "0.2.6"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "090c7f9998ee0ff65aa5b723e4009f7b217707f1fb5ea551329cc4d6231fb304"
+checksum = "b7f3fc75e3697059fb1bc465e3d8cca6cf92f56854f201158b3f9c77d5a3cfa0"
 dependencies = [
  "autocfg 1.0.0",
  "num-integer",
@@ -2914,12 +2903,6 @@ dependencies = [
  "once_cell",
  "regex",
 ]
-
-[[package]]
-name = "percent-encoding"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31010dd2e1ac33d5b46a5b413495239882813e0369f8ed8a5e266f173602f831"
 
 [[package]]
 name = "percent-encoding"
@@ -3228,7 +3211,7 @@ dependencies = [
  "tokio 0.2.21",
  "tokio-native-tls",
  "tokio-util",
- "url 2.1.1",
+ "url",
 ]
 
 [[package]]
@@ -3629,14 +3612,14 @@ dependencies = [
  "mime",
  "mime_guess",
  "native-tls",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "pin-project-lite",
  "serde",
  "serde_json",
  "serde_urlencoded",
  "tokio 0.2.21",
  "tokio-tls",
- "url 2.1.1",
+ "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -3697,7 +3680,7 @@ dependencies = [
  "lazy_static 1.4.0",
  "log 0.4.8",
  "md5",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "pin-project",
  "rusoto_credential",
  "rusoto_signature",
@@ -3799,7 +3782,7 @@ dependencies = [
  "hyper",
  "log 0.4.8",
  "md5",
- "percent-encoding 2.1.0",
+ "percent-encoding",
  "pin-project",
  "rusoto_credential",
  "rustc_version",
@@ -4046,7 +4029,7 @@ dependencies = [
  "dtoa",
  "itoa",
  "serde",
- "url 2.1.1",
+ "url",
 ]
 
 [[package]]
@@ -5314,24 +5297,13 @@ checksum = "826e7639553986605ec5979c7dd957c7895e93eabed50ab2ffa7f6128a75097c"
 
 [[package]]
 name = "url"
-version = "1.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd4e7c0d531266369519a4aa4f399d748bd37043b00bde1e4ff1f60a120b355a"
-dependencies = [
- "idna 0.1.5",
- "matches",
- "percent-encoding 1.0.1",
-]
-
-[[package]]
-name = "url"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "829d4a8476c35c9bf0bbce5a3b23f4106f79728039b726d292bb93bc106787cb"
 dependencies = [
- "idna 0.2.0",
+ "idna",
  "matches",
- "percent-encoding 2.1.0",
+ "percent-encoding",
 ]
 
 [[package]]
@@ -5535,7 +5507,7 @@ dependencies = [
  "tracing-subscriber",
  "tracing-tower",
  "typetag",
- "url 1.7.2",
+ "url",
  "uuid 0.7.4",
  "vector-wasm",
  "walkdir",
