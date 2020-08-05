@@ -8,9 +8,9 @@ use futures::{FutureExt, TryFutureExt};
 use futures01::{Async, Future, Poll};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time::{Duration};
+use std::time::Duration;
 use std::{error, fmt};
-use tokio::time::{delay_for};
+use tokio::time::delay_for;
 use tower::{
     layer::{util::Stack, Layer},
     limit::{concurrency::ConcurrencyLimit, rate::RateLimit},

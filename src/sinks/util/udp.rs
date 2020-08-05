@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
-use std::time::{Duration};
+use std::time::Duration;
 use tokio::time::{delay_for, Delay};
 use tokio_retry::strategy::ExponentialBackoff;
 use tracing::field;
