@@ -5,7 +5,7 @@
 ))]
 
 use approx::assert_relative_eq;
-use futures::compat::Future01CompatExt;
+use futures::{compat::Future01CompatExt, future};
 use tokio::net::TcpListener;
 use vector::{
     runtime::Runtime,
@@ -116,6 +116,77 @@ fn sample() {
             let next_line = input_lines.by_ref().find(|l| l == &output_line);
             assert_eq!(Some(output_line), next_line);
         }
+    });
+    shutdown_on_idle(rt);
+}
+
+#[test]
+fn merge() {
+    let num_lines: usize = 10000;
+
+    let in_addr1 = next_addr();
+    let in_addr2 = next_addr();
+    let out_addr = next_addr();
+
+    let mut config = config::Config::empty();
+    config.add_source(
+        "in1",
+        sources::socket::SocketConfig::make_tcp_config(in_addr1),
+    );
+    config.add_source(
+        "in2",
+        sources::socket::SocketConfig::make_tcp_config(in_addr2),
+    );
+    config.add_sink(
+        "out",
+        &["in1", "in2"],
+        sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
+    );
+
+    let mut rt = runtime();
+    rt.block_on_std(async move {
+        let mut output_lines = CountReceiver::receive_lines(out_addr);
+
+        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        // Wait for server to accept traffic
+        wait_for_tcp(in_addr1);
+        wait_for_tcp(in_addr2);
+
+        // Wait for output to connect
+        output_lines.connected().await;
+
+        let input_lines1 = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
+        let (a, b) = future::join(
+            send_lines(in_addr1, input_lines1.clone()),
+            send_lines(in_addr2, input_lines2.clone()),
+        )
+        .await;
+        a.unwrap();
+        b.unwrap();
+
+        // Shut down server
+        topology.stop().compat().await.unwrap();
+
+        let output_lines = output_lines.wait().await;
+        let num_output_lines = output_lines.len();
+
+        assert_eq!(num_output_lines, num_lines * 2);
+
+        let mut input_lines1 = input_lines1.into_iter().peekable();
+        let mut input_lines2 = input_lines2.into_iter().peekable();
+        // Assert that all of the output lines were present in the input and in the same order
+        for output_line in &output_lines {
+            if Some(output_line) == input_lines1.peek() {
+                input_lines1.next();
+            } else if Some(output_line) == input_lines2.peek() {
+                input_lines2.next();
+            } else {
+                panic!("Got line in output that wasn't in input");
+            }
+        }
+        assert_eq!(input_lines1.next(), None);
+        assert_eq!(input_lines2.next(), None);
     });
     shutdown_on_idle(rt);
 }
