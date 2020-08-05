@@ -110,22 +110,22 @@ impl<L> Controller<L> {
         let now = instant_now();
         let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
 
-        #[cfg(test)]
-        let mut stats = self.stats.lock().expect("Stats mutex is poisoned");
-
         let rtt = now.saturating_duration_since(start);
         emit!(AutoConcurrencyObservedRtt { rtt });
         let rtt = rtt.as_secs_f64();
-
-        #[cfg(test)]
-        stats.observed_rtt.add(rtt, now);
 
         if is_back_pressure {
             inner.had_back_pressure = true;
         }
 
         #[cfg(test)]
-        stats.in_flight.add(inner.in_flight, now);
+        let mut stats = self.stats.lock().expect("Stats mutex is poisoned");
+
+        #[cfg(test)]
+        {
+            stats.observed_rtt.add(rtt, now);
+            stats.in_flight.add(inner.in_flight, now);
+        }
 
         inner.in_flight -= 1;
         emit!(AutoConcurrencyInFlight {
@@ -140,15 +140,16 @@ impl<L> Controller<L> {
             inner.past_rtt.update(rtt);
             inner.next_update = now + Duration::from_secs_f64(rtt);
         } else if avg > 0.0 && now >= inner.next_update {
-            emit!(AutoConcurrencyAveragedRtt {
-                rtt: Duration::from_secs_f64(rtt)
-            });
-
             #[cfg(test)]
             {
                 stats.averaged_rtt.add(rtt, now);
                 stats.concurrency_limit.add(inner.current_limit, now);
+                drop(stats); // Drop the stats lock a little earlier on this path
             }
+
+            emit!(AutoConcurrencyAveragedRtt {
+                rtt: Duration::from_secs_f64(rtt)
+            });
 
             let threshold = avg * THRESHOLD_RATIO;
 
