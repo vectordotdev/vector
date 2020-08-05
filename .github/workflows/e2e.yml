@@ -67,7 +67,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v1
       - name: Setup Minikube
-        run: .github/scripts/setup_minikube
+        run: scripts/ci-setup-minikube.sh
         env:
           KUBERNETES_VERSION: ${{ matrix.kubernetes_version }}
           MINIKUBE_VERSION: ${{ matrix.minikube_version }}
@@ -103,7 +103,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v1
       - name: Setup Minikube
-        run: .github/scripts/setup_minikube
+        run: scripts/ci-setup-minikube.sh
         env:
           KUBERNETES_VERSION: ${{ matrix.kubernetes_version }}
           MINIKUBE_VERSION: ${{ matrix.minikube_version }}

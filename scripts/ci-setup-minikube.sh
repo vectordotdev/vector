@@ -1,9 +1,17 @@
 #!/bin/bash
-set -xeuo pipefail
+set -euo pipefail
+
+if [[ -z "${CI:-}" ]]; then
+  echo "Aborted: this script is for use in CI, it may alter your system in an" \
+    "unwanted way" >&2
+  exit 1
+fi
 
 KUBERNETES_VERSION="${KUBERNETES_VERSION:?required}"
 MINIKUBE_VERSION="${MINIKUBE_VERSION:?required}"
 CONTAINER_RUNTIME="${CONTAINER_RUNTIME:?required}"
+
+set -x
 
 curl -Lo kubectl \
   "https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/kubectl"
