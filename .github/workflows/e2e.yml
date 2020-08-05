@@ -64,28 +64,14 @@ jobs:
           - crio
       fail-fast: false
     steps:
-      - name: Setup Minikube
-        run: |
-          set -xeuo pipefail
-
-          curl -Lo kubectl \
-            'https://storage.googleapis.com/kubernetes-release/release/${{ matrix.kubernetes_version }}/bin/linux/amd64/kubectl'
-          sudo install kubectl /usr/local/bin/ && rm kubectl
-
-          curl -Lo minikube \
-            'https://storage.googleapis.com/minikube/releases/${{ matrix.minikube_version }}/minikube-linux-amd64'
-          sudo install minikube /usr/local/bin/ && rm minikube
-
-          minikube config set profile minikube
-          minikube config set vm-driver docker
-          minikube config set kubernetes-version '${{ matrix.kubernetes_version }}'
-          minikube config set container-runtime '${{ matrix.container_runtime }}'
-          # Start minikube, try again once if fails and print logs if the second
-          # attempt fails too.
-          minikube start || minikube delete && minikube start || minikube logs
-          kubectl cluster-info
       - name: Checkout
         uses: actions/checkout@v1
+      - name: Setup Minikube
+        run: .github/scripts/setup_minikube
+        env:
+          KUBERNETES_VERSION: ${{ matrix.kubernetes_version }}
+          MINIKUBE_VERSION: ${{ matrix.minikube_version }}
+          CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
       - run: USE_CONTAINER=none make slim-builds
       - run: make test-e2e-kubernetes
         env:
@@ -114,28 +100,14 @@ jobs:
       github.event.pull_request == null ||
       contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
     steps:
-      - name: Setup Minikube
-        run: |
-          set -xeuo pipefail
-
-          curl -Lo kubectl \
-            'https://storage.googleapis.com/kubernetes-release/release/${{ matrix.kubernetes_version }}/bin/linux/amd64/kubectl'
-          sudo install kubectl /usr/local/bin/ && rm kubectl
-
-          curl -Lo minikube \
-            'https://storage.googleapis.com/minikube/releases/${{ matrix.minikube_version }}/minikube-linux-amd64'
-          sudo install minikube /usr/local/bin/ && rm minikube
-
-          minikube config set profile minikube
-          minikube config set vm-driver docker
-          minikube config set kubernetes-version '${{ matrix.kubernetes_version }}'
-          minikube config set container-runtime '${{ matrix.container_runtime }}'
-          # Start minikube, try again once if fails and print logs if the second
-          # attempt fails too.
-          minikube start || minikube delete && minikube start || minikube logs
-          kubectl cluster-info
       - name: Checkout
         uses: actions/checkout@v1
+      - name: Setup Minikube
+        run: .github/scripts/setup_minikube
+        env:
+          KUBERNETES_VERSION: ${{ matrix.kubernetes_version }}
+          MINIKUBE_VERSION: ${{ matrix.minikube_version }}
+          CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
       - run: USE_CONTAINER=none make slim-builds
       - run: make test-e2e-kubernetes
         env:
