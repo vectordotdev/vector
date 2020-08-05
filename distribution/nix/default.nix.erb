@@ -23,7 +23,7 @@ rustPlatform.buildRustPackage rec {
       repo   = pname;
       rev    = "refs/tags/v${version}";
       sha256 = "<%= ENV["GITHUB_SHA256"] %>";
-    }<% else %><%= "#{VECTOR_TARGET_DIR}/distribution/nix" %><% end %>;
+    }<% else %><%= "/distribution/default.nix" %><% end %>;
 
   legacyCargoFetcher = true;
   cargoSha256 = "<%=
