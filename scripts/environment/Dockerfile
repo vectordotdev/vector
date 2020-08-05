@@ -30,8 +30,8 @@ ADD rust-toolchain \
 RUN ./scripts/environment/prepare.sh
 
 # Declare volumes
-VOLUME /vector
-VOLUME /vector/target
+VOLUME /git/timberio/vector
+VOLUME /git/timberio/vector/target
 VOLUME /root/.cargo
 
 # Prepare for use
