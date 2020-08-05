@@ -85,23 +85,7 @@ jobs:
           RUSTFLAGS: "-D warnings"
         run: cargo test --no-default-features --features default-msvc
 
-  test-behavior:
-    name: Behavior - Linux
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: make slim-builds
-      - run: make test-behavior
-
-  test-shutdown:
+  test-misc:
     name: Shutdown - Linux
     runs-on: ubuntu-20.04
     steps:
@@ -116,8 +100,8 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make test-shutdown
-      # Currently has too few tests to justify a separate task in CI.
       - run: make test-cli
+      - run: make test-behavior
 
   test-integration-aws:
     name: Integration - Linux, AWS
@@ -288,9 +272,10 @@ jobs:
           - "v1.11.0" # https://github.com/kubernetes/minikube/issues/8799
         kubernetes_version:
           - "v1.18.6"
-          - "v1.17.9"
-          - "v1.16.12" # v1.16.13 is broken, see https://github.com/kubernetes/minikube/issues/8840
-          - "v1.15.12"
+          # TODO: https://github.com/timberio/vector/issues/3338
+          #- "v1.17.9"
+          #- "v1.16.12" # v1.16.13 is broken, see https://github.com/kubernetes/minikube/issues/8840
+          #- "v1.15.12"
           - "v1.14.10"
         container_runtime:
           - docker
