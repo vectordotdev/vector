@@ -15,7 +15,7 @@ else
 endif
 
 # Override this to use debug builds in release builders.
-export RELEASE ?= false
+export RELEASE ?= true
 override BUILD_MODE = $(if $(findstring true,$(RELEASE)),release,debug)
 override MAYBE_RELEASE_FLAG = $(if $(findstring true,$(RELEASE)),--release,)
 # Override this with any scopes for testing/benching.
@@ -255,7 +255,7 @@ build-all: build-x86_64-unknown-linux-gnu build-x86_64-unknown-linux-musl build-
 build-x86_64-unknown-linux-gnu: ${VECTOR_BINARY_x86_64_unknown_linux_gnu} ## Build dynamically linked binary in release mode for the x86_64 architecture
 
 ${VECTOR_BINARY_x86_64_unknown_linux_gnu}:
-	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features default --target x86_64-unknown-linux-gnu
+	${MAYBE_ENVIRONMENT_EXEC} cargo build ${MAYBE_RELEASE_FLAG} --no-default-features --features default --target x86_64-unknown-linux-gnu
 
 .PHONY: ${MUSL_CROSS_MAKE}
 ${MUSL_CROSS_MAKE}:

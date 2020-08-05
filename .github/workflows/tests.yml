@@ -85,6 +85,31 @@ jobs:
           RUSTFLAGS: "-D warnings"
         run: cargo test --no-default-features --features default-msvc
 
+  build-x64_64-unknown-linux-gnu:
+    name: Release build - x64_64-unknown-linux-gnu
+    runs-on: ubuntu-20.04
+    env:
+      RELEASE: false
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make build-cross-x64_64-unknown-linux-gnu
+      - run: make clean-cross
+      - run: make build-x64_64-unknown-linux-gnu
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: vector-x64_64-unknown-linux-gnu
+          path: target/x64_64-unknown-linux-gnu/debug/vector
+
   build-x86_64-unknown-linux-musl:
     name: Release build - x86_64-unknown-linux-musl
     runs-on: ubuntu-20.04
