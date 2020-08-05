@@ -4,7 +4,6 @@ use crate::support::{sink, sink_failing_healthcheck, source, transform, MockSour
 use futures::compat::Future01CompatExt;
 use futures01::{
     future, future::Future, sink::Sink, stream::iter_ok, stream::Stream, sync::mpsc::SendError,
-    sync::oneshot,
 };
 use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -39,12 +38,11 @@ fn into_message(event: Event) -> String {
         .to_string_lossy()
 }
 
-#[test]
-fn topology_shutdown_while_active() {
+#[tokio::test(core_threads = 2)]
+async fn topology_shutdown_while_active() {
     let source_event_counter = Arc::new(AtomicUsize::new(0));
     let source_event_total = source_event_counter.clone();
 
-    let mut rt = runtime();
     let (in1, rx) = futures01::sync::mpsc::channel(1000);
 
     let source1 = MockSourceConfig::new_with_event_counter(rx, source_event_counter);
@@ -56,13 +54,16 @@ fn topology_shutdown_while_active() {
     config.add_transform("t1", &["in1"], transform1);
     config.add_sink("out1", &["t1"], sink1);
 
-    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
+    let (topology, _crash) = topology::start(config, false).await.unwrap();
 
-    let pump_future = iter_ok::<_, SendError<vector::event::Event>>(iter::from_fn(move || {
-        Some(Event::from("test"))
-    }))
-    .forward(in1);
-    let pump_handle = oneshot::spawn(pump_future, &rt.executor());
+    let pump_handle = tokio::spawn(async move {
+        iter_ok::<_, SendError<vector::event::Event>>(iter::from_fn(move || {
+            Some(Event::from("test"))
+        }))
+        .forward(in1)
+        .compat()
+        .await
+    });
 
     // Wait until at least 100 events have been seen by the source so we know the pump is running
     // and pushing events through the pipeline.
@@ -71,7 +72,7 @@ fn topology_shutdown_while_active() {
     }
 
     // Now shut down the RunningTopology while Events are still being processed.
-    let stop_complete = oneshot::spawn(topology.stop(), &rt.executor());
+    let stop_complete = tokio::spawn(async move { topology.stop().compat().await });
 
     // Now that shutdown has begun we should be able to drain the Sink without blocking forever,
     // as the source should shut down and close its output channel.
@@ -87,18 +88,15 @@ fn topology_shutdown_while_active() {
         );
     }
 
-    rt.block_on(stop_complete).unwrap();
+    stop_complete.await.unwrap().unwrap();
 
     // We expect the pump to fail with an error since we shut down the source it was sending to
     // while it was running.
-    let _err: SendError<Event> = rt.block_on(pump_handle).unwrap_err();
-
-    shutdown_on_idle(rt);
+    let _err: SendError<Event> = pump_handle.await.unwrap().unwrap_err();
 }
 
-#[test]
-fn topology_source_and_sink() {
-    let mut rt = runtime();
+#[tokio::test(core_threads = 2)]
+async fn topology_source_and_sink() {
     let (in1, source1) = source();
     let (out1, sink1) = sink(10);
 
@@ -106,22 +104,20 @@ fn topology_source_and_sink() {
     config.add_source("in1", source1);
     config.add_sink("out1", &["in1"], sink1);
 
-    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
+    let (topology, _crash) = topology::start(config, false).await.unwrap();
 
     let event = Event::from("this");
     in1.send(event.clone()).wait().unwrap();
 
-    rt.block_on(topology.stop()).unwrap();
+    topology.stop().compat().await.unwrap();
 
     let res = out1.collect().wait().unwrap();
 
-    shutdown_on_idle(rt);
     assert_eq!(vec![event], res);
 }
 
-#[test]
-fn topology_multiple_sources() {
-    let mut rt = runtime();
+#[tokio::test(core_threads = 2)]
+async fn topology_multiple_sources() {
     let (in1, source1) = source();
     let (in2, source2) = source();
     let (out1, sink1) = sink(10);
@@ -131,7 +127,7 @@ fn topology_multiple_sources() {
     config.add_source("in2", source2);
     config.add_sink("out1", &["in1", "in2"], sink1);
 
-    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
+    let (topology, _crash) = topology::start(config, false).await.unwrap();
 
     let event1 = Event::from("this");
     let event2 = Event::from("that");
@@ -144,17 +140,14 @@ fn topology_multiple_sources() {
 
     let (out_event2, _out1) = out1.into_future().wait().unwrap();
 
-    rt.block_on(topology.stop()).unwrap();
-
-    shutdown_on_idle(rt);
+    topology.stop().compat().await.unwrap();
 
     assert_eq!(out_event1, Some(event1));
     assert_eq!(out_event2, Some(event2));
 }
 
-#[test]
-fn topology_multiple_sinks() {
-    let mut rt = runtime();
+#[tokio::test(core_threads = 2)]
+async fn topology_multiple_sinks() {
     let (in1, source1) = source();
     let (out1, sink1) = sink(10);
     let (out2, sink2) = sink(10);
@@ -164,25 +157,23 @@ fn topology_multiple_sinks() {
     config.add_sink("out1", &["in1"], sink1);
     config.add_sink("out2", &["in1"], sink2);
 
-    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
+    let (topology, _crash) = topology::start(config, false).await.unwrap();
 
     let event = Event::from("this");
 
     in1.send(event.clone()).wait().unwrap();
 
-    rt.block_on(topology.stop()).unwrap();
+    topology.stop().compat().await.unwrap();
 
     let res1 = out1.collect().wait().unwrap();
     let res2 = out2.collect().wait().unwrap();
 
-    shutdown_on_idle(rt);
     assert_eq!(vec![event.clone()], res1);
     assert_eq!(vec![event], res2);
 }
 
-#[test]
-fn topology_transform_chain() {
-    let mut rt = runtime();
+#[tokio::test(core_threads = 2)]
+async fn topology_transform_chain() {
     let (in1, source1) = source();
     let transform1 = transform(" first", 0.0);
     let transform2 = transform(" second", 0.0);
@@ -194,17 +185,16 @@ fn topology_transform_chain() {
     config.add_transform("t2", &["t1"], transform2);
     config.add_sink("out1", &["t2"], sink1);
 
-    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
+    let (topology, _crash) = topology::start(config, false).await.unwrap();
 
     let event = Event::from("this");
 
     in1.send(event).wait().unwrap();
 
-    rt.block_on(topology.stop()).unwrap();
+    topology.stop().compat().await.unwrap();
 
     let res = out1.map(into_message).collect().wait().unwrap();
 
-    shutdown_on_idle(rt);
     assert_eq!(vec!["this first second"], res);
 }
 

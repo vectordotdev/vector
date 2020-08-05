@@ -1,5 +1,6 @@
 use crate::sinks::RouterSink;
 use crate::Event;
+use futures::compat::Future01CompatExt;
 use futures01::sync::mpsc;
 use futures01::{future, Async, AsyncSink, Poll, Sink, StartSend, Stream};
 
@@ -45,7 +46,7 @@ impl Fanout {
 
         let (_name, mut removed) = self.sinks.remove(i);
 
-        tokio01::spawn(future::poll_fn(move || removed.close()));
+        tokio::spawn(future::poll_fn(move || removed.close()).compat());
 
         if self.i > i {
             self.i -= 1;

@@ -4,7 +4,6 @@ use crate::{
 };
 use colored::*;
 use exitcode::ExitCode;
-use futures::compat::Future01CompatExt;
 use std::{fmt, fs::File, path::PathBuf};
 use structopt::StructOpt;
 
@@ -231,7 +230,7 @@ async fn validate_healthchecks(
             fmt.error(error);
         };
 
-        match tokio::spawn(healthcheck.compat()).await {
+        match tokio::spawn(healthcheck).await {
             Ok(Ok(())) => {
                 if config
                     .sinks
