@@ -66,7 +66,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
       - name: Setup Minikube
         run: scripts/ci-setup-minikube.sh
         env:
@@ -102,7 +102,7 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
       - name: Setup Minikube
         run: scripts/ci-setup-minikube.sh
         env:
