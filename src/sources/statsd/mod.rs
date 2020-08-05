@@ -1,4 +1,9 @@
-use crate::{shutdown::ShutdownSignal, topology::config::GlobalOptions, Event, Pipeline};
+use crate::{
+    internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
+    shutdown::ShutdownSignal,
+    topology::config::GlobalOptions,
+    Event, Pipeline,
+};
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     stream, FutureExt, StreamExt, TryFutureExt,
@@ -45,8 +50,9 @@ fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> super::S
     Box::new(
         async move {
             let socket = UdpSocket::bind(&addr)
-                .await
-                .expect("failed to bind to udp listener socket");
+                .map_err(|error| emit!(StatsdSocketError::bind(error)))
+                .await?;
+
             info!(
                 message = "listening.",
                 addr = &field::display(addr),
@@ -61,15 +67,23 @@ fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> super::S
                             let packet = String::from_utf8_lossy(bytes.as_ref());
                             let metrics = packet
                                 .lines()
-                                .map(parse)
-                                .filter_map(|res| res.map_err(|e| error!("{}", e)).ok())
-                                .map(Event::Metric)
-                                .map(Ok)
+                                .filter_map(|line| match parse(line) {
+                                    Ok(metric) => {
+                                        emit!(StatsdEventReceived {
+                                            byte_size: line.len()
+                                        });
+                                        Some(Ok(Event::Metric(metric)))
+                                    }
+                                    Err(error) => {
+                                        emit!(StatsdInvalidRecord { error, text: line });
+                                        None
+                                    }
+                                })
                                 .collect::<Vec<_>>();
                             Some(stream::iter(metrics))
                         }
                         Err(error) => {
-                            error!("error reading datagram: {:?}", error);
+                            emit!(StatsdSocketError::read(error));
                             None
                         }
                     }
