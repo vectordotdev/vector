@@ -115,6 +115,8 @@ jobs:
           - crio
       fail-fast: false
     # See TODO above.
+    # Run if we're either not in a PR context, or the PR has the opting-in label
+    # assigned.
     if: |
       github.event.pull_request == null ||
       contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
