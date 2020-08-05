@@ -555,15 +555,15 @@ mod checkpointer_tests {
 mod tests {
     use super::*;
     use crate::{
-        test_util::{block_on, runtime, shutdown_on_idle},
+        test_util::{runtime, shutdown_on_idle},
         Pipeline,
     };
+    use futures::compat::Future01CompatExt;
     use futures01::stream::Stream;
     use std::io::{self, BufReader, Cursor};
     use std::iter::FromIterator;
-    use std::time::Duration;
     use tempfile::tempdir;
-    use tokio01::util::FutureExt;
+    use tokio::time::{timeout, Duration};
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}
@@ -644,7 +644,13 @@ mod tests {
         drop(trigger);
         shutdown_on_idle(rt);
 
-        block_on(rx.collect().timeout(Duration::from_secs(1))).expect("Unclosed channel")
+        runtime()
+            .block_on_std(async move {
+                timeout(Duration::from_secs(1), rx.collect().compat())
+                    .await
+                    .expect("Unclosed channel")
+            })
+            .unwrap()
     }
 
     #[test]
