@@ -875,6 +875,7 @@ data_dir = "/home/user/vector/"
   # * default: 102400
   # * type: uint
   # * unit: bytes
+  # * relevant when mode = "tcp" or mode = "unix"
   max_length = 102400
 
   # The type of socket to use.
@@ -2482,8 +2483,8 @@ require('custom_module')
   # in any of the expressions.
   #
   # * required
-  # * type: [string]
-  patterns = ["^(?P<timestamp>[\\\\w\\\\-:\\\\+]+) (?P<level>\\\\w+) (?P<message>.*)$"]
+  # * type: string
+  patterns = "['^(?P<timestamp>[\\w\\-:\\+]+) (?P<level>\\w+) (?P<message>.*)$']"
 
   # If this setting is present, the parsed fields will be inserted into the log
   # as a sub-object with this name. If a field with the same name already exists,
@@ -3452,14 +3453,6 @@ require('custom_module')
   #
 
   [sinks.aws_kinesis_firehose.batch]
-    # The maximum size of a batch, in bytes, before it is flushed.
-    #
-    # * optional
-    # * default: 4000000
-    # * type: uint
-    # * unit: bytes
-    max_bytes = 4000000
-
     # The maximum size of a batch, in events, before it is flushed.
     #
     # * optional
@@ -3650,6 +3643,12 @@ require('custom_module')
   # * relevant when region = ""
   endpoint = "127.0.0.0:5000/path/to/service"
 
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
   # The log field used as the Kinesis record's partition key value.
   #
   # * optional
@@ -3671,19 +3670,19 @@ require('custom_module')
   # * type: string
   stream_name = "my-stream"
 
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "aws_kinesis_streams"
+  type = "aws_kinesis_streams"
+
   #
   # Batch
   #
 
   [sinks.aws_kinesis_streams.batch]
-    # The maximum size of a batch, in bytes, before it is flushed.
-    #
-    # * optional
-    # * default: 5000000
-    # * type: uint
-    # * unit: bytes
-    max_bytes = 5000000
-
     # The maximum size of a batch, in events, before it is flushed.
     #
     # * optional
@@ -8217,14 +8216,6 @@ require('custom_module')
   #
 
   [sinks.loki.batch]
-    # The maximum size of a batch, in bytes, before it is flushed.
-    #
-    # * optional
-    # * default: 102400
-    # * type: uint
-    # * unit: bytes
-    max_bytes = 102400
-
     # The maximum size of a batch, in events, before it is flushed.
     #
     # * optional
