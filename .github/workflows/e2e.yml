@@ -50,10 +50,9 @@ jobs:
           - "v1.11.0" # https://github.com/kubernetes/minikube/issues/8799
         kubernetes_version:
           - "v1.18.6"
-          # TODO: https://github.com/timberio/vector/issues/3338
-          #- "v1.17.9"
-          #- "v1.16.12" # v1.16.13 is broken, see https://github.com/kubernetes/minikube/issues/8840
-          #- "v1.15.12"
+          - "v1.17.9"
+          - "v1.16.12" # v1.16.13 is broken, see https://github.com/kubernetes/minikube/issues/8840
+          - "v1.15.12"
           - "v1.14.10"
         container_runtime:
           - docker
