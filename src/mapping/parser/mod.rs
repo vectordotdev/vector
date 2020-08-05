@@ -43,6 +43,30 @@ fn path_segments_from_pair(pair: Pair<Rule>) -> Result<Vec<Vec<String>>> {
     Ok(segments)
 }
 
+fn query_arithmetic_product_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
+    // TODO
+    query_from_pair(pairs.next().unwrap())
+}
+
+fn query_arithmetic_sum_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
+    // TODO
+    query_arithmetic_product_from_pairs(pairs.next().unwrap().into_inner())
+}
+
+fn query_arithmetic_compare_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
+    // TODO
+    query_arithmetic_sum_from_pairs(pairs.next().unwrap().into_inner())
+}
+
+fn query_arithmetic_boolean_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
+    // TODO
+    query_arithmetic_compare_from_pairs(pairs.next().unwrap().into_inner())
+}
+
+fn query_arithmetic_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
+    query_arithmetic_boolean_from_pairs(pairs.next().unwrap().into_inner())
+}
+
 fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
     Ok(match pair.as_rule() {
         Rule::string => Box::new(Literal::from(Value::from(
@@ -67,6 +91,7 @@ fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
             Box::new(Literal::from(Value::from(v)))
         }
         Rule::dot_path => Box::new(QueryPath::from(path_segments_from_pair(pair)?)),
+        Rule::group => query_arithmetic_from_pairs(pair.into_inner())?,
         _ => unreachable!(),
     })
 }
@@ -78,7 +103,7 @@ fn mapping_from_pairs(pairs: Pairs<Rule>) -> Result<Mapping> {
             Rule::assignment => {
                 let mut inner_rules = pair.into_inner();
                 let path = path_from_pair(inner_rules.next().unwrap())?;
-                let query = query_from_pair(inner_rules.next().unwrap())?;
+                let query = query_arithmetic_from_pairs(inner_rules)?;
                 assignments.push(Box::new(Assignment::new(path, query)));
             }
             Rule::deletion => {
@@ -114,7 +139,7 @@ mod test {
 1 | .foo = {"bar"}
   |        ^---
   |
-  = expected dot_path, boolean, null, string, or number"###,
+  = expected query"###,
             ),
             (
                 ". = \"bar\"",
@@ -147,6 +172,16 @@ mod test {
   = expected EOI"###,
             ),
             (
+                ".foo.bar = \"baz\" + ",
+                r###"mapping parse error
+ --> 1:20
+  |
+1 | .foo.bar = "baz" + 
+  |                    ^---
+  |
+  = expected query"###,
+            ),
+            (
                 ".foo.bar = .foo.(bar |)",
                 r###"mapping parse error
  --> 1:23
@@ -173,6 +208,13 @@ mod test {
         let cases = vec![
             (
                 ".foo = \"bar\"",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Literal::from(Value::from("bar"))),
+                ))]),
+            ),
+            (
+                ".foo = (\"bar\")",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(Literal::from(Value::from("bar"))),

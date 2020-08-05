@@ -2,7 +2,7 @@ mapping = _{ SOI ~ statement ~ (NEWLINE+ ~ statement)* ~ NEWLINE* ~ EOI }
 
 statement = _{ assignment | deletion }
 
-assignment = { target_path ~ "=" ~ query }
+assignment = { target_path ~ "=" ~ query_arithmetic }
 
 // Paths
 path_segment = @{ ('a'..'z' | 'A'..'Z' | "_" | "-" )+ ~ ( "[" ~ ('0'..'9')+ ~ "]" )? }
@@ -16,9 +16,7 @@ dot_path = ${ ("." ~ (path_segment | path_coalesce))+ }
 
 deletion = ${ "del(" ~ dot_path ~ ")" }
 
-// NOTE: Not including delete here yet, but there's no reason we can't slot it
-// in at some point and get `.nested = del(.foo)`.
-query = _{ value | dot_path }
+group = { "(" ~ query_arithmetic ~ ")" }
 
 value = _{ string | number | boolean | null }
 
@@ -42,5 +40,28 @@ number = @{
     ~ ("." ~ ASCII_DIGIT*)?
     ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?
 }
+
+// NOTE: Not including delete here yet, but there's no reason we can't slot it
+// in at some point and get `.nested = del(.foo)`.
+query_leaf = _{ value | dot_path | group }
+
+// Arithmetic, broken down into tiers in order to support operator precedence.
+// Operators of the same tier are resolved from left to right.
+
+// Deepest tier is the highest order of precedence, we call this just 'query' as
+// it'll appear in parser error messages.
+arithmetic_operator_product = _{ "*" | "/" | "%" }
+query = { query_leaf ~ (arithmetic_operator_product ~ query_leaf)* }
+
+arithmetic_operator_sum = _{ "+" | "-" }
+query_arithmetic_sum = { query ~ (arithmetic_operator_sum ~ query)* }
+
+arithmetic_operator_compare = _{ ">" | ">=" | "<" | "<=" | "==" | "!=" }
+query_arithmetic_compare = { query_arithmetic_sum ~ (arithmetic_operator_compare ~ query_arithmetic_sum)* }
+
+arithmetic_operator_boolean = _{ "||" | "&&" }
+query_arithmetic_boolean = { query_arithmetic_compare ~ (arithmetic_operator_boolean ~ query_arithmetic_compare)* }
+
+query_arithmetic = _{ query_arithmetic_boolean }
 
 WHITESPACE = _{ " " | "\t" }
