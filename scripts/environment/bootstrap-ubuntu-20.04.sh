@@ -30,7 +30,7 @@ apt install --yes \
     wget \
     tcl-dev \
     cmake \
-    crossbuild-essential-i386  \
+    crossbuild-essential-arm64  \
     gnupg2
 
 # Stupid, right? Sadly it works.

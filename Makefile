@@ -64,23 +64,17 @@ export MUSL_CROSS_MAKE_PATH ?= ${MUSL_CROSS_MAKE}/output
 export MUSL_CROSS_MAKE_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/x86_64-linux-musl
 export MUSL_CROSS_MAKE_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/aarch64-linux-musl
 
-
-# export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER ?= x86_64-linux-gnu-cc
-# export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS ?= -C link-arg=-lgcc
-# export CC_x86_64-unknown-linux-gnu ?= x86_64-linux-gnu-gcc
-# export CXX_x86_64-unknown-linux-gnu ?= x86_64-linux-gnu-g++
-#export AR_x86_64-unknown-linux-gnu ?= x86_64-linux-gnu-ld
-#export LD_x86_64-unknown-linux-gnu ?= x86_64-linux-gnu-ar
-
 export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-cc
 export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL__RUSTC_LINK_LIB ?= static=gcc
 export CC_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-gcc
 export CXX_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-g++
 export AR_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-ar
 export LD_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-ld
 
-export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-ld
+export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-cc
 export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc
+export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTC_LINK_LIB ?= static=gcc
 export CC_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-gcc
 export CXX_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-g++
 export AR_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-ar
@@ -212,8 +206,6 @@ build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`
 
 build-all: build-x86_64-unknown-linux-gnu build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
 
-
-
 build-x86_64-unknown-linux-gnu: ${VECTOR_BINARY_x86_64_unknown_linux_gnu} ## Build dynamically linked binary in release mode for the x86_64 architecture
 
 ${VECTOR_BINARY_x86_64_unknown_linux_gnu}:
@@ -249,9 +241,7 @@ ${MUSL_CROSS_MAKE_armv7-unknown-linux-musl}: ${MUSL_CROSS_MAKE}
 
 build-aarch64-unknown-linux-musl: ${VECTOR_BINARY_aarch64-unknown-linux-musl} ## Build static binary in release mode for the aarch64 architecture
 
-
-
-${VECTOR_BINARY_aarch64-unknown-linux-musl}: # ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}
+${VECTOR_BINARY_aarch64-unknown-linux-musl}: ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}
 	rustup toolchain install nightly
 	rustup target add aarch64-unknown-linux-musl
 	CROSS_COMPILE=aarch64-unknown-linux-musl \
@@ -260,6 +250,7 @@ ${VECTOR_BINARY_aarch64-unknown-linux-musl}: # ${MUSL_CROSS_MAKE_aarch64-unknown
     LD=${CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER} \
     HOST_CXX=musl-g++ \
     HOST_CC=musl-gcc \
+    LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${MUSL_CROSS_MAKE_PATH}/lib/ \
     cargo +nightly build --no-default-features --features default-musl --target aarch64-unknown-linux-musl
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
