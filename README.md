@@ -25,7 +25,7 @@
 
      To make changes please edit the template located at:
 
-     /Users/benjohnson/Code/timber/vector-generate/targets/vector/README.md.erb.erb
+     README.md.erb.erb
 -->
 
 ## What is Vector?

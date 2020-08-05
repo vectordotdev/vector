@@ -4,7 +4,7 @@
 
      To make changes please edit the template located at:
 
-     /Users/benjohnson/Code/timber/vector-generate/targets/vector/RELEASE_NOTES.md.erb.erb
+     RELEASE_NOTES.md.erb.erb
 -->
 # Release Notes
 

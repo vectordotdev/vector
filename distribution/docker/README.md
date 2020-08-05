@@ -28,7 +28,7 @@ observability data with Vector.
 
      To make changes please edit the template located at:
 
-     /Users/benjohnson/Code/timber/vector-generate/targets/vector/distribution/docker/README.md.erb.erb
+     distribution/docker/README.md.erb.erb
 -->
 
 ## Configuring
@@ -116,8 +116,8 @@ Vector's Docker source files are located
 [docs.strategies#service]: https://vector.dev/docs/setup/deployment/strategies/#service
 [docs.strategies#sidecar]: https://vector.dev/docs/setup/deployment/strategies/#sidecar
 [docs.transforms]: https://vector.dev/docs/reference/transforms/
-[pages.index#correctness]: https://vector.dev/index/#correctness
-[pages.index#performance]: https://vector.dev/index/#performance
+[pages.index#correctness]: https://vector.dev/#correctness
+[pages.index#performance]: https://vector.dev/#performance
 [urls.default_configuration]: https://github.com/timberio/vector/blob/master/config/vector.toml
 [urls.docker_alpine]: https://hub.docker.com/_/alpine
 [urls.docker_debian]: https://hub.docker.com/_/debian
