@@ -18,6 +18,7 @@ mod lua;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
 mod regex;
+#[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 mod splunk_hec;
 #[cfg(feature = "sources-statsd")]
 mod statsd;
@@ -52,7 +53,8 @@ pub use self::lua::*;
 #[cfg(feature = "sources-prometheus")]
 pub use self::prometheus::*;
 pub use self::regex::*;
-pub use self::splunk_hec::*;
+#[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
+pub(crate) use self::splunk_hec::*;
 #[cfg(feature = "sources-statsd")]
 pub use self::statsd::*;
 pub use self::stdin::*;
