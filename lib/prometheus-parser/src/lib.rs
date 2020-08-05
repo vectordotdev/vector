@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 mod line;
 
-
 #[derive(Debug, snafu::Snafu, PartialEq)]
 pub enum ParserError {
     #[snafu(display("Expected \"le\" tag for histogram metric"))]
