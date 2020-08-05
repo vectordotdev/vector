@@ -63,11 +63,11 @@ jobs:
 
           curl -Lo kubectl \
             'https://storage.googleapis.com/kubernetes-release/release/${{ matrix.kubernetes_version }}/bin/linux/amd64/kubectl'
-          sudo install kubectl /usr/local/bin/
+          sudo install kubectl /usr/local/bin/ && rm kubectl
 
           curl -Lo minikube \
             'https://storage.googleapis.com/minikube/releases/${{ matrix.minikube_version }}/minikube-linux-amd64'
-          sudo install minikube /usr/local/bin/
+          sudo install minikube /usr/local/bin/ && rm minikube
 
           minikube config set profile minikube
           minikube config set vm-driver docker
