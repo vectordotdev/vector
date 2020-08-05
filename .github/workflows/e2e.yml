@@ -20,6 +20,8 @@ on:
       - "Makefile"
       - "rust-toolchain"
   pull_request: {}
+  schedule:
+    - cron: "0 4 * * *"
 
 env:
   VERBOSE: true
