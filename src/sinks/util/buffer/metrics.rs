@@ -232,12 +232,14 @@ impl Batch for MetricBuffer {
                 if let MetricValue::Distribution {
                     values,
                     sample_rates,
+                    statistic,
                 } = metric.value
                 {
                     let compressed = compress_distribution(values, sample_rates);
                     metric.value = MetricValue::Distribution {
                         values: compressed.0,
                         sample_rates: compressed.1,
+                        statistic,
                     };
                 };
                 metric
@@ -285,7 +287,7 @@ mod test {
     use crate::sinks::util::BatchSink;
     use crate::{
         buffers::Acker,
-        event::metric::{Metric, MetricValue},
+        event::metric::{Metric, MetricValue, StatisticKind},
         runtime::Runtime,
         test_util::runtime,
         Event,
@@ -784,6 +786,7 @@ mod test {
                 value: MetricValue::Distribution {
                     values: vec![2.0],
                     sample_rates: vec![10],
+                    statistic: StatisticKind::Histogram,
                 },
             });
             events.push(event);
@@ -798,6 +801,7 @@ mod test {
                 value: MetricValue::Distribution {
                     values: vec![i as f64],
                     sample_rates: vec![10],
+                    statistic: StatisticKind::Histogram,
                 },
             });
             events.push(event);
@@ -826,6 +830,7 @@ mod test {
                     value: MetricValue::Distribution {
                         values: vec![2.0],
                         sample_rates: vec![50],
+                        statistic: StatisticKind::Histogram
                     },
                 },
                 Metric {
@@ -836,6 +841,7 @@ mod test {
                     value: MetricValue::Distribution {
                         values: vec![3.0],
                         sample_rates: vec![10],
+                        statistic: StatisticKind::Histogram
                     },
                 },
                 Metric {
@@ -846,6 +852,7 @@ mod test {
                     value: MetricValue::Distribution {
                         values: vec![4.0],
                         sample_rates: vec![10],
+                        statistic: StatisticKind::Histogram
                     },
                 },
                 Metric {
@@ -856,6 +863,7 @@ mod test {
                     value: MetricValue::Distribution {
                         values: vec![5.0],
                         sample_rates: vec![10],
+                        statistic: StatisticKind::Histogram
                     }
                 },
             ]

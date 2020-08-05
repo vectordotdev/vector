@@ -105,6 +105,14 @@ description = """\
 The rate at which each individual value was sampled.\
 """
 
+[data_model.metric.schema.distribution.children.statistic]
+type = "string"
+examples = ["histogram","summary"]
+required = true
+description = """\
+Statistic to be applied on the samples.\
+"""
+
 
 [data_model.metric.schema.aggregated_histogram]
 type = "struct"

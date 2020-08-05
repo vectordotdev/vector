@@ -129,7 +129,7 @@ impl StreamingSink for WriterSink {
 #[cfg(test)]
 mod test {
     use super::{encode_event, Encoding, EncodingConfig};
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use crate::event::{Event, Value};
     use chrono::{offset::TimeZone, Utc};
 
@@ -205,10 +205,11 @@ mod test {
             value: MetricValue::Distribution {
                 values: vec![10.0],
                 sample_rates: vec![1],
+                statistic: StatisticKind::Histogram,
             },
         });
         assert_eq!(
-            r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","distribution":{"values":[10.0],"sample_rates":[1]}}"#,
+            r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","distribution":{"values":[10.0],"sample_rates":[1],"statistic":"histogram"}}"#,
             encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
         );
     }

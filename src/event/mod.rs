@@ -16,7 +16,7 @@ pub mod merge_state;
 pub mod metric;
 mod util;
 
-pub use metric::Metric;
+pub use metric::{Metric, StatisticKind};
 pub(crate) use util::log::PathComponent;
 pub(crate) use util::log::PathIter;
 
@@ -538,6 +538,12 @@ impl From<proto::EventWrapper> for Event {
                         values: set.values.into_iter().collect(),
                     },
                     MetricProto::Distribution(dist) => MetricValue::Distribution {
+                        statistic: match dist.statistic() {
+                            proto::distribution::StatisticKind::Histogram => {
+                                StatisticKind::Histogram
+                            }
+                            proto::distribution::StatisticKind::Summary => StatisticKind::Summary,
+                        },
                         values: dist.values,
                         sample_rates: dist.sample_rates,
                     },
@@ -644,9 +650,17 @@ impl From<Event> for proto::EventWrapper {
                     MetricValue::Distribution {
                         values,
                         sample_rates,
+                        statistic,
                     } => MetricProto::Distribution(proto::Distribution {
                         values,
                         sample_rates,
+                        statistic: match statistic {
+                            StatisticKind::Histogram => {
+                                proto::distribution::StatisticKind::Histogram
+                            }
+                            StatisticKind::Summary => proto::distribution::StatisticKind::Summary,
+                        }
+                        .into(),
                     }),
                     MetricValue::AggregatedHistogram {
                         buckets,
