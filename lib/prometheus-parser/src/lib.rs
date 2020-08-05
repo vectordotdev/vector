@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 mod line;
 
-#[derive(Debug, snafu::Snafu)]
+#[derive(Debug, snafu::Snafu, PartialEq)]
 pub enum ParserError {
     Error,
 }
@@ -64,6 +64,38 @@ pub enum GroupKind {
 pub struct MetricGroup {
     pub name: String,
     pub metrics: GroupKind,
+}
+
+impl HistogramMetric {
+    pub fn get_labels(&self) -> &BTreeMap<String, String> {
+        match self {
+            HistogramMetric::Bucket { labels, .. }
+            | HistogramMetric::Count { labels, .. }
+            | HistogramMetric::Sum { labels, .. } => labels,
+        }
+    }
+}
+
+impl SummaryMetric {
+    pub fn get_labels(&self) -> &BTreeMap<String, String> {
+        match self {
+            SummaryMetric::Quantile { labels, .. }
+            | SummaryMetric::Count { labels, .. }
+            | SummaryMetric::Sum { labels, .. } => labels,
+        }
+    }
+}
+
+impl GroupKind {
+    pub fn is_empty(&self) -> bool {
+        match self {
+            GroupKind::Counter(vec) | GroupKind::Gauge(vec) | GroupKind::Untyped(vec) => {
+                vec.is_empty()
+            }
+            GroupKind::Histogram(vec) => vec.is_empty(),
+            GroupKind::Summary(vec) => vec.is_empty(),
+        }
+    }
 }
 
 impl MetricGroup {
@@ -130,7 +162,8 @@ impl MetricGroup {
                 let suffix = &metric.name[self.name.len()..];
                 match suffix {
                     "" => {
-                        let quantile = metric.labels.remove("quantile").ok_or(ParserError::Error)?;
+                        let quantile =
+                            metric.labels.remove("quantile").ok_or(ParserError::Error)?;
                         let (_, quantile) =
                             line::Metric::parse_value(&quantile).map_err(|_| ParserError::Error)?;
                         vec.push(SummaryMetric::Quantile {

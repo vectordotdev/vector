@@ -1,35 +1,8 @@
 use crate::event::metric::{Metric, MetricKind, MetricValue};
 use indexmap::IndexMap;
-use lazy_static::lazy_static;
-use regex::Regex;
-use snafu::{ResultExt, Snafu};
 use std::collections::BTreeMap;
-use std::num::ParseFloatError;
 
-lazy_static! {
-    static ref WHITESPACE: Regex = Regex::new(r"\s+").unwrap();
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum ParserType {
-    Untyped,
-    Counter,
-    Gauge,
-    Histogram,
-    Summary,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct ParserHeader {
-    name: String,
-    kind: ParserType,
-}
-
-struct ParserMetric {
-    name: String,
-    value: f64,
-    tags: BTreeMap<String, String>,
-}
+pub use prometheus_parser::*;
 
 struct ParserAggregate {
     name: String,
@@ -40,262 +13,26 @@ struct ParserAggregate {
     tags: BTreeMap<String, String>,
 }
 
-fn is_header(input: &str) -> bool {
-    input.starts_with("# TYPE")
-}
-
-fn is_comment(input: &str) -> bool {
-    input.starts_with('#')
-}
-
-fn parse_header(input: &str) -> Result<ParserHeader, ParserError> {
-    // example:
-    // # TYPE uptime counter
-    let tokens: Vec<_> = input.split_ascii_whitespace().collect();
-
-    if tokens.len() != 4 {
-        return Err(ParserError::Malformed {
-            s: "expected 4 tokens in TYPE string",
-            context: String::from(input),
-        });
-    }
-
-    let name = tokens[2];
-    let kind = match tokens[3] {
-        "counter" => ParserType::Counter,
-        "gauge" => ParserType::Gauge,
-        "untyped" => ParserType::Untyped,
-        "histogram" => ParserType::Histogram,
-        "summary" => ParserType::Summary,
-        other => {
-            return Err(ParserError::UnknownMetricType {
-                s: other.to_string(),
-            });
-        }
-    };
-
-    Ok(ParserHeader {
-        name: name.to_owned(),
-        kind,
-    })
-}
-
-fn parse_value(input: &str) -> Result<f64, ParserError> {
-    let input = input.trim();
-    let value = match input {
-        "Nan" => std::f64::NAN,
-        "+Inf" => std::f64::INFINITY,
-        "-Inf" => std::f64::NEG_INFINITY,
-        s => s.parse().with_context(|| InvalidFloat { s: input })?,
-    };
-
-    Ok(value)
-}
-
-fn parse_tags(input: &str) -> Result<BTreeMap<String, String>, ParserError> {
-    let input = input.trim();
-    let mut result = BTreeMap::new();
-
-    if input.is_empty() {
-        return Ok(result);
-    }
-
-    let pairs = input.split(',').collect::<Vec<_>>();
-    for pair in pairs {
-        if pair.is_empty() {
-            continue;
-        }
-        let pair = pair.trim();
-
-        match pair.find('=') {
-            None => {
-                return Err(ParserError::Malformed {
-                    s: "expected 2 values separated by '='",
-                    context: String::from(input),
-                });
-            }
-            Some(equals) => {
-                let key = pair[..equals].trim().to_string();
-                let mut value = pair[equals + 1..].trim();
-
-                if value.starts_with('"') {
-                    value = &value[1..];
-                };
-                if value.ends_with('"') {
-                    value = &value[..value.len() - 1];
-                };
-                let value = value.trim();
-                let value = value.replace(r#"\\"#, "\\");
-                let value = value.replace(r#"\n"#, "\n");
-                let value = value.replace(r#"\""#, "\"");
-                result.insert(key, value);
-            }
-        }
-    }
-
-    Ok(result)
-}
-
-fn parse_metric(input: &str) -> Result<ParserMetric, ParserError> {
-    // check if labels are present
-    if let Some(pos) = input.find('}') {
-        // example: http_requests_total{method="post",code="200"} 1027 1395066363000
-        // first comes name and labels
-        let (first, second) = input.split_at(pos);
-        let parts = first.split('{').collect::<Vec<_>>();
-        if parts.len() < 2 {
-            return Err(ParserError::Malformed {
-                s: "expected at least 2 tokens in data line",
-                context: String::from(input),
-            });
-        };
-
-        let name = parts[0].trim();
-        let tags = parse_tags(parts[1])?;
-        // second is value and optional timestamp, which is not meant to be used at client side
-        let parts = &second[1..].trim().split(' ').collect::<Vec<_>>();
-        let value = parse_value(parts[0])?;
-
-        Ok(ParserMetric {
-            name: name.to_string(),
-            value,
-            tags,
-        })
-    } else {
-        // there are no labels
-        // example: http_requests_total 1027 1395066363000
-        let parts = input.split(' ').collect::<Vec<_>>();
-        if parts.len() < 2 {
-            return Err(ParserError::Malformed {
-                s: "expected at least 2 tokens in data line",
-                context: String::from(input),
-            });
-        };
-        let name = parts[0];
-        let value = parse_value(parts[1])?;
-
-        Ok(ParserMetric {
-            name: name.to_string(),
-            value,
-            tags: BTreeMap::new(),
-        })
-    }
-}
-
-fn group_metrics(packet: &str) -> Result<IndexMap<ParserHeader, Vec<String>>, ParserError> {
-    // This will organise text into groups of lines, wrt to the format spec:
-    // https://prometheus.io/docs/instrumenting/exposition_formats/#text-format-details
-    //
-    // All lines for a given metric must be provided as one single group,
-    // with the optional HELP and TYPE lines first (in no particular order).
-    // Beyond that, reproducible sorting in repeated expositions is preferred
-    // but not required, i.e. do not sort if the computational cost is prohibitive.
-    //
-    // Each line must have a unique combination of a metric name and labels.
-    // Otherwise, the ingestion behavior is undefined.
-    let mut result = IndexMap::new();
-
-    let mut current_header = ParserHeader {
-        name: "".into(),
-        kind: ParserType::Untyped,
-    };
-
-    for line in packet.lines() {
-        let line = line.trim();
-        let line: String = WHITESPACE.replace_all(&line, " ").to_string();
-
-        if line.is_empty() {
-            continue;
-        }
-
-        if is_header(&line) {
-            // parse expected name and type from TYPE header
-            let header = parse_header(&line)?;
-            if !result.contains_key(&header) {
-                result.insert(header.clone(), Vec::new());
-            }
-            // we will need it to analyse the consequent lines
-            current_header = header;
-        } else if is_comment(&line) {
-            // skip comments and HELP strings
-        } else {
-            // parse the data line
-            let metric = parse_metric(&line)?;
-
-            current_header = match current_header.kind {
-                ParserType::Histogram => {
-                    // check if this is still a histogram
-                    if metric.name == format!("{}_bucket", current_header.name)
-                        || metric.name == format!("{}_count", current_header.name)
-                        || metric.name == format!("{}_sum", current_header.name)
-                    {
-                        current_header
-                    } else {
-                        // nope it's a new unrelated metric
-                        ParserHeader {
-                            name: metric.name,
-                            kind: ParserType::Untyped,
-                        }
-                    }
-                }
-                ParserType::Summary => {
-                    // check if this is still a summary
-                    if metric.name == current_header.name
-                        || metric.name == format!("{}_count", current_header.name)
-                        || metric.name == format!("{}_sum", current_header.name)
-                    {
-                        current_header
-                    } else {
-                        ParserHeader {
-                            name: metric.name,
-                            kind: ParserType::Untyped,
-                        }
-                    }
-                }
-                _ => {
-                    if metric.name == current_header.name {
-                        current_header
-                    } else {
-                        ParserHeader {
-                            name: metric.name,
-                            kind: ParserType::Untyped,
-                        }
-                    }
-                }
-            };
-
-            if let Some(lines) = result.get_mut(&current_header) {
-                lines.push(line);
-            } else {
-                result.insert(current_header.clone(), vec![line]);
-            }
-        }
-    }
-
-    Ok(result)
-}
-
 pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
     let mut result = Vec::new();
 
-    for (header, group) in group_metrics(packet)? {
+    for group in prometheus_parser::group_metrics(packet)? {
         // just a header without measurements
-        if group.is_empty() {
+        if group.metrics.is_empty() {
             continue;
         }
 
-        match header.kind {
-            ParserType::Counter => {
-                for line in group {
-                    let metric = parse_metric(&line)?;
-                    let tags = if !metric.tags.is_empty() {
-                        Some(metric.tags)
+        match group.metrics {
+            GroupKind::Counter(vec) => {
+                for metric in vec {
+                    let tags = if !metric.labels.is_empty() {
+                        Some(metric.labels)
                     } else {
                         None
                     };
 
                     let counter = Metric {
-                        name: metric.name,
+                        name: group.name.clone(),
                         timestamp: None,
                         tags,
                         kind: MetricKind::Absolute,
@@ -307,17 +44,16 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                     result.push(counter);
                 }
             }
-            ParserType::Gauge | ParserType::Untyped => {
-                for line in group {
-                    let metric = parse_metric(&line)?;
-                    let tags = if !metric.tags.is_empty() {
-                        Some(metric.tags)
+            GroupKind::Gauge(vec) | GroupKind::Untyped(vec) => {
+                for metric in vec {
+                    let tags = if !metric.labels.is_empty() {
+                        Some(metric.labels)
                     } else {
                         None
                     };
 
                     let gauge = Metric {
-                        name: metric.name,
+                        name: group.name.clone(),
                         timestamp: None,
                         tags,
                         kind: MetricKind::Absolute,
@@ -329,29 +65,13 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                     result.push(gauge);
                 }
             }
-            ParserType::Histogram => {
+            GroupKind::Histogram(vec) => {
                 let mut aggregates = IndexMap::new();
 
-                for line in group {
-                    let metric = parse_metric(&line)?;
-                    let mut tags = metric.tags;
-                    let bucket = tags.remove("le");
-
-                    let v: Vec<_> = metric.name.rsplitn(2, '_').collect();
-                    if v.len() < 2 {
-                        return Err(ParserError::Malformed {
-                            s: "expected histogram name suffix",
-                            context: line,
-                        });
-                    }
-                    let (name, suffix) = (v[1], v[0]);
-
-                    let mut id: Vec<_> = tags.iter().collect();
-                    id.sort();
-                    let group_key = format!("{:?}", id);
-
-                    let aggregate = aggregates.entry(group_key).or_insert(ParserAggregate {
-                        name: name.to_owned(),
+                for metric in vec {
+                    let tags = metric.get_labels().clone();
+                    let aggregate = aggregates.entry(tags.clone()).or_insert(ParserAggregate {
+                        name: group.name.clone(),
                         bounds: Vec::new(),
                         values: Vec::new(),
                         count: 0,
@@ -359,32 +79,19 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         tags,
                     });
 
-                    match suffix {
-                        "bucket" => {
-                            if let Some(b) = bucket {
-                                // last bucket is implicit, because we store its value in 'count'
-                                if b != "+Inf" {
-                                    aggregate.bounds.push(parse_value(&b)?);
-                                    aggregate.values.push(metric.value);
-                                }
-                            } else {
-                                return Err(ParserError::Malformed {
-                                    s: "expected \"le\" tag in histogram bucket",
-                                    context: line,
-                                });
+                    match metric {
+                        HistogramMetric::Count { value, .. } => {
+                            aggregate.count = value as u32; // TODO: check
+                        }
+                        HistogramMetric::Sum { value, .. } => {
+                            aggregate.sum = value;
+                        }
+                        HistogramMetric::Bucket { bucket, value, .. } => {
+                            // last bucket is implicit, because we store its value in 'count'
+                            if bucket != f64::INFINITY {
+                                aggregate.bounds.push(bucket);
+                                aggregate.values.push(value);
                             }
-                        }
-                        "sum" => {
-                            aggregate.sum = metric.value;
-                        }
-                        "count" => {
-                            aggregate.count = metric.value as u32;
-                        }
-                        _ => {
-                            return Err(ParserError::Malformed {
-                                s: "unknown histogram name suffix",
-                                context: line,
-                            });
                         }
                     }
                 }
@@ -403,7 +110,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         kind: MetricKind::Absolute,
                         value: MetricValue::AggregatedHistogram {
                             buckets: aggregate.bounds,
-                            counts: aggregate.values.into_iter().map(|x| x as u32).collect(),
+                            counts: aggregate.values.into_iter().map(|x| x as u32).collect(), // TODO: check
                             count: aggregate.count,
                             sum: aggregate.sum,
                         },
@@ -412,28 +119,13 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                     result.push(hist);
                 }
             }
-            ParserType::Summary => {
+            GroupKind::Summary(vec) => {
                 let mut aggregates = IndexMap::new();
 
-                for line in group {
-                    let metric = parse_metric(&line)?;
-                    let mut tags = metric.tags;
-                    let bucket = tags.remove("quantile");
-
-                    let (name, suffix) =
-                        if metric.name.ends_with("_sum") || metric.name.ends_with("_count") {
-                            let v: Vec<_> = metric.name.rsplitn(2, '_').collect();
-                            (v[1], v[0])
-                        } else {
-                            (&metric.name[..], "")
-                        };
-
-                    let mut id: Vec<_> = tags.iter().collect();
-                    id.sort();
-                    let group_key = format!("{:?}", id);
-
-                    let aggregate = aggregates.entry(group_key).or_insert(ParserAggregate {
-                        name: name.to_owned(),
+                for metric in vec {
+                    let tags = metric.get_labels().clone();
+                    let aggregate = aggregates.entry(tags.clone()).or_insert(ParserAggregate {
+                        name: group.name.clone(),
                         bounds: Vec::new(),
                         values: Vec::new(),
                         count: 0,
@@ -441,34 +133,23 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         tags,
                     });
 
-                    match suffix {
-                        "" => {
-                            if let Some(b) = bucket {
-                                aggregate.bounds.push(parse_value(&b)?);
-                                aggregate.values.push(metric.value);
-                            } else {
-                                return Err(ParserError::Malformed {
-                                    s: "expected \"quantile\" tag in summary bucket",
-                                    context: line,
-                                });
-                            }
+                    match metric {
+                        SummaryMetric::Count { value, .. } => {
+                            aggregate.count = value as u32; // TODO: check
                         }
-                        "sum" => {
-                            aggregate.sum = metric.value;
+                        SummaryMetric::Sum { value, .. } => {
+                            aggregate.sum = value;
                         }
-                        "count" => {
-                            aggregate.count = metric.value as u32;
-                        }
-                        _ => {
-                            return Err(ParserError::Malformed {
-                                s: "unknown summary name suffix",
-                                context: line,
-                            });
+                        SummaryMetric::Quantile {
+                            quantile, value, ..
+                        } => {
+                            aggregate.bounds.push(quantile);
+                            aggregate.values.push(value);
                         }
                     }
                 }
 
-                for (_id, aggregate) in aggregates {
+                for (_, aggregate) in aggregates {
                     let tags = if !aggregate.tags.is_empty() {
                         Some(aggregate.tags)
                     } else {
@@ -495,22 +176,6 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
     }
 
     Ok(result)
-}
-
-#[derive(Debug, PartialEq, Snafu)]
-pub enum ParserError {
-    Malformed {
-        s: &'static str,
-        context: String,
-    },
-    UnknownMetricType {
-        s: String,
-    },
-    #[snafu(display("Invalid floating point number {:?}: {}", s, source))]
-    InvalidFloat {
-        s: String,
-        source: ParseFloatError,
-    },
 }
 
 #[cfg(test)]
@@ -883,25 +548,7 @@ mod test {
             telemetry_scrape_size_bytes_count{registry="default",content_type=} 1890
             "##;
 
-        // This test is designed to ensure we do not panic in this scenario
-        // I wouldn't consider this test case a requirement for all future parsers
-        assert_eq!(
-            parse(exp),
-            Ok(vec![Metric {
-                name: "telemetry_scrape_size_bytes_count".into(),
-                timestamp: None,
-                tags: Some(
-                    vec![
-                        ("registry".into(), "default".into()),
-                        ("content_type".into(), "".into())
-                    ]
-                    .into_iter()
-                    .collect()
-                ),
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value: 1890.0 },
-            }]),
-        );
+        assert!(parse(exp).is_err());
     }
 
     #[test]
