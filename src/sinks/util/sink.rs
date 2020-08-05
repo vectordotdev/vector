@@ -35,6 +35,7 @@
 use super::batch::{Batch, PushResult, StatefulBatch};
 use super::buffer::partition::Partition;
 use crate::buffers::Acker;
+use futures::{FutureExt, TryFutureExt};
 use futures01::{
     future::Either,
     stream::FuturesUnordered,
@@ -43,15 +44,14 @@ use futures01::{
 };
 use std::{
     collections::{HashMap, VecDeque},
+    convert::Infallible,
     fmt,
     hash::Hash,
     marker::PhantomData,
-    time::{Duration, Instant},
+    time::Duration,
 };
-use tokio01::{
-    executor::{DefaultExecutor, Executor},
-    timer::Delay,
-};
+use tokio::time::delay_for;
+use tokio01::executor::{DefaultExecutor, Executor};
 use tower::Service;
 use tracing_futures::Instrument;
 
@@ -138,7 +138,7 @@ pub struct BatchSink<S, B, Request, E = DefaultExecutor> {
     service: ServiceSink<S, Request>,
     batch: StatefulBatch<B>,
     timeout: Duration,
-    linger: Option<Delay>,
+    linger: Option<Box<dyn Future<Item = (), Error = Infallible> + Send>>,
     closing: bool,
     exec: E,
     _pd: PhantomData<Request>,
@@ -222,8 +222,13 @@ where
             trace!("Starting new batch timer.");
             // We just inserted the first item of a new batch, so set our delay to the longest time
             // we want to allow that item to linger in the batch before being flushed.
-            let deadline = Instant::now() + self.timeout;
-            self.linger = Some(Delay::new(deadline));
+            let delay = delay_for(self.timeout);
+            let delay = Box::new(
+                async move { Ok::<(), Infallible>(delay.await) }
+                    .boxed()
+                    .compat(),
+            );
+            self.linger = Some(delay);
         }
 
         match self.batch.push(item) {
@@ -386,8 +391,10 @@ where
         let (tx, rx) = oneshot::channel();
         let partition_clone = partition.clone();
 
-        let deadline = Instant::now() + self.timeout;
-        let delay = Delay::new(deadline)
+        let delay = delay_for(self.timeout)
+            .map(|_| Ok::<(), ()>(()))
+            .boxed()
+            .compat()
             .map(move |_| LingerState::Elapsed(partition_clone))
             .map_err(|_| ());
 
@@ -828,7 +835,7 @@ mod tests {
         let (acker, ack_counter) = Acker::new_for_testing();
 
         let svc = tower::service_fn(|req: Vec<usize>| {
-            let dur = match req[0] {
+            let duration = match req[0] {
                 0 => Duration::from_secs(1),
                 1 => Duration::from_secs(1),
                 2 => Duration::from_secs(1),
@@ -842,9 +849,11 @@ mod tests {
                 _ => unreachable!(),
             };
 
-            let deadline = Instant::now() + dur;
-
-            Delay::new(deadline).map(drop)
+            delay_for(duration)
+                .map(|_| Ok::<(), Infallible>(()))
+                .boxed()
+                .compat()
+                .map(drop)
         });
 
         let batch = BatchSettings::default().bytes(9999).events(1);
