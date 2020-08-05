@@ -3140,6 +3140,7 @@ name = "prometheus-parser"
 version = "0.1.0"
 dependencies = [
  "nom 5.1.2",
+ "snafu",
 ]
 
 [[package]]
@@ -5458,6 +5459,7 @@ dependencies = [
  "openssl-probe",
  "pin-project",
  "pretty_assertions",
+ "prometheus-parser",
  "prost",
  "prost-build",
  "prost-types",

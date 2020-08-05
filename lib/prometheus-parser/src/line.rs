@@ -188,7 +188,7 @@ impl Line {
     pub fn parse(input: &str) -> Result<Option<Self>, ParserError> {
         Self::parse_inner(input)
             .map(|(_, line)| line)
-            .map_err(|_| ParserError {})
+            .map_err(|_| ParserError::Error)
     }
 }
 

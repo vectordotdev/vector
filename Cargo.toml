@@ -40,6 +40,7 @@ members = [
 codec = { path = "lib/codec" }
 file-source = { path = "lib/file-source" }
 tracing-limit = { path = "lib/tracing-limit" }
+prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
@@ -263,7 +264,7 @@ sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["rdkafka"]
 sources-logplex = ["warp", "sources-tls"]
-sources-prometheus = ["nom"]
+sources-prometheus = ["prometheus-parser"]
 sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls"]
 sources-splunk_hec = ["bytesize", "warp", "sources-tls"]
 sources-statsd = ["tokio-util/udp"]

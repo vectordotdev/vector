@@ -2,32 +2,53 @@ use std::collections::BTreeMap;
 
 mod line;
 
-#[derive(Debug)]
-pub struct ParserError {}
+#[derive(Debug, snafu::Snafu)]
+pub enum ParserError {
+    Error,
+}
 
-use line::Header;
 use line::Line;
 use line::Metric;
 use line::MetricKind;
 
 #[derive(Debug, PartialEq)]
 pub enum SummaryMetric {
-    Quantile { quantile: f64, value: f64 },
-    Sum(f64),
-    Count(f64),
+    Quantile {
+        quantile: f64,
+        value: f64,
+        labels: BTreeMap<String, String>,
+    },
+    Sum {
+        value: f64,
+        labels: BTreeMap<String, String>,
+    },
+    Count {
+        value: f64,
+        labels: BTreeMap<String, String>,
+    },
 }
 
 #[derive(Debug, PartialEq)]
 pub enum HistogramMetric {
-    Bucket { bucket: f64, value: f64 },
-    Sum(f64),
-    Count(f64),
+    Bucket {
+        bucket: f64,
+        value: f64,
+        labels: BTreeMap<String, String>,
+    },
+    Sum {
+        value: f64,
+        labels: BTreeMap<String, String>,
+    },
+    Count {
+        value: f64,
+        labels: BTreeMap<String, String>,
+    },
 }
 
 #[derive(Debug, PartialEq)]
 pub struct OtherMetric {
-    labels: BTreeMap<String, String>,
-    value: f64,
+    pub labels: BTreeMap<String, String>,
+    pub value: f64,
 }
 
 #[derive(Debug, PartialEq)]
@@ -41,8 +62,8 @@ pub enum GroupKind {
 
 #[derive(Debug, PartialEq)]
 pub struct MetricGroup {
-    name: String,
-    metrics: GroupKind,
+    pub name: String,
+    pub metrics: GroupKind,
 }
 
 impl MetricGroup {
@@ -70,7 +91,7 @@ impl MetricGroup {
         }
     }
 
-    fn push(&mut self, metric: Metric) -> Result<(), ParserError> {
+    fn push(&mut self, mut metric: Metric) -> Result<(), ParserError> {
         assert!(self.check_name(&metric.name));
         match self.metrics {
             GroupKind::Counter(ref mut vec)
@@ -85,16 +106,23 @@ impl MetricGroup {
                 let suffix = &metric.name[self.name.len()..];
                 match suffix {
                     "_bucket" => {
-                        let bucket = metric.labels.get("le").ok_or(ParserError {})?;
+                        let bucket = metric.labels.remove("le").ok_or(ParserError::Error)?;
                         let (_, bucket) =
-                            line::Metric::parse_value(&bucket).map_err(|_| ParserError {})?;
+                            line::Metric::parse_value(&bucket).map_err(|_| ParserError::Error)?;
                         vec.push(HistogramMetric::Bucket {
                             bucket,
                             value: metric.value,
+                            labels: metric.labels,
                         });
                     }
-                    "_sum" => vec.push(HistogramMetric::Sum(metric.value)),
-                    "_count" => vec.push(HistogramMetric::Count(metric.value)),
+                    "_sum" => vec.push(HistogramMetric::Sum {
+                        value: metric.value,
+                        labels: metric.labels,
+                    }),
+                    "_count" => vec.push(HistogramMetric::Count {
+                        value: metric.value,
+                        labels: metric.labels,
+                    }),
                     _ => unreachable!(),
                 }
             }
@@ -102,16 +130,23 @@ impl MetricGroup {
                 let suffix = &metric.name[self.name.len()..];
                 match suffix {
                     "" => {
-                        let quantile = metric.labels.get("quantile").ok_or(ParserError {})?;
+                        let quantile = metric.labels.remove("quantile").ok_or(ParserError::Error)?;
                         let (_, quantile) =
-                            line::Metric::parse_value(&quantile).map_err(|_| ParserError {})?;
+                            line::Metric::parse_value(&quantile).map_err(|_| ParserError::Error)?;
                         vec.push(SummaryMetric::Quantile {
                             quantile,
                             value: metric.value,
+                            labels: metric.labels,
                         });
                     }
-                    "_sum" => vec.push(SummaryMetric::Sum(metric.value)),
-                    "_count" => vec.push(SummaryMetric::Count(metric.value)),
+                    "_sum" => vec.push(SummaryMetric::Sum {
+                        value: metric.value,
+                        labels: metric.labels,
+                    }),
+                    "_count" => vec.push(SummaryMetric::Count {
+                        value: metric.value,
+                        labels: metric.labels,
+                    }),
                     _ => unreachable!(),
                 }
             }
