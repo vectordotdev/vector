@@ -54,6 +54,17 @@ examples = ["${HUMIO_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
 required = true
 description = "Your Humio ingestion token."
 
+[sinks.humio_logs.options.source]
+type = "string"
+common = false
+examples = ["{{file}}", "/var/log/syslog", "UDP:514"]
+required = false
+templateable = true
+description = """\
+The source of events sent to this sink. Typically the filename the logs \
+originated from. Maps to @source in Humio.
+"""
+
 [sinks.humio_logs.options.event_type]
 type = "string"
 common = false
