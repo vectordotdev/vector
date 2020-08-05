@@ -86,7 +86,7 @@ jobs:
         run: cargo test --no-default-features --features default-msvc
 
   build-x86_64-unknown-linux-musl:
-    name: Unit - Linux
+    name: Release build - x86_64-unknown-linux-musl
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -104,7 +104,7 @@ jobs:
       - run: make build-x86_64-unknown-linux-musl
 
   build-aarch64-unknown-linux-musl:
-    name: Unit - Linux
+    name: Release build - aarch64-unknown-linux-musl
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
