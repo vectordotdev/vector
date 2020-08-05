@@ -72,6 +72,29 @@ impl InternalEvent for SplunkSourceTypeMissingKeys {
     }
 }
 
+#[derive(Debug)]
+pub struct SplunkSourceMissingKeys {
+    pub keys: Vec<Atom>,
+}
+
+impl InternalEvent for SplunkSourceMissingKeys {
+    fn emit_logs(&self) {
+        warn!(
+            message = "failed to render template for source, leaving empty",
+            missing_keys = ?self.keys,
+            rate_limit_secs = 30,
+        )
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "source_missing_keys", 1,
+            "component_kind" => "sink",
+            "component_type" => "splunk_hec",
+        );
+    }
+}
+
 #[cfg(feature = "sources-splunk_hec")]
 mod source {
     use super::InternalEvent;
