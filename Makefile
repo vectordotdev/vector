@@ -14,6 +14,10 @@ else
 	export NUM_CPUS=$(awk '/^processor/ { N++} END { print N }' /proc/cpuinfo)
 endif
 
+# Override this to use debug builds in release builders.
+export RELEASE ?= false
+override BUILD_MODE = $(if $(findstring true,$(RELEASE)),release,debug)
+override MAYBE_RELEASE_FLAG = $(if $(findstring true,$(RELEASE)),--release,)
 # Override this with any scopes for testing/benching.
 export SCOPE ?= ""
 # Override to false to disable autospawning services on integration tests.
@@ -59,7 +63,13 @@ export OPENSSL_STATIC ?= 1
 export CROSS_COMPILE ?= true
 export LDFLAGS ?= -static
 
-export MUSL_CROSS_MAKE ?= $(abspath ./scripts/environment/cross)
+# In the environment, we have an established structure. Otherwise, configure it where you please! Absolute paths only.
+ifeq ($(ENVIRONMENT), true)
+export MUSL_CROSS_MAKE ?= /git/richfelker/musl-cross-make
+else
+export MUSL_CROSS_MAKE ?= ${abspath scripts/environment/cross}
+endif
+
 export MUSL_CROSS_MAKE_PATH ?= ${MUSL_CROSS_MAKE}/output
 export MUSL_CROSS_MAKE_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/x86_64-linux-musl
 export MUSL_CROSS_MAKE_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/aarch64-linux-musl
@@ -133,7 +143,6 @@ endif
 define ENVIRONMENT_EXEC
 	${ENVIRONMENT_PREPARE}
 	@echo "Entering environment..."
-	@mkdir -p target scripts/environment/cross
 	$(CONTAINER_TOOL) run \
 			--name vector-environment \
 			--rm \
@@ -141,10 +150,40 @@ define ENVIRONMENT_EXEC
 			--init \
 			--interactive \
 			--env INSIDE_ENVIRONMENT=true \
+			--env MUSL_CROSS_MAKE \
+			--env MUSL_CROSS_MAKE_PATH \
+            --env MUSL_CROSS_MAKE_x86_64-unknown-linux-musl \
+            --env MUSL_CROSS_MAKE_aarch64-unknown-linux-musl \
+            --env CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER \
+            --env CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS \
+            --env CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL__RUSTC_LINK_LIB \
+            --env CC_x86_64-unknown-linux-musl \
+            --env CXX_x86_64-unknown-linux-musl \
+            --env AR_x86_64-unknown-linux-musl \
+            --env LD_x86_64-unknown-linux-musl \
+            --env CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER \
+            --env CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS \
+            --env CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTC_LINK_LIB \
+            --env CC_aarch64-unknown-linux-musl \
+            --env CXX_aarch64-unknown-linux-musl \
+            --env AR_aarch64-unknown-linux-musl \
+            --env LD_aarch64-unknown-linux-musl \
+            --env CC \
+            --env CXX \
+            --env HOST_CXX \
+            --env HOST_CC \
+            --env TCLPATH \
+            --env PKG_CONFIG_ALLOW_CROSS \
+            --env PKG_CONFIG_ALL_STATIC \
+            --env LIBZ_SYS_STATIC \
+            --env OPENSSL_STATIC \
+            --env CROSS_COMPILE \
+            --env LDFLAGS \
 			--network host \
 			--mount type=bind,source=${PWD},target=/git/timberio/vector \
 			--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
 			--mount type=volume,source=vector-target,target=/git/timberio/vector/target \
+			--mount type=volume,source=vector-cross,target=${MUSL_CROSS_MAKE} \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
 			$(ENVIRONMENT_UPSTREAM)
 endef
@@ -190,7 +229,7 @@ environment-prepare: ## Prepare the Vector dev shell using $CONTAINER_TOOL.
 	${ENVIRONMENT_PREPARE}
 
 environment-clean: ## Clean the Vector dev shell using $CONTAINER_TOOL.
-	@$(CONTAINER_TOOL) volume rm -f vector-target vector-cargo-cache
+	@$(CONTAINER_TOOL) volume rm -f vector-target vector-cargo-cache vector-cross
 	@$(CONTAINER_TOOL) rmi $(ENVIRONMENT_UPSTREAM) || true
 
 environment-push: environment-prepare ## Publish a new version of the container image.
@@ -211,15 +250,16 @@ build-x86_64-unknown-linux-gnu: ${VECTOR_BINARY_x86_64_unknown_linux_gnu} ## Bui
 ${VECTOR_BINARY_x86_64_unknown_linux_gnu}:
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features default --target x86_64-unknown-linux-gnu
 
+.PHONY: ${MUSL_CROSS_MAKE}
 ${MUSL_CROSS_MAKE}:
-	${MAYBE_ENVIRONMENT_EXEC} git clone https://github.com/richfelker/musl-cross-make.git ${MUSL_CROSS_MAKE}
+	${MAYBE_ENVIRONMENT_EXEC} git clone https://github.com/richfelker/musl-cross-make.git ${MUSL_CROSS_MAKE} || true
 
 .PHONY: build-cross-x86_64-unknown-linux-musl
 build-cross-x86_64-unknown-linux-musl: ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}
 
 .PHONY: ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}
 ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}: ${MUSL_CROSS_MAKE}
-	${MAYBE_ENVIRONMENT_EXEC} ${MAKE} --quiet --directory ${MUSL_CROSS_MAKE} install -j${NUM_CPUS} TARGET=x86_64-linux-musl
+	${MAYBE_ENVIRONMENT_EXEC} make --quiet --directory ${MUSL_CROSS_MAKE} install -j${NUM_CPUS} TARGET=x86_64-linux-musl
 
 .PHONY: build-x86_64-unknown-linux-musl
 build-x86_64-unknown-linux-musl: ${VECTOR_BINARY_x86_64-unknown-linux-musl} ## Build static binary in release mode for the x86_64 architecture
@@ -227,13 +267,16 @@ build-x86_64-unknown-linux-musl: ${VECTOR_BINARY_x86_64-unknown-linux-musl} ## B
 ${VECTOR_BINARY_x86_64-unknown-linux-musl}:
 	${MAYBE_ENVIRONMENT_EXEC} rustup toolchain install nightly
 	${MAYBE_ENVIRONMENT_EXEC} rustup target add aarch64-unknown-linux-musl --toolchain nightly
-	${MAYBE_ENVIRONMENT_EXEC} bash -c "CROSS_COMPILE=x86_64-unknown-linux-musl \
-	CC=${CC_x86_64-unknown-linux-musl} \
-	CXX=${CXX_x86_64-unknown-linux-musl} \
-	LD=${CARGO_TARGET_x86_64-UNKOWNN_LINUX_MUSL_LINKER} \
-	HOST_CXX=musl-g++ \
-	HOST_CC=musl-gcc \
-	cargo +nightly build --no-default-features --features default-musl --target x86_64-unknown-linux-musl"
+	${MAYBE_ENVIRONMENT_EXEC} bash -c " \
+		CROSS_COMPILE=x86_64-unknown-linux-musl \
+		CC=${CC_x86_64-unknown-linux-musl} \
+		CXX=${CXX_x86_64-unknown-linux-musl} \
+		LD=${CARGO_TARGET_x86_64-UNKOWNN_LINUX_MUSL_LINKER} \
+		HOST_CXX=musl-g++ \
+		HOST_CC=musl-gcc \
+		PATH+=$(MUSL_CROSS_MAKE_PATH)/bin \
+		cargo +nightly build ${MAYBE_RELEASE_FLAG} --no-default-features --features default-musl --target x86_64-unknown-linux-musl \
+	"
 
 .PHONY: build-cross-aarch64-unknown-linux-musl
 build-cross-aarch64-unknown-linux-musl: ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}
@@ -248,14 +291,16 @@ build-aarch64-unknown-linux-musl: ${VECTOR_BINARY_aarch64-unknown-linux-musl} ##
 ${VECTOR_BINARY_aarch64-unknown-linux-musl}:
 	${MAYBE_ENVIRONMENT_EXEC} rustup toolchain install nightly
 	${MAYBE_ENVIRONMENT_EXEC} rustup target add aarch64-unknown-linux-musl
-	${MAYBE_ENVIRONMENT_EXEC} bash -c "CROSS_COMPILE=aarch64-unknown-linux-musl \
-    CC=${CC_aarch64-unknown-linux-musl} \
-    CXX=${CXX_aarch64-unknown-linux-musl} \
-    LD=${CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER} \
-    HOST_CXX=musl-g++ \
-    HOST_CC=musl-gcc \
-    LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${MUSL_CROSS_MAKE_PATH}/lib/ \
-    cargo +nightly build --no-default-features --features default-musl --target aarch64-unknown-linux-musl"
+	${MAYBE_ENVIRONMENT_EXEC} bash -c " \
+		CROSS_COMPILE=aarch64-unknown-linux-musl \
+		CC=${CC_aarch64-unknown-linux-musl} \
+		CXX=${CXX_aarch64-unknown-linux-musl} \
+		LD=${CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER} \
+		HOST_CXX=musl-g++ \
+		HOST_CC=musl-gcc \
+		PATH+=${MUSL_CROSS_MAKE_PATH}/bin \
+		cargo +nightly build ${MAYBE_RELEASE_FLAG} --no-default-features --features default-musl --target aarch64-unknown-linux-musl \
+	"
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
