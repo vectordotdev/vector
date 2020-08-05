@@ -57,13 +57,12 @@ export LIBZ_SYS_STATIC ?= 1
 # In case it didn't get the memo
 export OPENSSL_STATIC ?= 1
 export CROSS_COMPILE ?= true
+export LDFLAGS ?= -static
 
-export MUSL_CROSS_MAKE ?= $(abspath ./target/musl-cross-make)
+export MUSL_CROSS_MAKE ?= $(abspath ./scripts/environment/cross)
 export MUSL_CROSS_MAKE_PATH ?= ${MUSL_CROSS_MAKE}/output
 export MUSL_CROSS_MAKE_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/x86_64-linux-musl
 export MUSL_CROSS_MAKE_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/aarch64-linux-musl
-# Yes! the `armv7` and `arm` differences here are on purpose!
-export MUSL_CROSS_MAKE_armv7-unknown-linux-musleabifi ?= ${MUSL_CROSS_MAKE_PATH}/arm-linux-musl
 
 
 # export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER ?= x86_64-linux-gnu-cc
@@ -74,14 +73,14 @@ export MUSL_CROSS_MAKE_armv7-unknown-linux-musleabifi ?= ${MUSL_CROSS_MAKE_PATH}
 #export LD_x86_64-unknown-linux-gnu ?= x86_64-linux-gnu-ar
 
 export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-cc
-export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc -C linker=${CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER}
 export CC_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-gcc
 export CXX_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-g++
 export AR_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-ar
 export LD_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-ld
 
-export CARGO_TARGET_aarch64-unknown-linux-musl_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-cc
-export CARGO_TARGET_aarch64-unknown-linux-musl_RUSTFLAGS ?= -C link-arg=-lgcc
+export CARGO_TARGET_AARCH64-UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-ld
+export CARGO_TARGET_AARCH64-UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc -C linker=${CARGO_TARGET_AARCH64-UNKNOWN_LINUX_MUSL_LINKER}
 export CC_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-gcc
 export CXX_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-g++
 export AR_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-ar
@@ -222,13 +221,16 @@ ${VECTOR_BINARY_x86_64_unknown_linux_gnu}:
 
 build-x86_64-unknown-linux-musl: ${VECTOR_BINARY_x86_64-unknown-linux-musl} ## Build static binary in release mode for the x86_64 architecture
 
-${VECTOR_BINARY_x86_64-unknown-linux-musl}: CC := ${CC_x86_64-unknown-linux-musl}
-${VECTOR_BINARY_x86_64-unknown-linux-musl}: CXX := ${CXX_x86_64-unknown-linux-musl}
-${VECTOR_BINARY_x86_64-unknown-linux-musl}: HOST_CXX := musl-g++
-${VECTOR_BINARY_x86_64-unknown-linux-musl}: HOST_CC := musl-gcc
-${VECTOR_BINARY_x86_64-unknown-linux-musl}: ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl} rust-target-x86_64-unknown-linux-musl
-	${MAYBE_ENVIRONMENT_EXEC} \
-		cargo build --no-default-features --features default-musl --target x86_64-unknown-linux-musl
+${VECTOR_BINARY_x86_64-unknown-linux-musl}: ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}
+	rustup toolchain install nightly
+	rustup target add aarch64-unknown-linux-musl --toolchain nightly
+	CROSS_COMPILE=x86_64-unknown-linux-musl \
+	CC=${CC_x86_64-unknown-linux-musl} \
+	CXX=${CXX_x86_64-unknown-linux-musl} \
+	LD=${CARGO_TARGET_x86_64-UNKOWNN_LINUX_MUSL_LINKER} \
+	HOST_CXX=musl-g++ \
+	HOST_CC=musl-gcc \
+	cargo +nightly build --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 
 ${MUSL_CROSS_MAKE}:
 	${MAYBE_ENVIRONMENT_EXEC} git clone https://github.com/richfelker/musl-cross-make.git ${MUSL_CROSS_MAKE}
@@ -247,19 +249,18 @@ ${MUSL_CROSS_MAKE_armv7-unknown-linux-musl}: ${MUSL_CROSS_MAKE}
 
 build-aarch64-unknown-linux-musl: ${VECTOR_BINARY_aarch64-unknown-linux-musl} ## Build static binary in release mode for the aarch64 architecture
 
-# ${VECTOR_BINARY_aarch64-unknown-linux-musl}: export CC = ${CC_aarch64-unknown-linux-musl}
-# ${VECTOR_BINARY_aarch64-unknown-linux-musl}: export CXX = ${CXX_aarch64-unknown-linux-musl}
-# ${VECTOR_BINARY_aarch64-unknown-linux-musl}: export HOST_CXX = musl-g++
-# ${VECTOR_BINARY_aarch64-unknown-linux-musl}: export HOST_CC = musl-gcc
-${VECTOR_BINARY_aarch64-unknown-linux-musl}: ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}
+
+
+${VECTOR_BINARY_aarch64-unknown-linux-musl}: # ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}
 	rustup toolchain install nightly
-	rustup target add aarch64-unknown-linux-musl --toolchain nightly
-	CC=musl-gcc \
-	CXX=musl-g++ \
-	HOST_CXX=musl-g++ \
-	HOST_CC=musl-gcc \
-	PATH=${PATH}:${MUSL_CROSS_MAKE_PATH}/bin
-	cargo +nightly build --no-default-features --features default-musl --target aarch64-unknown-linux-musl
+	rustup target add aarch64-unknown-linux-musl
+	CROSS_COMPILE=aarch64-unknown-linux-musl \
+    CC=${CC_aarch64-unknown-linux-musl} \
+    CXX=${CXX_aarch64-unknown-linux-musl} \
+    LD=${CARGO_TARGET_AARCH64-UNKNOWN_LINUX_MUSL_LINKER} \
+    HOST_CXX=musl-g++ \
+    HOST_CC=musl-gcc \
+    cargo +nightly build --no-default-features --features default-musl --target aarch64-unknown-linux-musl
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
