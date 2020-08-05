@@ -10,23 +10,34 @@ pub enum ParserError {
     ExpectedLeTag,
     #[snafu(display("Expected \"quantile\" tag for summary metric"))]
     ExpectedQuantileTag,
-    #[snafu(display("Invalid metric type, input: {}", input))]
+    #[snafu(display("Invalid metric type, input: {:?}", input))]
     InvalidMetricKind { input: String },
-    #[snafu(display("Expected token {}, input: {}", expected, input))]
+    #[snafu(display("Expected token {:?}, input: {:?}", expected, input))]
     ExpectedToken {
         expected: &'static str,
         input: String,
     },
-    #[snafu(display("Name must start with [a-zA-Z_], input: {}", input))]
+    #[snafu(display("Name must start with [a-zA-Z_], input: {:?}", input))]
     ParseNameError { input: String },
-    #[snafu(display("Parse float value error, input: {}", input))]
+    #[snafu(display("Parse float value error, input: {:?}", input))]
     ParseFloatError { input: String },
-    #[snafu(display("Internal parser error"))]
-    InternalError,
-    #[snafu(display("Nom error {:?}, input: {}", kind, input))]
+
+    // Error that we didn't catch
+    #[snafu(display("Nom error {:?}, input: {:?}", kind, input))]
     Nom {
         input: String,
         kind: nom::error::ErrorKind,
+    },
+
+    // Below are bugs
+    #[snafu(display("Nom return incomplete"))]
+    NomIncomplete,
+    #[snafu(display("Nom return failure"))]
+    NomFailure,
+    #[snafu(display("Invalid name {:?} for metric group {:?}", metric_name, group_name))]
+    InvalidName {
+        group_name: String,
+        metric_name: String,
     },
 }
 
@@ -39,7 +50,8 @@ impl From<ParserError> for nom::Err<ParserError> {
 impl From<nom::Err<ParserError>> for ParserError {
     fn from(error: nom::Err<ParserError>) -> Self {
         match error {
-            nom::Err::Incomplete(_) | nom::Err::Failure(_) => ParserError::InternalError,
+            nom::Err::Incomplete(_) => ParserError::NomIncomplete,
+            nom::Err::Failure(_) => ParserError::NomFailure,
             nom::Err::Error(e) => e,
         }
     }
@@ -175,9 +187,14 @@ impl MetricGroup {
     }
 
     fn push(&mut self, mut metric: Metric) -> Result<(), ParserError> {
+        // this is an assertion
         if !self.check_name(&metric.name) {
-            return Err(ParserError::InternalError);
+            return Err(ParserError::InvalidName {
+                group_name: self.name.clone(),
+                metric_name: metric.name.clone(),
+            });
         }
+
         match self.metrics {
             GroupKind::Counter(ref mut vec)
             | GroupKind::Gauge(ref mut vec)
