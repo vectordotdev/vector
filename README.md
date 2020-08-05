@@ -14,7 +14,7 @@
 
 <p align="center">
   <strong>
-    New post! <a href="https://vector.dev/highlights/2020-07-10-add-reduce-transform">New Reduce transform</a>
+    New post! <a href="https://vector.dev/highlights/2020-07-10-add-reduce-transform/">New Reduce transform</a>
   </strong>
 </p>
 
@@ -193,11 +193,11 @@ Or use your own [preferred method][docs.installation].
 
 ## Latest Highlights
 
-* [2020/07/10 - New Reduce transform](https://vector.dev/highlights/2020-07-10-add-reduce-transform) - available in [0.10.0][urls.vector_download]
-* [2020/07/09 - Leveraging glibc when possible](https://vector.dev/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh) - available in [0.10.0][urls.vector_download]
-* [2020/07/06 - New compression options for some sinks](https://vector.dev/highlights/2020-07-06-add-compression-option-for-aws-sinks) - available in [0.10.0][urls.vector_download]
-* [2020/06/27 - Kafka components support SASL](https://vector.dev/highlights/2020-06-27-add-sasl-to-kafka) - available in [0.10.0][urls.vector_download]
-* [2020/06/18 - Custom DNS resolution removal](https://vector.dev/highlights/2020-06-18-remove-custom-dns-resolution) - available in [0.10.0][urls.vector_download]
+* [2020/07/10 - New Reduce transform](https://vector.dev/highlights/2020-07-10-add-reduce-transform/) - available in [0.10.0][urls.vector_download]
+* [2020/07/09 - Leveraging glibc when possible](https://vector.dev/highlights/2020-07-09-add-musl-and-glibc-support-to-install-sh/) - available in [0.10.0][urls.vector_download]
+* [2020/07/06 - New compression options for some sinks](https://vector.dev/highlights/2020-07-06-add-compression-option-for-aws-sinks/) - available in [0.10.0][urls.vector_download]
+* [2020/06/27 - Kafka components support SASL](https://vector.dev/highlights/2020-06-27-add-sasl-to-kafka/) - available in [0.10.0][urls.vector_download]
+* [2020/06/18 - Custom DNS resolution removal](https://vector.dev/highlights/2020-06-18-remove-custom-dns-resolution/) - available in [0.10.0][urls.vector_download]
 
 [view all...][urls.vector_highlights]
 
