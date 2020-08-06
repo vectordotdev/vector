@@ -19,7 +19,22 @@ on:
       - "docker-compose.yml"
       - "Makefile"
       - "rust-toolchain"
-  pull_request: {}
+  pull_request:
+    paths:
+      - ".github/workflows/e2e.yml"
+      - "lib/**"
+      - "proto/**"
+      - "scripts/**"
+      - "skaffold/**"
+      - "src/**"
+      - "tests/**"
+      - "distribution/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "build.rs"
+      - "docker-compose.yml"
+      - "Makefile"
+      - "rust-toolchain"
   schedule:
     - cron: "0 4 * * *"
 
