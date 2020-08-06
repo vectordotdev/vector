@@ -1,6 +1,5 @@
 //! Parse a single line of Prometheus text format.
 
-use crate::ParserError;
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, take_while, take_while1},
@@ -13,11 +12,71 @@ use nom::{
 };
 use std::collections::BTreeMap;
 
+#[derive(Debug, snafu::Snafu, PartialEq)]
+pub enum ErrorKind {
+    #[snafu(display("Invalid metric type, parsing: {:?}", input))]
+    InvalidMetricKind { input: String },
+    #[snafu(display("Expected token {:?}, parsing: {:?}", expected, input))]
+    ExpectedToken {
+        expected: &'static str,
+        input: String,
+    },
+    #[snafu(display("Expected blank space or tab, parsing: {:?}", input))]
+    ExpectedSpace { input: String },
+    #[snafu(display("Expected token {:?}, parsing: {:?}", expected, input))]
+    ExpectedChar { expected: char, input: String },
+    #[snafu(display("Name must start with [a-zA-Z_], parsing: {:?}", input))]
+    ParseNameError { input: String },
+    #[snafu(display("Parse float value error, parsing: {:?}", input))]
+    ParseFloatError { input: String },
+
+    // Error that we didn't catch
+    #[snafu(display("Nom error {:?}, parsing: {:?}", kind, input))]
+    Nom {
+        input: String,
+        kind: nom::error::ErrorKind,
+    },
+
+    #[snafu(display("Nom return incomplete"))]
+    NomIncomplete,
+    #[snafu(display("Nom return failure"))]
+    NomFailure,
+}
+
+impl From<ErrorKind> for nom::Err<ErrorKind> {
+    fn from(error: ErrorKind) -> Self {
+        nom::Err::Error(error)
+    }
+}
+
+impl From<nom::Err<ErrorKind>> for ErrorKind {
+    fn from(error: nom::Err<ErrorKind>) -> Self {
+        match error {
+            nom::Err::Incomplete(_) => ErrorKind::NomIncomplete,
+            nom::Err::Failure(_) => ErrorKind::NomFailure,
+            nom::Err::Error(e) => e,
+        }
+    }
+}
+
+impl<'a> nom::error::ParseError<&'a str> for ErrorKind {
+    fn from_error_kind(input: &str, kind: nom::error::ErrorKind) -> Self {
+        ErrorKind::Nom {
+            input: input.to_owned(),
+            kind,
+        }
+    }
+
+    fn append(_: &str, _: nom::error::ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
 type NomError<'a> = nom::Err<(&'a str, nom::error::ErrorKind)>;
 
 type NomErrorType<'a> = (&'a str, nom::error::ErrorKind);
 
-type IResult<'a, O> = Result<(&'a str, O), nom::Err<ParserError>>;
+type IResult<'a, O> = Result<(&'a str, O), nom::Err<ErrorKind>>;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum MetricKind {
@@ -76,7 +135,7 @@ impl Metric {
             double,
         ))(input)
         .map_err(|_: NomError| {
-            ParserError::ParseFloatError {
+            ErrorKind::ParseFloatError {
                 input: input.to_owned(),
             }
             .into()
@@ -192,7 +251,7 @@ impl Metric {
 
         fn match_quote(input: &str) -> IResult<char> {
             char('"')(input).map_err(|_: NomError| {
-                ParserError::ExpectedToken {
+                ErrorKind::ExpectedToken {
                     expected: "\"",
                     input: input.to_owned(),
                 }
@@ -208,7 +267,7 @@ impl Header {
     fn space1(input: &str) -> IResult<()> {
         take_while1(|c| c == ' ' || c == '\t')(input)
             .map_err(|_: NomError| {
-                ParserError::ExpectedSpace {
+                ErrorKind::ExpectedSpace {
                     input: input.to_owned(),
                 }
                 .into()
@@ -219,12 +278,12 @@ impl Header {
     /// `# TYPE <metric_name> <metric_type>`
     fn parse(input: &str) -> IResult<Self> {
         let input = trim_space(input);
-        let (input, _) = char('#')(input).map_err(|_: NomError| ParserError::ExpectedChar {
+        let (input, _) = char('#')(input).map_err(|_: NomError| ErrorKind::ExpectedChar {
             expected: '#',
             input: input.to_owned(),
         })?;
         let input = trim_space(input);
-        let (input, _) = tag("TYPE")(input).map_err(|_: NomError| ParserError::ExpectedToken {
+        let (input, _) = tag("TYPE")(input).map_err(|_: NomError| ErrorKind::ExpectedToken {
             expected: "TYPE",
             input: input.to_owned(),
         })?;
@@ -238,7 +297,7 @@ impl Header {
             value(MetricKind::Histogram, tag("histogram")),
             value(MetricKind::Untyped, tag("untyped")),
         ))(input)
-        .map_err(|_: NomError| ParserError::InvalidMetricKind {
+        .map_err(|_: NomError| ErrorKind::InvalidMetricKind {
             input: input.to_owned(),
         })?;
         Ok((input, Header { metric_name, kind }))
@@ -255,7 +314,7 @@ pub enum Line {
 
 impl Line {
     /// Parse a single line. Return `None` if it is a comment or an empty line.
-    pub fn parse(input: &str) -> Result<Option<Self>, ParserError> {
+    pub fn parse(input: &str) -> Result<Option<Self>, ErrorKind> {
         let input = input.trim();
         if input.is_empty() {
             return Ok(None);
@@ -293,7 +352,7 @@ fn parse_name(input: &str) -> IResult<String> {
         take_while1(|c: char| c.is_alphabetic() || c == '_'),
         take_while(|c: char| c.is_alphanumeric() || c == '_'),
     )(input)
-    .map_err(|_: NomError| ParserError::ParseNameError {
+    .map_err(|_: NomError| ErrorKind::ParseNameError {
         input: input.to_owned(),
     })?;
     Ok((input, a.to_owned() + b))
@@ -310,7 +369,7 @@ fn sp<'a, E: ParseError<&'a str>>(i: &'a str) -> nom::IResult<&'a str, &'a str, 
 fn match_char(c: char) -> impl Fn(&str) -> IResult<char> {
     move |input| {
         preceded(sp, char(c))(input).map_err(|_: NomError| {
-            ParserError::ExpectedChar {
+            ErrorKind::ExpectedChar {
                 expected: c,
                 input: input.to_owned(),
             }
@@ -595,12 +654,9 @@ mod test {
         assert!(input.lines().map(Line::parse).all(|r| r.is_ok()));
     }
 
-    fn is_good_err(e: ParserError) -> bool {
+    fn is_good_err(e: ErrorKind) -> bool {
         match e {
-            ParserError::Nom { .. }
-            | ParserError::NomFailure
-            | ParserError::NomIncomplete
-            | ParserError::InvalidName { .. } => false,
+            ErrorKind::Nom { .. } | ErrorKind::NomFailure | ErrorKind::NomIncomplete => false,
             _ => true,
         }
     }

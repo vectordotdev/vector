@@ -2,79 +2,29 @@ use std::collections::BTreeMap;
 
 mod line;
 
+pub use line::ErrorKind;
+use line::Line;
+use line::Metric;
+use line::MetricKind;
+
 #[derive(Debug, snafu::Snafu, PartialEq)]
 pub enum ParserError {
+    #[snafu(display("{}, line: {:?}", kind, line))]
+    WithLine { line: String, kind: ErrorKind },
     #[snafu(display("Expected \"le\" tag for histogram metric"))]
     ExpectedLeTag,
     #[snafu(display("Expected \"quantile\" tag for summary metric"))]
     ExpectedQuantileTag,
-    #[snafu(display("Invalid metric type, input: {:?}", input))]
-    InvalidMetricKind { input: String },
-    #[snafu(display("Expected token {:?}, input: {:?}", expected, input))]
-    ExpectedToken {
-        expected: &'static str,
-        input: String,
-    },
-    #[snafu(display("Expected blank space or tab, input: {:?}", input))]
-    ExpectedSpace { input: String },
-    #[snafu(display("Expected token {:?}, input: {:?}", expected, input))]
-    ExpectedChar { expected: char, input: String },
-    #[snafu(display("Name must start with [a-zA-Z_], input: {:?}", input))]
-    ParseNameError { input: String },
     #[snafu(display("Parse float value error, input: {:?}", input))]
     ParseFloatError { input: String },
 
-    // Error that we didn't catch
-    #[snafu(display("Nom error {:?}, input: {:?}", kind, input))]
-    Nom {
-        input: String,
-        kind: nom::error::ErrorKind,
-    },
-
     // Below are bugs
-    #[snafu(display("Nom return incomplete"))]
-    NomIncomplete,
-    #[snafu(display("Nom return failure"))]
-    NomFailure,
     #[snafu(display("Invalid name {:?} for metric group {:?}", metric_name, group_name))]
     InvalidName {
         group_name: String,
         metric_name: String,
     },
 }
-
-impl From<ParserError> for nom::Err<ParserError> {
-    fn from(error: ParserError) -> Self {
-        nom::Err::Error(error)
-    }
-}
-
-impl From<nom::Err<ParserError>> for ParserError {
-    fn from(error: nom::Err<ParserError>) -> Self {
-        match error {
-            nom::Err::Incomplete(_) => ParserError::NomIncomplete,
-            nom::Err::Failure(_) => ParserError::NomFailure,
-            nom::Err::Error(e) => e,
-        }
-    }
-}
-
-impl<'a> nom::error::ParseError<&'a str> for ParserError {
-    fn from_error_kind(input: &str, kind: nom::error::ErrorKind) -> Self {
-        ParserError::Nom {
-            input: input.to_owned(),
-            kind,
-        }
-    }
-
-    fn append(_: &str, _: nom::error::ErrorKind, other: Self) -> Self {
-        other
-    }
-}
-
-use line::Line;
-use line::Metric;
-use line::MetricKind;
 
 #[derive(Debug, PartialEq)]
 pub enum SummaryMetric {
@@ -214,7 +164,11 @@ impl MetricGroup {
                             .labels
                             .remove("le")
                             .ok_or(ParserError::ExpectedLeTag)?;
-                        let (_, bucket) = line::Metric::parse_value(&bucket)?;
+                        let (_, bucket) = line::Metric::parse_value(&bucket).map_err(|_| {
+                            ParserError::ParseFloatError {
+                                input: bucket.to_owned(),
+                            }
+                        })?;
                         vec.push(HistogramMetric::Bucket {
                             bucket,
                             value: metric.value,
@@ -240,7 +194,11 @@ impl MetricGroup {
                             .labels
                             .remove("quantile")
                             .ok_or(ParserError::ExpectedQuantileTag)?;
-                        let (_, quantile) = line::Metric::parse_value(&quantile)?;
+                        let (_, quantile) = line::Metric::parse_value(&quantile).map_err(|_| {
+                            ParserError::ParseFloatError {
+                                input: quantile.to_owned(),
+                            }
+                        })?;
                         vec.push(SummaryMetric::Quantile {
                             quantile,
                             value: metric.value,
@@ -267,7 +225,10 @@ pub fn group_metrics(input: &str) -> Result<Vec<MetricGroup>, ParserError> {
     let mut groups = Vec::new();
 
     for line in input.lines() {
-        let line = Line::parse(line)?;
+        let line = Line::parse(line).map_err(|kind| ParserError::WithLine {
+            line: line.to_owned(),
+            kind,
+        })?;
         if line.is_none() {
             continue;
         }
@@ -340,10 +301,11 @@ mod test {
 
     fn is_good_err(e: ParserError) -> bool {
         match e {
-            ParserError::Nom { .. }
-            | ParserError::NomFailure
-            | ParserError::NomIncomplete
-            | ParserError::InvalidName { .. } => false,
+            ParserError::WithLine { kind, .. } => match kind {
+                ErrorKind::Nom { .. } | ErrorKind::NomFailure | ErrorKind::NomIncomplete => false,
+                _ => true,
+            },
+            ParserError::InvalidName { .. } => false,
             _ => true,
         }
     }
@@ -351,27 +313,27 @@ mod test {
     #[test]
     fn test_errors() {
         let input = r##"name{registry="default" content_type="html"} 1890"##;
-        let error = group_metrics(input).unwrap_err().into();
+        let error = group_metrics(input).unwrap_err();
         println!("{}", error);
         assert!(is_good_err(error));
 
         let input = r##"# TYPE a counte"##;
-        let error = group_metrics(input).unwrap_err().into();
+        let error = group_metrics(input).unwrap_err();
         println!("{}", error);
         assert!(is_good_err(error));
 
         let input = r##"# TYPEabcd asdf"##;
-        let error = group_metrics(input).unwrap_err().into();
+        let error = group_metrics(input).unwrap_err();
         println!("{}", error);
         assert!(is_good_err(error));
 
         let input = r##"name{registry="} 1890"##;
-        let error = group_metrics(input).unwrap_err().into();
+        let error = group_metrics(input).unwrap_err();
         println!("{}", error);
         assert!(is_good_err(error));
 
         let input = r##"name abcd"##;
-        let error = group_metrics(input).unwrap_err().into();
+        let error = group_metrics(input).unwrap_err();
         println!("{}", error);
         assert!(is_good_err(error));
     }
