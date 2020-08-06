@@ -9,7 +9,7 @@ use nom::{
     error::ParseError,
     multi::{fold_many0, separated_list},
     number::complete::double,
-    sequence::{delimited, pair, preceded, tuple},
+    sequence::{delimited, pair, preceded, terminated, tuple},
 };
 use std::collections::BTreeMap;
 
@@ -83,18 +83,14 @@ impl Metric {
 
     fn parse_name_value(input: &str) -> IResult<(String, String)> {
         map(
-            tuple((
-                parse_name,
-                preceded(sp, char('=')),
-                Self::parse_escaped_string,
-            )),
+            tuple((parse_name, match_char('='), Self::parse_escaped_string)),
             |(name, _, value)| (name, value),
         )(input)
     }
 
     fn parse_labels_inner(input: &str) -> IResult<BTreeMap<String, String>> {
-        let (input, list) = separated_list(preceded(sp, char(',')), Self::parse_name_value)(input)?;
-        let (input, _) = opt(preceded(sp, char(',')))(input)?;
+        let (input, list) = separated_list(match_char(','), Self::parse_name_value)(input)?;
+        let (input, _) = opt(match_char(','))(input)?;
         Ok((input, list.into_iter().collect()))
     }
 
@@ -104,16 +100,7 @@ impl Metric {
 
         match opt(char('{'))(input) {
             Ok((input, None)) => Ok((input, BTreeMap::new())),
-            Ok((input, Some(_))) => {
-                let (input, labels) = Self::parse_labels_inner(input)?;
-                let (input, _) = preceded(sp, char('}'))(input).map_err(|_: NomError| {
-                    ParserError::ExpectedToken {
-                        expected: "}",
-                        input: input.to_owned(),
-                    }
-                })?;
-                Ok((input, labels))
-            }
+            Ok((input, Some(_))) => terminated(Self::parse_labels_inner, match_char('}'))(input),
             Err(e) => Err(e),
         }
     }
@@ -248,6 +235,18 @@ fn trim_space(input: &str) -> &str {
 
 fn sp<'a, E: ParseError<&'a str>>(i: &'a str) -> nom::IResult<&'a str, &'a str, E> {
     take_while(|c| c == ' ' || c == '\t')(i)
+}
+
+fn match_char(c: char) -> impl Fn(&str) -> IResult<char> {
+    move |input| {
+        preceded(sp, char(c))(input).map_err(|_: NomError| {
+            ParserError::ExpectedChar {
+                expected: c,
+                input: input.to_owned(),
+            }
+            .into()
+        })
+    }
 }
 
 #[cfg(test)]

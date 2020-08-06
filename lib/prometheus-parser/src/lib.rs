@@ -15,6 +15,8 @@ pub enum ParserError {
         expected: &'static str,
         input: String,
     },
+    #[snafu(display("Expected token {:?}, input: {:?}", expected, input))]
+    ExpectedChar { expected: char, input: String },
     #[snafu(display("Name must start with [a-zA-Z_], input: {:?}", input))]
     ParseNameError { input: String },
     #[snafu(display("Parse float value error, input: {:?}", input))]
