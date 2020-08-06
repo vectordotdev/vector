@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    event::metric::{Metric, MetricKind, MetricValue},
+    event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::{self, Value},
     template::{Template, TemplateError},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
@@ -193,6 +193,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 value: MetricValue::Distribution {
                     values: vec![value],
                     sample_rates: vec![1],
+                    statistic: StatisticKind::Histogram,
                 },
             })
         }
@@ -271,7 +272,7 @@ impl Transform for LogToMetric {
 mod tests {
     use super::{LogToMetric, LogToMetricConfig};
     use crate::{
-        event::metric::{Metric, MetricKind, MetricValue},
+        event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
         event::{self, Event},
         transforms::Transform,
     };
@@ -650,6 +651,7 @@ mod tests {
                 value: MetricValue::Distribution {
                     values: vec![2.5],
                     sample_rates: vec![1],
+                    statistic: StatisticKind::Histogram
                 },
             }
         );
