@@ -81,20 +81,29 @@ export MUSL_CROSS_MAKE_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/x86_
 export MUSL_CROSS_MAKE_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/aarch64-linux-musl
 
 export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-cc
-export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc
-export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL__RUSTC_LINK_LIB ?= static=gcc
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc -C link-arg=-lstdc++ -C link-arg=-lresolv
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL__RUSTC_LINK_LIB ?= static=gcc static=stdc++ static=resolv
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL__RUSTC_LINK_SEARCH ?= ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/ ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/
 export CC_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-gcc
 export CXX_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-g++
 export AR_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-ar
 export LD_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-ld
+export CFLAGS_x86_64-unknown-linux-musl ?= -nostdinc -isystem ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/
+export CXXFLAGS_x86_64-unknown-linux-musl ?= ${CFLAGS_x86_64-unknown-linux-musl} -nostdinc++ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/bits
+export LDFLAGS_x86_64-unknown-linux-musl ?= -static -nostdinc -nostdinc++ -nostartfiles -isystem ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/ -lc++ -lc++abi -lunwind -lc
+
 
 export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-cc
-export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc
-export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTC_LINK_LIB ?= static=gcc
+export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc -C link-arg=-lstdc++ -C link-arg=-lresolv
+export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTC_LINK_LIB ?= static=gcc static=stdc++ static=resolv
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL__RUSTC_LINK_SEARCH ?= ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/ ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/c++/9.2.0/
 export CC_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-gcc
 export CXX_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-g++
 export AR_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-ar
 export LD_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-ld
+export CFLAGS_aarch64-unknown-linux-musl ?= -I${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/
+export CXXFLAGS_aarch64-unknown-linux-musl ?= ${CFLAGS_aarch64-unknown-linux-musl} -imultilib ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/c++/9.2.0/
+export LDFLAGS_aarch64-unknown-linux-musl ?=  ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/
 
  # Deprecated.
 export USE_CONTAINER ?= $(CONTAINER_TOOL)
@@ -197,6 +206,7 @@ define ENVIRONMENT_EXEC
 			--mount type=bind,source=${PWD},target=/git/timberio/vector \
 			--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
 			--mount type=volume,source=vector-${ENVIRONMENT_TAG}-target,target=/git/timberio/vector/target \
+			--mount type=volume,source=vector-${ENVIRONMENT_TAG}-rustup,target=/root/.rustup \
 			--mount type=volume,source=vector-${ENVIRONMENT_TAG}-cross,target=${MUSL_CROSS_MAKE} \
 			--mount type=volume,source=vector-${ENVIRONMENT_TAG}-cargo-cache,target=/root/.cargo \
 			${ENVIRONMENT_UPSTREAM}:${ENVIRONMENT_TAG}
