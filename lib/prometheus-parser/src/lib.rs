@@ -189,7 +189,7 @@ impl MetricGroup {
         if !self.check_name(&metric.name) {
             return Err(ParserError::InvalidName {
                 group_name: self.name.clone(),
-                metric_name: metric.name.clone(),
+                metric_name: metric.name,
             });
         }
 
