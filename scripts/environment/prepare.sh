@@ -1,29 +1,32 @@
 #! /usr/bin/env bash
 set -e -o verbose
 
-curl https://sh.rustup.rs -sSf | sh -s -- -y
-source $HOME/.cargo/env
+WORKDIR=$(pwd)
 
-rustup target add wasm32-wasi
-rustup toolchain install nightly --target x86_64-unknown-linux-musl
-rustup toolchain install nightly --target armv7-unknown-linux-musleabihf
-rustup toolchain install nightly --target aarch64-unknown-linux-musl
-rustup component add rustfmt
-rustup component add clippy
-rustup default "$(cat rust-toolchain)"
+# curl https://sh.rustup.rs -sSf | sh -s -- -y
+# source $HOME/.cargo/env
 
-cd scripts
+# rustup target add wasm32-wasi
+# rustup toolchain install nightly --target x86_64-unknown-linux-musl
+# rustup toolchain install nightly --target armv7-unknown-linux-musleabihf
+# rustup toolchain install nightly --target aarch64-unknown-linux-musl
+# rustup component add rustfmt
+# rustup component add clippy
+# rustup default "$(cat rust-toolchain)"
+
 # Ruby toolchain
 export PATH="${HOME}/.rbenv/bin:${HOME}/.rbenv/shims:${PATH}"
 curl -fsSL https://github.com/rbenv/rbenv-installer/raw/master/bin/rbenv-installer | bash
 eval "$(rbenv init -)"
 rbenv install 2.7.1
 rbenv global 2.7.1
+
+cd ${WORKDIR}/scripts
 bundle update --bundler
 bundle install
 cd ..
 
-cd scripts
+cd ${WORKDIR}/scripts
 # Node toolchain
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.35.3/install.sh | bash
 export NVM_DIR="$HOME/.nvm"

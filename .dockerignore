@@ -7,5 +7,6 @@
 !shell.nix
 !default.nix
 !scripts/environment
+scripts/environment/cross
 !.envrc
 !tests
