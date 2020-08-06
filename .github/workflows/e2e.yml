@@ -43,6 +43,7 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
   build-deb-package:
+    name: Build .deb package
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -59,6 +60,7 @@ jobs:
   # detecting versions of various components, or reading them from `.meta`.
   # See https://github.community/t/feature-request-and-use-case-example-to-allow-matrix-in-if-s/126067
   compute-k8s-test-plan:
+    name: Compute K8s test plan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/github-script@v2
