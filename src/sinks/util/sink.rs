@@ -50,7 +50,6 @@ use std::{
     marker::PhantomData,
 };
 use tokio::time::{delay_for, Duration};
-use tokio01::executor::{DefaultExecutor, Executor};
 use tower::Service;
 use tracing_futures::Instrument;
 
@@ -133,17 +132,16 @@ impl<T: Sink> Sink for StreamSink<T> {
 /// batches have been acked. This means if sequential requests r1, r2,
 /// and r3 are dispatched and r2 and r3 complete, all events contained
 /// in all requests will not be acked until r1 has completed.
-pub struct BatchSink<S, B, Request, E = DefaultExecutor> {
+pub struct BatchSink<S, B, Request> {
     service: ServiceSink<S, Request>,
     batch: StatefulBatch<B>,
     timeout: Duration,
     linger: Option<Box<dyn Future<Item = (), Error = Infallible> + Send>>,
     closing: bool,
-    exec: E,
     _pd: PhantomData<Request>,
 }
 
-impl<S, B, Request> BatchSink<S, B, Request, DefaultExecutor>
+impl<S, B, Request> BatchSink<S, B, Request>
 where
     S: Service<Request>,
     S::Future: Send + 'static,
@@ -152,20 +150,6 @@ where
     B: Batch<Output = Request>,
 {
     pub fn new(service: S, batch: B, timeout: Duration, acker: Acker) -> Self {
-        BatchSink::with_executor(service, batch, timeout, acker, DefaultExecutor::current())
-    }
-}
-
-impl<S, B, Request, E> BatchSink<S, B, Request, E>
-where
-    S: Service<Request>,
-    S::Future: Send + 'static,
-    S::Error: Into<crate::Error> + Send + 'static,
-    S::Response: Response,
-    B: Batch<Output = Request>,
-    E: Executor,
-{
-    pub fn with_executor(service: S, batch: B, timeout: Duration, acker: Acker, exec: E) -> Self {
         let service = ServiceSink::new(service, acker);
 
         Self {
@@ -174,7 +158,6 @@ where
             timeout,
             linger: None,
             closing: false,
-            exec,
             _pd: PhantomData,
         }
     }
@@ -191,14 +174,13 @@ where
     }
 }
 
-impl<S, B, Request, E> Sink for BatchSink<S, B, Request, E>
+impl<S, B, Request> Sink for BatchSink<S, B, Request>
 where
     S: Service<Request>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
     S::Response: Response,
     B: Batch<Output = Request>,
-    E: Executor,
 {
     type SinkItem = B::Input;
     type SinkError = crate::Error;
@@ -315,10 +297,9 @@ type LingerDelay<K> = Box<dyn Future<Item = LingerState<K>, Error = ()> + Send +
 /// batches have been acked. This means if sequential requests r1, r2,
 /// and r3 are dispatched and r2 and r3 complete, all events contained
 /// in all requests will not be acked until r1 has completed.
-pub struct PartitionBatchSink<B, S, K, Request, E = DefaultExecutor> {
+pub struct PartitionBatchSink<B, S, K, Request> {
     batch: StatefulBatch<B>,
     service: ServiceSink<S, Request>,
-    exec: E,
     partitions: HashMap<K, StatefulBatch<B>>,
     timeout: Duration,
     closing: bool,
@@ -332,7 +313,7 @@ enum LingerState<K> {
     Canceled,
 }
 
-impl<B, S, K, Request> PartitionBatchSink<B, S, K, Request, DefaultExecutor>
+impl<B, S, K, Request> PartitionBatchSink<B, S, K, Request>
 where
     B: Batch<Output = Request>,
     B::Input: Partition<K>,
@@ -343,34 +324,11 @@ where
     S::Response: Response,
 {
     pub fn new(service: S, batch: B, timeout: Duration, acker: Acker) -> Self {
-        PartitionBatchSink::with_executor(
-            service,
-            batch,
-            timeout,
-            acker,
-            DefaultExecutor::current(),
-        )
-    }
-}
-
-impl<B, S, K, Request, E> PartitionBatchSink<B, S, K, Request, E>
-where
-    B: Batch<Output = Request>,
-    B::Input: Partition<K>,
-    K: Hash + Eq + Clone + Send + 'static,
-    S: Service<Request>,
-    S::Future: Send + 'static,
-    S::Error: Into<crate::Error> + Send + 'static,
-    S::Response: Response,
-    E: Executor,
-{
-    pub fn with_executor(service: S, batch: B, timeout: Duration, acker: Acker, exec: E) -> Self {
         let service = ServiceSink::new(service, acker);
 
         Self {
             batch: batch.into(),
             service,
-            exec,
             partitions: HashMap::new(),
             timeout,
             closing: false,
@@ -458,7 +416,7 @@ enum FullBatchResult<T> {
     Result(StartSend<T, crate::Error>),
 }
 
-impl<B, S, K, Request, E> Sink for PartitionBatchSink<B, S, K, Request, E>
+impl<B, S, K, Request> Sink for PartitionBatchSink<B, S, K, Request>
 where
     B: Batch<Output = Request>,
     B::Input: Partition<K>,
@@ -467,7 +425,6 @@ where
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
     S::Response: Response,
-    E: Executor,
 {
     type SinkItem = B::Input;
     type SinkError = crate::Error;
