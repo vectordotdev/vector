@@ -338,9 +338,9 @@ impl Line {
             if tuple::<_, _, NomErrorType, _>((sp, tag("TYPE")))(input).is_ok() {
                 return Err(header_error);
             }
-            return Ok(None);
+            Ok(None)
         } else {
-            return Err(metric_error);
+            Err(metric_error)
         }
     }
 }
