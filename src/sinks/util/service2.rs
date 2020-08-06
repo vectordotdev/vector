@@ -4,7 +4,11 @@ use super::sink::Response;
 use super::{Batch, BatchSink};
 use crate::buffers::Acker;
 use futures::TryFutureExt;
-use serde::{Deserialize, Serialize};
+use serde::{
+    de::{self, Unexpected, Visitor},
+    Deserialize, Deserializer, Serialize,
+};
+use std::fmt;
 use std::sync::Arc;
 use std::task::Poll;
 use std::time::Duration;
@@ -55,10 +59,79 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
     }
 }
 
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq, Serialize)]
+#[derivative(Default)]
+pub enum InFlightLimit {
+    #[derivative(Default)]
+    None,
+    Auto,
+    Fixed(usize),
+}
+
+impl InFlightLimit {
+    pub fn if_none(self, other: Self) -> Self {
+        match self {
+            Self::None => other,
+            _ => self,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for InFlightLimit {
+    // Deserialize either a positive integer or the string "auto"
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct UsizeOrAuto;
+
+        impl<'de> Visitor<'de> for UsizeOrAuto {
+            type Value = InFlightLimit;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str(r#"positive integer or "auto""#)
+            }
+
+            fn visit_str<E: de::Error>(self, value: &str) -> Result<InFlightLimit, E> {
+                if value == "auto" {
+                    Ok(InFlightLimit::Auto)
+                } else {
+                    Err(de::Error::unknown_variant(value, &["auto"]))
+                }
+            }
+
+            fn visit_i64<E: de::Error>(self, value: i64) -> Result<InFlightLimit, E> {
+                if value > 0 {
+                    Ok(InFlightLimit::Fixed(value as usize))
+                } else {
+                    Err(de::Error::invalid_value(
+                        Unexpected::Signed(value),
+                        &"positive integer",
+                    ))
+                }
+            }
+
+            fn visit_u64<E: de::Error>(self, value: u64) -> Result<InFlightLimit, E> {
+                if value > 0 {
+                    Ok(InFlightLimit::Fixed(value as usize))
+                } else {
+                    Err(de::Error::invalid_value(
+                        Unexpected::Unsigned(value),
+                        &"positive integer",
+                    ))
+                }
+            }
+        }
+
+        deserializer.deserialize_any(UsizeOrAuto)
+    }
+}
+
 /// Tower Request based configuration
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
 pub struct TowerRequestConfig {
-    pub in_flight_limit: Option<usize>,        // None == auto
+    #[serde(default)]
+    pub in_flight_limit: InFlightLimit, // 5
     pub timeout_secs: Option<u64>,             // 60
     pub rate_limit_duration_secs: Option<u64>, // 1
     pub rate_limit_num: Option<u64>,           // 5
@@ -70,7 +143,11 @@ pub struct TowerRequestConfig {
 impl TowerRequestConfig {
     pub fn unwrap_with(&self, defaults: &TowerRequestConfig) -> TowerRequestSettings {
         TowerRequestSettings {
-            in_flight_limit: self.in_flight_limit.or(defaults.in_flight_limit),
+            in_flight_limit: match self.in_flight_limit.if_none(defaults.in_flight_limit) {
+                InFlightLimit::None => Some(5),
+                InFlightLimit::Auto => None,
+                InFlightLimit::Fixed(limit) => Some(limit),
+            },
             timeout: Duration::from_secs(self.timeout_secs.or(defaults.timeout_secs).unwrap_or(60)),
             rate_limit_duration: Duration::from_secs(
                 self.rate_limit_duration_secs
@@ -285,5 +362,28 @@ mod compat {
         fn call(&mut self, req: Request) -> Self::Future {
             Compat::new(Box::pin(self.inner.call(req)))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn in_flight_limit_works() {
+        let cfg = toml::from_str::<TowerRequestConfig>("").expect("Empty config failed");
+        assert_eq!(cfg.in_flight_limit, InFlightLimit::None);
+        let cfg = toml::from_str::<TowerRequestConfig>("in_flight_limit = 10")
+            .expect("Fixed in_flight_limit failed");
+        assert_eq!(cfg.in_flight_limit, InFlightLimit::Fixed(10));
+        let cfg = toml::from_str::<TowerRequestConfig>(r#"in_flight_limit = "auto""#)
+            .expect("Auto in_flight_limit failed");
+        assert_eq!(cfg.in_flight_limit, InFlightLimit::Auto);
+        toml::from_str::<TowerRequestConfig>(r#"in_flight_limit = "broken""#)
+            .expect_err("Invalid in_flight_limit didn't fail");
+        toml::from_str::<TowerRequestConfig>(r#"in_flight_limit = 0"#)
+            .expect_err("Invalid in_flight_limit didn't fail on zero");
+        toml::from_str::<TowerRequestConfig>(r#"in_flight_limit = -9"#)
+            .expect_err("Invalid in_flight_limit didn't fail on negative number");
     }
 }

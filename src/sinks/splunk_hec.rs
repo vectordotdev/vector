@@ -4,7 +4,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpClient, HttpSink},
-        service2::TowerRequestConfig,
+        service2::{InFlightLimit, TowerRequestConfig},
         BatchConfig, BatchSettings, Buffer, Compression,
     },
     tls::{TlsOptions, TlsSettings},
@@ -53,6 +53,7 @@ pub struct HecSinkConfig {
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        in_flight_limit: InFlightLimit::Fixed(10),
         rate_limit_num: Some(10),
         ..Default::default()
     };
