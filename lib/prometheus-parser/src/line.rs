@@ -414,19 +414,19 @@ mod test {
         assert!(r.is_nan());
 
         let tests = [
-            ("0", 0.0),
-            ("0.25", 0.25),
-            ("-10.25", -10.25),
-            ("-10e-25", -10e-25),
-            ("-10e+25", -10e+25),
-            ("2020", 2020.0),
-            ("1.", 1.),
+            ("0", 0.0f64),
+            ("0.25", 0.25f64),
+            ("-10.25", -10.25f64),
+            ("-10e-25", -10e-25f64),
+            ("-10e+25", -10e+25f64),
+            ("2020", 2020.0f64),
+            ("1.", 1f64),
         ];
         for (text, value) in &tests {
             let input = wrap(text);
             let (left, r) = Metric::parse_value(&input).unwrap();
             assert_eq!(left, tail);
-            assert_eq!(r, *value);
+            assert!((r - *value).abs() < f64::EPSILON);
         }
     }
 
@@ -462,7 +462,7 @@ mod test {
 
         let input = wrap("100");
         let (left, r) = Metric::parse_labels(&input).unwrap();
-        assert_eq!(left, "100".to_owned() + &tail);
+        assert_eq!(left, "100".to_owned() + tail);
         assert_eq!(r, map! {});
 
         // We don't allow these values
