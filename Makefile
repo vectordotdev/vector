@@ -33,8 +33,13 @@ export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
 export CONTAINER_TOOL ?= docker
 # Override this to automatically enter a container containing the correct, full, official build environment for Vector, ready for development
 export ENVIRONMENT ?= false
+# Override the baseimage of the environment
+export ENVIRONMENT_BASEIMAGE ?= ubuntu:20.04
+export ENVIRONMENT_BOOTSTRAP ?= ./scripts/environment/bootstrap/$(subst :,-,${ENVIRONMENT_BASEIMAGE}).sh
+
 # The upstream container we publish artifacts to on a successful master build.
 export ENVIRONMENT_UPSTREAM ?= docker.pkg.github.com/timberio/vector/environment
+export ENVIRONMENT_TAG ?= $(subst :,-,${ENVIRONMENT_BASEIMAGE})
 # Override to disable building the container, having it pull from the Github packages repo instead
 # TODO: Disable this by default. Blocked by `docker pull` from Github Packages requiring authenticated login
 export ENVIRONMENT_AUTOBUILD ?= true
@@ -48,20 +53,21 @@ export WASM_MODULE_OUTPUTS = $(patsubst %,/target/wasm32-wasi/%,$(WASM_MODULES))
 
 export CC ?= gcc
 export CXX ?= g++
+export LD ?= ldd
 export HOST_CXX ?= g++
 export HOST_CC ?= gcc
+export HOST_LD ?= ldd
 # Some cross compile builds don't have access to TCL, since it's only used in some C SASL unit tests, we just make it null.
 export TCLPATH ?= /dev/null
-# We like cross compiles!
+# # We like cross compiles!
 export PKG_CONFIG_ALLOW_CROSS ?= true
-# We also like static packages!
+# # We also like static packages!
 export PKG_CONFIG_ALL_STATIC ?= true
-# In case it didn't get the memo
+# # In case it didn't get the memo
 export LIBZ_SYS_STATIC ?= 1
 # In case it didn't get the memo
 export OPENSSL_STATIC ?= 1
 export CROSS_COMPILE ?= true
-export LDFLAGS ?= -static
 
 # In the environment, we have an established structure. Otherwise, configure it where you please! Absolute paths only.
 ifeq ($(ENVIRONMENT), true)
@@ -140,6 +146,7 @@ endef
 endif
 
 # We use a volume here as non-Linux hosts are extremely slow to share disks, and Linux hosts tend to get permissions clobbered.
+# TODO: Clean up this env mess... Use an env file.
 define ENVIRONMENT_EXEC
 	${ENVIRONMENT_PREPARE}
 	@echo "Entering environment..."
@@ -151,6 +158,12 @@ define ENVIRONMENT_EXEC
 			--init \
 			--interactive \
 			--env INSIDE_ENVIRONMENT=true \
+			--env MUSL_CROSS_MAKE \
+			--env MUSL_CROSS_MAKE_PATH \
+			--env ENVIRONMENT_BASEIMAGE \
+			--env ENVIRONMENT_BOOTSTRAP \
+			--env ENVIRONMENT_TAG \
+			--env RUST_BACKTRACE \
 			--env MUSL_CROSS_MAKE \
 			--env MUSL_CROSS_MAKE_PATH \
             --env MUSL_CROSS_MAKE_x86_64-unknown-linux-musl \
@@ -183,10 +196,10 @@ define ENVIRONMENT_EXEC
 			--network host \
 			--mount type=bind,source=${PWD},target=/git/timberio/vector \
 			--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
-			--mount type=volume,source=vector-target,target=/git/timberio/vector/target \
-			--mount type=volume,source=vector-cross,target=${MUSL_CROSS_MAKE} \
-			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
-			$(ENVIRONMENT_UPSTREAM)
+			--mount type=volume,source=vector-${ENVIRONMENT_TAG}-target,target=/git/timberio/vector/target \
+			--mount type=volume,source=vector-${ENVIRONMENT_TAG}-cross,target=${MUSL_CROSS_MAKE} \
+			--mount type=volume,source=vector-${ENVIRONMENT_TAG}-cargo-cache,target=/root/.cargo \
+			${ENVIRONMENT_UPSTREAM}:${ENVIRONMENT_TAG}
 endef
 
 define ENVIRONMENT_COPY_ARTIFACTS
@@ -201,7 +214,7 @@ define ENVIRONMENT_COPY_ARTIFACTS
 	@$(CONTAINER_TOOL) rm -f vector-build-outputs || true
 	@$(CONTAINER_TOOL) run \
 		-d \
-		-v vector-target:/target \
+		-v vector-${ENVIRONMENT_TAG}-target:/target \
 		--name vector-build-outputs \
 		busybox true
 	$(CONTAINER_TOOL) cp vector-build-outputs:${VECTOR_BINARY_x86_64_unknown_linux_gnu} ./target/x86_64-unknown-linux-gnu/${BUILD_MODE} || true
@@ -218,7 +231,9 @@ define ENVIRONMENT_PREPARE
 	@echo "Building the environment. (ENVIRONMENT_AUTOBUILD=true) This may take a few minutes..."
 	$(CONTAINER_TOOL) build \
 		$(if $(findstring true,$(VERBOSE)),,--quiet) \
-		--tag $(ENVIRONMENT_UPSTREAM) \
+		--build-arg BASEIMAGE=${ENVIRONMENT_BASEIMAGE} \
+		--build-arg BOOTSTRAP=${ENVIRONMENT_BOOTSTRAP} \
+		--tag $(ENVIRONMENT_UPSTREAM):${ENVIRONMENT_TAG} \
 		--file scripts/environment/Dockerfile \
 		.
 endef
@@ -256,6 +271,7 @@ build-x86_64-unknown-linux-gnu: ${VECTOR_BINARY_x86_64_unknown_linux_gnu} ## Bui
 
 ${VECTOR_BINARY_x86_64_unknown_linux_gnu}:
 	${MAYBE_ENVIRONMENT_EXEC} cargo build ${MAYBE_RELEASE_FLAG} --no-default-features --features default --target x86_64-unknown-linux-gnu
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: ${MUSL_CROSS_MAKE}
 ${MUSL_CROSS_MAKE}:
@@ -271,19 +287,17 @@ ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}: ${MUSL_CROSS_MAKE}
 .PHONY: build-x86_64-unknown-linux-musl
 build-x86_64-unknown-linux-musl: ${VECTOR_BINARY_x86_64-unknown-linux-musl} ## Build static binary in release mode for the x86_64 architecture
 
+${VECTOR_BINARY_x86_64-unknown-linux-musl}: CROSS_COMPILE=x86_64-unknown-linux-musl
+${VECTOR_BINARY_x86_64-unknown-linux-musl}: CC=${CC_x86_64-unknown-linux-musl}
+${VECTOR_BINARY_x86_64-unknown-linux-musl}: CXX=${CXX_x86_64-unknown-linux-musl}
+${VECTOR_BINARY_x86_64-unknown-linux-musl}: LD=${CARGO_TARGET_x86_64-UNKOWNN_LINUX_MUSL_LINKER}
+${VECTOR_BINARY_x86_64-unknown-linux-musl}: HOST_CXX=musl-g++
+${VECTOR_BINARY_x86_64-unknown-linux-musl}: HOST_CC=musl-gcc
+${VECTOR_BINARY_x86_64-unknown-linux-musl}: PATH+=$(MUSL_CROSS_MAKE_PATH)/bin
 ${VECTOR_BINARY_x86_64-unknown-linux-musl}:
 	${MAYBE_ENVIRONMENT_EXEC} rustup toolchain install nightly
-	${MAYBE_ENVIRONMENT_EXEC} rustup target add aarch64-unknown-linux-musl --toolchain nightly
-	${MAYBE_ENVIRONMENT_EXEC} bash -c " \
-		CROSS_COMPILE=x86_64-unknown-linux-musl \
-		CC=${CC_x86_64-unknown-linux-musl} \
-		CXX=${CXX_x86_64-unknown-linux-musl} \
-		LD=${CARGO_TARGET_x86_64-UNKOWNN_LINUX_MUSL_LINKER} \
-		HOST_CXX=musl-g++ \
-		HOST_CC=musl-gcc \
-		PATH+=$(MUSL_CROSS_MAKE_PATH)/bin \
-		cargo +nightly build ${MAYBE_RELEASE_FLAG} --no-default-features --features default-musl --target x86_64-unknown-linux-musl \
-	"
+	${MAYBE_ENVIRONMENT_EXEC} rustup target add x86_64-unknown-linux-musl --toolchain nightly
+	${MAYBE_ENVIRONMENT_EXEC} cargo +nightly build ${MAYBE_RELEASE_FLAG} --no-default-features --features default-musl --target x86_64-unknown-linux-musl
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: build-cross-aarch64-unknown-linux-musl
@@ -296,19 +310,17 @@ ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}: ${MUSL_CROSS_MAKE}
 .PHONY: build-aarch64-unknown-linux-musl
 build-aarch64-unknown-linux-musl: ${VECTOR_BINARY_aarch64-unknown-linux-musl} ## Build static binary in release mode for the aarch64 architecture
 
+${VECTOR_BINARY_aarch64-unknown-linux-musl}: CROSS_COMPILE=aarch64-unknown-linux-musl
+${VECTOR_BINARY_aarch64-unknown-linux-musl}: CC=${CC_aarch64-unknown-linux-musl}
+${VECTOR_BINARY_aarch64-unknown-linux-musl}: CXX=${CXX_aarch64-unknown-linux-musl}
+${VECTOR_BINARY_aarch64-unknown-linux-musl}: LD=${CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER}
+${VECTOR_BINARY_aarch64-unknown-linux-musl}: HOST_CXX=musl-g++
+${VECTOR_BINARY_aarch64-unknown-linux-musl}: HOST_CC=musl-gcc
+${VECTOR_BINARY_aarch64-unknown-linux-musl}: PATH+=${MUSL_CROSS_MAKE_PATH}/bin
 ${VECTOR_BINARY_aarch64-unknown-linux-musl}:
 	${MAYBE_ENVIRONMENT_EXEC} rustup toolchain install nightly
 	${MAYBE_ENVIRONMENT_EXEC} rustup target add aarch64-unknown-linux-musl
-	${MAYBE_ENVIRONMENT_EXEC} bash -c " \
-		CROSS_COMPILE=aarch64-unknown-linux-musl \
-		CC=${CC_aarch64-unknown-linux-musl} \
-		CXX=${CXX_aarch64-unknown-linux-musl} \
-		LD=${CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER} \
-		HOST_CXX=musl-g++ \
-		HOST_CC=musl-gcc \
-		PATH+=${MUSL_CROSS_MAKE_PATH}/bin \
-		cargo +nightly build ${MAYBE_RELEASE_FLAG} --no-default-features --features default-musl --target aarch64-unknown-linux-musl \
-	"
+	${MAYBE_ENVIRONMENT_EXEC} cargo +nightly build ${MAYBE_RELEASE_FLAG} --no-default-features --features default-musl --target aarch64-unknown-linux-musl
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 ##@ Testing (Supports `ENVIRONMENT=true`)

@@ -22,9 +22,6 @@ apt install --yes \
     ca-certificates \
     curl \
     gnupg-agent \
-    ruby-bundler \
-    nodejs \
-    npm \
     libsasl2-dev \
     gnupg2 \
     wget \
@@ -50,9 +47,6 @@ cp "${TEMP}/grease/bin/grease" /usr/bin/grease
 # Locales
 locale-gen en_US.UTF-8
 dpkg-reconfigure locales
-
-# Rust
-curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
 
 # Docker
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
