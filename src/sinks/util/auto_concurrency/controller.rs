@@ -132,31 +132,33 @@ impl<L> Controller<L> {
             in_flight: inner.in_flight as u64
         });
 
-        let rtt = inner.current_rtt.update(rtt);
-        let avg = inner.past_rtt.average();
+        let current_rtt = inner.current_rtt.update(rtt);
+        let past_rtt = inner.past_rtt.average();
 
-        if avg == 0.0 {
+        if past_rtt == 0.0 {
             // No past measurements, set up initial values.
-            inner.past_rtt.update(rtt);
-            inner.next_update = now + Duration::from_secs_f64(rtt);
-        } else if avg > 0.0 && now >= inner.next_update {
+            inner.past_rtt.update(current_rtt);
+            inner.next_update = now + Duration::from_secs_f64(current_rtt);
+        } else if past_rtt > 0.0 && now >= inner.next_update {
             #[cfg(test)]
             {
-                stats.averaged_rtt.add(rtt, now);
+                stats.averaged_rtt.add(current_rtt, now);
                 stats.concurrency_limit.add(inner.current_limit, now);
                 drop(stats); // Drop the stats lock a little earlier on this path
             }
 
             emit!(AutoConcurrencyAveragedRtt {
-                rtt: Duration::from_secs_f64(rtt)
+                rtt: Duration::from_secs_f64(current_rtt)
             });
 
-            let threshold = avg * THRESHOLD_RATIO;
+            let threshold = past_rtt * THRESHOLD_RATIO;
 
             // Back pressure responses, either explicit or implicit due
             // to increasing response times, trigger a decrease in the
             // concurrency limit.
-            if inner.current_limit > 1 && (inner.had_back_pressure || rtt >= avg + threshold) {
+            if inner.current_limit > 1
+                && (inner.had_back_pressure || current_rtt >= past_rtt + threshold)
+            {
                 // Decrease (multiplicative) the current concurrency limit
                 let to_forget = inner.current_limit / 2;
                 self.semaphore.forget_permits(to_forget);
@@ -169,7 +171,7 @@ impl<L> Controller<L> {
             else if inner.current_limit < self.max
                 && inner.reached_limit
                 && !inner.had_back_pressure
-                && rtt <= avg
+                && current_rtt <= past_rtt
             {
                 // Increase (additive) the current concurrency limit
                 self.semaphore.add_permits(1);
@@ -180,7 +182,7 @@ impl<L> Controller<L> {
             });
 
             // Reset values for next interval
-            let new_avg = inner.past_rtt.update(rtt);
+            let new_avg = inner.past_rtt.update(current_rtt);
             inner.next_update = now + Duration::from_secs_f64(new_avg);
             inner.current_rtt.reset();
             inner.had_back_pressure = false;
