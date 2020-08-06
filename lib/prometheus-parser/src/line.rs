@@ -7,13 +7,15 @@ use nom::{
     character::complete::char,
     combinator::{map, opt, value},
     error::ParseError,
-    multi::{fold_many0, separated_list},
+    multi::fold_many0,
     number::complete::double,
-    sequence::{delimited, pair, preceded, terminated, tuple},
+    sequence::{delimited, pair, preceded, tuple},
 };
 use std::collections::BTreeMap;
 
 type NomError<'a> = nom::Err<(&'a str, nom::error::ErrorKind)>;
+
+type NomErrorType<'a> = (&'a str, nom::error::ErrorKind);
 
 type IResult<'a, O> = Result<(&'a str, O), nom::Err<ParserError>>;
 
@@ -88,10 +90,54 @@ impl Metric {
         )(input)
     }
 
-    fn parse_labels_inner(input: &str) -> IResult<BTreeMap<String, String>> {
-        let (input, list) = separated_list(match_char(','), Self::parse_name_value)(input)?;
-        let (input, _) = opt(match_char(','))(input)?;
-        Ok((input, list.into_iter().collect()))
+    // Return:
+    // - Some((name, value)) => success
+    // - None => list is properly ended with "}"
+    // - Error => errors of parse_name_value
+    fn element_parser(input: &str) -> IResult<Option<(String, String)>> {
+        match Self::parse_name_value(input) {
+            Ok((input, result)) => Ok((input, Some(result))),
+            Err(nom::Err::Error(parse_name_value_error)) => match match_char('}')(input) {
+                Ok((input, _)) => Ok((input, None)),
+                Err(nom::Err::Error(_)) => Err(nom::Err::Error(parse_name_value_error)),
+                Err(failure) => Err(failure),
+            },
+            Err(failure) => Err(failure),
+        }
+    }
+
+    fn parse_labels_inner(mut input: &str) -> IResult<BTreeMap<String, String>> {
+        let sep = match_char(',');
+
+        let mut result = BTreeMap::new();
+        loop {
+            match Self::element_parser(input)? {
+                (inner_input, None) => {
+                    input = inner_input;
+                    break;
+                }
+                (inner_input, Some((name, value))) => {
+                    result.insert(name, value);
+
+                    // try matching ",", if doesn't match then
+                    // check if the list ended with "}".
+                    // If not ended then return error `expected token ','`.
+                    let inner_input = match sep(inner_input) {
+                        Ok((inner_input, _)) => inner_input,
+                        Err(sep_err) => match match_char('}')(inner_input) {
+                            Ok((inner_input, _)) => {
+                                input = inner_input;
+                                break;
+                            }
+                            Err(_) => return Err(sep_err),
+                        },
+                    };
+
+                    input = inner_input;
+                }
+            }
+        }
+        Ok((input, result))
     }
 
     /// Parse `{label_name="value",...}`
@@ -100,8 +146,8 @@ impl Metric {
 
         match opt(char('{'))(input) {
             Ok((input, None)) => Ok((input, BTreeMap::new())),
-            Ok((input, Some(_))) => terminated(Self::parse_labels_inner, match_char('}'))(input),
-            Err(e) => Err(e),
+            Ok((input, Some(_))) => Self::parse_labels_inner(input),
+            Err(failure) => Err(failure),
         }
     }
 
@@ -159,11 +205,22 @@ impl Metric {
 }
 
 impl Header {
+    fn space1(input: &str) -> IResult<()> {
+        take_while1(|c| c == ' ' || c == '\t')(input)
+            .map_err(|_: NomError| {
+                ParserError::ExpectedSpace {
+                    input: input.to_owned(),
+                }
+                .into()
+            })
+            .map(|(input, _)| (input, ()))
+    }
+
     /// `# TYPE <metric_name> <metric_type>`
     fn parse(input: &str) -> IResult<Self> {
         let input = trim_space(input);
-        let (input, _) = tag("#")(input).map_err(|_: NomError| ParserError::ExpectedToken {
-            expected: "#",
+        let (input, _) = char('#')(input).map_err(|_: NomError| ParserError::ExpectedChar {
+            expected: '#',
             input: input.to_owned(),
         })?;
         let input = trim_space(input);
@@ -171,8 +228,9 @@ impl Header {
             expected: "TYPE",
             input: input.to_owned(),
         })?;
+        let (input, _) = Self::space1(input)?;
         let (input, metric_name) = parse_name(input)?;
-        let input = trim_space(input);
+        let (input, _) = Self::space1(input)?;
         let (input, kind) = alt((
             value(MetricKind::Counter, tag("counter")),
             value(MetricKind::Gauge, tag("gauge")),
@@ -197,22 +255,34 @@ pub enum Line {
 
 impl Line {
     /// Parse a single line. Return `None` if it is a comment or an empty line.
-    fn parse_inner(input: &str) -> IResult<Option<Self>> {
+    pub fn parse(input: &str) -> Result<Option<Self>, ParserError> {
         let input = input.trim();
         if input.is_empty() {
-            return Ok((input, None));
+            return Ok(None);
         }
-        alt((
-            map(Metric::parse, |r| Some(Line::Metric(r))),
-            map(Header::parse, |r| Some(Line::Header(r))),
-            value(None, char('#')),
-        ))(input)
-    }
 
-    pub fn parse(input: &str) -> Result<Option<Self>, ParserError> {
-        Self::parse_inner(input)
-            .map(|(_, line)| line)
-            .map_err(From::from)
+        let metric_error = match Metric::parse(input) {
+            Ok((_, metric)) => {
+                return Ok(Some(Line::Metric(metric)));
+            }
+            Err(e) => e.into(),
+        };
+
+        let header_error = match Header::parse(input) {
+            Ok((_, header)) => {
+                return Ok(Some(Line::Header(header)));
+            }
+            Err(e) => e.into(),
+        };
+
+        if let Ok((input, _)) = char::<_, NomErrorType>('#')(input) {
+            if tuple::<_, _, NomErrorType, _>((sp, tag("TYPE")))(input).is_ok() {
+                return Err(header_error);
+            }
+            return Ok(None);
+        } else {
+            return Err(metric_error);
+        }
     }
 }
 
@@ -467,16 +537,19 @@ mod test {
         // We don't allow these values
 
         let input = wrap(r#"{name="value}"#);
-        let result = Metric::parse_labels(&input);
-        assert!(
-            result.is_err() && !matches!(result, Err(nom::Err::Error(ParserError::Nom { .. })))
-        );
+        let error = Metric::parse_labels(&input).unwrap_err().into();
+        println!("{}", error);
+        assert!(is_good_err(error));
 
         let input = wrap(r#"{ a="b" c="d" }"#);
-        assert!(Metric::parse_labels(&input).is_err());
+        let error = Metric::parse_labels(&input).unwrap_err().into();
+        println!("{}", error);
+        assert!(is_good_err(error));
 
         let input = wrap(r#"{ a="b" ,, c="d" }"#);
-        assert!(Metric::parse_labels(&input).is_err());
+        let error = Metric::parse_labels(&input).unwrap_err().into();
+        println!("{}", error);
+        assert!(is_good_err(error));
     }
 
     #[test]
@@ -520,5 +593,15 @@ mod test {
             rpc_duration_seconds_count 2693
             "##;
         assert!(input.lines().map(Line::parse).all(|r| r.is_ok()));
+    }
+
+    fn is_good_err(e: ParserError) -> bool {
+        match e {
+            ParserError::Nom { .. }
+            | ParserError::NomFailure
+            | ParserError::NomIncomplete
+            | ParserError::InvalidName { .. } => false,
+            _ => true,
+        }
     }
 }

@@ -15,6 +15,8 @@ pub enum ParserError {
         expected: &'static str,
         input: String,
     },
+    #[snafu(display("Expected blank space or tab, input: {:?}", input))]
+    ExpectedSpace { input: String },
     #[snafu(display("Expected token {:?}, input: {:?}", expected, input))]
     ExpectedChar { expected: char, input: String },
     #[snafu(display("Name must start with [a-zA-Z_], input: {:?}", input))]
@@ -334,5 +336,43 @@ mod test {
             rpc_duration_seconds_count 2693
             "##;
         group_metrics(input).unwrap();
+    }
+
+    fn is_good_err(e: ParserError) -> bool {
+        match e {
+            ParserError::Nom { .. }
+            | ParserError::NomFailure
+            | ParserError::NomIncomplete
+            | ParserError::InvalidName { .. } => false,
+            _ => true,
+        }
+    }
+
+    #[test]
+    fn test_errors() {
+        let input = r##"name{registry="default" content_type="html"} 1890"##;
+        let error = group_metrics(input).unwrap_err().into();
+        println!("{}", error);
+        assert!(is_good_err(error));
+
+        let input = r##"# TYPE a counte"##;
+        let error = group_metrics(input).unwrap_err().into();
+        println!("{}", error);
+        assert!(is_good_err(error));
+
+        let input = r##"# TYPEabcd asdf"##;
+        let error = group_metrics(input).unwrap_err().into();
+        println!("{}", error);
+        assert!(is_good_err(error));
+
+        let input = r##"name{registry="} 1890"##;
+        let error = group_metrics(input).unwrap_err().into();
+        println!("{}", error);
+        assert!(is_good_err(error));
+
+        let input = r##"name abcd"##;
+        let error = group_metrics(input).unwrap_err().into();
+        println!("{}", error);
+        assert!(is_good_err(error));
     }
 }
