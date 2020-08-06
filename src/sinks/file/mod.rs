@@ -19,6 +19,8 @@ use tokio::{
     io::AsyncWriteExt,
 };
 
+use async_compression::tokio_02::write::GzipEncoder;
+
 mod bytes_path;
 use bytes_path::BytesPath;
 
@@ -34,6 +36,11 @@ pub struct FileSinkConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub compression: Compression,
 }
 
 inventory::submit! {
@@ -50,6 +57,39 @@ pub enum Encoding {
 impl Default for Encoding {
     fn default() -> Self {
         Encoding::Text
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Compression {
+    Gzip,
+    None,
+}
+
+impl Default for Compression {
+    fn default() -> Self {
+        Compression::None
+    }
+}
+
+enum OutFile {
+    Regular(File),
+    Gzip(GzipEncoder<File>),
+}
+
+impl OutFile {
+    async fn shutdown(&mut self) -> Result<(), std::io::Error> {
+        match self {
+            OutFile::Regular(file) => file.shutdown().await,
+            OutFile::Gzip(gzip) => gzip.shutdown().await,
+        }
+    }
+    async fn write_all(&mut self, src: &[u8]) -> Result<(), std::io::Error> {
+        match self {
+            OutFile::Regular(file) => file.write_all(src).await,
+            OutFile::Gzip(gzip) => gzip.write_all(src).await,
+        }
     }
 }
 
@@ -76,7 +116,8 @@ pub struct FileSink {
     path: Template,
     encoding: EncodingConfigWithDefault<Encoding>,
     idle_timeout: Duration,
-    files: ExpiringHashMap<Bytes, File>,
+    files: ExpiringHashMap<Bytes, OutFile>,
+    compression: bool,
 }
 
 impl FileSink {
@@ -86,6 +127,10 @@ impl FileSink {
             encoding: config.encoding.clone(),
             idle_timeout: Duration::from_secs(config.idle_timeout_secs.unwrap_or(30)),
             files: ExpiringHashMap::default(),
+            compression: match config.compression {
+                Compression::Gzip => true,
+                Compression::None => false,
+            },
         }
     }
 
@@ -134,7 +179,7 @@ impl FileSink {
                         Some(Ok((mut expired_file, path))) => {
                             // We got an expired file. All we really want is to
                             // flush and close it.
-                            if let Err(error) = expired_file.flush().await {
+                            if let Err(error) = expired_file.shutdown().await {
                                 error!(message = "Failed to flush file.", ?path, %error);
                             }
                             drop(expired_file); // ignore close error
@@ -180,7 +225,13 @@ impl FileSink {
                     return;
                 }
             };
-            self.files.insert_at(path.clone(), file, next_deadline);
+
+            let outfile = match self.compression {
+                true => OutFile::Gzip(GzipEncoder::new(file)),
+                false => OutFile::Regular(file),
+            };
+
+            self.files.insert_at(path.clone(), outfile, next_deadline);
             self.files.get_mut(&path).unwrap()
         };
 
@@ -220,7 +271,7 @@ pub fn encode_event(encoding: &EncodingConfigWithDefault<Encoding>, mut event: E
 }
 
 async fn write_event_to_file(
-    file: &mut File,
+    file: &mut OutFile,
     event: Event,
     encoding: &EncodingConfigWithDefault<Encoding>,
 ) -> Result<(), std::io::Error> {
@@ -262,6 +313,7 @@ mod tests {
             path: template.clone().try_into().unwrap(),
             idle_timeout_secs: None,
             encoding: Encoding::Text.into(),
+            compression: Compression::None,
         };
 
         let mut sink = FileSink::new(&config);
@@ -295,6 +347,7 @@ mod tests {
             path: template.try_into().unwrap(),
             idle_timeout_secs: None,
             encoding: Encoding::Text.into(),
+            compression: Compression::None,
         };
 
         let mut sink = FileSink::new(&config);
@@ -378,6 +431,7 @@ mod tests {
             path: template.clone().try_into().unwrap(),
             idle_timeout_secs: Some(1),
             encoding: Encoding::Text.into(),
+            compression: Compression::None,
         };
 
         let mut sink = FileSink::new(&config);

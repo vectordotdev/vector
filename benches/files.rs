@@ -53,6 +53,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                         path: output.try_into().unwrap(),
                         idle_timeout_secs: None,
                         encoding: sinks::file::Encoding::Text.into(),
+                        compression: sinks::file::Compression::None,
                     },
                 );
 
