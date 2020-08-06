@@ -332,6 +332,12 @@ mod test {
         println!("{}", error);
         assert!(is_good_err(error));
 
+        let input = r##"name{registry=} 1890"##;
+        let error = group_metrics(input).unwrap_err();
+        println!("{}", error);
+        assert!(is_good_err(error));
+
+
         let input = r##"name abcd"##;
         let error = group_metrics(input).unwrap_err();
         println!("{}", error);

@@ -474,6 +474,17 @@ mod test {
             }
         );
 
+        // We allow this case
+        let input = wrap("#  TYPE abc_def counteraaaaaaaaaaa");
+        let (_, r) = Header::parse(&input).unwrap();
+        assert_eq!(
+            r,
+            Header {
+                metric_name: "abc_def".into(),
+                kind: MetricKind::Counter,
+            }
+        );
+
         let input = wrap("#TYPE \t abc_def \t gauge");
         let (left, r) = Header::parse(&input).unwrap();
         assert_eq!(left, tail);
