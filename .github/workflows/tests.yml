@@ -17,7 +17,20 @@ on:
       - "docker-compose.yml"
       - "Makefile"
       - "rust-toolchain"
-  pull_request: {}
+  pull_request:
+    paths:
+      - ".github/workflows/tests.yml"
+      - "lib/**"
+      - "proto/**"
+      - "scripts/**"
+      - "skaffold/**"
+      - "src/**"
+      - "tests/**"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "docker-compose.yml"
+      - "Makefile"
+      - "rust-toolchain"
 
 env:
   VERBOSE: true
