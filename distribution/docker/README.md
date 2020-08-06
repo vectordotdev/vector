@@ -28,7 +28,7 @@ observability data with Vector.
 
      To make changes please edit the template located at:
 
-     distribution/docker/README.md.erb.erb
+     distribution/docker/README.md.erb
 -->
 
 ## Configuring
