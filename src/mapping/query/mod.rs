@@ -3,6 +3,7 @@ use crate::{
     mapping::Result,
 };
 
+pub mod arithmetic;
 pub mod path;
 
 pub trait Function: Send + core::fmt::Debug {

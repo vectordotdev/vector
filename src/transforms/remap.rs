@@ -88,7 +88,7 @@ mod tests {
   .bar = "baz"
   .copy = .copy_from
 "#
-                .to_string(),
+            .to_string(),
             drop_on_err: true,
         };
         let mut tform = Remap::new(conf).unwrap();

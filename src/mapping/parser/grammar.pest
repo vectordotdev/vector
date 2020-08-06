@@ -50,16 +50,16 @@ query_leaf = _{ value | dot_path | group }
 
 // Deepest tier is the highest order of precedence, we call this just 'query' as
 // it'll appear in parser error messages.
-arithmetic_operator_product = _{ "*" | "/" | "%" }
+arithmetic_operator_product = { "*" | "/" | "%" }
 query = { query_leaf ~ (arithmetic_operator_product ~ query_leaf)* }
 
-arithmetic_operator_sum = _{ "+" | "-" }
+arithmetic_operator_sum = { "+" | "-" }
 query_arithmetic_sum = { query ~ (arithmetic_operator_sum ~ query)* }
 
-arithmetic_operator_compare = _{ ">" | ">=" | "<" | "<=" | "==" | "!=" }
+arithmetic_operator_compare = { ">" | ">=" | "<" | "<=" | "==" | "!=" }
 query_arithmetic_compare = { query_arithmetic_sum ~ (arithmetic_operator_compare ~ query_arithmetic_sum)* }
 
-arithmetic_operator_boolean = _{ "||" | "&&" }
+arithmetic_operator_boolean = { "||" | "&&" }
 query_arithmetic_boolean = { query_arithmetic_compare ~ (arithmetic_operator_boolean ~ query_arithmetic_compare)* }
 
 query_arithmetic = _{ query_arithmetic_boolean }

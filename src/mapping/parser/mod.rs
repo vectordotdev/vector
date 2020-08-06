@@ -4,12 +4,16 @@ use crate::{
     event::Value,
     mapping::{
         query,
-        query::{path::Path as QueryPath, Literal},
+        query::{
+            arithmetic::Arithmetic, arithmetic::Operator,
+            path::Path as QueryPath, Literal,
+        },
         Assignment, Deletion, Function, Mapping, Result,
     },
 };
 
 use pest::{
+    error::ErrorVariant,
     iterators::{Pair, Pairs},
     Parser,
 };
@@ -44,23 +48,108 @@ fn path_segments_from_pair(pair: Pair<Rule>) -> Result<Vec<Vec<String>>> {
 }
 
 fn query_arithmetic_product_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
-    // TODO
-    query_from_pair(pairs.next().unwrap())
+    let mut left = query_from_pair(pairs.next().unwrap())?;
+    let mut op = Operator::Multiply;
+
+    for pair in pairs {
+        match pair.as_rule() {
+            Rule::arithmetic_operator_product => {
+                op = match pair.as_str() {
+                    "*" => Operator::Multiply,
+                    "/" => Operator::Divide,
+                    "%" => Operator::Modulo,
+                    s => return Err(format!("operator not recognized: {}", s)),
+                };
+            }
+            _ => {
+                left = Box::new(Arithmetic::new(left, query_from_pair(pair)?, op.clone()));
+            }
+        }
+    }
+
+    Ok(left)
 }
 
 fn query_arithmetic_sum_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
-    // TODO
-    query_arithmetic_product_from_pairs(pairs.next().unwrap().into_inner())
+    let mut left = query_arithmetic_product_from_pairs(pairs.next().unwrap().into_inner())?;
+    let mut op = Operator::Add;
+
+    for pair in pairs {
+        match pair.as_rule() {
+            Rule::arithmetic_operator_sum => {
+                op = match pair.as_str() {
+                    "+" => Operator::Add,
+                    "-" => Operator::Subtract,
+                    s => return Err(format!("operator not recognized: {}", s)),
+                };
+            }
+            _ => {
+                left = Box::new(Arithmetic::new(
+                    left,
+                    query_arithmetic_product_from_pairs(pair.into_inner())?,
+                    op.clone(),
+                ));
+            }
+        }
+    }
+
+    Ok(left)
 }
 
 fn query_arithmetic_compare_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
-    // TODO
-    query_arithmetic_sum_from_pairs(pairs.next().unwrap().into_inner())
+    let mut left = query_arithmetic_sum_from_pairs(pairs.next().unwrap().into_inner())?;
+    let mut op = Operator::Equal;
+
+    for pair in pairs {
+        match pair.as_rule() {
+            Rule::arithmetic_operator_compare => {
+                op = match pair.as_str() {
+                    "==" => Operator::Equal,
+                    "!=" => Operator::NotEqual,
+                    ">" => Operator::Greater,
+                    ">=" => Operator::GreaterOrEqual,
+                    "<" => Operator::Less,
+                    "<=" => Operator::LessOrEqual,
+                    s => return Err(format!("operator not recognized: {}", s)),
+                };
+            }
+            _ => {
+                left = Box::new(Arithmetic::new(
+                    left,
+                    query_arithmetic_sum_from_pairs(pair.into_inner())?,
+                    op.clone(),
+                ));
+            }
+        }
+    }
+
+    Ok(left)
 }
 
 fn query_arithmetic_boolean_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
-    // TODO
-    query_arithmetic_compare_from_pairs(pairs.next().unwrap().into_inner())
+    let mut left = query_arithmetic_compare_from_pairs(pairs.next().unwrap().into_inner())?;
+    let mut op = Operator::And;
+
+    for pair in pairs {
+        match pair.as_rule() {
+            Rule::arithmetic_operator_boolean => {
+                op = match pair.as_str() {
+                    "||" => Operator::Or,
+                    "&&" => Operator::And,
+                    s => return Err(format!("operator not recognized: {}", s)),
+                };
+            }
+            _ => {
+                left = Box::new(Arithmetic::new(
+                    left,
+                    query_arithmetic_compare_from_pairs(pair.into_inner())?,
+                    op.clone(),
+                ));
+            }
+        }
+    }
+
+    Ok(left)
 }
 
 fn query_arithmetic_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
@@ -120,7 +209,39 @@ fn mapping_from_pairs(pairs: Pairs<Rule>) -> Result<Mapping> {
 pub fn parse(input: &str) -> Result<Mapping> {
     match MappingParser::parse(Rule::mapping, input) {
         Ok(a) => mapping_from_pairs(a),
-        Err(err) => Err(format!("mapping parse error\n{}", err)),
+        // We need to do a bit of manual pruning of the error here as any
+        // non-silent rule will be included in the list of candidates for a
+        // parse error. Since we have several different sets of arithmetic
+        // operator rules we first remove all but one type and then we rename it
+        // to a more general 'operator' rule.
+        Err(mut err) => {
+            match err.variant {
+                ErrorVariant::ParsingError {
+                    ref mut positives,
+                    negatives: _,
+                } => {
+                    let mut i = 0;
+                    while i != positives.len() {
+                        match positives[i] {
+                            Rule::arithmetic_operator_boolean
+                            | Rule::arithmetic_operator_compare
+                            | Rule::arithmetic_operator_sum => {
+                                positives.remove(i);
+                            }
+                            _ => {
+                                i += 1;
+                            }
+                        };
+                    }
+                }
+                _ => (),
+            }
+            err = err.renamed_rules(|rule| match *rule {
+                Rule::arithmetic_operator_product => "operator".to_owned(),
+                _ => format!("{:?}", rule),
+            });
+            return Err(format!("mapping parse error\n{}", err));
+        }
     }
 }
 
@@ -169,7 +290,7 @@ mod test {
 1 | .foo.bar = "baz" and this
   |                  ^---
   |
-  = expected EOI"###,
+  = expected EOI or operator"###,
             ),
             (
                 ".foo.bar = \"baz\" + ",
@@ -321,6 +442,59 @@ mod test {
                         vec!["foo", "zap"],
                         vec!["bar", "baz", "buz"],
                     ])),
+                ))]),
+            ),
+            (
+                ".foo = 5 + 15 / 10",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Arithmetic::new(
+                        Box::new(Literal::from(Value::from(5.0))),
+                        Box::new(Arithmetic::new(
+                            Box::new(Literal::from(Value::from(15.0))),
+                            Box::new(Literal::from(Value::from(10.0))),
+                            Operator::Divide,
+                        )),
+                        Operator::Add,
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = (5 + 15) / 10",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Arithmetic::new(
+                        Box::new(Arithmetic::new(
+                            Box::new(Literal::from(Value::from(5.0))),
+                            Box::new(Literal::from(Value::from(15.0))),
+                            Operator::Add,
+                        )),
+                        Box::new(Literal::from(Value::from(10.0))),
+                        Operator::Divide,
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = 1 || 2 > 3 * 4 + 5",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Arithmetic::new(
+                        Box::new(Literal::from(Value::from(1.0))),
+                        Box::new(Arithmetic::new(
+                            Box::new(Literal::from(Value::from(2.0))),
+                            Box::new(Arithmetic::new(
+                                Box::new(Arithmetic::new(
+                                    Box::new(Literal::from(Value::from(3.0))),
+                                    Box::new(Literal::from(Value::from(4.0))),
+                                    Operator::Multiply,
+                                )),
+                                Box::new(Literal::from(Value::from(5.0))),
+                                Operator::Add,
+                            )),
+                            Operator::Greater,
+                        )),
+                        Operator::Or,
+                    )),
                 ))]),
             ),
         ];
