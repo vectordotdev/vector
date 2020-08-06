@@ -32,7 +32,7 @@ export NVM_DIR="$HOME/.nvm"
 nvm install 10.19.0
 nvm use 10.19.0
 nvm alias default 10.19.0
-npm install markdownlint-cli
+npm install markdownlint-cli --global
 cd ..
 
 pip3 install jsonschema==3.2.0

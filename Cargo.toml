@@ -200,10 +200,10 @@ k8s-test-framework = { version = "0.1", path = "lib/k8s-test-framework" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["sources", "transforms", "sinks", "vendor-all", "unix", "rdkafka-plain"]
-default-musl = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "rdkafka-cmake"]
+default = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+default-musl = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["sources", "transforms", "sinks", "vendor-all", "unix", "rdkafka-cmake"]
+default-cmake = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
 default-msvc = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "rdkafka-cmake"]

@@ -51,12 +51,12 @@ export WASM_MODULES = $(patsubst tests/data/wasm/%/,%,$(wildcard tests/data/wasm
 export WASM_MODULE_OUTPUTS = $(patsubst %,/target/wasm32-wasi/%,$(WASM_MODULES))
 
 
-export CC ?= gcc
-export CXX ?= g++
-export LD ?= ldd
-export HOST_CXX ?= g++
-export HOST_CC ?= gcc
-export HOST_LD ?= ldd
+# export CC ?= gcc
+# export CXX ?= g++
+# export LD ?= ldd
+# export HOST_CXX ?= g++
+# export HOST_CC ?= gcc
+# export HOST_LD ?= ldd
 # Some cross compile builds don't have access to TCL, since it's only used in some C SASL unit tests, we just make it null.
 export TCLPATH ?= /dev/null
 # # We like cross compiles!
@@ -507,7 +507,11 @@ check-style: ## Check that all files are styled properly
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh
 
 check-markdown: ## Check that markdown is styled properly
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-markdown.sh
+	${MAYBE_ENVIRONMENT_EXEC} markdownlint \
+		--config scripts/.markdownlintrc \
+		--ignore scripts/node_modules \
+		--ignore target \
+		.
 
 check-meta: ## Check that all /.meta file are valid
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-meta.sh
@@ -516,7 +520,7 @@ check-version: ## Check that Vector's version is correct accounting for recent c
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-version.rb
 
 check-examples: ## Check that the config/examples files are valid
-	${MAYBE_ENVIRONMENT_EXEC} cargo run -- validate --topology --deny-warnings ./config/examples/*.toml
+	$(foreach EXAMPLE, $(wildcard ./config/examples/*.toml), ${MAYBE_ENVIRONMENT_EXEC} cargo run -- validate --deny-warnings ${EXAMPLE};)
 
 check-scripts: ## Check that scipts do not have common mistakes
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-scripts.sh
