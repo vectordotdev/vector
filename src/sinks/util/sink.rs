@@ -35,7 +35,7 @@
 use super::batch::{Batch, PushResult, StatefulBatch};
 use super::buffer::partition::Partition;
 use crate::buffers::Acker;
-use futures::{FutureExt, TryFutureExt};
+use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::{
     future::Either,
     stream::FuturesUnordered,
@@ -48,9 +48,8 @@ use std::{
     fmt,
     hash::Hash,
     marker::PhantomData,
-    time::Duration,
 };
-use tokio::time::delay_for;
+use tokio::time::{delay_for, Duration};
 use tokio01::executor::{DefaultExecutor, Executor};
 use tower::Service;
 use tracing_futures::Instrument;
@@ -222,12 +221,7 @@ where
             trace!("Starting new batch timer.");
             // We just inserted the first item of a new batch, so set our delay to the longest time
             // we want to allow that item to linger in the batch before being flushed.
-            let delay = delay_for(self.timeout);
-            let delay = Box::new(
-                async move { Ok::<(), Infallible>(delay.await) }
-                    .boxed()
-                    .compat(),
-            );
+            let delay = Box::new(delay_for(self.timeout).never_error().boxed().compat());
             self.linger = Some(delay);
         }
 
@@ -259,9 +253,8 @@ where
                     let batch_size = batch.num_items();
                     let request = batch.finish();
 
-                    let fut = self.service.call(request, batch_size);
-
-                    self.exec.spawn(fut).expect("Spawn service future");
+                    let fut = self.service.call(request, batch_size).compat();
+                    tokio::spawn(fut);
 
                     // Disable linger timeout
                     self.linger.take();
@@ -392,7 +385,7 @@ where
         let partition_clone = partition.clone();
 
         let delay = delay_for(self.timeout)
-            .map(|_| Ok::<(), ()>(()))
+            .unit_error()
             .boxed()
             .compat()
             .map(move |_| LingerState::Elapsed(partition_clone))
@@ -419,9 +412,9 @@ where
         } else {
             let batch_size = batch.num_items();
             let batch = batch.finish();
-            let fut = self.service.call(batch, batch_size);
 
-            self.exec.spawn(fut).expect("Spawn service future");
+            let fut = self.service.call(batch, batch_size).compat();
+            tokio::spawn(fut);
 
             self.service.poll_complete()
         }
@@ -777,14 +770,11 @@ mod tests {
     use crate::sinks::util::{
         buffer::partition::Partition, BatchSettings, EncodedLength, VecBuffer,
     };
-    use crate::test_util::runtime;
+    use crate::test_util::{basic_scheduler_block_on_std, runtime};
     use bytes::Bytes;
     use futures01::{future, Sink};
-    use std::{
-        sync::{atomic::Ordering::Relaxed, Arc, Mutex},
-        time::Duration,
-    };
-    use tokio01_test::clock::MockClock;
+    use std::sync::{atomic::Ordering::Relaxed, Arc, Mutex};
+    use tokio::task::yield_now;
 
     const TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -794,100 +784,73 @@ mod tests {
         }
     }
 
-    #[test]
-    fn batch_sink_acking_sequential() {
-        let rt = runtime();
+    async fn advance_time(duration: Duration) {
+        tokio::time::pause();
+        tokio::time::advance(duration).await;
+        tokio::time::resume();
+    }
 
-        let mut clock = MockClock::new();
-
+    #[tokio::test(core_threads = 2)]
+    async fn batch_sink_acking_sequential() {
         let (acker, ack_counter) = Acker::new_for_testing();
 
-        let batch = BatchSettings::default().events(10).bytes(9999);
         let svc = tower::service_fn(|_| future::ok::<_, std::io::Error>(()));
-        let buffered = BatchSink::with_executor(
-            svc,
-            VecBuffer::new(batch.size),
-            TIMEOUT,
-            acker,
-            rt.executor(),
-        );
+        let batch = BatchSettings::default().events(10).bytes(9999);
+        let buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
-        let _ = clock.enter(|_| {
-            buffered
-                .sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(0..22))
-                .wait()
-                .unwrap()
-        });
+        let _ = buffered
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(0..22))
+            .wait()
+            .unwrap();
 
         assert_eq!(ack_counter.load(Relaxed), 22);
     }
 
     #[test]
     fn batch_sink_acking_unordered() {
-        // We need a mock executor here because we need to ensure
-        // that we poll the service futures within the mock clock
-        // context. This allows us to manually advance the time on the
-        // "spawned" futures.
-        let mut exec = MockExec::default();
-        let mut clock = MockClock::new();
+        basic_scheduler_block_on_std(async {
+            // Services future will be spawned and work between `yield_now` calls.
+            let (acker, ack_counter) = Acker::new_for_testing();
 
-        let (acker, ack_counter) = Acker::new_for_testing();
+            let svc = tower::service_fn(|req: Vec<usize>| {
+                let duration = match req[0] {
+                    0 => Duration::from_secs(1),
+                    1 => Duration::from_secs(1),
+                    2 => Duration::from_secs(1),
 
-        let svc = tower::service_fn(|req: Vec<usize>| {
-            let duration = match req[0] {
-                0 => Duration::from_secs(1),
-                1 => Duration::from_secs(1),
-                2 => Duration::from_secs(1),
+                    // The 4th request will introduce some sort of
+                    // latency spike to ensure later events don't
+                    // get acked.
+                    3 => Duration::from_secs(5),
+                    4 => Duration::from_secs(1),
+                    5 => Duration::from_secs(1),
+                    _ => unreachable!(),
+                };
 
-                // The 4th request will introduce some sort of
-                // latency spike to ensure later events don't
-                // get acked.
-                3 => Duration::from_secs(5),
-                4 => Duration::from_secs(1),
-                5 => Duration::from_secs(1),
-                _ => unreachable!(),
-            };
+                delay_for(duration).never_error().boxed().compat().map(drop)
+            });
 
-            delay_for(duration)
-                .map(|_| Ok::<(), Infallible>(()))
-                .boxed()
-                .compat()
-                .map(drop)
-        });
+            let batch = BatchSettings::default().bytes(9999).events(1);
 
-        let batch = BatchSettings::default().bytes(9999).events(1);
+            let mut sink = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
-        let mut sink = BatchSink::with_executor(
-            svc,
-            VecBuffer::new(batch.size),
-            TIMEOUT,
-            acker,
-            exec.clone(),
-        );
-
-        let _ = clock.enter(|handle| {
             assert!(sink.start_send(0).unwrap().is_ready());
             assert!(sink.start_send(1).unwrap().is_ready());
+            assert!(sink.start_send(2).unwrap().is_ready());
 
             assert_eq!(ack_counter.load(Relaxed), 0);
 
-            handle.advance(Duration::from_secs(2));
+            advance_time(Duration::from_secs(3)).await;
 
             // We must first poll so that we send the messages
-            // then we must pull the mock executor to set the timers
-            // then poll again to ack.
+            // then we must yield and then poll again to ack.
             sink.poll_complete().unwrap();
-            exec.poll().unwrap();
+            yield_now().await;
             sink.poll_complete().unwrap();
-
-            assert_eq!(ack_counter.load(Relaxed), 2);
-
-            assert!(sink.start_send(2).unwrap().is_ready());
-
+            yield_now().await;
             sink.poll_complete().unwrap();
-            exec.poll().unwrap();
-            sink.poll_complete().unwrap();
+            yield_now().await;
 
             assert_eq!(ack_counter.load(Relaxed), 3);
 
@@ -895,30 +858,28 @@ mod tests {
             assert!(sink.start_send(4).unwrap().is_ready());
             assert!(sink.start_send(5).unwrap().is_ready());
 
-            handle.advance(Duration::from_secs(2));
+            advance_time(Duration::from_secs(2)).await;
 
             sink.poll_complete().unwrap();
-            exec.poll().unwrap();
+            yield_now().await;
             sink.poll_complete().unwrap();
+            yield_now().await;
 
             // Check that events 3,4,6 have not been acked yet
             // only the three previous should be acked.
             assert_eq!(ack_counter.load(Relaxed), 3);
 
-            handle.advance(Duration::from_secs(5));
+            advance_time(Duration::from_secs(5)).await;
 
-            exec.poll().unwrap();
+            yield_now().await;
             sink.flush().wait().unwrap();
 
             assert_eq!(ack_counter.load(Relaxed), 6);
         });
     }
 
-    #[test]
-    fn batch_sink_buffers_messages_until_limit() {
-        let rt = runtime();
-        let mut clock = MockClock::new();
-
+    #[tokio::test(core_threads = 2)]
+    async fn batch_sink_buffers_messages_until_limit() {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
@@ -930,21 +891,13 @@ mod tests {
             future::ok::<_, std::io::Error>(())
         });
         let batch = BatchSettings::default().bytes(9999).events(10);
-        let buffered = BatchSink::with_executor(
-            svc,
-            VecBuffer::new(batch.size),
-            TIMEOUT,
-            acker,
-            rt.executor(),
-        );
+        let buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
-        let _ = clock.enter(|_| {
-            buffered
-                .sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(0..22))
-                .wait()
-                .unwrap()
-        });
+        let _ = buffered
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(0..22))
+            .wait()
+            .unwrap();
 
         let output = sent_requests.lock().unwrap();
         assert_eq!(
@@ -957,36 +910,24 @@ mod tests {
         );
     }
 
-    #[test]
-    fn batch_sink_flushes_below_min_on_close() {
-        let rt = runtime();
-        let mut clock = MockClock::new();
-
+    #[tokio::test(core_threads = 2)]
+    async fn batch_sink_flushes_below_min_on_close() {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
             let sent_requests = Arc::clone(&sent_requests);
-
             sent_requests.lock().unwrap().push(req);
-
             future::ok::<_, std::io::Error>(())
         });
+
         let batch = BatchSettings::default().bytes(9999).events(10);
-        let mut buffered = BatchSink::with_executor(
-            svc,
-            VecBuffer::new(batch.size),
-            TIMEOUT,
-            acker,
-            rt.executor(),
-        );
+        let mut buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
-        clock.enter(|_| {
-            assert!(buffered.start_send(0).unwrap().is_ready());
-            assert!(buffered.start_send(1).unwrap().is_ready());
+        assert!(buffered.start_send(0).unwrap().is_ready());
+        assert!(buffered.start_send(1).unwrap().is_ready());
 
-            future::poll_fn(|| buffered.close()).wait().unwrap()
-        });
+        future::poll_fn(|| buffered.close()).wait().unwrap();
 
         let output = sent_requests.lock().unwrap();
         assert_eq!(&*output, &vec![vec![0, 1]]);
@@ -994,63 +935,47 @@ mod tests {
 
     #[test]
     fn batch_sink_expired_linger() {
-        let rt = runtime();
-        let mut clock = MockClock::new();
+        basic_scheduler_block_on_std(async {
+            let (acker, _) = Acker::new_for_testing();
+            let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
-        let (acker, _) = Acker::new_for_testing();
-        let sent_requests = Arc::new(Mutex::new(Vec::new()));
+            let svc = tower::service_fn(|req| {
+                let sent_requests = Arc::clone(&sent_requests);
+                sent_requests.lock().unwrap().push(req);
+                future::ok::<_, std::io::Error>(())
+            });
 
-        let svc = tower::service_fn(|req| {
-            let sent_requests = Arc::clone(&sent_requests);
+            let batch = BatchSettings::default().bytes(9999).events(10);
+            let mut buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
-            sent_requests.lock().unwrap().push(req);
-
-            future::ok::<_, std::io::Error>(())
-        });
-        let batch = BatchSettings::default().bytes(9999).events(10);
-        let mut buffered = BatchSink::with_executor(
-            svc,
-            VecBuffer::new(batch.size),
-            TIMEOUT,
-            acker,
-            rt.executor(),
-        );
-
-        clock.enter(|handle| {
             assert!(buffered.start_send(0).unwrap().is_ready());
             assert!(buffered.start_send(1).unwrap().is_ready());
 
             // Move clock forward by linger timeout + 1 sec
-            handle.advance(TIMEOUT + Duration::from_secs(1));
+            advance_time(TIMEOUT + Duration::from_secs(1)).await;
 
-            future::poll_fn(|| buffered.poll_complete()).wait().unwrap();
+            while buffered.poll_complete().unwrap() == Async::NotReady {
+                yield_now().await;
+            }
+
+            let output = sent_requests.lock().unwrap();
+            assert_eq!(&*output, &vec![vec![0, 1]]);
         });
-
-        let output = sent_requests.lock().unwrap();
-        assert_eq!(&*output, &vec![vec![0, 1]]);
     }
 
-    #[test]
-    fn partition_batch_sink_buffers_messages_until_limit() {
-        let rt = runtime();
+    #[tokio::test(core_threads = 2)]
+    async fn partition_batch_sink_buffers_messages_until_limit() {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
             let sent_requests = Arc::clone(&sent_requests);
-
             sent_requests.lock().unwrap().push(req);
-
             future::ok::<_, std::io::Error>(())
         });
+
         let batch = BatchSettings::default().bytes(9999).events(10);
-        let buffered = PartitionBatchSink::with_executor(
-            svc,
-            VecBuffer::new(batch.size),
-            TIMEOUT,
-            acker,
-            rt.executor(),
-        );
+        let buffered = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
         let (_buffered, _) = buffered
             .sink_map_err(drop)
@@ -1069,32 +994,21 @@ mod tests {
         );
     }
 
-    #[test]
-    fn partition_batch_sink_buffers_by_partition_buffer_size_one() {
-        let rt = runtime();
+    #[tokio::test(core_threads = 2)]
+    async fn partition_batch_sink_buffers_by_partition_buffer_size_one() {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
             let sent_requests = Arc::clone(&sent_requests);
-
             sent_requests.lock().unwrap().push(req);
-
             future::ok::<_, std::io::Error>(())
         });
 
         let batch = BatchSettings::default().bytes(9999).events(1);
-
-        let buffered = PartitionBatchSink::with_executor(
-            svc,
-            VecBuffer::new(batch.size),
-            TIMEOUT,
-            acker,
-            rt.executor(),
-        );
+        let buffered = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
         let input = vec![Partitions::A, Partitions::B];
-
         let (_buffered, _) = buffered
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(input))
@@ -1106,32 +1020,21 @@ mod tests {
         assert_eq!(&*output, &vec![vec![Partitions::A], vec![Partitions::B]]);
     }
 
-    #[test]
-    fn partition_batch_sink_buffers_by_partition_buffer_size_two() {
-        let rt = runtime();
+    #[tokio::test(core_threads = 2)]
+    async fn partition_batch_sink_buffers_by_partition_buffer_size_two() {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
             let sent_requests = Arc::clone(&sent_requests);
-
             sent_requests.lock().unwrap().push(req);
-
             future::ok::<_, std::io::Error>(())
         });
 
         let batch = BatchSettings::default().bytes(9999).events(2);
-
-        let buffered = PartitionBatchSink::with_executor(
-            svc,
-            VecBuffer::new(batch.size),
-            TIMEOUT,
-            acker,
-            rt.executor(),
-        );
+        let buffered = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
         let input = vec![Partitions::A, Partitions::B, Partitions::A, Partitions::B];
-
         let (_buffered, _) = buffered
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(input))
@@ -1151,55 +1054,46 @@ mod tests {
 
     #[test]
     fn partition_batch_sink_submits_after_linger() {
-        let mut clock = MockClock::new();
-        let rt = runtime();
-        let (acker, _) = Acker::new_for_testing();
-        let sent_requests = Arc::new(Mutex::new(Vec::new()));
+        basic_scheduler_block_on_std(async {
+            let (acker, _) = Acker::new_for_testing();
+            let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
-        let svc = tower::service_fn(|req| {
-            let sent_requests = Arc::clone(&sent_requests);
+            let svc = tower::service_fn(|req| {
+                let sent_requests = Arc::clone(&sent_requests);
+                sent_requests.lock().unwrap().push(req);
+                future::ok::<_, std::io::Error>(())
+            });
 
-            sent_requests.lock().unwrap().push(req);
+            let batch = BatchSettings::default().bytes(9999).events(10);
+            let mut buffered =
+                PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
-            future::ok::<_, std::io::Error>(())
-        });
-
-        let batch = BatchSettings::default().bytes(9999).events(10);
-        let mut buffered = PartitionBatchSink::with_executor(
-            svc,
-            VecBuffer::new(batch.size),
-            TIMEOUT,
-            acker,
-            rt.executor(),
-        );
-
-        clock.enter(|handle| {
             buffered.start_send(1 as usize).unwrap();
             buffered.poll_complete().unwrap();
 
-            handle.advance(Duration::from_secs(11));
+            advance_time(TIMEOUT + Duration::from_secs(1)).await;
 
-            buffered.poll_complete().unwrap();
+            while buffered.poll_complete().unwrap() == Async::NotReady {
+                yield_now().await;
+            }
+
+            let output = sent_requests.lock().unwrap();
+            assert_eq!(&*output, &vec![vec![1]]);
         });
-
-        let output = sent_requests.lock().unwrap();
-        assert_eq!(&*output, &vec![vec![1]]);
     }
 
     #[test]
     fn service_sink_doesnt_propagate_error() {
-        // We need a mock executor here because we need to ensure
-        // that we poll the service futures within the mock clock
-        // context. This allows us to manually advance the time on the
-        // "spawned" futures.
-        let (acker, ack_counter) = Acker::new_for_testing();
+        runtime().block_on_std(async {
+            // We need a mock executor here because we need to ensure
+            // that we poll the service futures within the mock clock
+            // context. This allows us to manually advance the time on the
+            // "spawned" futures.
+            let (acker, ack_counter) = Acker::new_for_testing();
 
-        let svc = tower::service_fn(|req: u8| if req == 3 { Err("bad") } else { Ok("good") });
+            let svc = tower::service_fn(|req: u8| if req == 3 { Err("bad") } else { Ok("good") });
+            let mut sink = ServiceSink::new(svc, acker);
 
-        let mut sink = ServiceSink::new(svc, acker);
-
-        let mut clock = MockClock::new();
-        clock.enter(|_handle| {
             // send some initial requests
             let mut fut1 = sink.call(1, 1);
             let mut fut2 = sink.call(2, 2);
@@ -1222,47 +1116,6 @@ mod tests {
             assert!(sink.poll_complete().unwrap().is_ready());
             assert_eq!(ack_counter.load(Relaxed), 10);
         });
-    }
-
-    #[derive(Default, Clone)]
-    struct MockExec(
-        Arc<
-            Mutex<
-                Vec<(
-                    Box<dyn Future<Item = (), Error = ()> + Send + 'static>,
-                    bool,
-                )>,
-            >,
-        >,
-    );
-
-    impl tokio01::executor::Executor for MockExec {
-        fn spawn(
-            &mut self,
-            fut: Box<dyn Future<Item = (), Error = ()> + Send + 'static>,
-        ) -> Result<(), tokio01::executor::SpawnError> {
-            let mut futs = self.0.lock().unwrap();
-            Ok(futs.push((fut, false)))
-        }
-    }
-
-    impl MockExec {
-        pub fn poll(&mut self) -> futures01::Poll<(), ()> {
-            let mut futs = self.0.lock().unwrap();
-
-            for (fut, is_done) in &mut *futs {
-                if !*is_done {
-                    if let Async::Ready(_) = fut.poll()? {
-                        *is_done = true;
-                    }
-                }
-            }
-
-            // XXX: We don't really use this beyond polling a group
-            // of futures, it is expected that the user manually keeps
-            // polling this. Its not very useful but it works for now.
-            Ok(Async::Ready(()))
-        }
     }
 
     #[derive(Debug, PartialEq, Eq, Ord, PartialOrd)]
