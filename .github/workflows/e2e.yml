@@ -53,73 +53,62 @@ jobs:
           path: target/artifacts/*
 
   # Github Actions don't support `matrix` at the job-level `if:` condition.
-  # We apply this workaround for now: instead of using matrices, we split our
-  # job in two.
+  # We apply this workaround - compute `matrix` in a preceding job, and assign
+  # it's value dynamically at the actual test job.
+  # This approach can be advanced further by, for instance, dynamically
+  # detecting versions of various components, or reading them from `.meta`.
   # See https://github.community/t/feature-request-and-use-case-example-to-allow-matrix-in-if-s/126067
-  # TODO: merge the K8s E2E jobs and switch to job-level `if:` when the issue
-  # with `matrix` usage is fixed.
-  # This can also be simplified when composite actions are implemented.
-  # See https://github.com/actions/runner/blob/main/docs/adrs/0549-composite-run-steps.md
-  test-e2e-kubernetes-essential:
-    name: K8s ${{ matrix.kubernetes_version }} / ${{ matrix.container_runtime }} (essential)
+  compute-k8s-test-plan:
     runs-on: ubuntu-latest
-    needs:
-      - build-deb-package
-    strategy:
-      matrix:
-        minikube_version:
-          - "v1.11.0" # https://github.com/kubernetes/minikube/issues/8799
-        kubernetes_version:
-          - "v1.18.6"
-        container_runtime:
-          - docker
-          - containerd
-          - crio
-      fail-fast: false
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - uses: actions/download-artifact@v2
+      - uses: actions/github-script@v2
         with:
-          name: e2e-test-deb-package
-          path: target/artifacts
-      - name: Setup Minikube
-        run: scripts/ci-setup-minikube.sh
-        env:
-          KUBERNETES_VERSION: ${{ matrix.kubernetes_version }}
-          MINIKUBE_VERSION: ${{ matrix.minikube_version }}
-          CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
-      - run: USE_CONTAINER=none make slim-builds
-      - run: make test-e2e-kubernetes
-        env:
-          USE_MINIKUBE_CACHE: "true"
-          SKIP_PACKAGE_DEB: "true"
+          script: |
+            // Parameters.
+            const minikube_version = [
+              "v1.11.0", // https://github.com/kubernetes/minikube/issues/8799
+            ]
+            const kubernetes_version = [
+              { version: "v1.18.6", is_essential: true },
+              { version: "v1.17.9" },
+              { version: "v1.16.12" }, // v1.16.13 is broken, see https://github.com/kubernetes/minikube/issues/8840
+              { version: "v1.15.12" },
+              { version: "v1.14.10" },
+            ]
+            const container_runtime = [
+              "docker",
+              "containerd",
+              "crio",
+            ]
+            const ci_condition_label = 'ci-condition: k8s e2e all targets'
 
-  test-e2e-kubernetes-extra:
-    name: K8s ${{ matrix.kubernetes_version }} / ${{ matrix.container_runtime }} (extra)
+            // Planing.
+            const is_in_pull_request = !!context.payload.pull_request;
+            const should_test_all_targets = (
+              !is_in_pull_request ||
+              context.payload.pull_request.labels.some(label => label.name === ci_condition_label)
+            )
+            const filter_targets = array => array.filter(val => should_test_all_targets || val.is_essential)
+
+            const matrix = {
+              minikube_version,
+              kubernetes_version: filter_targets(kubernetes_version).map(e => ({
+                version: e.version,
+                role: e.is_essential ? "essential" : "extra",
+              })),
+              container_runtime,
+            }
+            core.setOutput('matrix', JSON.stringify(matrix))
+
+  test-e2e-kubernetes:
+    name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime }} (${{ matrix.kubernetes_version.role }})
     runs-on: ubuntu-latest
     needs:
       - build-deb-package
+      - compute-k8s-test-plan
     strategy:
-      matrix:
-        minikube_version:
-          - "v1.11.0" # https://github.com/kubernetes/minikube/issues/8799
-        kubernetes_version:
-          - "v1.17.9"
-          - "v1.16.12" # v1.16.13 is broken, see https://github.com/kubernetes/minikube/issues/8840
-          - "v1.15.12"
-          - "v1.14.10"
-        container_runtime:
-          - docker
-          - containerd
-          - crio
+      matrix: ${{ fromJson(needs.compute-k8s-test-plan.outputs.matrix) }}
       fail-fast: false
-    # See TODO above.
-    # Run if we're either not in a PR context, or the PR has the opting-in label
-    # assigned.
-    if: |
-      github.event.pull_request == null ||
-      contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -130,7 +119,7 @@ jobs:
       - name: Setup Minikube
         run: scripts/ci-setup-minikube.sh
         env:
-          KUBERNETES_VERSION: ${{ matrix.kubernetes_version }}
+          KUBERNETES_VERSION: ${{ matrix.kubernetes_version.version }}
           MINIKUBE_VERSION: ${{ matrix.minikube_version }}
           CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
       - run: USE_CONTAINER=none make slim-builds
