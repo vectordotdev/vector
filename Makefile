@@ -67,6 +67,7 @@ export PKG_CONFIG_ALL_STATIC ?= true
 export LIBZ_SYS_STATIC ?= 1
 # In case it didn't get the memo
 export OPENSSL_STATIC ?= 1
+export SASL2_STATIC ?= 1
 export CROSS_COMPILE ?= true
 
 # In the environment, we have an established structure. Otherwise, configure it where you please! Absolute paths only.

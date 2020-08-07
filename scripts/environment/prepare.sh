@@ -3,16 +3,16 @@ set -e -o verbose
 
 WORKDIR=$(pwd)
 
-# curl https://sh.rustup.rs -sSf | sh -s -- -y
-# source $HOME/.cargo/env
+curl https://sh.rustup.rs -sSf | sh -s -- -y
+source $HOME/.cargo/env
 
-# rustup target add wasm32-wasi
-# rustup toolchain install nightly --target x86_64-unknown-linux-musl
-# rustup toolchain install nightly --target armv7-unknown-linux-musleabihf
-# rustup toolchain install nightly --target aarch64-unknown-linux-musl
-# rustup component add rustfmt
-# rustup component add clippy
-# rustup default "$(cat rust-toolchain)"
+rustup target add wasm32-wasi
+rustup toolchain install nightly --target x86_64-unknown-linux-musl
+rustup toolchain install nightly --target armv7-unknown-linux-musleabihf
+rustup toolchain install nightly --target aarch64-unknown-linux-musl
+rustup component add rustfmt
+rustup component add clippy
+rustup default "$(cat rust-toolchain)"
 
 # Ruby toolchain
 export PATH="${HOME}/.rbenv/bin:${HOME}/.rbenv/shims:${PATH}"
