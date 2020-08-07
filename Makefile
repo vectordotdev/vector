@@ -96,7 +96,6 @@ export CFLAGS_x86_64-unknown-linux-musl ?= -target x86_64-unknown-linux-musl -fP
 export CXXFLAGS_x86_64-unknown-linux-musl ?= ${CFLAGS_x86_64-unknown-linux-musl} -static -nostdlib -nostdinc++ -lstdc++  -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/bits
 export LDFLAGS_x86_64-unknown-linux-musl ?= -static -nostdlib -nostdinc -nostdinc++ -nostartfiles -isystem ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-unknown-linux-musl/bits -lresolv -lc -lstdc++ -lgcc
 
-
 export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-unknown-linux-musl-cc
 export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc -C link-arg=-lstdc++ -C link-arg=-lresolv -C link-arg=-lc
 export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTC_LINK_LIB ?= static=gcc static=stdc++ static=resolv static=c static=c++ static=c++abi static=unwind
@@ -108,7 +107,6 @@ export LD_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-unkn
 export CFLAGS_aarch64-unknown-linux-musl ?= -target aarch64-unknown-linux-musl -fPIC -nostdlib -nostdinc -nostartfiles -isystem ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/ -lresolv -lc -lgcc
 export CXXFLAGS_aarch64-unknown-linux-musl ?= ${CFLAGS_aarch64-unknown-linux-musl} -static -nostdlib -nostdinc++ -lstdc++  -I${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/c++/9.2.0/aarch64-linux-musl/ -I${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/c++/9.2.0/aarch64-linux-musl/bits
 export LDFLAGS_aarch64-unknown-linux-musl ?= -static -nostdlib -nostdinc -nostdinc++ -nostartfiles -isystem ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/ -I${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/c++/9.2.0/aarch64-linux-musl/ -I${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/c++/9.2.0/aarch64-unknown-linux-musl/bits -lresolv -lc -lstdc++ -lgcc
-
 
  # Deprecated.
 export USE_CONTAINER ?= $(CONTAINER_TOOL)
@@ -279,12 +277,12 @@ environment-clean: ## Clean the Vector dev shell using $CONTAINER_TOOL.
 environment-push: environment-prepare ## Publish a new version of the container image.
 	$(CONTAINER_TOOL) push $(ENVIRONMENT_UPSTREAM)
 
-##@ Building
-build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
+##@ Building (Supports `ENVIRONMENT=true`)
+build: ## Build the project in release mode
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${DEFAULT_FEATURES}
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
-build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`)
+build-dev: ## Build the project in development mode
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features ${DEFAULT_FEATURES}
 
 build-all: build-x86_64-unknown-linux-gnu build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
