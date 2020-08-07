@@ -15,7 +15,7 @@ use std::{
 ///  - Invalid config, caused either by user or by data race.
 ///  - Frequent changes, caused by user/editor modifying/saving file in small chunks.
 /// so we can use smaller, more responsive delay.
-pub const CONFIG_WATCH_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
+const CONFIG_WATCH_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
 
 #[cfg(unix)]
 const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
@@ -25,7 +25,13 @@ const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 /// Has best effort guarante of detecting all file changes from the end of
 /// this function until the main thread stops.
 #[cfg(unix)]
-pub fn config_watcher(config_paths: Vec<PathBuf>, delay: Duration) -> Result<(), Error> {
+pub fn spawn_thread(
+    config_paths: &[PathBuf],
+    delay: impl Into<Option<Duration>>,
+) -> Result<(), Error> {
+    let config_paths = config_paths.to_vec();
+    let delay = delay.into().unwrap_or(CONFIG_WATCH_DELAY);
+
     // Create watcher now so not to miss any changes happening between
     // returning from this function and the thread starting.
     let mut watcher = Some(create_watcher(&config_paths)?);
@@ -76,7 +82,10 @@ pub fn config_watcher(config_paths: Vec<PathBuf>, delay: Duration) -> Result<(),
 
 #[cfg(windows)]
 /// Errors on Windows.
-pub fn config_watcher(_config_paths: Vec<PathBuf>, _delay: Duration) -> Result<(), Error> {
+pub fn spawn_thread(
+    _config_paths: &[PathBuf],
+    _delay: impl Into<Option<Duration>>,
+) -> Result<(), Error> {
     Err("Reloading config on Windows isn't currently supported. Related issue https://github.com/timberio/vector/issues/938 .".into())
 }
 

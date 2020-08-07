@@ -94,11 +94,7 @@ fn main() {
 
         if opts.watch_config {
             // Start listening for config changes immediately.
-            vector::topology::config::watcher::config_watcher(
-                config_paths.clone(),
-                vector::topology::config::watcher::CONFIG_WATCH_DELAY,
-            )
-            .unwrap_or_else(|error| {
+            config::watcher::spawn_thread(&config_paths, None).unwrap_or_else(|error| {
                 error!(message = "Unable to start config watcher.", %error);
                 std::process::exit(exitcode::CONFIG);
             });

@@ -3,6 +3,8 @@ use lazy_static::lazy_static;
 use once_cell::sync::OnceCell;
 use std::path::PathBuf;
 
+pub mod watcher;
+
 lazy_static! {
     pub static ref DEFAULT_CONFIG_PATHS: Vec<PathBuf> = vec!["/etc/vector/vector.toml".into()];
 }
