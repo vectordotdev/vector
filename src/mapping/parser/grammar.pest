@@ -56,7 +56,7 @@ query = { query_leaf ~ (arithmetic_operator_product ~ query_leaf)* }
 arithmetic_operator_sum = { "+" | "-" }
 query_arithmetic_sum = { query ~ (arithmetic_operator_sum ~ query)* }
 
-arithmetic_operator_compare = { ">" | ">=" | "<" | "<=" | "==" | "!=" }
+arithmetic_operator_compare = { ">=" | ">" | "<=" | "<" | "!=" | "==" }
 query_arithmetic_compare = { query_arithmetic_sum ~ (arithmetic_operator_compare ~ query_arithmetic_sum)* }
 
 arithmetic_operator_boolean = { "||" | "&&" }

@@ -4,10 +4,7 @@ use crate::{
     event::Value,
     mapping::{
         query,
-        query::{
-            arithmetic::Arithmetic, arithmetic::Operator,
-            path::Path as QueryPath, Literal,
-        },
+        query::{arithmetic::Arithmetic, arithmetic::Operator, path::Path as QueryPath, Literal},
         Assignment, Deletion, Function, Mapping, Result,
     },
 };

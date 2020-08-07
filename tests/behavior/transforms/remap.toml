@@ -1,0 +1,101 @@
+[transforms.remap_nested]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a.b = 123
+    .x.y = 456
+    .x.z = 789
+  """
+[[tests]]
+  name = "remap_nested"
+  [tests.input]
+    insert_at = "remap_nested"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_nested"
+    [[tests.outputs.conditions]]
+      "a.b.equals" = 123
+      "x.y.equals" = 456
+      "x.z.equals" = 789
+
+[transforms.remap_array]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a[0] = 0
+    .a[1] = "1"
+    .a[2] = 2.0
+    .b[2] = "two"
+    .b[0] = 0
+  """
+[[tests]]
+  name = "remap_array"
+  [tests.input]
+    insert_at = "remap_array"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_array"
+    [[tests.outputs.conditions]]
+      "a[0].equals" = 0
+      "a[1].equals" = "1"
+      "a[2].equals" = 2.0
+
+      "b[0].equals" = 0
+      "b[1].equals" = "<null>"
+      "b[2].equals" = "two"
+
+[transforms.remap_arithmetic]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .result_a = .a * .b + .c - .d
+    .result_b = .a * (.b + .c) - .d
+    .result_c = .a + .b * .c / .d
+    .result_d = (.a + .b) * (.c / .d)
+  """
+[[tests]]
+  name = "remap_arithmetic"
+  [tests.input]
+    insert_at = "remap_arithmetic"
+    type = "log"
+    [tests.input.log_fields]
+      a = 3
+      b = 7
+      c = 12
+      d = 6
+  [[tests.outputs]]
+    extract_from = "remap_arithmetic"
+    [[tests.outputs.conditions]]
+      "result_a.equals" = 27
+      "result_b.equals" = 51
+      "result_c.equals" = 17
+      "result_d.equals" = 20
+
+[transforms.remap_boolean_arithmetic]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .result_a = .a + .b > 9
+    .result_b = .a * .b < 20
+    .result_c = 1 >= .a / .b
+    .result_d = .a + .b > .c + .d
+  """
+[[tests]]
+  name = "remap_boolean_arithmetic"
+  [tests.input]
+    insert_at = "remap_boolean_arithmetic"
+    type = "log"
+    [tests.input.log_fields]
+      a = 3
+      b = 7
+      c = 12
+      d = 6
+  [[tests.outputs]]
+    extract_from = "remap_boolean_arithmetic"
+    [[tests.outputs.conditions]]
+      "result_a.equals" = true
+      "result_b.equals" = false
+      "result_c.equals" = true
+      "result_d.equals" = false
