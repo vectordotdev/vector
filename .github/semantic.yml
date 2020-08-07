@@ -27,13 +27,16 @@ scopes:
   - config
   - data model
   - deps
+  - compression
   - dev
+  - enriching
   - guides
   - external docs
   - internal docs
   - extensions
   - healthchecks
   - logs
+  - mapping
   - marketing
   - metrics
   - observability
