@@ -5,11 +5,11 @@ RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/scripts/r
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export OPERATING_SYSTEM := Windows
-	export RUST_TARGET ?= "x86_64-unknown-windows-msvc"
+	export HOST ?= "x86_64-unknown-windows-msvc"
     export DEFAULT_FEATURES = default-msvc
 else
     export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
-	export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
+	export HOST ?= "x86_64-unknown-linux-gnu"
     export DEFAULT_FEATURES = default
 	export NUM_CPUS=$(awk '/^processor/ { N++} END { print N }' /proc/cpuinfo)
 endif
@@ -78,20 +78,20 @@ export MUSL_CROSS_MAKE ?= ${abspath scripts/environment/cross}
 endif
 
 export MUSL_CROSS_MAKE_PATH ?= ${MUSL_CROSS_MAKE}/output
-export MUSL_CROSS_MAKE_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/x86_64-linux-musl
-export MUSL_CROSS_MAKE_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/aarch64-linux-musl
+export MUSL_CROSS_MAKE_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/x86_64-unknown-linux-musl
+export MUSL_CROSS_MAKE_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/aarch64-unknown-linux-musl
 
-export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-cc
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-unknown-linux-musl-cc
 export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc -C link-arg=-lstdc++ -C link-arg=-lresolv -C link-arg=-lc
 export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL__RUSTC_LINK_LIB ?= static=gcc static=stdc++ static=resolv static=c static=c++ static=c++abi static=unwind
 export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL__RUSTC_LINK_SEARCH ?= ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/ ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/
-export CC_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-gcc
-export CXX_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-g++
-export AR_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-ar
-export LD_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-linux-musl-ld
-export CFLAGS_x86_64-unknown-linux-musl ?= -nostdinc -isystem ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/
-export CXXFLAGS_x86_64-unknown-linux-musl ?= ${CFLAGS_x86_64-unknown-linux-musl} -nostdinc++ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/bits
-export LDFLAGS_x86_64-unknown-linux-musl ?= -static -nostdinc -nostdinc++ -nostartfiles -isystem ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/ -lresolv -lc
+export CC_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-unknown-linux-musl-gcc
+export CXX_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-unknown-linux-musl-g++
+export AR_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-unknown-linux-musl-ar
+export LD_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-unknown-linux-musl-ld
+export CFLAGS_x86_64-unknown-linux-musl ?= -target x86_64-unknown-linux-musl -fPIC -nostdlib -nostdinc -nostartfiles -isystem ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/ -lresolv -lc -lgcc
+export CXXFLAGS_x86_64-unknown-linux-musl ?= ${CFLAGS_x86_64-unknown-linux-musl} -nostdlib -nostdinc++ -lstdc++  -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/bits
+export LDFLAGS_x86_64-unknown-linux-musl ?= -static -nostdlib -nostdinc -nostdinc++ -nostartfiles -isystem ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/bits -lresolv -lc -lstdc++ -lgcc
 
 
 export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-cc
@@ -175,6 +175,8 @@ define ENVIRONMENT_EXEC
 			--env ENVIRONMENT_TAG \
 			--env RUST_BACKTRACE \
 			--env MUSL_CROSS_MAKE \
+			--env TARGET \
+			--env HOST \
 			--env MUSL_CROSS_MAKE_PATH \
             --env MUSL_CROSS_MAKE_x86_64-unknown-linux-musl \
             --env MUSL_CROSS_MAKE_aarch64-unknown-linux-musl \
@@ -293,12 +295,13 @@ build-cross-x86_64-unknown-linux-musl: ${MUSL_CROSS_MAKE_x86_64-unknown-linux-mu
 
 .PHONY: ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}
 ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}: ${MUSL_CROSS_MAKE}
-	${MAYBE_ENVIRONMENT_EXEC} make --quiet --directory ${MUSL_CROSS_MAKE} install -j${NUM_CPUS} TARGET=x86_64-linux-musl
+	${MAYBE_ENVIRONMENT_EXEC} make --quiet --directory ${MUSL_CROSS_MAKE} install -j${NUM_CPUS} TARGET=x86_64-unknown-linux-musl
 
 .PHONY: build-x86_64-unknown-linux-musl
 build-x86_64-unknown-linux-musl: ${VECTOR_BINARY_x86_64-unknown-linux-musl} ## Build static binary in release mode for the x86_64 architecture
 
 ${VECTOR_BINARY_x86_64-unknown-linux-musl}: CROSS_COMPILE=x86_64-unknown-linux-musl
+${VECTOR_BINARY_x86_64-unknown-linux-musl}: TARGET=x86_64-unknown-linux-musl
 ${VECTOR_BINARY_x86_64-unknown-linux-musl}: CC=${CC_x86_64-unknown-linux-musl}
 ${VECTOR_BINARY_x86_64-unknown-linux-musl}: CXX=${CXX_x86_64-unknown-linux-musl}
 ${VECTOR_BINARY_x86_64-unknown-linux-musl}: LD=${CARGO_TARGET_x86_64-UNKOWNN_LINUX_MUSL_LINKER}
@@ -322,6 +325,7 @@ ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}: ${MUSL_CROSS_MAKE}
 build-aarch64-unknown-linux-musl: ${VECTOR_BINARY_aarch64-unknown-linux-musl} ## Build static binary in release mode for the aarch64 architecture
 
 ${VECTOR_BINARY_aarch64-unknown-linux-musl}: CROSS_COMPILE=aarch64-unknown-linux-musl
+${VECTOR_BINARY_aarch64-unknown-linux-musl}: TARGET=aarch64-unknown-linux-musl
 ${VECTOR_BINARY_aarch64-unknown-linux-musl}: CC=${CC_aarch64-unknown-linux-musl}
 ${VECTOR_BINARY_aarch64-unknown-linux-musl}: CXX=${CXX_aarch64-unknown-linux-musl}
 ${VECTOR_BINARY_aarch64-unknown-linux-musl}: LD=${CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER}
