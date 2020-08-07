@@ -27,7 +27,7 @@ pub struct DnstapConfig {
     pub socket_path: PathBuf,
     pub raw_data_only: Option<bool>,
     pub multithreaded: Option<bool>,
-    pub max_frame_handling_tasks: Option<u32>,
+    pub max_frame_handling_tasks: Option<i32>,
 }
 
 fn default_max_length() -> usize {
@@ -121,7 +121,7 @@ pub struct DnstapFrameHandler {
     schema: DnstapEventSchema,
     raw_data_only: bool,
     multithreaded: bool,
-    max_frame_handling_tasks: u32,
+    max_frame_handling_tasks: i32,
 }
 
 impl DnstapFrameHandler {
@@ -132,7 +132,7 @@ impl DnstapFrameHandler {
         content_type: String,
         raw_data_only: bool,
         multithreaded: bool,
-        max_frame_handling_tasks: u32,
+        max_frame_handling_tasks: i32,
     ) -> Self {
         Self {
             max_length,
@@ -142,7 +142,7 @@ impl DnstapFrameHandler {
             schema: DnstapEventSchema::new(),
             raw_data_only,
             multithreaded,
-            max_frame_handling_tasks: max_frame_handling_tasks,
+            max_frame_handling_tasks,
         }
     }
 }
@@ -198,7 +198,7 @@ impl FrameHandler for DnstapFrameHandler {
         self.multithreaded
     }
 
-    fn max_frame_handling_tasks(&self) -> u32 {
+    fn max_frame_handling_tasks(&self) -> i32 {
         self.max_frame_handling_tasks
     }
 }

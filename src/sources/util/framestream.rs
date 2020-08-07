@@ -6,14 +6,14 @@ use crate::{
     stream::StreamExt,
 };
 use bytes::Bytes;
-use futures01::{future, sync::mpsc, Future, Sink, Stream};
+use futures01::{future, sync::mpsc::Sender, Future, Sink, Stream};
 use std::convert::TryInto;
 use std::fs;
 use std::marker::{Send, Sync};
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicU32, Ordering},
+        atomic::{AtomicI32, Ordering},
         Arc,
     },
     thread,
@@ -22,6 +22,7 @@ use std::{
 use tokio01::{
     self,
     codec::{length_delimited, Framed},
+    executor::Spawn,
     sync::lock::Lock,
 };
 use tokio_uds::UnixListener;
@@ -112,7 +113,7 @@ impl ControlField {
             }
         }
     }
-    fn to_u32(self) -> u32 {
+    fn to_u32(&self) -> u32 {
         match self {
             ControlField::ContentType => 0x01,
         }
@@ -354,7 +355,7 @@ pub trait FrameHandler {
     fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event>;
     fn socket_path(&self) -> PathBuf;
     fn multithreaded(&self) -> bool;
-    fn max_frame_handling_tasks(&self) -> u32;
+    fn max_frame_handling_tasks(&self) -> i32;
 }
 
 /**
@@ -365,7 +366,7 @@ pub trait FrameHandler {
 pub fn build_framestream_unix_source(
     frame_handler: impl FrameHandler + Send + Sync + Clone + 'static,
     shutdown: ShutdownSignal,
-    out: mpsc::Sender<Event>,
+    out: Sender<Event>,
 ) -> Source {
     let path = frame_handler.socket_path();
 
@@ -384,7 +385,7 @@ pub fn build_framestream_unix_source(
 
     Box::new(future::lazy(move || {
         let listener = UnixListener::bind(&path).expect("failed to bind to listener socket");
-        let parsing_task_counter = Arc::new(AtomicU32::new(0));
+        let parsing_task_counter = Arc::new(AtomicI32::new(0));
 
         info!(message = "listening.", ?path, r#type = "unix");
 
@@ -444,24 +445,26 @@ pub fn build_framestream_unix_source(
                 } else {
                     let handler = frames
                         .for_each(move |f| {
-                            wait_for_task_quota(
-                                &task_counter,
-                                frame_handler_copy.max_frame_handling_tasks(),
-                            );
-
+                            let max_frame_handling_tasks =
+                                frame_handler_copy.max_frame_handling_tasks();
                             let f_handler = frame_handler_copy.clone();
                             let received_from_copy = received_from.clone();
                             let mut event_sink_copy = event_sink.clone();
                             let task_counter_copy = task_counter.clone();
-                            tokio01::spawn(future::lazy(move || {
+
+                            let event_handler = move || {
                                 if let Some(e) = f_handler.handle_event(received_from_copy, f) {
                                     if let Err(e) = event_sink_copy.get_mut().try_send(e) {
-                                        println!("{:#?}", e);
+                                        error!("{:#?}", e);
                                     }
                                 };
-                                task_counter_copy.fetch_sub(1, Ordering::Relaxed);
-                                Ok(())
-                            }));
+                            };
+
+                            spawn_event_handling_tasks(
+                                event_handler,
+                                task_counter_copy,
+                                max_frame_handling_tasks,
+                            );
                             Ok(())
                         })
                         .map_err(move |error| {
@@ -477,8 +480,25 @@ pub fn build_framestream_unix_source(
     }))
 }
 
-fn wait_for_task_quota(task_counter: &Arc<AtomicU32>, max_tasks: u32) {
-    let waiting_time = Duration::from_millis(100);
+fn spawn_event_handling_tasks<F>(
+    event_handler: F,
+    task_counter: Arc<AtomicI32>,
+    max_frame_handling_tasks: i32,
+) -> Spawn
+where
+    F: Send + Sync + Clone + FnOnce() -> () + 'static,
+{
+    wait_for_task_quota(&task_counter, max_frame_handling_tasks);
+
+    tokio01::spawn(future::lazy(move || {
+        event_handler();
+        task_counter.fetch_sub(1, Ordering::Relaxed);
+        Ok(())
+    }))
+}
+
+fn wait_for_task_quota(task_counter: &Arc<AtomicI32>, max_tasks: i32) {
+    let waiting_time = Duration::from_millis(10);
     while max_tasks > 0 && max_tasks < task_counter.load(Ordering::Relaxed) {
         thread::sleep(waiting_time);
     }
@@ -487,7 +507,10 @@ fn wait_for_task_quota(task_counter: &Arc<AtomicU32>, max_tasks: u32) {
 
 #[cfg(test)]
 mod test {
-    use super::{build_framestream_unix_source, ControlField, ControlHeader, FrameHandler};
+    use super::{
+        build_framestream_unix_source, spawn_event_handling_tasks, ControlField, ControlHeader,
+        FrameHandler,
+    };
     use crate::test_util::{collect_n, collect_n_stream};
     use crate::{
         event::{self, Event},
@@ -497,7 +520,15 @@ mod test {
     use bytes::{Bytes, BytesMut};
     use futures01::{sync::mpsc, Future, IntoFuture, Sink, Stream};
     #[cfg(unix)]
-    use std::path::PathBuf;
+    use std::{
+        path::PathBuf,
+        sync::{
+            atomic::{AtomicI32, Ordering},
+            Arc, Mutex,
+        },
+        thread,
+        time::Duration,
+    };
     use tokio01::{
         self,
         codec::{length_delimited, Framed},
@@ -511,7 +542,7 @@ mod test {
         host_key: String,
         socket_path: PathBuf,
         multithreaded: bool,
-        max_frame_handling_tasks: u32,
+        max_frame_handling_tasks: i32,
     }
 
     impl MockFrameHandler {
@@ -555,7 +586,7 @@ mod test {
         fn multithreaded(&self) -> bool {
             self.multithreaded
         }
-        fn max_frame_handling_tasks(&self) -> u32 {
+        fn max_frame_handling_tasks(&self) -> i32 {
             self.max_frame_handling_tasks
         }
     }
@@ -564,16 +595,16 @@ mod test {
         frame_handler: MockFrameHandler,
         sender: mpsc::Sender<event::Event>,
     ) -> (PathBuf, runtime::Runtime) {
-        let server =
-            build_framestream_unix_source(frame_handler.clone(), ShutdownSignal::noop(), sender);
+        let socket_path = frame_handler.socket_path();
+        let server = build_framestream_unix_source(frame_handler, ShutdownSignal::noop(), sender);
 
         let mut rt = runtime::Runtime::new().unwrap();
         rt.spawn(server);
 
         // Wait for server to accept traffic
-        while let Err(_) = std::os::unix::net::UnixStream::connect(&frame_handler.socket_path()) {}
+        while let Err(_) = std::os::unix::net::UnixStream::connect(&socket_path) {}
 
-        (frame_handler.socket_path(), rt)
+        (socket_path, rt)
     }
 
     fn make_unix_stream(
@@ -830,5 +861,44 @@ mod test {
         );
 
         // std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+    }
+
+    #[test]
+    fn test_spawn_event_handling_tasks() {
+        let max_frame_handling_tasks = 100;
+        let task_counter = Arc::new(AtomicI32::new(0));
+        let task_counter_copy = task_counter.clone();
+        let max_task_counter_value = Arc::new(Mutex::new(0));
+        let max_task_counter_value_copy = max_task_counter_value.clone();
+        tokio01::run(futures01::lazy(move || {
+            let mut handles = vec![];
+            let task_counter_copy_2 = task_counter_copy.clone();
+            let mock_event_handler = move || {
+                let current_task_counter = task_counter_copy_2.load(Ordering::Relaxed);
+                thread::sleep(Duration::from_millis(10));
+                let mut max = max_task_counter_value_copy.lock().unwrap(); // Also to simulate writing to a single sink
+                if *max < current_task_counter {
+                    *max = current_task_counter
+                };
+            };
+            for _ in 0..max_frame_handling_tasks * 10 {
+                handles.push(spawn_event_handling_tasks(
+                    mock_event_handler.clone(),
+                    task_counter_copy.clone(),
+                    max_frame_handling_tasks,
+                ));
+            }
+            Ok(())
+        }));
+
+        let final_task_counter = task_counter.load(Ordering::Relaxed);
+        assert_eq!(
+            0, final_task_counter,
+            "There should be NO left-over tasks at the end"
+        );
+
+        let max_counter_value = max_task_counter_value.lock().unwrap();
+        assert!(*max_counter_value > 1, "MultiThreaded mode does NOT work");
+        assert!((*max_counter_value - max_frame_handling_tasks) < 2, "Max number of tasks at any given time should NOT Exceed max_frame_handling_tasks too much");
     }
 }
