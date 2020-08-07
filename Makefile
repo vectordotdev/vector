@@ -110,6 +110,8 @@ export LD_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-unknow
 export CFLAGS_x86_64-unknown-linux-musl ?= \
 	-fPIC \
 	-static \
+	-nodefaultlibs \
+	-static-libgcc \
 	-nostdinc \
 	-nostartfiles \
 	-L${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/lib/ \
@@ -130,6 +132,8 @@ export CXXFLAGS_x86_64-unknown-linux-musl ?= \
 	-lstdc++
 export LDFLAGS_x86_64-unknown-linux-musl ?= \
 	-static \
+	-nodefaultlibs \
+	-static-libgcc \
 	-nostdinc \
 	-nostdinc++ \
 	-nostartfiles \
