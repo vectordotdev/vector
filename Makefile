@@ -69,6 +69,9 @@ export LIBZ_SYS_STATIC ?= 1
 export OPENSSL_STATIC ?= 1
 export SASL2_STATIC ?= 1
 export CROSS_COMPILE ?= true
+export krb5_cv_attr_constructor_destructor ?= yes
+export ac_cv_func_regcomp ?= yes
+export ac_cv_printf_positional ?= yes
 
 # In the environment, we have an established structure. Otherwise, configure it where you please! Absolute paths only.
 ifeq ($(ENVIRONMENT), true)
@@ -83,28 +86,29 @@ export MUSL_CROSS_MAKE_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/aar
 
 export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-unknown-linux-musl-cc
 export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc -C link-arg=-lstdc++ -C link-arg=-lresolv -C link-arg=-lc
-export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL__RUSTC_LINK_LIB ?= static=gcc static=stdc++ static=resolv static=c static=c++ static=c++abi static=unwind
-export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL__RUSTC_LINK_SEARCH ?= ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/ ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTC_LINK_LIB ?= static=gcc static=stdc++ static=resolv static=c static=c++ static=c++abi static=unwind
+export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTC_LINK_SEARCH ?= ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/ ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/
 export CC_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-unknown-linux-musl-gcc
 export CXX_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-unknown-linux-musl-g++
 export AR_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-unknown-linux-musl-ar
 export LD_x86_64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/x86_64-unknown-linux-musl-ld
 export CFLAGS_x86_64-unknown-linux-musl ?= -target x86_64-unknown-linux-musl -fPIC -nostdlib -nostdinc -nostartfiles -isystem ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/ -lresolv -lc -lgcc
-export CXXFLAGS_x86_64-unknown-linux-musl ?= ${CFLAGS_x86_64-unknown-linux-musl} -nostdlib -nostdinc++ -lstdc++  -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/bits
-export LDFLAGS_x86_64-unknown-linux-musl ?= -static -nostdlib -nostdinc -nostdinc++ -nostartfiles -isystem ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/bits -lresolv -lc -lstdc++ -lgcc
+export CXXFLAGS_x86_64-unknown-linux-musl ?= ${CFLAGS_x86_64-unknown-linux-musl} -static -nostdlib -nostdinc++ -lstdc++  -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/bits
+export LDFLAGS_x86_64-unknown-linux-musl ?= -static -nostdlib -nostdinc -nostdinc++ -nostartfiles -isystem ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-linux-musl/ -I${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/c++/9.2.0/x86_64-unknown-linux-musl/bits -lresolv -lc -lstdc++ -lgcc
 
 
-export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-cc
-export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc -C link-arg=-lstdc++ -C link-arg=-lresolv
-export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTC_LINK_LIB ?= static=gcc static=stdc++ static=resolv
-export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL__RUSTC_LINK_SEARCH ?= ${MUSL_CROSS_MAKE_x86_64-unknown-linux-musl}/include/ ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/c++/9.2.0/
-export CC_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-gcc
-export CXX_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-g++
-export AR_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-ar
-export LD_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-linux-musl-ld
-export CFLAGS_aarch64-unknown-linux-musl ?= -I${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/
-export CXXFLAGS_aarch64-unknown-linux-musl ?= ${CFLAGS_aarch64-unknown-linux-musl} -imultilib ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/c++/9.2.0/
-export LDFLAGS_aarch64-unknown-linux-musl ?=  ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/
+export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-unknown-linux-musl-cc
+export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS ?= -C link-arg=-lgcc -C link-arg=-lstdc++ -C link-arg=-lresolv -C link-arg=-lc
+export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTC_LINK_LIB ?= static=gcc static=stdc++ static=resolv static=c static=c++ static=c++abi static=unwind
+export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTC_LINK_SEARCH ?= ${MUSL_CROSS_MAKE_AARCH64-unknown-linux-musl}/include/ ${MUSL_CROSS_MAKE_AARCH64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_AARCH64-unknown-linux-musl}/include/c++/9.2.0/AARCH64-linux-musl/
+export CC_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-unknown-linux-musl-gcc
+export CXX_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-unknown-linux-musl-g++
+export AR_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-unknown-linux-musl-ar
+export LD_aarch64-unknown-linux-musl ?= ${MUSL_CROSS_MAKE_PATH}/bin/aarch64-unknown-linux-musl-ld
+export CFLAGS_aarch64-unknown-linux-musl ?= -target aarch64-unknown-linux-musl -fPIC -nostdlib -nostdinc -nostartfiles -isystem ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/ -lresolv -lc -lgcc
+export CXXFLAGS_aarch64-unknown-linux-musl ?= ${CFLAGS_aarch64-unknown-linux-musl} -static -nostdlib -nostdinc++ -lstdc++  -I${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/c++/9.2.0/aarch64-linux-musl/ -I${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/c++/9.2.0/aarch64-linux-musl/bits
+export LDFLAGS_aarch64-unknown-linux-musl ?= -static -nostdlib -nostdinc -nostdinc++ -nostartfiles -isystem ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/ -I${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/c++/9.2.0/ -I${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/c++/9.2.0/aarch64-linux-musl/ -I${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}/include/c++/9.2.0/aarch64-unknown-linux-musl/bits -lresolv -lc -lstdc++ -lgcc
+
 
  # Deprecated.
 export USE_CONTAINER ?= $(CONTAINER_TOOL)
@@ -204,6 +208,11 @@ define ENVIRONMENT_EXEC
             --env LIBZ_SYS_STATIC \
             --env OPENSSL_STATIC \
             --env CROSS_COMPILE \
+			--env SASL2_STATIC \
+			--env CROSS_COMPILE \
+			--env krb5_cv_attr_constructor_destructor \
+			--env ac_cv_func_regcomp \
+			--env ac_cv_printf_positional \
             --env LDFLAGS \
 			--network host \
 			--mount type=bind,source=${PWD},target=/git/timberio/vector \
@@ -319,7 +328,7 @@ build-cross-aarch64-unknown-linux-musl: ${MUSL_CROSS_MAKE_aarch64-unknown-linux-
 
 .PHONY: ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}
 ${MUSL_CROSS_MAKE_aarch64-unknown-linux-musl}: ${MUSL_CROSS_MAKE}
-	${MAYBE_ENVIRONMENT_EXEC} ${MAKE} --quiet --directory ${MUSL_CROSS_MAKE} install -j${NUM_CPUS} TARGET=aarch64-linux-musl
+	${MAYBE_ENVIRONMENT_EXEC} ${MAKE} --quiet --directory ${MUSL_CROSS_MAKE} install -j${NUM_CPUS} TARGET=aarch64-unknown-linux-musl
 
 .PHONY: build-aarch64-unknown-linux-musl
 build-aarch64-unknown-linux-musl: ${VECTOR_BINARY_aarch64-unknown-linux-musl} ## Build static binary in release mode for the aarch64 architecture
