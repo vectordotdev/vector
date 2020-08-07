@@ -159,10 +159,10 @@ mod test {
             Arc,
         },
         thread,
-        time::{Duration, Instant},
     };
     #[cfg(unix)]
     use tokio::net::UnixStream;
+    use tokio::time::{Duration, Instant};
     #[cfg(unix)]
     use tokio_util::codec::{FramedWrite, LinesCodec};
 

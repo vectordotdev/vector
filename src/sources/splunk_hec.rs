@@ -1,5 +1,9 @@
 use crate::{
     event::{self, Event, LogEvent, Value},
+    internal_events::{
+        SplunkHECEventReceived, SplunkHECRequestBodyInvalid, SplunkHECRequestError,
+        SplunkHECRequestReceived,
+    },
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig},
@@ -87,6 +91,15 @@ impl SourceConfig for SplunkConfig {
         let options = SplunkSource::options();
 
         let services = path!("services" / "collector" / ..)
+            .and(
+                warp::path::full()
+                    .map(|path: warp::filters::path::FullPath| {
+                        emit!(SplunkHECRequestReceived {
+                            path: path.as_str()
+                        });
+                    })
+                    .untuple_one(),
+            )
             .and(
                 event_service
                     .or(raw_service)
@@ -367,7 +380,9 @@ impl<R: Read> Stream for EventStream<R> {
                 };
             }
             Err(error) => {
-                error!(message = "Malformed request body",%error);
+                emit!(SplunkHECRequestBodyInvalid {
+                    error: error.into()
+                });
                 return Err(ApiError::InvalidDataFormat { event: self.events }.into());
             }
         };
@@ -466,6 +481,7 @@ impl<R: Read> Stream for EventStream<R> {
             de.extract(log, &mut json);
         }
 
+        emit!(SplunkHECEventReceived);
         self.events += 1;
 
         Ok(Async::Ready(Some(event)))
@@ -568,7 +584,7 @@ fn raw_event(
             Ok(0) => return Err(ApiError::NoData.into()),
             Ok(_) => data.into(),
             Err(error) => {
-                error!(message = "Malformed request body",%error);
+                emit!(SplunkHECRequestBodyInvalid { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
             }
         }
@@ -599,11 +615,13 @@ fn raw_event(
         .as_mut_log()
         .try_insert(event::log_schema().source_type_key(), "splunk_hec");
 
+    emit!(SplunkHECEventReceived);
+
     Ok(event)
 }
 
-#[derive(Debug, Snafu)]
-enum ApiError {
+#[derive(Clone, Copy, Debug, Snafu)]
+pub(crate) enum ApiError {
     MissingAuthorization,
     InvalidAuthorization,
     UnsupportedEncoding,
@@ -657,7 +675,8 @@ fn finish_ok(_: ()) -> Response {
 }
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
-    if let Some(error) = rejection.find::<ApiError>() {
+    if let Some(&error) = rejection.find::<ApiError>() {
+        emit!(SplunkHECRequestError { error });
         Ok((match error {
             ApiError::MissingAuthorization => response_json(
                 StatusCode::UNAUTHORIZED,
@@ -682,12 +701,12 @@ async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
                 StatusCode::SERVICE_UNAVAILABLE,
                 splunk_response::SERVER_SHUTDOWN.as_ref(),
             ),
-            ApiError::InvalidDataFormat { event } => event_error("Invalid data format", 6, *event),
+            ApiError::InvalidDataFormat { event } => event_error("Invalid data format", 6, event),
             ApiError::EmptyEventField { event } => {
-                event_error("Event field cannot be blank", 13, *event)
+                event_error("Event field cannot be blank", 13, event)
             }
             ApiError::MissingEventField { event } => {
-                event_error("Event field is required", 12, *event)
+                event_error("Event field is required", 12, event)
             }
             ApiError::BadRequest => empty_response(StatusCode::BAD_REQUEST),
         },))
@@ -718,7 +737,8 @@ fn event_error(text: &str, code: u16, event: usize) -> Response {
     match serde_json::to_string(&body) {
         Ok(string) => response_json(StatusCode::BAD_REQUEST, string),
         Err(error) => {
-            error!("Error encoding json body: {}", error);
+            // This should never happen.
+            error!("error encoding json body: {}.", error);
             response_json(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 splunk_response::SERVER_ERROR.clone(),

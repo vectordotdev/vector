@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    event::metric::{MetricKind, MetricValue},
+    event::metric::{MetricKind, MetricValue, StatisticKind},
     event::Event,
     sinks::util::{
         service2::TowerCompat, BatchConfig, BatchSettings, BatchSink, Buffer, Compression,
@@ -155,10 +155,15 @@ fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
             MetricValue::Distribution {
                 values,
                 sample_rates,
+                statistic,
             } => {
+                let metric_type = match statistic {
+                    StatisticKind::Histogram => "h",
+                    StatisticKind::Summary => "d",
+                };
                 for (val, sample_rate) in values.iter().zip(sample_rates.iter()) {
                     buf.push(format!("{}:{}", metric.name, val));
-                    buf.push("h".to_string());
+                    buf.push(metric_type.to_string());
                     if *sample_rate != 1 {
                         buf.push(format!("@{}", 1.0 / f64::from(*sample_rate)));
                     };
@@ -224,7 +229,7 @@ mod test {
     use super::*;
     use crate::{
         buffers::Acker,
-        event::{metric::MetricKind, metric::MetricValue, Metric},
+        event::{metric::MetricKind, metric::MetricValue, metric::StatisticKind, Metric},
         test_util::{collect_n, runtime},
         Event,
     };
@@ -298,6 +303,7 @@ mod test {
             value: MetricValue::Distribution {
                 values: vec![1.5],
                 sample_rates: vec![1],
+                statistic: StatisticKind::Histogram,
             },
         };
         let event = Event::Metric(metric1.clone());
@@ -357,6 +363,7 @@ mod test {
                     value: MetricValue::Distribution {
                         values: vec![2.0],
                         sample_rates: vec![100],
+                        statistic: StatisticKind::Histogram
                     },
                 }),
             ];
