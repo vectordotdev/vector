@@ -16,8 +16,11 @@ rustup default "$(cat rust-toolchain)"
 
 # Ruby toolchain
 export PATH="${HOME}/.rbenv/bin:${HOME}/.rbenv/shims:${PATH}"
-curl -fsSL https://github.com/rbenv/rbenv-installer/raw/master/bin/rbenv-installer | bash
+git clone https://github.com/rbenv/rbenv.git ~/.rbenv
+cd ~/.rbenv && src/configure && make -C src
 eval "$(rbenv init -)"
+mkdir -p "$(rbenv root)"/plugins
+git clone https://github.com/rbenv/ruby-build.git "$(rbenv root)"/plugins/ruby-build
 rbenv install 2.7.1
 rbenv global 2.7.1
 

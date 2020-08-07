@@ -264,6 +264,7 @@ endef
 endif
 
 environment: export ENVIRONMENT_TTY = true ## Enter a full Vector dev shell in $CONTAINER_TOOL, binding this folder to the container.
+environment: override ENVIRONMENT = true
 environment:
 	${ENVIRONMENT_EXEC}
 
