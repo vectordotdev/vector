@@ -88,7 +88,7 @@ fn main() {
             })
         };
 
-        let config_paths = config::prepare(opts.config_paths.clone()).unwrap_or_else(|| {
+        let config_paths = config::prepare(&opts.config_paths).unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });
 

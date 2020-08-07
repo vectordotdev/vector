@@ -10,7 +10,7 @@ lazy_static! {
 pub static CONFIG_PATHS: OnceCell<Vec<PathBuf>> = OnceCell::new();
 
 /// Expands, dedups, and sets global values.
-pub fn prepare(paths: Vec<PathBuf>) -> Option<Vec<PathBuf>> {
+pub fn prepare(paths: &[PathBuf]) -> Option<Vec<PathBuf>> {
     let mut config_paths = expand(paths)?;
     config_paths.sort();
     config_paths.dedup();
@@ -22,13 +22,16 @@ pub fn prepare(paths: Vec<PathBuf>) -> Option<Vec<PathBuf>> {
 
 /// Expand a list of paths (potentially containing glob patterns) into real
 /// config paths, replacing it with the default paths when empty.
-pub fn expand(config_paths: Vec<PathBuf>) -> Option<Vec<PathBuf>> {
-    let mut paths = Vec::new();
-    for config_pattern in if !config_paths.is_empty() {
+pub fn expand(config_paths: &[PathBuf]) -> Option<Vec<PathBuf>> {
+    let starting_paths = if !config_paths.is_empty() {
         config_paths
     } else {
-        DEFAULT_CONFIG_PATHS.to_vec()
-    } {
+        &DEFAULT_CONFIG_PATHS
+    };
+
+    let mut paths = Vec::new();
+
+    for config_pattern in starting_paths {
         let matches: Vec<PathBuf> = match glob(config_pattern.to_str().expect("No ability to glob"))
         {
             Ok(glob_paths) => glob_paths.filter_map(Result::ok).collect(),
@@ -47,5 +50,6 @@ pub fn expand(config_paths: Vec<PathBuf>) -> Option<Vec<PathBuf>> {
             paths.push(path);
         }
     }
+
     Some(paths)
 }

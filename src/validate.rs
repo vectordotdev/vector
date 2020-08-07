@@ -84,7 +84,7 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
 /// Err Some contains only succesfully validated configs.
 fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Result<Config, Option<Config>> {
     // Prepare paths
-    let paths = if let Some(paths) = config::prepare(opts.paths.clone()) {
+    let paths = if let Some(paths) = config::prepare(&opts.paths) {
         paths
     } else {
         fmt.error("No config file paths");
