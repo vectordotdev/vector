@@ -1,7 +1,7 @@
 mod interop;
 
 use crate::{
-    config_paths::CONFIG_PATHS,
+    config::CONFIG_PATHS,
     event::Event,
     topology::config::{DataType, TransformContext},
     transforms::{

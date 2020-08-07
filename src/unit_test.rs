@@ -1,5 +1,5 @@
 use crate::{
-    config_paths, event,
+    config, event,
     topology::{config::Config, unit_test::UnitTest},
 };
 use colored::*;
@@ -52,7 +52,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let mut failed_files: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
     let mut inspected_files: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
 
-    let paths = config_paths::expand(opts.paths.clone()).unwrap_or_else(|| {
+    let paths = config::expand(opts.paths.clone()).unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
 

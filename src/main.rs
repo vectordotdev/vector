@@ -17,7 +17,7 @@ use std::{
 use tokio::select;
 use topology::Config;
 use vector::{
-    config_paths, event, generate, list, metrics, runtime,
+    config, event, generate, list, metrics, runtime,
     signal::{self, SignalTo},
     topology, trace, unit_test, validate,
 };
@@ -88,7 +88,7 @@ fn main() {
             })
         };
 
-        let config_paths = config_paths::prepare(opts.config_paths.clone()).unwrap_or_else(|| {
+        let config_paths = config::prepare(opts.config_paths.clone()).unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });
 
