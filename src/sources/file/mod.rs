@@ -12,8 +12,9 @@ use file_source::{
     FileServer, Fingerprinter,
 };
 use futures::{
-    compat::{Compat01As03Sink, Future01CompatExt},
+    compat::{Compat, Compat01As03, Compat01As03Sink, Future01CompatExt},
     future::{FutureExt, TryFutureExt},
+    stream::StreamExt,
 };
 use futures01::{future, Future, Sink, Stream};
 use regex::bytes::Regex;
@@ -272,20 +273,28 @@ pub fn file_source(
         // sizing here is just a guess
         let (tx, rx) = futures01::sync::mpsc::channel(100);
 
+        // This closure is overcomplicated because of the compatibility layer.
+        let wrap_with_line_agg = |rx, config| {
+            let rx = StreamExt::filter_map(Compat01As03::new(rx), |val| {
+                futures::future::ready(val.ok())
+            });
+            let logic = line_agg::Logic::new(config);
+            Box::new(Compat::new(LineAgg::new(rx, logic).map(Ok)))
+        };
         let messages: Box<dyn Stream<Item = (Bytes, String), Error = ()> + Send> =
             if let Some(ref multiline_config) = multiline_config {
-                Box::new(LineAgg::new(
+                wrap_with_line_agg(
                     rx,
                     multiline_config.try_into().unwrap(), // validated in build
-                ))
+                )
             } else if let Some(msi) = message_start_indicator {
-                Box::new(LineAgg::new(
+                wrap_with_line_agg(
                     rx,
                     line_agg::Config::for_legacy(
                         Regex::new(&msi).unwrap(), // validated in build
                         multi_line_timeout,
                     ),
-                ))
+                )
             } else {
                 Box::new(rx)
             };
