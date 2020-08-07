@@ -50,7 +50,7 @@ pub fn build_test_server(
     let (trigger, tripwire) = stream_cancel::Tripwire::new();
     let server = Server::bind(&addr)
         .serve(service)
-        .with_graceful_shutdown(tripwire.clone().compat().map(|_| ()))
+        .with_graceful_shutdown(tripwire.compat().map(|_| ()))
         .map_err(|e| panic!("server error: {}", e));
 
     (rx, trigger, server)
