@@ -106,12 +106,12 @@ mod test {
     use super::StatsdConfig;
     use crate::{
         sinks::prometheus::PrometheusSinkConfig,
-        test_util::{block_on, next_addr, runtime, shutdown_on_idle},
+        test_util::next_addr,
         topology::{self, config},
     };
-    use futures::{TryFutureExt, TryStreamExt};
+    use futures::{compat::Future01CompatExt, TryStreamExt};
     use futures01::Stream;
-    use std::{thread, time::Duration};
+    use tokio::time::{delay_for, Duration};
 
     fn parse_count(lines: &[&str], prefix: &str) -> usize {
         lines
@@ -123,8 +123,8 @@ mod test {
             .unwrap()
     }
 
-    #[test]
-    fn test_statsd() {
+    #[tokio::test]
+    async fn test_statsd() {
         let in_addr = next_addr();
         let out_addr = next_addr();
 
@@ -141,9 +141,7 @@ mod test {
             },
         );
 
-        let mut rt = runtime();
-
-        let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
+        let (topology, _crash) = topology::start(config, false).await.unwrap();
 
         let bind_addr = next_addr();
         let socket = std::net::UdpSocket::bind(&bind_addr).unwrap();
@@ -156,29 +154,27 @@ mod test {
                 )
                 .unwrap();
             // Space things out slightly to try to avoid dropped packets
-            thread::sleep(Duration::from_millis(10));
+            delay_for(Duration::from_millis(10)).await;
         }
 
         // Give packets some time to flow through
-        thread::sleep(Duration::from_millis(100));
+        delay_for(Duration::from_millis(100)).await;
 
         let client = hyper::Client::new();
-        let response = block_on(
-            client
-                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
-                .compat(),
-        )
-        .unwrap();
+        let response = client
+            .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+            .await
+            .unwrap();
         assert!(response.status().is_success());
 
-        let body = block_on(
-            response
-                .into_body()
-                .compat()
-                .map(|bytes| bytes.to_vec())
-                .concat2(),
-        )
-        .unwrap();
+        let body = response
+            .into_body()
+            .compat()
+            .map(|bytes| bytes.to_vec())
+            .concat2()
+            .compat()
+            .await
+            .unwrap();
         let lines = std::str::from_utf8(&body)
             .unwrap()
             .lines()
@@ -217,24 +213,22 @@ mod test {
         // Flush test
         {
             // Wait for flush to happen
-            thread::sleep(Duration::from_millis(2000));
+            delay_for(Duration::from_millis(2000)).await;
 
-            let response = block_on(
-                client
-                    .get(format!("http://{}/metrics", out_addr).parse().unwrap())
-                    .compat(),
-            )
-            .unwrap();
+            let response = client
+                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+                .await
+                .unwrap();
             assert!(response.status().is_success());
 
-            let body = block_on(
-                response
-                    .into_body()
-                    .compat()
-                    .map(|bytes| bytes.to_vec())
-                    .concat2(),
-            )
-            .unwrap();
+            let body = response
+                .into_body()
+                .compat()
+                .map(|bytes| bytes.to_vec())
+                .concat2()
+                .compat()
+                .await
+                .unwrap();
             let lines = std::str::from_utf8(&body)
                 .unwrap()
                 .lines()
@@ -247,26 +241,24 @@ mod test {
 
             socket.send_to(b"set:0|s\nset:1|s\n", &in_addr).unwrap();
             // Space things out slightly to try to avoid dropped packets
-            thread::sleep(Duration::from_millis(10));
+            delay_for(Duration::from_millis(10)).await;
             // Give packets some time to flow through
-            thread::sleep(Duration::from_millis(100));
+            delay_for(Duration::from_millis(100)).await;
 
-            let response = block_on(
-                client
-                    .get(format!("http://{}/metrics", out_addr).parse().unwrap())
-                    .compat(),
-            )
-            .unwrap();
+            let response = client
+                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+                .await
+                .unwrap();
             assert!(response.status().is_success());
 
-            let body = block_on(
-                response
-                    .into_body()
-                    .compat()
-                    .map(|bytes| bytes.to_vec())
-                    .concat2(),
-            )
-            .unwrap();
+            let body = response
+                .into_body()
+                .compat()
+                .map(|bytes| bytes.to_vec())
+                .concat2()
+                .compat()
+                .await
+                .unwrap();
             let lines = std::str::from_utf8(&body)
                 .unwrap()
                 .lines()
@@ -277,7 +269,6 @@ mod test {
         }
 
         // Shut down server
-        block_on(topology.stop()).unwrap();
-        shutdown_on_idle(rt);
+        topology.stop().compat().await.unwrap();
     }
 }

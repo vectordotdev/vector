@@ -15,7 +15,7 @@ rustPlatform.buildRustPackage rec {
   pname = "vector";
   version = "0.11.0";
 
-  src = /Users/benjohnson/Code/timber/vector-website/scripts;
+  src = /distribution/default.nix;
 
   legacyCargoFetcher = true;
   cargoSha256 = "";
