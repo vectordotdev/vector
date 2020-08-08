@@ -12,6 +12,7 @@
 /scripts/package-* @a-rodin
 /scripts/release-* @a-rodin
 /scripts/upgrade-* @a-rodin
+/scripts/ci-setup-minikube.sh @MOZGIII
 
 /src/buffers/ @a-rodin
 
@@ -81,3 +82,5 @@
 /lib/file-source/src/paths_provider/glob.rs @MOZGIII
 
 /tests/buffering.rs @MOZGIII
+
+/.github/workflows/e2e.yml @MOZGIII
