@@ -42,24 +42,6 @@ services:
     user: $USER
     command: scripts/build.sh
 
-  build-armv7-unknown-linux-musleabihf:
-    build:
-      context: .
-      dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
-    environment:
-      NATIVE_BUILD: "false"
-      TARGET: armv7-unknown-linux-musleabihf
-      FEATURES: default-musl
-      CARGO_TERM_COLOR: always
-    volumes:
-      - $PWD:$PWD
-      - ./target/armv7-unknown-linux-musleabihf/cargo/registry:/opt/rust/cargo/registry
-      - ./target/armv7-unknown-linux-musleabihf/cargo/git:/opt/rust/cargo/git
-      - ./target/armv7-unknown-linux-musleabihf/rustup/tmp:/opt/rust/rustup/tmp
-    working_dir: $PWD
-    user: $USER
-    command: scripts/build.sh
-
   build-aarch64-unknown-linux-musl:
     build:
       context: .
@@ -116,24 +98,6 @@ services:
     user: $USER
     command: ./scripts/package-archive.sh
 
-  package-archive-armv7-unknown-linux-musleabihf:
-    build:
-      context: .
-      dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
-    environment:
-      NATIVE_BUILD: "false"
-      TARGET: armv7-unknown-linux-musleabihf
-      FEATURES: default-musl
-      CARGO_TERM_COLOR: always
-    volumes:
-      - $PWD:$PWD
-      - ./target/armv7-unknown-linux-musleabihf/cargo/registry:/opt/rust/cargo/registry
-      - ./target/armv7-unknwon-linux-musleabihf/cargo/git:/opt/rust/cargo/git
-      - ./target/armv7-unknwon-linux-musleabihf/rustup/tmp:/opt/rust/rustup/tmp
-    working_dir: $PWD
-    user: $USER
-    command: ./scripts/package-archive.sh
-
   package-archive-aarch64-unknown-linux-musl:
     build:
       context: .
@@ -169,21 +133,6 @@ services:
     user: $USER
     command: ./scripts/package-deb.sh
 
-  package-deb-armv7:
-    build:
-      context: .
-      dockerfile: scripts/ci-docker-images/builder-armv7-unknown-linux-musleabihf/Dockerfile
-    environment:
-      TARGET: armv7-unknown-linux-musleabihf
-    volumes:
-      - $PWD:$PWD
-      - ./target/armv7-unknown-linux-musleabihf/cargo/registry:/opt/rust/cargo/registry
-      - ./target/armv7-unknown-linux-musleabihf/cargo/git:/opt/rust/cargo/git
-      - ./target/armv7-unknown-linux-musleabihf/rustup/tmp:/opt/rust/rustup/tmp
-    working_dir: $PWD
-    user: $USER
-    command: ./scripts/package-deb.sh
-
   package-deb-aarch64:
     build:
       context: .
@@ -205,19 +154,6 @@ services:
       dockerfile: scripts/ci-docker-images/packager-rpm/Dockerfile
     environment:
       TARGET: x86_64-unknown-linux-gnu
-    volumes:
-      - $PWD:$PWD
-    working_dir: $PWD
-    user: $USER
-    command: ./scripts/package-rpm.sh
-
-  package-rpm-armv7:
-    build:
-      context: .
-      dockerfile: scripts/ci-docker-images/packager-rpm/Dockerfile
-    environment:
-      TARGET: armv7-unknown-linux-musleabihf
-      ARCH: armv7hl
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
