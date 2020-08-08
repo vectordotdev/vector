@@ -60,27 +60,6 @@ jobs:
           name: "vector-aarch64.rpm"
           path: "./target/artifacts/vector-aarch64.rpm"
 
-  build-armv7-unknown-linux-musleabihf-packages:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - env:
-          DOCKER_PRIVILEGED: "true"
-          PASS_FEATURES: "default-cmake"
-        run: make package-armv7-unknown-linux-musleabihf-all
-      - uses: actions/upload-artifact@v1
-        with:
-          name: "vector-armv7-unknown-linux-musleabihf.tar.gz"
-          path: "./target/artifacts/vector-armv7-unknown-linux-musleabihf.tar.gz"
-      - uses: actions/upload-artifact@v1
-        with:
-          name: "vector-armhf.deb"
-          path: "./target/artifacts/vector-armhf.deb"
-      - uses: actions/upload-artifact@v1
-        with:
-          name: "vector-armv7hl.rpm"
-          path: "./target/artifacts/vector-armv7hl.rpm"
-
   build-x86_64-apple-darwin-packages:
     runs-on: macos-10.15
     steps:
@@ -137,7 +116,6 @@ jobs:
     needs:
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
-      - build-armv7-unknown-linux-musleabihf-packages
     steps:
       - uses: actions/checkout@v1
       - uses: actions/download-artifact@v1
@@ -147,10 +125,6 @@ jobs:
       - uses: actions/download-artifact@v1
         with:
           name: vector-aarch64-unknown-linux-musl.tar.gz
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
-          name: vector-armv7-unknown-linux-musleabihf.tar.gz
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
@@ -180,7 +154,6 @@ jobs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
-      - build-armv7-unknown-linux-musleabihf-packages
       - build-x86_64-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
     steps:
@@ -196,10 +169,6 @@ jobs:
       - uses: actions/download-artifact@v1
         with:
           name: vector-aarch64-unknown-linux-musl.tar.gz
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
-          name: vector-armv7-unknown-linux-musleabihf.tar.gz
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
@@ -228,10 +197,6 @@ jobs:
       - uses: actions/download-artifact@v1
         with:
           name: vector-x86_64.rpm
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
-          name: vector-armv7hl.rpm
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
@@ -249,7 +214,6 @@ jobs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
-      - build-armv7-unknown-linux-musleabihf-packages
       - build-x86_64-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
     steps:
@@ -268,19 +232,11 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
-          name: vector-armv7-unknown-linux-musleabihf.tar.gz
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
           name: vector-amd64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
           name: vector-arm64.deb
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
-          name: vector-armhf.deb
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
@@ -297,10 +253,6 @@ jobs:
       - uses: actions/download-artifact@v1
         with:
           name: vector-x86_64.rpm
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
-          name: vector-armv7hl.rpm
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
@@ -320,7 +272,6 @@ jobs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
-      - build-armv7-unknown-linux-musleabihf-packages
       - build-x86_64-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
     steps:
@@ -336,10 +287,6 @@ jobs:
       - uses: actions/download-artifact@v1
         with:
           name: vector-aarch64-unknown-linux-musl.tar.gz
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
-          name: vector-armv7-unknown-linux-musleabihf.tar.gz
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
@@ -368,10 +315,6 @@ jobs:
       - uses: actions/download-artifact@v1
         with:
           name: vector-x86_64.rpm
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
-          name: vector-armv7hl.rpm
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
