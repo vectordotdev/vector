@@ -34,7 +34,7 @@ observability data with Vector.
 ## Configuring
 
 As shown above, you can pass a custom
-[Vector configuration file][docs.configuration] via the `-v` flag. You'll want
+[Vector configuration file][docs.configuration] via the `-c` flag. You'll want
 to do this since the
 [default `/etc/vector/vector.toml` configuration file][urls.default_configuration]
 doesn't do anything.
