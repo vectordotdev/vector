@@ -89,7 +89,7 @@ to reduce the amount of unique label values.\
 type = "string"
 required = true
 templateable = true
-examples = [ {key = "value"}, {key = "{{ event_field }}"}]
+examples = [ {forwarder = "vector"}, {event = "{{ event_field }}"}, {key = "value"}]
 description = "A key-value pair for labels."
 
 [sinks.loki.options.remove_label_fields]
