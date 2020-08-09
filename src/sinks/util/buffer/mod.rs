@@ -173,39 +173,33 @@ mod test {
     use super::{Buffer, Compression};
     use crate::buffers::Acker;
     use crate::sinks::util::{BatchSettings, BatchSink};
-    use crate::test_util::runtime;
     use futures01::{future, Future, Sink};
-    use std::io::Read;
-    use std::sync::{Arc, Mutex};
-    use std::time::Duration;
-    use tokio01_test::clock::MockClock;
+    use std::{
+        io::Read,
+        sync::{Arc, Mutex},
+    };
+    use tokio::time::Duration;
 
-    #[test]
-    fn gzip() {
+    #[tokio::test(core_threads = 2)]
+    async fn gzip() {
         use flate2::read::GzDecoder;
-
-        let rt = runtime();
-        let mut clock = MockClock::new();
 
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
             let sent_requests = Arc::clone(&sent_requests);
-
             sent_requests.lock().unwrap().push(req);
-
             future::ok::<_, std::io::Error>(())
         });
         let batch_size = BatchSettings::default().bytes(100_000).events(1_000).size;
         let timeout = Duration::from_secs(0);
 
-        let buffered = BatchSink::with_executor(
+        let buffered = BatchSink::new(
             svc,
             Buffer::new(batch_size, Compression::Gzip),
             timeout,
             acker,
-            rt.executor(),
         );
 
         let input = std::iter::repeat(
@@ -213,15 +207,11 @@ mod test {
         )
         .take(100_000);
 
-        let (sink, _) = clock.enter(|_| {
-            buffered
-                .sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(input))
-                .wait()
-                .unwrap()
-        });
-
-        drop(sink);
+        let _ = buffered
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(input))
+            .wait()
+            .unwrap();
 
         let output = Arc::try_unwrap(sent_requests)
             .unwrap()

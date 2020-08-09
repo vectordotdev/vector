@@ -5,13 +5,14 @@ use crate::{
     topology::config::SinkContext,
 };
 use bytes::Bytes;
+use futures::{FutureExt, TryFutureExt};
 use futures01::{future, stream::iter_ok, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
-use std::time::{Duration, Instant};
-use tokio01::timer::Delay;
+use std::time::Duration;
+use tokio::time::{delay_for, Delay};
 use tokio_retry::strategy::ExponentialBackoff;
 use tracing::field;
 
@@ -77,7 +78,7 @@ enum State {
     Initializing,
     ResolvingDns(ResolverFuture),
     ResolvedDns(SocketAddr),
-    Backoff(Delay),
+    Backoff(Box<dyn Future<Item = (), Error = ()> + Send>),
 }
 
 impl UdpSink {
@@ -103,7 +104,12 @@ impl UdpSink {
     }
 
     fn next_delay(&mut self) -> Delay {
-        Delay::new(Instant::now() + self.backoff.next().unwrap())
+        delay_for(self.backoff.next().unwrap())
+    }
+
+    fn next_delay01(&mut self) -> Box<dyn Future<Item = (), Error = ()> + Send> {
+        let delay = self.next_delay();
+        Box::new(async move { Ok(delay.await) }.boxed().compat())
     }
 
     fn poll_inner(&mut self) -> Result<Async<SocketAddr>, ()> {
@@ -122,21 +128,20 @@ impl UdpSink {
                         }
                         None => {
                             error!(message = "DNS resolved no addresses", host = %self.host);
-                            State::Backoff(self.next_delay())
+                            State::Backoff(self.next_delay01())
                         }
                     },
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Err(error) => {
                         error!(message = "unable to resolve DNS", host = %self.host, %error);
-                        State::Backoff(self.next_delay())
+                        State::Backoff(self.next_delay01())
                     }
                 },
                 State::ResolvedDns(addr) => return Ok(Async::Ready(addr)),
                 State::Backoff(ref mut delay) => match delay.poll() {
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
-                    // Err can only occur if the tokio runtime has been shutdown or if more than 2^63 timers have been created
-                    Err(err) => unreachable!(err),
                     Ok(Async::Ready(())) => State::Initializing,
+                    Err(_) => unreachable!(),
                 },
             }
         }

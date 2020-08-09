@@ -1,6 +1,8 @@
 use crate::{event::LogEvent, runtime::Runtime, trace, Event};
-
-use futures::{compat::Stream01CompatExt, stream, SinkExt, Stream, StreamExt, TryStreamExt};
+use futures::{
+    compat::Stream01CompatExt, stream, FutureExt as _, SinkExt, Stream, StreamExt, TryFutureExt,
+    TryStreamExt,
+};
 use futures01::{
     future, stream as stream01, sync::mpsc, try_ready, Async, Future, Poll, Stream as Stream01,
 };
@@ -233,6 +235,22 @@ where
 
 pub fn runtime() -> Runtime {
     Runtime::single_threaded().unwrap()
+}
+
+pub fn basic_scheduler_block_on_std<F>(future: F) -> F::Output
+where
+    F: std::future::Future + Send + 'static,
+    F::Output: Send + 'static,
+{
+    // `tokio::time::advance` is not work on threaded scheduler
+    // `tokio_compat::runtime::current_thread` use `basic_scheduler`
+    // Example: https://pastebin.com/7fK4nxEW
+    tokio_compat::runtime::current_thread::Builder::new()
+        .build()
+        .unwrap()
+        // This is limit of `compat`, otherwise we get error: `no Task is currently running`
+        .block_on(future.never_error().boxed().compat())
+        .unwrap()
 }
 
 pub fn wait_for_tcp(addr: SocketAddr) {

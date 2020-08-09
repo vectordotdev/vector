@@ -4,12 +4,13 @@ use super::{
     Batch, BatchSink,
 };
 use crate::buffers::Acker;
+use futures::{FutureExt, TryFutureExt};
 use futures01::{Async, Future, Poll};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use std::{error, fmt};
-use tokio01::timer::Delay;
+use tokio::time::delay_for;
 use tower::{
     layer::{util::Stack, Layer},
     limit::{concurrency::ConcurrencyLimit, rate::RateLimit},
@@ -275,7 +276,8 @@ where
 
     fn call(&mut self, request: Request) -> Self::Future {
         let response = self.inner.call(request);
-        let sleep = Delay::new(Instant::now() + self.timeout);
+        let delay = delay_for(self.timeout);
+        let sleep = Box::new(async move { Ok(delay.await) }.boxed().compat());
 
         ResponseFuture { response, sleep }
     }
@@ -306,10 +308,9 @@ impl<S> Layer<S> for TimeoutLayer {
 }
 
 /// `Timeout` response future
-#[derive(Debug)]
 pub struct ResponseFuture<T> {
     response: T,
-    sleep: Delay,
+    sleep: Box<dyn Future<Item = (), Error = ()> + Send>,
 }
 
 impl<T> Future for ResponseFuture<T>
@@ -328,9 +329,10 @@ where
         }
 
         // Now check the sleep
-        match self.sleep.poll()? {
-            Async::NotReady => Ok(Async::NotReady),
-            Async::Ready(_) => Err(Elapsed(()).into()),
+        match self.sleep.poll() {
+            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Ok(Async::Ready(())) => Err(Elapsed(()).into()),
+            Err(_) => unreachable!(),
         }
     }
 }
