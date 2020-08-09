@@ -60,7 +60,7 @@ impl Default for Encoding {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
 pub enum Compression {
     Gzip,
@@ -79,6 +79,13 @@ enum OutFile {
 }
 
 impl OutFile {
+    fn new(file: File, compression: Compression) -> Self {
+        match compression {
+          Compression::None => OutFile::Regular(file),
+          Compression::Gzip => OutFile::Gzip(GzipEncoder::new(file)),
+        }
+    }
+
     async fn shutdown(&mut self) -> Result<(), std::io::Error> {
         match self {
             OutFile::Regular(file) => file.shutdown().await,
@@ -117,7 +124,7 @@ pub struct FileSink {
     encoding: EncodingConfigWithDefault<Encoding>,
     idle_timeout: Duration,
     files: ExpiringHashMap<Bytes, OutFile>,
-    compression: bool,
+    compression: Compression,
 }
 
 impl FileSink {
@@ -127,10 +134,7 @@ impl FileSink {
             encoding: config.encoding.clone(),
             idle_timeout: Duration::from_secs(config.idle_timeout_secs.unwrap_or(30)),
             files: ExpiringHashMap::default(),
-            compression: match config.compression {
-                Compression::Gzip => true,
-                Compression::None => false,
-            },
+            compression: config.compression,
         }
     }
 
@@ -226,10 +230,7 @@ impl FileSink {
                 }
             };
 
-            let outfile = match self.compression {
-                true => OutFile::Gzip(GzipEncoder::new(file)),
-                false => OutFile::Regular(file),
-            };
+            let outfile = OutFile::new(file, self.compression);
 
             self.files.insert_at(path.clone(), outfile, next_deadline);
             self.files.get_mut(&path).unwrap()
