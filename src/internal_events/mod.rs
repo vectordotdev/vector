@@ -13,6 +13,7 @@ mod json;
 mod kafka;
 #[cfg(feature = "sources-kubernetes-logs")]
 mod kubernetes_logs;
+mod logplex;
 #[cfg(feature = "transforms-lua")]
 mod lua;
 #[cfg(feature = "sources-prometheus")]
@@ -48,6 +49,7 @@ pub use self::json::*;
 pub use self::kafka::*;
 #[cfg(feature = "sources-kubernetes-logs")]
 pub use self::kubernetes_logs::*;
+pub use self::logplex::*;
 #[cfg(feature = "transforms-lua")]
 pub use self::lua::*;
 #[cfg(feature = "sources-prometheus")]

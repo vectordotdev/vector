@@ -1,5 +1,6 @@
 use crate::{
     event::{self, Event},
+    internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     shutdown::ShutdownSignal,
     sources::util::{ErrorMessage, HttpSource},
     tls::TlsConfig,
@@ -61,7 +62,12 @@ fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, Erro
     };
     let frame_id = get_header(&header_map, "Logplex-Frame-Id")?;
     let drain_token = get_header(&header_map, "Logplex-Drain-Token")?;
-    info!(message = "Handling logplex request", %msg_count, %frame_id, %drain_token);
+
+    emit!(HerokuLogplexRequestReceived {
+        msg_count,
+        frame_id,
+        drain_token
+    });
 
     // Deal with body
     let events = body_to_events(body);
@@ -75,8 +81,6 @@ fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, Erro
 
         if cfg!(test) {
             panic!(error_msg);
-        } else {
-            error!(message = error_msg.as_str());
         }
         return Err(header_error_message("Logplex-Msg-Count", &error_msg));
     }
@@ -105,7 +109,7 @@ fn body_to_events(body: Bytes) -> Vec<Event> {
     let rdr = BufReader::new(body.reader());
     rdr.lines()
         .filter_map(|res| {
-            res.map_err(|error| error!(message = "Error reading request body", ?error))
+            res.map_err(|error| emit!(HerokuLogplexRequestReadError { error }))
                 .ok()
         })
         .filter(|s| !s.is_empty())
@@ -138,8 +142,9 @@ fn line_to_event(line: String) -> Event {
         event
     } else {
         warn!(
-            message = "Line didn't match expected logplex format. Forwarding raw message.",
-            fields = parts.len()
+            message = "line didn't match expected logplex format, so raw message is forwarded.",
+            fields = parts.len(),
+            rate_limit_secs = 10
         );
         Event::from(line)
     };
