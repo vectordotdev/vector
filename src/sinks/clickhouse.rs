@@ -241,8 +241,7 @@ mod integration_tests {
     use futures::compat::Future01CompatExt;
     use futures01::Sink;
     use serde_json::Value;
-    use std::time::Duration;
-    use tokio01::util::FutureExt;
+    use tokio::time::{timeout, Duration};
 
     #[test]
     fn insert_events() {
@@ -451,11 +450,13 @@ timestamp_format = "unix""#,
 
             // Retries should go on forever, so if we are retrying incorrectly
             // this timeout should trigger.
-            sink.send(input_event.clone())
-                .timeout(Duration::from_secs(5))
-                .compat()
-                .await
-                .unwrap();
+            timeout(
+                Duration::from_secs(5),
+                sink.send(input_event.clone()).compat(),
+            )
+            .await
+            .unwrap()
+            .unwrap();
         });
     }
 
