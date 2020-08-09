@@ -18,7 +18,7 @@ required = true
 description = """\
 Path to the MaxMind GeoIP2-City, GeoLite2-City, GeoIP2-ISP or GeoLite2-ASN binary \
 database file (`GeoLite2-City.mmdb` or `GeoLite2-ISP.mmdb`). Other databases, such \
-as the the country database, are not currently supported.\
+as the country database, are not currently supported.\
 """
 
 [transforms.geoip.options.source]
@@ -175,8 +175,8 @@ title = "Supported Maxmind Databases"
 body = """\
 The `geopip` transform currently supports the following Maxmind databases:
 
-* [GeoIP2-ASP.mmdb][urls.maxmind_geoip2_asp] (paid) - Detect proxies, VPNs, and other anonymizers.
-* [GeoLite2-City.mmdb][urls.maxmind_geolite_city_2] (free) -  Determine the country, subdivisions, city, and postal code associated with IPv4 and IPv6 addresses worldwide.
+* [GeoLite2-ASN.mmdb][urls.maxmind_geolite2_asn] (free) - Determine the autonomous system number and organization associated with an IP address.
+* [GeoLite2-City.mmdb][urls.maxmind_geolite2_city] (free) -  Determine the country, subdivisions, city, and postal code associated with IPv4 and IPv6 addresses worldwide.
 * [GeoIP2-City.mmdb][urls.maxmind_geoip2_city] (paid) -  Determine the country, subdivisions, city, and postal code associated with IPv4 and IPv6 addresses worldwide.
 * [GeoIP2-ISP.mmdb][urls.maxmind_geoip2_isp] (paid) - Determine the Internet Service Provider, organization name, and autonomous system organization and number associated with an IP address.
 
