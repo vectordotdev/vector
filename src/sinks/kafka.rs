@@ -325,7 +325,7 @@ mod integration_test {
     use crate::{
         buffers::Acker,
         kafka::{KafkaAuthConfig, KafkaSaslConfig, KafkaTlsConfig},
-        test_util::{block_on, random_lines_with_stream, random_string, wait_for},
+        test_util::{block_on, random_lines_with_stream, random_string, wait_for_sync},
         tls::TlsOptions,
     };
     use futures::compat::Future01CompatExt;
@@ -480,7 +480,7 @@ mod integration_test {
         consumer.assign(&tpl).unwrap();
 
         // wait for messages to show up
-        wait_for(|| {
+        wait_for_sync(|| {
             let (_low, high) = consumer
                 .fetch_watermarks(&topic, 0, Duration::from_secs(3))
                 .unwrap();

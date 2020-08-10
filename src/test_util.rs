@@ -199,7 +199,7 @@ pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     output.lines().map(|s| s.to_owned()).collect()
 }
 
-pub fn wait_for(mut f: impl FnMut() -> bool) {
+pub fn wait_for_sync(mut f: impl FnMut() -> bool) {
     let wait = std::time::Duration::from_millis(5);
     let limit = std::time::Duration::from_secs(5);
     let mut attempts = 0;
@@ -253,17 +253,17 @@ where
         .unwrap()
 }
 
-pub fn wait_for_tcp(addr: SocketAddr) {
-    wait_for(|| std::net::TcpStream::connect(addr).is_ok())
+pub fn wait_for_tcp_sync(addr: SocketAddr) {
+    wait_for_sync(|| std::net::TcpStream::connect(addr).is_ok())
 }
 
-pub fn wait_for_atomic_usize<T, F>(val: T, unblock: F)
+pub fn wait_for_atomic_usize_sync<T, F>(val: T, unblock: F)
 where
     T: AsRef<AtomicUsize>,
     F: Fn(usize) -> bool,
 {
     let val = val.as_ref();
-    wait_for(|| unblock(val.load(Ordering::SeqCst)))
+    wait_for_sync(|| unblock(val.load(Ordering::SeqCst)))
 }
 
 pub fn shutdown_on_idle(rt: Runtime) {

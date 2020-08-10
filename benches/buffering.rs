@@ -4,7 +4,7 @@ use futures::compat::Future01CompatExt;
 use rand::{distributions::Alphanumeric, rngs::SmallRng, thread_rng, Rng, SeedableRng};
 use tempfile::tempdir;
 use vector::test_util::{
-    next_addr, runtime, send_lines, shutdown_on_idle, wait_for_tcp, CountReceiver,
+    next_addr, runtime, send_lines, shutdown_on_idle, wait_for_tcp_sync, CountReceiver,
 };
 use vector::{
     buffers::BufferConfig,
@@ -51,7 +51,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                         let (topology, _crash) = topology::start(config, false).await.unwrap();
                         (output_lines, topology)
                     });
-                    wait_for_tcp(in_addr);
+                    wait_for_tcp_sync(in_addr);
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
@@ -93,7 +93,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                         let (topology, _crash) = topology::start(config, false).await.unwrap();
                         (output_lines, topology)
                     });
-                    wait_for_tcp(in_addr);
+                    wait_for_tcp_sync(in_addr);
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
@@ -136,7 +136,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                         let (topology, _crash) = topology::start(config, false).await.unwrap();
                         (output_lines, topology)
                     });
-                    wait_for_tcp(in_addr);
+                    wait_for_tcp_sync(in_addr);
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {

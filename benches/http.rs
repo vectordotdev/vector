@@ -7,7 +7,7 @@ use hyper::{
 };
 use std::net::SocketAddr;
 use tokio::runtime::{Builder, Runtime};
-use vector::test_util::{next_addr, random_lines, send_lines, wait_for_tcp};
+use vector::test_util::{next_addr, random_lines, send_lines, wait_for_tcp_sync};
 use vector::{
     runtime, sinks, sources,
     topology::{self, config},
@@ -51,7 +51,7 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
                 let mut rt = runtime::Runtime::new().unwrap();
 
                 let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
-                wait_for_tcp(in_addr);
+                wait_for_tcp_sync(in_addr);
 
                 (rt, topology)
             },
@@ -109,7 +109,7 @@ fn benchmark_http_gzip(c: &mut Criterion) {
                 let mut rt = runtime::Runtime::new().unwrap();
 
                 let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
-                wait_for_tcp(in_addr);
+                wait_for_tcp_sync(in_addr);
 
                 (rt, topology)
             },

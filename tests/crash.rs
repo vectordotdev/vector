@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use vector::{
     shutdown::ShutdownSignal,
     test_util::{
-        next_addr, random_lines, runtime, send_lines, shutdown_on_idle, wait_for_tcp, CountReceiver,
+        next_addr, random_lines, runtime, send_lines, shutdown_on_idle, wait_for_tcp_sync,
+        CountReceiver,
     },
     topology::{
         self,
@@ -78,7 +79,7 @@ fn test_sink_panic() {
         std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
         let (topology, crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr);
+        wait_for_tcp_sync(in_addr);
         std::thread::sleep(std::time::Duration::from_millis(100));
 
         // Wait for output to connect
@@ -162,7 +163,7 @@ fn test_sink_error() {
 
         let (topology, crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr);
+        wait_for_tcp_sync(in_addr);
         std::thread::sleep(std::time::Duration::from_millis(100));
 
         // Wait for output to connect
@@ -232,7 +233,7 @@ fn test_source_error() {
 
         let (topology, crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr);
+        wait_for_tcp_sync(in_addr);
         std::thread::sleep(std::time::Duration::from_millis(100));
 
         // Wait for output to connect
@@ -305,7 +306,7 @@ fn test_source_panic() {
         std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
         let (topology, crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr);
+        wait_for_tcp_sync(in_addr);
         std::thread::sleep(std::time::Duration::from_millis(100));
 
         // Wait for output to connect

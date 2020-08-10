@@ -11,8 +11,8 @@ use vector::{
     runtime::Runtime,
     sinks, sources,
     test_util::{
-        next_addr, random_lines, runtime, send_lines, shutdown_on_idle, trace_init, wait_for_tcp,
-        CountReceiver,
+        next_addr, random_lines, runtime, send_lines, shutdown_on_idle, trace_init,
+        wait_for_tcp_sync, CountReceiver,
     },
     topology::{self, config},
     transforms,
@@ -42,7 +42,7 @@ fn pipe() {
 
         let (topology, _crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr);
+        wait_for_tcp_sync(in_addr);
 
         // Wait for output to connect
         output_lines.connected().await;
@@ -93,7 +93,7 @@ fn sample() {
 
         let (topology, _crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr);
+        wait_for_tcp_sync(in_addr);
 
         // Wait for output to connect
         output_lines.connected().await;
@@ -151,7 +151,7 @@ fn fork() {
 
         let (topology, _crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr);
+        wait_for_tcp_sync(in_addr);
 
         // Wait for output to connect
         output_lines1.connected().await;
@@ -213,8 +213,8 @@ fn merge_and_fork() {
 
         let (topology, _crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr1);
-        wait_for_tcp(in_addr2);
+        wait_for_tcp_sync(in_addr1);
+        wait_for_tcp_sync(in_addr2);
 
         // Wait for output to connect
         output_lines1.connected().await;
@@ -278,7 +278,7 @@ fn reconnect() {
 
         let (topology, _crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr);
+        wait_for_tcp_sync(in_addr);
 
         let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
         send_lines(in_addr, input_lines.clone()).await.unwrap();

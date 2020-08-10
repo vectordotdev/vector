@@ -9,7 +9,7 @@ use rand::{
 use std::convert::TryFrom;
 use vector::event::Event;
 use vector::test_util::{
-    next_addr, runtime, send_lines, shutdown_on_idle, wait_for_tcp, CountReceiver,
+    next_addr, runtime, send_lines, shutdown_on_idle, wait_for_tcp_sync, CountReceiver,
 };
 use vector::topology::config::{TransformConfig, TransformContext};
 use vector::topology::{self, config};
@@ -75,7 +75,7 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
                         let (topology, _crash) = topology::start(config, false).await.unwrap();
                         (output_lines, topology)
                     });
-                    wait_for_tcp(in_addr);
+                    wait_for_tcp_sync(in_addr);
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
@@ -127,7 +127,7 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
                         let (topology, _crash) = topology::start(config, false).await.unwrap();
                         (output_lines, topology)
                     });
-                    wait_for_tcp(in_addr);
+                    wait_for_tcp_sync(in_addr);
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
@@ -179,7 +179,7 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
                         let (topology, _crash) = topology::start(config, false).await.unwrap();
                         (output_lines, topology)
                     });
-                    wait_for_tcp(in_addr);
+                    wait_for_tcp_sync(in_addr);
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
@@ -232,7 +232,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
                         let (topology, _crash) = topology::start(config, false).await.unwrap();
                         (output_lines, topology)
                     });
-                    wait_for_tcp(in_addr);
+                    wait_for_tcp_sync(in_addr);
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
@@ -307,8 +307,8 @@ fn benchmark_interconnected(c: &mut Criterion) {
                         let (topology, _crash) = topology::start(config, false).await.unwrap();
                         (output_lines1, output_lines2, topology)
                     });
-                    wait_for_tcp(in_addr1);
-                    wait_for_tcp(in_addr2);
+                    wait_for_tcp_sync(in_addr1);
+                    wait_for_tcp_sync(in_addr2);
                     (rt, topology, output_lines1, output_lines2)
                 },
                 |(mut rt, topology, output_lines1, output_lines2)| {
@@ -380,7 +380,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                         let (topology, _crash) = topology::start(config, false).await.unwrap();
                         (output_lines, topology)
                     });
-                    wait_for_tcp(in_addr);
+                    wait_for_tcp_sync(in_addr);
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
@@ -565,8 +565,8 @@ fn benchmark_complex(c: &mut Criterion) {
                             topology,
                         )
                     });
-                    wait_for_tcp(in_addr1);
-                    wait_for_tcp(in_addr2);
+                    wait_for_tcp_sync(in_addr1);
+                    wait_for_tcp_sync(in_addr2);
                     (
                         rt,
                         topology,

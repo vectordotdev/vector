@@ -7,7 +7,7 @@ use tempfile::tempdir;
 use tracing::trace;
 use vector::event;
 use vector::test_util::{
-    random_events_with_stream, runtime, trace_init, wait_for_atomic_usize, CountReceiver,
+    random_events_with_stream, runtime, trace_init, wait_for_atomic_usize_sync, CountReceiver,
 };
 use vector::topology::{self, config};
 use vector::{buffers::BufferConfig, runtime};
@@ -69,7 +69,7 @@ fn test_buffering() {
     // can happen in any order, we reaching `terminate_abruptly` and source processing
     // all of the events. We need for the source to process events before `terminate_abruptly`
     // so we wait for that here.
-    wait_for_atomic_usize(source_event_counter, |x| x == num_events);
+    wait_for_atomic_usize_sync(source_event_counter, |x| x == num_events);
     // Now we give it some time for the events to propagate to File.
     // This is to avoid a race after the source processes all events, at that point two things
     // can happen in any order, we reaching `terminate_abruptly` and events being written
@@ -171,7 +171,7 @@ fn test_max_size() {
     // can happen in any order, we reaching `terminate_abruptly` and source processing
     // all of the events. We need for the source to process events before `terminate_abruptly`
     // so we wait for that here.
-    wait_for_atomic_usize(source_event_counter, |x| x == num_events);
+    wait_for_atomic_usize_sync(source_event_counter, |x| x == num_events);
     // Now we give it some time for the events to propagate to File.
     // This is to avoid a race after the source processes all events, at that point two things
     // can happen in any order, we reaching `terminate_abruptly` and events being written
@@ -255,7 +255,7 @@ fn test_reclaim_disk_space() {
     // can happen in any order, we reaching `terminate_abruptly` and source processing
     // all of the events. We need for the source to process events before `terminate_abruptly`
     // so we wait for that here.
-    wait_for_atomic_usize(source_event_counter, |x| x == num_events);
+    wait_for_atomic_usize_sync(source_event_counter, |x| x == num_events);
     // Now we give it some time for the events to propagate to File.
     // This is to avoid a race after the source processes all events, at that point two things
     // can happen in any order, we reaching `terminate_abruptly` and events being written
