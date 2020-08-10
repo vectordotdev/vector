@@ -4,7 +4,7 @@ use crate::{
     event::{Event, Value},
     internal_events::AddFieldsEventProcessed,
     template::Template,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;

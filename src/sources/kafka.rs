@@ -3,7 +3,7 @@ use crate::{
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::KafkaAuthConfig,
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Pipeline,
 };
 use bytes::Bytes;

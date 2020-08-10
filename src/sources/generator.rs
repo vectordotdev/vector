@@ -1,7 +1,7 @@
 use crate::{
     event::Event,
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Pipeline,
 };
 use futures::{

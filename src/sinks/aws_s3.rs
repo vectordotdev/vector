@@ -13,7 +13,7 @@ use crate::{
         PartitionInnerBuffer,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes05::Bytes;
 use chrono::Utc;
@@ -529,7 +529,7 @@ mod integration_tests {
         event::Event,
         region::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string, runtime},
-        topology::config::SinkContext,
+        config::SinkContext,
     };
     use bytes05::{buf::BufExt, BytesMut};
     use flate2::read::GzDecoder;

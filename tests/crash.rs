@@ -4,15 +4,12 @@ use futures::compat::Future01CompatExt;
 use futures01::{future, Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use vector::{
+    config::{self, GlobalOptions, SinkContext},
     shutdown::ShutdownSignal,
     test_util::{
         next_addr, random_lines, runtime, send_lines, shutdown_on_idle, wait_for_tcp, CountReceiver,
     },
-    topology::{
-        self,
-        config::{self, GlobalOptions, SinkContext},
-    },
-    Event, Pipeline, {sinks, sources},
+    topology, Event, Pipeline, {sinks, sources},
 };
 
 #[derive(Debug, Serialize, Deserialize)]

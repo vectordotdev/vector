@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -111,7 +111,7 @@ mod tests {
     use super::LogfmtConfig;
     use crate::{
         event::{LogEvent, Value},
-        topology::config::{TransformConfig, TransformContext},
+        config::{TransformConfig, TransformContext},
         Event,
     };
 

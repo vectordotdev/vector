@@ -8,7 +8,7 @@ use crate::{
     event,
     shutdown::ShutdownSignal,
     tls::MaybeTlsSettings,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Pipeline,
 };
 use serde::{Deserialize, Serialize};
@@ -144,7 +144,7 @@ mod test {
         block_on, collect_n, next_addr, runtime, send_lines, send_lines_tls, wait_for_tcp, CollectN,
     };
     use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions};
-    use crate::topology::config::{GlobalOptions, SourceConfig};
+    use crate::config::{GlobalOptions, SourceConfig};
     use crate::Pipeline;
     use bytes::Bytes;
     #[cfg(unix)]

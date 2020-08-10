@@ -1,4 +1,4 @@
-use crate::topology::{config::DataType, Config};
+use super::{Config, DataType};
 use std::collections::HashMap;
 
 pub fn typecheck(config: &Config) -> Result<(), Vec<String>> {
@@ -188,7 +188,7 @@ fn paths_rec(
 #[cfg(test)]
 mod test {
     use super::Graph;
-    use crate::topology::config::DataType;
+    use crate::config::DataType;
     use pretty_assertions::assert_eq;
 
     #[test]

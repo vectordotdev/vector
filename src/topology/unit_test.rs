@@ -1,7 +1,7 @@
 use crate::{
     conditions::{Condition, ConditionConfig},
     event::{Event, Value},
-    topology::config::{
+    config::{
         TestCondition, TestDefinition, TestInput, TestInputValue, TransformContext,
     },
     transforms::Transform,
@@ -520,7 +520,7 @@ pub fn build_unit_tests(config: &mut super::Config) -> Result<Vec<UnitTest>, Vec
 ))]
 mod tests {
     use super::*;
-    use crate::topology::config::Config;
+    use crate::config::Config;
 
     #[test]
     fn parse_no_input() {

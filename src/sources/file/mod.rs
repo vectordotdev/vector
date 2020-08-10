@@ -2,7 +2,7 @@ use crate::{
     event::{self, Event},
     internal_events::FileEventReceived,
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     trace::{current_span, Instrument},
     Pipeline,
 };

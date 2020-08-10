@@ -7,12 +7,12 @@ use rand::{
     prelude::*,
 };
 use std::convert::TryFrom;
+use vector::config::{self, TransformConfig, TransformContext};
 use vector::event::Event;
 use vector::test_util::{
     next_addr, runtime, send_lines, shutdown_on_idle, wait_for_tcp, CountReceiver,
 };
-use vector::topology::config::{TransformConfig, TransformContext};
-use vector::topology::{self, config};
+use vector::topology;
 use vector::{sinks, sources, transforms};
 
 mod batch;

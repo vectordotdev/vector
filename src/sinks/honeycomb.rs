@@ -5,7 +5,7 @@ use crate::{
         service2::TowerRequestConfig,
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, UriSerde,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::TryFutureExt;
 use futures01::Sink;

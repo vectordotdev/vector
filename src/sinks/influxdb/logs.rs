@@ -11,7 +11,7 @@ use crate::sinks::util::{
 use crate::sinks::Healthcheck;
 use crate::{
     event::{log_schema, Event},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures01::Sink;
 use http::{Request, Uri};

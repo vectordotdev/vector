@@ -1,6 +1,7 @@
 use crate::{
-    config, event,
-    topology::{config::Config, unit_test::UnitTest},
+    config::{self, Config},
+    event,
+    topology::unit_test::UnitTest,
 };
 use colored::*;
 use std::{fs::File, path::PathBuf};

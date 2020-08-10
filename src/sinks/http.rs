@@ -7,7 +7,7 @@ use crate::{
         BatchConfig, BatchSettings, Buffer, Compression, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::{future, Sink};
@@ -294,7 +294,7 @@ mod tests {
         sinks::util::http::HttpSink,
         sinks::util::test::build_test_server,
         test_util::{next_addr, random_lines_with_stream, runtime, shutdown_on_idle},
-        topology::config::SinkContext,
+        config::SinkContext,
     };
     use bytes05::buf::BufExt;
     use futures01::{Sink, Stream};

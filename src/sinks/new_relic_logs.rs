@@ -5,7 +5,7 @@ use crate::{
         service2::TowerRequestConfig,
         BatchConfig, Compression,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use http::Uri;
 use indexmap::IndexMap;
@@ -147,7 +147,7 @@ mod tests {
         event::Event,
         sinks::util::test::build_test_server,
         test_util::{next_addr, runtime, shutdown_on_idle},
-        topology::config::SinkConfig,
+        config::SinkConfig,
     };
     use bytes05::buf::BufExt;
     use futures01::{stream, Sink, Stream};

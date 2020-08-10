@@ -1,11 +1,11 @@
 use crate::{
+    config::{self, GlobalOptions},
     hyper::body_to_bytes,
     internal_events::{
         PrometheusEventReceived, PrometheusHttpError, PrometheusParseError,
         PrometheusRequestCompleted,
     },
     shutdown::ShutdownSignal,
-    topology::config::GlobalOptions,
     Event, Pipeline,
 };
 use futures::{
@@ -33,7 +33,7 @@ pub fn default_scrape_interval_secs() -> u64 {
 }
 
 #[typetag::serde(name = "prometheus")]
-impl crate::topology::config::SourceConfig for PrometheusConfig {
+impl crate::config::SourceConfig for PrometheusConfig {
     fn build(
         &self,
         _name: &str,
@@ -49,8 +49,8 @@ impl crate::topology::config::SourceConfig for PrometheusConfig {
         Ok(prometheus(urls, self.scrape_interval_secs, shutdown, out))
     }
 
-    fn output_type(&self) -> crate::topology::config::DataType {
-        crate::topology::config::DataType::Metric
+    fn output_type(&self) -> crate::config::DataType {
+        config::DataType::Metric
     }
 
     fn source_type(&self) -> &'static str {
@@ -129,11 +129,8 @@ fn prometheus(
 mod test {
     use super::*;
     use crate::{
-        hyper::body_to_bytes,
-        sinks::prometheus::PrometheusSinkConfig,
-        test_util::next_addr,
-        topology::{self, config},
-        Error,
+        config, hyper::body_to_bytes, sinks::prometheus::PrometheusSinkConfig,
+        test_util::next_addr, topology, Error,
     };
     use futures::compat::Future01CompatExt;
     use hyper::service::{make_service_fn, service_fn};

@@ -3,7 +3,7 @@ use crate::{
     sinks::util::{
         encoding::EncodingConfigWithDefault, service2::TowerRequestConfig, BatchConfig, Compression,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
 use futures01::{Future, Sink};
@@ -102,7 +102,7 @@ mod tests {
     use crate::event::Event;
     use crate::sinks::util::test::{build_test_server, load_sink};
     use crate::test_util;
-    use crate::topology::config::SinkConfig;
+    use crate::config::SinkConfig;
     use futures01::{Sink, Stream};
 
     #[test]

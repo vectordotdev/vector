@@ -3,7 +3,7 @@ use crate::{
     event::{Event, LogEvent, Value},
     internal_events::{JournaldEventReceived, JournaldInvalidRecord},
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Pipeline,
 };
 use chrono::TimeZone;

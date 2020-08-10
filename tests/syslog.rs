@@ -19,13 +19,13 @@ use tokio_util::codec::BytesCodec;
 #[cfg(unix)]
 use tokio_util::codec::{FramedWrite, LinesCodec};
 use vector::{
-    sinks,
+    config, sinks,
     sources::syslog::{Mode, SyslogConfig},
     test_util::{
         next_addr, random_maps, random_string, runtime, send_encodable, send_lines,
         shutdown_on_idle, trace_init, wait_for_tcp, CountReceiver,
     },
-    topology::{self, config},
+    topology,
 };
 
 #[test]

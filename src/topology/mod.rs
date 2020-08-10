@@ -7,13 +7,12 @@
 //! each type of component.
 
 pub mod builder;
-pub mod config;
 mod fanout;
 mod task;
 pub mod unit_test;
 
-pub use self::config::Config;
-pub use self::config::SinkContext;
+pub use crate::config::SinkContext;
+pub use crate::config::{Config, ConfigDiff};
 
 use crate::topology::{builder::Pieces, task::Task};
 
@@ -21,7 +20,6 @@ use crate::buffers;
 use crate::shutdown::SourceShutdownCoordinator;
 use futures::{compat::Future01CompatExt, future, FutureExt, StreamExt, TryFutureExt};
 use futures01::{sync::mpsc, Future};
-use indexmap::IndexMap;
 use std::{
     collections::{HashMap, HashSet},
     panic::AssertUnwindSafe,
@@ -604,85 +602,6 @@ impl RunningTopology {
     }
 }
 
-pub struct ConfigDiff {
-    sources: Difference,
-    transforms: Difference,
-    sinks: Difference,
-}
-
-impl ConfigDiff {
-    pub fn initial(initial: &Config) -> Self {
-        Self::new(&Config::empty(), initial)
-    }
-
-    fn new(old: &Config, new: &Config) -> Self {
-        ConfigDiff {
-            sources: Difference::new(&old.sources, &new.sources),
-            transforms: Difference::new(&old.transforms, &new.transforms),
-            sinks: Difference::new(&old.sinks, &new.sinks),
-        }
-    }
-
-    /// Swaps removed with added in Differences.
-    fn flip(mut self) -> Self {
-        self.sources.flip();
-        self.transforms.flip();
-        self.sinks.flip();
-        self
-    }
-}
-
-struct Difference {
-    to_remove: HashSet<String>,
-    to_change: HashSet<String>,
-    to_add: HashSet<String>,
-}
-
-impl Difference {
-    fn new<C>(old: &IndexMap<String, C>, new: &IndexMap<String, C>) -> Self
-    where
-        C: serde::Serialize + serde::Deserialize<'static>,
-    {
-        let old_names = old.keys().cloned().collect::<HashSet<_>>();
-        let new_names = new.keys().cloned().collect::<HashSet<_>>();
-
-        let to_change = old_names
-            .intersection(&new_names)
-            .filter(|&n| {
-                // This is a hack around the issue of comparing two
-                // trait objects. Json is used here over toml since
-                // toml does not support serializing `None`.
-                let old_json = serde_json::to_vec(&old[n]).unwrap();
-                let new_json = serde_json::to_vec(&new[n]).unwrap();
-                old_json != new_json
-            })
-            .cloned()
-            .collect::<HashSet<_>>();
-
-        let to_remove = &old_names - &new_names;
-        let to_add = &new_names - &old_names;
-
-        Self {
-            to_remove,
-            to_change,
-            to_add,
-        }
-    }
-
-    /// True if name is present in new config and either not in the old one or is different.
-    fn contains_new(&self, name: &str) -> bool {
-        self.to_add.contains(name) || self.to_change.contains(name)
-    }
-
-    fn flip(&mut self) {
-        std::mem::swap(&mut self.to_remove, &mut self.to_add);
-    }
-
-    fn changed_and_added(&self) -> impl Iterator<Item = &String> {
-        self.to_change.iter().chain(self.to_add.iter())
-    }
-}
-
 fn handle_errors(
     task: impl Future<Item = (), Error = ()>,
     abort_tx: mpsc::UnboundedSender<()>,
@@ -712,11 +631,11 @@ fn retain<T>(vec: &mut Vec<T>, mut retain_filter: impl FnMut(&mut T) -> bool) {
 
 #[cfg(all(test, feature = "sinks-console", feature = "sources-socket"))]
 mod tests {
+    use crate::config::Config;
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sources::socket::SocketConfig;
     use crate::test_util::{next_addr, runtime};
     use crate::topology;
-    use crate::topology::config::Config;
 
     #[test]
     fn topology_doesnt_reload_new_data_dir() {
@@ -757,11 +676,11 @@ mod tests {
 
 #[cfg(all(test, feature = "sinks-console", feature = "sources-splunk_hec"))]
 mod reload_tests {
+    use crate::config::Config;
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sources::splunk_hec::SplunkConfig;
     use crate::test_util::{next_addr, runtime};
     use crate::topology;
-    use crate::topology::config::Config;
 
     #[test]
     fn topology_rebuild_old() {
@@ -834,7 +753,7 @@ mod reload_tests {
 mod source_finished_tests {
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sources::generator::GeneratorConfig;
-    use crate::topology::{self, config::Config};
+    use crate::{config::Config, topology};
     use futures::compat::Future01CompatExt;
     use tokio::time::{timeout, Duration};
 
@@ -867,12 +786,12 @@ mod source_finished_tests {
     feature = "transforms-json_parser"
 ))]
 mod transient_state_tests {
+    use crate::config::{Config, DataType, GlobalOptions, SourceConfig};
     use crate::shutdown::ShutdownSignal;
     use crate::sinks::blackhole::BlackholeConfig;
     use crate::sources::stdin::StdinConfig;
     use crate::sources::Source;
     use crate::test_util::runtime;
-    use crate::topology::config::{Config, DataType, GlobalOptions, SourceConfig};
     use crate::transforms::json_parser::JsonParserConfig;
     use crate::Pipeline;
     use crate::{topology, Error};

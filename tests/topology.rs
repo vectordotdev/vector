@@ -11,10 +11,10 @@ use std::sync::{
 };
 use std::time::Duration;
 use std::{iter, thread};
+use vector::config::Config;
 use vector::event::{self, Event};
 use vector::test_util::{runtime, shutdown_on_idle, trace_init};
 use vector::topology;
-use vector::topology::config::Config;
 
 fn basic_config() -> Config {
     let mut config = Config::empty();

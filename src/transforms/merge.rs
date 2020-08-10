@@ -3,7 +3,7 @@ use crate::{
     event::discriminant::Discriminant,
     event::merge_state::LogEventMergeState,
     event::{self, Event},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};

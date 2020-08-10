@@ -8,14 +8,14 @@ use approx::assert_relative_eq;
 use futures::compat::Future01CompatExt;
 use tokio::net::TcpListener;
 use vector::{
+    config,
     runtime::Runtime,
     sinks, sources,
     test_util::{
         next_addr, random_lines, runtime, send_lines, shutdown_on_idle, trace_init, wait_for_tcp,
         CountReceiver,
     },
-    topology::{self, config},
-    transforms,
+    topology, transforms,
 };
 
 #[test]

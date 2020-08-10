@@ -12,7 +12,7 @@ use crate::{
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
@@ -394,7 +394,7 @@ mod integration_tests {
     use crate::{
         assert_downcast_matches, sinks,
         test_util::{random_lines_with_stream, random_string, runtime},
-        topology::config::{SinkConfig, SinkContext},
+        config::{SinkConfig, SinkContext},
         Event,
     };
     use futures::compat::Future01CompatExt;

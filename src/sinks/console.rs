@@ -4,7 +4,7 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use async_trait::async_trait;
 use futures::pin_mut;

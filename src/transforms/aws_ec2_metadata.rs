@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     hyper::body_to_bytes,
     sinks::util::http::HttpClient,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use bytes::Bytes;
 use futures::compat::Future01CompatExt;

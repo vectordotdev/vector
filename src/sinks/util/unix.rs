@@ -5,7 +5,7 @@ use crate::{
     },
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, StreamSink},
     sinks::{Healthcheck, RouterSink},
-    topology::config::SinkContext,
+    config::SinkContext,
 };
 use bytes05::Bytes;
 use futures::{compat::CompatSink, FutureExt, TryFutureExt};

@@ -7,7 +7,7 @@ use crate::{
         DockerLoggingDriverUnsupported, DockerTimestampParseFailed,
     },
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Pipeline,
 };
 use bollard::{

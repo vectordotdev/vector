@@ -9,11 +9,7 @@ use futures::{
     StreamExt,
 };
 use futures01::Future;
-use std::{
-    cmp::max,
-    fs::File,
-    path::{Path, PathBuf},
-};
+use std::cmp::max;
 use tokio::select;
 use topology::Config;
 use vector::{
@@ -105,7 +101,7 @@ fn main() {
             path = ?config_paths
         );
 
-        let read_config = read_configs(&config_paths);
+        let read_config = config::read_configs(&config_paths);
         let maybe_config = handle_config_errors(read_config);
         let config = maybe_config.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
@@ -145,7 +141,7 @@ fn main() {
                             message = "Reloading configs.",
                             path = ?config_paths
                         );
-                        let new_config = read_configs(&config_paths);
+                        let new_config = config::read_configs(&config_paths);
 
                         trace!("Parsing config");
                         let new_config = handle_config_errors(new_config);
@@ -204,54 +200,6 @@ fn handle_config_errors(config: Result<Config, Vec<String>>) -> Option<Config> {
             None
         }
         Ok(config) => Some(config),
-    }
-}
-
-fn read_configs(config_paths: &[PathBuf]) -> Result<Config, Vec<String>> {
-    let mut config = vector::topology::Config::empty();
-    let mut errors = Vec::new();
-
-    config_paths.iter().for_each(|p| {
-        let file = if let Some(file) = open_config(&p) {
-            file
-        } else {
-            errors.push(format!("Config file not found in path: {:?}.", p));
-            return;
-        };
-
-        trace!(
-            message = "Parsing config.",
-            path = ?p
-        );
-
-        if let Err(errs) = Config::load(file).and_then(|n| config.append(n)) {
-            errors.extend(errs.iter().map(|e| format!("{:?}: {}", p, e)));
-        }
-    });
-
-    if let Err(mut errs) = config.expand_macros() {
-        errors.append(&mut errs);
-    }
-
-    if !errors.is_empty() {
-        Err(errors)
-    } else {
-        Ok(config)
-    }
-}
-
-fn open_config(path: &Path) -> Option<File> {
-    match File::open(path) {
-        Ok(f) => Some(f),
-        Err(error) => {
-            if let std::io::ErrorKind::NotFound = error.kind() {
-                error!(message = "Config file not found in path.", ?path);
-                None
-            } else {
-                error!(message = "Error opening config file.", %error);
-                None
-            }
-        }
     }
 }
 

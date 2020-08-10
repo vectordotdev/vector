@@ -11,7 +11,7 @@ use crate::{
         sink::Response,
         BatchConfig, BatchSettings, Compression, EncodedLength, VecBuffer,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes05::Bytes;
 use futures::{future::BoxFuture, FutureExt, TryFutureExt};
@@ -358,7 +358,7 @@ mod integration_tests {
     use crate::{
         region::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string, runtime},
-        topology::config::SinkContext,
+        config::SinkContext,
     };
     use futures01::Sink;
     use rusoto_core::Region;

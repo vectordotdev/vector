@@ -4,7 +4,7 @@ use crate::{
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Event, Pipeline,
 };
 use bytes05::{Bytes, BytesMut};
@@ -102,7 +102,7 @@ mod test {
         sinks::vector::VectorSinkConfig,
         test_util::{next_addr, runtime, wait_for_tcp, CollectCurrent},
         tls::{TlsConfig, TlsOptions},
-        topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
+        config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
         Event, Pipeline,
     };
     use futures01::{stream, Future, Sink};

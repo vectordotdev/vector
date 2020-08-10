@@ -3,7 +3,7 @@ mod interop;
 use crate::{
     config::CONFIG_PATHS,
     event::Event,
-    topology::config::{DataType, TransformContext},
+    config::{DataType, TransformContext},
     transforms::{
         util::runtime_transform::{RuntimeTransform, Timer},
         Transform,

@@ -6,7 +6,7 @@ use crate::{
         retries2::RetryLogic, rusoto, service2::TowerRequestConfig, BatchConfig, BatchSettings,
         Compression, MetricBuffer,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, SecondsFormat, Utc};
 use futures::{future::BoxFuture, FutureExt, TryFutureExt};
@@ -428,7 +428,7 @@ mod integration_tests {
     use crate::event::{metric::StatisticKind, Event};
     use crate::region::RegionOrEndpoint;
     use crate::test_util::{random_string, runtime};
-    use crate::topology::config::SinkContext;
+    use crate::config::SinkContext;
     use chrono::offset::TimeZone;
     use futures01::{stream, Sink};
 

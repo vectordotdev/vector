@@ -5,7 +5,7 @@ use crate::{
     serde::to_string,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
     template::{Template, TemplateError},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::compat::Compat;
 use futures01::{

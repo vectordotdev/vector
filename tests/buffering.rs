@@ -10,8 +10,8 @@ use vector::test_util::{
     random_events_with_stream, runtime, shutdown_on_idle, trace_init, wait_for_atomic_usize,
     CountReceiver,
 };
-use vector::topology::{self, config};
 use vector::{buffers::BufferConfig, runtime};
+use vector::{config, topology};
 
 mod support;
 

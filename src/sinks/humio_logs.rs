@@ -4,7 +4,7 @@ use crate::{
         encoding::EncodingConfigWithDefault, service2::TowerRequestConfig, BatchConfig, Compression,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use serde::{Deserialize, Serialize};
 
@@ -133,7 +133,7 @@ mod integration_tests {
     use crate::{
         sinks::util::Compression,
         test_util::{random_string, runtime},
-        topology::config::{SinkConfig, SinkContext},
+        config::{SinkConfig, SinkContext},
         Event,
     };
     use chrono::Utc;

@@ -1,7 +1,7 @@
 use crate::{
+    config::{self, GlobalOptions},
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
-    topology::config::GlobalOptions,
     Event, Pipeline,
 };
 use futures::{
@@ -24,7 +24,7 @@ struct StatsdConfig {
 }
 
 #[typetag::serde(name = "statsd")]
-impl crate::topology::config::SourceConfig for StatsdConfig {
+impl crate::config::SourceConfig for StatsdConfig {
     fn build(
         &self,
         _name: &str,
@@ -35,8 +35,8 @@ impl crate::topology::config::SourceConfig for StatsdConfig {
         Ok(statsd(self.address, shutdown, out))
     }
 
-    fn output_type(&self) -> crate::topology::config::DataType {
-        crate::topology::config::DataType::Metric
+    fn output_type(&self) -> crate::config::DataType {
+        config::DataType::Metric
     }
 
     fn source_type(&self) -> &'static str {
@@ -104,11 +104,7 @@ fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> super::S
 #[cfg(test)]
 mod test {
     use super::StatsdConfig;
-    use crate::{
-        sinks::prometheus::PrometheusSinkConfig,
-        test_util::next_addr,
-        topology::{self, config},
-    };
+    use crate::{config, sinks::prometheus::PrometheusSinkConfig, test_util::next_addr, topology};
     use futures::{compat::Future01CompatExt, TryStreamExt};
     use futures01::Stream;
     use tokio::time::{delay_for, Duration};

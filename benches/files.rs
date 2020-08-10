@@ -8,9 +8,9 @@ use tempfile::tempdir;
 use tokio::fs::OpenOptions;
 use tokio_util::codec::{BytesCodec, FramedWrite};
 use vector::{
-    sinks, sources,
+    config, sinks, sources,
     test_util::{random_lines, runtime},
-    topology::{self, config},
+    topology,
 };
 
 fn benchmark_files_without_partitions(c: &mut Criterion) {

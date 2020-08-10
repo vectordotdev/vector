@@ -11,7 +11,7 @@ use crate::{
         Healthcheck, RouterSink, UriParseError,
     },
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;

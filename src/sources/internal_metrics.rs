@@ -1,7 +1,7 @@
 use crate::{
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Event, Pipeline,
 };
 use chrono::Utc;

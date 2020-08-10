@@ -6,7 +6,7 @@ use crate::{
     internal_events::{SyslogEventReceived, SyslogUdpReadError, SyslogUdpUtf8Error},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Pipeline,
 };
 use bytes05::{Buf, Bytes, BytesMut};

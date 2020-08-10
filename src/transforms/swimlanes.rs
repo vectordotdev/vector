@@ -2,7 +2,7 @@ use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
     event::Event,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};

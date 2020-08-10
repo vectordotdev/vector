@@ -1,4 +1,7 @@
-use vector::topology::{self, Config, ConfigDiff};
+use vector::{
+    config::{Config, ConfigDiff},
+    topology,
+};
 
 fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
     let mut rt = vector::runtime::Runtime::new().unwrap();

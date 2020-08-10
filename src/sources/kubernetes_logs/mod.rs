@@ -12,7 +12,7 @@ use crate::{
     dns::Resolver,
     shutdown::ShutdownSignal,
     sources,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     transforms::Transform,
     Pipeline,
 };

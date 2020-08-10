@@ -5,7 +5,7 @@ use crate::{
     sinks::util::{
         service2::TowerCompat, BatchConfig, BatchSettings, BatchSink, Buffer, Compression,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{future, FutureExt, TryFutureExt};
 use futures01::{stream, Sink};

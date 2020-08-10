@@ -1,10 +1,16 @@
 use super::{
-    config::{DataType, SinkContext, TransformContext},
     fanout::{self, Fanout},
     task::Task,
     ConfigDiff,
 };
-use crate::{buffers, dns::Resolver, event::Event, shutdown::SourceShutdownCoordinator, Pipeline};
+use crate::{
+    buffers,
+    config::{DataType, SinkContext, TransformContext},
+    dns::Resolver,
+    event::Event,
+    shutdown::SourceShutdownCoordinator,
+    Pipeline,
+};
 use futures::{compat::Future01CompatExt, FutureExt};
 use futures01::{sync::mpsc, Future, Stream};
 use std::collections::HashMap;

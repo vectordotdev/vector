@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     event::metric::{Metric, MetricKind, MetricValue},
     sinks::util::MetricEntry,
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
 use chrono::Utc;

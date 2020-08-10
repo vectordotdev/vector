@@ -6,7 +6,7 @@ use crate::{
         StreamSink,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use async_trait::async_trait;
 use bytes::Bytes;

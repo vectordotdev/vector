@@ -3,7 +3,7 @@ use crate::{
     internal_events::VectorEventSent,
     sinks::util::{tcp::TcpSink, StreamSink},
     tls::{MaybeTlsSettings, TlsConfig},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
 use bytes::Bytes;

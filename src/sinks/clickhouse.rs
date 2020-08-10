@@ -8,7 +8,7 @@ use crate::{
         BatchConfig, BatchSettings, Buffer, Compression,
     },
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
@@ -236,7 +236,7 @@ mod integration_tests {
         event::Event,
         sinks::util::encoding::TimestampFormat,
         test_util::{random_string, runtime},
-        topology::config::{SinkConfig, SinkContext},
+        config::{SinkConfig, SinkContext},
     };
     use futures::compat::Future01CompatExt;
     use futures01::Sink;

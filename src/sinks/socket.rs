@@ -3,7 +3,7 @@ use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     sinks::util::{encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding},
     tls::TlsConfig,
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use serde::{Deserialize, Serialize};
 
@@ -89,7 +89,7 @@ mod test {
     use crate::{
         event::Event,
         test_util::{next_addr, random_lines_with_stream, runtime, CountReceiver},
-        topology::config::SinkContext,
+        config::SinkContext,
     };
     use futures::compat::Future01CompatExt;
     use futures01::Sink;

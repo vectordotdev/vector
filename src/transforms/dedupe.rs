@@ -2,7 +2,7 @@ use super::Transform;
 use crate::{
     event,
     event::{Event, Value},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use bytes::Bytes;
 use lru::LruCache;

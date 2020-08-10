@@ -4,7 +4,7 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::util::{ErrorMessage, HttpSource},
     tls::TlsConfig,
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    config::{DataType, GlobalOptions, SourceConfig},
     Pipeline,
 };
 use bytes05::{buf::BufExt, Bytes};
@@ -165,7 +165,7 @@ mod tests {
         event::{self, Event},
         runtime::Runtime,
         test_util::{self, collect_n, runtime},
-        topology::config::{GlobalOptions, SourceConfig},
+        config::{GlobalOptions, SourceConfig},
         Pipeline,
     };
     use chrono::{DateTime, Utc};

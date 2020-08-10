@@ -6,7 +6,7 @@ use crate::{
         service2::TowerRequestConfig,
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, UriSerde,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
@@ -221,7 +221,7 @@ mod tests {
     use crate::event::Event;
     use crate::sinks::util::test::{build_test_server, load_sink};
     use crate::test_util;
-    use crate::topology::config::SinkConfig;
+    use crate::config::SinkConfig;
     use futures01::{Sink, Stream};
     use serde_json::json;
 

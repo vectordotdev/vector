@@ -24,7 +24,7 @@ use crate::{
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use derivative::Derivative;
 use futures01::Sink;
@@ -251,7 +251,7 @@ mod integration_tests {
     use super::*;
     use crate::sinks::util::test::load_sink;
     use crate::template::Template;
-    use crate::topology::config::SinkConfig;
+    use crate::config::SinkConfig;
     use crate::Event;
     use bytes::Bytes;
     use futures::compat::Future01CompatExt;

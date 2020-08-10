@@ -6,11 +6,7 @@ use tempfile::tempdir;
 use vector::test_util::{
     next_addr, runtime, send_lines, shutdown_on_idle, wait_for_tcp, CountReceiver,
 };
-use vector::{
-    buffers::BufferConfig,
-    sinks, sources,
-    topology::{self, config},
-};
+use vector::{buffers::BufferConfig, config, sinks, sources, topology};
 
 fn benchmark_buffers(c: &mut Criterion) {
     let num_lines: usize = 100_000;

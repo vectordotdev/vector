@@ -2,7 +2,7 @@ use super::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, St
 use crate::{
     dns::{Resolver, ResolverFuture},
     sinks::{Healthcheck, RouterSink},
-    topology::config::SinkContext,
+    config::SinkContext,
 };
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};

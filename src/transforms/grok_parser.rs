@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event, PathComponent, PathIter},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     types::{parse_conversion_map_no_atoms, Conversion},
 };
 use grok::Pattern;
@@ -134,7 +134,7 @@ mod tests {
     use crate::event::LogEvent;
     use crate::{
         event,
-        topology::config::{TransformConfig, TransformContext},
+        config::{TransformConfig, TransformContext},
         Event,
     };
     use pretty_assertions::assert_eq;

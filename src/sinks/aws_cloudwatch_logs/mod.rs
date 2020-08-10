@@ -11,7 +11,7 @@ use crate::{
         PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig, SinkContext},
+    config::{DataType, SinkConfig, SinkContext},
 };
 use bytes::Bytes;
 use chrono::{Duration, Utc};
@@ -848,7 +848,7 @@ mod integration_tests {
     use crate::{
         region::RegionOrEndpoint,
         test_util::{random_lines, random_lines_with_stream, random_string, runtime},
-        topology::config::{SinkConfig, SinkContext},
+        config::{SinkConfig, SinkContext},
     };
     use futures01::{
         stream::{self, Stream},

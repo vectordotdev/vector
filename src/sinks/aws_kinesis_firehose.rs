@@ -10,7 +10,7 @@ use crate::{
         sink::Response,
         BatchConfig, BatchSettings, Compression, EncodedLength, VecBuffer,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes05::Bytes;
 use futures::{future::BoxFuture, FutureExt, TryFutureExt};
@@ -281,7 +281,7 @@ mod integration_tests {
             util::BatchConfig,
         },
         test_util::{random_events_with_stream, random_string, runtime},
-        topology::config::SinkContext,
+        config::SinkContext,
     };
     use futures::compat::Future01CompatExt;
     use futures01::Sink;

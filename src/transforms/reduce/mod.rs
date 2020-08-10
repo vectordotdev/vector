@@ -3,7 +3,7 @@ use crate::{
     conditions::{AnyCondition, Condition},
     event::discriminant::Discriminant,
     event::{Event, LogEvent},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use async_stream::stream;
 use futures::{
@@ -287,7 +287,7 @@ mod test {
     use super::ReduceConfig;
     use crate::{
         event::Value,
-        topology::config::{TransformConfig, TransformContext},
+        config::{TransformConfig, TransformContext},
         Event,
     };
     use serde_json::json;

@@ -8,7 +8,7 @@ use crate::{
         service2::TowerRequestConfig,
         BatchConfig, BatchSettings, MetricBuffer,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, Utc};
 use futures::{FutureExt, TryFutureExt};

@@ -2,7 +2,7 @@ use crate::{
     event::{self, Event},
     internal_events::{StdinEventReceived, StdinReadFailed},
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Pipeline,
 };
 use bytes::Bytes;

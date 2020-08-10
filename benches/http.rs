@@ -8,11 +8,7 @@ use hyper::{
 use std::net::SocketAddr;
 use tokio::runtime::{Builder, Runtime};
 use vector::test_util::{next_addr, random_lines, send_lines, wait_for_tcp};
-use vector::{
-    runtime, sinks, sources,
-    topology::{self, config},
-    Error,
-};
+use vector::{config, runtime, sinks, sources, topology, Error};
 
 fn benchmark_http_no_compression(c: &mut Criterion) {
     let num_lines: usize = 100_000;

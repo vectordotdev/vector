@@ -1,7 +1,7 @@
 use crate::{
     event::{Event, Value},
     internal_events::{LuaEventProcessed, LuaGcTriggered, LuaScriptError},
-    topology::config::{DataType, TransformContext},
+    config::{DataType, TransformContext},
     transforms::Transform,
 };
 use serde::{Deserialize, Serialize};

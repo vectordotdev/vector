@@ -9,7 +9,7 @@ use crate::{
         service2::TowerRequestConfig,
         BatchConfig, BatchSettings, MetricBuffer,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::future::{ready, BoxFuture};
 use futures01::Sink;

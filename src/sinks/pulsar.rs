@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     event::{self, Event},
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{lock::Mutex, FutureExt, TryFutureExt};
 use futures01::{

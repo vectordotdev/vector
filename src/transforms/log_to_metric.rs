@@ -3,7 +3,7 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::{self, Value},
     template::{Template, TemplateError},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     Event,
 };
 use indexmap::IndexMap;
