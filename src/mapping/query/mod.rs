@@ -6,14 +6,14 @@ use crate::{
 pub mod arithmetic;
 pub mod path;
 
-pub trait Function: Send + core::fmt::Debug {
+pub(in crate::mapping) trait Function: Send + core::fmt::Debug {
     fn execute(&self, context: &Event) -> Result<Value>;
 }
 
 //------------------------------------------------------------------------------
 
 #[derive(Debug)]
-pub struct Literal {
+pub(in crate::mapping) struct Literal {
     value: Value,
 }
 

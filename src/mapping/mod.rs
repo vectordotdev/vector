@@ -7,20 +7,20 @@ use string_cache::DefaultAtom as Atom;
 
 pub type Result<T> = std::result::Result<T, String>;
 
-pub trait Function: Send + core::fmt::Debug {
+pub(self) trait Function: Send + core::fmt::Debug {
     fn apply(&self, target: &mut Event) -> Result<()>;
 }
 
 //------------------------------------------------------------------------------
 
 #[derive(Debug)]
-pub struct Assignment {
+pub(self) struct Assignment {
     path: String,
     function: Box<dyn query::Function>,
 }
 
 impl Assignment {
-    pub fn new(path: String, func: Box<dyn query::Function>) -> Self {
+    pub(self) fn new(path: String, func: Box<dyn query::Function>) -> Self {
         Self {
             path: path,
             function: func,
@@ -39,13 +39,13 @@ impl Function for Assignment {
 //------------------------------------------------------------------------------
 
 #[derive(Debug)]
-pub struct Deletion {
+pub(self) struct Deletion {
     // TODO: Switch to String once Event API is cleaned up.
     path: Atom,
 }
 
 impl Deletion {
-    pub fn new(path: String) -> Self {
+    pub(self) fn new(path: String) -> Self {
         Self {
             path: Atom::from(path),
         }
@@ -67,7 +67,7 @@ pub struct Mapping {
 }
 
 impl Mapping {
-    pub fn new(assignments: Vec<Box<dyn Function>>) -> Self {
+    pub(self) fn new(assignments: Vec<Box<dyn Function>>) -> Self {
         Mapping { assignments }
     }
 

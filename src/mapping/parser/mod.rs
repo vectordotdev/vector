@@ -290,12 +290,12 @@ mod test {
   = expected EOI or operator"###,
             ),
             (
-                ".foo.bar = \"baz\" + ",
+                ".foo.bar = \"baz\" +",
                 r###"mapping parse error
- --> 1:20
+ --> 1:19
   |
 1 | .foo.bar = "baz" +
-  |                    ^---
+  |                   ^---
   |
   = expected query"###,
             ),

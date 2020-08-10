@@ -75,6 +75,14 @@ mod tests {
     use super::*;
     use string_cache::DefaultAtom as Atom;
 
+    fn get_field_string(event: &Event, field: &str) -> String {
+        event
+            .as_log()
+            .get(&Atom::from(field))
+            .unwrap()
+            .to_string_lossy()
+    }
+
     #[test]
     fn check_remap_adds() {
         let event = {
@@ -94,45 +102,10 @@ mod tests {
         let mut tform = Remap::new(conf).unwrap();
 
         let result = tform.transform(event.clone()).unwrap();
-        assert_eq!(
-            result
-                .as_log()
-                .get(&Atom::from("message"))
-                .unwrap()
-                .to_string_lossy(),
-            "augment me"
-        );
-        assert_eq!(
-            result
-                .as_log()
-                .get(&Atom::from("copy_from"))
-                .unwrap()
-                .to_string_lossy(),
-            "buz"
-        );
-        assert_eq!(
-            result
-                .as_log()
-                .get(&Atom::from("foo"))
-                .unwrap()
-                .to_string_lossy(),
-            "bar"
-        );
-        assert_eq!(
-            result
-                .as_log()
-                .get(&Atom::from("bar"))
-                .unwrap()
-                .to_string_lossy(),
-            "baz"
-        );
-        assert_eq!(
-            result
-                .as_log()
-                .get(&Atom::from("copy"))
-                .unwrap()
-                .to_string_lossy(),
-            "buz"
-        );
+        assert_eq!(get_field_string(&result, "message"), "augment me");
+        assert_eq!(get_field_string(&result, "copy_from"), "buz");
+        assert_eq!(get_field_string(&result, "foo"), "bar");
+        assert_eq!(get_field_string(&result, "bar"), "baz");
+        assert_eq!(get_field_string(&result, "copy"), "buz");
     }
 }

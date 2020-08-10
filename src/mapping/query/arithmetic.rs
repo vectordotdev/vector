@@ -5,7 +5,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub enum Operator {
+pub(in crate::mapping) enum Operator {
     Multiply,
     Divide,
     Modulo,
@@ -22,14 +22,18 @@ pub enum Operator {
 }
 
 #[derive(Debug)]
-pub struct Arithmetic {
+pub(in crate::mapping) struct Arithmetic {
     left: Box<dyn Function>,
     right: Box<dyn Function>,
     op: Operator,
 }
 
 impl Arithmetic {
-    pub fn new(left: Box<dyn Function>, right: Box<dyn Function>, op: Operator) -> Self {
+    pub(in crate::mapping) fn new(
+        left: Box<dyn Function>,
+        right: Box<dyn Function>,
+        op: Operator,
+    ) -> Self {
         Self { left, right, op }
     }
 }
@@ -76,6 +80,10 @@ impl Function for Arithmetic {
     fn execute(&self, ctx: &Event) -> Result<Value> {
         let left = self.left.execute(ctx);
         let right = self.right.execute(ctx);
+
+        // TODO: A lot of these comparisons could potentially be baked into the
+        // Value type. However, we would need to agree on general rules as to
+        // how different types are compared.
 
         Ok(match self.op {
             Operator::Multiply => {
