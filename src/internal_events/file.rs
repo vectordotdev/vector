@@ -12,7 +12,6 @@ impl InternalEvent for FileEventReceived<'_> {
         trace!(
             message = "received one event.",
             %self.file,
-            rate_limit_secs = 10
         );
     }
 

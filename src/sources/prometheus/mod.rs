@@ -1,19 +1,23 @@
 use crate::{
     hyper::body_to_bytes,
-    internal_events::{PrometheusHttpError, PrometheusParseError, PrometheusRequestCompleted},
+    internal_events::{
+        PrometheusEventReceived, PrometheusHttpError, PrometheusParseError,
+        PrometheusRequestCompleted,
+    },
     shutdown::ShutdownSignal,
-    stream::StreamExt01,
     topology::config::GlobalOptions,
-    Event,
+    Event, Pipeline,
 };
-use futures::{FutureExt, TryFutureExt};
-use futures01::{sync::mpsc, Future, Sink, Stream as Stream01};
+use futures::{
+    compat::{Future01CompatExt, Sink01CompatExt},
+    future, stream, FutureExt, StreamExt, TryFutureExt,
+};
+use futures01::Sink;
 use hyper::{Body, Client, Request};
 use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::time::{Duration, Instant};
-use tokio01::timer::Interval;
 
 pub mod parser;
 
@@ -35,7 +39,7 @@ impl crate::topology::config::SourceConfig for PrometheusConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let mut urls = Vec::new();
         for host in self.hosts.iter() {
@@ -58,14 +62,11 @@ fn prometheus(
     urls: Vec<String>,
     interval: u64,
     shutdown: ShutdownSignal,
-    out: mpsc::Sender<Event>,
+    out: Pipeline,
 ) -> super::Source {
-    let out = out.sink_map_err(|e| error!("error sending metric: {:?}", e));
-
-    let task = Interval::new(Instant::now(), Duration::from_secs(interval))
-        .map_err(|e| error!("timer error: {:?}", e))
-        .take_until(shutdown)
-        .map(move |_| futures01::stream::iter_ok(urls.clone()))
+    let task = tokio::time::interval(Duration::from_secs(interval))
+        .take_until(shutdown.compat())
+        .map(move |_| stream::iter(urls.clone()))
         .flatten()
         .map(move |url| {
             let https = HttpsConnector::new().expect("TLS initialization failed");
@@ -75,34 +76,52 @@ fn prometheus(
                 .body(Body::empty())
                 .expect("error creating request");
 
+            let start = Instant::now();
             client
                 .request(request)
-                .and_then(|response| body_to_bytes(response.into_body()).boxed())
-                .compat()
-                .map(|body| {
-                    emit!(PrometheusRequestCompleted);
+                .and_then(|response| body_to_bytes(response.into_body()))
+                .into_stream()
+                .filter_map(move |response| {
+                    future::ready(match response {
+                        Ok(body) => {
+                            emit!(PrometheusRequestCompleted {
+                                start,
+                                end: Instant::now()
+                            });
 
-                    let packet = String::from_utf8_lossy(&body);
-                    let metrics = parser::parse(&packet)
-                        .map_err(|error| {
-                            emit!(PrometheusParseError { error });
-                        })
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(Event::Metric);
+                            let byte_size = body.len();
+                            let packet = String::from_utf8_lossy(&body);
+                            let metrics = parser::parse(&packet)
+                                .map_err(|error| {
+                                    emit!(PrometheusParseError { error });
+                                })
+                                .unwrap_or_default();
 
-                    futures01::stream::iter_ok(metrics)
+                            if !metrics.is_empty() {
+                                emit!(PrometheusEventReceived {
+                                    byte_size,
+                                    count: metrics.len()
+                                });
+                            }
+
+                            Some(stream::iter(metrics).map(Event::Metric).map(Ok))
+                        }
+                        Err(error) => {
+                            emit!(PrometheusHttpError { error });
+                            None
+                        }
+                    })
                 })
-                .flatten_stream()
-                .map_err(|error| {
-                    emit!(PrometheusHttpError { error });
-                })
+                .flatten()
         })
         .flatten()
-        .forward(out)
-        .map(|_| info!("finished sending"));
+        .forward(
+            out.sink_map_err(|e| error!("error sending metric: {:?}", e))
+                .sink_compat(),
+        )
+        .inspect(|_| info!("finished sending"));
 
-    Box::new(task)
+    Box::new(task.boxed().compat())
 }
 
 #[cfg(feature = "sinks-prometheus")]
@@ -112,19 +131,18 @@ mod test {
     use crate::{
         hyper::body_to_bytes,
         sinks::prometheus::PrometheusSinkConfig,
-        test_util::{block_on, next_addr, runtime},
+        test_util::next_addr,
         topology::{self, config},
         Error,
     };
-    use futures::TryFutureExt;
+    use futures::compat::Future01CompatExt;
     use hyper::service::{make_service_fn, service_fn};
     use hyper::{Body, Client, Response, Server};
     use pretty_assertions::assert_eq;
-    use std::{thread, time::Duration};
+    use tokio::time::{delay_for, Duration};
 
-    #[test]
-    fn test_prometheus_routing() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn test_prometheus_routing() {
         let in_addr = next_addr();
         let out_addr = next_addr();
 
@@ -163,7 +181,7 @@ mod test {
             }))
         });
 
-        rt.spawn_std(async move {
+        tokio::spawn(async move {
             if let Err(e) = Server::bind(&in_addr).serve(make_svc).await {
                 error!("server error: {:?}", e);
             }
@@ -188,19 +206,16 @@ mod test {
             },
         );
 
-        let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
-        thread::sleep(Duration::from_secs(1));
+        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        delay_for(Duration::from_secs(1)).await;
 
-        let client = Client::new();
-        let response = block_on(
-            client
-                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
-                .compat(),
-        )
-        .unwrap();
+        let response = Client::new()
+            .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+            .await
+            .unwrap();
         assert!(response.status().is_success());
 
-        let body = block_on(body_to_bytes(response.into_body()).boxed().compat()).unwrap();
+        let body = body_to_bytes(response.into_body()).await.unwrap();
         let lines = std::str::from_utf8(&body)
             .unwrap()
             .lines()
@@ -236,6 +251,6 @@ mod test {
             ],
         );
 
-        block_on(topology.stop()).unwrap();
+        topology.stop().compat().await.unwrap();
     }
 }

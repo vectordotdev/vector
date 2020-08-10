@@ -4,14 +4,11 @@ use super::{
     task::Task,
     ConfigDiff,
 };
-use crate::{buffers, dns::Resolver, event::Event, shutdown::SourceShutdownCoordinator};
-use futures01::{
-    future::{lazy, Either},
-    sync::mpsc,
-    Future, Stream,
-};
-use std::{collections::HashMap, time::Duration};
-use tokio01::util::FutureExt;
+use crate::{buffers, dns::Resolver, event::Event, shutdown::SourceShutdownCoordinator, Pipeline};
+use futures::{compat::Future01CompatExt, FutureExt};
+use futures01::{sync::mpsc, Future, Stream};
+use std::collections::HashMap;
+use tokio::time::{timeout, Duration};
 
 pub struct Pieces {
     pub inputs: HashMap<String, (buffers::BufferInputCloner, Vec<String>)>,
@@ -131,13 +128,14 @@ pub async fn build_pieces(
         .filter(|(name, _)| diff.sources.contains_new(&name))
     {
         let (tx, rx) = mpsc::channel(1000);
+        let pipeline = Pipeline::from_sender(tx);
 
         let typetag = source.source_type();
 
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
 
         let server = match source
-            .build_async(&name, &config.global, shutdown_signal, tx)
+            .build_async(&name, &config.global, shutdown_signal, pipeline)
             .await
         {
             Err(error) => {
@@ -148,8 +146,8 @@ pub async fn build_pieces(
         };
 
         let (output, control) = Fanout::new();
-        let pump = rx.forward(output).map(|_| ());
-        let pump = Task::new(&name, &typetag, pump);
+        let pump = rx.forward(output).map(|_| ()).compat();
+        let pump = Task::new(name, typetag, pump);
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source
         // has failed to shut down gracefully within its allotted time window and instead should be
@@ -159,8 +157,9 @@ pub async fn build_pieces(
         let server = server
             .select(force_shutdown_tripwire)
             .map(|_| debug!("Finished"))
-            .map_err(|_| ());
-        let server = Task::new(&name, &typetag, server);
+            .map_err(|_| ())
+            .compat();
+        let server = Task::new(name, typetag, server);
 
         outputs.insert(name.clone(), control);
         tasks.insert(name.clone(), pump);
@@ -175,7 +174,7 @@ pub async fn build_pieces(
     {
         let trans_inputs = &transform.inputs;
 
-        let typetag = &transform.inner.transform_type();
+        let typetag = transform.inner.transform_type();
 
         let cx = TransformContext { resolver };
 
@@ -196,8 +195,9 @@ pub async fn build_pieces(
         let transform = transform
             .transform_stream(filter_event_type(input_rx, input_type))
             .forward(output)
-            .map(|_| debug!("Finished"));
-        let task = Task::new(&name, &typetag, transform);
+            .map(|_| debug!("Finished"))
+            .compat();
+        let task = Task::new(name, typetag, transform);
 
         inputs.insert(name.clone(), (input_tx, trans_inputs.clone()));
         outputs.insert(name.clone(), control);
@@ -237,23 +237,35 @@ pub async fn build_pieces(
 
         let sink = filter_event_type(rx, input_type)
             .forward(sink)
-            .map(|_| debug!("Finished"));
-        let task = Task::new(&name, &typetag, sink);
+            .map(|_| debug!("Finished"))
+            .compat();
+        let task = Task::new(name, typetag, sink);
 
-        let healthcheck_task = if enable_healthcheck {
-            let healthcheck_task = healthcheck
-                // TODO: Add healthcheck timeouts per sink
-                .timeout(Duration::from_secs(10))
-                .map(move |_| info!("Healthcheck: Passed."))
-                .map_err(move |err| error!("Healthcheck: Failed Reason: {}", err));
-            Either::A(healthcheck_task)
-        } else {
-            Either::B(lazy(|| {
+        let healthcheck_task = async move {
+            if enable_healthcheck {
+                let duration = Duration::from_secs(10);
+                timeout(duration, healthcheck.compat())
+                    .map(|result| match result {
+                        Ok(Ok(_)) => {
+                            info!("Healthcheck: Passed.");
+                            Ok(())
+                        }
+                        Ok(Err(error)) => {
+                            error!("Healthcheck: Failed Reason: {}", error);
+                            Err(())
+                        }
+                        Err(_) => {
+                            error!("Healthcheck: timeout");
+                            Err(())
+                        }
+                    })
+                    .await
+            } else {
                 info!("Healthcheck: Disabled.");
                 Ok(())
-            }))
+            }
         };
-        let healthcheck_task = Task::new(&name, &typetag, healthcheck_task);
+        let healthcheck_task = Task::new(name, typetag, healthcheck_task);
 
         inputs.insert(name.clone(), (tx, sink_inputs.clone()));
         healthchecks.insert(name.clone(), healthcheck_task);

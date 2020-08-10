@@ -2,58 +2,61 @@
 
 One paragraph description of the change.
 
+## Scope
+
+- What will this RFC cover, and what will it not cover?
+- Link to any previous RFCs for additional context.
+
 ## Motivation
 
-Context that helps readers understand the motivation behind this change.
+- What is the problem?
+- What pain motivated this change?
+- Do not cover benefits of your change, that should be covered in the "Rationale" section.
 
-## Guide-level Proposal
+## Internal Proposal
 
-Describe your proposal in the form of a guide, as if it were being presented
-to a Vector user.
-
-1. Be succint and to the point!
-2. Use code examples instead of long conceptual explanations!
-3. Run your guide through grammarly or a similar tool.
+- Describe your change as if you were presenting it to the Vector team.
+- Use lists, examples, and code blocks for efficient reading.
+- Be specific!
 
 ## Doc-level Proposal
 
-If this feature requires documentation or reference changes please include
-those here. Please create sections for each new page within our docs.
+- Optional. Only do this if your change is public facing.
+- Demonstrate how your change will look in the form of Vector's public docs.
+
+## Rationale
+
+- Why is this change worth it?
+- What is the impact of not doing this?
+- How does this position us for success in the future?
 
 ## Prior Art
 
-List prior art, the good and bad. Why can't we simply use them?
-
-## Sales Pitch
-
-Sell this change.
-
-* Why is this design the best in the space of possible designs?
-* How will this change make Vector superior?
-* What other designs have been considered and what is the rationale for not choosing them?
-* What is the impact of not doing this?
+- List prior art, the good and bad.
+- Why can't we simply use or copy them?
 
 ## Drawbacks
 
-Why should we not do this?
+- Why should we not do this?
+- What kind on ongoing burden does this place on the team?
 
-## Rationale & Alternatives
+## Alternatives
 
-* Why is this design the best in the space of possible designs?
-* What other designs have been considered and what is the rationale for not choosing them?
-* What is the impact of not doing this?
+- What other approaches have been considered and why did you not choose them?
+- How about not doing this at all?
 
 ## Outstanding Questions
 
-List any outstanding questions that we can discuss and resolve.
+- List any remaining questions that you have.
+- These must be resolved before the RFC can be merged.
 
 ## Plan Of Attack
 
 Incremental steps that execute this change. Generally this is in the form of:
 
-* [ ] Submit a PR with spike-level code _roughly_ demonstrating the change.
-* [ ] Incremental change #1
-* [ ] Incremental change #2
-* [ ] ...
+- [ ] Submit a PR with spike-level code _roughly_ demonstrating the change.
+- [ ] Incremental change #1
+- [ ] Incremental change #2
+- [ ] ...
 
 Note: This can be filled out during the review process.

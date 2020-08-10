@@ -109,11 +109,10 @@ impl SinkConfig for DatadogConfig {
         let client = HttpClient::new(cx.resolver(), None)?;
         let healthcheck = healthcheck(self.clone(), client.clone()).boxed().compat();
 
-        let batch = self
-            .batch
-            .disallow_max_bytes()?
-            .use_size_as_events()?
-            .get_settings_or_default(BatchSettings::default().events(20).timeout(1));
+        let batch = BatchSettings::default()
+            .events(20)
+            .timeout(1)
+            .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let uri = build_uri(&self.host)?;
@@ -294,6 +293,7 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
                     MetricValue::Distribution {
                         values,
                         sample_rates,
+                        statistic: _,
                     } => {
                         // https://docs.datadoghq.com/developers/metrics/metrics_type/?tab=histogram#metric-type-definition
                         if let Some(s) = stats(&values, &sample_rates) {
@@ -382,7 +382,7 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use crate::sinks::util::{http::HttpSink, test::load_sink};
     use crate::test_util::runtime;
     use chrono::offset::TimeZone;
@@ -651,6 +651,7 @@ mod tests {
             value: MetricValue::Distribution {
                 values: vec![1.0, 2.0, 3.0],
                 sample_rates: vec![3, 3, 2],
+                statistic: StatisticKind::Histogram,
             },
         }];
         let input = encode_events(events, 60, "");

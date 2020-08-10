@@ -5,7 +5,8 @@ use std::convert::Infallible;
 use std::time::Duration;
 use vector::buffers::Acker;
 use vector::sinks::util::{
-    Batch, BatchSink, BatchSize, Buffer, Compression, Partition, PartitionBatchSink, PushResult,
+    batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
+    BatchSink, Buffer, Compression, Partition, PartitionBatchSink,
 };
 use vector::test_util::random_lines;
 
@@ -28,10 +29,10 @@ fn batching(
             |input| {
                 let mut rt = vector::test_util::runtime();
                 let (acker, _) = Acker::new_for_testing();
-                let batch = BatchSize {
-                    bytes: max_bytes,
-                    events: num_events,
-                };
+                let batch = BatchSettings::default()
+                    .bytes(max_bytes as u64)
+                    .events(num_events)
+                    .size;
                 let batch_sink = BatchSink::new(
                     tower::service_fn(|_| future::ok::<_, Infallible>(())),
                     Buffer::new(batch, compression),
@@ -73,10 +74,10 @@ fn partitioned_batching(
             |input| {
                 let mut rt = vector::test_util::runtime();
                 let (acker, _) = Acker::new_for_testing();
-                let batch = BatchSize {
-                    bytes: max_bytes,
-                    events: num_events,
-                };
+                let batch = BatchSettings::default()
+                    .bytes(max_bytes as u64)
+                    .events(num_events)
+                    .size;
                 let batch_sink = PartitionBatchSink::new(
                     tower::service_fn(|_| future::ok::<_, Infallible>(())),
                     PartitionedBuffer::new(batch, compression),
@@ -168,7 +169,7 @@ impl Partition<Bytes> for InnerBuffer {
 }
 
 impl PartitionedBuffer {
-    pub fn new(batch: BatchSize, compression: Compression) -> Self {
+    pub fn new(batch: BatchSize<Buffer>, compression: Compression) -> Self {
         Self {
             inner: Buffer::new(batch, compression),
             key: None,
@@ -179,6 +180,13 @@ impl PartitionedBuffer {
 impl Batch for PartitionedBuffer {
     type Input = InnerBuffer;
     type Output = InnerBuffer;
+
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
+        Ok(Buffer::get_settings_defaults(config, defaults.into())?.into())
+    }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         let key = item.key;

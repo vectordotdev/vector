@@ -37,6 +37,7 @@ pub enum MetricValue {
     Distribution {
         values: Vec<f64>,
         sample_rates: Vec<u32>,
+        statistic: StatisticKind,
     },
     AggregatedHistogram {
         buckets: Vec<f64>,
@@ -50,6 +51,15 @@ pub enum MetricValue {
         count: u32,
         sum: f64,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize, is_enum_variant)]
+#[serde(rename_all = "snake_case")]
+pub enum StatisticKind {
+    Histogram,
+    /// Corresponds to DataDog's Distribution Metric
+    /// https://docs.datadoghq.com/developers/metrics/types/?tab=distribution#definition
+    Summary,
 }
 
 impl Metric {
@@ -84,12 +94,14 @@ impl Metric {
                 MetricValue::Distribution {
                     ref mut values,
                     ref mut sample_rates,
+                    statistic: statistic_a,
                 },
                 MetricValue::Distribution {
                     values: values2,
                     sample_rates: sample_rates2,
+                    statistic: statistic_b,
                 },
-            ) => {
+            ) if statistic_a == statistic_b => {
                 values.extend_from_slice(&values2);
                 sample_rates.extend_from_slice(&sample_rates2);
             }
@@ -133,6 +145,7 @@ impl Metric {
             MetricValue::Distribution {
                 ref mut values,
                 ref mut sample_rates,
+                ..
             } => {
                 values.clear();
                 sample_rates.clear();
@@ -178,6 +191,7 @@ impl Metric {
                 MetricValue::Distribution {
                     values,
                     sample_rates,
+                    statistic: StatisticKind::Histogram,
                 }
             }
         };
@@ -329,6 +343,7 @@ mod test {
             value: MetricValue::Distribution {
                 values: vec![1.0],
                 sample_rates: vec![10],
+                statistic: StatisticKind::Histogram,
             },
         };
 
@@ -340,6 +355,7 @@ mod test {
             value: MetricValue::Distribution {
                 values: vec![1.0],
                 sample_rates: vec![20],
+                statistic: StatisticKind::Histogram,
             },
         };
 
@@ -354,6 +370,7 @@ mod test {
                 value: MetricValue::Distribution {
                     values: vec![1.0, 1.0],
                     sample_rates: vec![10, 20],
+                    statistic: StatisticKind::Histogram
                 },
             }
         )

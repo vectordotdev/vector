@@ -13,7 +13,7 @@ require_relative "setup"
 #
 
 VERSION = ENV.fetch("VERSION")
-SHA1 = ENV.fetch("CIRCLE_SHA1")
+SHA1 = ENV.fetch("SHA1")
 
 #
 # Setup

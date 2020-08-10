@@ -25,7 +25,9 @@ impl Opts {
 
     pub fn log_level(&self) -> &'static str {
         let (quiet_level, verbose_level) = match self.sub_command {
-            Some(SubCommand::Validate(_)) | Some(SubCommand::Generate(_)) => {
+            Some(SubCommand::Validate(_))
+            | Some(SubCommand::Generate(_))
+            | Some(SubCommand::List(_)) => {
                 if self.root.verbose == 0 {
                     (self.root.quiet + 1, self.root.verbose)
                 } else {

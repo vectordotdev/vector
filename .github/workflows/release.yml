@@ -60,27 +60,6 @@ jobs:
           name: "vector-aarch64.rpm"
           path: "./target/artifacts/vector-aarch64.rpm"
 
-  build-armv7-unknown-linux-musleabihf-packages:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - env:
-          DOCKER_PRIVILEGED: "true"
-          PASS_FEATURES: "default-cmake"
-        run: make package-armv7-unknown-linux-musleabihf-all
-      - uses: actions/upload-artifact@v1
-        with:
-          name: "vector-armv7-unknown-linux-musleabihf.tar.gz"
-          path: "./target/artifacts/vector-armv7-unknown-linux-musleabihf.tar.gz"
-      - uses: actions/upload-artifact@v1
-        with:
-          name: "vector-armhf.deb"
-          path: "./target/artifacts/vector-armhf.deb"
-      - uses: actions/upload-artifact@v1
-        with:
-          name: "vector-armv7hl.rpm"
-          path: "./target/artifacts/vector-armv7hl.rpm"
-
   build-x86_64-apple-darwin-packages:
     runs-on: macos-10.15
     steps:
@@ -106,42 +85,9 @@ jobs:
     runs-on: windows-2019
     steps:
       - uses: actions/checkout@v1
-      - name: "Download Perl"
-        shell: bash
-        env:
-          VERSION: "5.30.0.1"
-          SHA256SUM: "459de13a284a4c83213208c9caa1c372c81136b6e863a3f13d42f631048e0b12" # we need to verify checksum because strawberryperl.com doesn't support HTTPS
-        run: |
-          curl -sSf http://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
-          echo "$SHA256SUM perl-installer.msi" | sha256sum --check --status
-      - name: "Install Perl"
-        shell: cmd # msiexec fails when called from bash
-        run: |
-          msiexec /quiet /i perl-installer.msi
-          del perl-installer.msi
-      - name: "Download CMake"
-        shell: bash
-        env:
-          VERSION: "3.15.5"
-        run: |
-          curl -sSfL https://github.com/Kitware/CMake/releases/download/v$VERSION/cmake-$VERSION-win64-x64.msi > cmake-installer.msi
-      - name: "Install CMake"
-        shell: cmd # msiexec fails when called from bash
-        run: |
-          msiexec /quiet /i cmake-installer.msi
-          del cmake-installer.msi
-      - name: "Install Wix"
-        shell: bash
-        run: |
-          mkdir -p /c/wix
-          cd /c/wix
-          curl -sSfL https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip > wix-binaries.zip
-          unzip wix-binaries.zip
-          rm wix-binaries.zip
       - name: "Build archive"
         shell: bash
         run: |
-          export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
           export RUSTFLAGS=-Ctarget-feature=+crt-static
           export FEATURES="default-msvc"
           export ARCHIVE_TYPE="zip"
@@ -170,7 +116,6 @@ jobs:
     needs:
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
-      - build-armv7-unknown-linux-musleabihf-packages
     steps:
       - uses: actions/checkout@v1
       - uses: actions/download-artifact@v1
@@ -180,10 +125,6 @@ jobs:
       - uses: actions/download-artifact@v1
         with:
           name: vector-aarch64-unknown-linux-musl.tar.gz
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
-          name: vector-armv7-unknown-linux-musleabihf.tar.gz
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
@@ -213,7 +154,6 @@ jobs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
-      - build-armv7-unknown-linux-musleabihf-packages
       - build-x86_64-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
     steps:
@@ -229,10 +169,6 @@ jobs:
       - uses: actions/download-artifact@v1
         with:
           name: vector-aarch64-unknown-linux-musl.tar.gz
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
-          name: vector-armv7-unknown-linux-musleabihf.tar.gz
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
@@ -261,10 +197,6 @@ jobs:
       - uses: actions/download-artifact@v1
         with:
           name: vector-x86_64.rpm
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
-          name: vector-armv7hl.rpm
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
@@ -277,12 +209,11 @@ jobs:
         run: make release-s3
 
   release-github:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
-      - build-armv7-unknown-linux-musleabihf-packages
       - build-x86_64-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
     steps:
@@ -301,19 +232,11 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
-          name: vector-armv7-unknown-linux-musleabihf.tar.gz
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
           name: vector-amd64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
           name: vector-arm64.deb
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
-          name: vector-armhf.deb
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
@@ -333,24 +256,22 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
-          name: vector-armv7hl.rpm
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
           name: vector-aarch64.rpm
           path: target/artifacts
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
       - run: |
-          export PASS_VERSION=$(make version)
+          export VERSION=$(make version)
+          export SHA1="${{ github.sha }}"
           export GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
           make release-github
 
   release-homebrew:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
-      - build-armv7-unknown-linux-musleabihf-packages
       - build-x86_64-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
     steps:
@@ -366,10 +287,6 @@ jobs:
       - uses: actions/download-artifact@v1
         with:
           name: vector-aarch64-unknown-linux-musl.tar.gz
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
-          name: vector-armv7-unknown-linux-musleabihf.tar.gz
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
@@ -401,13 +318,11 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
-          name: vector-armv7hl.rpm
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
           name: vector-aarch64.rpm
           path: target/artifacts
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
       - run: |
-          export PASS_VERSION=$(make version)
+          export VERSION=$(make version)
           export GITHUB_TOKEN="${{ secrets.GH_PACKAGE_PUBLISHER_TOKEN }}"
           make release-homebrew

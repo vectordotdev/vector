@@ -108,15 +108,10 @@ impl SinkConfig for ElasticSearchConfig {
 
         let common = ElasticSearchCommon::parse_config(&self)?;
         let compression = common.compression;
-        let batch = self
-            .batch
-            .clone()
-            .use_size_as_bytes()?
-            .get_settings_or_default(
-                BatchSettings::default()
-                    .bytes(bytesize::mib(10u64))
-                    .timeout(1),
-            );
+        let batch = BatchSettings::default()
+            .bytes(bytesize::mib(10u64))
+            .timeout(1)
+            .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let sink = BatchedHttpSink::with_retry_logic(
@@ -739,7 +734,7 @@ mod integration_tests {
                     let _ = sink
                         .send_all(events.map(move |mut event| {
                             if doit {
-                                event.as_mut_log().insert("message", 1);
+                                event.as_mut_log().insert("_type", 1);
                             }
                             doit = true;
                             event

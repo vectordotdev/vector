@@ -4,7 +4,35 @@ on:
   push:
     branches:
       - master
-  pull_request: {}
+    paths:
+      - ".github/workflows/tests.yml"
+      - "lib/**"
+      - "proto/**"
+      - "scripts/**"
+      - "skaffold/**"
+      - "src/**"
+      - "tests/**"
+      - "build.rs"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "docker-compose.yml"
+      - "Makefile"
+      - "rust-toolchain"
+  pull_request:
+    paths:
+      - ".github/workflows/tests.yml"
+      - "lib/**"
+      - "proto/**"
+      - "scripts/**"
+      - "skaffold/**"
+      - "src/**"
+      - "tests/**"
+      - "build.rs"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "docker-compose.yml"
+      - "Makefile"
+      - "rust-toolchain"
 
 env:
   VERBOSE: true
@@ -20,13 +48,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - uses: styfle/cancel-workflow-action@0.3.1
+      - uses: styfle/cancel-workflow-action@0.4.1
         with:
-          workflow_id: "1463240,1463054"
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
   test-linux:
-    name: Unit - Linux, flaky
+    name: Unit - Linux
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -42,7 +69,7 @@ jobs:
       - run: make test
 
   test-mac:
-    name: Unit - Mac, flaky
+    name: Unit - Mac
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
@@ -55,12 +82,13 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: bash scripts/environment/bootstrap-macos-10.sh
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make test
 
   test-windows:
-    name: Unit - Windows, flaky
+    name: Unit - Windows
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
@@ -72,23 +100,7 @@ jobs:
           RUSTFLAGS: "-D warnings"
         run: cargo test --no-default-features --features default-msvc
 
-  test-behavior:
-    name: Behavior - Linux
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: make slim-builds
-      - run: make test-behavior
-
-  test-shutdown:
+  test-misc:
     name: Shutdown - Linux
     runs-on: ubuntu-20.04
     steps:
@@ -103,7 +115,8 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make test-shutdown
-
+      - run: make test-cli
+      - run: make test-behavior
 
   test-integration-aws:
     name: Integration - Linux, AWS
@@ -264,34 +277,3 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make test-integration-splunk
-
-  test-integration-kubernetes:
-    name: Integration - Linux, Kubernetes, flaky
-    # This is an experimental test. Allow it to fail without failing the whole
-    # workflow, but keep it executing on every build to gather stats.
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        kubernetes:
-          - v1.18.2
-          - v1.17.5
-          - v1.16.9
-          - v1.15.11
-          - v1.14.10
-      fail-fast: false
-    steps:
-      - name: Setup Minikube
-        uses: manusa/actions-setup-minikube@v1.0.2
-        with:
-          minikube version: 'v1.9.2'
-          kubernetes version: '${{ matrix.kubernetes }}'
-          github token: '${{ secrets.GITHUB_TOKEN }}'
-      - name: Checkout
-        uses: actions/checkout@v1
-      - run: USE_CONTAINER=none make slim-builds
-      - run: make test-integration-kubernetes
-        env:
-          USE_MINIKUBE_DOCKER: "true"
-          CONTAINER_IMAGE_REPO: vector-test
-          PACKAGE_DEB_USE_CONTAINER: docker

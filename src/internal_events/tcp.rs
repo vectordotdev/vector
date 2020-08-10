@@ -74,11 +74,11 @@ impl InternalEvent for TcpConnectionShutdown {
 }
 
 #[derive(Debug)]
-pub struct TcpConnectionError {
-    pub error: std::io::Error,
+pub struct TcpConnectionError<T> {
+    pub error: T,
 }
 
-impl InternalEvent for TcpConnectionError {
+impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for TcpConnectionError<T> {
     fn emit_logs(&self) {
         warn!(message = "connection error.", error = %self.error, rate_limit_secs = 10);
     }
@@ -114,7 +114,7 @@ pub struct TcpEventSent {
 
 impl InternalEvent for TcpEventSent {
     fn emit_logs(&self) {
-        debug!(message = "sending event.", byte_size = %self.byte_size);
+        trace!(message = "sending event.", byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {
@@ -134,7 +134,7 @@ pub struct TcpEventReceived {
 
 impl InternalEvent for TcpEventReceived {
     fn emit_logs(&self) {
-        debug!(message = "sending event.", byte_size = %self.byte_size);
+        trace!(message = "received event.", byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {

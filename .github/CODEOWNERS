@@ -12,6 +12,7 @@
 /scripts/package-* @a-rodin
 /scripts/release-* @a-rodin
 /scripts/upgrade-* @a-rodin
+/scripts/ci-setup-minikube.sh @MOZGIII
 
 /src/buffers/ @a-rodin
 
@@ -83,4 +84,4 @@
 
 /tests/buffering.rs @MOZGIII
 
-/website/ @binarylogic
+/.github/workflows/e2e.yml @MOZGIII

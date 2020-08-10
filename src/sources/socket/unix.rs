@@ -3,12 +3,12 @@ use crate::{
     internal_events::UnixSocketEventReceived,
     shutdown::ShutdownSignal,
     sources::{util::build_unix_source, Source},
+    Pipeline,
 };
-use bytes::Bytes;
-use futures01::sync::mpsc;
+use bytes05::Bytes;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use tokio01::codec::LinesCodec;
+use tokio_util::codec::LinesCodec;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -55,7 +55,7 @@ pub fn unix(
     max_length: usize,
     host_key: String,
     shutdown: ShutdownSignal,
-    out: mpsc::Sender<Event>,
+    out: Pipeline,
 ) -> Source {
     build_unix_source(
         path,

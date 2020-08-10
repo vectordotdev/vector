@@ -10,7 +10,7 @@ use crate::{
         util::{
             retries2::RetryLogic,
             service2::{InFlightLimit, TowerRequestConfig},
-            BatchSettings, VecBuffer,
+            BatchSettings, EncodedLength, VecBuffer,
         },
         Healthcheck, RouterSink,
     },
@@ -187,6 +187,12 @@ impl Service<Vec<Event>> for TestSink {
                 }
             })
         }
+    }
+}
+
+impl EncodedLength for Event {
+    fn encoded_length(&self) -> usize {
+        1 // Dummy implementation, unused
     }
 }
 

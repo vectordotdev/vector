@@ -2,14 +2,14 @@ use crate::{
     metrics::{capture_metrics, get_controller},
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    Event,
+    Pipeline,
 };
 use futures::{
     compat::Future01CompatExt,
     future::{FutureExt, TryFutureExt},
     stream::StreamExt,
 };
-use futures01::{sync::mpsc, Future, Sink};
+use futures01::{Future, Sink};
 use metrics_runtime::Controller;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -29,7 +29,7 @@ impl SourceConfig for InternalMetricsConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let fut = run(get_controller()?, out, shutdown).boxed().compat();
         Ok(Box::new(fut))
@@ -46,7 +46,7 @@ impl SourceConfig for InternalMetricsConfig {
 
 async fn run(
     controller: Controller,
-    mut out: mpsc::Sender<Event>,
+    mut out: Pipeline,
     mut shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
     let mut interval = interval(Duration::from_secs(2)).map(|_| ());
@@ -72,7 +72,7 @@ async fn run(
 
 #[cfg(test)]
 mod tests {
-    use crate::event::metric::{Metric, MetricValue};
+    use crate::event::metric::{Metric, MetricValue, StatisticKind};
     use crate::metrics::{capture_metrics, get_controller};
     use metrics::{counter, gauge, timing, value};
     use std::collections::BTreeMap;
@@ -110,14 +110,16 @@ mod tests {
         assert_eq!(
             MetricValue::Distribution {
                 values: vec![5.0, 6.0],
-                sample_rates: vec![1, 1]
+                sample_rates: vec![1, 1],
+                statistic: StatisticKind::Histogram
             },
             output["baz"].value
         );
         assert_eq!(
             MetricValue::Distribution {
                 values: vec![7.0, 8.0],
-                sample_rates: vec![1, 1]
+                sample_rates: vec![1, 1],
+                statistic: StatisticKind::Histogram
             },
             output["quux"].value
         );

@@ -5,13 +5,12 @@ use crate::{
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    Event,
+    Event, Pipeline,
 };
-use bytes::{Bytes, BytesMut};
-use futures01::sync::mpsc;
+use bytes05::{Bytes, BytesMut};
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use tokio01::codec::LengthDelimitedCodec;
+use tokio_util::codec::LengthDelimitedCodec;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -48,7 +47,7 @@ impl SourceConfig for VectorConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let vector = VectorSource;
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
@@ -68,6 +67,7 @@ impl SourceConfig for VectorConfig {
 struct VectorSource;
 
 impl TcpSource for VectorSource {
+    type Error = std::io::Error;
     type Decoder = LengthDelimitedCodec;
 
     fn decoder(&self) -> Self::Decoder {
@@ -75,8 +75,6 @@ impl TcpSource for VectorSource {
     }
 
     fn build_event(&self, frame: BytesMut, _host: Bytes) -> Option<Event> {
-        let frame = bytes05::Bytes::copy_from_slice(&frame);
-
         let byte_size = frame.len();
         match proto::EventWrapper::decode(frame).map(Event::from) {
             Ok(event) => {
@@ -105,13 +103,13 @@ mod test {
         test_util::{next_addr, runtime, wait_for_tcp, CollectCurrent},
         tls::{TlsConfig, TlsOptions},
         topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
-        Event,
+        Event, Pipeline,
     };
-    use futures01::{stream, sync::mpsc, Future, Sink};
+    use futures01::{stream, Future, Sink};
     use std::net::SocketAddr;
 
     fn stream_test(addr: SocketAddr, source: VectorConfig, sink: VectorSinkConfig) {
-        let (tx, rx) = mpsc::channel(100);
+        let (tx, rx) = Pipeline::new_test();
 
         let server = source
             .build(

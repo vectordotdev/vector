@@ -1,12 +1,15 @@
 use crate::{
     internal_events::TcpConnectionError,
     shutdown::ShutdownSignal,
-    stream::StreamExt01,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
-    Event,
+    Event, Pipeline,
 };
-use bytes::Bytes;
-use futures01::{future, stream, sync::mpsc, Async, Future, Sink, Stream};
+use bytes05::Bytes;
+use futures::{
+    compat::{Compat, Compat01As03, Future01CompatExt, Stream01CompatExt},
+    StreamExt, TryStreamExt,
+};
+use futures01::{future, stream, Async, Future, Sink, Stream};
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{
@@ -15,10 +18,13 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio01::{
-    codec::{Decoder, FramedRead},
     net::{TcpListener, TcpStream},
     reactor::Handle,
     timer,
+};
+use tokio_util::{
+    codec::{Decoder, FramedRead},
+    compat::FuturesAsyncReadCompatExt,
 };
 use tracing::{field, Span};
 use tracing_futures::Instrument;
@@ -57,15 +63,14 @@ fn make_listener(
 }
 
 pub trait TcpSource: Clone + Send + 'static {
-    type Decoder: Decoder<Error = io::Error> + Send + 'static;
+    // Should be default: `std::io::Error`.
+    // Right now this is unstable: https://github.com/rust-lang/rust/issues/29661
+    type Error: From<io::Error> + std::fmt::Debug + std::fmt::Display;
+    type Decoder: Decoder<Error = Self::Error> + Send + 'static;
 
     fn decoder(&self) -> Self::Decoder;
 
-    fn build_event(
-        &self,
-        frame: <Self::Decoder as tokio01::codec::Decoder>::Item,
-        host: Bytes,
-    ) -> Option<Event>;
+    fn build_event(&self, frame: <Self::Decoder as Decoder>::Item, host: Bytes) -> Option<Event>;
 
     fn run(
         self,
@@ -73,7 +78,7 @@ pub trait TcpSource: Clone + Send + 'static {
         shutdown_timeout_secs: u64,
         tls: MaybeTlsSettings,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
         let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 
@@ -105,7 +110,9 @@ pub trait TcpSource: Clone + Send + 'static {
 
             let future = listener
                 .incoming()
-                .take_until(shutdown.clone())
+                .compat()
+                .take_until(shutdown.clone().compat())
+                .compat()
                 .map_err(|error| {
                     error!(
                         message = "failed to accept socket",
@@ -163,7 +170,8 @@ fn handle_stream(
 ) {
     let mut shutdown = Some(shutdown);
     let mut _token = None;
-    let mut reader = FramedRead::new(socket, source.decoder());
+    let socket = Compat01As03::new(socket).compat();
+    let mut reader = Compat::new(FramedRead::new(socket, source.decoder()));
     let handler = stream::poll_fn(move || {
         // Gracefull shutdown procedure
         if let Some(future) = shutdown.as_mut() {
@@ -172,8 +180,9 @@ fn handle_stream(
                     debug!("Start gracefull shutdown");
                     // Close our write part of TCP socket to signal the other side
                     // that it should stop writing and close the channel.
-                    if let Some(socket) = reader.get_ref().get_ref() {
-                        if let Err(error)=socket.shutdown(Shutdown::Write){
+                    let socket: Option<&TcpStream> = reader.get_ref().get_ref().get_ref().get_ref().get_ref();
+                    if let Some(socket) = socket {
+                        if let Err(error) = socket.shutdown(Shutdown::Write) {
                             warn!(message = "Failed in signalling to the other side to close the TCP channel.",%error);
                         }
                     } else {
@@ -192,7 +201,9 @@ fn handle_stream(
         // Actual work
         reader.poll()
     })
-    .take_until(tripwire)
+    .compat()
+    .take_until(tripwire.compat())
+    .compat()
     .filter_map(move |frame| {
         let host = host.clone();
         source.build_event(frame, host)

@@ -1,8 +1,10 @@
 use crate::{
     event,
     event::{Event, LogEvent, Value},
+    internal_events::{JournaldEventReceived, JournaldInvalidRecord},
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    Pipeline,
 };
 use chrono::TimeZone;
 use futures::{
@@ -10,7 +12,7 @@ use futures::{
     executor::block_on,
     future::{select, Either, FutureExt, TryFutureExt},
 };
-use futures01::{future, sync::mpsc, Future, Sink};
+use futures01::{future, Future, Sink};
 use lazy_static::lazy_static;
 use nix::{
     sys::signal::{kill, Signal},
@@ -83,7 +85,7 @@ impl SourceConfig for JournaldConfig {
         name: &str,
         globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
@@ -97,8 +99,9 @@ impl SourceConfig for JournaldConfig {
             (false, _) => &self.include_units,
         };
 
-        let include_units: HashSet<String> = include_units.iter().map(fixup_unit).collect();
-        let exclude_units: HashSet<String> = self.exclude_units.iter().map(fixup_unit).collect();
+        let include_units: HashSet<String> = include_units.iter().map(|s| fixup_unit(&s)).collect();
+        let exclude_units: HashSet<String> =
+            self.exclude_units.iter().map(|s| fixup_unit(&s)).collect();
         if let Some(unit) = include_units
             .iter()
             .find(|unit| exclude_units.contains(&unit[..]))
@@ -133,7 +136,7 @@ impl SourceConfig for JournaldConfig {
 impl JournaldConfig {
     fn source<J>(
         &self,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
         shutdown: ShutdownSignal,
         mut checkpointer: Checkpointer,
         include_units: HashSet<String>,
@@ -225,7 +228,7 @@ fn create_event(record: Record) -> Event {
 
 /// Map the given unit name into a valid systemd unit
 /// by appending ".service" if no extension is present.
-fn fixup_unit(unit: &String) -> String {
+fn fixup_unit(unit: &str) -> String {
     if unit.contains('.') {
         unit.into()
     } else {
@@ -350,7 +353,7 @@ where
                 let mut record = match decode_record(&text, self.remap_priority) {
                     Ok(record) => record,
                     Err(error) => {
-                        error!(message = "Invalid record from journald, discarding", %error, %text);
+                        emit!(JournaldInvalidRecord { error, text });
                         continue;
                     }
                 };
@@ -364,6 +367,10 @@ where
                 if filter_unit(unit, &self.include_units, &self.exclude_units) {
                     continue;
                 }
+
+                emit!(JournaldEventReceived {
+                    byte_size: text.len()
+                });
 
                 match channel.send(record).wait() {
                     Ok(_) => {}
@@ -404,7 +411,7 @@ fn decode_record(text: &str, remap: bool) -> Result<Record, JsonError> {
     record.get_mut("MESSAGE").and_then(|message| {
         message
             .as_array()
-            .and_then(decode_array)
+            .and_then(|v| decode_array(&v))
             .map(|decoded| *message = decoded)
     });
     if remap {
@@ -413,7 +420,7 @@ fn decode_record(text: &str, remap: bool) -> Result<Record, JsonError> {
     serde_json::from_value(record)
 }
 
-fn decode_array(array: &Vec<JsonValue>) -> Option<JsonValue> {
+fn decode_array(array: &[JsonValue]) -> Option<JsonValue> {
     // From the array of values, turn all the numbers into bytes, and
     // then the bytes into a string, but return None if any value in the
     // array was not a valid byte.
@@ -547,13 +554,16 @@ mod checkpointer_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::{block_on, runtime, shutdown_on_idle};
+    use crate::{
+        test_util::{runtime, shutdown_on_idle},
+        Pipeline,
+    };
+    use futures::compat::Future01CompatExt;
     use futures01::stream::Stream;
     use std::io::{self, BufReader, Cursor};
     use std::iter::FromIterator;
-    use std::time::Duration;
     use tempfile::tempdir;
-    use tokio01::util::FutureExt;
+    use tokio::time::{timeout, Duration};
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}
@@ -603,7 +613,7 @@ mod tests {
     }
 
     fn run_journal(iunits: &[&str], xunits: &[&str], cursor: Option<&str>) -> Vec<Event> {
-        let (tx, rx) = futures01::sync::mpsc::channel(10);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
         let tempdir = tempdir().unwrap();
         let mut checkpointer =
@@ -634,7 +644,13 @@ mod tests {
         drop(trigger);
         shutdown_on_idle(rt);
 
-        block_on(rx.collect().timeout(Duration::from_secs(1))).expect("Unclosed channel")
+        runtime()
+            .block_on_std(async move {
+                timeout(Duration::from_secs(1), rx.collect().compat())
+                    .await
+                    .expect("Unclosed channel")
+            })
+            .unwrap()
     }
 
     #[test]

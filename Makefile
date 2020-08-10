@@ -159,16 +159,13 @@ build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
 build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`)
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features ${DEFAULT_FEATURES}
 
-build-all: build-x86_64-unknown-linux-musl build-armv7-unknown-linux-musleabihf build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
+build-all: build-x86_64-unknown-linux-musl build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
 
 build-x86_64-unknown-linux-gnu: ## Build dynamically linked binary in release mode for the x86_64 architecture
 	$(RUN) build-x86_64-unknown-linux-gnu
 
 build-x86_64-unknown-linux-musl: ## Build static binary in release mode for the x86_64 architecture
 	$(RUN) build-x86_64-unknown-linux-musl
-
-build-armv7-unknown-linux-musleabihf: load-qemu-binfmt ## Build static binary in release mode for the armv7 architecture
-	$(RUN) build-armv7-unknown-linux-musleabihf
 
 build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in release mode for the aarch64 architecture
 	$(RUN) build-aarch64-unknown-linux-musl
@@ -231,6 +228,16 @@ ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
+test-integration-humio: ## Runs Humio integration tests
+ifeq ($(AUTOSPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-humio
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features humio-integration-tests ::humio:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
+endif
+
+
 test-integration-influxdb: ## Runs InfluxDB integration tests
 ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-influxdb
@@ -276,14 +283,14 @@ ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-splunk
 	sleep 5 # Many services are very lazy... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features splunk-integration-tests ::splunk:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features splunk-integration-tests ::splunk_hec:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
-PACKAGE_DEB_USE_CONTAINER ?= "$(USE_CONTAINER)"
-test-integration-kubernetes: ## Runs Kubernetes integration tests (Sorry, no `ENVIRONMENT=true` support)
-	PACKAGE_DEB_USE_CONTAINER="$(PACKAGE_DEB_USE_CONTAINER)" USE_CONTAINER=none $(RUN) test-integration-kubernetes
+PACKAGE_DEB_USE_CONTAINER ?= $(USE_CONTAINER)
+test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
+	PACKAGE_DEB_USE_CONTAINER="$(PACKAGE_DEB_USE_CONTAINER)" scripts/test-e2e-kubernetes.sh
 
 test-shutdown: ## Runs shutdown tests
 ifeq ($(AUTOSPAWN), true)
@@ -294,6 +301,9 @@ endif
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
+
+test-cli: ## Runs cli tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --test cli -- --test-threads 4
 
 .PHONY: build-wasm-tests
 test-wasm-build-modules: $(WASM_MODULE_OUTPUTS) ### Build all WASM test modules
@@ -329,7 +339,7 @@ bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
 check: ## Run prerequisite code checks
 	${MAYBE_ENVIRONMENT_EXEC} cargo check --all --no-default-features --features ${DEFAULT_FEATURES}
 
-check-all: check-fmt check-clippy check-style check-markdown check-generate check-blog check-version check-examples check-component-features check-scripts ## Check everything
+check-all: check-fmt check-clippy check-style check-markdown check-meta check-version check-examples check-component-features check-scripts ## Check everything
 
 check-component-features: ## Check that all component features are setup properly
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-features.sh
@@ -344,11 +354,10 @@ check-style: ## Check that all files are styled properly
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh
 
 check-markdown: ## Check that markdown is styled properly
-	@echo "This requires yarn have been run in the website/ dir!"
-	${MAYBE_ENVIRONMENT_EXEC} ./website/node_modules/.bin/markdownlint .
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-markdown.sh
 
-check-generate: ## Check that no files are pending generation
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-generate.sh
+check-meta: ## Check that all /.meta file are valid
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-meta.sh
 
 check-version: ## Check that Vector's version is correct accounting for recent changes
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-version.rb
@@ -370,8 +379,6 @@ package-x86_64-unknown-linux-musl-all: package-archive-x86_64-unknown-linux-musl
 
 package-x86_64-unknown-linux-gnu-all: package-archive-x86_64-unknown-linux-gnu package-deb-x86_64 package-rpm-x86_64 # Build all x86_64 GNU packages
 
-package-armv7-unknown-linux-musleabihf-all: package-archive-armv7-unknown-linux-musleabihf package-deb-armv7 package-rpm-armv7  # Build all armv7 MUSL packages
-
 package-aarch64-unknown-linux-musl-all: package-archive-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
 
 # archives
@@ -379,16 +386,13 @@ package-aarch64-unknown-linux-musl-all: package-archive-aarch64-unknown-linux-mu
 package-archive: build ## Build the Vector archive
 	$(RUN) package-archive
 
-package-archive-all: package-archive-x86_64-unknown-linux-musl package-archive-x86_64-unknown-linux-gnu package-archive-armv7-unknown-linux-musleabihf package-archive-aarch64-unknown-linux-musl ## Build all archives
+package-archive-all: package-archive-x86_64-unknown-linux-musl package-archive-x86_64-unknown-linux-gnu package-archive-aarch64-unknown-linux-musl ## Build all archives
 
 package-archive-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## Build the x86_64 archive
 	$(RUN) package-archive-x86_64-unknown-linux-musl
 
 package-archive-x86_64-unknown-linux-gnu: build-x86_64-unknown-linux-gnu ## Build the x86_64 archive
 	$(RUN) package-archive-x86_64-unknown-linux-gnu
-
-package-archive-armv7-unknown-linux-musleabihf: build-armv7-unknown-linux-musleabihf ## Build the armv7 archive
-	$(RUN) package-archive-armv7-unknown-linux-musleabihf
 
 package-archive-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## Build the aarch64 archive
 	$(RUN) package-archive-aarch64-unknown-linux-musl
@@ -398,13 +402,10 @@ package-archive-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## 
 package-deb: ## Build the deb package
 	$(RUN) package-deb
 
-package-deb-all: package-deb-x86_64 package-deb-armv7 package-deb-aarch64 ## Build all deb packages
+package-deb-all: package-deb-x86_64 ## Build all deb packages
 
 package-deb-x86_64: package-archive-x86_64-unknown-linux-gnu ## Build the x86_64 deb package
 	$(RUN) package-deb-x86_64
-
-package-deb-armv7: package-archive-armv7-unknown-linux-musleabihf ## Build the armv7 deb package
-	$(RUN) package-deb-armv7
 
 package-deb-aarch64: package-archive-aarch64-unknown-linux-musl  ## Build the aarch64 deb package
 	$(RUN) package-deb-aarch64
@@ -414,13 +415,10 @@ package-deb-aarch64: package-archive-aarch64-unknown-linux-musl  ## Build the aa
 package-rpm: ## Build the rpm package
 	@scripts/package-rpm.sh
 
-package-rpm-all: package-rpm-x86_64 package-rpm-armv7 package-rpm-aarch64 ## Build all rpm packages
+package-rpm-all: package-rpm-x86_64 package-rpm-aarch64 ## Build all rpm packages
 
 package-rpm-x86_64: package-archive-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
 	$(RUN) package-rpm-x86_64
-
-package-rpm-armv7: package-archive-armv7-unknown-linux-musleabihf ## Build the armv7 rpm package
-	$(RUN) package-rpm-armv7
 
 package-rpm-aarch64: package-archive-aarch64-unknown-linux-musl ## Build the aarch64 rpm package
 	$(RUN) package-rpm-aarch64
@@ -452,6 +450,9 @@ release-rollback: ## Rollback pending release changes
 
 release-s3: ## Release artifacts to S3
 	@scripts/release-s3.sh
+
+release-helm: ## Package and release Helm Chart
+	@scripts/release-helm.sh
 
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
@@ -493,15 +494,6 @@ verify-deb-artifact-on-ubuntu-19-04: package-deb-x86_64 ## Verify the deb packag
 
 verify-nixos:  ## Verify that Vector can be built on NixOS
 	$(RUN) verify-nixos
-
-##@ Website
-
-generate:  ## Generates files across the repo using the data in /.meta
-	${MAYBE_ENVIRONMENT_EXEC} bundle exec --gemfile scripts/Gemfile ./scripts/generate.rb
-
-export ARTICLE ?= true
-sign-blog: ## Sign newly added blog articles using GPG
-	$(RUN) sign-blog
 
 ##@ Utility
 
