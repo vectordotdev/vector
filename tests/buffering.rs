@@ -7,8 +7,7 @@ use tempfile::tempdir;
 use tracing::trace;
 use vector::event;
 use vector::test_util::{
-    random_events_with_stream, runtime, shutdown_on_idle, trace_init, wait_for_atomic_usize,
-    CountReceiver,
+    random_events_with_stream, runtime, trace_init, wait_for_atomic_usize, CountReceiver,
 };
 use vector::topology::{self, config};
 use vector::{buffers::BufferConfig, runtime};
@@ -120,7 +119,6 @@ fn test_buffering() {
         assert_eq!(input_events, &output_events[..num_events]);
         assert_eq!(input_events2, &output_events[num_events..]);
     });
-    shutdown_on_idle(rt);
 }
 
 #[test]
@@ -213,7 +211,6 @@ fn test_max_size() {
         assert_eq!(num_events / 2, output_events.len());
         assert_eq!(&input_events[..num_events / 2], &output_events[..]);
     });
-    shutdown_on_idle(rt);
 }
 
 #[test]
@@ -316,7 +313,6 @@ fn test_reclaim_disk_space() {
         // was before we reclaimed the space.
         assert!(after_disk_size < before_disk_size / 2);
     });
-    shutdown_on_idle(rt);
 }
 
 fn compute_disk_size(dir: impl AsRef<std::path::Path>) -> u64 {
