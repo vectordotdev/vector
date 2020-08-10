@@ -186,49 +186,32 @@ impl Transform for Geoip {
         // If we have any of the geoip fields missing, we insert
         // empty values so that we know that the transform was executed
         // but the lookup didn't find the result
+        let e = event.as_mut_log();
+        let mut fill = |key: String, value: Value| {
+            e.try_insert(&Atom::from(key), value);
+        };
+
         if self.dbreader.metadata.database_type == "GeoLite2-ASN"
             || self.dbreader.metadata.database_type == "GeoIP2-ISP"
         {
-            let e = event.as_mut_log();
-            if e.get(&Atom::from(format!(
-                "{}.autonomous_system_number",
-                target_field
-            )))
-            .is_none()
-            {
-                e.insert(
-                    Atom::from(format!("{}.autonomous_system_number", target_field)),
-                    Value::from(0),
-                );
-            }
-
-            let geoip_fields = [
+            fill(
+                format!("{}.autonomous_system_number", target_field),
+                Value::from(0), // not ""
+            );
+            fill(
                 format!("{}.autonomous_system_organization", target_field),
-                format!("{}.isp", target_field),
-                format!("{}.organization", target_field),
-            ];
-            for field in geoip_fields.iter() {
-                let e = event.as_mut_log();
-                if e.get(&Atom::from(field.to_string())).is_none() {
-                    e.insert(Atom::from(field.to_string()), Value::from(""));
-                }
-            }
+                Value::from(""),
+            );
+            fill(format!("{}.isp", target_field), Value::from(""));
+            fill(format!("{}.organization", target_field), Value::from(""));
         } else {
-            let geoip_fields = [
-                format!("{}.city_name", target_field),
-                format!("{}.country_code", target_field),
-                format!("{}.continent_code", target_field),
-                format!("{}.timezone", target_field),
-                format!("{}.latitude", target_field),
-                format!("{}.longitude", target_field),
-                format!("{}.postal_code", target_field),
-            ];
-            for field in geoip_fields.iter() {
-                let e = event.as_mut_log();
-                if e.get(&Atom::from(field.to_string())).is_none() {
-                    e.insert(Atom::from(field.to_string()), Value::from(""));
-                }
-            }
+            fill(format!("{}.city_name", target_field), Value::from(""));
+            fill(format!("{}.country_code", target_field), Value::from(""));
+            fill(format!("{}.continent_code", target_field), Value::from(""));
+            fill(format!("{}.timezone", target_field), Value::from(""));
+            fill(format!("{}.latitude", target_field), Value::from(""));
+            fill(format!("{}.longitude", target_field), Value::from(""));
+            fill(format!("{}.postal_code", target_field), Value::from(""));
         }
 
         Some(event)
