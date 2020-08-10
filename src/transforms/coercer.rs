@@ -1,6 +1,6 @@
 use super::Transform;
-use crate::event::Event;
 use crate::config::{DataType, TransformConfig, TransformContext, TransformDescription};
+use crate::event::Event;
 use crate::types::{parse_conversion_map, Conversion};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

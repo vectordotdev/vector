@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
-    event::{self, Event, PathComponent, PathIter},
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::{self, Event, PathComponent, PathIter},
     types::{parse_conversion_map_no_atoms, Conversion},
 };
 use grok::Pattern;
@@ -133,9 +133,8 @@ mod tests {
     use super::GrokParserConfig;
     use crate::event::LogEvent;
     use crate::{
-        event,
         config::{TransformConfig, TransformContext},
-        Event,
+        event, Event,
     };
     use pretty_assertions::assert_eq;
     use serde_json::json;

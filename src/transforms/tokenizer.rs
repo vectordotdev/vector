@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
-    event::{self, Event, PathComponent, PathIter},
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::{self, Event, PathComponent, PathIter},
     types::{parse_check_conversion_map, Conversion},
 };
 use nom::{

@@ -2,8 +2,8 @@ mod interop;
 
 use crate::{
     config::CONFIG_PATHS,
-    event::Event,
     config::{DataType, TransformContext},
+    event::Event,
     transforms::{
         util::runtime_transform::{RuntimeTransform, Timer},
         Transform,

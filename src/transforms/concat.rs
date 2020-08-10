@@ -1,7 +1,7 @@
 use super::{BuildError, Transform};
 use crate::{
-    event::Event,
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::Event,
 };
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};

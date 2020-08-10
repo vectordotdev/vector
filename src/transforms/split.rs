@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
-    event::{self, Event},
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::{self, Event},
     types::{parse_check_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};

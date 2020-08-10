@@ -1,4 +1,5 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, LogEvent, Value},
     internal_events::{
         SplunkEventEncodeError, SplunkEventSent, SplunkSourceMissingKeys,
@@ -12,7 +13,6 @@ use crate::{
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
@@ -392,9 +392,10 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        assert_downcast_matches, sinks,
-        test_util::{random_lines_with_stream, random_string, runtime},
+        assert_downcast_matches,
         config::{SinkConfig, SinkContext},
+        sinks,
+        test_util::{random_lines_with_stream, random_string, runtime},
         Event,
     };
     use futures::compat::Future01CompatExt;

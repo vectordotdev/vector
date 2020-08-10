@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
-    event::Event,
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::Event,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};

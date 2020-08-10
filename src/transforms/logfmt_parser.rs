@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
-    event::{self, Event},
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::{self, Event},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -110,8 +110,8 @@ impl Transform for Logfmt {
 mod tests {
     use super::LogfmtConfig;
     use crate::{
-        event::{LogEvent, Value},
         config::{TransformConfig, TransformContext},
+        event::{LogEvent, Value},
         Event,
     };
 

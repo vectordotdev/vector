@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
-    event::Event,
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::Event,
 };
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;

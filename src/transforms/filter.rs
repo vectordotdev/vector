@@ -1,8 +1,8 @@
 use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
-    event::Event,
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::Event,
 };
 use serde::{Deserialize, Serialize};
 

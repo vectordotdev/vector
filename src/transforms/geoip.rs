@@ -1,8 +1,8 @@
 use super::Transform;
 
 use crate::{
-    event::{Event, Value},
     config::{DataType, TransformConfig, TransformContext},
+    event::{Event, Value},
 };
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;

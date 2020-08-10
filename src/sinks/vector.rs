@@ -1,9 +1,9 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::proto,
     internal_events::VectorEventSent,
     sinks::util::{tcp::TcpSink, StreamSink},
     tls::{MaybeTlsSettings, TlsConfig},
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
 use bytes::Bytes;

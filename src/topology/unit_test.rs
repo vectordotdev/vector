@@ -1,9 +1,7 @@
 use crate::{
     conditions::{Condition, ConditionConfig},
+    config::{TestCondition, TestDefinition, TestInput, TestInputValue, TransformContext},
     event::{Event, Value},
-    config::{
-        TestCondition, TestDefinition, TestInput, TestInputValue, TransformContext,
-    },
     transforms::Transform,
 };
 use indexmap::IndexMap;

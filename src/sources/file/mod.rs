@@ -1,8 +1,8 @@
 use crate::{
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::{self, Event},
     internal_events::FileEventReceived,
     shutdown::ShutdownSignal,
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     trace::{current_span, Instrument},
     Pipeline,
 };

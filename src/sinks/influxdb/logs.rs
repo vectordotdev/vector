@@ -10,8 +10,8 @@ use crate::sinks::util::{
 };
 use crate::sinks::Healthcheck;
 use crate::{
-    event::{log_schema, Event},
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    event::{log_schema, Event},
 };
 use futures01::Sink;
 use http::{Request, Uri};

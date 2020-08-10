@@ -1,4 +1,5 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricValue},
     sinks::influxdb::{
         encode_namespace, encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings,
@@ -9,7 +10,6 @@ use crate::{
         service2::TowerRequestConfig,
         BatchConfig, BatchSettings, MetricBuffer,
     },
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::future::{ready, BoxFuture};
 use futures01::Sink;

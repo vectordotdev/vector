@@ -1,7 +1,7 @@
 use crate::{
+    config::{SinkConfig, SinkContext},
     runtime::Runtime,
     test_util::runtime,
-    config::{SinkConfig, SinkContext},
     Error,
 };
 use bytes05::Bytes;
