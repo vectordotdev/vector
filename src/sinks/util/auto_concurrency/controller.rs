@@ -30,7 +30,7 @@ const THRESHOLD_RATIO: f64 = 0.05;
 #[derive(Clone, Debug)]
 pub(super) struct Controller<L> {
     semaphore: Arc<ShrinkableSemaphore>,
-    max: usize,
+    in_flight_limit: Option<usize>,
     logic: L,
     pub(super) inner: Arc<Mutex<Inner>>,
     #[cfg(test)]
@@ -64,10 +64,9 @@ impl<L> Controller<L> {
         // mechanisms. Otherwise, the current limit is set to 1 and the
         // maximum to MAX_CONCURRENCY.
         let current_limit = in_flight_limit.unwrap_or(1);
-        let max = in_flight_limit.unwrap_or(super::MAX_CONCURRENCY);
         Self {
             semaphore: Arc::new(ShrinkableSemaphore::new(current_limit)),
-            max,
+            in_flight_limit,
             logic,
             inner: Arc::new(Mutex::new(Inner {
                 current_limit,
@@ -153,33 +152,36 @@ impl<L> Controller<L> {
 
             let threshold = past_rtt * THRESHOLD_RATIO;
 
-            // Back pressure responses, either explicit or implicit due
-            // to increasing response times, trigger a decrease in the
-            // concurrency limit.
-            if inner.current_limit > 1
-                && (inner.had_back_pressure || current_rtt >= past_rtt + threshold)
-            {
-                // Decrease (multiplicative) the current concurrency limit
-                let to_forget = inner.current_limit / 2;
-                self.semaphore.forget_permits(to_forget);
-                inner.current_limit -= to_forget;
+            // Only manage the concurrency if in_flight_limit was set to "auto"
+            if self.in_flight_limit.is_none() {
+                // Normal quick responses trigger an increase in the
+                // concurrency limit. Note that we only check this if we had
+                // requests to go beyond the current limit to prevent
+                // increasing the limit beyond what we have evidence for.
+                if inner.current_limit < super::MAX_CONCURRENCY
+                    && inner.reached_limit
+                    && !inner.had_back_pressure
+                    && current_rtt <= past_rtt
+                {
+                    // Increase (additive) the current concurrency limit
+                    self.semaphore.add_permits(1);
+                    inner.current_limit += 1;
+                }
+                // Back pressure responses, either explicit or implicit due
+                // to increasing response times, trigger a decrease in the
+                // concurrency limit.
+                else if inner.current_limit > 1
+                    && (inner.had_back_pressure || current_rtt >= past_rtt + threshold)
+                {
+                    // Decrease (multiplicative) the current concurrency limit
+                    let to_forget = inner.current_limit / 2;
+                    self.semaphore.forget_permits(to_forget);
+                    inner.current_limit -= to_forget;
+                }
+                emit!(AutoConcurrencyLimit {
+                    concurrency: inner.current_limit as u64,
+                });
             }
-            // Normal quick responses trigger an increase in the
-            // concurrency limit. Note that we only check this if we had
-            // requests to go beyond the current limit to prevent
-            // increasing the limit beyond what we have evidence for.
-            else if inner.current_limit < self.max
-                && inner.reached_limit
-                && !inner.had_back_pressure
-                && current_rtt <= past_rtt
-            {
-                // Increase (additive) the current concurrency limit
-                self.semaphore.add_permits(1);
-                inner.current_limit += 1;
-            }
-            emit!(AutoConcurrencyLimit {
-                concurrency: inner.current_limit as u64,
-            });
 
             // Reset values for next interval
             let new_avg = inner.past_rtt.update(current_rtt);
