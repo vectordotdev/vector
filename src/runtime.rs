@@ -76,10 +76,6 @@ impl Runtime {
             .unwrap()
     }
 
-    pub fn shutdown_on_idle(self) -> impl Future<Item = (), Error = ()> {
-        self.rt.shutdown_on_idle()
-    }
-
     pub fn shutdown_now(self) -> impl Future<Item = (), Error = ()> {
         self.rt.shutdown_now()
     }
