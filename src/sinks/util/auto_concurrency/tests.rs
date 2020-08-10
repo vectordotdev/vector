@@ -15,13 +15,14 @@ use crate::{
         Healthcheck, RouterSink,
     },
     sources::generator::GeneratorConfig,
-    test_util::{block_on, runtime, shutdown_on_idle, stats::LevelTimeHistogram},
+    test_util::stats::LevelTimeHistogram,
     topology::{
         self,
         config::{self, DataType, SinkConfig, SinkContext},
     },
 };
 use core::task::Context;
+use futures::compat::Future01CompatExt;
 use futures::future::{pending, BoxFuture};
 use futures01::{future, Sink};
 use rand::{distributions::Exp1, prelude::*};
@@ -31,7 +32,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::task::Poll;
 use std::time::{Duration, Instant};
-use tokio::time::delay_until;
+use tokio::time::{delay_for, delay_until};
 use tower03::Service;
 
 #[derive(Copy, Clone, Debug, Default, Serialize)]
@@ -224,11 +225,11 @@ struct TestData {
     cstats: ControllerStatistics,
 }
 
-fn run_test(lines: usize, interval: Option<f64>, params: TestParams) -> TestData {
-    run_test4(lines, interval, params, InFlightLimit::Auto)
+async fn run_test(lines: usize, interval: Option<f64>, params: TestParams) -> TestData {
+    run_test4(lines, interval, params, InFlightLimit::Auto).await
 }
 
-fn run_test4(
+async fn run_test4(
     lines: usize,
     interval: Option<f64>,
     params: TestParams,
@@ -255,19 +256,17 @@ fn run_test4(
     config.add_source("in", generator);
     config.add_sink("out", &["in"], test_config);
 
-    let mut rt = runtime();
-
-    let (topology, _crash) = rt
-        .block_on_std(topology::start(config, false))
+    let (topology, _crash) = topology::start(config, false)
+        .await
         .expect("Failed to start topology");
 
     let controller = get_controller().unwrap();
 
     // Give time for the generator to start and queue all its data.
     let delay = interval.unwrap_or(0.0) * (lines as f64) + 1.0;
-    std::thread::sleep(Duration::from_secs_f64(delay));
-    block_on(topology.stop()).unwrap();
-    shutdown_on_idle(rt);
+    delay_for(Duration::from_secs_f64(delay)).await;
+    topology.stop().compat().await.unwrap();
+    //shutdown_on_idle(rt);
 
     let stats = Arc::try_unwrap(stats)
         .expect("Failed to unwrap stats Arc")
@@ -310,8 +309,8 @@ fn run_test4(
     TestData { stats, cstats }
 }
 
-#[test]
-fn fixed_concurrency() {
+#[tokio::test]
+async fn fixed_concurrency() {
     // Simulate a very jittery link, but with a fixed concurrency
     let results = run_test4(
         200,
@@ -322,7 +321,8 @@ fn fixed_concurrency() {
             ..Default::default()
         },
         InFlightLimit::Fixed(10),
-    );
+    )
+    .await;
 
     let in_flight = results.stats.in_flight.stats().unwrap();
     assert_eq!(in_flight.max, 10, "{:#?}", results);
@@ -337,8 +337,8 @@ fn fixed_concurrency() {
     assert_eq!(in_flight.mode, 10, "{:#?}", results);
 }
 
-#[test]
-fn constant_link() {
+#[tokio::test]
+async fn constant_link() {
     let results = run_test(
         500,
         None,
@@ -346,7 +346,8 @@ fn constant_link() {
             delay: Duration::from_millis(100),
             ..Default::default()
         },
-    );
+    )
+    .await;
 
     // With a constant response time link and enough responses, the
     // limiter will ramp up towards the maximum concurrency.
@@ -388,8 +389,8 @@ fn constant_link() {
     );
 }
 
-#[test]
-fn defers_at_high_concurrency() {
+#[tokio::test]
+async fn defers_at_high_concurrency() {
     let results = run_test(
         500,
         None,
@@ -398,7 +399,8 @@ fn defers_at_high_concurrency() {
             concurrency_defer: 5,
             ..Default::default()
         },
-    );
+    )
+    .await;
 
     // With a constant time link that gives deferrals over a certain
     // concurrency, the limiter will ramp up to that concurrency and
@@ -430,8 +432,8 @@ fn defers_at_high_concurrency() {
     assert_within!(c_in_flight.mean, 2.0, 4.0, "{:#?}", results);
 }
 
-#[test]
-fn drops_at_high_concurrency() {
+#[tokio::test]
+async fn drops_at_high_concurrency() {
     let results = run_test(
         500,
         None,
@@ -440,7 +442,8 @@ fn drops_at_high_concurrency() {
             concurrency_drop: 5,
             ..Default::default()
         },
-    );
+    )
+    .await;
 
     // Since our internal framework doesn't track the "dropped"
     // requests, the values won't be representative of the actual number
@@ -466,8 +469,8 @@ fn drops_at_high_concurrency() {
     assert_within!(c_in_flight.mean, 3.0, 5.0, "{:#?}", results);
 }
 
-#[test]
-fn slow_link() {
+#[tokio::test]
+async fn slow_link() {
     let results = run_test(
         200,
         None,
@@ -476,7 +479,8 @@ fn slow_link() {
             concurrency_scale: 1.0,
             ..Default::default()
         },
-    );
+    )
+    .await;
 
     // With a link that slows down heavily as concurrency increases, the
     // limiter will keep the concurrency low (timing skews occasionally
@@ -502,8 +506,8 @@ fn slow_link() {
     assert_within!(c_in_flight.mean, 1.0, 2.0, "{:#?}", results);
 }
 
-#[test]
-fn slow_send_1() {
+#[tokio::test]
+async fn slow_send_1() {
     let results = run_test(
         100,
         Some(0.100),
@@ -511,7 +515,8 @@ fn slow_send_1() {
             delay: Duration::from_millis(50),
             ..Default::default()
         },
-    );
+    )
+    .await;
 
     // With a generator running slower than the link can process, the
     // limiter will never raise the concurrency above 1.
@@ -535,8 +540,8 @@ fn slow_send_1() {
     assert_within!(c_in_flight.mean, 0.5, 1.0, "{:#?}", results);
 }
 
-#[test]
-fn slow_send_2() {
+#[tokio::test]
+async fn slow_send_2() {
     let results = run_test(
         100,
         Some(0.050),
@@ -544,7 +549,8 @@ fn slow_send_2() {
             delay: Duration::from_millis(50),
             ..Default::default()
         },
-    );
+    )
+    .await;
 
     // With a generator running at the same speed as the link RTT, the
     // limiter will keep the limit around 1-2 depending on timing jitter.
@@ -568,8 +574,8 @@ fn slow_send_2() {
     assert_within!(c_in_flight.mean, 1.0, 2.0, "{:#?}", results);
 }
 
-#[test]
-fn medium_send() {
+#[tokio::test]
+async fn medium_send() {
     let results = run_test(
         500,
         Some(0.025),
@@ -577,7 +583,8 @@ fn medium_send() {
             delay: Duration::from_millis(100),
             ..Default::default()
         },
-    );
+    )
+    .await;
 
     let in_flight = results.stats.in_flight.stats().unwrap();
     // With a generator running at four times the speed as the link RTT,
@@ -600,8 +607,8 @@ fn medium_send() {
     assert_within!(c_in_flight.mean, 4.0, 5.0, "{:#?}", results);
 }
 
-#[test]
-fn jittery_link_small() {
+#[tokio::test]
+async fn jittery_link_small() {
     let results = run_test(
         500,
         None,
@@ -610,7 +617,8 @@ fn jittery_link_small() {
             jitter: 0.1,
             ..Default::default()
         },
-    );
+    )
+    .await;
 
     // Jitter can cause concurrency management to vary widely, though it
     // will typically reach the maximum of 10 in flight.
