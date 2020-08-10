@@ -5,12 +5,12 @@ use futures::compat::Future01CompatExt;
 use futures01::{
     future, future::Future, sink::Sink, stream::iter_ok, stream::Stream, sync::mpsc::SendError,
 };
+use std::iter;
 use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
     Arc,
 };
-use std::time::Duration;
-use std::{iter, thread};
+use tokio::time::{delay_for, Duration};
 use vector::event::{self, Event};
 use vector::test_util::{runtime, trace_init};
 use vector::topology;
@@ -68,7 +68,7 @@ async fn topology_shutdown_while_active() {
     // Wait until at least 100 events have been seen by the source so we know the pump is running
     // and pushing events through the pipeline.
     while source_event_total.load(Ordering::SeqCst) < 100 {
-        thread::sleep(Duration::from_millis(10));
+        delay_for(Duration::from_millis(10)).await;
     }
 
     // Now shut down the RunningTopology while Events are still being processed.
@@ -463,7 +463,7 @@ async fn topology_swap_transform_is_atomic() {
     config.add_sink("out1", &["t1"], sink1);
 
     let (mut topology, _crash) = topology::start(config, false).await.unwrap();
-    tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
+    delay_for(Duration::from_millis(10)).await;
 
     let transform1v2 = transform(" replaced", 0.0);
 
@@ -476,7 +476,7 @@ async fn topology_swap_transform_is_atomic() {
         .reload_config_and_respawn(config, false)
         .await
         .unwrap());
-    tokio::time::delay_for(std::time::Duration::from_millis(10)).await;
+    delay_for(Duration::from_millis(10)).await;
 
     run_control.store(false, Ordering::Release);
     h_in.await.unwrap().unwrap();
