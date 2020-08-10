@@ -100,7 +100,7 @@ mod test {
             Metric,
         },
         sinks::vector::VectorSinkConfig,
-        test_util::{next_addr, runtime, wait_for_tcp_sync, CollectCurrent},
+        test_util::{next_addr, runtime, wait_for_tcp, CollectCurrent},
         tls::{TlsConfig, TlsOptions},
         topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
         Event, Pipeline,
@@ -121,7 +121,7 @@ mod test {
             .unwrap();
         let mut rt = runtime();
         rt.spawn(server);
-        wait_for_tcp_sync(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         let cx = SinkContext::new_test();
         let (sink, _) = sink.build(cx).unwrap();

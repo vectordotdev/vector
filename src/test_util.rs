@@ -271,10 +271,6 @@ pub fn wait_for_sync(mut f: impl FnMut() -> bool) {
     }
 }
 
-pub fn wait_for_tcp_sync(addr: SocketAddr) {
-    wait_for_sync(|| std::net::TcpStream::connect(addr).is_ok())
-}
-
 pub fn wait_for_atomic_usize_sync<T, F>(val: T, unblock: F)
 where
     T: AsRef<AtomicUsize>,

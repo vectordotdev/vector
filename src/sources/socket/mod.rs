@@ -141,8 +141,7 @@ mod test {
     use crate::shutdown::{ShutdownSignal, SourceShutdownCoordinator};
     use crate::sinks::util::tcp::TcpSink;
     use crate::test_util::{
-        block_on, collect_n, next_addr, runtime, send_lines, send_lines_tls, wait_for_tcp_sync,
-        CollectN,
+        block_on, collect_n, next_addr, runtime, send_lines, send_lines_tls, wait_for_tcp, CollectN,
     };
     use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions};
     use crate::topology::config::{GlobalOptions, SourceConfig};
@@ -184,7 +183,7 @@ mod test {
             .unwrap();
         let mut rt = runtime();
         rt.spawn(server);
-        wait_for_tcp_sync(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         rt.block_on_std(send_lines(addr, vec!["test".to_owned()].into_iter()))
             .unwrap();
@@ -212,7 +211,7 @@ mod test {
             .unwrap();
         let mut rt = runtime();
         rt.spawn(server);
-        wait_for_tcp_sync(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         rt.block_on_std(send_lines(addr, vec!["test".to_owned()].into_iter()))
             .unwrap();
@@ -243,7 +242,7 @@ mod test {
             .unwrap();
         let mut rt = runtime();
         rt.spawn(server);
-        wait_for_tcp_sync(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         let lines = vec![
             "short".to_owned(),
@@ -294,7 +293,7 @@ mod test {
             .unwrap();
         let mut rt = runtime();
         rt.spawn(server);
-        wait_for_tcp_sync(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         let lines = vec![
             "short".to_owned(),
@@ -333,7 +332,7 @@ mod test {
             .unwrap();
         let mut rt = runtime();
         let source_handle = oneshot::spawn(server, &rt.executor());
-        wait_for_tcp_sync(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         // Send data to Source.
         rt.block_on_std(send_lines(addr, vec!["test".to_owned()].into_iter()))
@@ -377,7 +376,7 @@ mod test {
         .unwrap();
         let mut rt = Runtime::with_thread_count(2).unwrap();
         let source_handle = oneshot::spawn(server, &rt.executor());
-        wait_for_tcp_sync(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         // Spawn future that keeps sending lines to the TCP source forever.
         let sink = TcpSink::new(
