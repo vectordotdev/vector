@@ -294,7 +294,7 @@ mod test {
                 r###"mapping parse error
  --> 1:20
   |
-1 | .foo.bar = "baz" + 
+1 | .foo.bar = "baz" +
   |                    ^---
   |
   = expected query"###,

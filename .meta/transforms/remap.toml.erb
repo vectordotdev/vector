@@ -1,0 +1,25 @@
+[transforms.remap]
+title = "Remap"
+allow_you_to_description = "remap one or more log fields"
+beta = false
+common = false
+function_category = "schema"
+input_types = ["log"]
+output_types = ["log"]
+requirements = {}
+
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "remap") %>
+
+[transforms.remap.options.mapping]
+type = "string"
+common = true
+required = true
+description = """\
+A mapping that describes field assignments and deletions to be performed on log \
+events.\
+"""
+examples = [
+  """.type = "foo"""",
+  """.new_field = .old_field * 2
+del(.old_field)""",
+]
