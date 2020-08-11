@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Value},
-    internal_events::ANSIStripperEventProcessed,
+    internal_events::{ANSIStripperEventProcessed, ANSIStripperFieldMissing},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     Event,
 };
@@ -55,10 +55,7 @@ impl Transform for AnsiStripper {
         emit!(ANSIStripperEventProcessed);
 
         match log.get_mut(&self.field) {
-            None => debug!(
-                message = "Field does not exist.",
-                field = self.field.as_ref(),
-            ),
+            None => emit!(ANSIStripperFieldMissing { field: &self.field }),
             Some(Value::Bytes(ref mut bytes)) => {
                 *bytes = match strip_ansi_escapes::strip(bytes.clone()) {
                     Ok(b) => b.into(),
