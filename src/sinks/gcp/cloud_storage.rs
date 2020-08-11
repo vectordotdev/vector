@@ -7,7 +7,7 @@ use crate::{
             encoding::{EncodingConfig, EncodingConfiguration},
             http::{HttpClient, HttpClientFuture},
             retries2::{RetryAction, RetryLogic},
-            service2::{ServiceBuilderExt, TowerCompat, TowerRequestConfig},
+            service2::{InFlightLimit, ServiceBuilderExt, TowerCompat, TowerRequestConfig},
             BatchConfig, BatchSettings, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
             PartitionInnerBuffer,
         },
@@ -123,7 +123,7 @@ enum GcsStorageClass {
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        in_flight_limit: Some(25),
+        in_flight_limit: InFlightLimit::Fixed(25),
         rate_limit_num: Some(25),
         ..Default::default()
     };

@@ -1,5 +1,6 @@
 <%- groups ||= [] -%>
 <%- retry_attempts ||= 18446744073709551615 %>
+<%- in_flight_limit ||= 5 %>
 [<%= namespace %>.request]
 type = "table"
 category = "Request"
@@ -13,7 +14,11 @@ common = true
 default = <%= in_flight_limit %>
 groups = <%= groups.to_toml %>
 unit = "requests"
-description = "The maximum number of in-flight requests allowed at any given time."
+description = """\
+The maximum number of in-flight requests allowed at any given time. \
+If this is set to `"auto"`, the effective limit will vary continuously based \
+on the timing and contents of responses received from the remote service.\
+"""
 
 [<%= namespace %>.request.children.rate_limit_duration_secs]
 type = "uint"

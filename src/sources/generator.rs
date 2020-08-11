@@ -16,7 +16,7 @@ use tokio::time::interval;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct GeneratorConfig {
+pub struct GeneratorConfig {
     #[serde(default)]
     sequence: bool,
     lines: Vec<String>,
@@ -28,11 +28,11 @@ pub(crate) struct GeneratorConfig {
 
 impl GeneratorConfig {
     #[allow(dead_code)] // to make check-component-features pass
-    #[cfg(test)]
-    pub fn repeat(lines: Vec<String>, count: usize) -> Self {
+    pub fn repeat(lines: Vec<String>, count: usize, batch_interval: Option<f64>) -> Self {
         Self {
             lines,
             count,
+            batch_interval,
             ..Self::default()
         }
     }

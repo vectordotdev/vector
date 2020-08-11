@@ -37,7 +37,7 @@ write_to_description = "[New Relic's log service][urls.new_relic] via their [log
   "_partials/fields/_request_options.toml",
   namespace: "sinks.new_relic_logs.options",
   common: false,
-  in_flight_limit: 5,
+  in_flight_limit: 100,
   rate_limit_duration_secs: 1,
   rate_limit_num: 100,
   retry_initial_backoff_secs: 1,
