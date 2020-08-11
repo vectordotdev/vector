@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
-    internal_events::{SplitEventProcessed, SplitFieldMissing},
+    internal_events::{SplitConvertFailed, SplitEventProcessed, SplitFieldMissing},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -107,11 +107,10 @@ impl Transform for Split {
                         event.as_mut_log().insert(name.clone(), value);
                     }
                     Err(error) => {
-                        debug!(
-                            message = "Could not convert types.",
-                            name = &name[..],
-                            %error
-                        );
+                        emit!(SplitConvertFailed {
+                            field: name.as_ref(),
+                            error
+                        });
                     }
                 }
             }
