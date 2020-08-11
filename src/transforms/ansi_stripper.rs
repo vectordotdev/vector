@@ -2,7 +2,8 @@ use super::Transform;
 use crate::{
     event::{self, Value},
     internal_events::{
-        ANSIStripperEventProcessed, ANSIStripperFieldInvalid, ANSIStripperFieldMissing,
+        ANSIStripperEventProcessed, ANSIStripperFailed, ANSIStripperFieldInvalid,
+        ANSIStripperFieldMissing,
     },
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     Event,
@@ -62,12 +63,10 @@ impl Transform for AnsiStripper {
                 *bytes = match strip_ansi_escapes::strip(bytes.clone()) {
                     Ok(b) => b.into(),
                     Err(error) => {
-                        debug!(
-                            message = "Could not strip ANSI escape sequences.",
-                            field = self.field.as_ref(),
-                            %error,
-                            rate_limit_secs = 30,
-                        );
+                        emit!(ANSIStripperFailed {
+                            field: &self.field,
+                            error
+                        });
                         return Some(event);
                     }
                 };

@@ -59,3 +59,27 @@ impl InternalEvent for ANSIStripperFieldInvalid<'_> {
         );
     }
 }
+
+#[derive(Debug)]
+pub struct ANSIStripperFailed<'a> {
+    pub field: &'a Atom,
+    pub error: std::io::Error,
+}
+
+impl InternalEvent for ANSIStripperFailed<'_> {
+    fn emit_logs(&self) {
+        debug!(
+            message = "could not strip ANSI escape sequences.",
+            field = %self.field,
+            error = %self.error,
+            rate_limit_secs = 30,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("processing_errors", 1,
+            "component_kind" => "transform",
+            "component_type" => "ansi_stripper",
+        );
+    }
+}
