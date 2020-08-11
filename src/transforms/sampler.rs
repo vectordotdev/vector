@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
+    internal_events::SamplerEventProcessed,
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use regex::RegexSet; // TODO: use regex::bytes
@@ -72,6 +73,8 @@ impl Transform for Sampler {
         if self.pass_list.is_match(&message) {
             return Some(event);
         }
+
+        emit!(SamplerEventProcessed);
 
         if seahash::hash(message.as_bytes()) % self.rate == 0 {
             event
