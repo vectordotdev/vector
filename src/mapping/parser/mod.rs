@@ -249,75 +249,37 @@ mod test {
     #[test]
     fn check_parser_errors() {
         let cases = vec![
-            (
-                ".foo = {\"bar\"}",
-                r###"mapping parse error
- --> 1:8
-  |
-1 | .foo = {"bar"}
-  |        ^---
-  |
-  = expected query"###,
-            ),
+            (".foo = {\"bar\"}", vec![" 1:8", "= expected query"]),
             (
                 ". = \"bar\"",
-                r###"mapping parse error
- --> 1:1
-  |
-1 | . = "bar"
-  | ^---
-  |
-  = expected target_path or deletion"###,
+                vec![" 1:1", "= expected target_path or deletion"],
             ),
             (
                 "foo = \"bar\"",
-                r###"mapping parse error
- --> 1:1
-  |
-1 | foo = "bar"
-  | ^---
-  |
-  = expected target_path or deletion"###,
+                vec![" 1:1", "= expected target_path or deletion"],
             ),
             (
                 ".foo.bar = \"baz\" and this",
-                r###"mapping parse error
- --> 1:18
-  |
-1 | .foo.bar = "baz" and this
-  |                  ^---
-  |
-  = expected EOI or operator"###,
+                vec![" 1:18", "= expected EOI or operator"],
             ),
-            (
-                ".foo.bar = \"baz\" +",
-                r###"mapping parse error
- --> 1:19
-  |
-1 | .foo.bar = "baz" +
-  |                   ^---
-  |
-  = expected query"###,
-            ),
+            (".foo.bar = \"baz\" +", vec![" 1:19", "= expected query"]),
             (
                 ".foo.bar = .foo.(bar |)",
-                r###"mapping parse error
- --> 1:23
-  |
-1 | .foo.bar = .foo.(bar |)
-  |                       ^---
-  |
-  = expected path_segment"###,
+                vec![" 1:23", "= expected path_segment"],
             ),
         ];
 
-        for (mapping, exp) in cases {
-            assert_eq!(
-                format!("{}", parse(mapping).err().unwrap()),
-                exp,
-                "mapping: {}",
-                mapping
-            );
+        for (mapping, exp_expressions) in cases {
+            let err = format!("{}", parse(mapping).err().unwrap());
+            for exp in exp_expressions {
+                assert!(
+                    err.contains(exp),
+                    "expected: {}\nwith mapping: {}\nfull error message: {}",
+                    exp,
+                    mapping,
+                    err
+                );
+            }
         }
     }
 

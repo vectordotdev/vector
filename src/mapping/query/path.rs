@@ -25,7 +25,11 @@ impl From<Vec<Vec<String>>> for Path {
             // TODO: Switch to String once Event API is cleaned up.
             path: path
                 .iter()
-                .map(|c| c.iter().map(|p| Atom::from(p.clone())).collect())
+                .map(|c| {
+                    c.iter()
+                        .map(|p| Atom::from(p.replace(".", "\\.")))
+                        .collect()
+                })
                 .collect(),
         }
     }
@@ -37,7 +41,11 @@ impl From<Vec<Vec<&str>>> for Path {
             // TODO: Switch to String once Event API is cleaned up.
             path: path
                 .iter()
-                .map(|c| c.iter().map(|p| Atom::from(p.clone())).collect())
+                .map(|c| {
+                    c.iter()
+                        .map(|p| Atom::from(p.replace(".", "\\.")))
+                        .collect()
+                })
                 .collect(),
         }
     }
@@ -114,6 +122,28 @@ mod test {
                 },
                 Ok(Value::from(json!("bar"))),
                 Path::from(vec![vec!["foo"]]),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event
+                        .as_mut_log()
+                        .insert("foo\\.bar.baz", Value::Integer(20));
+                    event
+                },
+                Ok(Value::Integer(20)),
+                Path::from(vec![vec!["foo.bar"], vec!["baz"]]),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event
+                        .as_mut_log()
+                        .insert("foo\\.bar[0].baz", Value::Integer(20));
+                    event
+                },
+                Ok(Value::Integer(20)),
+                Path::from(vec![vec!["foo.bar[0]"], vec!["baz"]]),
             ),
             (
                 {
