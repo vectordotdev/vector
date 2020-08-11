@@ -144,12 +144,11 @@ impl NewRelicLogsConfig {
 mod tests {
     use super::*;
     use crate::{
-        event::Event,
-        sinks::util::test::build_test_server,
-        test_util::{next_addr, runtime, shutdown_on_idle},
+        event::Event, sinks::util::test::build_test_server, test_util::next_addr,
         topology::config::SinkConfig,
     };
     use bytes05::buf::BufExt;
+    use futures::compat::Future01CompatExt;
     use futures01::{stream, Sink, Stream};
     use hyper::Method;
     use serde_json::Value;
@@ -261,8 +260,8 @@ mod tests {
         assert!(http_config.auth.is_none());
     }
 
-    #[test]
-    fn new_relic_logs_happy_path() {
+    #[tokio::test(core_threads = 2)]
+    async fn new_relic_logs_happy_path() {
         let in_addr = next_addr();
 
         let mut nr_config = NewRelicLogsConfig::default();
@@ -273,19 +272,17 @@ mod tests {
             .unwrap()
             .into();
 
-        let mut rt = runtime();
-
         let (sink, _healthcheck) = http_config.build(SinkContext::new_test()).unwrap();
-        let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
+        let (rx, trigger, server) = build_test_server(in_addr);
 
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
         let events = stream::iter_ok(input_lines.clone().into_iter().map(Event::from));
 
         let pump = sink.send_all(events);
 
-        rt.spawn(server);
+        tokio::spawn(server);
 
-        let _ = rt.block_on(pump).unwrap();
+        let _ = pump.compat().await.unwrap();
         drop(trigger);
 
         let output_lines = rx
@@ -312,8 +309,6 @@ mod tests {
                     .collect()
             })
             .collect::<Vec<_>>();
-
-        shutdown_on_idle(rt);
 
         assert_eq!(input_lines, output_lines);
     }
