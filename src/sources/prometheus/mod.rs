@@ -1,9 +1,8 @@
 use crate::{
     config::{self, GlobalOptions},
-    hyper::body_to_bytes,
     internal_events::{
-        PrometheusEventReceived, PrometheusHttpError, PrometheusParseError,
-        PrometheusRequestCompleted,
+        PrometheusErrorResponse, PrometheusEventReceived, PrometheusHttpError,
+        PrometheusParseError, PrometheusRequestCompleted,
     },
     shutdown::ShutdownSignal,
     Event, Pipeline,
@@ -64,6 +63,9 @@ fn prometheus(
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
+    let out = out
+        .sink_map_err(|e| error!("error sending metric: {:?}", e))
+        .sink_compat();
     let task = tokio::time::interval(Duration::from_secs(interval))
         .take_until(shutdown.compat())
         .map(move |_| stream::iter(urls.clone()))
@@ -79,11 +81,15 @@ fn prometheus(
             let start = Instant::now();
             client
                 .request(request)
-                .and_then(|response| body_to_bytes(response.into_body()))
+                .and_then(|response| async move {
+                    let (header, body) = response.into_parts();
+                    let body = hyper::body::to_bytes(body).await?;
+                    Ok((header, body))
+                })
                 .into_stream()
                 .filter_map(move |response| {
                     future::ready(match response {
-                        Ok(body) => {
+                        Ok((header, body)) if header.status == hyper::StatusCode::OK => {
                             emit!(PrometheusRequestCompleted {
                                 start,
                                 end: Instant::now()
@@ -93,21 +99,34 @@ fn prometheus(
                             let packet = String::from_utf8_lossy(&body);
                             let metrics = parser::parse(&packet)
                                 .map_err(|error| {
-                                    emit!(PrometheusParseError { error });
+                                    emit!(PrometheusParseError {
+                                        error,
+                                        url: url.clone(),
+                                    });
                                 })
                                 .unwrap_or_default();
 
                             if !metrics.is_empty() {
                                 emit!(PrometheusEventReceived {
                                     byte_size,
-                                    count: metrics.len()
+                                    count: metrics.len(),
                                 });
                             }
 
                             Some(stream::iter(metrics).map(Event::Metric).map(Ok))
                         }
+                        Ok((header, _)) => {
+                            emit!(PrometheusErrorResponse {
+                                code: header.status,
+                                url: url.clone(),
+                            });
+                            None
+                        }
                         Err(error) => {
-                            emit!(PrometheusHttpError { error });
+                            emit!(PrometheusHttpError {
+                                error,
+                                url: url.clone(),
+                            });
                             None
                         }
                     })
@@ -115,10 +134,7 @@ fn prometheus(
                 .flatten()
         })
         .flatten()
-        .forward(
-            out.sink_map_err(|e| error!("error sending metric: {:?}", e))
-                .sink_compat(),
-        )
+        .forward(out)
         .inspect(|_| info!("finished sending"));
 
     Box::new(task.boxed().compat())
