@@ -676,6 +676,47 @@ mod reload_tests {
     use crate::sources::splunk_hec::SplunkConfig;
     use crate::test_util::{next_addr, runtime, start_topology};
 
+    // TODO: Run it only on Linux and Mac since it fails on Windows.
+    // TODO: Issue: https://github.com/timberio/vector/issues/3035
+    #[cfg(unix)]
+    #[test]
+    fn topology_reuse_old_port() {
+        let address = next_addr();
+
+        let mut rt = runtime();
+
+        let mut old_config = Config::empty();
+        old_config.add_source("in1", SplunkConfig::on(address));
+        old_config.add_sink(
+            "out",
+            &[&"in1"],
+            ConsoleSinkConfig {
+                target: Target::Stdout,
+                encoding: Encoding::Text.into(),
+            },
+        );
+
+        let mut new_config = Config::empty();
+        new_config.add_source("in2", SplunkConfig::on(address));
+        new_config.add_sink(
+            "out",
+            &[&"in2"],
+            ConsoleSinkConfig {
+                target: Target::Stdout,
+                encoding: Encoding::Text.into(),
+            },
+        );
+
+        rt.block_on_std(async move {
+            let (mut topology, _crash) = start_topology(old_config, false).await;
+
+            assert!(topology
+                .reload_config_and_respawn(new_config, false)
+                .await
+                .unwrap());
+        });
+    }
+
     #[test]
     fn topology_rebuild_old() {
         let address = next_addr();

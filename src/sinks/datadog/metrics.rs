@@ -407,7 +407,7 @@ mod tests {
 
     #[test]
     fn test_request() {
-        let (sink, _, _) = load_sink::<DatadogConfig>(
+        let (sink, _cx) = load_sink::<DatadogConfig>(
             r#"
             namespace = "test"
             api_key = "test"

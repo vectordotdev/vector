@@ -210,7 +210,7 @@ mod tests {
 
     #[test]
     fn interpolate_labels() {
-        let (config, _cx, _rt) = load_sink::<LokiConfig>(
+        let (config, _cx) = load_sink::<LokiConfig>(
             r#"
             endpoint = "http://localhost:3100"
             labels = {label1 = "{{ foo }}", label2 = "some-static-label"}
@@ -258,11 +258,11 @@ mod integration_tests {
     use futures01::Sink;
     use std::convert::TryFrom;
 
-    #[test]
-    fn text() {
+    #[tokio::test]
+    async fn text() {
         let stream = uuid::Uuid::new_v4();
 
-        let (mut config, cx, mut rt) = load_sink::<LokiConfig>(
+        let (mut config, cx) = load_sink::<LokiConfig>(
             r#"
             endpoint = "http://localhost:3100"
             labels = {test_name = "placeholder"}
@@ -271,37 +271,35 @@ mod integration_tests {
         )
         .unwrap();
 
-        rt.block_on_std(async move {
-            let test_name = config.labels.get_mut("test_name").unwrap();
-            assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
+        let test_name = config.labels.get_mut("test_name").unwrap();
+        assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
 
-            *test_name = Template::try_from(stream.to_string()).unwrap();
+        *test_name = Template::try_from(stream.to_string()).unwrap();
 
-            let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).unwrap();
 
-            let lines = crate::test_util::random_lines(100)
-                .take(10)
-                .collect::<Vec<_>>();
+        let lines = crate::test_util::random_lines(100)
+            .take(10)
+            .collect::<Vec<_>>();
 
-            let events = lines.clone().into_iter().map(Event::from);
-            let _ = sink
-                .send_all(futures01::stream::iter_ok(events))
-                .compat()
-                .await
-                .unwrap();
+        let events = lines.clone().into_iter().map(Event::from);
+        let _ = sink
+            .send_all(futures01::stream::iter_ok(events))
+            .compat()
+            .await
+            .unwrap();
 
-            let outputs = fetch_stream(stream.to_string()).await;
-            for (i, output) in outputs.iter().enumerate() {
-                assert_eq!(output, &lines[i]);
-            }
-        });
+        let outputs = fetch_stream(stream.to_string()).await;
+        for (i, output) in outputs.iter().enumerate() {
+            assert_eq!(output, &lines[i]);
+        }
     }
 
-    #[test]
-    fn json() {
+    #[tokio::test]
+    async fn json() {
         let stream = uuid::Uuid::new_v4();
 
-        let (mut config, cx, mut rt) = load_sink::<LokiConfig>(
+        let (mut config, cx) = load_sink::<LokiConfig>(
             r#"
             endpoint = "http://localhost:3100"
             labels = {test_name = "placeholder"}
@@ -311,39 +309,36 @@ mod integration_tests {
         )
         .unwrap();
 
-        rt.block_on_std(async move {
-            let test_name = config.labels.get_mut("test_name").unwrap();
-            assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
+        let test_name = config.labels.get_mut("test_name").unwrap();
+        assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
 
-            *test_name = Template::try_from(stream.to_string()).unwrap();
+        *test_name = Template::try_from(stream.to_string()).unwrap();
 
-            let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).unwrap();
 
-            let events = crate::test_util::random_lines(100)
-                .take(10)
-                .map(Event::from)
-                .collect::<Vec<_>>();
-            let _ = sink
-                .send_all(futures01::stream::iter_ok(events.clone()))
-                .compat()
-                .await
-                .unwrap();
+        let events = crate::test_util::random_lines(100)
+            .take(10)
+            .map(Event::from)
+            .collect::<Vec<_>>();
+        let _ = sink
+            .send_all(futures01::stream::iter_ok(events.clone()))
+            .compat()
+            .await
+            .unwrap();
 
-            let outputs = fetch_stream(stream.to_string()).await;
-            for (i, output) in outputs.iter().enumerate() {
-                let expected_json =
-                    serde_json::to_string(&events[i].as_log().all_fields()).unwrap();
-                assert_eq!(output, &expected_json);
-            }
-        });
+        let outputs = fetch_stream(stream.to_string()).await;
+        for (i, output) in outputs.iter().enumerate() {
+            let expected_json = serde_json::to_string(&events[i].as_log().all_fields()).unwrap();
+            assert_eq!(output, &expected_json);
+        }
     }
 
-    #[test]
-    fn many_streams() {
+    #[tokio::test]
+    async fn many_streams() {
         let stream1 = uuid::Uuid::new_v4();
         let stream2 = uuid::Uuid::new_v4();
 
-        let (config, cx, mut rt) = load_sink::<LokiConfig>(
+        let (config, cx) = load_sink::<LokiConfig>(
             r#"
             endpoint = "http://localhost:3100"
             labels = {test_name = "{{ stream_id }}"}
@@ -352,48 +347,46 @@ mod integration_tests {
         )
         .unwrap();
 
-        rt.block_on_std(async move {
-            let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).unwrap();
 
-            let lines = crate::test_util::random_lines(100)
-                .take(10)
-                .collect::<Vec<_>>();
+        let lines = crate::test_util::random_lines(100)
+            .take(10)
+            .collect::<Vec<_>>();
 
-            let mut events = lines
-                .clone()
-                .into_iter()
-                .map(Event::from)
-                .collect::<Vec<_>>();
+        let mut events = lines
+            .clone()
+            .into_iter()
+            .map(Event::from)
+            .collect::<Vec<_>>();
 
-            for i in 0..10 {
-                let event = events.get_mut(i).unwrap();
+        for i in 0..10 {
+            let event = events.get_mut(i).unwrap();
 
-                if i % 2 == 0 {
-                    event.as_mut_log().insert("stream_id", stream1.to_string());
-                } else {
-                    event.as_mut_log().insert("stream_id", stream2.to_string());
-                }
+            if i % 2 == 0 {
+                event.as_mut_log().insert("stream_id", stream1.to_string());
+            } else {
+                event.as_mut_log().insert("stream_id", stream2.to_string());
             }
+        }
 
-            let _ = sink
-                .send_all(futures01::stream::iter_ok(events))
-                .compat()
-                .await
-                .unwrap();
+        let _ = sink
+            .send_all(futures01::stream::iter_ok(events))
+            .compat()
+            .await
+            .unwrap();
 
-            let outputs1 = fetch_stream(stream1.to_string()).await;
-            let outputs2 = fetch_stream(stream2.to_string()).await;
+        let outputs1 = fetch_stream(stream1.to_string()).await;
+        let outputs2 = fetch_stream(stream2.to_string()).await;
 
-            for (i, output) in outputs1.iter().enumerate() {
-                let index = (i % 5) * 2;
-                assert_eq!(output, &lines[index]);
-            }
+        for (i, output) in outputs1.iter().enumerate() {
+            let index = (i % 5) * 2;
+            assert_eq!(output, &lines[index]);
+        }
 
-            for (i, output) in outputs2.iter().enumerate() {
-                let index = ((i % 5) * 2) + 1;
-                assert_eq!(output, &lines[index]);
-            }
-        });
+        for (i, output) in outputs2.iter().enumerate() {
+            let index = ((i % 5) * 2) + 1;
+            assert_eq!(output, &lines[index]);
+        }
     }
 
     async fn fetch_stream(stream: String) -> Vec<String> {
