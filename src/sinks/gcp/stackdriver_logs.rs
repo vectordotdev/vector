@@ -5,8 +5,7 @@ use crate::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpClient, HttpSink},
-            service2::TowerRequestConfig,
-            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer,
+            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, RouterSink,
     },

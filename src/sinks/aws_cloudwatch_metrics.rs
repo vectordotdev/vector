@@ -3,8 +3,8 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries2::RetryLogic, rusoto, service2::TowerRequestConfig, BatchConfig, BatchSettings,
-        Compression, MetricBuffer,
+        retries::RetryLogic, rusoto, BatchConfig, BatchSettings, Compression, MetricBuffer,
+        TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };

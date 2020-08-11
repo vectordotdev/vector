@@ -3,8 +3,7 @@ use crate::{
     sinks::util::{
         encoding::EncodingConfigWithDefault,
         http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
-        service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, UriSerde,
+        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };

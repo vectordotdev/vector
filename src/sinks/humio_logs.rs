@@ -1,7 +1,7 @@
 use crate::{
     sinks::splunk_hec::{self, HecSinkConfig},
     sinks::util::{
-        encoding::EncodingConfigWithDefault, service2::TowerRequestConfig, BatchConfig, Compression,
+        encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},

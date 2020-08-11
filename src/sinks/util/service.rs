@@ -4,23 +4,24 @@ use super::{
     Batch, BatchSink,
 };
 use crate::buffers::Acker;
-use futures::{FutureExt, TryFutureExt};
-use futures01::{Async, Future, Poll};
+use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::task::Poll;
 use std::time::Duration;
-use std::{error, fmt};
-use tokio::time::delay_for;
-use tower::{
+use tower03::{
     layer::{util::Stack, Layer},
-    limit::{concurrency::ConcurrencyLimit, rate::RateLimit},
+    limit::{ConcurrencyLimit, RateLimit},
     retry::Retry,
+    timeout::Timeout,
     util::BoxService,
     Service, ServiceBuilder,
 };
 
-pub type TowerBatchedSink<S, B, L, Request> =
-    BatchSink<ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>, B, Request>;
+pub use compat::TowerCompat;
+
+pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, ConcurrencyLimit<Timeout<S>>>>;
+pub type TowerBatchedSink<S, B, L, Request> = BatchSink<TowerCompat<Svc<S, L>>, B, Request>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -143,14 +144,13 @@ impl TowerRequestSettings {
     {
         let policy = self.retry_policy(retry_logic);
         let service = ServiceBuilder::new()
-            .concurrency_limit(self.in_flight_limit)
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
             .retry(policy)
-            .layer(TimeoutLayer {
-                timeout: self.timeout,
-            })
+            .concurrency_limit(self.in_flight_limit)
+            .timeout(self.timeout)
             .service(service);
 
+        let service = TowerCompat::new(service);
         BatchSink::new(service, batch, batch_timeout, acker)
     }
 }
@@ -162,7 +162,7 @@ pub struct TowerRequestLayer<L, Request> {
     _pd: std::marker::PhantomData<Request>,
 }
 
-impl<S, L, Request> tower::layer::Layer<S> for TowerRequestLayer<L, Request>
+impl<S, L, Request> Layer<S> for TowerRequestLayer<L, Request>
 where
     S: Service<Request> + Send + Clone + 'static,
     S::Response: Response + Send + 'static,
@@ -183,9 +183,7 @@ where
                 self.settings.rate_limit_duration,
             )
             .retry(policy)
-            .layer(TimeoutLayer {
-                timeout: self.settings.timeout,
-            })
+            .timeout(self.settings.timeout)
             .service(inner);
 
         BoxService::new(l)
@@ -224,15 +222,17 @@ where
 {
     type Response = S::Response;
     type Error = crate::Error;
-    type Future = futures01::future::MapErr<S::Future, fn(S::Error) -> crate::Error>;
+    type Future = futures::future::MapErr<S::Future, fn(S::Error) -> crate::Error>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        self.inner.poll_ready().map_err(Into::into)
+    fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner
+            .poll_ready(cx)
+            .map(|result| result.map_err(|e| e.into()))
     }
 
     fn call(&mut self, req: R1) -> Self::Future {
         let req = (self.f)(req);
-        self.inner.call(req).map_err(|e| e.into())
+        self.inner.call(req).map_err(Into::into)
     }
 }
 
@@ -245,137 +245,38 @@ impl<S: Clone, R1, R2> Clone for Map<S, R1, R2> {
     }
 }
 
-// === timeout ===
+mod compat {
+    use futures::compat::Compat;
+    use futures01::Poll;
+    use std::pin::Pin;
+    use tower::Service as Service01;
+    use tower03::Service as Service03;
 
-/// Applies a timeout to requests.
-///
-/// We require our own timeout layer because the current
-/// 0.1 version uses From intead of Into bounds for errors
-/// this casues the whole stack to not align and not compile.
-/// In future versions of tower this should be fixed.
-#[derive(Debug, Clone)]
-pub struct Timeout<T> {
-    inner: T,
-    timeout: Duration,
-}
-
-// ===== impl Timeout =====
-
-impl<S, Request> Service<Request> for Timeout<S>
-where
-    S: Service<Request>,
-    S::Error: Into<crate::Error>,
-{
-    type Response = S::Response;
-    type Error = crate::Error;
-    type Future = ResponseFuture<S::Future>;
-
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        self.inner.poll_ready().map_err(Into::into)
+    pub struct TowerCompat<S> {
+        inner: S,
     }
 
-    fn call(&mut self, request: Request) -> Self::Future {
-        let response = self.inner.call(request);
-        let delay = delay_for(self.timeout);
-        let sleep = Box::new(async move { Ok(delay.await) }.boxed().compat());
-
-        ResponseFuture { response, sleep }
-    }
-}
-
-/// Applies a timeout to requests via the supplied inner service.
-#[derive(Debug)]
-pub struct TimeoutLayer {
-    timeout: Duration,
-}
-
-impl TimeoutLayer {
-    /// Create a timeout from a duration
-    pub fn new(timeout: Duration) -> Self {
-        TimeoutLayer { timeout }
-    }
-}
-
-impl<S> Layer<S> for TimeoutLayer {
-    type Service = Timeout<S>;
-
-    fn layer(&self, service: S) -> Self::Service {
-        Timeout {
-            inner: service,
-            timeout: self.timeout,
+    impl<S> TowerCompat<S> {
+        pub fn new(inner: S) -> Self {
+            Self { inner }
         }
     }
-}
 
-/// `Timeout` response future
-pub struct ResponseFuture<T> {
-    response: T,
-    sleep: Box<dyn Future<Item = (), Error = ()> + Send>,
-}
+    impl<S, Request> Service01<Request> for TowerCompat<S>
+    where
+        S: Service03<Request>,
+    {
+        type Response = S::Response;
+        type Error = S::Error;
+        type Future = Compat<Pin<Box<S::Future>>>;
 
-impl<T> Future for ResponseFuture<T>
-where
-    T: Future,
-    T::Error: Into<crate::Error>,
-{
-    type Item = T::Item;
-    type Error = crate::Error;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        // First, try polling the future
-        match self.response.poll().map_err(Into::into)? {
-            Async::Ready(v) => return Ok(Async::Ready(v)),
-            Async::NotReady => {}
+        fn poll_ready(&mut self) -> Poll<(), Self::Error> {
+            let p = task_compat::with_context(|cx| self.inner.poll_ready(cx));
+            task_compat::poll_03_to_01(p)
         }
 
-        // Now check the sleep
-        match self.sleep.poll() {
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Ok(Async::Ready(())) => Err(Elapsed(()).into()),
-            Err(_) => unreachable!(),
+        fn call(&mut self, req: Request) -> Self::Future {
+            Compat::new(Box::pin(self.inner.call(req)))
         }
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct Elapsed(pub(super) ());
-
-impl fmt::Display for Elapsed {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.pad("request timed out")
-    }
-}
-
-impl error::Error for Elapsed {}
-
-// rustc issue: https://github.com/rust-lang/rust/issues/71259
-#[cfg(feature = "disabled")]
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use futures01::Future;
-    use std::sync::Arc;
-    use tokio01_test::{assert_ready, task::MockTask};
-    use tower::layer::Layer;
-    use tower_test::{assert_request_eq, mock};
-
-    #[test]
-    fn map() {
-        let mut task = MockTask::new();
-        let (mock, mut handle) = mock::pair();
-
-        let f = |r| r;
-
-        let map_layer = MapLayer { f: Arc::new(f) };
-
-        let mut svc = map_layer.layer(mock);
-
-        task.enter(|| assert_ready!(svc.poll_ready()));
-
-        let res = svc.call("hello world");
-
-        assert_request_eq!(handle, "hello world").send_response("world bye");
-
-        res.wait().unwrap();
     }
 }

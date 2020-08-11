@@ -1,7 +1,7 @@
 use crate::{
     sinks::elasticsearch::{ElasticSearchConfig, Encoding},
     sinks::util::{
-        encoding::EncodingConfigWithDefault, service2::TowerRequestConfig, BatchConfig, Compression,
+        encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,

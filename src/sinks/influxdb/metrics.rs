@@ -6,8 +6,7 @@ use crate::{
     },
     sinks::util::{
         http::{HttpBatchService, HttpClient, HttpRetryLogic},
-        service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, MetricBuffer,
+        BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };

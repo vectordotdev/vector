@@ -2,9 +2,7 @@ use crate::{
     buffers::Acker,
     event::metric::{MetricKind, MetricValue, StatisticKind},
     event::Event,
-    sinks::util::{
-        service2::TowerCompat, BatchConfig, BatchSettings, BatchSink, Buffer, Compression,
-    },
+    sinks::util::{BatchConfig, BatchSettings, BatchSink, Buffer, Compression, TowerCompat},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{future, FutureExt, TryFutureExt};

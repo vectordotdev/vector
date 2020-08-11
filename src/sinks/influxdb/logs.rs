@@ -1,16 +1,17 @@
-use crate::event::Value;
-use crate::sinks::influxdb::{
-    encode_namespace, encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings,
-    Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
-};
-use crate::sinks::util::encoding::EncodingConfigWithDefault;
-use crate::sinks::util::http::{BatchedHttpSink, HttpClient, HttpSink};
-use crate::sinks::util::{
-    service2::TowerRequestConfig, BatchConfig, BatchSettings, Buffer, Compression,
-};
-use crate::sinks::Healthcheck;
 use crate::{
-    event::{log_schema, Event},
+    event::{log_schema, Event, Value},
+    sinks::{
+        influxdb::{
+            encode_namespace, encode_timestamp, healthcheck, influx_line_protocol,
+            influxdb_settings, Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
+        },
+        util::{
+            encoding::EncodingConfigWithDefault,
+            http::{BatchedHttpSink, HttpClient, HttpSink},
+            BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
+        },
+        Healthcheck,
+    },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures01::Sink;

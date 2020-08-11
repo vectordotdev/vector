@@ -6,10 +6,9 @@ use crate::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
             http::{HttpClient, HttpClientFuture},
-            retries2::{RetryAction, RetryLogic},
-            service2::{ServiceBuilderExt, TowerCompat, TowerRequestConfig},
+            retries::{RetryAction, RetryLogic},
             BatchConfig, BatchSettings, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
-            PartitionInnerBuffer,
+            PartitionInnerBuffer, ServiceBuilderExt, TowerCompat, TowerRequestConfig,
         },
         Healthcheck, RouterSink,
     },

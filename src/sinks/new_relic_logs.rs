@@ -2,8 +2,7 @@ use crate::{
     sinks::http::{HttpMethod, HttpSinkConfig},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        service2::TowerRequestConfig,
-        BatchConfig, Compression,
+        BatchConfig, Compression, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
