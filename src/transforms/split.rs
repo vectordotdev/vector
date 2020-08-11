@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
-    internal_events::SplitEventProcessed,
+    internal_events::{SplitEventProcessed, SplitFieldMissing},
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -119,10 +119,9 @@ impl Transform for Split {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            debug!(
-                message = "Field does not exist.",
-                field = self.field.as_ref(),
-            );
+            emit!(SplitFieldMissing {
+                field: self.field.as_ref()
+            });
         };
 
         emit!(SplitEventProcessed);
