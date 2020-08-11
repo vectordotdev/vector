@@ -104,7 +104,11 @@ fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> super::S
 #[cfg(test)]
 mod test {
     use super::StatsdConfig;
-    use crate::{config, sinks::prometheus::PrometheusSinkConfig, test_util::next_addr, topology};
+    use crate::{
+        config,
+        sinks::prometheus::PrometheusSinkConfig,
+        test_util::{next_addr, start_topology},
+    };
     use futures::{compat::Future01CompatExt, TryStreamExt};
     use futures01::Stream;
     use tokio::time::{delay_for, Duration};
@@ -137,7 +141,7 @@ mod test {
             },
         );
 
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
 
         let bind_addr = next_addr();
         let socket = std::net::UdpSocket::bind(&bind_addr).unwrap();

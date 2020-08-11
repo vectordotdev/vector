@@ -25,18 +25,6 @@ pub struct Pieces {
     pub shutdown_coordinator: SourceShutdownCoordinator,
 }
 
-/// Builds only the new pieces and checks topology.
-pub async fn check_build(
-    config: &super::Config,
-    diff: &ConfigDiff,
-) -> Result<(Pieces, Vec<String>), Vec<String>> {
-    match (check(config), build_pieces(config, diff).await) {
-        (Ok(warnings), Ok(new_pieces)) => Ok((new_pieces, warnings)),
-        (Err(t_errors), Err(p_errors)) => Err(t_errors.into_iter().chain(p_errors).collect()),
-        (Err(errors), Ok(_)) | (Ok(_), Err(errors)) => Err(errors),
-    }
-}
-
 pub fn check(config: &super::Config) -> Result<Vec<String>, Vec<String>> {
     let mut errors = vec![];
     let mut warnings = vec![];

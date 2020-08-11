@@ -12,10 +12,10 @@ use vector::{
     runtime::Runtime,
     sinks, sources,
     test_util::{
-        next_addr, random_lines, runtime, send_lines, shutdown_on_idle, trace_init, wait_for_tcp,
-        CountReceiver,
+        next_addr, random_lines, runtime, send_lines, shutdown_on_idle, start_topology, trace_init,
+        wait_for_tcp, CountReceiver,
     },
-    topology, transforms,
+    transforms,
 };
 
 #[test]
@@ -40,7 +40,7 @@ fn pipe() {
     rt.block_on_std(async move {
         let mut output_lines = CountReceiver::receive_lines(out_addr);
 
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
 
@@ -91,7 +91,7 @@ fn sample() {
     rt.block_on_std(async move {
         let mut output_lines = CountReceiver::receive_lines(out_addr);
 
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
 
@@ -149,7 +149,7 @@ fn fork() {
         let mut output_lines1 = CountReceiver::receive_lines(out_addr1);
         let mut output_lines2 = CountReceiver::receive_lines(out_addr2);
 
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
 
@@ -211,7 +211,7 @@ fn merge_and_fork() {
         let mut output_lines1 = CountReceiver::receive_lines(out_addr1);
         let mut output_lines2 = CountReceiver::receive_lines(out_addr2);
 
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
         // Wait for server to accept traffic
         wait_for_tcp(in_addr1);
         wait_for_tcp(in_addr2);
@@ -276,7 +276,7 @@ fn reconnect() {
     rt.block_on_std(async move {
         let output_lines = CountReceiver::receive_lines(out_addr);
 
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
 

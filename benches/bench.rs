@@ -10,9 +10,8 @@ use std::convert::TryFrom;
 use vector::config::{self, TransformConfig, TransformContext};
 use vector::event::Event;
 use vector::test_util::{
-    next_addr, runtime, send_lines, shutdown_on_idle, wait_for_tcp, CountReceiver,
+    next_addr, runtime, send_lines, shutdown_on_idle, start_topology, wait_for_tcp, CountReceiver,
 };
-use vector::topology;
 use vector::{sinks, sources, transforms};
 
 mod batch;
@@ -72,7 +71,7 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on_std(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        let (topology, _crash) = start_topology(config, false).await;
                         (output_lines, topology)
                     });
                     wait_for_tcp(in_addr);
@@ -124,7 +123,7 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on_std(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        let (topology, _crash) = start_topology(config, false).await;
                         (output_lines, topology)
                     });
                     wait_for_tcp(in_addr);
@@ -176,7 +175,7 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on_std(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        let (topology, _crash) = start_topology(config, false).await;
                         (output_lines, topology)
                     });
                     wait_for_tcp(in_addr);
@@ -229,7 +228,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on_std(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        let (topology, _crash) = start_topology(config, false).await;
                         (output_lines, topology)
                     });
                     wait_for_tcp(in_addr);
@@ -304,7 +303,7 @@ fn benchmark_interconnected(c: &mut Criterion) {
                     let (output_lines1, output_lines2, topology) = rt.block_on_std(async move {
                         let output_lines1 = CountReceiver::receive_lines(out_addr1);
                         let output_lines2 = CountReceiver::receive_lines(out_addr2);
-                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        let (topology, _crash) = start_topology(config, false).await;
                         (output_lines1, output_lines2, topology)
                     });
                     wait_for_tcp(in_addr1);
@@ -377,7 +376,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on_std(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        let (topology, _crash) = start_topology(config, false).await;
                         (output_lines, topology)
                     });
                     wait_for_tcp(in_addr);
@@ -556,7 +555,7 @@ fn benchmark_complex(c: &mut Criterion) {
                         let output_lines_sampled = CountReceiver::receive_lines(out_addr_sampled);
                         let output_lines_200 = CountReceiver::receive_lines(out_addr_200);
                         let output_lines_404 = CountReceiver::receive_lines(out_addr_404);
-                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        let (topology, _crash) = start_topology(config, false).await;
                         (
                             output_lines_all,
                             output_lines_sampled,

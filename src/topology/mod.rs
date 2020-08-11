@@ -41,18 +41,6 @@ pub struct RunningTopology {
     abort_tx: mpsc::UnboundedSender<()>,
 }
 
-pub async fn start(
-    config: Config,
-    require_healthy: bool,
-) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
-    let diff = ConfigDiff::initial(&config);
-    if let Some(pieces) = validate(&config, &diff).await {
-        start_validated(config, diff, pieces, require_healthy).await
-    } else {
-        None
-    }
-}
-
 pub async fn start_validated(
     config: Config,
     diff: ConfigDiff,
@@ -85,7 +73,16 @@ pub async fn start_validated(
 }
 
 pub async fn validate(config: &Config, diff: &ConfigDiff) -> Option<Pieces> {
-    match builder::check_build(config, diff).await {
+    let check_build_result = match (
+        builder::check(config),
+        builder::build_pieces(config, diff).await,
+    ) {
+        (Ok(warnings), Ok(new_pieces)) => Ok((new_pieces, warnings)),
+        (Err(t_errors), Err(p_errors)) => Err(t_errors.into_iter().chain(p_errors).collect()),
+        (Err(errors), Ok(_)) | (Ok(_), Err(errors)) => Err(errors),
+    };
+
+    match check_build_result {
         Err(errors) => {
             for error in errors {
                 error!("Configuration error: {}", error);
@@ -634,8 +631,7 @@ mod tests {
     use crate::config::Config;
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sources::socket::SocketConfig;
-    use crate::test_util::{next_addr, runtime};
-    use crate::topology;
+    use crate::test_util::{next_addr, runtime, start_topology};
 
     #[test]
     fn topology_doesnt_reload_new_data_dir() {
@@ -657,7 +653,7 @@ mod tests {
         let mut new_config = old_config.clone();
 
         rt.block_on_std(async move {
-            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
+            let (mut topology, _crash) = start_topology(old_config, false).await;
 
             new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
@@ -679,8 +675,7 @@ mod reload_tests {
     use crate::config::Config;
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sources::splunk_hec::SplunkConfig;
-    use crate::test_util::{next_addr, runtime};
-    use crate::topology;
+    use crate::test_util::{next_addr, runtime, start_topology};
 
     #[test]
     fn topology_rebuild_old() {
@@ -712,7 +707,7 @@ mod reload_tests {
         );
 
         rt.block_on_std(async move {
-            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
+            let (mut topology, _crash) = start_topology(old_config, false).await;
 
             assert!(!topology
                 .reload_config_and_respawn(new_config, false)
@@ -739,7 +734,7 @@ mod reload_tests {
         );
 
         rt.block_on_std(async move {
-            let (mut topology, _crash) = topology::start(old_config.clone(), false).await.unwrap();
+            let (mut topology, _crash) = start_topology(old_config.clone(), false).await;
 
             assert!(topology
                 .reload_config_and_respawn(old_config, false)
@@ -751,9 +746,10 @@ mod reload_tests {
 
 #[cfg(all(test, feature = "sinks-console", feature = "sources-generator"))]
 mod source_finished_tests {
+    use crate::config::Config;
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sources::generator::GeneratorConfig;
-    use crate::{config::Config, topology};
+    use crate::test_util::start_topology;
     use futures::compat::Future01CompatExt;
     use tokio::time::{timeout, Duration};
 
@@ -770,7 +766,7 @@ mod source_finished_tests {
             },
         );
 
-        let (topology, _crash) = topology::start(old_config, false).await.unwrap();
+        let (topology, _crash) = start_topology(old_config, false).await;
 
         timeout(Duration::from_secs(2), topology.sources_finished().compat())
             .await
@@ -791,10 +787,10 @@ mod transient_state_tests {
     use crate::sinks::blackhole::BlackholeConfig;
     use crate::sources::stdin::StdinConfig;
     use crate::sources::Source;
-    use crate::test_util::runtime;
+    use crate::test_util::{runtime, start_topology};
     use crate::transforms::json_parser::JsonParserConfig;
+    use crate::Error;
     use crate::Pipeline;
-    use crate::{topology, Error};
     use futures::compat::Future01CompatExt;
     use futures01::Future;
     use serde::{Deserialize, Serialize};
@@ -876,7 +872,7 @@ mod transient_state_tests {
         new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
 
         rt.block_on_std(async move {
-            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
+            let (mut topology, _crash) = start_topology(old_config, false).await;
 
             trigger_old.cancel();
 
@@ -921,7 +917,7 @@ mod transient_state_tests {
         new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
 
         rt.block_on_std(async move {
-            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
+            let (mut topology, _crash) = start_topology(old_config, false).await;
 
             assert!(topology
                 .reload_config_and_respawn(new_config, false)
@@ -969,7 +965,7 @@ mod transient_state_tests {
         new_config.add_sink("out1", &["trans1"], BlackholeConfig { print_amount: 1000 });
 
         rt.block_on_std(async move {
-            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
+            let (mut topology, _crash) = start_topology(old_config, false).await;
 
             assert!(topology
                 .reload_config_and_respawn(new_config, false)

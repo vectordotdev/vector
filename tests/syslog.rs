@@ -23,9 +23,8 @@ use vector::{
     sources::syslog::{Mode, SyslogConfig},
     test_util::{
         next_addr, random_maps, random_string, runtime, send_encodable, send_lines,
-        shutdown_on_idle, trace_init, wait_for_tcp, CountReceiver,
+        shutdown_on_idle, start_topology, trace_init, wait_for_tcp, CountReceiver,
     },
-    topology,
 };
 
 #[test]
@@ -49,7 +48,7 @@ fn test_tcp_syslog() {
     rt.block_on_std(async move {
         let output_lines = CountReceiver::receive_lines(out_addr);
 
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
 
@@ -102,7 +101,7 @@ fn test_unix_stream_syslog() {
     rt.block_on_std(async move {
         let output_lines = CountReceiver::receive_lines(out_addr);
 
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
         // Wait for server to accept traffic
         while std::os::unix::net::UnixStream::connect(&in_path).is_err() {}
 
@@ -165,7 +164,7 @@ fn test_octet_counting_syslog() {
     rt.block_on_std(async move {
         let output_lines = CountReceiver::receive_lines(out_addr);
 
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
         // Wait for server to accept traffic
         wait_for_tcp(in_addr);
 

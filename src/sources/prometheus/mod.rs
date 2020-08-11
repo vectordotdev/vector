@@ -129,8 +129,11 @@ fn prometheus(
 mod test {
     use super::*;
     use crate::{
-        config, hyper::body_to_bytes, sinks::prometheus::PrometheusSinkConfig,
-        test_util::next_addr, topology, Error,
+        config,
+        hyper::body_to_bytes,
+        sinks::prometheus::PrometheusSinkConfig,
+        test_util::{next_addr, start_topology},
+        Error,
     };
     use futures::compat::Future01CompatExt;
     use hyper::service::{make_service_fn, service_fn};
@@ -203,7 +206,7 @@ mod test {
             },
         );
 
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
         delay_for(Duration::from_secs(1)).await;
 
         let response = Client::new()
