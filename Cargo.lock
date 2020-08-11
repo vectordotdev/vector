@@ -1572,6 +1572,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "data-encoding"
+version = "2.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72aa14c04dfae8dd7d8a2b1cb7ca2152618cd01336dbfe704b8dcbf8d41dbd69"
+
+[[package]]
+name = "data-encoding-macro"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1995a2e32b5306e4f49cf55ffcf4365a4dab2c7ca3a97163a4f099ec2fee3453"
+dependencies = [
+ "data-encoding",
+ "data-encoding-macro-internal",
+ "proc-macro-hack",
+]
+
+[[package]]
 name = "ctor"
 version = "0.1.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7829,6 +7846,7 @@ dependencies = [
  "criterion",
  "crossterm",
  "dashmap",
+ "data-encoding",
  "derivative 2.2.0",
  "dirs-next",
  "dyn-clone",

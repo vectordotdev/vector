@@ -24,7 +24,7 @@ use super::dns_message::{
     DnsRecord, EdnsOptionEntry, OptPseudoSection, QueryHeader, QueryQuestion, UpdateHeader,
     ZoneInfo,
 };
-use super::dns_message_parser::{parse_dns_query_message, parse_dns_update_message};
+use super::dns_message_parser::DnsMessageParser;
 use super::schema::DnstapEventSchema;
 
 #[derive(Debug, Snafu)]
@@ -326,20 +326,29 @@ impl<'a> DnstapParser<'a> {
         match dnstap_message_type_id {
             1..=12 => {
                 if let Some(query_message) = dnstap_message.query_message {
+                    let mut query_message_parser = DnsMessageParser::new(query_message);
                     if let Err(error) =
-                        self.parse_dns_query_message(&query_message_key, &query_message)
+                        self.parse_dns_query_message(&query_message_key, &mut query_message_parser)
                     {
-                        self.log_raw_dns_message(&query_message_key, &query_message);
+                        self.log_raw_dns_message(
+                            &query_message_key,
+                            query_message_parser.raw_message(),
+                        );
 
                         return Err(error);
                     };
                 }
 
                 if let Some(response_message) = dnstap_message.response_message {
-                    if let Err(error) =
-                        self.parse_dns_query_message(&response_message_key, &response_message)
-                    {
-                        self.log_raw_dns_message(&response_message_key, &response_message);
+                    let mut response_message_parser = DnsMessageParser::new(response_message);
+                    if let Err(error) = self.parse_dns_query_message(
+                        &response_message_key,
+                        &mut response_message_parser,
+                    ) {
+                        self.log_raw_dns_message(
+                            &response_message_key,
+                            response_message_parser.raw_message(),
+                        );
 
                         return Err(error);
                     };
@@ -347,13 +356,15 @@ impl<'a> DnstapParser<'a> {
             }
             13 | 14 => {
                 if let Some(update_request_message) = dnstap_message.query_message {
+                    let mut update_request_message_parser =
+                        DnsMessageParser::new(update_request_message);
                     if let Err(error) = self.parse_dns_update_message(
                         &update_request_message_key,
-                        &update_request_message,
+                        &mut update_request_message_parser,
                     ) {
                         self.log_raw_dns_message(
                             &update_request_message_key,
-                            &update_request_message,
+                            update_request_message_parser.raw_message(),
                         );
 
                         return Err(error);
@@ -361,13 +372,15 @@ impl<'a> DnstapParser<'a> {
                 }
 
                 if let Some(udpate_response_message) = dnstap_message.response_message {
+                    let mut update_response_message_parser =
+                        DnsMessageParser::new(udpate_response_message);
                     if let Err(error) = self.parse_dns_update_message(
                         &update_response_message_key,
-                        &udpate_response_message,
+                        &mut update_response_message_parser,
                     ) {
                         self.log_raw_dns_message(
                             &update_response_message_key,
-                            &udpate_response_message,
+                            update_response_message_parser.raw_message(),
                         );
 
                         return Err(error);
@@ -398,7 +411,7 @@ impl<'a> DnstapParser<'a> {
         self.insert(&String::from(time_precision_key), time_precision);
     }
 
-    fn log_raw_dns_message(&mut self, key_prefix: &str, raw_dns_message: &Vec<u8>) {
+    fn log_raw_dns_message(&mut self, key_prefix: &str, raw_dns_message: &[u8]) {
         self.parent_key_path
             .push(PathComponent::Key(String::from(key_prefix)));
 
@@ -413,9 +426,9 @@ impl<'a> DnstapParser<'a> {
     fn parse_dns_query_message(
         &mut self,
         key_prefix: &str,
-        raw_dns_message: &Vec<u8>,
+        dns_message_parser: &mut DnsMessageParser,
     ) -> Result<()> {
-        let msg = parse_dns_query_message(raw_dns_message)?;
+        let msg = dns_message_parser.parse_as_query_message()?;
 
         self.parent_key_path
             .push(PathComponent::Key(String::from(key_prefix)));
@@ -549,11 +562,7 @@ impl<'a> DnstapParser<'a> {
         self.parent_key_path.pop();
     }
 
-    fn log_dns_query_message_query_section(
-        &mut self,
-        key_path: &str,
-        questions: &Vec<QueryQuestion>,
-    ) {
+    fn log_dns_query_message_query_section(&mut self, key_path: &str, questions: &[QueryQuestion]) {
         self.parent_key_path
             .push(PathComponent::Key(String::from(key_path)));
 
@@ -590,9 +599,9 @@ impl<'a> DnstapParser<'a> {
     fn parse_dns_update_message(
         &mut self,
         key_prefix: &str,
-        raw_dns_message: &Vec<u8>,
+        dns_message_parser: &mut DnsMessageParser,
     ) -> Result<()> {
-        let msg = parse_dns_update_message(raw_dns_message)?;
+        let msg = dns_message_parser.parse_as_update_message()?;
 
         self.parent_key_path
             .push(PathComponent::Key(String::from(key_prefix)));
@@ -767,7 +776,7 @@ impl<'a> DnstapParser<'a> {
         self.parent_key_path.pop();
     }
 
-    fn log_edns_options(&mut self, key_path: &str, options: &Vec<EdnsOptionEntry>) {
+    fn log_edns_options(&mut self, key_path: &str, options: &[EdnsOptionEntry]) {
         self.parent_key_path
             .push(PathComponent::Key(String::from(key_path)));
 
@@ -795,7 +804,7 @@ impl<'a> DnstapParser<'a> {
         );
     }
 
-    fn log_dns_message_record_section(&mut self, key_path: &str, records: &Vec<DnsRecord>) {
+    fn log_dns_message_record_section(&mut self, key_path: &str, records: &[DnsRecord]) {
         self.parent_key_path
             .push(PathComponent::Key(String::from(key_path)));
 
@@ -879,39 +888,31 @@ mod tests {
         if let Ok(dnstap_data) = base64::decode(raw_dnstap_data) {
             let parse_result = parser.parse_dnstap_data(Bytes::from(dnstap_data));
             assert!(parse_result.is_ok());
+            assert!(log_event.all_fields().any(|(key, value)| key == "time"
+                && match *value {
+                    Value::Integer(time) => time == 1_593_489_007_920_014_129,
+                    _ => false,
+                }));
             assert!(log_event
                 .all_fields()
-                .find(|(key, value)| key == "time"
+                .any(|(key, value)| key == "requestData.header.qr"
                     && match *value {
-                        Value::Integer(time) => *time == 1_593_489_007_920_014_129,
+                        Value::Integer(qr) => qr == 0,
                         _ => false,
-                    })
-                .is_some());
-            assert!(log_event
-                .all_fields()
-                .find(|(key, value)| key == "requestData.header.qr"
-                    && match *value {
-                        Value::Integer(qr) => *qr == 0,
-                        _ => false,
-                    })
-                .is_some());
-            assert!(log_event
-                .all_fields()
-                .find(|(key, value)| key == "requestData.opt.udpPayloadSize"
-                    && match *value {
-                        Value::Integer(udp_payload_size) => *udp_payload_size == 512,
-                        _ => false,
-                    })
-                .is_some());
-            assert!(log_event
-                .all_fields()
-                .find(|(key, value)| key == "requestData.question[0].domainName"
-                    && match *value {
-                        Value::Bytes(domain_name) =>
-                            *domain_name == Bytes::from_static(b"facebook1.com."),
-                        _ => false,
-                    })
-                .is_some());
+                    }));
+            assert!(log_event.all_fields().any(|(key, value)| key
+                == "requestData.opt.udpPayloadSize"
+                && match *value {
+                    Value::Integer(udp_payload_size) => udp_payload_size == 512,
+                    _ => false,
+                }));
+            assert!(log_event.all_fields().any(|(key, value)| key
+                == "requestData.question[0].domainName"
+                && match value {
+                    Value::Bytes(domain_name) =>
+                        *domain_name == Bytes::from_static(b"facebook1.com."),
+                    _ => false,
+                }));
         } else {
             error!("Invalid base64 encoded data");
         }
@@ -929,40 +930,32 @@ mod tests {
         if let Ok(dnstap_data) = base64::decode(raw_dnstap_data) {
             let parse_result = parser.parse_dnstap_data(Bytes::from(dnstap_data));
             assert!(parse_result.is_ok());
+            assert!(log_event.all_fields().any(|(key, value)| key == "time"
+                && match *value {
+                    Value::Integer(time) => time == 1_593_541_950_792_494_106,
+                    _ => false,
+                }));
+            assert!(log_event.all_fields().any(|(key, value)| key
+                == "updateRequestData.header.qr"
+                && match *value {
+                    Value::Integer(qr) => qr == 1,
+                    _ => false,
+                }));
             assert!(log_event
                 .all_fields()
-                .find(|(key, value)| key == "time"
-                    && match *value {
-                        Value::Integer(time) => *time == 1_593_541_950_792_494_106,
-                        _ => false,
-                    })
-                .is_some());
-            assert!(log_event
-                .all_fields()
-                .find(|(key, value)| key == "updateRequestData.header.qr"
-                    && match *value {
-                        Value::Integer(qr) => *qr == 1,
-                        _ => false,
-                    })
-                .is_some());
-            assert!(log_event
-                .all_fields()
-                .find(|(key, value)| key == "messageType"
-                    && match *value {
+                .any(|(key, value)| key == "messageType"
+                    && match value {
                         Value::Bytes(data_type) =>
                             *data_type == Bytes::from_static(b"UpdateResponse"),
                         _ => false,
-                    })
-                .is_some());
-            assert!(log_event
-                .all_fields()
-                .find(|(key, value)| key == "updateRequestData.zone.domainName"
-                    && match *value {
-                        Value::Bytes(domain_name) =>
-                            *domain_name == Bytes::from_static(b"example.com."),
-                        _ => false,
-                    })
-                .is_some());
+                    }));
+            assert!(log_event.all_fields().any(|(key, value)| key
+                == "updateRequestData.zone.domainName"
+                && match value {
+                    Value::Bytes(domain_name) =>
+                        *domain_name == Bytes::from_static(b"example.com."),
+                    _ => false,
+                }));
         } else {
             error!("Invalid base64 encoded data");
         }
