@@ -1,4 +1,4 @@
-use crate::topology::Config;
+use super::Config;
 use glob::glob;
 use lazy_static::lazy_static;
 use once_cell::sync::OnceCell;

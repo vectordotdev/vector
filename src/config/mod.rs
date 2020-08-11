@@ -22,6 +22,7 @@ pub mod watcher;
 
 pub use diff::ConfigDiff;
 pub use loading::*;
+pub use validation::check;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]

@@ -11,13 +11,12 @@ mod fanout;
 mod task;
 pub mod unit_test;
 
-pub use crate::config::SinkContext;
-pub use crate::config::{Config, ConfigDiff};
-
-use crate::topology::{builder::Pieces, task::Task};
-
-use crate::buffers;
-use crate::shutdown::SourceShutdownCoordinator;
+use crate::{
+    buffers,
+    config::{self, Config, ConfigDiff},
+    shutdown::SourceShutdownCoordinator,
+    topology::{builder::Pieces, task::Task},
+};
 use futures::{compat::Future01CompatExt, future, FutureExt, StreamExt, TryFutureExt};
 use futures01::{sync::mpsc, Future};
 use std::{
@@ -74,7 +73,7 @@ pub async fn start_validated(
 
 pub async fn validate(config: &Config, diff: &ConfigDiff) -> Option<Pieces> {
     let check_build_result = match (
-        builder::check(config),
+        config::check(config),
         builder::build_pieces(config, diff).await,
     ) {
         (Ok(warnings), Ok(new_pieces)) => Ok((new_pieces, warnings)),
@@ -230,7 +229,7 @@ impl RunningTopology {
             return Ok(false);
         }
 
-        if let Err(errors) = builder::check(&new_config) {
+        if let Err(errors) = config::check(&new_config) {
             for error in errors {
                 error!("Configuration error: {}", error);
             }

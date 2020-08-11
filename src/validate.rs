@@ -1,6 +1,7 @@
 use crate::{
-    config, event,
-    topology::{self, builder::Pieces, Config, ConfigDiff},
+    config::{self, Config, ConfigDiff},
+    event,
+    topology::{self, builder::Pieces},
 };
 use colored::*;
 use exitcode::ExitCode;
@@ -156,7 +157,7 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Result<Config, Option<Co
 }
 
 fn validate_topology(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool {
-    match topology::builder::check(config) {
+    match config::check(config) {
         Ok(warnings) => {
             if warnings.is_empty() {
                 fmt.success("Configuration topology");

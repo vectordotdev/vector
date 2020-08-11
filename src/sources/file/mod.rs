@@ -363,11 +363,11 @@ fn create_event(
 mod tests {
     use super::*;
     use crate::{
+        config::Config,
         event,
         shutdown::ShutdownSignal,
         sources::file,
         test_util::{runtime, shutdown_on_idle, trace_init},
-        topology::Config,
     };
     use futures01::{Future, Stream};
     use pretty_assertions::assert_eq;

@@ -11,9 +11,9 @@ use futures::{
 use futures01::Future;
 use std::cmp::max;
 use tokio::select;
-use topology::Config;
 use vector::{
-    config, event, generate, list, metrics, runtime,
+    config::{self, Config, ConfigDiff},
+    event, generate, list, metrics, runtime,
     signal::{self, SignalTo},
     topology, trace, unit_test, validate,
 };
@@ -118,7 +118,7 @@ fn main() {
             arch = built_info::CFG_TARGET_ARCH
         );
 
-        let diff = topology::ConfigDiff::initial(&config);
+        let diff = ConfigDiff::initial(&config);
         let pieces = topology::validate(&config, &diff).await.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });
