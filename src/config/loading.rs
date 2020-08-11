@@ -57,36 +57,30 @@ pub fn read_configs(config_paths: &[PathBuf]) -> Result<Config, Vec<String>> {
     let mut config = Config::empty();
     let mut errors = Vec::new();
 
-    config_paths.iter().for_each(|p| {
-        let file = if let Some(file) = open_config(&p) {
-            file
+    for path in config_paths {
+        if let Some(file) = open_config(&path) {
+            trace!(message = "Parsing config.", ?path);
+
+            if let Err(errs) = Config::load(file).and_then(|n| config.append(n)) {
+                errors.extend(errs.iter().map(|e| format!("{:?}: {}", path, e)));
+            }
         } else {
-            errors.push(format!("Config file not found in path: {:?}.", p));
-            return;
+            errors.push(format!("Config file not found in path: {:?}.", path));
         };
-
-        trace!(
-            message = "Parsing config.",
-            path = ?p
-        );
-
-        if let Err(errs) = Config::load(file).and_then(|n| config.append(n)) {
-            errors.extend(errs.iter().map(|e| format!("{:?}: {}", p, e)));
-        }
-    });
+    }
 
     if let Err(mut errs) = config.expand_macros() {
         errors.append(&mut errs);
     }
 
-    if !errors.is_empty() {
-        Err(errors)
-    } else {
+    if errors.is_empty() {
         Ok(config)
+    } else {
+        Err(errors)
     }
 }
 
-pub fn open_config(path: &Path) -> Option<File> {
+fn open_config(path: &Path) -> Option<File> {
     match File::open(path) {
         Ok(f) => Some(f),
         Err(error) => {
