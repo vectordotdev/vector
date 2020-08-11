@@ -1,3 +1,4 @@
+pub mod auto_concurrency;
 pub mod batch;
 pub mod buffer;
 pub mod encoding;
@@ -28,8 +29,8 @@ pub use buffer::partition::Partition;
 pub use buffer::vec::{EncodedLength, VecBuffer};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
 pub use service::{
-    ServiceBuilderExt, TowerBatchedSink, TowerCompat, TowerRequestConfig, TowerRequestLayer,
-    TowerRequestSettings,
+    InFlightLimit, ServiceBuilderExt, TowerBatchedSink, TowerCompat, TowerRequestConfig,
+    TowerRequestLayer, TowerRequestSettings,
 };
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 pub use uri::UriSerde;

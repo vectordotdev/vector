@@ -3,7 +3,8 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
-        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
+        BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, TowerRequestConfig,
+        UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -70,7 +71,7 @@ fn default_config(e: Encoding) -> HttpSinkConfig {
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        in_flight_limit: Some(10),
+        in_flight_limit: InFlightLimit::Fixed(10),
         timeout_secs: Some(30),
         rate_limit_num: Some(10),
         ..Default::default()

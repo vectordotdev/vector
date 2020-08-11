@@ -2,7 +2,7 @@ use crate::{
     sinks::http::{HttpMethod, HttpSinkConfig},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        BatchConfig, Compression, TowerRequestConfig,
+        BatchConfig, Compression, InFlightLimit, TowerRequestConfig,
     },
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
@@ -117,7 +117,7 @@ impl NewRelicLogsConfig {
         let request = TowerRequestConfig {
             // The default throughput ceiling defaults are relatively
             // conservative so we crank them up for New Relic.
-            in_flight_limit: Some(self.request.in_flight_limit.unwrap_or(100)),
+            in_flight_limit: (self.request.in_flight_limit).if_none(InFlightLimit::Fixed(100)),
             rate_limit_num: Some(self.request.rate_limit_num.unwrap_or(100)),
             ..self.request
         };
@@ -143,7 +143,9 @@ impl NewRelicLogsConfig {
 mod tests {
     use super::*;
     use crate::{
-        event::Event, sinks::util::test::build_test_server, test_util::next_addr,
+        event::Event,
+        sinks::util::{test::build_test_server, InFlightLimit},
+        test_util::next_addr,
         topology::config::SinkConfig,
     };
     use bytes05::buf::BufExt;
@@ -181,7 +183,10 @@ mod tests {
             http_config.batch.max_bytes,
             Some(bytesize::mib(5u64) as usize)
         );
-        assert_eq!(http_config.request.in_flight_limit, Some(100));
+        assert_eq!(
+            http_config.request.in_flight_limit,
+            InFlightLimit::Fixed(100)
+        );
         assert_eq!(http_config.request.rate_limit_num, Some(100));
         assert_eq!(
             http_config.headers.unwrap()["X-License-Key"],
@@ -197,7 +202,7 @@ mod tests {
         nr_config.insert_key = Some("foo".to_owned());
         nr_config.region = Some(NewRelicLogsRegion::Eu);
         nr_config.batch.max_size = Some(bytesize::mib(8u64) as usize);
-        nr_config.request.in_flight_limit = Some(12);
+        nr_config.request.in_flight_limit = InFlightLimit::Fixed(12);
         nr_config.request.rate_limit_num = Some(24);
 
         let http_config = nr_config.create_config().unwrap();
@@ -212,7 +217,10 @@ mod tests {
             http_config.batch.max_bytes,
             Some(bytesize::mib(8u64) as usize)
         );
-        assert_eq!(http_config.request.in_flight_limit, Some(12));
+        assert_eq!(
+            http_config.request.in_flight_limit,
+            InFlightLimit::Fixed(12)
+        );
         assert_eq!(http_config.request.rate_limit_num, Some(24));
         assert_eq!(
             http_config.headers.unwrap()["X-Insert-Key"],
@@ -249,7 +257,10 @@ mod tests {
             http_config.batch.max_bytes,
             Some(bytesize::mib(8u64) as usize)
         );
-        assert_eq!(http_config.request.in_flight_limit, Some(12));
+        assert_eq!(
+            http_config.request.in_flight_limit,
+            InFlightLimit::Fixed(12)
+        );
         assert_eq!(http_config.request.rate_limit_num, Some(24));
         assert_eq!(
             http_config.headers.unwrap()["X-Insert-Key"],

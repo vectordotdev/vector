@@ -8,8 +8,8 @@ use crate::{
         retries::RetryLogic,
         rusoto,
         sink::Response,
-        BatchConfig, BatchSettings, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
-        PartitionInnerBuffer, ServiceBuilderExt, TowerCompat, TowerRequestConfig,
+        BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
+        PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerCompat, TowerRequestConfig,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
@@ -118,7 +118,7 @@ enum S3StorageClass {
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        in_flight_limit: Some(50),
+        in_flight_limit: InFlightLimit::Fixed(50),
         rate_limit_num: Some(250),
         ..Default::default()
     };
