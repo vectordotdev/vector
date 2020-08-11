@@ -28,9 +28,10 @@ impl<'a> InternalEvent for SplitFieldMissing<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("fields_missing", 1,
+        counter!("processing_errors", 1,
             "component_kind" => "transform",
             "component_type" => "split",
+            "error_type" => "field_missing",
         );
     }
 }
@@ -52,9 +53,10 @@ impl<'a> InternalEvent for SplitConvertFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("convert_errors", 1,
+        counter!("processing_errors", 1,
             "component_kind" => "transform",
             "component_type" => "split",
+            "error_type" => "convert_failed",
         );
     }
 }
