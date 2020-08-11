@@ -107,10 +107,7 @@ impl Transform for Split {
                         event.as_mut_log().insert(name.clone(), value);
                     }
                     Err(error) => {
-                        emit!(SplitConvertFailed {
-                            field: name.as_ref(),
-                            error
-                        });
+                        emit!(SplitConvertFailed { field: name, error });
                     }
                 }
             }
@@ -118,9 +115,7 @@ impl Transform for Split {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            emit!(SplitFieldMissing {
-                field: self.field.as_ref()
-            });
+            emit!(SplitFieldMissing { field: &self.field });
         };
 
         emit!(SplitEventProcessed);
