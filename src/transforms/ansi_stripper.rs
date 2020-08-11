@@ -1,7 +1,9 @@
 use super::Transform;
 use crate::{
     event::{self, Value},
-    internal_events::{ANSIStripperEventProcessed, ANSIStripperFieldMissing},
+    internal_events::{
+        ANSIStripperEventProcessed, ANSIStripperFieldInvalid, ANSIStripperFieldMissing,
+    },
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     Event,
 };
@@ -70,10 +72,7 @@ impl Transform for AnsiStripper {
                     }
                 };
             }
-            _ => debug!(
-                message = "Field value must be a string.",
-                field = self.field.as_ref(),
-            ),
+            _ => emit!(ANSIStripperFieldInvalid { field: &self.field }),
         }
 
         Some(event)

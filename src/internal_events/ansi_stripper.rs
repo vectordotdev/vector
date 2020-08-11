@@ -36,3 +36,26 @@ impl InternalEvent for ANSIStripperFieldMissing<'_> {
         );
     }
 }
+
+#[derive(Debug)]
+pub struct ANSIStripperFieldInvalid<'a> {
+    pub field: &'a Atom,
+}
+
+impl InternalEvent for ANSIStripperFieldInvalid<'_> {
+    fn emit_logs(&self) {
+        debug!(
+            message = "field value must be a string.",
+            field = %self.field,
+            rate_limit_secs = 10
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("processing_errors", 1,
+            "component_kind" => "transform",
+            "component_type" => "ansi_stripper",
+            "error_type" => "value_invalid",
+        );
+    }
+}
