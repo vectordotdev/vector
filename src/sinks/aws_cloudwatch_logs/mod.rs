@@ -44,7 +44,7 @@ use tower03::{
     buffer::Buffer,
     limit::{
         concurrency::ConcurrencyLimit,
-        rate::{Rate, RateLimit},
+        rate::RateLimit,
     },
     retry::Retry,
     timeout::Timeout,
@@ -250,24 +250,21 @@ impl Service<PartitionInnerBuffer<Vec<InputLogEvent>, CloudwatchKey>>
         let svc = if let Some(svc) = &mut self.clients.get_mut(&key) {
             svc.clone()
         } else {
-            let svc = {
-                let policy = self.request_settings.retry_policy(CloudwatchRetryLogic);
-
-                let cloudwatch = CloudwatchLogsSvc::new(&self.config, &key, self.client.clone());
-                let timeout = Timeout::new(cloudwatch, self.request_settings.timeout);
-
-                let buffer = Buffer::new(timeout, 1);
-                let retry = Retry::new(policy, buffer);
-
-                let rate = Rate::new(
+            let svc = ServiceBuilder::new()
+                .buffer(self.request_settings.in_flight_limit)
+                .concurrency_limit(1)
+                .rate_limit(
                     self.request_settings.rate_limit_num,
                     self.request_settings.rate_limit_duration,
-                );
-                let rate = RateLimit::new(retry, rate);
-                let concurrency = ConcurrencyLimit::new(rate, 1);
-
-                Buffer::new(concurrency, self.request_settings.in_flight_limit)
-            };
+                )
+                .retry(self.request_settings.retry_policy(CloudwatchRetryLogic))
+                .buffer(1)
+                .timeout(self.request_settings.timeout)
+                .service(CloudwatchLogsSvc::new(
+                    &self.config,
+                    &key,
+                    self.client.clone(),
+                ));
 
             self.clients.insert(key, svc.clone());
             svc
