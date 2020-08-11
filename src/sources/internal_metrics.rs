@@ -1,20 +1,18 @@
 use crate::{
-    event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
+    metrics::{capture_metrics, get_controller},
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    Event, Pipeline,
+    Pipeline,
 };
-use chrono::Utc;
 use futures::{
     compat::Future01CompatExt,
     future::{FutureExt, TryFutureExt},
     stream::StreamExt,
 };
 use futures01::{Future, Sink};
-use metrics_core::Key;
-use metrics_runtime::{Controller, Measurement};
+use metrics_runtime::Controller;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, time::Duration};
+use std::time::Duration;
 use tokio::time::interval;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -46,13 +44,6 @@ impl SourceConfig for InternalMetricsConfig {
     }
 }
 
-fn get_controller() -> crate::Result<Controller> {
-    crate::metrics::CONTROLLER
-        .get()
-        .cloned()
-        .ok_or_else(|| "metrics system not initialized".into())
-}
-
 async fn run(
     controller: Controller,
     mut out: Pipeline,
@@ -79,63 +70,16 @@ async fn run(
     Ok(())
 }
 
-fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
-    controller
-        .snapshot()
-        .into_measurements()
-        .into_iter()
-        .map(|(k, m)| into_event(k, m))
-}
-
-fn into_event(key: Key, measurement: Measurement) -> Event {
-    let value = match measurement {
-        Measurement::Counter(v) => MetricValue::Counter { value: v as f64 },
-        Measurement::Gauge(v) => MetricValue::Gauge { value: v as f64 },
-        Measurement::Histogram(packed) => {
-            let values = packed
-                .decompress()
-                .into_iter()
-                .map(|i| i as f64)
-                .collect::<Vec<_>>();
-            let sample_rates = vec![1; values.len()];
-            MetricValue::Distribution {
-                values,
-                sample_rates,
-                statistic: StatisticKind::Histogram,
-            }
-        }
-    };
-
-    let labels = key
-        .labels()
-        .map(|label| (String::from(label.key()), String::from(label.value())))
-        .collect::<BTreeMap<_, _>>();
-
-    let metric = Metric {
-        name: key.name().to_string(),
-        timestamp: Some(Utc::now()),
-        tags: if labels.is_empty() {
-            None
-        } else {
-            Some(labels)
-        },
-        kind: MetricKind::Absolute,
-        value,
-    };
-
-    Event::Metric(metric)
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{capture_metrics, get_controller};
     use crate::event::metric::{Metric, MetricValue, StatisticKind};
+    use crate::metrics::{capture_metrics, get_controller};
     use metrics::{counter, gauge, timing, value};
     use std::collections::BTreeMap;
 
     #[test]
     fn captures_internal_metrics() {
-        crate::metrics::init().unwrap();
+        let _ = crate::metrics::init();
 
         // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
         std::thread::sleep(std::time::Duration::from_millis(300));
