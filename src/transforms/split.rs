@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
+    internal_events::SplitEventProcessed,
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -123,6 +124,8 @@ impl Transform for Split {
                 field = self.field.as_ref(),
             );
         };
+
+        emit!(SplitEventProcessed);
 
         Some(event)
     }
