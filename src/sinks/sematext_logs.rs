@@ -103,11 +103,12 @@ mod tests {
     use crate::sinks::util::test::{build_test_server, load_sink};
     use crate::test_util;
     use crate::topology::config::SinkConfig;
+    use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
 
-    #[test]
-    fn smoke() {
-        let (mut config, cx, mut rt) = load_sink::<SematextLogsConfig>(
+    #[tokio::test]
+    async fn smoke() {
+        let (mut config, cx) = load_sink::<SematextLogsConfig>(
             r#"
             region = "na"
             token = "mylogtoken"
@@ -126,12 +127,12 @@ mod tests {
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let (rx, _trigger, server) = build_test_server(addr, &mut rt);
-        rt.spawn(server);
+        let (rx, _trigger, server) = build_test_server(addr);
+        tokio::spawn(server);
 
         let (expected, lines) = test_util::random_lines_with_stream(100, 10);
         let pump = sink.send_all(lines.map(Event::from));
-        let _ = rt.block_on(pump).unwrap();
+        let _ = pump.compat().await.unwrap();
 
         let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();
 

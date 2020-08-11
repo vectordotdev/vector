@@ -288,7 +288,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", "value");
 
-        let (config, _, _) = load_sink::<HecSinkConfig>(
+        let (config, _cx) = load_sink::<HecSinkConfig>(
             r#"
             host = "test.com"
             token = "alksjdfo"
@@ -335,7 +335,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", "value");
 
-        let (config, _, _) = load_sink::<HecSinkConfig>(
+        let (config, _cx) = load_sink::<HecSinkConfig>(
             r#"
             host = "test.com"
             token = "alksjdfo"

@@ -76,10 +76,6 @@ impl Runtime {
             .unwrap()
     }
 
-    pub fn shutdown_on_idle(self) -> impl Future<Item = (), Error = ()> {
-        self.rt.shutdown_on_idle()
-    }
-
     pub fn shutdown_now(self) -> impl Future<Item = (), Error = ()> {
         self.rt.shutdown_now()
     }
@@ -108,15 +104,6 @@ where
 {
     fn execute(&self, future: F) -> Result<(), ExecuteError<F>> {
         self.inner.execute(future)
-    }
-}
-
-impl tokio01::executor::Executor for TaskExecutor {
-    fn spawn(
-        &mut self,
-        fut: Box<dyn Future<Item = (), Error = ()> + Send + 'static>,
-    ) -> Result<(), tokio01::executor::SpawnError> {
-        Ok(self.inner.spawn(fut))
     }
 }
 

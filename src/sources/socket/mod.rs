@@ -183,7 +183,7 @@ mod test {
             .unwrap();
         let mut rt = runtime();
         rt.spawn(server);
-        wait_for_tcp(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         rt.block_on_std(send_lines(addr, vec!["test".to_owned()].into_iter()))
             .unwrap();
@@ -211,7 +211,7 @@ mod test {
             .unwrap();
         let mut rt = runtime();
         rt.spawn(server);
-        wait_for_tcp(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         rt.block_on_std(send_lines(addr, vec!["test".to_owned()].into_iter()))
             .unwrap();
@@ -242,7 +242,7 @@ mod test {
             .unwrap();
         let mut rt = runtime();
         rt.spawn(server);
-        wait_for_tcp(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         let lines = vec![
             "short".to_owned(),
@@ -293,7 +293,7 @@ mod test {
             .unwrap();
         let mut rt = runtime();
         rt.spawn(server);
-        wait_for_tcp(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         let lines = vec![
             "short".to_owned(),
@@ -332,7 +332,7 @@ mod test {
             .unwrap();
         let mut rt = runtime();
         let source_handle = oneshot::spawn(server, &rt.executor());
-        wait_for_tcp(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         // Send data to Source.
         rt.block_on_std(send_lines(addr, vec!["test".to_owned()].into_iter()))
@@ -376,7 +376,7 @@ mod test {
         .unwrap();
         let mut rt = Runtime::with_thread_count(2).unwrap();
         let source_handle = oneshot::spawn(server, &rt.executor());
-        wait_for_tcp(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         // Spawn future that keeps sending lines to the TCP source forever.
         let sink = TcpSink::new(

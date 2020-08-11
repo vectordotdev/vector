@@ -121,7 +121,7 @@ mod test {
             .unwrap();
         let mut rt = runtime();
         rt.spawn(server);
-        wait_for_tcp(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         let cx = SinkContext::new_test();
         let (sink, _) = sink.build(cx).unwrap();

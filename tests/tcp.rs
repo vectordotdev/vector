@@ -11,8 +11,7 @@ use vector::{
     runtime::Runtime,
     sinks, sources,
     test_util::{
-        next_addr, random_lines, runtime, send_lines, shutdown_on_idle, trace_init, wait_for_tcp,
-        CountReceiver,
+        next_addr, random_lines, runtime, send_lines, trace_init, wait_for_tcp, CountReceiver,
     },
     topology::{self, config},
     transforms,
@@ -42,7 +41,7 @@ fn pipe() {
 
         let (topology, _crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr);
+        wait_for_tcp(in_addr).await;
 
         // Wait for output to connect
         output_lines.connected().await;
@@ -57,7 +56,6 @@ fn pipe() {
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
     });
-    shutdown_on_idle(rt);
 }
 
 #[test]
@@ -93,7 +91,7 @@ fn sample() {
 
         let (topology, _crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr);
+        wait_for_tcp(in_addr).await;
 
         // Wait for output to connect
         output_lines.connected().await;
@@ -117,7 +115,6 @@ fn sample() {
             assert_eq!(Some(output_line), next_line);
         }
     });
-    shutdown_on_idle(rt);
 }
 
 #[test]
@@ -151,7 +148,7 @@ fn fork() {
 
         let (topology, _crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr);
+        wait_for_tcp(in_addr).await;
 
         // Wait for output to connect
         output_lines1.connected().await;
@@ -170,7 +167,6 @@ fn fork() {
         assert_eq!(input_lines, output_lines1);
         assert_eq!(input_lines, output_lines2);
     });
-    shutdown_on_idle(rt);
 }
 
 #[test]
@@ -213,8 +209,8 @@ fn merge_and_fork() {
 
         let (topology, _crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr1);
-        wait_for_tcp(in_addr2);
+        wait_for_tcp(in_addr1).await;
+        wait_for_tcp(in_addr2).await;
 
         // Wait for output to connect
         output_lines1.connected().await;
@@ -251,7 +247,6 @@ fn merge_and_fork() {
         assert_eq!(input_lines1.next(), None);
         assert_eq!(input_lines2.next(), None);
     });
-    shutdown_on_idle(rt);
 }
 
 #[test]
@@ -278,7 +273,7 @@ fn reconnect() {
 
         let (topology, _crash) = topology::start(config, false).await.unwrap();
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr);
+        wait_for_tcp(in_addr).await;
 
         let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
         send_lines(in_addr, input_lines.clone()).await.unwrap();
@@ -290,7 +285,6 @@ fn reconnect() {
         assert!(num_lines >= 2);
         assert!(output_lines.iter().all(|line| input_lines.contains(line)))
     });
-    shutdown_on_idle(rt);
 }
 
 #[tokio::test]

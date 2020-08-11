@@ -28,9 +28,11 @@ use std::iter::FromIterator;
 use std::path::PathBuf;
 use std::process::{Child, ChildStdout, Command, Stdio};
 use std::str::FromStr;
-use std::time;
 use string_cache::DefaultAtom as Atom;
-use tokio::{task::spawn_blocking, time::delay_for};
+use tokio::{
+    task::spawn_blocking,
+    time::{delay_for, Duration},
+};
 use tracing::{dispatcher, field};
 
 const DEFAULT_BATCH_SIZE: usize = 16;
@@ -325,7 +327,7 @@ where
     T: Sink<SinkItem = Record, SinkError = ()>,
 {
     pub fn run(mut self) {
-        let timeout = time::Duration::from_millis(500); // arbitrary timeout
+        let timeout = Duration::from_millis(500); // arbitrary timeout
         let channel = &mut self.channel;
         let mut shutdown = self.shutdown.compat();
 
@@ -554,16 +556,14 @@ mod checkpointer_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        test_util::{runtime, shutdown_on_idle},
-        Pipeline,
-    };
-    use futures::compat::Future01CompatExt;
+    use crate::Pipeline;
     use futures01::stream::Stream;
-    use std::io::{self, BufReader, Cursor};
-    use std::iter::FromIterator;
+    use std::{
+        io::{self, BufReader, Cursor},
+        iter::FromIterator,
+    };
     use tempfile::tempdir;
-    use tokio::time::{timeout, Duration};
+    use tokio::time::timeout;
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}
@@ -612,7 +612,7 @@ mod tests {
         }
     }
 
-    fn run_journal(iunits: &[&str], xunits: &[&str], cursor: Option<&str>) -> Vec<Event> {
+    async fn run_journal(iunits: &[&str], xunits: &[&str], cursor: Option<&str>) -> Vec<Event> {
         let (tx, rx) = Pipeline::new_test();
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
         let tempdir = tempdir().unwrap();
@@ -637,25 +637,20 @@ mod tests {
                 true,
             )
             .expect("Creating journald source failed");
-        let mut rt = runtime();
-        rt.spawn(source);
+        tokio::spawn(source.compat());
 
-        std::thread::sleep(Duration::from_millis(100));
+        delay_for(Duration::from_millis(100)).await;
         drop(trigger);
-        shutdown_on_idle(rt);
 
-        runtime()
-            .block_on_std(async move {
-                timeout(Duration::from_secs(1), rx.collect().compat())
-                    .await
-                    .expect("Unclosed channel")
-            })
+        timeout(Duration::from_secs(1), rx.collect().compat())
+            .await
+            .expect("Unclosed channel")
             .unwrap()
     }
 
-    #[test]
-    fn reads_journal() {
-        let received = run_journal(&[], &[], None);
+    #[tokio::test]
+    async fn reads_journal() {
+        let received = run_journal(&[], &[], None).await;
         assert_eq!(received.len(), 5);
         assert_eq!(
             message(&received[0]),
@@ -672,17 +667,17 @@ mod tests {
         assert_eq!(priority(&received[1]), Value::Bytes("DEBUG".into()));
     }
 
-    #[test]
-    fn includes_units() {
-        let received = run_journal(&["unit.service"], &[], None);
+    #[tokio::test]
+    async fn includes_units() {
+        let received = run_journal(&["unit.service"], &[], None).await;
         assert_eq!(received.len(), 1);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
 
-    #[test]
-    fn excludes_units() {
-        let received = run_journal(&[], &["unit.service", "badunit.service"], None);
+    #[tokio::test]
+    async fn excludes_units() {
+        let received = run_journal(&[], &["unit.service", "badunit.service"], None).await;
         assert_eq!(received.len(), 3);
         assert_eq!(
             message(&received[0]),
@@ -698,24 +693,24 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handles_checkpoint() {
-        let received = run_journal(&[], &[], Some("1"));
+    #[tokio::test]
+    async fn handles_checkpoint() {
+        let received = run_journal(&[], &[], Some("1")).await;
         assert_eq!(received.len(), 4);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
 
-    #[test]
-    fn parses_array_messages() {
-        let received = run_journal(&["badunit.service"], &[], None);
+    #[tokio::test]
+    async fn parses_array_messages() {
+        let received = run_journal(&["badunit.service"], &[], None).await;
         assert_eq!(received.len(), 1);
         assert_eq!(message(&received[0]), Value::Bytes("¿Hello?".into()));
     }
 
-    #[test]
-    fn handles_missing_timestamp() {
-        let received = run_journal(&["stdout"], &[], None);
+    #[tokio::test]
+    async fn handles_missing_timestamp() {
+        let received = run_journal(&["stdout"], &[], None).await;
         assert_eq!(received.len(), 2);
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140004000));
         assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140005000));

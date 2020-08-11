@@ -105,7 +105,7 @@ mod tests {
     fn humio_valid_time_field() {
         let event = Event::from("hello world");
 
-        let (config, _, _) = load_sink::<HumioLogsConfig>(
+        let (config, _cx) = load_sink::<HumioLogsConfig>(
             r#"
             token = "alsdkfjaslkdfjsalkfj"
             host = "https://127.0.0.1"

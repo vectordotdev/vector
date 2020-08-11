@@ -3,9 +3,7 @@ use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughpu
 use futures::compat::Future01CompatExt;
 use rand::{distributions::Alphanumeric, rngs::SmallRng, thread_rng, Rng, SeedableRng};
 use tempfile::tempdir;
-use vector::test_util::{
-    next_addr, runtime, send_lines, shutdown_on_idle, wait_for_tcp, CountReceiver,
-};
+use vector::test_util::{next_addr, runtime, send_lines, wait_for_tcp, CountReceiver};
 use vector::{
     buffers::BufferConfig,
     sinks, sources,
@@ -49,9 +47,9 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let (output_lines, topology) = rt.block_on_std(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
                         let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });
-                    wait_for_tcp(in_addr);
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
@@ -62,7 +60,6 @@ fn benchmark_buffers(c: &mut Criterion) {
                         topology.stop().compat().await.unwrap();
                         assert_eq!(num_lines, output_lines.wait().await.len());
                     });
-                    shutdown_on_idle(rt);
                 },
             );
         })
@@ -86,14 +83,13 @@ fn benchmark_buffers(c: &mut Criterion) {
                         when_full: Default::default(),
                     };
                     config.global.data_dir = Some(data_dir.clone());
-
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on_std(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
                         let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });
-                    wait_for_tcp(in_addr);
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
@@ -101,11 +97,9 @@ fn benchmark_buffers(c: &mut Criterion) {
                         let lines = random_lines(line_size).take(num_lines);
                         send_lines(in_addr, lines).await.unwrap();
                         tokio::time::delay_for(std::time::Duration::from_secs(100)).await;
-
                         topology.stop().compat().await.unwrap();
                         assert_eq!(num_lines, output_lines.wait().await.len());
                     });
-                    shutdown_on_idle(rt);
                 },
             );
         })
@@ -129,14 +123,13 @@ fn benchmark_buffers(c: &mut Criterion) {
                         when_full: Default::default(),
                     };
                     config.global.data_dir = Some(data_dir2.clone());
-
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on_std(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
                         let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });
-                    wait_for_tcp(in_addr);
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
@@ -144,11 +137,9 @@ fn benchmark_buffers(c: &mut Criterion) {
                         let lines = random_lines(line_size).take(num_lines);
                         send_lines(in_addr, lines).await.unwrap();
                         tokio::time::delay_for(std::time::Duration::from_secs(100)).await;
-
                         topology.stop().compat().await.unwrap();
                         assert_eq!(num_lines, output_lines.wait().await.len());
                     });
-                    shutdown_on_idle(rt);
                 },
             );
         })
