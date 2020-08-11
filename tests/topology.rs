@@ -525,7 +525,7 @@ fn topology_required_healthcheck_fails_start() {
         let pieces = topology::validate(&config, &diff).await.unwrap();
         assert!(topology::start_validated(config, diff, pieces, true)
             .await
-            .is_some());
+            .is_none());
     });
 }
 
