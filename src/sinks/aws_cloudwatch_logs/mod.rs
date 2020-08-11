@@ -6,17 +6,23 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        retries::{FixedRetryPolicy, RetryLogic},
-        rusoto, BatchConfig, BatchSettings, Compression, EncodedLength, PartitionBatchSink,
-        PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
+        retries2::{FixedRetryPolicy, RetryLogic},
+        rusoto,
+        service2::{TowerCompat, TowerRequestConfig, TowerRequestSettings},
+        BatchConfig, BatchSettings, Compression, EncodedLength, PartitionBatchSink,
+        PartitionBuffer, PartitionInnerBuffer, VecBuffer,
     },
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext},
 };
 use bytes::Bytes;
 use chrono::{Duration, Utc};
-use futures::future::{FutureExt, TryFutureExt};
-use futures01::{stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
+use futures::{
+    compat::Future01CompatExt,
+    future::{BoxFuture, FutureExt, TryFutureExt},
+    ready,
+};
+use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::{request::BufferedHttpResponse, RusotoError};
 use rusoto_logs::{
@@ -25,8 +31,16 @@ use rusoto_logs::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{collections::HashMap, convert::TryInto, fmt};
-use tower::{
+use std::{
+    collections::HashMap,
+    convert::TryInto,
+    fmt,
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
+use tokio::sync::oneshot;
+use tower03::{
     buffer::Buffer,
     limit::{
         concurrency::ConcurrencyLimit,
@@ -180,11 +194,12 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let encoding = self.encoding.clone();
         let sink = {
             let buffer = PartitionBuffer::new(VecBuffer::new(batch.size));
-            let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-                .sink_map_err(|e| error!("Fatal cloudwatchlogs sink error: {}", e))
-                .with_flat_map(move |event| {
-                    iter_ok(partition_encode(event, &encoding, &log_group, &log_stream))
-                });
+            let svc_sink =
+                PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch.timeout, cx.acker())
+                    .sink_map_err(|e| error!("Fatal cloudwatchlogs sink error: {}", e))
+                    .with_flat_map(move |event| {
+                        iter_ok(partition_encode(event, &encoding, &log_group, &log_stream))
+                    });
             Box::new(svc_sink)
         };
 
@@ -220,10 +235,10 @@ impl Service<PartitionInnerBuffer<Vec<InputLogEvent>, CloudwatchKey>>
 {
     type Response = ();
     type Error = crate::Error;
-    type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(().into())
+    fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     fn call(
@@ -251,20 +266,14 @@ impl Service<PartitionInnerBuffer<Vec<InputLogEvent>, CloudwatchKey>>
                 let rate = RateLimit::new(retry, rate);
                 let concurrency = ConcurrencyLimit::new(rate, 1);
 
-                Buffer::new(concurrency, 1)
+                Buffer::new(concurrency, self.request_settings.in_flight_limit)
             };
 
             self.clients.insert(key, svc.clone());
             svc
         };
 
-        let fut = svc
-            .ready()
-            .map_err(Into::into)
-            .and_then(move |mut svc| svc.call(events))
-            .map_err(Into::into);
-
-        Box::new(fut)
+        svc.oneshot(events).map_err(Into::into).boxed()
     }
 }
 
@@ -349,38 +358,36 @@ impl CloudwatchLogsSvc {
 impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
     type Response = ();
     type Error = CloudwatchError;
-    type Future = request::CloudwatchFuture;
+    // type Future = request::CloudwatchFuture;
+    type Future = BoxFuture<'static, Result<(), CloudwatchError>>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
+    fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         if let Some(rx) = &mut self.token_rx {
-            match rx.poll() {
-                Ok(Async::Ready(token)) => {
+            match ready!(Pin::new(rx).poll(cx)) {
+                Ok(token) => {
                     self.token = token;
                     self.token_rx = None;
-                    Ok(().into())
                 }
-                Ok(Async::NotReady) => Ok(Async::NotReady),
-                Err(oneshot::Canceled) => {
+                Err(_) => {
                     // This case only happens when the `tx` end gets dropped due to an error
                     // in this case we just reset the token and try again.
                     self.token = None;
                     self.token_rx = None;
-                    Ok(().into())
                 }
             }
-        } else {
-            Ok(().into())
         }
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, req: Vec<InputLogEvent>) -> Self::Future {
+        warn!("CloudwatchLogsSvc::call, req len: {:?}", req.len());
         if self.token_rx.is_none() {
             let event_batches = self.process_events(req);
 
             let (tx, rx) = oneshot::channel();
             self.token_rx = Some(rx);
 
-            request::CloudwatchFuture::new(
+            let fut = request::CloudwatchFuture::new(
                 self.client.clone(),
                 self.stream_name.clone(),
                 self.group_name.clone(),
@@ -389,7 +396,8 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
                 event_batches,
                 self.token.take(),
                 tx,
-            )
+            );
+            Box::pin(fut.compat())
         } else {
             panic!("poll_ready was not called; this is a bug!");
         }

@@ -1,7 +1,7 @@
 use super::CloudwatchError;
 use futures::compat::Compat;
 use futures::future::BoxFuture;
-use futures01::{sync::oneshot, try_ready, Async, Future, Poll};
+use futures01::{try_ready, Async, Future, Poll};
 use rusoto_core::RusotoError;
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogGroupRequest,
@@ -9,6 +9,7 @@ use rusoto_logs::{
     DescribeLogStreamsRequest, DescribeLogStreamsResponse, InputLogEvent, PutLogEventsError,
     PutLogEventsRequest, PutLogEventsResponse,
 };
+use tokio::sync::oneshot;
 
 pub struct CloudwatchFuture {
     client: Client,
