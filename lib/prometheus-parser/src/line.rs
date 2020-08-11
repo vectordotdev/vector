@@ -14,24 +14,24 @@ use std::collections::BTreeMap;
 
 #[derive(Debug, snafu::Snafu, PartialEq)]
 pub enum ErrorKind {
-    #[snafu(display("invalid metric type, parsing: {:?}", input))]
+    #[snafu(display("invalid metric type, parsing: `{}`", input))]
     InvalidMetricKind { input: String },
-    #[snafu(display("expected token {:?}, parsing: {:?}", expected, input))]
+    #[snafu(display("expected token {:?}, parsing: `{}`", expected, input))]
     ExpectedToken {
         expected: &'static str,
         input: String,
     },
-    #[snafu(display("expected blank space or tab, parsing: {:?}", input))]
+    #[snafu(display("expected blank space or tab, parsing: `{}`", input))]
     ExpectedSpace { input: String },
-    #[snafu(display("expected token {:?}, parsing: {:?}", expected, input))]
+    #[snafu(display("expected token {:?}, parsing: `{}`", expected, input))]
     ExpectedChar { expected: char, input: String },
-    #[snafu(display("name must start with [a-zA-Z_], parsing: {:?}", input))]
+    #[snafu(display("name must start with [a-zA-Z_], parsing: `{}`", input))]
     ParseNameError { input: String },
-    #[snafu(display("parse float value error, parsing: {:?}", input))]
+    #[snafu(display("parse float value error, parsing: `{}`", input))]
     ParseFloatError { input: String },
 
     // Error that we didn't catch
-    #[snafu(display("error kind: {:?}, parsing: {:?}", kind, input))]
+    #[snafu(display("error kind: {:?}, parsing: `{}`", kind, input))]
     Nom {
         input: String,
         kind: nom::error::ErrorKind,

@@ -10,7 +10,7 @@ use line::MetricKind;
 
 #[derive(Debug, snafu::Snafu, PartialEq)]
 pub enum ParserError {
-    #[snafu(display("{}, line: {:?}", kind, line))]
+    #[snafu(display("{}, line: `{}`", kind, line))]
     WithLine {
         line: String,
         #[snafu(source)]
