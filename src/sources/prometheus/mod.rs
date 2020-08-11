@@ -97,23 +97,28 @@ fn prometheus(
 
                             let byte_size = body.len();
                             let packet = String::from_utf8_lossy(&body);
-                            let metrics = parser::parse(&packet)
-                                .map_err(|error| {
+
+                            match parser::parse(&packet) {
+                                Ok(metrics) => {
+                                    emit!(PrometheusEventReceived {
+                                        byte_size,
+                                        count: metrics.len(),
+                                    });
+                                    Some(stream::iter(metrics).map(Event::Metric).map(Ok))
+                                }
+                                Err(error) => {
                                     emit!(PrometheusParseError {
                                         error,
                                         url: url.clone(),
                                     });
-                                })
-                                .unwrap_or_default();
-
-                            if !metrics.is_empty() {
-                                emit!(PrometheusEventReceived {
-                                    byte_size,
-                                    count: metrics.len(),
-                                });
+                                    debug!(
+                                        message = %format!("failed to parse response:\n\n{}\n\n", packet),
+                                        url=%url.clone(),
+                                        rate_limit_secs = 10
+                                    );
+                                    None
+                                }
                             }
-
-                            Some(stream::iter(metrics).map(Event::Metric).map(Ok))
                         }
                         Ok((header, _)) => {
                             emit!(PrometheusErrorResponse {
