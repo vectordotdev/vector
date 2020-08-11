@@ -1,16 +1,22 @@
 use crate::event::metric::{Metric, MetricKind, MetricValue};
 use indexmap::IndexMap;
-use std::collections::BTreeMap;
 
 pub use prometheus_parser::*;
 
-struct ParserAggregate {
-    name: String,
-    bounds: Vec<f64>,
+#[derive(Default)]
+struct AggregatedHistogram {
+    buckets: Vec<f64>,
+    counts: Vec<u32>,
+    count: u32,
+    sum: f64,
+}
+
+#[derive(Default)]
+struct AggregatedSummary {
+    quantiles: Vec<f64>,
     values: Vec<f64>,
     count: u32,
     sum: f64,
-    tags: BTreeMap<String, String>,
 }
 
 pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
@@ -66,19 +72,11 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                 }
             }
             GroupKind::Histogram(vec) => {
-                let mut aggregates = IndexMap::new();
+                let mut aggregates = IndexMap::<_, AggregatedHistogram>::new();
 
                 for metric in vec {
-                    let tags = metric.labels;
-                    let aggregate = aggregates.entry(tags.clone()).or_insert(ParserAggregate {
-                        name: group.name.clone(),
-                        bounds: Vec::new(),
-                        values: Vec::new(),
-                        count: 0,
-                        sum: 0.0,
-                        tags,
-                    });
-
+                    let labels = metric.labels;
+                    let aggregate = aggregates.entry(labels).or_default();
                     match metric.value {
                         HistogramMetricValue::Count { count } => {
                             aggregate.count = count as u32;
@@ -89,28 +87,24 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         HistogramMetricValue::Bucket { bucket, value } => {
                             // last bucket is implicit, because we store its value in 'count'
                             if bucket != f64::INFINITY {
-                                aggregate.bounds.push(bucket);
-                                aggregate.values.push(value);
+                                aggregate.buckets.push(bucket);
+                                aggregate.counts.push(value as u32);
                             }
                         }
                     }
                 }
 
-                for (_, aggregate) in aggregates {
-                    let tags = if !aggregate.tags.is_empty() {
-                        Some(aggregate.tags)
-                    } else {
-                        None
-                    };
+                for (tags, aggregate) in aggregates {
+                    let tags = if tags.is_empty() { None } else { Some(tags) };
 
                     let hist = Metric {
-                        name: aggregate.name,
+                        name: group.name.clone(),
                         timestamp: None,
                         tags,
                         kind: MetricKind::Absolute,
                         value: MetricValue::AggregatedHistogram {
-                            buckets: aggregate.bounds,
-                            counts: aggregate.values.into_iter().map(|x| x as u32).collect(),
+                            buckets: aggregate.buckets,
+                            counts: aggregate.counts,
                             count: aggregate.count,
                             sum: aggregate.sum,
                         },
@@ -120,18 +114,11 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                 }
             }
             GroupKind::Summary(vec) => {
-                let mut aggregates = IndexMap::new();
+                let mut aggregates = IndexMap::<_, AggregatedSummary>::new();
 
                 for metric in vec {
                     let tags = metric.labels;
-                    let aggregate = aggregates.entry(tags.clone()).or_insert(ParserAggregate {
-                        name: group.name.clone(),
-                        bounds: Vec::new(),
-                        values: Vec::new(),
-                        count: 0,
-                        sum: 0.0,
-                        tags,
-                    });
+                    let aggregate = aggregates.entry(tags).or_default();
 
                     match metric.value {
                         SummaryMetricValue::Count { count } => {
@@ -141,26 +128,22 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                             aggregate.sum = sum;
                         }
                         SummaryMetricValue::Quantile { quantile, value } => {
-                            aggregate.bounds.push(quantile);
+                            aggregate.quantiles.push(quantile);
                             aggregate.values.push(value);
                         }
                     }
                 }
 
-                for (_, aggregate) in aggregates {
-                    let tags = if !aggregate.tags.is_empty() {
-                        Some(aggregate.tags)
-                    } else {
-                        None
-                    };
+                for (tags, aggregate) in aggregates {
+                    let tags = if tags.is_empty() { None } else { Some(tags) };
 
                     let summary = Metric {
-                        name: aggregate.name,
+                        name: group.name.clone(),
                         timestamp: None,
                         tags,
                         kind: MetricKind::Absolute,
                         value: MetricValue::AggregatedSummary {
-                            quantiles: aggregate.bounds,
+                            quantiles: aggregate.quantiles,
                             values: aggregate.values,
                             count: aggregate.count,
                             sum: aggregate.sum,
