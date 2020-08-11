@@ -173,7 +173,7 @@ fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
             pair.as_str().parse::<f64>().unwrap(),
         ))),
         Rule::boolean => {
-            let v = if pair.as_str() == "true" { true } else { false };
+            let v = pair.as_str() == "true";
             Box::new(Literal::from(Value::from(v)))
         }
         Rule::dot_path => Box::new(QueryPath::from(path_segments_from_pair(pair)?)),
@@ -212,32 +212,30 @@ pub fn parse(input: &str) -> Result<Mapping> {
         // operator rules we first remove all but one type and then we rename it
         // to a more general 'operator' rule.
         Err(mut err) => {
-            match err.variant {
-                ErrorVariant::ParsingError {
-                    ref mut positives,
-                    negatives: _,
-                } => {
-                    let mut i = 0;
-                    while i != positives.len() {
-                        match positives[i] {
-                            Rule::arithmetic_operator_boolean
-                            | Rule::arithmetic_operator_compare
-                            | Rule::arithmetic_operator_sum => {
-                                positives.remove(i);
-                            }
-                            _ => {
-                                i += 1;
-                            }
-                        };
-                    }
+            if let ErrorVariant::ParsingError {
+                ref mut positives,
+                negatives: _,
+            } = err.variant
+            {
+                let mut i = 0;
+                while i != positives.len() {
+                    match positives[i] {
+                        Rule::arithmetic_operator_boolean
+                        | Rule::arithmetic_operator_compare
+                        | Rule::arithmetic_operator_sum => {
+                            positives.remove(i);
+                        }
+                        _ => {
+                            i += 1;
+                        }
+                    };
                 }
-                _ => (),
             }
             err = err.renamed_rules(|rule| match *rule {
                 Rule::arithmetic_operator_product => "operator".to_owned(),
                 _ => format!("{:?}", rule),
             });
-            return Err(format!("mapping parse error\n{}", err));
+            Err(format!("mapping parse error\n{}", err))
         }
     }
 }
@@ -270,7 +268,7 @@ mod test {
         ];
 
         for (mapping, exp_expressions) in cases {
-            let err = format!("{}", parse(mapping).err().unwrap());
+            let err = parse(mapping).err().unwrap().to_string();
             for exp in exp_expressions {
                 assert!(
                     err.contains(exp),

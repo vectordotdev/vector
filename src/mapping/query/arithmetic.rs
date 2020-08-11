@@ -149,11 +149,10 @@ impl Function for Arithmetic {
                         Value::Integer(ir) => Value::Integer(il + ir),
                         vr => return Err(format!("unable to add right-hand field type {:?}", vr)),
                     },
-                    Value::Bytes(sl) => match right {
+                    Value::Bytes(mut sl) => match right {
                         Value::Bytes(sr) => {
-                            let mut b = sl.clone();
-                            b.extend_from_slice(&sr);
-                            Value::Bytes(b)
+                            sl.extend_from_slice(&sr);
+                            Value::Bytes(sl)
                         }
                         vr => return Err(format!("unable to add right-hand field type {:?}", vr)),
                     },

@@ -20,11 +20,8 @@ pub(self) struct Assignment {
 }
 
 impl Assignment {
-    pub(self) fn new(path: String, func: Box<dyn query::Function>) -> Self {
-        Self {
-            path: path,
-            function: func,
-        }
+    pub(self) fn new(path: String, function: Box<dyn query::Function>) -> Self {
+        Self { path, function }
     }
 }
 

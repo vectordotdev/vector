@@ -101,7 +101,7 @@ mod tests {
         };
         let mut tform = Remap::new(conf).unwrap();
 
-        let result = tform.transform(event.clone()).unwrap();
+        let result = tform.transform(event).unwrap();
         assert_eq!(get_field_string(&result, "message"), "augment me");
         assert_eq!(get_field_string(&result, "copy_from"), "buz");
         assert_eq!(get_field_string(&result, "foo"), "bar");
