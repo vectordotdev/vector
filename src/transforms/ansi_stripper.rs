@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Value},
+    internal_events::ANSIStripperEventProcessed,
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     Event,
 };
@@ -50,6 +51,8 @@ pub struct AnsiStripper {
 impl Transform for AnsiStripper {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
+
+        emit!(ANSIStripperEventProcessed);
 
         match log.get_mut(&self.field) {
             None => debug!(
