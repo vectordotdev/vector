@@ -30,7 +30,7 @@ impl ShrinkableSemaphore {
         self: Arc<Self>,
     ) -> impl Future<Output = OwnedSemaphorePermit> + Send + 'static {
         MaybeForgetFuture {
-            master: self.clone(),
+            master: Arc::clone(&self),
             future: Box::pin(Arc::clone(&self.semaphore).acquire_owned()),
         }
     }
