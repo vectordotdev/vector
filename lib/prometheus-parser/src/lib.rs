@@ -27,7 +27,6 @@ pub enum ParserError {
         error: ErrorKind,
     },
 
-    // Below are bugs
     #[snafu(display("invalid name {:?} for metric group {:?}", metric_name, group_name))]
     InvalidName {
         group_name: String,
