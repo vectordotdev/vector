@@ -239,15 +239,10 @@ pub fn group_metrics(input: &str) -> Result<Vec<MetricGroup>, ParserError> {
                     groups.push(MetricGroup::new(header.metric_name, header.kind));
                 }
                 Line::Metric(metric) => {
-                    let group = {
-                        if groups.last().is_none()
-                            || !groups.last().unwrap().check_name(&metric.name)
-                        {
-                            groups.push(MetricGroup::new(metric.name.clone(), MetricKind::Untyped));
-                        }
-                        groups.last_mut().unwrap()
-                    };
-                    group.push(metric)?;
+                    if groups.last().is_none() || !groups.last().unwrap().check_name(&metric.name) {
+                        groups.push(MetricGroup::new(metric.name.clone(), MetricKind::Untyped));
+                    }
+                    groups.last_mut().unwrap().push(metric)?;
                 }
             }
         }
