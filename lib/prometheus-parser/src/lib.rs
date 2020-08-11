@@ -35,37 +35,29 @@ pub enum ParserError {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum SummaryMetric {
-    Quantile {
-        quantile: f64,
-        value: f64,
-        labels: BTreeMap<String, String>,
-    },
-    Sum {
-        value: f64,
-        labels: BTreeMap<String, String>,
-    },
-    Count {
-        value: f64,
-        labels: BTreeMap<String, String>,
-    },
+pub struct SummaryMetric {
+    pub labels: BTreeMap<String, String>,
+    pub value: SummaryMetricValue,
 }
 
 #[derive(Debug, PartialEq)]
-pub enum HistogramMetric {
-    Bucket {
-        bucket: f64,
-        value: f64,
-        labels: BTreeMap<String, String>,
-    },
-    Sum {
-        value: f64,
-        labels: BTreeMap<String, String>,
-    },
-    Count {
-        value: f64,
-        labels: BTreeMap<String, String>,
-    },
+pub enum SummaryMetricValue {
+    Quantile { quantile: f64, value: f64 },
+    Sum { sum: f64 },
+    Count { count: f64 },
+}
+
+#[derive(Debug, PartialEq)]
+pub struct HistogramMetric {
+    pub labels: BTreeMap<String, String>,
+    pub value: HistogramMetricValue,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum HistogramMetricValue {
+    Bucket { bucket: f64, value: f64 },
+    Sum { sum: f64 },
+    Count { count: f64 },
 }
 
 #[derive(Debug, PartialEq)]
@@ -87,26 +79,6 @@ pub enum GroupKind {
 pub struct MetricGroup {
     pub name: String,
     pub metrics: GroupKind,
-}
-
-impl HistogramMetric {
-    pub fn get_labels(&self) -> &BTreeMap<String, String> {
-        match self {
-            HistogramMetric::Bucket { labels, .. }
-            | HistogramMetric::Count { labels, .. }
-            | HistogramMetric::Sum { labels, .. } => labels,
-        }
-    }
-}
-
-impl SummaryMetric {
-    pub fn get_labels(&self) -> &BTreeMap<String, String> {
-        match self {
-            SummaryMetric::Quantile { labels, .. }
-            | SummaryMetric::Count { labels, .. }
-            | SummaryMetric::Sum { labels, .. } => labels,
-        }
-    }
 }
 
 impl GroupKind {
@@ -146,7 +118,7 @@ impl MetricGroup {
         }
     }
 
-    fn push(&mut self, mut metric: Metric) -> Result<(), ParserError> {
+    fn push(&mut self, metric: Metric) -> Result<(), ParserError> {
         // this is an assertion
         if !self.check_name(&metric.name) {
             return Err(ParserError::InvalidName {
@@ -168,25 +140,27 @@ impl MetricGroup {
                 let suffix = &metric.name[self.name.len()..];
                 match suffix {
                     "_bucket" => {
-                        let bucket = metric
-                            .labels
-                            .remove("le")
-                            .ok_or(ParserError::ExpectedLeTag)?;
+                        let mut labels = metric.labels;
+                        let bucket = labels.remove("le").ok_or(ParserError::ExpectedLeTag)?;
                         let (_, bucket) = line::Metric::parse_value(&bucket)
                             .map_err(Into::into)
                             .context(ParseLabelValue)?;
-                        vec.push(HistogramMetric::Bucket {
-                            bucket,
-                            value: metric.value,
-                            labels: metric.labels,
+                        vec.push(HistogramMetric {
+                            labels,
+                            value: HistogramMetricValue::Bucket {
+                                bucket,
+                                value: metric.value,
+                            },
                         });
                     }
-                    "_sum" => vec.push(HistogramMetric::Sum {
-                        value: metric.value,
+                    "_sum" => vec.push(HistogramMetric {
+                        value: HistogramMetricValue::Sum { sum: metric.value },
                         labels: metric.labels,
                     }),
-                    "_count" => vec.push(HistogramMetric::Count {
-                        value: metric.value,
+                    "_count" => vec.push(HistogramMetric {
+                        value: HistogramMetricValue::Count {
+                            count: metric.value,
+                        },
                         labels: metric.labels,
                     }),
                     _ => unreachable!(),
@@ -196,25 +170,29 @@ impl MetricGroup {
                 let suffix = &metric.name[self.name.len()..];
                 match suffix {
                     "" => {
-                        let quantile = metric
-                            .labels
+                        let mut labels = metric.labels;
+                        let quantile = labels
                             .remove("quantile")
                             .ok_or(ParserError::ExpectedQuantileTag)?;
                         let (_, quantile) = line::Metric::parse_value(&quantile)
                             .map_err(Into::into)
                             .context(ParseLabelValue)?;
-                        vec.push(SummaryMetric::Quantile {
-                            quantile,
-                            value: metric.value,
-                            labels: metric.labels,
+                        vec.push(SummaryMetric {
+                            labels,
+                            value: SummaryMetricValue::Quantile {
+                                quantile,
+                                value: metric.value,
+                            },
                         });
                     }
-                    "_sum" => vec.push(SummaryMetric::Sum {
-                        value: metric.value,
+                    "_sum" => vec.push(SummaryMetric {
+                        value: SummaryMetricValue::Sum { sum: metric.value },
                         labels: metric.labels,
                     }),
-                    "_count" => vec.push(SummaryMetric::Count {
-                        value: metric.value,
+                    "_count" => vec.push(SummaryMetric {
+                        value: SummaryMetricValue::Count {
+                            count: metric.value,
+                        },
                         labels: metric.labels,
                     }),
                     _ => unreachable!(),

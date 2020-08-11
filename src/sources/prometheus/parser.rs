@@ -69,7 +69,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                 let mut aggregates = IndexMap::new();
 
                 for metric in vec {
-                    let tags = metric.get_labels().clone();
+                    let tags = metric.labels;
                     let aggregate = aggregates.entry(tags.clone()).or_insert(ParserAggregate {
                         name: group.name.clone(),
                         bounds: Vec::new(),
@@ -79,14 +79,14 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         tags,
                     });
 
-                    match metric {
-                        HistogramMetric::Count { value, .. } => {
-                            aggregate.count = value as u32; // TODO: check
+                    match metric.value {
+                        HistogramMetricValue::Count { count } => {
+                            aggregate.count = count as u32;
                         }
-                        HistogramMetric::Sum { value, .. } => {
-                            aggregate.sum = value;
+                        HistogramMetricValue::Sum { sum } => {
+                            aggregate.sum = sum;
                         }
-                        HistogramMetric::Bucket { bucket, value, .. } => {
+                        HistogramMetricValue::Bucket { bucket, value } => {
                             // last bucket is implicit, because we store its value in 'count'
                             if bucket != f64::INFINITY {
                                 aggregate.bounds.push(bucket);
@@ -110,7 +110,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         kind: MetricKind::Absolute,
                         value: MetricValue::AggregatedHistogram {
                             buckets: aggregate.bounds,
-                            counts: aggregate.values.into_iter().map(|x| x as u32).collect(), // TODO: check
+                            counts: aggregate.values.into_iter().map(|x| x as u32).collect(),
                             count: aggregate.count,
                             sum: aggregate.sum,
                         },
@@ -123,7 +123,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                 let mut aggregates = IndexMap::new();
 
                 for metric in vec {
-                    let tags = metric.get_labels().clone();
+                    let tags = metric.labels;
                     let aggregate = aggregates.entry(tags.clone()).or_insert(ParserAggregate {
                         name: group.name.clone(),
                         bounds: Vec::new(),
@@ -133,16 +133,14 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                         tags,
                     });
 
-                    match metric {
-                        SummaryMetric::Count { value, .. } => {
-                            aggregate.count = value as u32; // TODO: check
+                    match metric.value {
+                        SummaryMetricValue::Count { count } => {
+                            aggregate.count = count as u32;
                         }
-                        SummaryMetric::Sum { value, .. } => {
-                            aggregate.sum = value;
+                        SummaryMetricValue::Sum { sum } => {
+                            aggregate.sum = sum;
                         }
-                        SummaryMetric::Quantile {
-                            quantile, value, ..
-                        } => {
+                        SummaryMetricValue::Quantile { quantile, value } => {
                             aggregate.bounds.push(quantile);
                             aggregate.values.push(value);
                         }
