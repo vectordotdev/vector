@@ -4,7 +4,6 @@ mod blackhole;
 #[cfg(feature = "sources-docker")]
 mod docker;
 mod elasticsearch;
-mod file;
 mod http;
 #[cfg(all(unix, feature = "sources-journald"))]
 mod journald;
@@ -82,3 +81,6 @@ macro_rules! emit {
         $crate::internal_events::emit($event);
     };
 }
+
+// Modules that require emit! macro so they need to be defined after the macro.
+mod file;

@@ -1,5 +1,7 @@
 use bytes05::Bytes;
-use file_source::{paths_provider::PathsProvider, FileServer, FileServerShutdown};
+use file_source::{
+    paths_provider::PathsProvider, FileServer, FileServerShutdown, FileSourceInternalEvents,
+};
 use futures::future::{select, Either};
 use futures::{pin_mut, Sink};
 use std::convert::Infallible;
@@ -9,13 +11,14 @@ use tokio::task::spawn_blocking;
 
 /// A tiny wrapper around a [`FileServer`] that runs it as a [`spawn_blocking`]
 /// task.
-pub async fn run_file_server<PP, C, S>(
-    file_server: FileServer<PP>,
+pub async fn run_file_server<PP, E, C, S>(
+    file_server: FileServer<PP, E>,
     chans: C,
     shutdown: S,
 ) -> Result<FileServerShutdown, tokio::task::JoinError>
 where
     PP: PathsProvider + Send + 'static,
+    E: FileSourceInternalEvents,
     C: Sink<(Bytes, String)> + Unpin + Send + 'static,
     <C as Sink<(Bytes, String)>>::Error: Error + Send,
     S: Future + Unpin + Send + 'static,

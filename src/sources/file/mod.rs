@@ -1,6 +1,6 @@
 use crate::{
     event::{self, Event},
-    internal_events::FileEventReceived,
+    internal_events::{FileEventReceived, FileSourceInternalEventsEmitter},
     shutdown::ShutdownSignal,
     topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     trace::{current_span, Instrument},
@@ -252,6 +252,7 @@ pub fn file_source(
         fingerprinter: config.fingerprinting.clone().into(),
         oldest_first: config.oldest_first,
         remove_after: config.remove_after.map(Duration::from_secs),
+        emitter: FileSourceInternalEventsEmitter,
     };
 
     let file_key = config.file_key.clone();
