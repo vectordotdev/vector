@@ -14,33 +14,31 @@ use std::collections::BTreeMap;
 
 #[derive(Debug, snafu::Snafu, PartialEq)]
 pub enum ErrorKind {
-    #[snafu(display("Invalid metric type, parsing: {:?}", input))]
+    #[snafu(display("invalid metric type, parsing: {:?}", input))]
     InvalidMetricKind { input: String },
-    #[snafu(display("Expected token {:?}, parsing: {:?}", expected, input))]
+    #[snafu(display("expected token {:?}, parsing: {:?}", expected, input))]
     ExpectedToken {
         expected: &'static str,
         input: String,
     },
-    #[snafu(display("Expected blank space or tab, parsing: {:?}", input))]
+    #[snafu(display("expected blank space or tab, parsing: {:?}", input))]
     ExpectedSpace { input: String },
-    #[snafu(display("Expected token {:?}, parsing: {:?}", expected, input))]
+    #[snafu(display("expected token {:?}, parsing: {:?}", expected, input))]
     ExpectedChar { expected: char, input: String },
-    #[snafu(display("Name must start with [a-zA-Z_], parsing: {:?}", input))]
+    #[snafu(display("name must start with [a-zA-Z_], parsing: {:?}", input))]
     ParseNameError { input: String },
-    #[snafu(display("Parse float value error, parsing: {:?}", input))]
+    #[snafu(display("parse float value error, parsing: {:?}", input))]
     ParseFloatError { input: String },
 
     // Error that we didn't catch
-    #[snafu(display("Nom error {:?}, parsing: {:?}", kind, input))]
+    #[snafu(display("error kind: {:?}, parsing: {:?}", kind, input))]
     Nom {
         input: String,
         kind: nom::error::ErrorKind,
     },
 
-    #[snafu(display("Nom return incomplete"))]
-    NomIncomplete,
-    #[snafu(display("Nom return failure"))]
-    NomFailure,
+    #[snafu(display("incomplete input, needed {:?} bytes", needed))]
+    NomIncomplete { needed: nom::Needed },
 }
 
 impl From<ErrorKind> for nom::Err<ErrorKind> {
@@ -52,9 +50,8 @@ impl From<ErrorKind> for nom::Err<ErrorKind> {
 impl From<nom::Err<ErrorKind>> for ErrorKind {
     fn from(error: nom::Err<ErrorKind>) -> Self {
         match error {
-            nom::Err::Incomplete(_) => ErrorKind::NomIncomplete,
-            nom::Err::Failure(_) => ErrorKind::NomFailure,
-            nom::Err::Error(e) => e,
+            nom::Err::Incomplete(needed) => ErrorKind::NomIncomplete { needed },
+            nom::Err::Error(e) | nom::Err::Failure(e) => e,
         }
     }
 }
@@ -72,9 +69,9 @@ impl<'a> nom::error::ParseError<&'a str> for ErrorKind {
     }
 }
 
-type NomError<'a> = nom::Err<(&'a str, nom::error::ErrorKind)>;
-
 type NomErrorType<'a> = (&'a str, nom::error::ErrorKind);
+
+type NomError<'a> = nom::Err<NomErrorType<'a>>;
 
 type IResult<'a, O> = Result<(&'a str, O), nom::Err<ErrorKind>>;
 
@@ -251,8 +248,8 @@ impl Metric {
 
         fn match_quote(input: &str) -> IResult<char> {
             char('"')(input).map_err(|_: NomError| {
-                ErrorKind::ExpectedToken {
-                    expected: "\"",
+                ErrorKind::ExpectedChar {
+                    expected: '"',
                     input: input.to_owned(),
                 }
                 .into()
@@ -609,17 +606,26 @@ mod test {
         let input = wrap(r#"{name="value}"#);
         let error = Metric::parse_labels(&input).unwrap_err().into();
         println!("{}", error);
-        assert!(is_good_err(error));
+        assert!(matches!(
+            error,
+            ErrorKind::ExpectedChar { expected: '"', .. }
+        ));
 
         let input = wrap(r#"{ a="b" c="d" }"#);
         let error = Metric::parse_labels(&input).unwrap_err().into();
         println!("{}", error);
-        assert!(is_good_err(error));
+        assert!(matches!(
+            error,
+            ErrorKind::ExpectedChar { expected: ',', .. }
+        ));
 
         let input = wrap(r#"{ a="b" ,, c="d" }"#);
         let error = Metric::parse_labels(&input).unwrap_err().into();
         println!("{}", error);
-        assert!(is_good_err(error));
+        assert!(matches!(
+            error,
+            ErrorKind::ParseNameError { .. }
+        ));
     }
 
     #[test]
@@ -663,12 +669,5 @@ mod test {
             rpc_duration_seconds_count 2693
             "##;
         assert!(input.lines().map(Line::parse).all(|r| r.is_ok()));
-    }
-
-    fn is_good_err(e: ErrorKind) -> bool {
-        match e {
-            ErrorKind::Nom { .. } | ErrorKind::NomFailure | ErrorKind::NomIncomplete => false,
-            _ => true,
-        }
     }
 }

@@ -1,3 +1,4 @@
+use snafu::ResultExt;
 use std::collections::BTreeMap;
 
 mod line;
@@ -10,16 +11,24 @@ use line::MetricKind;
 #[derive(Debug, snafu::Snafu, PartialEq)]
 pub enum ParserError {
     #[snafu(display("{}, line: {:?}", kind, line))]
-    WithLine { line: String, kind: ErrorKind },
-    #[snafu(display("Expected \"le\" tag for histogram metric"))]
+    WithLine {
+        line: String,
+        #[snafu(source)]
+        kind: ErrorKind,
+    },
+    #[snafu(display("expected \"le\" tag for histogram metric"))]
     ExpectedLeTag,
-    #[snafu(display("Expected \"quantile\" tag for summary metric"))]
+    #[snafu(display("expected \"quantile\" tag for summary metric"))]
     ExpectedQuantileTag,
-    #[snafu(display("Parse float value error, input: {:?}", input))]
-    ParseFloatError { input: String },
+
+    #[snafu(display("error parsing label value: {}", error))]
+    ParseLabelValue {
+        #[snafu(source)]
+        error: ErrorKind,
+    },
 
     // Below are bugs
-    #[snafu(display("Invalid name {:?} for metric group {:?}", metric_name, group_name))]
+    #[snafu(display("invalid name {:?} for metric group {:?}", metric_name, group_name))]
     InvalidName {
         group_name: String,
         metric_name: String,
@@ -164,11 +173,9 @@ impl MetricGroup {
                             .labels
                             .remove("le")
                             .ok_or(ParserError::ExpectedLeTag)?;
-                        let (_, bucket) = line::Metric::parse_value(&bucket).map_err(|_| {
-                            ParserError::ParseFloatError {
-                                input: bucket.to_owned(),
-                            }
-                        })?;
+                        let (_, bucket) = line::Metric::parse_value(&bucket)
+                            .map_err(Into::into)
+                            .context(ParseLabelValue)?;
                         vec.push(HistogramMetric::Bucket {
                             bucket,
                             value: metric.value,
@@ -194,11 +201,9 @@ impl MetricGroup {
                             .labels
                             .remove("quantile")
                             .ok_or(ParserError::ExpectedQuantileTag)?;
-                        let (_, quantile) = line::Metric::parse_value(&quantile).map_err(|_| {
-                            ParserError::ParseFloatError {
-                                input: quantile.to_owned(),
-                            }
-                        })?;
+                        let (_, quantile) = line::Metric::parse_value(&quantile)
+                            .map_err(Into::into)
+                            .context(ParseLabelValue)?;
                         vec.push(SummaryMetric::Quantile {
                             quantile,
                             value: metric.value,
@@ -225,26 +230,25 @@ pub fn group_metrics(input: &str) -> Result<Vec<MetricGroup>, ParserError> {
     let mut groups = Vec::new();
 
     for line in input.lines() {
-        let line = Line::parse(line).map_err(|kind| ParserError::WithLine {
+        let line = Line::parse(line).with_context(|| WithLine {
             line: line.to_owned(),
-            kind,
         })?;
-        if line.is_none() {
-            continue;
-        }
-        let line = line.unwrap();
-        match line {
-            Line::Header(header) => {
-                groups.push(MetricGroup::new(header.metric_name, header.kind));
-            }
-            Line::Metric(metric) => {
-                let group = {
-                    if groups.last().is_none() || !groups.last().unwrap().check_name(&metric.name) {
-                        groups.push(MetricGroup::new(metric.name.clone(), MetricKind::Untyped));
-                    }
-                    groups.last_mut().unwrap()
-                };
-                group.push(metric)?;
+        if let Some(line) = line {
+            match line {
+                Line::Header(header) => {
+                    groups.push(MetricGroup::new(header.metric_name, header.kind));
+                }
+                Line::Metric(metric) => {
+                    let group = {
+                        if groups.last().is_none()
+                            || !groups.last().unwrap().check_name(&metric.name)
+                        {
+                            groups.push(MetricGroup::new(metric.name.clone(), MetricKind::Untyped));
+                        }
+                        groups.last_mut().unwrap()
+                    };
+                    group.push(metric)?;
+                }
             }
         }
     }
@@ -299,47 +303,66 @@ mod test {
         group_metrics(input).unwrap();
     }
 
-    fn is_good_err(e: ParserError) -> bool {
-        match e {
-            ParserError::WithLine { kind, .. } => match kind {
-                ErrorKind::Nom { .. } | ErrorKind::NomFailure | ErrorKind::NomIncomplete => false,
-                _ => true,
-            },
-            ParserError::InvalidName { .. } => false,
-            _ => true,
-        }
-    }
-
     #[test]
     fn test_errors() {
         let input = r##"name{registry="default" content_type="html"} 1890"##;
         let error = group_metrics(input).unwrap_err();
         println!("{}", error);
-        assert!(is_good_err(error));
+        assert!(matches!(
+            error,
+            ParserError::WithLine {
+                kind: ErrorKind::ExpectedChar { expected: ',', .. }, ..
+            }
+        ));
 
         let input = r##"# TYPE a counte"##;
         let error = group_metrics(input).unwrap_err();
         println!("{}", error);
-        assert!(is_good_err(error));
+        assert!(matches!(
+            error,
+            ParserError::WithLine {
+                kind: ErrorKind::InvalidMetricKind { .. }, ..
+            }
+        ));
 
         let input = r##"# TYPEabcd asdf"##;
         let error = group_metrics(input).unwrap_err();
         println!("{}", error);
-        assert!(is_good_err(error));
+        assert!(matches!(
+            error,
+            ParserError::WithLine {
+                kind: ErrorKind::ExpectedSpace { .. }, ..
+            }
+        ));
 
         let input = r##"name{registry="} 1890"##;
         let error = group_metrics(input).unwrap_err();
         println!("{}", error);
-        assert!(is_good_err(error));
+        assert!(matches!(
+            error,
+            ParserError::WithLine {
+                kind: ErrorKind::ExpectedChar { expected: '"', .. }, ..
+            }
+        ));
 
         let input = r##"name{registry=} 1890"##;
         let error = group_metrics(input).unwrap_err();
         println!("{}", error);
-        assert!(is_good_err(error));
+        assert!(matches!(
+            error,
+            ParserError::WithLine {
+                kind: ErrorKind::ExpectedChar { expected: '"', .. }, ..
+            }
+        ));
 
         let input = r##"name abcd"##;
         let error = group_metrics(input).unwrap_err();
         println!("{}", error);
-        assert!(is_good_err(error));
+        assert!(matches!(
+            error,
+            ParserError::WithLine {
+                kind: ErrorKind::ParseFloatError { .. }, ..
+            }
+        ));
     }
 }
