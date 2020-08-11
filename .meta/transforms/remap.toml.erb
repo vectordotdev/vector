@@ -23,3 +23,77 @@ examples = [
   """.new_field = .old_field * 2
 del(.old_field)""",
 ]
+
+[[transforms.remap.examples]]
+label = "Generic"
+body = """\
+The remap transform makes it easy to add, rename and remove fields with a series of statements. Given events of the following form:
+
+```json
+{
+  "name": "Foo McBarson",
+  "friends": 23,
+  "enemies": 17
+}
+```
+
+If, say, we wished to add a new field `type` with a static value `"human_person"`, a dynamic field `acquaintances` that equals the sum of the fields `friends` and `enemies`, and remove the field `enemies`, we can achieve that with two mapping statements:
+
+```toml
+[transforms.remap_human_person]
+  type = "remap"
+  mapping = \"\"\"
+    .type = "human_person"
+    .acquaintances = .friends + .enemies
+    del(.enemies)
+  \"\"\"
+```
+
+A log event will be output with the following structure:
+
+```json
+{
+  "name": "Foo McBarson",
+  "type": "human_person",
+  "friends": 23,
+  "acquaintances": 40
+}
+```\
+"""
+
+[[transforms.remap.examples]]
+label = "Removing fields"
+body = """\
+:
+
+```json
+{
+  "name": "Foo McBarson",
+  "friends": 23,
+  "enemies": 17
+}
+```
+
+If, say, we wished to add a new field `type` with a static value `"human_person"`, and a dynamic field `acquaintances` that equals the sum of the fields `friends` and `enemies`, we can achieve that with two mapping statements:
+
+```toml
+[transforms.remap_human_person]
+  type = "remap"
+  mapping = \"\"\"
+    .type = "human_person"
+    .acquaintances = .friends + .enemies
+  \"\"\"
+```
+
+A log event will be output with the following structure:
+
+```json
+{
+  "name": "Foo McBarson",
+  "type": "human_person",
+  "friends": 23,
+  "enemies": 17,
+  "acquaintance": 40
+}
+```\
+"""
