@@ -55,24 +55,21 @@ impl Transform for AnsiStripper {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
 
-        emit!(ANSIStripperEventProcessed);
-
         match log.get_mut(&self.field) {
             None => emit!(ANSIStripperFieldMissing { field: &self.field }),
             Some(Value::Bytes(ref mut bytes)) => {
-                *bytes = match strip_ansi_escapes::strip(bytes.clone()) {
-                    Ok(b) => b.into(),
-                    Err(error) => {
-                        emit!(ANSIStripperFailed {
-                            field: &self.field,
-                            error
-                        });
-                        return Some(event);
-                    }
+                match strip_ansi_escapes::strip(&bytes) {
+                    Ok(b) => *bytes = b.into(),
+                    Err(error) => emit!(ANSIStripperFailed {
+                        field: &self.field,
+                        error
+                    }),
                 };
             }
             _ => emit!(ANSIStripperFieldInvalid { field: &self.field }),
         }
+
+        emit!(ANSIStripperEventProcessed);
 
         Some(event)
     }

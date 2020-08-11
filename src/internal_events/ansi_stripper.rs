@@ -72,7 +72,7 @@ impl InternalEvent for ANSIStripperFailed<'_> {
             message = "could not strip ANSI escape sequences.",
             field = %self.field,
             error = %self.error,
-            rate_limit_secs = 30,
+            rate_limit_secs = 10,
         );
     }
 
