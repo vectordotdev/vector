@@ -293,10 +293,11 @@ mod tests {
         sinks::http::HttpSinkConfig,
         sinks::util::http::HttpSink,
         sinks::util::test::build_test_server,
-        test_util::{next_addr, random_lines_with_stream, runtime, shutdown_on_idle},
+        test_util::{next_addr, random_lines_with_stream},
         topology::config::SinkContext,
     };
     use bytes05::buf::BufExt;
+    use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
     use headers::{Authorization, HeaderMapExt};
     use hyper::Method;
@@ -387,8 +388,8 @@ mod tests {
         let _ = config.build(cx).unwrap();
     }
 
-    #[test]
-    fn http_happy_path_post() {
+    #[tokio::test(core_threads = 2)]
+    async fn http_happy_path_post() {
         let num_lines = 1000;
 
         let in_addr = next_addr();
@@ -406,18 +407,17 @@ mod tests {
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let mut rt = runtime();
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).unwrap();
-        let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
+        let (rx, trigger, server) = build_test_server(in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
 
-        rt.spawn(server);
+        tokio::spawn(server);
 
-        let _ = rt.block_on(pump).unwrap();
+        let _ = pump.compat().await.unwrap();
         drop(trigger);
 
         let output_lines = rx
@@ -442,14 +442,12 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        shutdown_on_idle(rt);
-
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
     }
 
-    #[test]
-    fn http_happy_path_put() {
+    #[tokio::test(core_threads = 2)]
+    async fn http_happy_path_put() {
         let num_lines = 1000;
 
         let in_addr = next_addr();
@@ -468,18 +466,17 @@ mod tests {
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let mut rt = runtime();
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).unwrap();
-        let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
+        let (rx, trigger, server) = build_test_server(in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
 
-        rt.spawn(server);
+        tokio::spawn(server);
 
-        let _ = rt.block_on(pump).unwrap();
+        let _ = pump.compat().await.unwrap();
         drop(trigger);
 
         let output_lines = rx
@@ -504,14 +501,12 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        shutdown_on_idle(rt);
-
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
     }
 
-    #[test]
-    fn http_passes_custom_headers() {
+    #[tokio::test(core_threads = 2)]
+    async fn http_passes_custom_headers() {
         let num_lines = 1000;
 
         let in_addr = next_addr();
@@ -527,18 +522,17 @@ mod tests {
         .replace("$IN_ADDR", &format!("{}", in_addr));
         let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 
-        let mut rt = runtime();
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).unwrap();
-        let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
+        let (rx, trigger, server) = build_test_server(in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
         let pump = sink.send_all(events);
 
-        rt.spawn(server);
+        tokio::spawn(server);
 
-        let _ = rt.block_on(pump).unwrap();
+        let _ = pump.compat().await.unwrap();
         drop(trigger);
 
         let output_lines = rx
@@ -566,8 +560,6 @@ mod tests {
                 val.get("message").unwrap().as_str().unwrap().to_owned()
             })
             .collect::<Vec<_>>();
-
-        shutdown_on_idle(rt);
 
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);

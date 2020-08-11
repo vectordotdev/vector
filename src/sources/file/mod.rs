@@ -363,21 +363,18 @@ fn create_event(
 mod tests {
     use super::*;
     use crate::{
-        event,
-        shutdown::ShutdownSignal,
-        sources::file,
-        test_util::{runtime, shutdown_on_idle, trace_init},
-        topology::Config,
+        event, shutdown::ShutdownSignal, sources::file, test_util::trace_init, topology::Config,
     };
-    use futures01::{Future, Stream};
+    use futures01::Stream;
     use pretty_assertions::assert_eq;
     use std::{
         collections::HashSet,
         fs::{self, File},
+        future::Future,
         io::{Seek, Write},
     };
     use tempfile::tempdir;
-    use tokio::time::timeout;
+    use tokio::time::{delay_for, timeout, Duration};
 
     fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {
@@ -391,26 +388,22 @@ mod tests {
         }
     }
 
-    fn wait_with_timeout<F, R, E>(future: F) -> R
+    async fn wait_with_timeout<F, R, E>(future: F) -> R
     where
-        F: Send + 'static + Future<Item = R, Error = E>,
+        F: Future<Output = Result<R, E>> + Send + 'static,
         R: Send + 'static,
-        E: Send + 'static + std::fmt::Debug,
+        E: std::fmt::Debug + Send + 'static,
     {
-        runtime()
-            .block_on_std(async move {
-                let result = timeout(tokio::time::Duration::from_secs(5), future.compat()).await;
-                assert!(
-                    result.is_ok(),
-                    "Unclosed channel: may indicate file-server could not shutdown gracefully."
-                );
-                result.unwrap()
-            })
-            .unwrap()
+        match timeout(Duration::from_secs(5), future).await {
+            Ok(result) => result.unwrap(),
+            Err(_) => {
+                panic!("Unclosed channel: may indicate file-server could not shutdown gracefully.")
+            }
+        }
     }
 
-    fn sleep() {
-        std::thread::sleep(std::time::Duration::from_millis(500));
+    async fn sleep_500_millis() {
+        delay_for(Duration::from_millis(500)).await;
     }
 
     #[test]
@@ -496,8 +489,8 @@ mod tests {
         assert_eq!(log[event::log_schema().source_type_key()], "file".into());
     }
 
-    #[test]
-    fn file_happy_path() {
+    #[tokio::test]
+    async fn file_happy_path() {
         let n = 5;
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
@@ -509,29 +502,25 @@ mod tests {
         };
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-
-        let mut rt = runtime();
-
-        rt.spawn(source);
+        tokio::spawn(source.compat());
 
         let path1 = dir.path().join("file1");
         let path2 = dir.path().join("file2");
         let mut file1 = File::create(&path1).unwrap();
         let mut file2 = File::create(&path2).unwrap();
 
-        sleep(); // The files must be observed at their original lengths before writing to them
+        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
         for i in 0..n {
             writeln!(&mut file1, "hello {}", i).unwrap();
             writeln!(&mut file2, "goodbye {}", i).unwrap();
         }
 
-        sleep();
+        sleep_500_millis().await;
 
         drop(trigger_shutdown);
-        shutdown_on_idle(rt);
 
-        let received = wait_with_timeout(rx.collect());
+        let received = wait_with_timeout(rx.collect().compat()).await;
 
         let mut hello_i = 0;
         let mut goodbye_i = 0;
@@ -558,8 +547,8 @@ mod tests {
         assert_eq!(goodbye_i, n);
     }
 
-    #[test]
-    fn file_truncate() {
+    #[tokio::test]
+    async fn file_truncate() {
         let n = 5;
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
@@ -570,37 +559,33 @@ mod tests {
             ..test_default_file_config(&dir)
         };
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-
-        let mut rt = runtime();
-
-        rt.spawn(source);
+        tokio::spawn(source.compat());
 
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
 
-        sleep(); // The files must be observed at its original length before writing to it
+        sleep_500_millis().await; // The files must be observed at its original length before writing to it
 
         for i in 0..n {
             writeln!(&mut file, "pretrunc {}", i).unwrap();
         }
 
-        sleep(); // The writes must be observed before truncating
+        sleep_500_millis().await; // The writes must be observed before truncating
 
         file.set_len(0).unwrap();
         file.seek(std::io::SeekFrom::Start(0)).unwrap();
 
-        sleep(); // The truncate must be observed before writing again
+        sleep_500_millis().await; // The truncate must be observed before writing again
 
         for i in 0..n {
             writeln!(&mut file, "posttrunc {}", i).unwrap();
         }
 
-        sleep();
+        sleep_500_millis().await;
 
         drop(trigger_shutdown);
-        shutdown_on_idle(rt);
 
-        let received = wait_with_timeout(rx.collect());
+        let received = wait_with_timeout(rx.collect().compat()).await;
 
         let mut i = 0;
         let mut pre_trunc = true;
@@ -627,8 +612,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn file_rotate() {
+    #[tokio::test]
+    async fn file_rotate() {
         let n = 5;
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
@@ -639,38 +624,34 @@ mod tests {
             ..test_default_file_config(&dir)
         };
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-
-        let mut rt = runtime();
-
-        rt.spawn(source);
+        tokio::spawn(source.compat());
 
         let path = dir.path().join("file");
         let archive_path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
 
-        sleep(); // The files must be observed at its original length before writing to it
+        sleep_500_millis().await; // The files must be observed at its original length before writing to it
 
         for i in 0..n {
             writeln!(&mut file, "prerot {}", i).unwrap();
         }
 
-        sleep(); // The writes must be observed before rotating
+        sleep_500_millis().await; // The writes must be observed before rotating
 
         fs::rename(&path, archive_path).expect("could not rename");
         let mut file = File::create(&path).unwrap();
 
-        sleep(); // The rotation must be observed before writing again
+        sleep_500_millis().await; // The rotation must be observed before writing again
 
         for i in 0..n {
             writeln!(&mut file, "postrot {}", i).unwrap();
         }
 
-        sleep();
+        sleep_500_millis().await;
 
         drop(trigger_shutdown);
-        shutdown_on_idle(rt);
 
-        let received = wait_with_timeout(rx.collect());
+        let received = wait_with_timeout(rx.collect().compat()).await;
 
         let mut i = 0;
         let mut pre_rot = true;
@@ -697,8 +678,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn file_multiple_paths() {
+    #[tokio::test]
+    async fn file_multiple_paths() {
         let n = 5;
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
@@ -711,10 +692,7 @@ mod tests {
         };
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-
-        let mut rt = runtime();
-
-        rt.spawn(source);
+        tokio::spawn(source.compat());
 
         let path1 = dir.path().join("a.txt");
         let path2 = dir.path().join("b.txt");
@@ -725,7 +703,7 @@ mod tests {
         let mut file3 = File::create(&path3).unwrap();
         let mut file4 = File::create(&path4).unwrap();
 
-        sleep(); // The files must be observed at their original lengths before writing to them
+        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
         for i in 0..n {
             writeln!(&mut file1, "1 {}", i).unwrap();
@@ -734,12 +712,11 @@ mod tests {
             writeln!(&mut file4, "4 {}", i).unwrap();
         }
 
-        sleep();
+        sleep_500_millis().await;
 
         drop(trigger_shutdown);
-        shutdown_on_idle(rt);
 
-        let received = wait_with_timeout(rx.collect());
+        let received = wait_with_timeout(rx.collect().compat()).await;
 
         let mut is = [0; 3];
 
@@ -757,10 +734,8 @@ mod tests {
         assert_eq!(is, [n as usize; 3]);
     }
 
-    #[test]
-    fn file_file_key() {
-        let mut rt = runtime();
-
+    #[tokio::test]
+    async fn file_file_key() {
         // Default
         {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
@@ -773,22 +748,24 @@ mod tests {
             };
 
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-
-            rt.spawn(source);
+            tokio::spawn(source.compat());
 
             let path = dir.path().join("file");
             let mut file = File::create(&path).unwrap();
 
-            sleep();
+            sleep_500_millis().await;
 
             writeln!(&mut file, "hello there").unwrap();
 
-            sleep();
+            sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            let _ = rt.block_on(shutdown_done);
+            shutdown_done.compat().await.unwrap();
 
-            let received = wait_with_timeout(rx.into_future()).0.unwrap();
+            let received = wait_with_timeout(rx.into_future().compat())
+                .await
+                .0
+                .unwrap();
             assert_eq!(
                 received.as_log()[&"file".into()].to_string_lossy(),
                 path.to_str().unwrap()
@@ -808,22 +785,24 @@ mod tests {
             };
 
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-
-            rt.spawn(source);
+            tokio::spawn(source.compat());
 
             let path = dir.path().join("file");
             let mut file = File::create(&path).unwrap();
 
-            sleep();
+            sleep_500_millis().await;
 
             writeln!(&mut file, "hello there").unwrap();
 
-            sleep();
+            sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            let _ = rt.block_on(shutdown_done);
+            shutdown_done.compat().await.unwrap();
 
-            let received = wait_with_timeout(rx.into_future()).0.unwrap();
+            let received = wait_with_timeout(rx.into_future().compat())
+                .await
+                .0
+                .unwrap();
             assert_eq!(
                 received.as_log()[&"source".into()].to_string_lossy(),
                 path.to_str().unwrap()
@@ -843,22 +822,24 @@ mod tests {
             };
 
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-
-            rt.spawn(source);
+            tokio::spawn(source.compat());
 
             let path = dir.path().join("file");
             let mut file = File::create(&path).unwrap();
 
-            sleep();
+            sleep_500_millis().await;
 
             writeln!(&mut file, "hello there").unwrap();
 
-            sleep();
+            sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            let _ = rt.block_on(shutdown_done);
+            shutdown_done.compat().await.unwrap();
 
-            let received = wait_with_timeout(rx.into_future()).0.unwrap();
+            let received = wait_with_timeout(rx.into_future().compat())
+                .await
+                .0
+                .unwrap();
             assert_eq!(
                 received.as_log().keys().collect::<HashSet<_>>(),
                 vec![
@@ -871,12 +852,10 @@ mod tests {
                 .collect::<HashSet<_>>()
             );
         }
-
-        shutdown_on_idle(rt);
     }
 
-    #[test]
-    fn file_start_position_server_restart() {
+    #[tokio::test]
+    async fn file_start_position_server_restart() {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -886,7 +865,7 @@ mod tests {
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
         writeln!(&mut file, "zeroth line").unwrap();
-        sleep();
+        sleep_500_millis().await;
 
         // First time server runs it picks up existing lines.
         {
@@ -894,17 +873,15 @@ mod tests {
 
             let (tx, rx) = Pipeline::new_test();
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            let mut rt = runtime();
-            rt.spawn(source);
+            tokio::spawn(source.compat());
 
-            sleep();
+            sleep_500_millis().await;
             writeln!(&mut file, "first line").unwrap();
-            sleep();
+            sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            shutdown_on_idle(rt);
 
-            let received = wait_with_timeout(rx.collect());
+            let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
                 .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
@@ -917,17 +894,15 @@ mod tests {
 
             let (tx, rx) = Pipeline::new_test();
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            let mut rt = runtime();
-            rt.spawn(source);
+            tokio::spawn(source.compat());
 
-            sleep();
+            sleep_500_millis().await;
             writeln!(&mut file, "second line").unwrap();
-            sleep();
+            sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            shutdown_on_idle(rt);
 
-            let received = wait_with_timeout(rx.collect());
+            let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
                 .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
@@ -945,17 +920,15 @@ mod tests {
             };
             let (tx, rx) = Pipeline::new_test();
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            let mut rt = runtime();
-            rt.spawn(source);
+            tokio::spawn(source.compat());
 
-            sleep();
+            sleep_500_millis().await;
             writeln!(&mut file, "third line").unwrap();
-            sleep();
+            sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            shutdown_on_idle(rt);
 
-            let received = wait_with_timeout(rx.collect());
+            let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
                 .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
@@ -966,8 +939,9 @@ mod tests {
             );
         }
     }
-    #[test]
-    fn file_start_position_server_restart_with_file_rotation() {
+
+    #[tokio::test]
+    async fn file_start_position_server_restart_with_file_rotation() {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -982,18 +956,16 @@ mod tests {
 
             let (tx, rx) = Pipeline::new_test();
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            let mut rt = runtime();
-            rt.spawn(source);
+            tokio::spawn(source.compat());
 
             let mut file = File::create(&path).unwrap();
-            sleep();
+            sleep_500_millis().await;
             writeln!(&mut file, "first line").unwrap();
-            sleep();
+            sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            shutdown_on_idle(rt);
 
-            let received = wait_with_timeout(rx.collect());
+            let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
                 .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
@@ -1009,18 +981,16 @@ mod tests {
 
             let (tx, rx) = Pipeline::new_test();
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-            let mut rt = runtime();
-            rt.spawn(source);
+            tokio::spawn(source.compat());
 
             let mut file = File::create(&path).unwrap();
-            sleep();
+            sleep_500_millis().await;
             writeln!(&mut file, "second line").unwrap();
-            sleep();
+            sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            shutdown_on_idle(rt);
 
-            let received = wait_with_timeout(rx.collect());
+            let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
                 .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
@@ -1030,12 +1000,11 @@ mod tests {
     }
 
     #[cfg(unix)] // this test uses unix-specific function `futimes` during test time
-    #[test]
-    fn file_start_position_ignore_old_files() {
+    #[tokio::test]
+    async fn file_start_position_ignore_old_files() {
         use std::os::unix::io::AsRawFd;
         use std::time::{Duration, SystemTime};
 
-        let mut rt = runtime();
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
         let dir = tempdir().unwrap();
@@ -1047,8 +1016,7 @@ mod tests {
         };
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-
-        rt.spawn(source);
+        tokio::spawn(source.compat());
 
         let before_path = dir.path().join("before");
         let mut before_file = File::create(&before_path).unwrap();
@@ -1087,16 +1055,15 @@ mod tests {
             }
         }
 
-        sleep();
+        sleep_500_millis().await;
         writeln!(&mut before_file, "second line").unwrap();
         writeln!(&mut after_file, "_second line").unwrap();
 
-        sleep();
+        sleep_500_millis().await;
 
         drop(trigger_shutdown);
-        shutdown_on_idle(rt);
 
-        let received = wait_with_timeout(rx.collect());
+        let received = wait_with_timeout(rx.collect().compat()).await;
         let before_lines = received
             .iter()
             .filter(|event| {
@@ -1119,8 +1086,8 @@ mod tests {
         assert_eq!(after_lines, vec!["_first line", "_second line"]);
     }
 
-    #[test]
-    fn file_max_line_bytes() {
+    #[tokio::test]
+    async fn file_max_line_bytes() {
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
@@ -1132,15 +1099,12 @@ mod tests {
         };
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-
-        let mut rt = runtime();
-
-        rt.spawn(source);
+        tokio::spawn(source.compat());
 
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
 
-        sleep(); // The files must be observed at their original lengths before writing to them
+        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
         writeln!(&mut file, "short").unwrap();
         writeln!(&mut file, "this is too long").unwrap();
@@ -1150,17 +1114,16 @@ mod tests {
         writeln!(&mut file, "exactly 10").unwrap();
         writeln!(&mut file, "it can end on a line that's too long").unwrap();
 
-        sleep();
-        sleep();
+        sleep_500_millis().await;
+        sleep_500_millis().await;
 
         writeln!(&mut file, "and then continue").unwrap();
         writeln!(&mut file, "last short").unwrap();
 
-        sleep();
-        sleep();
+        sleep_500_millis().await;
+        sleep_500_millis().await;
 
         drop(trigger_shutdown);
-        shutdown_on_idle(rt);
 
         let received = wait_with_timeout(
             rx.map(|event| {
@@ -1170,8 +1133,10 @@ mod tests {
                     .unwrap()
                     .clone()
             })
-            .collect(),
-        );
+            .collect()
+            .compat(),
+        )
+        .await;
 
         assert_eq!(
             received,
@@ -1179,8 +1144,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_multi_line_aggregation_legacy() {
+    #[tokio::test]
+    async fn test_multi_line_aggregation_legacy() {
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
@@ -1193,38 +1158,34 @@ mod tests {
         };
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-
-        let mut rt = runtime();
-
-        rt.spawn(source);
+        tokio::spawn(source.compat());
 
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
 
-        sleep(); // The files must be observed at their original lengths before writing to them
+        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
         writeln!(&mut file, "leftover foo").unwrap();
         writeln!(&mut file, "INFO hello").unwrap();
         writeln!(&mut file, "INFO goodbye").unwrap();
         writeln!(&mut file, "part of goodbye").unwrap();
 
-        sleep();
+        sleep_500_millis().await;
 
         writeln!(&mut file, "INFO hi again").unwrap();
         writeln!(&mut file, "and some more").unwrap();
         writeln!(&mut file, "INFO hello").unwrap();
 
-        sleep();
+        sleep_500_millis().await;
 
         writeln!(&mut file, "too slow").unwrap();
         writeln!(&mut file, "INFO doesn't have").unwrap();
         writeln!(&mut file, "to be INFO in").unwrap();
         writeln!(&mut file, "the middle").unwrap();
 
-        sleep();
+        sleep_500_millis().await;
 
         drop(trigger_shutdown);
-        shutdown_on_idle(rt);
 
         let received = wait_with_timeout(
             rx.map(|event| {
@@ -1234,8 +1195,10 @@ mod tests {
                     .unwrap()
                     .clone()
             })
-            .collect(),
-        );
+            .collect()
+            .compat(),
+        )
+        .await;
 
         assert_eq!(
             received,
@@ -1252,8 +1215,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_multi_line_aggregation() {
+    #[tokio::test]
+    async fn test_multi_line_aggregation() {
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
@@ -1270,38 +1233,34 @@ mod tests {
         };
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-
-        let mut rt = runtime();
-
-        rt.spawn(source);
+        tokio::spawn(source.compat());
 
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
 
-        sleep(); // The files must be observed at their original lengths before writing to them
+        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
         writeln!(&mut file, "leftover foo").unwrap();
         writeln!(&mut file, "INFO hello").unwrap();
         writeln!(&mut file, "INFO goodbye").unwrap();
         writeln!(&mut file, "part of goodbye").unwrap();
 
-        sleep();
+        sleep_500_millis().await;
 
         writeln!(&mut file, "INFO hi again").unwrap();
         writeln!(&mut file, "and some more").unwrap();
         writeln!(&mut file, "INFO hello").unwrap();
 
-        sleep();
+        sleep_500_millis().await;
 
         writeln!(&mut file, "too slow").unwrap();
         writeln!(&mut file, "INFO doesn't have").unwrap();
         writeln!(&mut file, "to be INFO in").unwrap();
         writeln!(&mut file, "the middle").unwrap();
 
-        sleep();
+        sleep_500_millis().await;
 
         drop(trigger_shutdown);
-        shutdown_on_idle(rt);
 
         let received = wait_with_timeout(
             rx.map(|event| {
@@ -1311,8 +1270,10 @@ mod tests {
                     .unwrap()
                     .clone()
             })
-            .collect(),
-        );
+            .collect()
+            .compat(),
+        )
+        .await;
 
         assert_eq!(
             received,
@@ -1329,8 +1290,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_fair_reads() {
+    #[tokio::test]
+    async fn test_fair_reads() {
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
@@ -1346,7 +1307,7 @@ mod tests {
         let older_path = dir.path().join("z_older_file");
         let mut older = File::create(&older_path).unwrap();
 
-        sleep();
+        sleep_500_millis().await;
 
         let newer_path = dir.path().join("a_newer_file");
         let mut newer = File::create(&newer_path).unwrap();
@@ -1359,16 +1320,14 @@ mod tests {
         writeln!(&mut newer, "this should be interleaved with the old one").unwrap();
         writeln!(&mut newer, "which is fine because we want fairness").unwrap();
 
-        sleep();
+        sleep_500_millis().await;
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        let mut rt = runtime();
-        rt.spawn(source);
+        tokio::spawn(source.compat());
 
-        sleep();
+        sleep_500_millis().await;
 
         drop(trigger_shutdown);
-        shutdown_on_idle(rt);
 
         let received = wait_with_timeout(
             rx.map(|event| {
@@ -1378,8 +1337,10 @@ mod tests {
                     .unwrap()
                     .clone()
             })
-            .collect(),
-        );
+            .collect()
+            .compat(),
+        )
+        .await;
 
         assert_eq!(
             received,
@@ -1394,8 +1355,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_oldest_first() {
+    #[tokio::test]
+    async fn test_oldest_first() {
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
@@ -1411,7 +1372,7 @@ mod tests {
         let older_path = dir.path().join("z_older_file");
         let mut older = File::create(&older_path).unwrap();
 
-        sleep();
+        sleep_500_millis().await;
 
         let newer_path = dir.path().join("a_newer_file");
         let mut newer = File::create(&newer_path).unwrap();
@@ -1424,16 +1385,14 @@ mod tests {
         writeln!(&mut newer, "hopefully you read all the old stuff first").unwrap();
         writeln!(&mut newer, "because otherwise i'm not going to make sense").unwrap();
 
-        sleep();
+        sleep_500_millis().await;
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        let mut rt = runtime();
-        rt.spawn(source);
+        tokio::spawn(source.compat());
 
-        sleep();
+        sleep_500_millis().await;
 
         drop(trigger_shutdown);
-        shutdown_on_idle(rt);
 
         let received = wait_with_timeout(
             rx.map(|event| {
@@ -1443,8 +1402,10 @@ mod tests {
                     .unwrap()
                     .clone()
             })
-            .collect(),
-        );
+            .collect()
+            .compat(),
+        )
+        .await;
 
         assert_eq!(
             received,
@@ -1459,8 +1420,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_gzipped_file() {
+    #[tokio::test]
+    async fn test_gzipped_file() {
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
@@ -1471,13 +1432,11 @@ mod tests {
         };
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        let mut rt = runtime();
-        rt.spawn(source);
+        tokio::spawn(source.compat());
 
-        sleep();
+        sleep_500_millis().await;
 
         drop(trigger_shutdown);
-        shutdown_on_idle(rt);
 
         let received = wait_with_timeout(
             rx.map(|event| {
@@ -1487,8 +1446,10 @@ mod tests {
                     .unwrap()
                     .clone()
             })
-            .collect(),
-        );
+            .collect()
+            .compat(),
+        )
+        .await;
 
         assert_eq!(
             received,
@@ -1502,9 +1463,10 @@ mod tests {
         );
     }
 
-    #[test]
-    fn remove_file() {
+    #[tokio::test]
+    async fn remove_file() {
         trace_init();
+
         let n = 5;
         let remove_after = 2;
 
@@ -1519,13 +1481,12 @@ mod tests {
         };
 
         let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        let mut rt = runtime();
-        rt.spawn(source);
+        tokio::spawn(source.compat());
 
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
 
-        sleep(); // The files must be observed at their original lengths before writing to them
+        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
         for i in 0..n {
             writeln!(&mut file, "{}", i).unwrap();
@@ -1533,12 +1494,11 @@ mod tests {
         std::mem::drop(file);
 
         // Wait for remove grace period to end.
-        std::thread::sleep(Duration::from_secs(remove_after + 1));
+        delay_for(Duration::from_secs(remove_after + 1)).await;
 
         drop(trigger_shutdown);
-        shutdown_on_idle(rt);
 
-        let received = wait_with_timeout(rx.collect());
+        let received = wait_with_timeout(rx.collect().compat()).await;
         assert_eq!(received.len(), n);
 
         match File::open(&path) {

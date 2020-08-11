@@ -6,14 +6,12 @@ use crate::{
     topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use bytes::Bytes;
-use futures::compat::Future01CompatExt;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::Body;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::RandomState, HashSet};
-use std::time::{Duration, Instant};
 use string_cache::DefaultAtom as Atom;
-use tokio01::timer::Delay;
+use tokio::time::{delay_for, Duration, Instant};
 use tracing_futures::Instrument;
 
 type WriteHandle = evmap::WriteHandle<Atom, Bytes, (), RandomState>;
@@ -241,19 +239,12 @@ impl MetadataClient {
     async fn run(&mut self) {
         loop {
             if let Err(error) = self.refresh_metadata().await {
-                error!(message="Unable to fetch EC2 metadata; Retrying.", %error);
-
-                Delay::new(Instant::now() + Duration::from_secs(1))
-                    .compat()
-                    .await
-                    .expect("Timer not set.");
-
+                error!(message = "Unable to fetch EC2 metadata; Retrying.", %error);
+                delay_for(Duration::from_secs(1)).await;
                 continue;
             }
 
-            let deadline = Instant::now() + self.refresh_interval;
-
-            Delay::new(deadline).compat().await.expect("Timer not set.");
+            delay_for(self.refresh_interval).await;
         }
     }
 
