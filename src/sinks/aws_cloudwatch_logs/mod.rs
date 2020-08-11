@@ -18,7 +18,6 @@ use crate::{
 use bytes::Bytes;
 use chrono::{Duration, Utc};
 use futures::{
-    compat::Future01CompatExt,
     future::{BoxFuture, FutureExt, TryFutureExt},
     ready,
 };
@@ -42,10 +41,7 @@ use std::{
 use tokio::sync::oneshot;
 use tower03::{
     buffer::Buffer,
-    limit::{
-        concurrency::ConcurrencyLimit,
-        rate::RateLimit,
-    },
+    limit::{concurrency::ConcurrencyLimit, rate::RateLimit},
     retry::Retry,
     timeout::Timeout,
     Service, ServiceBuilder, ServiceExt,
@@ -355,8 +351,7 @@ impl CloudwatchLogsSvc {
 impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
     type Response = ();
     type Error = CloudwatchError;
-    // type Future = request::CloudwatchFuture;
-    type Future = BoxFuture<'static, Result<(), CloudwatchError>>;
+    type Future = request::CloudwatchFuture;
 
     fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         if let Some(rx) = &mut self.token_rx {
@@ -384,7 +379,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
             let (tx, rx) = oneshot::channel();
             self.token_rx = Some(rx);
 
-            let fut = request::CloudwatchFuture::new(
+            request::CloudwatchFuture::new(
                 self.client.clone(),
                 self.stream_name.clone(),
                 self.group_name.clone(),
@@ -393,8 +388,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
                 event_batches,
                 self.token.take(),
                 tx,
-            );
-            Box::pin(fut.compat())
+            )
         } else {
             panic!("poll_ready was not called; this is a bug!");
         }

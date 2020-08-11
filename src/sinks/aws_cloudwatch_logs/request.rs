@@ -1,13 +1,16 @@
 use super::CloudwatchError;
-use futures::compat::Compat;
-use futures::future::BoxFuture;
-use futures01::{try_ready, Async, Future, Poll};
-use rusoto_core::RusotoError;
+use futures::{future::BoxFuture, ready};
+use rusoto_core::{RusotoError, RusotoResult};
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogGroupRequest,
     CreateLogStreamError, CreateLogStreamRequest, DescribeLogStreamsError,
     DescribeLogStreamsRequest, DescribeLogStreamsResponse, InputLogEvent, PutLogEventsError,
     PutLogEventsRequest, PutLogEventsResponse,
+};
+use std::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
 };
 use tokio::sync::oneshot;
 
@@ -26,7 +29,7 @@ struct Client {
     group_name: String,
 }
 
-type ClientResult<T, E> = Compat<BoxFuture<'static, Result<T, RusotoError<E>>>>;
+type ClientResult<T, E> = BoxFuture<'static, RusotoResult<T, E>>;
 
 enum State {
     CreateGroup(ClientResult<(), CreateLogGroupError>),
@@ -71,33 +74,24 @@ impl CloudwatchFuture {
 }
 
 impl Future for CloudwatchFuture {
-    type Item = ();
-    type Error = CloudwatchError;
+    type Output = Result<(), CloudwatchError>;
 
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        let this = self.get_mut();
         loop {
-            match &mut self.state {
+            match &mut this.state {
                 State::DescribeStream(fut) => {
-                    let response = match fut.poll() {
-                        Ok(Async::Ready(res)) => res,
-                        Ok(Async::NotReady) => return Ok(Async::NotReady),
-                        Err(e) => {
-                            if let RusotoError::Service(
-                                DescribeLogStreamsError::ResourceNotFound(_),
-                            ) = e
-                            {
-                                if self.create_missing_group {
-                                    info!("log group provided does not exist; creating a new one.");
+                    let response = match ready!(Pin::new(fut).poll(cx)) {
+                        Ok(response) => response,
+                        Err(RusotoError::Service(DescribeLogStreamsError::ResourceNotFound(_)))
+                            if this.create_missing_group =>
+                        {
+                            info!("log group provided does not exist; creating a new one.");
 
-                                    self.state = State::CreateGroup(self.client.create_log_group());
-                                    continue;
-                                } else {
-                                    return Err(CloudwatchError::Describe(e));
-                                }
-                            } else {
-                                return Err(CloudwatchError::Describe(e));
-                            }
+                            this.state = State::CreateGroup(this.client.create_log_group());
+                            continue;
                         }
+                        Err(err) => return Poll::Ready(Err(CloudwatchError::Describe(err))),
                     };
 
                     if let Some(stream) = response
@@ -108,7 +102,7 @@ impl Future for CloudwatchFuture {
                     {
                         debug!(message = "stream found", stream = ?stream.log_stream_name);
 
-                        let events = self
+                        let events = this
                             .events
                             .pop()
                             .expect("Token got called multiple times, this is a bug!");
@@ -116,76 +110,65 @@ impl Future for CloudwatchFuture {
                         let token = stream.upload_sequence_token;
 
                         info!(message = "putting logs.", ?token);
-                        self.state = State::Put(self.client.put_logs(token, events));
-                    } else if self.create_missing_stream {
+                        this.state = State::Put(this.client.put_logs(token, events));
+                    } else if this.create_missing_stream {
                         info!("provided stream does not exist; creating a new one.");
-                        self.state = State::CreateStream(self.client.create_log_stream());
+                        this.state = State::CreateStream(this.client.create_log_stream());
                     } else {
-                        return Err(CloudwatchError::NoStreamsFound);
+                        return Poll::Ready(Err(CloudwatchError::NoStreamsFound));
                     }
                 }
 
                 State::CreateGroup(fut) => {
-                    try_ready!(fut
-                        .poll()
-                        .or_else(|e| {
-                            if let RusotoError::Service(
-                                CreateLogGroupError::ResourceAlreadyExists(_),
-                            ) = e
-                            {
-                                Ok(Async::Ready(()))
-                            } else {
-                                Err(e)
-                            }
-                        })
-                        .map_err(CloudwatchError::CreateGroup));
+                    match ready!(Pin::new(fut).poll(cx)) {
+                        Ok(_) => {}
+                        Err(RusotoError::Service(CreateLogGroupError::ResourceAlreadyExists(
+                            _,
+                        ))) => {}
+                        Err(err) => return Poll::Ready(Err(CloudwatchError::CreateGroup(err))),
+                    };
 
-                    info!(message = "group created.", name = %self.client.group_name);
+                    info!(message = "group created.", name = %this.client.group_name);
 
                     // This does not abide by `create_missing_stream` since a group
                     // never has any streams and thus we need to create one if a group
                     // is created no matter what.
-                    self.state = State::CreateStream(self.client.create_log_stream());
+                    this.state = State::CreateStream(this.client.create_log_stream());
                 }
 
                 State::CreateStream(fut) => {
-                    try_ready!(fut
-                        .poll()
-                        .or_else(|e| {
-                            if let RusotoError::Service(
-                                CreateLogStreamError::ResourceAlreadyExists(_),
-                            ) = e
-                            {
-                                Ok(Async::Ready(()))
-                            } else {
-                                Err(e)
-                            }
-                        })
-                        .map_err(CloudwatchError::CreateStream));
+                    match ready!(Pin::new(fut).poll(cx)) {
+                        Ok(_) => {}
+                        Err(RusotoError::Service(CreateLogStreamError::ResourceAlreadyExists(
+                            _,
+                        ))) => {}
+                        Err(err) => return Poll::Ready(Err(CloudwatchError::CreateStream(err))),
+                    };
 
-                    info!(message = "stream created.", name = %self.client.stream_name);
+                    info!(message = "stream created.", name = %this.client.stream_name);
 
-                    self.state = State::DescribeStream(self.client.describe_stream());
+                    this.state = State::DescribeStream(this.client.describe_stream());
                 }
 
                 State::Put(fut) => {
-                    let res = try_ready!(fut.poll().map_err(CloudwatchError::Put));
+                    let next_token = match ready!(Pin::new(fut).poll(cx)) {
+                        Ok(resp) => resp.next_sequence_token,
+                        Err(err) => return Poll::Ready(Err(CloudwatchError::Put(err))),
+                    };
 
-                    let next_token = res.next_sequence_token;
-
-                    if let Some(events) = self.events.pop() {
+                    if let Some(events) = this.events.pop() {
                         debug!(message = "putting logs.", ?next_token);
-                        self.state = State::Put(self.client.put_logs(next_token, events));
+                        this.state = State::Put(this.client.put_logs(next_token, events));
                     } else {
                         info!(message = "putting logs was successful.", ?next_token);
 
-                        self.token_tx
+                        this.token_tx
                             .take()
                             .expect("Put was polled after finishing.")
                             .send(next_token)
                             .expect("CloudwatchLogsSvc was dropped unexpectedly");
 
-                        return Ok(().into());
+                        return Poll::Ready(Ok(()));
                     }
                 }
             }
@@ -207,9 +190,7 @@ impl Client {
         };
 
         let client = self.client.clone();
-        Compat::new(Box::pin(
-            async move { client.put_log_events(request).await },
-        ))
+        Box::pin(async move { client.put_log_events(request).await })
     }
 
     pub fn describe_stream(
@@ -223,9 +204,7 @@ impl Client {
         };
 
         let client = self.client.clone();
-        Compat::new(Box::pin(async move {
-            client.describe_log_streams(request).await
-        }))
+        Box::pin(async move { client.describe_log_streams(request).await })
     }
 
     pub fn create_log_group(&self) -> ClientResult<(), CreateLogGroupError> {
@@ -235,9 +214,7 @@ impl Client {
         };
 
         let client = self.client.clone();
-        Compat::new(Box::pin(
-            async move { client.create_log_group(request).await },
-        ))
+        Box::pin(async move { client.create_log_group(request).await })
     }
 
     pub fn create_log_stream(&self) -> ClientResult<(), CreateLogStreamError> {
@@ -247,8 +224,6 @@ impl Client {
         };
 
         let client = self.client.clone();
-        Compat::new(Box::pin(
-            async move { client.create_log_stream(request).await },
-        ))
+        Box::pin(async move { client.create_log_stream(request).await })
     }
 }
