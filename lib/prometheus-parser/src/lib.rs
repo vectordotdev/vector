@@ -27,6 +27,9 @@ pub enum ParserError {
         error: ErrorKind,
     },
 
+    #[snafu(display("value must be non-negative, found: {}", value))]
+    ExpectNonNegativeValue { value: f64 },
+
     #[snafu(display("invalid name {:?} for metric group {:?}", metric_name, group_name))]
     InvalidName {
         group_name: String,
@@ -44,7 +47,7 @@ pub struct SummaryMetric {
 pub enum SummaryMetricValue {
     Quantile { quantile: f64, value: f64 },
     Sum { sum: f64 },
-    Count { count: f64 },
+    Count { count: u32 },
 }
 
 #[derive(Debug, PartialEq)]
@@ -55,9 +58,9 @@ pub struct HistogramMetric {
 
 #[derive(Debug, PartialEq)]
 pub enum HistogramMetricValue {
-    Bucket { bucket: f64, value: f64 },
+    Bucket { bucket: f64, count: u32 },
     Sum { sum: f64 },
-    Count { count: f64 },
+    Count { count: u32 },
 }
 
 #[derive(Debug, PartialEq)]
@@ -93,6 +96,14 @@ impl GroupKind {
     }
 }
 
+fn try_f64_to_u32(f: f64) -> Result<u32, ParserError> {
+    if f < 0.0 {
+        Err(ParserError::ExpectNonNegativeValue { value: f })
+    } else {
+        Ok(f as u32)
+    }
+}
+
 impl MetricGroup {
     fn new(name: String, kind: MetricKind) -> Self {
         let metrics = match kind {
@@ -119,7 +130,6 @@ impl MetricGroup {
     }
 
     fn push(&mut self, metric: Metric) -> Result<(), ParserError> {
-        // this is an assertion
         if !self.check_name(&metric.name) {
             return Err(ParserError::InvalidName {
                 group_name: self.name.clone(),
@@ -149,7 +159,7 @@ impl MetricGroup {
                             labels,
                             value: HistogramMetricValue::Bucket {
                                 bucket,
-                                value: metric.value,
+                                count: try_f64_to_u32(metric.value)?,
                             },
                         });
                     }
@@ -159,7 +169,7 @@ impl MetricGroup {
                     }),
                     "_count" => vec.push(HistogramMetric {
                         value: HistogramMetricValue::Count {
-                            count: metric.value,
+                            count: try_f64_to_u32(metric.value)?,
                         },
                         labels: metric.labels,
                     }),
@@ -191,7 +201,7 @@ impl MetricGroup {
                     }),
                     "_count" => vec.push(SummaryMetric {
                         value: SummaryMetricValue::Count {
-                            count: metric.value,
+                            count: try_f64_to_u32(metric.value)?,
                         },
                         labels: metric.labels,
                     }),

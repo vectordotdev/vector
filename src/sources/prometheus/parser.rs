@@ -79,16 +79,16 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                     let aggregate = aggregates.entry(labels).or_default();
                     match metric.value {
                         HistogramMetricValue::Count { count } => {
-                            aggregate.count = count as u32;
+                            aggregate.count = count;
                         }
                         HistogramMetricValue::Sum { sum } => {
                             aggregate.sum = sum;
                         }
-                        HistogramMetricValue::Bucket { bucket, value } => {
+                        HistogramMetricValue::Bucket { bucket, count } => {
                             // last bucket is implicit, because we store its value in 'count'
                             if bucket != f64::INFINITY {
                                 aggregate.buckets.push(bucket);
-                                aggregate.counts.push(value as u32);
+                                aggregate.counts.push(count);
                             }
                         }
                     }
@@ -122,7 +122,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
 
                     match metric.value {
                         SummaryMetricValue::Count { count } => {
-                            aggregate.count = count as u32;
+                            aggregate.count = count;
                         }
                         SummaryMetricValue::Sum { sum } => {
                             aggregate.sum = sum;
