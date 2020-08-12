@@ -63,6 +63,10 @@ pub struct Config {
     /// Specifies the field names for metadata annotation.
     annotation_fields: pod_metadata_annotator::FieldsSpec,
 
+    /// Specifies the field selector to filter `Pod`s with, to be used in
+    /// addition to the built-in `Node` filter.
+    extra_field_selector: String,
+
     /// Specifies the label selector to filter `Pod`s with.
     #[serde(default = "default_label_selector")]
     label_selector: String,
@@ -140,24 +144,7 @@ impl Source {
         globals: &GlobalOptions,
         name: &str,
     ) -> crate::Result<Self> {
-        let self_node_name = if config.self_node_name.is_empty()
-            || config.self_node_name == default_self_node_name_env_template()
-        {
-            std::env::var(SELF_NODE_NAME_ENV_KEY).map_err(|_| {
-                format!(
-                    "self_node_name config value or {} env var is not set",
-                    SELF_NODE_NAME_ENV_KEY
-                )
-            })?
-        } else {
-            config.self_node_name.clone()
-        };
-        info!(
-            message = "obtained Kubernetes Node name to collect logs for (self)",
-            ?self_node_name
-        );
-
-        let field_selector = format!("spec.nodeName={}", self_node_name);
+        let field_selector = prepare_field_selector(config)?;
 
         let k8s_config = k8s::client::config::Config::in_cluster()?;
         let client = k8s::client::Client::new(k8s_config, resolver)?;
@@ -363,6 +350,36 @@ fn default_self_node_name_env_template() -> String {
 /// This function returns the default value for `label_selector`.
 fn default_label_selector() -> String {
     "vector.dev/exclude!=true".to_string()
+}
+
+/// This function construct the effective field selector to use, based on
+/// the specified configuration.
+fn prepare_field_selector(config: &Config) -> crate::Result<String> {
+    let self_node_name = if config.self_node_name.is_empty()
+        || config.self_node_name == default_self_node_name_env_template()
+    {
+        std::env::var(SELF_NODE_NAME_ENV_KEY).map_err(|_| {
+            format!(
+                "self_node_name config value or {} env var is not set",
+                SELF_NODE_NAME_ENV_KEY
+            )
+        })?
+    } else {
+        config.self_node_name.clone()
+    };
+    info!(
+        message = "obtained Kubernetes Node name to collect logs for (self)",
+        ?self_node_name
+    );
+
+    let mut field_selector = format!("spec.nodeName={}", self_node_name);
+
+    if !config.extra_field_selector.is_empty() {
+        field_selector.push(',');
+        field_selector.push_str(config.extra_field_selector.as_str());
+    }
+
+    Ok(field_selector)
 }
 
 #[cfg(test)]
