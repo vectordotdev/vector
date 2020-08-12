@@ -50,11 +50,19 @@ const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
+    /// Specifies the label selector to filter `Pod`s with.
+    #[serde(default = "default_label_selector")]
+    label_selector: String,
+
     /// The `name` of the Kubernetes `Node` that Vector runs at.
     /// Required to filter the `Pod`s to only include the ones with the log
     /// files accessible locally.
     #[serde(default = "default_self_node_name_env_template")]
     self_node_name: String,
+
+    /// Specifies the field selector to filter `Pod`s with, to be used in
+    /// addition to the built-in `Node` filter.
+    extra_field_selector: String,
 
     /// Automatically merge partial events.
     #[serde(default = "crate::serde::default_true")]
@@ -62,14 +70,6 @@ pub struct Config {
 
     /// Specifies the field names for metadata annotation.
     annotation_fields: pod_metadata_annotator::FieldsSpec,
-
-    /// Specifies the field selector to filter `Pod`s with, to be used in
-    /// addition to the built-in `Node` filter.
-    extra_field_selector: String,
-
-    /// Specifies the label selector to filter `Pod`s with.
-    #[serde(default = "default_label_selector")]
-    label_selector: String,
 }
 
 inventory::submit! {
@@ -341,15 +341,15 @@ fn create_event(line: Bytes, file: &str) -> Event {
     event
 }
 
+/// This function returns the default value for `label_selector`.
+fn default_label_selector() -> String {
+    "vector.dev/exclude!=true".to_string()
+}
+
 /// This function returns the default value for `self_node_name` variable
 /// as it should be at the generated config file.
 fn default_self_node_name_env_template() -> String {
     format!("${{{}}}", SELF_NODE_NAME_ENV_KEY.to_owned())
-}
-
-/// This function returns the default value for `label_selector`.
-fn default_label_selector() -> String {
-    "vector.dev/exclude!=true".to_string()
 }
 
 /// This function construct the effective field selector to use, based on
