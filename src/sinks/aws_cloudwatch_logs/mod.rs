@@ -371,7 +371,6 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
     }
 
     fn call(&mut self, req: Vec<InputLogEvent>) -> Self::Future {
-        warn!("CloudwatchLogsSvc::call, req len: {:?}", req.len());
         if self.token_rx.is_none() {
             let event_batches = self.process_events(req);
 
