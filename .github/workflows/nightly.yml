@@ -169,10 +169,6 @@ jobs:
         with:
           name: vector-arm64.deb
           path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
-          name: vector-armhf.deb
-          path: target/artifacts
       - env:
           DOCKER_USERNAME: "${{ secrets.CI_DOCKER_USERNAME }}"
           DOCKER_PASSWORD: "${{ secrets.CI_DOCKER_PASSWORD }}"
@@ -212,10 +208,6 @@ jobs:
       - uses: actions/download-artifact@v1
         with:
           name: vector-arm64.deb
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
-          name: vector-armhf.deb
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
