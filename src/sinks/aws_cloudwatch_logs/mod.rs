@@ -33,8 +33,6 @@ use std::{
     collections::HashMap,
     convert::TryInto,
     fmt,
-    future::Future,
-    pin::Pin,
     task::{Context, Poll},
 };
 use tokio::sync::oneshot;
@@ -354,7 +352,7 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
 
     fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         if let Some(rx) = &mut self.token_rx {
-            match ready!(Pin::new(rx).poll(cx)) {
+            match ready!(rx.poll_unpin(cx)) {
                 Ok(token) => {
                     self.token = token;
                     self.token_rx = None;

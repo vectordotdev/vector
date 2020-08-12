@@ -1,5 +1,5 @@
 use super::CloudwatchError;
-use futures::{future::BoxFuture, ready};
+use futures::{future::BoxFuture, ready, FutureExt};
 use rusoto_core::{RusotoError, RusotoResult};
 use rusoto_logs::{
     CloudWatchLogs, CloudWatchLogsClient, CreateLogGroupError, CreateLogGroupRequest,
@@ -81,7 +81,7 @@ impl Future for CloudwatchFuture {
         loop {
             match &mut this.state {
                 State::DescribeStream(fut) => {
-                    let response = match ready!(Pin::new(fut).poll(cx)) {
+                    let response = match ready!(fut.poll_unpin(cx)) {
                         Ok(response) => response,
                         Err(RusotoError::Service(DescribeLogStreamsError::ResourceNotFound(_)))
                             if this.create_missing_group =>
@@ -120,7 +120,7 @@ impl Future for CloudwatchFuture {
                 }
 
                 State::CreateGroup(fut) => {
-                    match ready!(Pin::new(fut).poll(cx)) {
+                    match ready!(fut.poll_unpin(cx)) {
                         Ok(_) => {}
                         Err(RusotoError::Service(CreateLogGroupError::ResourceAlreadyExists(
                             _,
@@ -137,7 +137,7 @@ impl Future for CloudwatchFuture {
                 }
 
                 State::CreateStream(fut) => {
-                    match ready!(Pin::new(fut).poll(cx)) {
+                    match ready!(fut.poll_unpin(cx)) {
                         Ok(_) => {}
                         Err(RusotoError::Service(CreateLogStreamError::ResourceAlreadyExists(
                             _,
@@ -151,7 +151,7 @@ impl Future for CloudwatchFuture {
                 }
 
                 State::Put(fut) => {
-                    let next_token = match ready!(Pin::new(fut).poll(cx)) {
+                    let next_token = match ready!(fut.poll_unpin(cx)) {
                         Ok(resp) => resp.next_sequence_token,
                         Err(err) => return Poll::Ready(Err(CloudwatchError::Put(err))),
                     };
