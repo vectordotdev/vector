@@ -170,6 +170,18 @@ impl FileSink {
                         None => {
                             // If we got `None` - terminate the processing.
                             debug!(message = "Receiver exhausted, terminating the processing loop.");
+
+                            // Shutdown all the open files. This will flush any
+                            // headers or anything pending.
+                            debug!(message = "Flushing all the open files");
+                            for (path, file) in self.files.iterate_map() {
+                                if let Err(error) = file.shutdown().await {
+                                    error!(message = "Failed to flush file.", ?path, %error);
+                                } else{
+                                    trace!(message = "Successfully flushed file", ?path);
+                                }
+                            }
+
                             break;
                         }
                         Some(event) => self.process_event(event).await,
