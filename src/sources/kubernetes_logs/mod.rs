@@ -50,9 +50,9 @@ const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
-    /// Specifies the label selector to filter `Pod`s with.
-    #[serde(default = "default_label_selector")]
-    label_selector: String,
+    /// Specifies the label selector to filter `Pod`s with, to be used in
+    /// addition to the built-in `vector.dev/exclude` filter.
+    extra_label_selector: String,
 
     /// The `name` of the Kubernetes `Node` that Vector runs at.
     /// Required to filter the `Pod`s to only include the ones with the log
@@ -81,7 +81,6 @@ impl GenerateConfig for Config {
         toml::Value::try_from(&Self {
             self_node_name: default_self_node_name_env_template(),
             auto_partial_merge: true,
-            label_selector: default_label_selector(),
             ..Default::default()
         })
         .unwrap()
@@ -145,6 +144,7 @@ impl Source {
         name: &str,
     ) -> crate::Result<Self> {
         let field_selector = prepare_field_selector(config)?;
+        let label_selector = prepare_label_selector(config);
 
         let k8s_config = k8s::client::config::Config::in_cluster()?;
         let client = k8s::client::Client::new(k8s_config, resolver)?;
@@ -157,7 +157,7 @@ impl Source {
             auto_partial_merge: config.auto_partial_merge,
             fields_spec: config.annotation_fields.clone(),
             field_selector,
-            label_selector: config.label_selector.clone(),
+            label_selector,
         })
     }
 
@@ -341,11 +341,6 @@ fn create_event(line: Bytes, file: &str) -> Event {
     event
 }
 
-/// This function returns the default value for `label_selector`.
-fn default_label_selector() -> String {
-    "vector.dev/exclude!=true".to_string()
-}
-
 /// This function returns the default value for `self_node_name` variable
 /// as it should be at the generated config file.
 fn default_self_node_name_env_template() -> String {
@@ -380,6 +375,18 @@ fn prepare_field_selector(config: &Config) -> crate::Result<String> {
     }
 
     Ok(field_selector)
+}
+
+/// This function construct the effective label selector to use, based on
+/// the specified configuration.
+fn prepare_label_selector(config: &Config) -> String {
+    const BUILT_IN: &str = "vector.dev/exclude!=true";
+
+    if config.extra_label_selector.is_empty() {
+        return BUILT_IN.to_string();
+    }
+
+    format!("{},{}", BUILT_IN, config.extra_label_selector)
 }
 
 #[cfg(test)]
