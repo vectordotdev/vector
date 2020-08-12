@@ -121,10 +121,11 @@ impl SourceConfig for Config {
 #[derive(Clone)]
 struct Source {
     client: k8s::client::Client,
-    self_node_name: String,
     data_dir: PathBuf,
     auto_partial_merge: bool,
     fields_spec: pod_metadata_annotator::FieldsSpec,
+    field_selector: String,
+    label_selector: String,
 }
 
 impl Source {
@@ -151,6 +152,9 @@ impl Source {
             ?self_node_name
         );
 
+        let field_selector = format!("spec.nodeName={}", self_node_name);
+        let label_selector = "vector.dev/exclude!=true".to_owned();
+
         let k8s_config = k8s::client::config::Config::in_cluster()?;
         let client = k8s::client::Client::new(k8s_config, resolver)?;
 
@@ -158,10 +162,11 @@ impl Source {
 
         Ok(Self {
             client,
-            self_node_name,
             data_dir,
             auto_partial_merge: config.auto_partial_merge,
             fields_spec: config.annotation_fields.clone(),
+            field_selector,
+            label_selector,
         })
     }
 
@@ -172,14 +177,12 @@ impl Source {
     {
         let Self {
             client,
-            self_node_name,
             data_dir,
             auto_partial_merge,
             fields_spec,
+            field_selector,
+            label_selector,
         } = self;
-
-        let field_selector = format!("spec.nodeName={}", self_node_name);
-        let label_selector = "vector.dev/exclude!=true".to_owned();
 
         let watcher = k8s::api_watcher::ApiWatcher::new(client, Pod::watch_pod_for_all_namespaces);
         let watcher = k8s::instrumenting_watcher::InstrumentingWatcher::new(watcher);
