@@ -29,12 +29,6 @@ pub enum ParserError {
 
     #[snafu(display("value must be non-negative, found: {}", value))]
     ExpectNonNegativeValue { value: f64 },
-
-    #[snafu(display("invalid name {:?} for metric group {:?}", metric_name, group_name))]
-    InvalidName {
-        group_name: String,
-        metric_name: String,
-    },
 }
 
 #[derive(Debug, PartialEq)]
@@ -116,100 +110,98 @@ impl MetricGroup {
         MetricGroup { name, metrics }
     }
 
-    /// Check if the name belongs to this metric.
-    fn check_name(&self, name: &str) -> bool {
-        if !name.starts_with(&self.name) {
-            return false;
-        }
-        let left = &name[self.name.len()..];
-        match self.metrics {
-            GroupKind::Histogram(_) => left == "_bucket" || left == "_sum" || left == "_count",
-            GroupKind::Summary(_) => left.is_empty() || left == "_sum" || left == "_count",
-            _ => left.is_empty(),
+    // For cases where a metric group was not defined with `# TYPE ...`.
+    fn new_untyped(metric: Metric) -> Self {
+        let Metric {
+            name,
+            labels,
+            value,
+        } = metric;
+        MetricGroup {
+            name,
+            metrics: GroupKind::Untyped(vec![OtherMetric { labels, value }]),
         }
     }
 
-    fn push(&mut self, metric: Metric) -> Result<(), ParserError> {
-        if !self.check_name(&metric.name) {
-            return Err(ParserError::InvalidName {
-                group_name: self.name.clone(),
-                metric_name: metric.name,
-            });
+    /// Err(_) if there are irrecoverable error.
+    /// Ok(Some(metric)) if this metric belongs to another group.
+    /// Ok(None) pushed successfully.
+    fn try_push(&mut self, metric: Metric) -> Result<Option<Metric>, ParserError> {
+        if !metric.name.starts_with(&self.name) {
+            return Ok(Some(metric));
         }
+        let suffix = &metric.name[self.name.len()..];
 
         match self.metrics {
             GroupKind::Counter(ref mut vec)
             | GroupKind::Gauge(ref mut vec)
             | GroupKind::Untyped(ref mut vec) => {
+                if !suffix.is_empty() {
+                    return Ok(Some(metric));
+                }
                 vec.push(OtherMetric {
                     labels: metric.labels,
                     value: metric.value,
                 });
             }
-            GroupKind::Histogram(ref mut vec) => {
-                let suffix = &metric.name[self.name.len()..];
-                match suffix {
-                    "_bucket" => {
-                        let mut labels = metric.labels;
-                        let bucket = labels.remove("le").ok_or(ParserError::ExpectedLeTag)?;
-                        let (_, bucket) = line::Metric::parse_value(&bucket)
-                            .map_err(Into::into)
-                            .context(ParseLabelValue)?;
-                        vec.push(HistogramMetric {
-                            labels,
-                            value: HistogramMetricValue::Bucket {
-                                bucket,
-                                count: try_f64_to_u32(metric.value)?,
-                            },
-                        });
-                    }
-                    "_sum" => vec.push(HistogramMetric {
-                        value: HistogramMetricValue::Sum { sum: metric.value },
-                        labels: metric.labels,
-                    }),
-                    "_count" => vec.push(HistogramMetric {
-                        value: HistogramMetricValue::Count {
+            GroupKind::Histogram(ref mut vec) => match suffix {
+                "_bucket" => {
+                    let mut labels = metric.labels;
+                    let bucket = labels.remove("le").ok_or(ParserError::ExpectedLeTag)?;
+                    let (_, bucket) = line::Metric::parse_value(&bucket)
+                        .map_err(Into::into)
+                        .context(ParseLabelValue)?;
+                    vec.push(HistogramMetric {
+                        labels,
+                        value: HistogramMetricValue::Bucket {
+                            bucket,
                             count: try_f64_to_u32(metric.value)?,
                         },
-                        labels: metric.labels,
-                    }),
-                    _ => unreachable!(),
+                    });
                 }
-            }
-            GroupKind::Summary(ref mut vec) => {
-                let suffix = &metric.name[self.name.len()..];
-                match suffix {
-                    "" => {
-                        let mut labels = metric.labels;
-                        let quantile = labels
-                            .remove("quantile")
-                            .ok_or(ParserError::ExpectedQuantileTag)?;
-                        let (_, quantile) = line::Metric::parse_value(&quantile)
-                            .map_err(Into::into)
-                            .context(ParseLabelValue)?;
-                        vec.push(SummaryMetric {
-                            labels,
-                            value: SummaryMetricValue::Quantile {
-                                quantile,
-                                value: metric.value,
-                            },
-                        });
-                    }
-                    "_sum" => vec.push(SummaryMetric {
-                        value: SummaryMetricValue::Sum { sum: metric.value },
-                        labels: metric.labels,
-                    }),
-                    "_count" => vec.push(SummaryMetric {
-                        value: SummaryMetricValue::Count {
-                            count: try_f64_to_u32(metric.value)?,
+                "_sum" => vec.push(HistogramMetric {
+                    value: HistogramMetricValue::Sum { sum: metric.value },
+                    labels: metric.labels,
+                }),
+                "_count" => vec.push(HistogramMetric {
+                    value: HistogramMetricValue::Count {
+                        count: try_f64_to_u32(metric.value)?,
+                    },
+                    labels: metric.labels,
+                }),
+                _ => return Ok(Some(metric)),
+            },
+            GroupKind::Summary(ref mut vec) => match suffix {
+                "" => {
+                    let mut labels = metric.labels;
+                    let quantile = labels
+                        .remove("quantile")
+                        .ok_or(ParserError::ExpectedQuantileTag)?;
+                    let (_, quantile) = line::Metric::parse_value(&quantile)
+                        .map_err(Into::into)
+                        .context(ParseLabelValue)?;
+                    vec.push(SummaryMetric {
+                        labels,
+                        value: SummaryMetricValue::Quantile {
+                            quantile,
+                            value: metric.value,
                         },
-                        labels: metric.labels,
-                    }),
-                    _ => unreachable!(),
+                    });
                 }
-            }
+                "_sum" => vec.push(SummaryMetric {
+                    value: SummaryMetricValue::Sum { sum: metric.value },
+                    labels: metric.labels,
+                }),
+                "_count" => vec.push(SummaryMetric {
+                    value: SummaryMetricValue::Count {
+                        count: try_f64_to_u32(metric.value)?,
+                    },
+                    labels: metric.labels,
+                }),
+                _ => return Ok(Some(metric)),
+            },
         }
-        Ok(())
+        Ok(None)
     }
 }
 
@@ -226,10 +218,13 @@ pub fn group_metrics(input: &str) -> Result<Vec<MetricGroup>, ParserError> {
                     groups.push(MetricGroup::new(header.metric_name, header.kind));
                 }
                 Line::Metric(metric) => {
-                    if groups.last().is_none() || !groups.last().unwrap().check_name(&metric.name) {
-                        groups.push(MetricGroup::new(metric.name.clone(), MetricKind::Untyped));
+                    let metric = match groups.last_mut() {
+                        Some(group) => group.try_push(metric)?,
+                        None => Some(metric),
+                    };
+                    if let Some(metric) = metric {
+                        groups.push(MetricGroup::new_untyped(metric));
                     }
-                    groups.last_mut().unwrap().push(metric)?;
                 }
             }
         }

@@ -12,6 +12,11 @@ use nom::{
 };
 use std::collections::BTreeMap;
 
+/// We try to catch all nom's `ErrorKind` with our own `ErrorKind`,
+/// to provide a meaningful error message.
+/// Parsers in this module should return this IResult instead of `nom::IResult`.
+type IResult<'a, O> = Result<(&'a str, O), nom::Err<ErrorKind>>;
+
 #[derive(Debug, snafu::Snafu, PartialEq)]
 pub enum ErrorKind {
     #[snafu(display("invalid metric type, parsing: `{}`", input))]
@@ -36,9 +41,6 @@ pub enum ErrorKind {
         input: String,
         kind: nom::error::ErrorKind,
     },
-
-    #[snafu(display("incomplete input, needed {:?} bytes", needed))]
-    NomIncomplete { needed: nom::Needed },
 }
 
 impl From<ErrorKind> for nom::Err<ErrorKind> {
@@ -50,7 +52,8 @@ impl From<ErrorKind> for nom::Err<ErrorKind> {
 impl From<nom::Err<ErrorKind>> for ErrorKind {
     fn from(error: nom::Err<ErrorKind>) -> Self {
         match error {
-            nom::Err::Incomplete(needed) => ErrorKind::NomIncomplete { needed },
+            // this error only occurs when "streaming" nom is used.
+            nom::Err::Incomplete(_) => unreachable!(),
             nom::Err::Error(e) | nom::Err::Failure(e) => e,
         }
     }
@@ -72,8 +75,6 @@ impl<'a> nom::error::ParseError<&'a str> for ErrorKind {
 type NomErrorType<'a> = (&'a str, nom::error::ErrorKind);
 
 type NomError<'a> = nom::Err<NomErrorType<'a>>;
-
-type IResult<'a, O> = Result<(&'a str, O), nom::Err<ErrorKind>>;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum MetricKind {
