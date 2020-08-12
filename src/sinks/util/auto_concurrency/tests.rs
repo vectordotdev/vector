@@ -6,6 +6,7 @@ use super::controller::ControllerStatistics;
 use super::MAX_CONCURRENCY;
 use crate::{
     assert_within,
+    config::{self, DataType, SinkConfig, SinkContext},
     event::{metric::MetricValue, Event},
     metrics::{self, capture_metrics, get_controller},
     sinks::{
@@ -17,11 +18,7 @@ use crate::{
         Healthcheck, RouterSink,
     },
     sources::generator::GeneratorConfig,
-    test_util::stats::LevelTimeHistogram,
-    topology::{
-        self,
-        config::{self, DataType, SinkConfig, SinkContext},
-    },
+    test_util::{start_topology, stats::LevelTimeHistogram},
 };
 use core::task::Context;
 use futures::compat::Future01CompatExt;
@@ -258,9 +255,7 @@ async fn run_test4(
     config.add_source("in", generator);
     config.add_sink("out", &["in"], test_config);
 
-    let (topology, _crash) = topology::start(config, false)
-        .await
-        .expect("Failed to start topology");
+    let (topology, _crash) = start_topology(config, false).await;
 
     let controller = get_controller().unwrap();
 

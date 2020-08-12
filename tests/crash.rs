@@ -5,11 +5,10 @@ use futures01::{future, Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use tokio::time::{delay_for, Duration};
 use vector::{
+    config::{self, GlobalOptions, SinkContext},
     shutdown::ShutdownSignal,
-    test_util::{next_addr, random_lines, runtime, send_lines, wait_for_tcp, CountReceiver},
-    topology::{
-        self,
-        config::{self, GlobalOptions, SinkContext},
+    test_util::{
+        next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver,
     },
     Event, Pipeline, {sinks, sources},
 };
@@ -75,7 +74,7 @@ fn test_sink_panic() {
         let mut output_lines = CountReceiver::receive_lines(out_addr);
 
         std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
-        let (topology, crash) = topology::start(config, false).await.unwrap();
+        let (topology, crash) = start_topology(config, false).await;
         // Wait for server to accept traffic
         wait_for_tcp(in_addr).await;
         delay_for(Duration::from_millis(100)).await;
@@ -158,7 +157,7 @@ fn test_sink_error() {
     rt.block_on_std(async move {
         let mut output_lines = CountReceiver::receive_lines(out_addr);
 
-        let (topology, crash) = topology::start(config, false).await.unwrap();
+        let (topology, crash) = start_topology(config, false).await;
         // Wait for server to accept traffic
         wait_for_tcp(in_addr).await;
         delay_for(Duration::from_millis(100)).await;
@@ -227,7 +226,7 @@ fn test_source_error() {
     rt.block_on_std(async move {
         let mut output_lines = CountReceiver::receive_lines(out_addr);
 
-        let (topology, crash) = topology::start(config, false).await.unwrap();
+        let (topology, crash) = start_topology(config, false).await;
         // Wait for server to accept traffic
         wait_for_tcp(in_addr).await;
         delay_for(Duration::from_millis(100)).await;
@@ -299,7 +298,7 @@ fn test_source_panic() {
         let mut output_lines = CountReceiver::receive_lines(out_addr);
 
         std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
-        let (topology, crash) = topology::start(config, false).await.unwrap();
+        let (topology, crash) = start_topology(config, false).await;
         // Wait for server to accept traffic
         wait_for_tcp(in_addr).await;
         delay_for(Duration::from_millis(100)).await;

@@ -1,4 +1,5 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::{self, Event},
     internal_events::AwsKinesisStreamsEventSent,
@@ -11,7 +12,6 @@ use crate::{
         sink::Response,
         BatchConfig, BatchSettings, Compression, EncodedLength, VecBuffer,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes05::Bytes;
 use futures::{future::BoxFuture, FutureExt, TryFutureExt};
@@ -356,9 +356,9 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        config::SinkContext,
         region::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string, runtime},
-        topology::config::SinkContext,
     };
     use futures01::Sink;
     use rusoto_core::Region;

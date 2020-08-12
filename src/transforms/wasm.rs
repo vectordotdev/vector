@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     wasm::{WasmModule, WasmModuleConfig},
 };
 use serde::{Deserialize, Serialize};

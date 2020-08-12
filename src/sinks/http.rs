@@ -1,4 +1,5 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -7,7 +8,6 @@ use crate::{
         BatchConfig, BatchSettings, Buffer, Compression, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::{future, Sink};
@@ -290,11 +290,11 @@ mod tests {
     use super::*;
     use crate::{
         assert_downcast_matches,
+        config::SinkContext,
         sinks::http::HttpSinkConfig,
         sinks::util::http::HttpSink,
         sinks::util::test::build_test_server,
         test_util::{next_addr, random_lines_with_stream},
-        topology::config::SinkContext,
     };
     use bytes05::buf::BufExt;
     use futures::compat::Future01CompatExt;
