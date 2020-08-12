@@ -15,17 +15,13 @@ use tokio::io::{self, AsyncWriteExt};
 
 use super::streaming_sink::{self, StreamingSink};
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Target {
+    #[derivative(Default)]
     Stdout,
     Stderr,
-}
-
-impl Default for Target {
-    fn default() -> Self {
-        Target::Stdout
-    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -89,7 +85,10 @@ fn encode_event(
                 Ok(s)
             }
         },
-        Event::Metric(metric) => serde_json::to_string(&metric),
+        Event::Metric(metric) => match encoding.codec() {
+            Encoding::Json => serde_json::to_string(&metric),
+            Encoding::Text => Ok(format!("{}", metric)),
+        },
     }
 }
 

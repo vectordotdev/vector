@@ -3,7 +3,9 @@ use derive_is_enum_variant::is_enum_variant;
 use metrics_core::Key;
 use metrics_runtime::Measurement;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Metric {
@@ -212,6 +214,121 @@ impl Metric {
             kind: MetricKind::Absolute,
             value,
         }
+    }
+}
+
+impl Display for Metric {
+    /// Display a metric using something like Prometheus' text format:
+    ///
+    /// TIMESTAMP NAME{TAGS} KIND DATA
+    ///
+    /// TIMESTAMP is in ISO 8601 format with UTC time zone.
+    ///
+    /// KIND is either `=` for absolute metrics, or `+` for incremental
+    /// metrics.
+    ///
+    /// DATA is dependent on the type of metric, and is a simplified
+    /// representation of the data contents. In particular,
+    /// distributions, histograms, and summaries are represented as a
+    /// list of `X@Y` words, where `X` is the rate, count, or quantile,
+    /// and `Y` is the value or bucket.
+    ///
+    /// example:
+    /// ```
+    /// 2020-08-12T20:23:37.248661343Z bytes_processed{component_kind="sink",component_type="blackhole"} = 6391
+    /// ```
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        if let Some(timestamp) = &self.timestamp {
+            write!(fmt, "{:?} ", timestamp)?;
+        }
+        write!(fmt, "{}", quote_word(&self.name))?;
+        if let Some(tags) = &self.tags {
+            write!(fmt, "{{")?;
+            write_list(fmt, ",", tags.iter(), |fmt, (tag, value)| {
+                write!(fmt, "{}={:?}", quote_word(tag), value)
+            })?;
+            write!(fmt, "}}")?;
+        }
+        match self.kind {
+            MetricKind::Absolute => write!(fmt, " = "),
+            MetricKind::Incremental => write!(fmt, " + "),
+        }?;
+        match &self.value {
+            MetricValue::Counter { value } => write!(fmt, "{}", value),
+            MetricValue::Gauge { value } => write!(fmt, "{}", value),
+            MetricValue::Set { values } => write_list(fmt, " ", values.iter(), |fmt, value| {
+                write!(fmt, "{}", quote_word(value))
+            }),
+            MetricValue::Distribution {
+                values,
+                sample_rates,
+                statistic,
+            } => {
+                write!(fmt, "{:?} ", statistic)?;
+                write_list(
+                    fmt,
+                    " ",
+                    values.iter().zip(sample_rates.iter()),
+                    |fmt, (value, rate)| write!(fmt, "{}@{}", rate, value),
+                )
+            }
+            MetricValue::AggregatedHistogram {
+                buckets,
+                counts,
+                count,
+                sum,
+            } => {
+                write!(fmt, "count={} sum={} ", count, sum)?;
+                write_list(
+                    fmt,
+                    " ",
+                    buckets.iter().zip(counts.iter()),
+                    |fmt, (bucket, count)| write!(fmt, "{}@{}", bucket, count),
+                )
+            }
+            MetricValue::AggregatedSummary {
+                quantiles,
+                values,
+                count,
+                sum,
+            } => {
+                write!(fmt, "count={} sum={} ", count, sum)?;
+                write_list(
+                    fmt,
+                    " ",
+                    quantiles.iter().zip(values.iter()),
+                    |fmt, (quantile, value)| write!(fmt, "{}@{}", quantile, value),
+                )
+            }
+        }
+    }
+}
+
+fn write_list<I, T, W>(
+    fmt: &mut Formatter<'_>,
+    sep: &str,
+    items: I,
+    writer: W,
+) -> Result<(), fmt::Error>
+where
+    I: Iterator<Item = T>,
+    W: Fn(&mut Formatter<'_>, T) -> Result<(), fmt::Error>,
+{
+    let mut this_sep = "";
+    for item in items {
+        write!(fmt, "{}", this_sep)?;
+        writer(fmt, item)?;
+        this_sep = sep;
+    }
+    Ok(())
+}
+
+fn quote_word(s: &str) -> Cow<'_, str> {
+    const ALPHANUM: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_";
+    if s.contains(|c| !ALPHANUM.contains(c)) {
+        format!("{:?}", s).into()
+    } else {
+        s.into()
     }
 }
 
