@@ -1,8 +1,8 @@
 use super::Transform;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event,
     event::{Event, Value},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use bytes::Bytes;
 use lru::LruCache;

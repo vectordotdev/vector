@@ -1,7 +1,7 @@
 use crate::{
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     metrics::{capture_metrics, get_controller},
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Pipeline,
 };
 use futures::{

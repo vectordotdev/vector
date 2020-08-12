@@ -2,7 +2,7 @@ use criterion::{criterion_group, Benchmark, Criterion};
 use indexmap::IndexMap;
 use transforms::lua::v2::LuaConfig;
 use vector::{
-    topology::config::{TransformConfig, TransformContext},
+    config::{TransformConfig, TransformContext},
     transforms::{self, Transform},
     Event,
 };

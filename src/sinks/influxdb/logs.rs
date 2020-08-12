@@ -1,17 +1,20 @@
-use crate::event::Value;
-use crate::sinks::influxdb::{
-    encode_namespace, encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings,
-    Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
-};
-use crate::sinks::util::encoding::EncodingConfigWithDefault;
-use crate::sinks::util::http::{BatchedHttpSink, HttpClient, HttpSink};
-use crate::sinks::util::{
-    service2::TowerRequestConfig, BatchConfig, BatchSettings, Buffer, Compression,
-};
-use crate::sinks::Healthcheck;
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    event::Value,
     event::{log_schema, Event},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    sinks::{
+        influxdb::{
+            encode_namespace, encode_timestamp, healthcheck, influx_line_protocol,
+            influxdb_settings, Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
+        },
+        util::{
+            encoding::EncodingConfigWithDefault,
+            http::{BatchedHttpSink, HttpClient, HttpSink},
+            service2::TowerRequestConfig,
+            BatchConfig, BatchSettings, Buffer, Compression,
+        },
+        Healthcheck,
+    },
 };
 use futures01::Sink;
 use http::{Request, Uri};
@@ -592,11 +595,15 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::sinks::influxdb::logs::InfluxDBLogsConfig;
-    use crate::sinks::influxdb::test_util::{onboarding_v2, BUCKET, ORG, TOKEN};
-    use crate::sinks::influxdb::InfluxDB2Settings;
-    use crate::test_util::runtime;
-    use crate::topology::SinkContext;
+    use crate::{
+        config::SinkContext,
+        sinks::influxdb::{
+            logs::InfluxDBLogsConfig,
+            test_util::{onboarding_v2, BUCKET, ORG, TOKEN},
+            InfluxDB2Settings,
+        },
+        test_util::runtime,
+    };
     use chrono::Utc;
     use futures::compat::Future01CompatExt;
     use futures01::Sink;

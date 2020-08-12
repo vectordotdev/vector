@@ -1,4 +1,5 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event},
     sinks::util::{
         encoding::EncodingConfigWithDefault,
@@ -6,7 +7,6 @@ use crate::{
         service2::TowerRequestConfig,
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, UriSerde,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
@@ -218,10 +218,10 @@ async fn healthcheck(config: LogdnaConfig, mut client: HttpClient) -> crate::Res
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::SinkConfig;
     use crate::event::Event;
     use crate::sinks::util::test::{build_test_server, load_sink};
     use crate::test_util;
-    use crate::topology::config::SinkConfig;
     use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
     use serde_json::json;

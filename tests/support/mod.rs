@@ -11,14 +11,14 @@ use std::sync::{
     Arc, Mutex,
 };
 use tracing::{error, info};
+use vector::config::{
+    DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
+    TransformContext,
+};
 use vector::event::{self, metric::MetricValue, Event, Value};
 use vector::shutdown::ShutdownSignal;
 use vector::sinks::{util::StreamSink, Healthcheck, RouterSink};
 use vector::sources::Source;
-use vector::topology::config::{
-    DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
-    TransformContext,
-};
 use vector::transforms::Transform;
 use vector::Pipeline;
 

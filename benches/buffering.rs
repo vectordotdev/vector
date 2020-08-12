@@ -3,12 +3,10 @@ use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughpu
 use futures::compat::Future01CompatExt;
 use rand::{distributions::Alphanumeric, rngs::SmallRng, thread_rng, Rng, SeedableRng};
 use tempfile::tempdir;
-use vector::test_util::{next_addr, runtime, send_lines, wait_for_tcp, CountReceiver};
-use vector::{
-    buffers::BufferConfig,
-    sinks, sources,
-    topology::{self, config},
+use vector::test_util::{
+    next_addr, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver,
 };
+use vector::{buffers::BufferConfig, config, sinks, sources};
 
 fn benchmark_buffers(c: &mut Criterion) {
     let num_lines: usize = 100_000;
@@ -46,7 +44,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on_std(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        let (topology, _crash) = start_topology(config, false).await;
                         wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });
@@ -86,7 +84,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on_std(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        let (topology, _crash) = start_topology(config, false).await;
                         wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });
@@ -126,7 +124,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on_std(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        let (topology, _crash) = start_topology(config, false).await;
                         wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });

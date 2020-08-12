@@ -1,4 +1,5 @@
 use crate::{
+    config::{DataType, GlobalOptions, SourceConfig},
     event::{self, Event, LogEvent, Value},
     internal_events::{
         SplunkHECEventReceived, SplunkHECRequestBodyInvalid, SplunkHECRequestError,
@@ -6,7 +7,6 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
     Pipeline,
 };
 use bytes05::{buf::BufExt, Bytes};
@@ -754,6 +754,7 @@ mod tests {
     use crate::runtime::Runtime;
     use crate::test_util::{self, collect_n, runtime};
     use crate::{
+        config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
         event::{self, Event},
         shutdown::ShutdownSignal,
         sinks::{
@@ -761,7 +762,6 @@ mod tests {
             util::{encoding::EncodingConfigWithDefault, Compression},
             Healthcheck, RouterSink,
         },
-        topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
         Pipeline,
     };
     use chrono::{TimeZone, Utc};

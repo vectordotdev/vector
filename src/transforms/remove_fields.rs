@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     Event,
 };
 use serde::{Deserialize, Serialize};

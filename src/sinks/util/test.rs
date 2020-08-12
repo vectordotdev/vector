@@ -1,5 +1,5 @@
 use crate::{
-    topology::config::{SinkConfig, SinkContext},
+    config::{SinkConfig, SinkContext},
     Error,
 };
 use bytes05::Bytes;

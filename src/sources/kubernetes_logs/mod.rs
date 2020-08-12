@@ -9,10 +9,10 @@ use crate::event::{self, Event};
 use crate::internal_events::{KubernetesLogsEventAnnotationFailed, KubernetesLogsEventReceived};
 use crate::kubernetes as k8s;
 use crate::{
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     dns::Resolver,
     shutdown::ShutdownSignal,
     sources,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     transforms::Transform,
     Pipeline,
 };

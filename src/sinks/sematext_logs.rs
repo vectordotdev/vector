@@ -1,9 +1,9 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     sinks::elasticsearch::{ElasticSearchConfig, Encoding},
     sinks::util::{
         encoding::EncodingConfigWithDefault, service2::TowerRequestConfig, BatchConfig, Compression,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
 use futures01::{Future, Sink};
@@ -99,10 +99,10 @@ fn map_timestamp(mut event: Event) -> impl Future<Item = Event, Error = ()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::SinkConfig;
     use crate::event::Event;
     use crate::sinks::util::test::{build_test_server, load_sink};
     use crate::test_util;
-    use crate::topology::config::SinkConfig;
     use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
 

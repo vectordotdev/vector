@@ -2,7 +2,7 @@ pub mod v1;
 pub mod v2;
 
 use crate::{
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     transforms::Transform,
 };
 use serde::{Deserialize, Serialize};

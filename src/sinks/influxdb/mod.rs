@@ -725,11 +725,16 @@ mod tests {
 #[cfg(feature = "influxdb-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use crate::sinks::influxdb::test_util::{onboarding_v2, BUCKET, DATABASE, ORG, TOKEN};
-    use crate::sinks::influxdb::{healthcheck, InfluxDB1Settings, InfluxDB2Settings};
-    use crate::sinks::util::http::HttpClient;
-    use crate::test_util::runtime;
-    use crate::topology::SinkContext;
+    use crate::{
+        config::SinkContext,
+        sinks::influxdb::{
+            healthcheck,
+            test_util::{onboarding_v2, BUCKET, DATABASE, ORG, TOKEN},
+            InfluxDB1Settings, InfluxDB2Settings,
+        },
+        sinks::util::http::HttpClient,
+        test_util::runtime,
+    };
 
     #[test]
     fn influxdb2_healthchecks_ok() {

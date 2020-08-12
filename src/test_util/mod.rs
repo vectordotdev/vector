@@ -1,4 +1,10 @@
-use crate::{event::LogEvent, runtime::Runtime, trace, Event};
+use crate::{
+    config::{Config, ConfigDiff},
+    event::LogEvent,
+    runtime::Runtime,
+    topology::{self, RunningTopology},
+    trace, Event,
+};
 use futures::{
     compat::Stream01CompatExt, stream, FutureExt as _, SinkExt, Stream, StreamExt, TryFutureExt,
     TryStreamExt,
@@ -607,4 +613,15 @@ fn random_pseudonested_map(len: usize, breadth: usize, depth: usize) -> HashMap<
         }
     }
     tree
+}
+
+pub async fn start_topology(
+    config: Config,
+    require_healthy: bool,
+) -> (RunningTopology, mpsc::UnboundedReceiver<()>) {
+    let diff = ConfigDiff::initial(&config);
+    let pieces = topology::validate(&config, &diff).await.unwrap();
+    topology::start_validated(config, diff, pieces, require_healthy)
+        .await
+        .unwrap()
 }

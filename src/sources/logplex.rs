@@ -1,10 +1,10 @@
 use crate::{
+    config::{DataType, GlobalOptions, SourceConfig},
     event::{self, Event},
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     shutdown::ShutdownSignal,
     sources::util::{ErrorMessage, HttpSource},
     tls::TlsConfig,
-    topology::config::{DataType, GlobalOptions, SourceConfig},
     Pipeline,
 };
 use bytes05::{buf::BufExt, Bytes};
@@ -162,10 +162,10 @@ mod tests {
     use super::LogplexConfig;
     use crate::shutdown::ShutdownSignal;
     use crate::{
+        config::{GlobalOptions, SourceConfig},
         event::{self, Event},
         runtime::Runtime,
         test_util::{self, collect_n, runtime},
-        topology::config::{GlobalOptions, SourceConfig},
         Pipeline,
     };
     use chrono::{DateTime, Utc};

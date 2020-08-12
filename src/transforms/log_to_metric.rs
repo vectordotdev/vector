@@ -1,9 +1,9 @@
 use super::Transform;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::{self, Value},
     template::{Template, TemplateError},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     Event,
 };
 use indexmap::IndexMap;

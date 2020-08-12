@@ -1,9 +1,9 @@
 mod interop;
 
 use crate::{
-    config_paths::CONFIG_PATHS,
+    config::CONFIG_PATHS,
+    config::{DataType, TransformContext},
     event::Event,
-    topology::config::{DataType, TransformContext},
     transforms::{
         util::runtime_transform::{RuntimeTransform, Timer},
         Transform,

@@ -1,9 +1,9 @@
 use crate::{
     buffers::Acker,
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
     event::{self, Event},
     internal_events::BlackholeEventReceived,
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures01::{future, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};

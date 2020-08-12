@@ -1,8 +1,8 @@
 use super::Transform;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{self, Event},
     internal_events::{JsonEventProcessed, JsonFailedParse},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

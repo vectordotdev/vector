@@ -1,8 +1,8 @@
 use super::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSink};
 use crate::{
+    config::SinkContext,
     dns::{Resolver, ResolverFuture},
     sinks::{Healthcheck, RouterSink},
-    topology::config::SinkContext,
 };
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};

@@ -1,4 +1,4 @@
-use crate::topology::config::component::ComponentDescription;
+use crate::config::component::ComponentDescription;
 use crate::Event;
 use serde::{Deserialize, Serialize};
 

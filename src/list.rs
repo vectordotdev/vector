@@ -1,4 +1,4 @@
-use crate::topology::config::{SinkDescription, SourceDescription, TransformDescription};
+use crate::config::{SinkDescription, SourceDescription, TransformDescription};
 use serde::Serialize;
 use structopt::StructOpt;
 

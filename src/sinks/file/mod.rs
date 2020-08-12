@@ -1,12 +1,12 @@
 use crate::expiring_hash_map::ExpiringHashMap;
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         StreamSink,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use async_trait::async_trait;
 use bytes::Bytes;

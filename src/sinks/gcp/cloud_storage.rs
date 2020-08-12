@@ -1,5 +1,6 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event},
     serde::to_string,
     sinks::{
@@ -15,7 +16,6 @@ use crate::{
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
 use chrono::Utc;

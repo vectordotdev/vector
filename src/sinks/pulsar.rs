@@ -1,8 +1,8 @@
 use crate::{
     buffers::Acker,
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event},
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{lock::Mutex, FutureExt, TryFutureExt};
 use futures01::{

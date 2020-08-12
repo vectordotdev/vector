@@ -1,8 +1,8 @@
 use crate::{
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::{self, Event},
     internal_events::FileEventReceived,
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     trace::{current_span, Instrument},
     Pipeline,
 };
@@ -363,7 +363,7 @@ fn create_event(
 mod tests {
     use super::*;
     use crate::{
-        event, shutdown::ShutdownSignal, sources::file, test_util::trace_init, topology::Config,
+        config::Config, event, shutdown::ShutdownSignal, sources::file, test_util::trace_init,
     };
     use futures01::Stream;
     use pretty_assertions::assert_eq;

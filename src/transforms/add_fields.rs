@@ -1,10 +1,10 @@
 use super::Transform;
 use crate::serde::Fields;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::AddFieldsEventProcessed,
     template::Template,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;

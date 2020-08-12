@@ -1,4 +1,5 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::log_schema,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -6,7 +7,6 @@ use crate::{
         Encoding, UriSerde,
     },
     tls::{MaybeTlsSettings, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
 use futures01::{stream::iter_ok, Sink};
