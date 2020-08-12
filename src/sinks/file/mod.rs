@@ -8,6 +8,7 @@ use crate::{
     template::Template,
     topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
+use async_compression::tokio_02::write::GzipEncoder;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::pin_mut;
@@ -18,8 +19,6 @@ use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
 };
-
-use async_compression::tokio_02::write::GzipEncoder;
 
 mod bytes_path;
 use bytes_path::BytesPath;
@@ -81,8 +80,8 @@ enum OutFile {
 impl OutFile {
     fn new(file: File, compression: Compression) -> Self {
         match compression {
-          Compression::None => OutFile::Regular(file),
-          Compression::Gzip => OutFile::Gzip(GzipEncoder::new(file)),
+            Compression::None => OutFile::Regular(file),
+            Compression::Gzip => OutFile::Gzip(GzipEncoder::new(file)),
         }
     }
 
