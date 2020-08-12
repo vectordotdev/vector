@@ -1,4 +1,10 @@
-use crate::{event::LogEvent, runtime::Runtime, trace, Event};
+use crate::{
+    config::{Config, ConfigDiff},
+    event::LogEvent,
+    runtime::Runtime,
+    topology::{self, RunningTopology},
+    trace, Event,
+};
 use futures::{
     compat::Stream01CompatExt, stream, FutureExt as _, SinkExt, Stream, StreamExt, TryFutureExt,
     TryStreamExt,
@@ -24,9 +30,11 @@ use tokio::{
     net::{TcpListener, TcpStream},
     sync::oneshot,
     task::JoinHandle,
+    time::{delay_for, Duration, Instant},
 };
-use tokio01::util::FutureExt;
 use tokio_util::codec::{Encoder, FramedRead, FramedWrite, LinesCodec};
+
+pub mod stats;
 
 #[macro_export]
 macro_rules! assert_downcast_matches {
@@ -36,6 +44,68 @@ macro_rules! assert_downcast_matches {
             got => panic!("assertion failed: got wrong error variant {:?}", got),
         }
     }};
+}
+
+#[macro_export]
+macro_rules! assert_within {
+    // Adapted from std::assert_eq
+    ($expr:expr, $low:expr, $high:expr) => ({
+        match (&$expr, &$low, &$high) {
+            (expr, low, high) => {
+                if *expr < *low {
+                    panic!(
+                        r#"assertion failed: `(expr < low)`
+expr: {} = `{:?}`,
+ low: `{:?}`"#,
+                        stringify!($expr),
+                        &*expr,
+                        &*low
+                    );
+                }
+                if *expr > *high {
+                    panic!(
+                        r#"assertion failed: `(expr > high)`
+expr: {} = `{:?}`,
+high: `{:?}`"#,
+                        stringify!($expr),
+                        &*expr,
+                        &*high
+                    );
+                }
+            }
+        }
+    });
+    ($expr:expr, $low:expr, $high:expr, $($arg:tt)+) => ({
+        match (&$expr, &$low, &$high) {
+            (expr, low, high) => {
+                if *expr < *low {
+                    panic!(
+                        r#"assertion failed: `(expr < low)`
+expr: {} = `{:?}`,
+ low: `{:?}`
+{}"#,
+                        stringify!($expr),
+                        &*expr,
+                        &*low,
+                        format_args!($($arg)+)
+                    );
+                }
+                if *expr > *high {
+                    panic!(
+                        r#"assertion failed: `(expr > high)`
+expr: {} = `{:?}`,
+high: `{:?}`
+{}"#,
+                        stringify!($expr),
+                        &*expr,
+                        &*high,
+                        format_args!($($arg)+)
+                    );
+                }
+            }
+        }
+    });
+
 }
 
 static NEXT_PORT: AtomicUsize = AtomicUsize::new(1234);
@@ -199,19 +269,6 @@ pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     output.lines().map(|s| s.to_owned()).collect()
 }
 
-pub fn wait_for(mut f: impl FnMut() -> bool) {
-    let wait = std::time::Duration::from_millis(5);
-    let limit = std::time::Duration::from_secs(5);
-    let mut attempts = 0;
-    while !f() {
-        std::thread::sleep(wait);
-        attempts += 1;
-        if attempts * wait > limit {
-            panic!("timed out while waiting");
-        }
-    }
-}
-
 pub fn block_on<F, R, E>(future: F) -> Result<R, E>
 where
     F: Send + 'static + Future<Item = R, Error = E>,
@@ -253,26 +310,44 @@ where
         .unwrap()
 }
 
-pub fn wait_for_tcp(addr: SocketAddr) {
-    wait_for(|| std::net::TcpStream::connect(addr).is_ok())
+pub async fn wait_for<F, Fut>(mut f: F)
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = bool> + Send + 'static,
+{
+    let started = Instant::now();
+    while !f().await {
+        delay_for(Duration::from_millis(5)).await;
+        if started.elapsed().as_secs() > 5 {
+            panic!("timed out while waiting");
+        }
+    }
 }
 
-pub fn wait_for_atomic_usize<T, F>(val: T, unblock: F)
+pub async fn wait_for_tcp(addr: SocketAddr) {
+    wait_for(|| async move { TcpStream::connect(addr).await.is_ok() }).await
+}
+
+pub fn wait_for_sync(mut f: impl FnMut() -> bool) {
+    let wait = std::time::Duration::from_millis(5);
+    let limit = std::time::Duration::from_secs(5);
+    let mut attempts = 0;
+    while !f() {
+        std::thread::sleep(wait);
+        attempts += 1;
+        if attempts * wait > limit {
+            panic!("timed out while waiting");
+        }
+    }
+}
+
+pub fn wait_for_atomic_usize_sync<T, F>(val: T, unblock: F)
 where
     T: AsRef<AtomicUsize>,
     F: Fn(usize) -> bool,
 {
     let val = val.as_ref();
-    wait_for(|| unblock(val.load(Ordering::SeqCst)))
-}
-
-pub fn shutdown_on_idle(runtime: Runtime) {
-    block_on(
-        runtime
-            .shutdown_on_idle()
-            .timeout(std::time::Duration::from_secs(10)),
-    )
-    .unwrap()
+    wait_for_sync(|| unblock(val.load(Ordering::SeqCst)))
 }
 
 #[derive(Debug)]
@@ -538,4 +613,15 @@ fn random_pseudonested_map(len: usize, breadth: usize, depth: usize) -> HashMap<
         }
     }
     tree
+}
+
+pub async fn start_topology(
+    config: Config,
+    require_healthy: bool,
+) -> (RunningTopology, mpsc::UnboundedReceiver<()>) {
+    let diff = ConfigDiff::initial(&config);
+    let pieces = topology::validate(&config, &diff).await.unwrap();
+    topology::start_validated(config, diff, pieces, require_healthy)
+        .await
+        .unwrap()
 }

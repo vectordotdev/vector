@@ -1,4 +1,4 @@
-use crate::topology::config::{
+use crate::config::{
     component::ExampleError, GlobalOptions, SinkDescription, SourceDescription,
     TransformDescription,
 };
@@ -84,7 +84,7 @@ fn generate_example(include_globals: bool, expression: &str) -> Result<String, V
 
     let globals = {
         let mut globals = GlobalOptions::default();
-        globals.data_dir = crate::topology::config::default_data_dir();
+        globals.data_dir = crate::config::default_data_dir();
         globals
     };
     let mut config = Config::default();

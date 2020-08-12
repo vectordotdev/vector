@@ -7,12 +7,11 @@ use rand::{
     prelude::*,
 };
 use std::convert::TryFrom;
+use vector::config::{self, TransformConfig, TransformContext};
 use vector::event::Event;
 use vector::test_util::{
-    next_addr, runtime, send_lines, shutdown_on_idle, wait_for_tcp, CountReceiver,
+    next_addr, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver,
 };
-use vector::topology::config::{TransformConfig, TransformContext};
-use vector::topology::{self, config};
 use vector::{sinks, sources, transforms};
 
 mod batch;
@@ -72,10 +71,10 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on_std(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        let (topology, _crash) = start_topology(config, false).await;
+                        wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });
-                    wait_for_tcp(in_addr);
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
@@ -86,7 +85,6 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
                         topology.stop().compat().await.unwrap();
                         assert_eq!(num_lines, output_lines.wait().await.len());
                     });
-                    shutdown_on_idle(rt);
                 },
             );
         })
@@ -124,10 +122,10 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on_std(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        let (topology, _crash) = start_topology(config, false).await;
+                        wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });
-                    wait_for_tcp(in_addr);
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
@@ -138,7 +136,6 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
                         topology.stop().compat().await.unwrap();
                         assert_eq!(num_lines, output_lines.wait().await.len());
                     });
-                    shutdown_on_idle(rt);
                 },
             );
         })
@@ -176,10 +173,10 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on_std(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        let (topology, _crash) = start_topology(config, false).await;
+                        wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });
-                    wait_for_tcp(in_addr);
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
@@ -190,7 +187,6 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
                         topology.stop().compat().await.unwrap();
                         assert_eq!(num_lines, output_lines.wait().await.len());
                     });
-                    shutdown_on_idle(rt);
                 },
             );
         })
@@ -229,10 +225,10 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on_std(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        let (topology, _crash) = start_topology(config, false).await;
+                        wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });
-                    wait_for_tcp(in_addr);
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
@@ -250,7 +246,6 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
                         topology.stop().compat().await.unwrap();
                         assert_eq!(num_lines * num_writers, output_lines.wait().await.len());
                     });
-                    shutdown_on_idle(rt);
                 },
             );
         })
@@ -304,11 +299,11 @@ fn benchmark_interconnected(c: &mut Criterion) {
                     let (output_lines1, output_lines2, topology) = rt.block_on_std(async move {
                         let output_lines1 = CountReceiver::receive_lines(out_addr1);
                         let output_lines2 = CountReceiver::receive_lines(out_addr2);
-                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        let (topology, _crash) = start_topology(config, false).await;
+                        wait_for_tcp(in_addr1).await;
+                        wait_for_tcp(in_addr2).await;
                         (output_lines1, output_lines2, topology)
                     });
-                    wait_for_tcp(in_addr1);
-                    wait_for_tcp(in_addr2);
                     (rt, topology, output_lines1, output_lines2)
                 },
                 |(mut rt, topology, output_lines1, output_lines2)| {
@@ -322,7 +317,6 @@ fn benchmark_interconnected(c: &mut Criterion) {
                         assert_eq!(num_lines * 2, output_lines1.wait().await.len());
                         assert_eq!(num_lines * 2, output_lines2.wait().await.len());
                     });
-                    shutdown_on_idle(rt);
                 },
             );
         })
@@ -377,10 +371,10 @@ fn benchmark_transforms(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on_std(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        let (topology, _crash) = start_topology(config, false).await;
+                        wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });
-                    wait_for_tcp(in_addr);
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
@@ -393,7 +387,6 @@ fn benchmark_transforms(c: &mut Criterion) {
                         topology.stop().compat().await.unwrap();
                         assert_eq!(num_lines, output_lines.wait().await.len());
                     });
-                    shutdown_on_idle(rt);
                 },
             );
         })
@@ -556,7 +549,9 @@ fn benchmark_complex(c: &mut Criterion) {
                         let output_lines_sampled = CountReceiver::receive_lines(out_addr_sampled);
                         let output_lines_200 = CountReceiver::receive_lines(out_addr_200);
                         let output_lines_404 = CountReceiver::receive_lines(out_addr_404);
-                        let (topology, _crash) = topology::start(config, false).await.unwrap();
+                        let (topology, _crash) = start_topology(config, false).await;
+                        wait_for_tcp(in_addr1).await;
+                        wait_for_tcp(in_addr2).await;
                         (
                             output_lines_all,
                             output_lines_sampled,
@@ -565,8 +560,6 @@ fn benchmark_complex(c: &mut Criterion) {
                             topology,
                         )
                     });
-                    wait_for_tcp(in_addr1);
-                    wait_for_tcp(in_addr2);
                     (
                         rt,
                         topology,
@@ -618,7 +611,6 @@ fn benchmark_complex(c: &mut Criterion) {
                         assert!(output_lines_404 > 0);
                         assert_eq!(output_lines_200 + output_lines_404, num_lines);
                     });
-                    shutdown_on_idle(rt);
                 },
             );
         })

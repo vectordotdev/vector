@@ -1,4 +1,5 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -8,7 +9,6 @@ use crate::{
         BatchConfig, BatchSettings, Buffer, Compression,
     },
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
@@ -232,11 +232,11 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        config::{SinkConfig, SinkContext},
         event,
         event::Event,
         sinks::util::encoding::TimestampFormat,
         test_util::{random_string, runtime},
-        topology::config::{SinkConfig, SinkContext},
     };
     use futures::compat::Future01CompatExt;
     use futures01::Sink;
