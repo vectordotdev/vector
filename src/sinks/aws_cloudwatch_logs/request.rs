@@ -76,19 +76,18 @@ impl CloudwatchFuture {
 impl Future for CloudwatchFuture {
     type Output = Result<(), CloudwatchError>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        let this = self.get_mut();
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         loop {
-            match &mut this.state {
+            match &mut self.state {
                 State::DescribeStream(fut) => {
                     let response = match ready!(fut.poll_unpin(cx)) {
                         Ok(response) => response,
                         Err(RusotoError::Service(DescribeLogStreamsError::ResourceNotFound(_)))
-                            if this.create_missing_group =>
+                            if self.create_missing_group =>
                         {
                             info!("log group provided does not exist; creating a new one.");
 
-                            this.state = State::CreateGroup(this.client.create_log_group());
+                            self.state = State::CreateGroup(self.client.create_log_group());
                             continue;
                         }
                         Err(err) => return Poll::Ready(Err(CloudwatchError::Describe(err))),
@@ -102,18 +101,18 @@ impl Future for CloudwatchFuture {
                     {
                         debug!(message = "stream found", stream = ?stream.log_stream_name);
 
-                        let events = this
+                        let events = self
                             .events
                             .pop()
-                            .expect("Token got called multiple times, this is a bug!");
+                            .expect("Token got called multiple times, self is a bug!");
 
                         let token = stream.upload_sequence_token;
 
                         info!(message = "putting logs.", ?token);
-                        this.state = State::Put(this.client.put_logs(token, events));
-                    } else if this.create_missing_stream {
+                        self.state = State::Put(self.client.put_logs(token, events));
+                    } else if self.create_missing_stream {
                         info!("provided stream does not exist; creating a new one.");
-                        this.state = State::CreateStream(this.client.create_log_stream());
+                        self.state = State::CreateStream(self.client.create_log_stream());
                     } else {
                         return Poll::Ready(Err(CloudwatchError::NoStreamsFound));
                     }
@@ -128,12 +127,12 @@ impl Future for CloudwatchFuture {
                         Err(err) => return Poll::Ready(Err(CloudwatchError::CreateGroup(err))),
                     };
 
-                    info!(message = "group created.", name = %this.client.group_name);
+                    info!(message = "group created.", name = %self.client.group_name);
 
-                    // This does not abide by `create_missing_stream` since a group
+                    // self does not abide by `create_missing_stream` since a group
                     // never has any streams and thus we need to create one if a group
                     // is created no matter what.
-                    this.state = State::CreateStream(this.client.create_log_stream());
+                    self.state = State::CreateStream(self.client.create_log_stream());
                 }
 
                 State::CreateStream(fut) => {
@@ -145,9 +144,9 @@ impl Future for CloudwatchFuture {
                         Err(err) => return Poll::Ready(Err(CloudwatchError::CreateStream(err))),
                     };
 
-                    info!(message = "stream created.", name = %this.client.stream_name);
+                    info!(message = "stream created.", name = %self.client.stream_name);
 
-                    this.state = State::DescribeStream(this.client.describe_stream());
+                    self.state = State::DescribeStream(self.client.describe_stream());
                 }
 
                 State::Put(fut) => {
@@ -156,13 +155,13 @@ impl Future for CloudwatchFuture {
                         Err(err) => return Poll::Ready(Err(CloudwatchError::Put(err))),
                     };
 
-                    if let Some(events) = this.events.pop() {
+                    if let Some(events) = self.events.pop() {
                         debug!(message = "putting logs.", ?next_token);
-                        this.state = State::Put(this.client.put_logs(next_token, events));
+                        self.state = State::Put(self.client.put_logs(next_token, events));
                     } else {
                         info!(message = "putting logs was successful.", ?next_token);
 
-                        this.token_tx
+                        self.token_tx
                             .take()
                             .expect("Put was polled after finishing.")
                             .send(next_token)
