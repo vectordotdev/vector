@@ -367,14 +367,16 @@ fn prepare_field_selector(config: &Config) -> crate::Result<String> {
         ?self_node_name
     );
 
-    let mut field_selector = format!("spec.nodeName={}", self_node_name);
+    let field_selector = format!("spec.nodeName={}", self_node_name);
 
-    if !config.extra_field_selector.is_empty() {
-        field_selector.push(',');
-        field_selector.push_str(config.extra_field_selector.as_str());
+    if config.extra_field_selector.is_empty() {
+        return Ok(field_selector);
     }
 
-    Ok(field_selector)
+    Ok(format!(
+        "{},{}",
+        field_selector, config.extra_field_selector
+    ))
 }
 
 /// This function construct the effective label selector to use, based on
