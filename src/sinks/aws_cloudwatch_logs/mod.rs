@@ -842,9 +842,10 @@ mod integration_tests {
     use super::*;
     use crate::{
         region::RegionOrEndpoint,
-        test_util::{random_lines, random_lines_with_stream, random_string, runtime},
+        test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
         topology::config::{SinkConfig, SinkContext},
     };
+    use futures::compat::Future01CompatExt;
     use futures01::{
         stream::{self, Stream},
         Sink,
@@ -856,14 +857,13 @@ mod integration_tests {
 
     const GROUP_NAME: &'static str = "vector-cw";
 
-    #[test]
-    fn cloudwatch_insert_log_event() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn cloudwatch_insert_log_event() {
+        trace_init();
+
+        ensure_group().await;
 
         let stream_name = gen_name();
-
-        ensure_group();
-
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
             group_name: Template::try_from(GROUP_NAME).unwrap(),
@@ -884,7 +884,7 @@ mod integration_tests {
         let (input_lines, events) = random_lines_with_stream(100, 11);
 
         let pump = sink.send_all(events);
-        let (sink, _) = rt.block_on(pump).unwrap();
+        let (sink, _) = pump.compat().await.unwrap();
         // drop the sink so it closes all its connections
         drop(sink);
 
@@ -893,9 +893,7 @@ mod integration_tests {
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let response = rt
-            .block_on_std(async move { create_client_test().get_log_events(request).await })
-            .unwrap();
+        let response = create_client_test().get_log_events(request).await.unwrap();
 
         let events = response.events.unwrap();
 
@@ -907,14 +905,13 @@ mod integration_tests {
         assert_eq!(output_lines, input_lines);
     }
 
-    #[test]
-    fn cloudwatch_insert_log_events_sorted() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn cloudwatch_insert_log_events_sorted() {
+        trace_init();
+
+        ensure_group().await;
 
         let stream_name = gen_name();
-
-        ensure_group();
-
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
             group_name: Template::try_from(GROUP_NAME).unwrap(),
@@ -950,7 +947,7 @@ mod integration_tests {
 
             event
         }));
-        let (sink, _) = rt.block_on(pump).unwrap();
+        let (sink, _) = pump.compat().await.unwrap();
         // drop the sink so it closes all its connections
         drop(sink);
 
@@ -959,9 +956,7 @@ mod integration_tests {
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let response = rt
-            .block_on_std(async move { create_client_test().get_log_events(request).await })
-            .unwrap();
+        let response = create_client_test().get_log_events(request).await.unwrap();
 
         let events = response.events.unwrap();
 
@@ -976,13 +971,12 @@ mod integration_tests {
         assert_eq!(output_lines, input_lines);
     }
 
-    #[test]
-    fn cloudwatch_insert_out_of_range_timestamp() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn cloudwatch_insert_out_of_range_timestamp() {
+        trace_init();
+        ensure_group().await;
 
         let stream_name = gen_name();
-        ensure_group();
-
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
             group_name: Template::try_from(GROUP_NAME).unwrap(),
@@ -1027,7 +1021,7 @@ mod integration_tests {
         lines.push(add_event(Duration::days(-13)));
 
         let pump = sink.send_all(stream::iter_ok(events));
-        let (sink, _) = rt.block_on(pump).unwrap();
+        let (sink, _) = pump.compat().await.unwrap();
         // drop the sink so it closes all its connections
         drop(sink);
 
@@ -1036,9 +1030,7 @@ mod integration_tests {
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some((now - Duration::days(30)).timestamp_millis());
 
-        let response = rt
-            .block_on_std(async move { create_client_test().get_log_events(request).await })
-            .unwrap();
+        let response = create_client_test().get_log_events(request).await.unwrap();
 
         let events = response.events.unwrap();
 
@@ -1050,12 +1042,12 @@ mod integration_tests {
         assert_eq!(output_lines, lines);
     }
 
-    #[test]
-    fn cloudwatch_dynamic_group_and_stream_creation() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn cloudwatch_dynamic_group_and_stream_creation() {
+        trace_init();
 
-        let group_name = gen_name();
         let stream_name = gen_name();
+        let group_name = gen_name();
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
@@ -1077,7 +1069,7 @@ mod integration_tests {
         let (input_lines, events) = random_lines_with_stream(100, 11);
 
         let pump = sink.send_all(events);
-        let (sink, _) = rt.block_on(pump).unwrap();
+        let (sink, _) = pump.compat().await.unwrap();
         // drop the sink so it closes all its connections
         drop(sink);
 
@@ -1086,9 +1078,7 @@ mod integration_tests {
         request.log_group_name = group_name;
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let response = rt
-            .block_on_std(async move { create_client_test().get_log_events(request).await })
-            .unwrap();
+        let response = create_client_test().get_log_events(request).await.unwrap();
 
         let events = response.events.unwrap();
 
@@ -1100,14 +1090,13 @@ mod integration_tests {
         assert_eq!(output_lines, input_lines);
     }
 
-    #[test]
-    fn cloudwatch_insert_log_event_batched() {
-        let mut rt = runtime();
+    #[tokio::test(core_threads = 2)]
+    async fn cloudwatch_insert_log_event_batched() {
+        trace_init();
+        ensure_group().await;
 
-        let group_name = gen_name();
         let stream_name = gen_name();
-
-        ensure_group();
+        let group_name = gen_name();
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
@@ -1132,7 +1121,7 @@ mod integration_tests {
         let (input_lines, events) = random_lines_with_stream(100, 11);
 
         let pump = sink.send_all(events);
-        let (sink, _) = rt.block_on(pump).unwrap();
+        let (sink, _) = pump.compat().await.unwrap();
         // drop the sink so it closes all its connections
         drop(sink);
 
@@ -1141,9 +1130,7 @@ mod integration_tests {
         request.log_group_name = group_name.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let response = rt
-            .block_on_std(async move { create_client_test().get_log_events(request).await })
-            .unwrap();
+        let response = create_client_test().get_log_events(request).await.unwrap();
 
         let events = response.events.unwrap();
 
@@ -1155,15 +1142,12 @@ mod integration_tests {
         assert_eq!(output_lines, input_lines);
     }
 
-    #[test]
-    fn cloudwatch_insert_log_event_partitioned() {
-        crate::test_util::trace_init();
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn cloudwatch_insert_log_event_partitioned() {
+        trace_init();
+        ensure_group().await;
 
         let stream_name = gen_name();
-
-        ensure_group();
-
         let config = CloudwatchLogsSinkConfig {
             group_name: Template::try_from(GROUP_NAME).unwrap(),
             stream_name: Template::try_from(format!("{}-{{{{key}}}}", stream_name)).unwrap(),
@@ -1196,8 +1180,8 @@ mod integration_tests {
             .collect::<Vec<_>>();
 
         let pump = sink.send_all(iter_ok(events));
-        let (sink, _) = rt.block_on(pump).unwrap();
-        let sink = rt.block_on(sink.flush()).unwrap();
+        let (sink, _) = pump.compat().await.unwrap();
+        let sink = sink.flush().compat().await.unwrap();
         // drop the sink so it closes all its connections
         drop(sink);
 
@@ -1206,9 +1190,7 @@ mod integration_tests {
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let response = rt
-            .block_on_std(async move { create_client_test().get_log_events(request).await })
-            .unwrap();
+        let response = create_client_test().get_log_events(request).await.unwrap();
         let events = response.events.unwrap();
         let output_lines = events
             .into_iter()
@@ -1229,9 +1211,7 @@ mod integration_tests {
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let response = rt
-            .block_on_std(async move { create_client_test().get_log_events(request).await })
-            .unwrap();
+        let response = create_client_test().get_log_events(request).await.unwrap();
         let events = response.events.unwrap();
         let output_lines = events
             .into_iter()
@@ -1248,9 +1228,10 @@ mod integration_tests {
         assert_eq!(output_lines, expected_output);
     }
 
-    #[test]
-    fn cloudwatch_healthcheck() {
-        ensure_group();
+    #[tokio::test]
+    async fn cloudwatch_healthcheck() {
+        trace_init();
+        ensure_group().await;
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from("test-stream").unwrap(),
@@ -1265,10 +1246,8 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let mut rt = runtime();
-
         let client = config.create_client(Resolver).unwrap();
-        rt.block_on_std(healthcheck(config, client)).unwrap();
+        healthcheck(config, client).await.unwrap();
     }
 
     fn create_client_test() -> CloudWatchLogsClient {
@@ -1282,17 +1261,13 @@ mod integration_tests {
         CloudWatchLogsClient::new_with(client, creds, region)
     }
 
-    fn ensure_group() {
-        let mut rt = runtime();
-
-        let _ = rt.block_on_std(async move {
-            let client = create_client_test();
-            let req = CreateLogGroupRequest {
-                log_group_name: GROUP_NAME.into(),
-                ..Default::default()
-            };
-            client.create_log_group(req).await
-        });
+    async fn ensure_group() {
+        let client = create_client_test();
+        let req = CreateLogGroupRequest {
+            log_group_name: GROUP_NAME.into(),
+            ..Default::default()
+        };
+        let _ = client.create_log_group(req).await;
     }
 
     fn gen_name() -> String {
