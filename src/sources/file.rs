@@ -1,3 +1,4 @@
+use super::util::MultilineConfig;
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::{self, Event},
@@ -21,7 +22,7 @@ use futures01::{future, Future, Sink, Stream};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 use tokio::task::spawn_blocking;
@@ -53,24 +54,6 @@ enum BuildError {
         indicator: String,
         source: regex::Error,
     },
-    #[snafu(display(
-        "unable to parse multiline start pattern from {:?}: {}",
-        start_pattern,
-        source
-    ))]
-    InvalidMultilineStartPattern {
-        start_pattern: String,
-        source: regex::Error,
-    },
-    #[snafu(display(
-        "unable to parse multiline condition pattern from {:?}: {}",
-        condition_pattern,
-        source
-    ))]
-    InvalidMultilineConditionPattern {
-        condition_pattern: String,
-        source: regex::Error,
-    },
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
@@ -93,42 +76,6 @@ pub struct FileConfig {
     pub max_read_bytes: usize,
     pub oldest_first: bool,
     pub remove_after: Option<u64>,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct MultilineConfig {
-    pub start_pattern: String,
-    pub condition_pattern: String,
-    pub mode: line_agg::Mode,
-    pub timeout_ms: u64,
-}
-
-impl TryFrom<&MultilineConfig> for line_agg::Config {
-    type Error = crate::Error;
-
-    fn try_from(config: &MultilineConfig) -> crate::Result<Self> {
-        let MultilineConfig {
-            start_pattern,
-            condition_pattern,
-            mode,
-            timeout_ms,
-        } = config;
-
-        let start_pattern = Regex::new(start_pattern)
-            .with_context(|| InvalidMultilineStartPattern { start_pattern })?;
-        let condition_pattern = Regex::new(condition_pattern)
-            .with_context(|| InvalidMultilineConditionPattern { condition_pattern })?;
-        let mode = mode.clone();
-        let timeout = Duration::from_millis(*timeout_ms);
-
-        Ok(Self {
-            start_pattern,
-            condition_pattern,
-            mode,
-            timeout,
-        })
-    }
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
