@@ -3,7 +3,6 @@ use derive_is_enum_variant::is_enum_variant;
 use metrics_core::Key;
 use metrics_runtime::Measurement;
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Display, Formatter};
 
@@ -241,14 +240,14 @@ impl Display for Metric {
         if let Some(timestamp) = &self.timestamp {
             write!(fmt, "{:?} ", timestamp)?;
         }
-        write!(fmt, "{}", quote_word(&self.name))?;
+        write_word(fmt, &self.name)?;
+        write!(fmt, "{{")?;
         if let Some(tags) = &self.tags {
-            write!(fmt, "{{")?;
             write_list(fmt, ",", tags.iter(), |fmt, (tag, value)| {
-                write!(fmt, "{}={:?}", quote_word(tag), value)
+                write_word(fmt, tag).and_then(|()| write!(fmt, "={:?}", value))
             })?;
-            write!(fmt, "}}")?;
         }
+        write!(fmt, "}}")?;
         match self.kind {
             MetricKind::Absolute => write!(fmt, " = "),
             MetricKind::Incremental => write!(fmt, " + "),
@@ -256,15 +255,22 @@ impl Display for Metric {
         match &self.value {
             MetricValue::Counter { value } => write!(fmt, "{}", value),
             MetricValue::Gauge { value } => write!(fmt, "{}", value),
-            MetricValue::Set { values } => write_list(fmt, " ", values.iter(), |fmt, value| {
-                write!(fmt, "{}", quote_word(value))
-            }),
+            MetricValue::Set { values } => {
+                write_list(fmt, " ", values.iter(), |fmt, value| write_word(fmt, value))
+            }
             MetricValue::Distribution {
                 values,
                 sample_rates,
                 statistic,
             } => {
-                write!(fmt, "{:?} ", statistic)?;
+                write!(
+                    fmt,
+                    "{}",
+                    match statistic {
+                        StatisticKind::Histogram => "histogram ",
+                        StatisticKind::Summary => "summary ",
+                    }
+                )?;
                 write_list(
                     fmt,
                     " ",
@@ -283,7 +289,7 @@ impl Display for Metric {
                     fmt,
                     " ",
                     buckets.iter().zip(counts.iter()),
-                    |fmt, (bucket, count)| write!(fmt, "{}@{}", bucket, count),
+                    |fmt, (bucket, count)| write!(fmt, "{}@{}", count, bucket),
                 )
             }
             MetricValue::AggregatedSummary {
@@ -323,12 +329,11 @@ where
     Ok(())
 }
 
-fn quote_word(s: &str) -> Cow<'_, str> {
-    const ALPHANUM: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_";
-    if s.contains(|c| !ALPHANUM.contains(c)) {
-        format!("{:?}", s).into()
+fn write_word(fmt: &mut Formatter<'_>, word: &str) -> Result<(), fmt::Error> {
+    if word.contains(|c: char| !c.is_ascii_alphanumeric() && c != '_') {
+        write!(fmt, "{:?}", word)
     } else {
-        s.into()
+        write!(fmt, "{}", word)
     }
 }
 
@@ -491,5 +496,111 @@ mod test {
                 },
             }
         )
+    }
+
+    #[test]
+    fn display() {
+        assert_eq!(
+            format!(
+                "{}",
+                Metric {
+                    name: "one".into(),
+                    timestamp: None,
+                    tags: Some(tags()),
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 1.23 },
+                }
+            ),
+            r#"one{empty_tag="",normal_tag="value",true_tag="true"} = 1.23"#
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                Metric {
+                    name: "two word".into(),
+                    timestamp: Some(ts()),
+                    tags: None,
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Gauge { value: 2.0 }
+                }
+            ),
+            r#"2018-11-14T08:09:10.000000011Z "two word"{} + 2"#
+        );
+
+        let mut values = BTreeSet::<String>::new();
+        values.insert("v1".into());
+        values.insert("v2_two".into());
+        values.insert("thrəë".into());
+        values.insert("four=4".into());
+        assert_eq!(
+            format!(
+                "{}",
+                Metric {
+                    name: "three".into(),
+                    timestamp: None,
+                    tags: None,
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Set { values }
+                }
+            ),
+            r#"three{} = "four=4" "thrəë" v1 v2_two"#
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                Metric {
+                    name: "four".into(),
+                    timestamp: None,
+                    tags: None,
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Distribution {
+                        values: vec![1.0, 2.0],
+                        sample_rates: vec![3, 4],
+                        statistic: StatisticKind::Histogram,
+                    }
+                }
+            ),
+            r#"four{} = histogram 3@1 4@2"#
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                Metric {
+                    name: "five".into(),
+                    timestamp: None,
+                    tags: None,
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::AggregatedHistogram {
+                        buckets: vec![51.0, 52.0],
+                        counts: vec![53, 54],
+                        count: 107,
+                        sum: 103.0,
+                    }
+                }
+            ),
+            r#"five{} = count=107 sum=103 53@51 54@52"#
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                Metric {
+                    name: "six".into(),
+                    timestamp: None,
+                    tags: None,
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::AggregatedSummary {
+                        quantiles: vec![1.0, 2.0],
+                        values: vec![63.0, 64.0],
+                        count: 2,
+                        sum: 127.0,
+                    }
+                }
+            ),
+            r#"six{} = count=2 sum=127 1@63 2@64"#
+        );
     }
 }

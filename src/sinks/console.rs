@@ -212,4 +212,21 @@ mod test {
             encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
         );
     }
+
+    #[test]
+    fn encodes_metric_text() {
+        let event = Event::Metric(Metric {
+            name: "users".into(),
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Set {
+                values: vec!["bob".into()].into_iter().collect(),
+            },
+        });
+        assert_eq!(
+            "users{} + bob",
+            encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
+        );
+    }
 }
