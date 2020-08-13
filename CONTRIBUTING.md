@@ -167,13 +167,22 @@ aligns better with our process.
 
 ### CI
 
-Currently Vector uses [CircleCI](https://circleci.com). The build process
-is defined in `/.circleci/config.yml`. This delegates heavily to the
-[`distribution/docker`](/distribution/docker) folder where Docker images are
-defined for all of our testing, building, verifying, and releasing.
+Currently Vector uses Github Actions to run tests. The workflows are defined in
+`.github/workflows`.
 
-Tests are run for all changes, and Circleci is responsible for releasing
+Tests are run for all changes, and Github Actions is responsible for releasing
 updated versions of Vector through various channels.
+
+Some long running tests are only run daily, rather than on every pull request.
+If needed, an administrator can kick off these tests manually via:
+
+``` bash
+$ curl -u "$GITHUB_USERNAME:$GITHUB_TOKEN" \
+  -H 'Accept: application/vnd.github.v3+json' \
+  -X POST \
+  https://api.github.com/repos/timberio/vector/actions/workflows/nightly.yml/dispatches \
+  --data '{"ref": "$GIT_REF}'
+```
 
 ## Development
 
