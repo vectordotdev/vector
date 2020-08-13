@@ -1,6 +1,6 @@
 // Only run the test suite on unix systems, as the timings on especially
 // MacOS are too variable to produce reliable results in these tests.
-#![cfg(all(test, unix, feature = "sources-generator"))]
+#![cfg(all(test, not(target_os = "macos"), feature = "sources-generator"))]
 
 use super::controller::ControllerStatistics;
 use super::MAX_CONCURRENCY;
