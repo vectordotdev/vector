@@ -1,9 +1,9 @@
 use crate::{
     buffers::Acker,
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{MetricKind, MetricValue, StatisticKind},
     event::Event,
     sinks::util::{BatchConfig, BatchSettings, BatchSink, Buffer, Compression, TowerCompat},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{future, FutureExt, TryFutureExt};
 use futures01::{stream, Sink};

@@ -1,10 +1,10 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{log_schema, Event, Value},
     sinks::util::{
         http::{BatchedHttpSink, HttpClient, HttpSink},
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::TryFutureExt;
 use futures01::Sink;

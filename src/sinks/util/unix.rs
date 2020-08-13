@@ -1,11 +1,11 @@
 use crate::{
+    config::SinkContext,
     internal_events::{
         UnixSocketConnectionEstablished, UnixSocketConnectionFailure, UnixSocketError,
         UnixSocketEventSent,
     },
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, StreamSink},
     sinks::{Healthcheck, RouterSink},
-    topology::config::SinkContext,
 };
 use bytes05::Bytes;
 use futures::{compat::CompatSink, FutureExt, TryFutureExt};

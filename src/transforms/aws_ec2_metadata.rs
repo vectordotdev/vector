@@ -1,9 +1,9 @@
 use super::Transform;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     hyper::body_to_bytes,
     sinks::util::http::HttpClient,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use bytes::Bytes;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};

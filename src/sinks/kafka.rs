@@ -1,11 +1,11 @@
 use crate::{
     buffers::Acker,
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
     template::{Template, TemplateError},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::compat::Compat;
 use futures01::{

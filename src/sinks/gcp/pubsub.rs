@@ -1,5 +1,6 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::{
         util::{
@@ -10,7 +11,6 @@ use crate::{
         Healthcheck, RouterSink, UriParseError,
     },
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;

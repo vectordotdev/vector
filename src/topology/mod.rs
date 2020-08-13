@@ -7,21 +7,18 @@
 //! each type of component.
 
 pub mod builder;
-pub mod config;
 mod fanout;
 mod task;
 pub mod unit_test;
 
-pub use self::config::Config;
-pub use self::config::SinkContext;
-
-use crate::topology::{builder::Pieces, task::Task};
-
-use crate::buffers;
-use crate::shutdown::SourceShutdownCoordinator;
+use crate::{
+    buffers,
+    config::{self, Config, ConfigDiff},
+    shutdown::SourceShutdownCoordinator,
+    topology::{builder::Pieces, task::Task},
+};
 use futures::{compat::Future01CompatExt, future, FutureExt, StreamExt, TryFutureExt};
 use futures01::{sync::mpsc, Future};
-use indexmap::IndexMap;
 use std::{
     collections::{HashMap, HashSet},
     panic::AssertUnwindSafe,
@@ -41,18 +38,6 @@ pub struct RunningTopology {
     shutdown_coordinator: SourceShutdownCoordinator,
     config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
-}
-
-pub async fn start(
-    config: Config,
-    require_healthy: bool,
-) -> Option<(RunningTopology, mpsc::UnboundedReceiver<()>)> {
-    let diff = ConfigDiff::initial(&config);
-    if let Some(pieces) = validate(&config, &diff).await {
-        start_validated(config, diff, pieces, require_healthy).await
-    } else {
-        None
-    }
 }
 
 pub async fn start_validated(
@@ -87,7 +72,16 @@ pub async fn start_validated(
 }
 
 pub async fn validate(config: &Config, diff: &ConfigDiff) -> Option<Pieces> {
-    match builder::check_build(config, diff).await {
+    let check_build_result = match (
+        config::check(config),
+        builder::build_pieces(config, diff).await,
+    ) {
+        (Ok(warnings), Ok(new_pieces)) => Ok((new_pieces, warnings)),
+        (Err(t_errors), Err(p_errors)) => Err(t_errors.into_iter().chain(p_errors).collect()),
+        (Err(errors), Ok(_)) | (Ok(_), Err(errors)) => Err(errors),
+    };
+
+    match check_build_result {
         Err(errors) => {
             for error in errors {
                 error!("Configuration error: {}", error);
@@ -235,7 +229,7 @@ impl RunningTopology {
             return Ok(false);
         }
 
-        if let Err(errors) = builder::check(&new_config) {
+        if let Err(errors) = config::check(&new_config) {
             for error in errors {
                 error!("Configuration error: {}", error);
             }
@@ -604,85 +598,6 @@ impl RunningTopology {
     }
 }
 
-pub struct ConfigDiff {
-    sources: Difference,
-    transforms: Difference,
-    sinks: Difference,
-}
-
-impl ConfigDiff {
-    pub fn initial(initial: &Config) -> Self {
-        Self::new(&Config::empty(), initial)
-    }
-
-    fn new(old: &Config, new: &Config) -> Self {
-        ConfigDiff {
-            sources: Difference::new(&old.sources, &new.sources),
-            transforms: Difference::new(&old.transforms, &new.transforms),
-            sinks: Difference::new(&old.sinks, &new.sinks),
-        }
-    }
-
-    /// Swaps removed with added in Differences.
-    fn flip(mut self) -> Self {
-        self.sources.flip();
-        self.transforms.flip();
-        self.sinks.flip();
-        self
-    }
-}
-
-struct Difference {
-    to_remove: HashSet<String>,
-    to_change: HashSet<String>,
-    to_add: HashSet<String>,
-}
-
-impl Difference {
-    fn new<C>(old: &IndexMap<String, C>, new: &IndexMap<String, C>) -> Self
-    where
-        C: serde::Serialize + serde::Deserialize<'static>,
-    {
-        let old_names = old.keys().cloned().collect::<HashSet<_>>();
-        let new_names = new.keys().cloned().collect::<HashSet<_>>();
-
-        let to_change = old_names
-            .intersection(&new_names)
-            .filter(|&n| {
-                // This is a hack around the issue of comparing two
-                // trait objects. Json is used here over toml since
-                // toml does not support serializing `None`.
-                let old_json = serde_json::to_vec(&old[n]).unwrap();
-                let new_json = serde_json::to_vec(&new[n]).unwrap();
-                old_json != new_json
-            })
-            .cloned()
-            .collect::<HashSet<_>>();
-
-        let to_remove = &old_names - &new_names;
-        let to_add = &new_names - &old_names;
-
-        Self {
-            to_remove,
-            to_change,
-            to_add,
-        }
-    }
-
-    /// True if name is present in new config and either not in the old one or is different.
-    fn contains_new(&self, name: &str) -> bool {
-        self.to_add.contains(name) || self.to_change.contains(name)
-    }
-
-    fn flip(&mut self) {
-        std::mem::swap(&mut self.to_remove, &mut self.to_add);
-    }
-
-    fn changed_and_added(&self) -> impl Iterator<Item = &String> {
-        self.to_change.iter().chain(self.to_add.iter())
-    }
-}
-
 fn handle_errors(
     task: impl Future<Item = (), Error = ()>,
     abort_tx: mpsc::UnboundedSender<()>,
@@ -712,11 +627,10 @@ fn retain<T>(vec: &mut Vec<T>, mut retain_filter: impl FnMut(&mut T) -> bool) {
 
 #[cfg(all(test, feature = "sinks-console", feature = "sources-socket"))]
 mod tests {
+    use crate::config::Config;
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sources::socket::SocketConfig;
-    use crate::test_util::{next_addr, runtime};
-    use crate::topology;
-    use crate::topology::config::Config;
+    use crate::test_util::{next_addr, runtime, start_topology};
 
     #[test]
     fn topology_doesnt_reload_new_data_dir() {
@@ -738,7 +652,7 @@ mod tests {
         let mut new_config = old_config.clone();
 
         rt.block_on_std(async move {
-            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
+            let (mut topology, _crash) = start_topology(old_config, false).await;
 
             new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
@@ -757,11 +671,10 @@ mod tests {
 
 #[cfg(all(test, feature = "sinks-console", feature = "sources-splunk_hec"))]
 mod reload_tests {
+    use crate::config::Config;
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sources::splunk_hec::SplunkConfig;
-    use crate::test_util::{next_addr, runtime};
-    use crate::topology;
-    use crate::topology::config::Config;
+    use crate::test_util::{next_addr, runtime, start_topology};
 
     // TODO: Run it only on Linux and Mac since it fails on Windows.
     // TODO: Issue: https://github.com/timberio/vector/issues/3035
@@ -795,7 +708,7 @@ mod reload_tests {
         );
 
         rt.block_on_std(async move {
-            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
+            let (mut topology, _crash) = start_topology(old_config, false).await;
 
             assert!(topology
                 .reload_config_and_respawn(new_config, false)
@@ -834,7 +747,7 @@ mod reload_tests {
         );
 
         rt.block_on_std(async move {
-            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
+            let (mut topology, _crash) = start_topology(old_config, false).await;
 
             assert!(!topology
                 .reload_config_and_respawn(new_config, false)
@@ -861,7 +774,7 @@ mod reload_tests {
         );
 
         rt.block_on_std(async move {
-            let (mut topology, _crash) = topology::start(old_config.clone(), false).await.unwrap();
+            let (mut topology, _crash) = start_topology(old_config.clone(), false).await;
 
             assert!(topology
                 .reload_config_and_respawn(old_config, false)
@@ -873,9 +786,10 @@ mod reload_tests {
 
 #[cfg(all(test, feature = "sinks-console", feature = "sources-generator"))]
 mod source_finished_tests {
+    use crate::config::Config;
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sources::generator::GeneratorConfig;
-    use crate::topology::{self, config::Config};
+    use crate::test_util::start_topology;
     use futures::compat::Future01CompatExt;
     use tokio::time::{timeout, Duration};
 
@@ -893,7 +807,7 @@ mod source_finished_tests {
             },
         );
 
-        let (topology, _crash) = topology::start(old_config, false).await.unwrap();
+        let (topology, _crash) = start_topology(old_config, false).await;
 
         timeout(Duration::from_secs(2), topology.sources_finished().compat())
             .await
@@ -909,15 +823,15 @@ mod source_finished_tests {
     feature = "transforms-json_parser"
 ))]
 mod transient_state_tests {
+    use crate::config::{Config, DataType, GlobalOptions, SourceConfig};
     use crate::shutdown::ShutdownSignal;
     use crate::sinks::blackhole::BlackholeConfig;
     use crate::sources::stdin::StdinConfig;
     use crate::sources::Source;
-    use crate::test_util::runtime;
-    use crate::topology::config::{Config, DataType, GlobalOptions, SourceConfig};
+    use crate::test_util::{runtime, start_topology};
     use crate::transforms::json_parser::JsonParserConfig;
+    use crate::Error;
     use crate::Pipeline;
-    use crate::{topology, Error};
     use futures::compat::Future01CompatExt;
     use futures01::Future;
     use serde::{Deserialize, Serialize};
@@ -999,7 +913,7 @@ mod transient_state_tests {
         new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
 
         rt.block_on_std(async move {
-            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
+            let (mut topology, _crash) = start_topology(old_config, false).await;
 
             trigger_old.cancel();
 
@@ -1044,7 +958,7 @@ mod transient_state_tests {
         new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
 
         rt.block_on_std(async move {
-            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
+            let (mut topology, _crash) = start_topology(old_config, false).await;
 
             assert!(topology
                 .reload_config_and_respawn(new_config, false)
@@ -1092,7 +1006,7 @@ mod transient_state_tests {
         new_config.add_sink("out1", &["trans1"], BlackholeConfig { print_amount: 1000 });
 
         rt.block_on_std(async move {
-            let (mut topology, _crash) = topology::start(old_config, false).await.unwrap();
+            let (mut topology, _crash) = start_topology(old_config, false).await;
 
             assert!(topology
                 .reload_config_and_respawn(new_config, false)

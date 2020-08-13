@@ -1,10 +1,10 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     sinks::http::{HttpMethod, HttpSinkConfig},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         BatchConfig, Compression, InFlightLimit, TowerRequestConfig,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use http::Uri;
 use indexmap::IndexMap;
@@ -143,10 +143,10 @@ impl NewRelicLogsConfig {
 mod tests {
     use super::*;
     use crate::{
+        config::SinkConfig,
         event::Event,
         sinks::util::{test::build_test_server, InFlightLimit},
         test_util::next_addr,
-        topology::config::SinkConfig,
     };
     use bytes05::buf::BufExt;
     use futures::compat::Future01CompatExt;

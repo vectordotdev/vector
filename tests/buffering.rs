@@ -9,8 +9,8 @@ use vector::event;
 use vector::test_util::{
     random_events_with_stream, runtime, trace_init, wait_for_atomic_usize_sync, CountReceiver,
 };
-use vector::topology::{self, config};
 use vector::{buffers::BufferConfig, runtime};
+use vector::{config, test_util::start_topology, topology};
 
 mod support;
 
@@ -56,7 +56,7 @@ fn test_buffering() {
 
     let mut rt = runtime();
 
-    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
+    let (topology, _crash) = rt.block_on_std(start_topology(config, false));
 
     let (input_events, input_events_stream) = random_events_with_stream(line_length, num_events);
     let send = in_tx
@@ -98,7 +98,7 @@ fn test_buffering() {
 
     let mut rt = runtime();
     rt.block_on_std(async move {
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
 
         let (input_events2, input_events_stream) =
             random_events_with_stream(line_length, num_events);
@@ -159,7 +159,7 @@ fn test_max_size() {
 
     let mut rt = runtime();
 
-    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
+    let (topology, _crash) = rt.block_on_std(start_topology(config, false));
 
     let send = in_tx
         .sink_map_err(|err| panic!(err))
@@ -201,7 +201,7 @@ fn test_max_size() {
 
     let mut rt = runtime();
     rt.block_on_std(async move {
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
 
         let output_events = CountReceiver::receive_events(out_rx);
 
@@ -242,7 +242,7 @@ fn test_reclaim_disk_space() {
 
     let mut rt = runtime();
 
-    let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
+    let (topology, _crash) = rt.block_on_std(start_topology(config, false));
 
     let (input_events, input_events_stream) = random_events_with_stream(line_length, num_events);
     let send = in_tx
@@ -286,7 +286,7 @@ fn test_reclaim_disk_space() {
 
     let mut rt = runtime();
     rt.block_on_std(async move {
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
 
         let (input_events2, input_events_stream) =
             random_events_with_stream(line_length, num_events);

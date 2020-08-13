@@ -1,4 +1,5 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{log_schema, Event, Value},
     sinks::{
         influxdb::{
@@ -12,7 +13,6 @@ use crate::{
         },
         Healthcheck,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures01::Sink;
 use http::{Request, Uri};
@@ -593,11 +593,15 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::sinks::influxdb::logs::InfluxDBLogsConfig;
-    use crate::sinks::influxdb::test_util::{onboarding_v2, BUCKET, ORG, TOKEN};
-    use crate::sinks::influxdb::InfluxDB2Settings;
-    use crate::test_util::runtime;
-    use crate::topology::SinkContext;
+    use crate::{
+        config::SinkContext,
+        sinks::influxdb::{
+            logs::InfluxDBLogsConfig,
+            test_util::{onboarding_v2, BUCKET, ORG, TOKEN},
+            InfluxDB2Settings,
+        },
+        test_util::runtime,
+    };
     use chrono::Utc;
     use futures::compat::Future01CompatExt;
     use futures01::Sink;

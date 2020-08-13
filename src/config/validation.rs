@@ -1,5 +1,78 @@
-use crate::topology::{config::DataType, Config};
+use super::{Config, DataType};
 use std::collections::HashMap;
+
+pub fn check(config: &Config) -> Result<Vec<String>, Vec<String>> {
+    let mut errors = vec![];
+    let mut warnings = vec![];
+
+    if config.sources.is_empty() {
+        errors.push("No sources defined in the config.".to_owned());
+    }
+    if config.sinks.is_empty() {
+        errors.push("No sinks defined in the config.".to_owned());
+    }
+
+    // Warnings and errors
+    let sink_inputs = config
+        .sinks
+        .iter()
+        .map(|(name, sink)| ("sink", name.clone(), sink.inputs.clone()));
+    let transform_inputs = config
+        .transforms
+        .iter()
+        .map(|(name, transform)| ("transform", name.clone(), transform.inputs.clone()));
+    for (output_type, name, inputs) in sink_inputs.chain(transform_inputs) {
+        if inputs.is_empty() {
+            errors.push(format!(
+                "{} {:?} has no inputs",
+                capitalize(output_type),
+                name
+            ));
+        }
+
+        for input in inputs {
+            if !config.sources.contains_key(&input) && !config.transforms.contains_key(&input) {
+                errors.push(format!(
+                    "Input {:?} for {} {:?} doesn't exist.",
+                    input, output_type, name
+                ));
+            }
+        }
+    }
+
+    let source_names = config.sources.keys().map(|name| ("source", name.clone()));
+    let transform_names = config
+        .transforms
+        .keys()
+        .map(|name| ("transform", name.clone()));
+    for (input_type, name) in transform_names.chain(source_names) {
+        if !config
+            .transforms
+            .iter()
+            .any(|(_, transform)| transform.inputs.contains(&name))
+            && !config
+                .sinks
+                .iter()
+                .any(|(_, sink)| sink.inputs.contains(&name))
+        {
+            warnings.push(format!(
+                "{} {:?} has no consumers",
+                capitalize(input_type),
+                name
+            ));
+        }
+    }
+
+    if let Err(type_errors) = config.typecheck() {
+        errors.extend(type_errors);
+    }
+
+    if errors.is_empty() {
+        Ok(warnings)
+    } else {
+        Err(errors)
+    }
+}
 
 pub fn typecheck(config: &Config) -> Result<(), Vec<String>> {
     Graph::from(config).typecheck()
@@ -185,10 +258,18 @@ fn paths_rec(
     }
 }
 
+fn capitalize(s: &str) -> String {
+    let mut s = s.to_owned();
+    if let Some(r) = s.get_mut(0..1) {
+        r.make_ascii_uppercase();
+    }
+    s
+}
+
 #[cfg(test)]
 mod test {
     use super::Graph;
-    use crate::topology::config::DataType;
+    use crate::config::DataType;
     use pretty_assertions::assert_eq;
 
     #[test]

@@ -1,4 +1,5 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
@@ -9,7 +10,6 @@ use crate::{
         sink::Response,
         BatchConfig, BatchSettings, Compression, EncodedLength, TowerRequestConfig, VecBuffer,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes05::Bytes;
 use futures::{future::BoxFuture, FutureExt, TryFutureExt};
@@ -274,13 +274,13 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        config::SinkContext,
         region::RegionOrEndpoint,
         sinks::{
             elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
             util::BatchConfig,
         },
         test_util::{random_events_with_stream, random_string, runtime},
-        topology::config::SinkContext,
     };
     use futures::compat::Future01CompatExt;
     use futures01::Sink;

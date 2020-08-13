@@ -13,6 +13,7 @@
 //! does not match, we will add a default label `{agent="vector"}`.
 
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
     runtime::FutureExt,
     sinks::util::{
@@ -23,7 +24,6 @@ use crate::{
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use derivative::Derivative;
 use futures01::Sink;
@@ -248,9 +248,9 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
+    use crate::config::SinkConfig;
     use crate::sinks::util::test::load_sink;
     use crate::template::Template;
-    use crate::topology::config::SinkConfig;
     use crate::Event;
     use bytes::Bytes;
     use futures::compat::Future01CompatExt;

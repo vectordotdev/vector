@@ -1,4 +1,5 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
@@ -7,7 +8,6 @@ use crate::{
         http::{BatchedHttpSink, HttpClient, HttpSink},
         BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, Utc};
 use futures::{FutureExt, TryFutureExt};

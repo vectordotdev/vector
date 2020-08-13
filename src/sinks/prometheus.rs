@@ -1,8 +1,8 @@
 use crate::{
     buffers::Acker,
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     sinks::util::MetricEntry,
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
 use chrono::Utc;
