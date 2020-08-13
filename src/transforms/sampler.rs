@@ -2,6 +2,7 @@ use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{self, Event},
+    internal_events::{SamplerEventDiscarded, SamplerEventProcessed},
 };
 use regex::RegexSet; // TODO: use regex::bytes
 use serde::{Deserialize, Serialize};
@@ -69,6 +70,8 @@ impl Transform for Sampler {
             .map(|v| v.to_string_lossy())
             .unwrap_or_else(|| "".into());
 
+        emit!(SamplerEventProcessed);
+
         if self.pass_list.is_match(&message) {
             return Some(event);
         }
@@ -80,6 +83,7 @@ impl Transform for Sampler {
 
             Some(event)
         } else {
+            emit!(SamplerEventDiscarded);
             None
         }
     }
