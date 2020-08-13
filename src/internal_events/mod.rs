@@ -1,4 +1,5 @@
 mod add_fields;
+mod ansi_stripper;
 mod auto_concurrency;
 mod aws_kinesis_streams;
 mod blackhole;
@@ -19,6 +20,7 @@ mod lua;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
 mod regex;
+mod sampler;
 mod split;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 mod splunk_hec;
@@ -36,6 +38,7 @@ mod wasm;
 pub mod kubernetes;
 
 pub use self::add_fields::*;
+pub use self::ansi_stripper::*;
 pub use self::auto_concurrency::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
@@ -57,6 +60,7 @@ pub use self::lua::*;
 #[cfg(feature = "sources-prometheus")]
 pub use self::prometheus::*;
 pub use self::regex::*;
+pub use self::sampler::*;
 pub use self::split::*;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 pub(crate) use self::splunk_hec::*;
