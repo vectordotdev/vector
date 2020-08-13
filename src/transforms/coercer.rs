@@ -1,6 +1,6 @@
 use super::Transform;
+use crate::config::{DataType, TransformConfig, TransformContext, TransformDescription};
 use crate::event::Event;
-use crate::topology::config::{DataType, TransformConfig, TransformContext, TransformDescription};
 use crate::types::{parse_conversion_map, Conversion};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -103,7 +103,7 @@ mod tests {
     use super::CoercerConfig;
     use crate::event::{LogEvent, Value};
     use crate::{
-        topology::config::{TransformConfig, TransformContext},
+        config::{TransformConfig, TransformContext},
         Event,
     };
     use pretty_assertions::assert_eq;

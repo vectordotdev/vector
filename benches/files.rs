@@ -8,9 +8,8 @@ use tempfile::tempdir;
 use tokio::fs::OpenOptions;
 use tokio_util::codec::{BytesCodec, FramedWrite};
 use vector::{
-    sinks, sources,
-    test_util::{random_lines, runtime},
-    topology::{self, config},
+    config, sinks, sources,
+    test_util::{random_lines, runtime, start_topology},
 };
 
 fn benchmark_files_without_partitions(c: &mut Criterion) {
@@ -58,7 +57,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
 
                 let mut rt = runtime();
                 let (topology, input) = rt.block_on_std(async move {
-                    let (topology, _crash) = topology::start(config, false).await.unwrap();
+                    let (topology, _crash) = start_topology(config, false).await;
 
                     let mut options = OpenOptions::new();
                     options.create(true).write(true);

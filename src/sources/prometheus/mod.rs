@@ -1,11 +1,11 @@
 use crate::{
+    config::{self, GlobalOptions},
     hyper::body_to_bytes,
     internal_events::{
         PrometheusEventReceived, PrometheusHttpError, PrometheusParseError,
         PrometheusRequestCompleted,
     },
     shutdown::ShutdownSignal,
-    topology::config::GlobalOptions,
     Event, Pipeline,
 };
 use futures::{
@@ -33,7 +33,7 @@ pub fn default_scrape_interval_secs() -> u64 {
 }
 
 #[typetag::serde(name = "prometheus")]
-impl crate::topology::config::SourceConfig for PrometheusConfig {
+impl crate::config::SourceConfig for PrometheusConfig {
     fn build(
         &self,
         _name: &str,
@@ -49,8 +49,8 @@ impl crate::topology::config::SourceConfig for PrometheusConfig {
         Ok(prometheus(urls, self.scrape_interval_secs, shutdown, out))
     }
 
-    fn output_type(&self) -> crate::topology::config::DataType {
-        crate::topology::config::DataType::Metric
+    fn output_type(&self) -> crate::config::DataType {
+        config::DataType::Metric
     }
 
     fn source_type(&self) -> &'static str {
@@ -129,10 +129,10 @@ fn prometheus(
 mod test {
     use super::*;
     use crate::{
+        config,
         hyper::body_to_bytes,
         sinks::prometheus::PrometheusSinkConfig,
-        test_util::next_addr,
-        topology::{self, config},
+        test_util::{next_addr, start_topology},
         Error,
     };
     use futures::compat::Future01CompatExt;
@@ -206,7 +206,7 @@ mod test {
             },
         );
 
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
         delay_for(Duration::from_secs(1)).await;
 
         let response = Client::new()

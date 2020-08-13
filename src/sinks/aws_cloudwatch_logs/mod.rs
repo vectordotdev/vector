@@ -1,6 +1,7 @@
 mod request;
 
 use crate::{
+    config::{DataType, SinkConfig, SinkContext},
     dns::Resolver,
     event::{self, Event, LogEvent, Value},
     region::RegionOrEndpoint,
@@ -11,7 +12,6 @@ use crate::{
         PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig, SinkContext},
 };
 use bytes::Bytes;
 use chrono::{Duration, Utc};
@@ -846,9 +846,9 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        config::{SinkConfig, SinkContext},
         region::RegionOrEndpoint,
         test_util::{random_lines, random_lines_with_stream, random_string, runtime},
-        topology::config::{SinkConfig, SinkContext},
     };
     use futures01::{
         stream::{self, Stream},

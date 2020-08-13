@@ -1,5 +1,7 @@
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
+use metrics_core::Key;
+use metrics_runtime::Measurement;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -172,6 +174,43 @@ impl Metric {
                 *count = 0;
                 *sum = 0.0;
             }
+        }
+    }
+
+    pub fn from_measurement(key: Key, measurement: Measurement) -> Self {
+        let value = match measurement {
+            Measurement::Counter(v) => MetricValue::Counter { value: v as f64 },
+            Measurement::Gauge(v) => MetricValue::Gauge { value: v as f64 },
+            Measurement::Histogram(packed) => {
+                let values = packed
+                    .decompress()
+                    .into_iter()
+                    .map(|i| i as f64)
+                    .collect::<Vec<_>>();
+                let sample_rates = vec![1; values.len()];
+                MetricValue::Distribution {
+                    values,
+                    sample_rates,
+                    statistic: StatisticKind::Histogram,
+                }
+            }
+        };
+
+        let labels = key
+            .labels()
+            .map(|label| (String::from(label.key()), String::from(label.value())))
+            .collect::<BTreeMap<_, _>>();
+
+        Self {
+            name: key.name().to_string(),
+            timestamp: Some(Utc::now()),
+            tags: if labels.is_empty() {
+                None
+            } else {
+                Some(labels)
+            },
+            kind: MetricKind::Absolute,
+            value,
         }
     }
 }

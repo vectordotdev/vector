@@ -1,11 +1,11 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     sinks::http::{HttpMethod, HttpSinkConfig},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        service2::TowerRequestConfig,
+        service2::{InFlightLimit, TowerRequestConfig},
         BatchConfig, Compression,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use http::Uri;
 use indexmap::IndexMap;
@@ -118,7 +118,7 @@ impl NewRelicLogsConfig {
         let request = TowerRequestConfig {
             // The default throughput ceiling defaults are relatively
             // conservative so we crank them up for New Relic.
-            in_flight_limit: Some(self.request.in_flight_limit.unwrap_or(100)),
+            in_flight_limit: (self.request.in_flight_limit).if_none(InFlightLimit::Fixed(100)),
             rate_limit_num: Some(self.request.rate_limit_num.unwrap_or(100)),
             ..self.request
         };
@@ -144,12 +144,13 @@ impl NewRelicLogsConfig {
 mod tests {
     use super::*;
     use crate::{
+        config::SinkConfig,
         event::Event,
-        sinks::util::test::build_test_server,
-        test_util::{next_addr, runtime, shutdown_on_idle},
-        topology::config::SinkConfig,
+        sinks::util::{service2::InFlightLimit, test::build_test_server},
+        test_util::next_addr,
     };
     use bytes05::buf::BufExt;
+    use futures::compat::Future01CompatExt;
     use futures01::{stream, Sink, Stream};
     use hyper::Method;
     use serde_json::Value;
@@ -183,7 +184,10 @@ mod tests {
             http_config.batch.max_bytes,
             Some(bytesize::mib(5u64) as usize)
         );
-        assert_eq!(http_config.request.in_flight_limit, Some(100));
+        assert_eq!(
+            http_config.request.in_flight_limit,
+            InFlightLimit::Fixed(100)
+        );
         assert_eq!(http_config.request.rate_limit_num, Some(100));
         assert_eq!(
             http_config.headers.unwrap()["X-License-Key"],
@@ -199,7 +203,7 @@ mod tests {
         nr_config.insert_key = Some("foo".to_owned());
         nr_config.region = Some(NewRelicLogsRegion::Eu);
         nr_config.batch.max_size = Some(bytesize::mib(8u64) as usize);
-        nr_config.request.in_flight_limit = Some(12);
+        nr_config.request.in_flight_limit = InFlightLimit::Fixed(12);
         nr_config.request.rate_limit_num = Some(24);
 
         let http_config = nr_config.create_config().unwrap();
@@ -214,7 +218,10 @@ mod tests {
             http_config.batch.max_bytes,
             Some(bytesize::mib(8u64) as usize)
         );
-        assert_eq!(http_config.request.in_flight_limit, Some(12));
+        assert_eq!(
+            http_config.request.in_flight_limit,
+            InFlightLimit::Fixed(12)
+        );
         assert_eq!(http_config.request.rate_limit_num, Some(24));
         assert_eq!(
             http_config.headers.unwrap()["X-Insert-Key"],
@@ -251,7 +258,10 @@ mod tests {
             http_config.batch.max_bytes,
             Some(bytesize::mib(8u64) as usize)
         );
-        assert_eq!(http_config.request.in_flight_limit, Some(12));
+        assert_eq!(
+            http_config.request.in_flight_limit,
+            InFlightLimit::Fixed(12)
+        );
         assert_eq!(http_config.request.rate_limit_num, Some(24));
         assert_eq!(
             http_config.headers.unwrap()["X-Insert-Key"],
@@ -261,8 +271,8 @@ mod tests {
         assert!(http_config.auth.is_none());
     }
 
-    #[test]
-    fn new_relic_logs_happy_path() {
+    #[tokio::test(core_threads = 2)]
+    async fn new_relic_logs_happy_path() {
         let in_addr = next_addr();
 
         let mut nr_config = NewRelicLogsConfig::default();
@@ -273,19 +283,17 @@ mod tests {
             .unwrap()
             .into();
 
-        let mut rt = runtime();
-
         let (sink, _healthcheck) = http_config.build(SinkContext::new_test()).unwrap();
-        let (rx, trigger, server) = build_test_server(in_addr, &mut rt);
+        let (rx, trigger, server) = build_test_server(in_addr);
 
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
         let events = stream::iter_ok(input_lines.clone().into_iter().map(Event::from));
 
         let pump = sink.send_all(events);
 
-        rt.spawn(server);
+        tokio::spawn(server);
 
-        let _ = rt.block_on(pump).unwrap();
+        let _ = pump.compat().await.unwrap();
         drop(trigger);
 
         let output_lines = rx
@@ -312,8 +320,6 @@ mod tests {
                     .collect()
             })
             .collect::<Vec<_>>();
-
-        shutdown_on_idle(rt);
 
         assert_eq!(input_lines, output_lines);
     }

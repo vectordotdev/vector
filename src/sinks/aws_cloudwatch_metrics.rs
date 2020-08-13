@@ -1,4 +1,5 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::metric::{Metric, MetricKind, MetricValue},
     region::RegionOrEndpoint,
@@ -6,7 +7,6 @@ use crate::{
         retries2::RetryLogic, rusoto, service2::TowerRequestConfig, BatchConfig, BatchSettings,
         Compression, MetricBuffer,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, SecondsFormat, Utc};
 use futures::{future::BoxFuture, FutureExt, TryFutureExt};
@@ -425,10 +425,10 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
+    use crate::config::SinkContext;
     use crate::event::{metric::StatisticKind, Event};
     use crate::region::RegionOrEndpoint;
     use crate::test_util::{random_string, runtime};
-    use crate::topology::config::SinkContext;
     use chrono::offset::TimeZone;
     use futures01::{stream, Sink};
 
