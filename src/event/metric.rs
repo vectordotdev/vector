@@ -247,11 +247,14 @@ impl Display for Metric {
                 write_word(fmt, tag).and_then(|()| write!(fmt, "={:?}", value))
             })?;
         }
-        write!(fmt, "}}")?;
-        match self.kind {
-            MetricKind::Absolute => write!(fmt, " = "),
-            MetricKind::Incremental => write!(fmt, " + "),
-        }?;
+        write!(
+            fmt,
+            "}} {} ",
+            match self.kind {
+                MetricKind::Absolute => '=',
+                MetricKind::Incremental => '+',
+            }
+        )?;
         match &self.value {
             MetricValue::Counter { value } => write!(fmt, "{}", value),
             MetricValue::Gauge { value } => write!(fmt, "{}", value),
@@ -265,10 +268,10 @@ impl Display for Metric {
             } => {
                 write!(
                     fmt,
-                    "{}",
+                    "{} ",
                     match statistic {
-                        StatisticKind::Histogram => "histogram ",
-                        StatisticKind::Summary => "summary ",
+                        StatisticKind::Histogram => "histogram",
+                        StatisticKind::Summary => "summary",
                     }
                 )?;
                 write_list(
