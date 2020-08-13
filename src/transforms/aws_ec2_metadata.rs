@@ -14,8 +14,8 @@ use string_cache::DefaultAtom as Atom;
 use tokio::time::{delay_for, Duration, Instant};
 use tracing_futures::Instrument;
 
-type WriteHandle = evmap::WriteHandle<Atom, Bytes, (), RandomState>;
-type ReadHandle = evmap::ReadHandle<Atom, Bytes, (), RandomState>;
+type WriteHandle = evmap07::WriteHandle<Atom, Bytes, (), RandomState>;
+type ReadHandle = evmap07::ReadHandle<Atom, Bytes, (), RandomState>;
 
 lazy_static::lazy_static! {
     static ref AMI_ID: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/ami-id");
@@ -118,7 +118,7 @@ impl TransformConfig for Ec2Metadata {
     }
 
     async fn build_async(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        let (read, write) = evmap::new();
+        let (read, write) = evmap07::new();
 
         // Check if the namespace is set to `""` which should mean that we do
         // not want a prefixed namespace.
