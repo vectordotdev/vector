@@ -1,4 +1,6 @@
 use super::InternalEvent;
+use crate::event::Event;
+use futures01::sync::mpsc::SendError;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -41,5 +43,16 @@ impl InternalEvent for UdpSocketError {
             "component_type" => "socket",
             "mode" => "udp",
         );
+    }
+}
+
+#[derive(Debug)]
+pub struct UdpSocketSendError {
+    pub error: SendError<Event>,
+}
+
+impl InternalEvent for UdpSocketSendError {
+    fn emit_logs(&self) {
+        error!(message = "error sending event.", error = ?self.error);
     }
 }
