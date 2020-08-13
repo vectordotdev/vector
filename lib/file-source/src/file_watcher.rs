@@ -60,7 +60,7 @@ impl FileWatcher {
                 // the entire thing, so for now we simply refuse to read gzipped files for which we
                 // already have a stored file position from a previous run.
                 debug!(
-                    message = "Not re-reading gzipped file with existing stored offset",
+                    message = "not re-reading gzipped file with existing stored offset.",
                     ?path,
                     %file_position
                 );
@@ -242,7 +242,7 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
 
         if !discarding && buf.len() > max_size {
             warn!(
-                message = "Found line that exceeds max_line_bytes; discarding.",
+                message = "found line that exceeds max_line_bytes; discarding.",
                 rate_limit_secs = 30
             );
             discarding = true;
