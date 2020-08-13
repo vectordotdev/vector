@@ -243,6 +243,8 @@ impl Service<PartitionInnerBuffer<Vec<InputLogEvent>, CloudwatchKey>>
         let svc = if let Some(svc) = &mut self.clients.get_mut(&key) {
             svc.clone()
         } else {
+            // Buffer size is in_flight_limit because current service always ready.
+            // Concurrency limit is 1 because we need token from previous request.
             let svc = ServiceBuilder::new()
                 .buffer(self.request_settings.in_flight_limit.unwrap_or(5))
                 .concurrency_limit(1)
