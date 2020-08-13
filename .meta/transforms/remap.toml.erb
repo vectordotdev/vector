@@ -37,7 +37,7 @@ The remap transform makes it easy to add, rename and remove fields with a series
 }
 ```
 
-If, say, we wished to add a new field `type` with a static value `"human_person"`, a dynamic field `acquaintances` that equals the sum of the fields `friends` and `enemies`, and remove the field `enemies`, we can achieve that with two mapping statements:
+If, say, we wished to add a new field `type` with a static value `"human_person"`, a dynamic field `acquaintances` that equals the sum of the fields `friends` and `enemies`, and remove the field `enemies`, we can achieve that with the following mapping:
 
 ```toml
 [transforms.remap_human_person]
@@ -49,7 +49,7 @@ If, say, we wished to add a new field `type` with a static value `"human_person"
   \"\"\"
 ```
 
-A log event will be output with the following structure:
+And log events will be output with the following structure:
 
 ```json
 {
@@ -62,38 +62,51 @@ A log event will be output with the following structure:
 """
 
 [[transforms.remap.examples]]
-label = "Removing fields"
+label = "Conditional mapping"
 body = """\
-:
+Sometimes there are mappings that we only wish to execute given certain conditions, the remap transform allows you to express this with if statements. For example, given events of the following form:
 
 ```json
 {
-  "name": "Foo McBarson",
-  "friends": 23,
-  "enemies": 17
+  "type": "foo",
+  "foo": {
+    "body": "hello world",
+    "id": "XXX"
+  }
 }
 ```
 
-If, say, we wished to add a new field `type` with a static value `"human_person"`, and a dynamic field `acquaintances` that equals the sum of the fields `friends` and `enemies`, we can achieve that with two mapping statements:
+And, occasionally of the following alternative form:
+
+```json
+{
+  "type": "bar",
+  "body": "hello world",
+  "id": "YYY"
+}
+```
+
+If we wished to create a consistent format between the two, where the fields `body` and `id` are always at the root of the event, we can achieve this by conditionally mapping against the field `type` of the input event:
 
 ```toml
 [transforms.remap_human_person]
   type = "remap"
   mapping = \"\"\"
-    .type = "human_person"
-    .acquaintances = .friends + .enemies
+    if .type == "foo" {
+      .body = .foo.body
+      .id = .foo.id
+      del(.foo)
+    }
   \"\"\"
 ```
 
-A log event will be output with the following structure:
+And with the above mapping our events will be output with the following consistent structure:
 
 ```json
 {
-  "name": "Foo McBarson",
-  "type": "human_person",
-  "friends": 23,
-  "enemies": 17,
-  "acquaintance": 40
+  "type": "foo",
+  "body": "hello world",
+  "id": "XXX"
 }
 ```\
 """
