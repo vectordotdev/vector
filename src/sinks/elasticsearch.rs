@@ -1,4 +1,5 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
     event::Event,
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
@@ -13,7 +14,6 @@ use crate::{
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes05::Bytes;
 use futures::{FutureExt, TryFutureExt};
@@ -565,12 +565,12 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        config::{SinkConfig, SinkContext},
         dns::Resolver,
         event,
         sinks::util::http::HttpClient,
         test_util::{random_events_with_stream, random_string, runtime},
         tls::TlsOptions,
-        topology::config::{SinkConfig, SinkContext},
         Event,
     };
     use futures::compat::Future01CompatExt;

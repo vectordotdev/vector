@@ -1,11 +1,11 @@
 use crate::{
     buffers::Acker,
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
     template::{Template, TemplateError},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::compat::Compat;
 use futures01::{
@@ -325,7 +325,7 @@ mod integration_test {
     use crate::{
         buffers::Acker,
         kafka::{KafkaAuthConfig, KafkaSaslConfig, KafkaTlsConfig},
-        test_util::{block_on, random_lines_with_stream, random_string, wait_for},
+        test_util::{block_on, random_lines_with_stream, random_string, wait_for_sync},
         tls::TlsOptions,
     };
     use futures::compat::Future01CompatExt;
@@ -480,7 +480,7 @@ mod integration_test {
         consumer.assign(&tpl).unwrap();
 
         // wait for messages to show up
-        wait_for(|| {
+        wait_for_sync(|| {
             let (_low, high) = consumer
                 .fetch_watermarks(&topic, 0, Duration::from_secs(3))
                 .unwrap();

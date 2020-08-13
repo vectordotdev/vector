@@ -10,9 +10,6 @@ Group=vector
 ExecStart=/usr/bin/vector
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=no
-StandardOutput=syslog
-StandardError=syslog
-SyslogIdentifier=vector
 
 [Install]
 WantedBy=multi-user.target

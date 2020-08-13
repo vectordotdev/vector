@@ -1,9 +1,9 @@
 use crate::{
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::{self, Event},
     shutdown::ShutdownSignal,
     sources::util::{ErrorMessage, HttpSource},
     tls::TlsConfig,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Pipeline,
 };
 use bytes05::{Bytes, BytesMut};
@@ -201,10 +201,10 @@ mod tests {
 
     use crate::shutdown::ShutdownSignal;
     use crate::{
+        config::{GlobalOptions, SourceConfig},
         event::{self, Event},
         runtime::Runtime,
         test_util::{self, collect_n, runtime},
-        topology::config::{GlobalOptions, SourceConfig},
         Pipeline,
     };
     use futures::compat::Future01CompatExt;

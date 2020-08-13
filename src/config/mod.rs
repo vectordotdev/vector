@@ -14,9 +14,15 @@ use std::fs::DirBuilder;
 use std::{collections::HashMap, path::PathBuf};
 
 pub mod component;
+mod diff;
+mod loading;
 mod validation;
 mod vars;
 pub mod watcher;
+
+pub use diff::ConfigDiff;
+pub use loading::*;
+pub use validation::check;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]

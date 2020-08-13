@@ -1,8 +1,8 @@
 use super::Transform;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{self, Event},
     internal_events::{SplitConvertFailed, SplitEventProcessed, SplitFieldMissing},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -139,7 +139,7 @@ mod tests {
     use super::SplitConfig;
     use crate::event::{LogEvent, Value};
     use crate::{
-        topology::config::{TransformConfig, TransformContext},
+        config::{TransformConfig, TransformContext},
         Event,
     };
     use string_cache::DefaultAtom as Atom;

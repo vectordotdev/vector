@@ -1,10 +1,10 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     sinks::splunk_hec::{self, HecSinkConfig},
     sinks::util::{
         encoding::EncodingConfigWithDefault, service2::TowerRequestConfig, BatchConfig, Compression,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use serde::{Deserialize, Serialize};
 
@@ -105,7 +105,7 @@ mod tests {
     fn humio_valid_time_field() {
         let event = Event::from("hello world");
 
-        let (config, _, _) = load_sink::<HumioLogsConfig>(
+        let (config, _cx) = load_sink::<HumioLogsConfig>(
             r#"
             token = "alsdkfjaslkdfjsalkfj"
             host = "https://127.0.0.1"
@@ -131,9 +131,9 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        config::{SinkConfig, SinkContext},
         sinks::util::Compression,
         test_util::{random_string, runtime},
-        topology::config::{SinkConfig, SinkContext},
         Event,
     };
     use chrono::Utc;

@@ -1,10 +1,10 @@
 mod add_fields;
+mod auto_concurrency;
 mod aws_kinesis_streams;
 mod blackhole;
 #[cfg(feature = "sources-docker")]
 mod docker;
 mod elasticsearch;
-mod file;
 mod http;
 #[cfg(all(unix, feature = "sources-journald"))]
 mod journald;
@@ -36,6 +36,7 @@ mod wasm;
 pub mod kubernetes;
 
 pub use self::add_fields::*;
+pub use self::auto_concurrency::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
 #[cfg(feature = "sources-docker")]
@@ -86,3 +87,6 @@ macro_rules! emit {
         $crate::internal_events::emit($event);
     };
 }
+
+// Modules that require emit! macro so they need to be defined after the macro.
+mod file;
