@@ -376,16 +376,15 @@ where
     fn poll_send(&mut self, batch: B) -> Poll<(), crate::Error> {
         if let Async::NotReady = self.service.poll_ready()? {
             self.sending.push_front(batch);
-            Ok(Async::NotReady)
         } else {
             let batch_size = batch.num_items();
             let batch = batch.finish();
 
             let fut = self.service.call(batch, batch_size).compat();
             tokio::spawn(fut);
-
-            self.service.poll_complete()
         }
+
+        self.service.poll_complete()
     }
 
     fn handle_full_batch(&mut self, item: B::Input, partition: &K) -> FullBatchResult<B::Input> {
@@ -515,7 +514,9 @@ where
         self.service.poll_complete()?;
 
         while let Some(batch) = self.sending.pop_front() {
-            self.poll_send(batch)?;
+            if self.poll_send(batch)? == Async::Ready(()) {
+                break;
+            }
         }
 
         let closing = self.closing;
@@ -553,6 +554,12 @@ where
                 ready_batches.push(batch);
             }
         }
+        if !self.partitions.is_empty() {
+            assert!(
+                !self.lingers.is_empty(),
+                "If partitions are not empty, then there must be a linger"
+            );
+        }
 
         for batch in ready_batches.into_iter().chain(partitions) {
             self.poll_send(batch.into_inner())?;
@@ -561,11 +568,7 @@ where
         // If we still have an inflight partition then
         // we should have a linger associated with it that
         // will wake up this task when it is ready to be flushed.
-        if !self.partitions.is_empty() {
-            assert!(
-                !self.lingers.is_empty(),
-                "If partitions are not empty, then there must be a linger"
-            );
+        if !self.partitions.is_empty() || !self.sending.is_empty() {
             self.service.poll_complete()?;
             Ok(Async::NotReady)
         } else {
