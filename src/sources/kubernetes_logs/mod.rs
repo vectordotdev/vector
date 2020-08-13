@@ -6,7 +6,10 @@
 #![deny(missing_docs)]
 
 use crate::event::{self, Event};
-use crate::internal_events::{KubernetesLogsEventAnnotationFailed, KubernetesLogsEventReceived};
+use crate::internal_events::{
+    FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
+    KubernetesLogsEventReceived,
+};
 use crate::kubernetes as k8s;
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -203,6 +206,7 @@ impl Source {
             },
             oldest_first: false,
             remove_after: None,
+            emitter: FileSourceInternalEventsEmitter,
         };
 
         let (file_source_tx, file_source_rx) =
