@@ -1,8 +1,8 @@
 use super::Transform;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{self, Event, Value},
     internal_events::{RegexEventProcessed, RegexFailedMatch, RegexMissingField},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
@@ -304,7 +304,7 @@ mod tests {
     use super::RegexParserConfig;
     use crate::event::{LogEvent, Value};
     use crate::{
-        topology::config::{TransformConfig, TransformContext},
+        config::{TransformConfig, TransformContext},
         Event,
     };
 

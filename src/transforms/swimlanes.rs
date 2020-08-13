@@ -1,8 +1,8 @@
 use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};

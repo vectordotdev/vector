@@ -1,4 +1,5 @@
 use crate::{
+    config::SinkContext,
     dns::Resolver,
     emit,
     internal_events::{
@@ -8,7 +9,6 @@ use crate::{
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSink},
     sinks::{Healthcheck, RouterSink},
     tls::{MaybeTlsConnector, MaybeTlsSettings, MaybeTlsStream, TlsConfig},
-    topology::config::SinkContext,
 };
 use bytes05::Bytes;
 use futures::{

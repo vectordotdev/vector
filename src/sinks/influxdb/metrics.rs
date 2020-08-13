@@ -1,4 +1,5 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricValue},
     sinks::influxdb::{
         encode_namespace, encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings,
@@ -9,7 +10,6 @@ use crate::{
         service2::TowerRequestConfig,
         BatchConfig, BatchSettings, MetricBuffer,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::future::{ready, BoxFuture};
 use futures01::Sink;
@@ -735,15 +735,20 @@ mod tests {
 #[cfg(feature = "influxdb-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use crate::event::metric::{MetricKind, MetricValue};
-    use crate::event::Metric;
-    use crate::sinks::influxdb::metrics::{InfluxDBConfig, InfluxDBSvc};
-    use crate::sinks::influxdb::test_util::{onboarding_v2, BUCKET, ORG, TOKEN};
-    use crate::sinks::influxdb::InfluxDB2Settings;
-    use crate::sinks::util::http::HttpClient;
-    use crate::test_util::runtime;
-    use crate::topology::SinkContext;
-    use crate::Event;
+    use crate::{
+        config::SinkContext,
+        event::metric::{Metric, MetricKind, MetricValue},
+        sinks::{
+            influxdb::{
+                metrics::{InfluxDBConfig, InfluxDBSvc},
+                test_util::{onboarding_v2, BUCKET, ORG, TOKEN},
+                InfluxDB2Settings,
+            },
+            util::http::HttpClient,
+        },
+        test_util::runtime,
+        Event,
+    };
     use chrono::Utc;
     use futures::compat::Future01CompatExt;
     use futures01::{stream as stream01, Sink};

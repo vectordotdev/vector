@@ -1,4 +1,5 @@
 use crate::{
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
     internal_events::{
@@ -7,7 +8,6 @@ use crate::{
         DockerLoggingDriverUnsupported, DockerTimestampParseFailed,
     },
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Pipeline,
 };
 use bollard::{
