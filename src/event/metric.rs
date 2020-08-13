@@ -87,9 +87,7 @@ impl Metric {
                 *value += value2;
             }
             (MetricValue::Set { ref mut values }, MetricValue::Set { values: values2 }) => {
-                for val in values2 {
-                    values.insert(val.to_string());
-                }
+                values.extend(values2.iter().map(Into::into));
             }
             (
                 MetricValue::Distribution {
