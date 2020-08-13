@@ -1,4 +1,4 @@
-use crate::event::Event;
+use crate::event::{Event, Value};
 
 pub mod parser;
 pub mod query;
@@ -59,6 +59,49 @@ impl Function for Deletion {
 //------------------------------------------------------------------------------
 
 #[derive(Debug)]
+pub(self) struct IfStatement {
+    query: Box<dyn query::Function>,
+    true_statement: Box<dyn Function>,
+    false_statement: Box<dyn Function>,
+}
+
+impl IfStatement {
+    pub(self) fn new(
+        query: Box<dyn query::Function>,
+        true_statement: Box<dyn Function>,
+        false_statement: Box<dyn Function>,
+    ) -> Self {
+        Self {
+            query,
+            true_statement,
+            false_statement,
+        }
+    }
+}
+
+impl Function for IfStatement {
+    fn apply(&self, target: &mut Event) -> Result<()> {
+        match self.query.execute(target)? {
+            Value::Boolean(true) => self.true_statement.apply(target),
+            _ => self.false_statement.apply(target),
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug)]
+pub(self) struct Noop {}
+
+impl Function for Noop {
+    fn apply(&self, _: &mut Event) -> Result<()> {
+        Ok(())
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug)]
 pub struct Mapping {
     assignments: Vec<Box<dyn Function>>,
 }
@@ -82,7 +125,10 @@ impl Mapping {
 
 #[cfg(test)]
 mod test {
-    use super::query::Literal;
+    use super::query::{
+        arithmetic::Arithmetic, arithmetic::Operator as ArithmeticOperator,
+        path::Path as QueryPath, Literal,
+    };
     use super::*;
     use crate::event::{Event, Value};
 
@@ -142,6 +188,82 @@ mod test {
                     )),
                     Box::new(Deletion::new("bar".to_string())),
                 ]),
+                Ok(()),
+            ),
+            (
+                {
+                    let mut event = Event::from("foo body");
+                    event.as_mut_log().insert("bar", Value::from("baz"));
+                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event
+                },
+                {
+                    let mut event = Event::from("foo body");
+                    event.as_mut_log().insert("bar", Value::from("baz"));
+                    event.as_mut_log().insert("foo", Value::from("bar is baz"));
+                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event
+                },
+                Mapping::new(vec![Box::new(IfStatement::new(
+                    Box::new(Arithmetic::new(
+                        Box::new(QueryPath::from("bar")),
+                        Box::new(Literal::from(Value::from("baz"))),
+                        ArithmeticOperator::Equal,
+                    )),
+                    Box::new(Assignment::new(
+                        "foo".to_string(),
+                        Box::new(Literal::from(Value::from("bar is baz"))),
+                    )),
+                    Box::new(Deletion::new("bar".to_string())),
+                ))]),
+                Ok(()),
+            ),
+            (
+                {
+                    let mut event = Event::from("foo body");
+                    event.as_mut_log().insert("bar", Value::from("buz"));
+                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event
+                },
+                {
+                    let mut event = Event::from("foo body");
+                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event
+                },
+                Mapping::new(vec![Box::new(IfStatement::new(
+                    Box::new(Arithmetic::new(
+                        Box::new(QueryPath::from("bar")),
+                        Box::new(Literal::from(Value::from("baz"))),
+                        ArithmeticOperator::Equal,
+                    )),
+                    Box::new(Assignment::new(
+                        "foo".to_string(),
+                        Box::new(Literal::from(Value::from("bar is baz"))),
+                    )),
+                    Box::new(Deletion::new("bar".to_string())),
+                ))]),
+                Ok(()),
+            ),
+            (
+                {
+                    let mut event = Event::from("foo body");
+                    event.as_mut_log().insert("bar", Value::from("buz"));
+                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event
+                },
+                {
+                    let mut event = Event::from("foo body");
+                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event
+                },
+                Mapping::new(vec![Box::new(IfStatement::new(
+                    Box::new(QueryPath::from("bar")),
+                    Box::new(Assignment::new(
+                        "foo".to_string(),
+                        Box::new(Literal::from(Value::from("bar is baz"))),
+                    )),
+                    Box::new(Deletion::new("bar".to_string())),
+                ))]),
                 Ok(()),
             ),
         ];

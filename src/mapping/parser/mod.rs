@@ -5,7 +5,7 @@ use crate::{
     mapping::{
         query,
         query::{arithmetic::Arithmetic, arithmetic::Operator, path::Path as QueryPath, Literal},
-        Assignment, Deletion, Function, Mapping, Result,
+        Assignment, Deletion, Function, IfStatement, Mapping, Noop, Result,
     },
 };
 
@@ -149,8 +149,8 @@ fn query_arithmetic_boolean_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn
     Ok(left)
 }
 
-fn query_arithmetic_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
-    query_arithmetic_boolean_from_pairs(pairs.next().unwrap().into_inner())
+fn query_arithmetic_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
+    query_arithmetic_boolean_from_pairs(pair.into_inner())
 }
 
 fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
@@ -177,27 +177,53 @@ fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
             Box::new(Literal::from(Value::from(v)))
         }
         Rule::dot_path => Box::new(QueryPath::from(path_segments_from_pair(pair)?)),
-        Rule::group => query_arithmetic_from_pairs(pair.into_inner())?,
+        Rule::group => query_arithmetic_from_pair(pair.into_inner().next().unwrap())?,
         _ => unreachable!(),
     })
+}
+
+fn if_statement_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn Function>> {
+    let query = query_arithmetic_from_pair(pairs.next().unwrap())?;
+
+    let first = statement_from_pair(pairs.next().unwrap())?;
+
+    let second = if let Some(pair) = pairs.next() {
+        statement_from_pair(pair)?
+    } else {
+        Box::new(Noop {})
+    };
+
+    Ok(Box::new(IfStatement::new(query, first, second)))
+}
+
+fn statement_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
+    match pair.as_rule() {
+        Rule::assignment => {
+            let mut inner_rules = pair.into_inner();
+            let path = path_from_pair(inner_rules.next().unwrap())?;
+            let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
+            Ok(Box::new(Assignment::new(path, query)))
+        }
+        Rule::deletion => {
+            let mut inner_rules = pair.into_inner();
+            let path = path_from_pair(inner_rules.next().unwrap())?;
+            Ok(Box::new(Deletion::new(path)))
+        }
+        Rule::if_statement => if_statement_from_pairs(pair.into_inner()),
+        _ => unreachable!(),
+    }
 }
 
 fn mapping_from_pairs(pairs: Pairs<Rule>) -> Result<Mapping> {
     let mut assignments = Vec::<Box<dyn Function>>::new();
     for pair in pairs {
         match pair.as_rule() {
-            Rule::assignment => {
-                let mut inner_rules = pair.into_inner();
-                let path = path_from_pair(inner_rules.next().unwrap())?;
-                let query = query_arithmetic_from_pairs(inner_rules)?;
-                assignments.push(Box::new(Assignment::new(path, query)));
+            // Rules expected at the root of a mapping statement.
+            Rule::assignment | Rule::deletion | Rule::if_statement => {
+                assignments.push(statement_from_pair(pair)?);
             }
-            Rule::deletion => {
-                let mut inner_rules = pair.into_inner();
-                let path = path_from_pair(inner_rules.next().unwrap())?;
-                assignments.push(Box::new(Deletion::new(path)));
-            }
-            _ => (),
+            Rule::EOI => (),
+            _ => unreachable!(),
         }
     }
     Ok(Mapping::new(assignments))
@@ -247,23 +273,49 @@ mod test {
     #[test]
     fn check_parser_errors() {
         let cases = vec![
-            (".foo = {\"bar\"}", vec![" 1:8", "= expected query"]),
+            (".foo = {\"bar\"}", vec![" 1:8\n", "= expected query"]),
             (
                 ". = \"bar\"",
-                vec![" 1:1", "= expected target_path or deletion"],
+                vec![
+                    " 1:1\n",
+                    "= expected if_statement, target_path, or deletion",
+                ],
             ),
             (
                 "foo = \"bar\"",
-                vec![" 1:1", "= expected target_path or deletion"],
+                vec![
+                    " 1:1\n",
+                    "= expected if_statement, target_path, or deletion",
+                ],
             ),
             (
                 ".foo.bar = \"baz\" and this",
-                vec![" 1:18", "= expected EOI or operator"],
+                vec![" 1:18\n", "= expected EOI or operator"],
             ),
             (".foo.bar = \"baz\" +", vec![" 1:19", "= expected query"]),
             (
                 ".foo.bar = .foo.(bar |)",
-                vec![" 1:23", "= expected path_segment"],
+                vec![" 1:23\n", "= expected path_segment"],
+            ),
+            (
+                "if .foo > 0 { .foo = \"bar\" } else",
+                vec![" 1:30\n", "= expected EOI"],
+            ),
+            (
+                r#"if .foo { }"#,
+                vec![
+                    " 1:11\n",
+                    "= expected if_statement, target_path, or deletion",
+                ],
+            ),
+            (
+                r#"if { del(.foo) } else { del(.bar) }"#,
+                vec![" 1:4\n", "= expected query"],
+            ),
+            (
+                r#"if .foo > .bar { del(.foo) } else { .bar = .baz"#,
+                // This message isn't great, ideally I'd like "expected closing bracket"
+                vec![" 1:48\n", "= expected operator"],
             ),
         ];
 
@@ -452,6 +504,51 @@ mod test {
                         )),
                         Operator::Or,
                     )),
+                ))]),
+            ),
+            (
+                "del(.foo)",
+                Mapping::new(vec![Box::new(Deletion::new("foo".to_string()))]),
+            ),
+            (
+                "del(.foo)\ndel(.bar.baz)",
+                Mapping::new(vec![
+                    Box::new(Deletion::new("foo".to_string())),
+                    Box::new(Deletion::new("bar.baz".to_string())),
+                ]),
+            ),
+            (
+                r#"if .foo == 5 {
+                    .foo = .bar
+                  } else {
+                    del(.buz)
+                  }"#,
+                Mapping::new(vec![Box::new(IfStatement::new(
+                    Box::new(Arithmetic::new(
+                        Box::new(QueryPath::from("foo")),
+                        Box::new(Literal::from(Value::from(5.0))),
+                        Operator::Equal,
+                    )),
+                    Box::new(Assignment::new(
+                        "foo".to_string(),
+                        Box::new(QueryPath::from("bar")),
+                    )),
+                    Box::new(Deletion::new("buz".to_string())),
+                ))]),
+            ),
+            (
+                "if .foo > .buz { .thing = .foo }",
+                Mapping::new(vec![Box::new(IfStatement::new(
+                    Box::new(Arithmetic::new(
+                        Box::new(QueryPath::from("foo")),
+                        Box::new(QueryPath::from("buz")),
+                        Operator::Greater,
+                    )),
+                    Box::new(Assignment::new(
+                        "thing".to_string(),
+                        Box::new(QueryPath::from("foo")),
+                    )),
+                    Box::new(Noop {}),
                 ))]),
             ),
         ];
