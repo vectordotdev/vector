@@ -15,6 +15,16 @@ env:
   AWS_SECRET_ACCESS_KEY: "dummy"
 
 jobs:
+  cancel-previous:
+    name: Cancel redundant jobs
+    runs-on: ubuntu-20.04
+    timeout-minutes: 3
+    if: github.ref != 'refs/heads/master'
+    steps:
+      - uses: styfle/cancel-workflow-action@0.4.1
+        with:
+          access_token: ${{ secrets.GITHUB_TOKEN }}
+
   checks:
     name: Checks
     runs-on: ubuntu-20.04

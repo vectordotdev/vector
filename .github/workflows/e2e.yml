@@ -47,6 +47,16 @@ env:
   AWS_SECRET_ACCESS_KEY: "dummy"
 
 jobs:
+  cancel-previous:
+    name: Cancel redundant jobs
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    if: ${{ github.ref != 'refs/heads/master' && github.event_name != 'schedule' }}
+    steps:
+      - uses: styfle/cancel-workflow-action@0.4.1
+        with:
+          access_token: ${{ secrets.GITHUB_TOKEN }}
+
   build-deb-package:
     name: Build .deb package
     runs-on: ubuntu-latest
