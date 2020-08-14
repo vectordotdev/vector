@@ -6,7 +6,7 @@ use crate::{
     tls::TlsConfig,
     Pipeline,
 };
-use bytes05::{Bytes, BytesMut};
+use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use codec::BytesDelimitedCodec;
 use serde::{Deserialize, Serialize};

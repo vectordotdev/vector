@@ -17,7 +17,7 @@ use bollard::{
     system::EventsOptions,
     Docker,
 };
-use bytes05::{Buf, Bytes};
+use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, NaiveTime, ParseError, Utc, MAX_DATE};
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},

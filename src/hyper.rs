@@ -1,4 +1,4 @@
-use bytes05::{Bytes, BytesMut};
+use bytes::{Bytes, BytesMut};
 use futures::TryStreamExt;
 use hyper::{Body, Error};
 

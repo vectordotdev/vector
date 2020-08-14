@@ -5,7 +5,7 @@ use crate::{
     hyper::body_to_bytes,
     sinks::util::http::HttpClient,
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::Body;
 use serde::{Deserialize, Serialize};

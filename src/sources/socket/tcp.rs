@@ -4,7 +4,7 @@ use crate::{
     sources::util::{SocketListenAddr, TcpSource},
     tls::TlsConfig,
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;

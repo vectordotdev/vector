@@ -1,4 +1,4 @@
-use bytes05::Bytes;
+use bytes::Bytes;
 use file_source::{
     paths_provider::PathsProvider, FileServer, FileServerShutdown, FileSourceInternalEvents,
 };

@@ -7,7 +7,7 @@ use crate::{
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, StreamSink},
     sinks::{Healthcheck, RouterSink},
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use futures::{compat::CompatSink, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
@@ -142,7 +142,7 @@ impl UnixSink {
 }
 
 impl Sink for UnixSink {
-    type SinkItem = bytes::Bytes;
+    type SinkItem = Bytes;
     type SinkError = ();
 
     fn start_send(&mut self, line: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
@@ -165,13 +165,7 @@ impl Sink for UnixSink {
                     }
                     Ok(res) => {
                         emit!(UnixSocketEventSent { byte_size });
-                        Ok(match res {
-                            AsyncSink::Ready => AsyncSink::Ready,
-                            AsyncSink::NotReady(bytes) => {
-                                let bytes = bytes::Bytes::from(&bytes[..]);
-                                AsyncSink::NotReady(bytes)
-                            }
-                        })
+                        Ok(res)
                     }
                 }
             }

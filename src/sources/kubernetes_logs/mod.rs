@@ -19,7 +19,7 @@ use crate::{
     transforms::Transform,
     Pipeline,
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use file_source::{FileServer, FileServerShutdown, Fingerprinter};
 use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
 use k8s_openapi::api::core::v1::Pod;

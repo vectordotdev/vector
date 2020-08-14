@@ -10,7 +10,7 @@ use crate::{
     sinks::{Healthcheck, RouterSink},
     tls::{MaybeTlsConnector, MaybeTlsSettings, MaybeTlsStream, TlsConfig},
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use futures::{
     compat::{Compat01As03, CompatSink},
     FutureExt, TryFutureExt,
@@ -196,7 +196,7 @@ impl TcpSink {
 }
 
 impl Sink for TcpSink {
-    type SinkItem = bytes::Bytes;
+    type SinkItem = Bytes;
     type SinkError = ();
 
     fn start_send(&mut self, line: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
@@ -249,13 +249,7 @@ impl Sink for TcpSink {
                                 self.state = TcpSinkState::Disconnected;
                                 Ok(AsyncSink::Ready)
                             }
-                            Ok(res) => Ok(match res {
-                                AsyncSink::Ready => AsyncSink::Ready,
-                                AsyncSink::NotReady(bytes) => {
-                                    let bytes = bytes::Bytes::from(&bytes[..]);
-                                    AsyncSink::NotReady(bytes)
-                                }
-                            }),
+                            Ok(res) => Ok(res),
                         }
                     }
                 }

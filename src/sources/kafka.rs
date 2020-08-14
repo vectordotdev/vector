@@ -126,7 +126,7 @@ fn kafka_source(
 
                             let payload = match msg.payload() {
                                 None => return Err(()), // skip messages with empty payload
-                                Some(payload) => Bytes::from(payload),
+                                Some(payload) => Bytes::copy_from_slice(payload),
                             };
                             let mut event = Event::new_empty_log();
                             let log = event.as_mut_log();
