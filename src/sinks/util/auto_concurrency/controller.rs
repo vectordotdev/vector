@@ -180,6 +180,10 @@ impl<L> Controller<L> {
                 }
                 emit!(AutoConcurrencyLimit {
                     concurrency: inner.current_limit as u64,
+                    reached_limit: inner.reached_limit,
+                    had_back_pressure: inner.had_back_pressure,
+                    current_rtt: Duration::from_secs_f64(current_rtt),
+                    past_rtt: Duration::from_secs_f64(past_rtt),
                 });
             }
 

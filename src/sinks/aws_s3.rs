@@ -91,6 +91,8 @@ enum S3CannedAcl {
     PublicReadWrite,
     AwsExecRead,
     AuthenticatedRead,
+    BucketOwnerRead,
+    BucketOwnerFullControl,
     LogDeliveryWrite,
 }
 

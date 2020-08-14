@@ -172,7 +172,7 @@ jobs:
       - env:
           DOCKER_USERNAME: "${{ secrets.CI_DOCKER_USERNAME }}"
           DOCKER_PASSWORD: "${{ secrets.CI_DOCKER_PASSWORD }}"
-          PLATFORM: "linux/amd64,linux/arm64,linux/arm"
+          PLATFORM: "linux/amd64,linux/arm64"
           USE_CONTAINER: none
         run: |
           ./scripts/upgrade-docker.sh
