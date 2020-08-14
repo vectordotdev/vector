@@ -16,8 +16,8 @@ jobs:
     timeout-minutes: 3
     steps:
       - uses: styfle/cancel-workflow-action@0.4.1
-        workflow_id: 1463240
         with:
+          workflow_id: 1463240
           access_token: ${{ secrets.GITHUB_TOKEN }}
   cancel-benches:
     name: Cancel redundant benches.yml workflows
@@ -25,8 +25,8 @@ jobs:
     timeout-minutes: 3
     steps:
       - uses: styfle/cancel-workflow-action@0.4.1
-        workflow_id: 1481114
         with:
+          workflow_id: 1481114
           access_token: ${{ secrets.GITHUB_TOKEN }}
   cancel-lints:
     name: Cancel redundant lints.yml workflows
@@ -34,8 +34,8 @@ jobs:
     timeout-minutes: 3
     steps:
       - uses: styfle/cancel-workflow-action@0.4.1
-        workflow_id: 1463054
         with:
+          workflow_id: 1463054
           access_token: ${{ secrets.GITHUB_TOKEN }}
   cancel-e2e:
     name: Cancel redundant e2e.yml workflows
@@ -44,6 +44,6 @@ jobs:
     if: github.event_name != 'schedule'
     steps:
       - uses: styfle/cancel-workflow-action@0.4.1
-        workflow_id: 2103337
         with:
+          workflow_id: 2103337
           access_token: ${{ secrets.GITHUB_TOKEN }}
