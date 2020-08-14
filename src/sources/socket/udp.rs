@@ -1,6 +1,6 @@
 use crate::{
     event::{self, Event},
-    internal_events::{UdpEventReceived, UdpSocketError, UdpSocketSendError},
+    internal_events::{SocketEventReceived, SocketMode, SocketReceiveError, SocketSendError},
     shutdown::ShutdownSignal,
     sources::Source,
     Pipeline,
@@ -46,7 +46,12 @@ pub fn udp(
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
-    let mut out = out.sink_map_err(|error| emit!(UdpSocketSendError { error }));
+    let mut out = out.sink_map_err(|error| {
+        emit!(SocketSendError {
+            error,
+            mode: SocketMode::Udp
+        })
+    });
 
     Box::new(
         async move {
@@ -62,7 +67,10 @@ pub fn udp(
                 tokio::select! {
                     recv = socket.recv_from(&mut buf) => {
                         let (byte_size, address) = recv.map_err(|error| {
-                            emit!(UdpSocketError { error });
+                            emit!(SocketReceiveError {
+                                error,
+                                mode: SocketMode::Udp
+                            });
                         })?;
 
                         let mut payload = buf.split_to(byte_size);
@@ -80,7 +88,7 @@ pub fn udp(
                                 .as_mut_log()
                                 .insert(host_key.clone(), address.to_string());
 
-                            emit!(UdpEventReceived { byte_size });
+                            emit!(SocketEventReceived { byte_size,mode:SocketMode::Udp });
 
                             tokio::select!{
                                 result = out.send(event).compat() => {

@@ -21,6 +21,12 @@ mod lua;
 mod prometheus;
 mod regex;
 mod sampler;
+#[cfg(any(
+    feature = "sources-socket",
+    feature = "sources-syslog",
+    feature = "sources-vector"
+))]
+mod socket;
 mod split;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 mod splunk_hec;
@@ -29,7 +35,6 @@ mod statsd;
 mod stdin;
 mod syslog;
 mod tcp;
-mod udp;
 mod unix;
 mod vector;
 #[cfg(feature = "wasm")]
@@ -61,6 +66,12 @@ pub use self::lua::*;
 pub use self::prometheus::*;
 pub use self::regex::*;
 pub use self::sampler::*;
+#[cfg(any(
+    feature = "sources-socket",
+    feature = "sources-syslog",
+    feature = "sources-vector"
+))]
+pub(crate) use self::socket::*;
 pub use self::split::*;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 pub(crate) use self::splunk_hec::*;
@@ -69,13 +80,12 @@ pub use self::statsd::*;
 pub use self::stdin::*;
 pub use self::syslog::*;
 pub use self::tcp::*;
-pub use self::udp::*;
 pub use self::unix::*;
 pub use self::vector::*;
 #[cfg(feature = "wasm")]
 pub use self::wasm::*;
 
-pub trait InternalEvent: std::fmt::Debug {
+pub trait InternalEvent {
     fn emit_logs(&self) {}
     fn emit_metrics(&self) {}
 }

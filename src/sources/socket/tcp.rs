@@ -1,6 +1,6 @@
 use crate::{
     event::{self, Event},
-    internal_events::TcpEventReceived,
+    internal_events::{SocketEventReceived, SocketMode},
     sources::util::{SocketListenAddr, TcpSource},
     tls::TlsConfig,
 };
@@ -66,7 +66,10 @@ impl TcpSource for RawTcpSource {
 
         event.as_mut_log().insert(host_key.clone(), host);
 
-        emit!(TcpEventReceived { byte_size });
+        emit!(SocketEventReceived {
+            byte_size,
+            mode: SocketMode::Tcp
+        });
 
         Some(event)
     }
