@@ -5,11 +5,22 @@ use std::time::Duration;
 #[derive(Debug)]
 pub struct AutoConcurrencyLimit {
     pub concurrency: u64,
+    pub reached_limit: bool,
+    pub had_back_pressure: bool,
+    pub current_rtt: Duration,
+    pub past_rtt: Duration,
 }
 
 impl InternalEvent for AutoConcurrencyLimit {
     fn emit_logs(&self) {
-        trace!(message = "changed concurrency.", concurrency = %self.concurrency);
+        trace!(
+            message = "changed concurrency.",
+            concurrency = %self.concurrency,
+            reached_limit = %self.reached_limit,
+            had_back_pressure = %self.had_back_pressure,
+            current_rtt = ?self.current_rtt,
+            past_rtt = ?self.past_rtt,
+        );
     }
 
     fn emit_metrics(&self) {
