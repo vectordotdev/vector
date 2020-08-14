@@ -5,7 +5,7 @@ use crate::{
     mapping::{
         query,
         query::{arithmetic::Arithmetic, arithmetic::Operator, path::Path as QueryPath, Literal},
-        Assignment, Deletion, Function, IfStatement, Mapping, Noop, Result,
+        Assignment, Deletion, Function, IfStatement, Mapping, Noop, OnlyFields, Result,
     },
 };
 
@@ -196,6 +196,23 @@ fn if_statement_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn Function>> 
     Ok(Box::new(IfStatement::new(query, first, second)))
 }
 
+fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
+    match pair.as_rule() {
+        Rule::deletion => {
+            let path = path_from_pair(pair.into_inner().next().unwrap())?;
+            Ok(Box::new(Deletion::new(path)))
+        }
+        Rule::only_fields => {
+            let mut paths = Vec::new();
+            for pair in pair.into_inner() {
+                paths.push(path_from_pair(pair)?);
+            }
+            Ok(Box::new(OnlyFields::new(paths)))
+        }
+        _ => unreachable!(),
+    }
+}
+
 fn statement_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
         Rule::assignment => {
@@ -204,11 +221,7 @@ fn statement_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
             let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
             Ok(Box::new(Assignment::new(path, query)))
         }
-        Rule::deletion => {
-            let mut inner_rules = pair.into_inner();
-            let path = path_from_pair(inner_rules.next().unwrap())?;
-            Ok(Box::new(Deletion::new(path)))
-        }
+        Rule::function => function_from_pair(pair.into_inner().next().unwrap()),
         Rule::if_statement => if_statement_from_pairs(pair.into_inner()),
         _ => unreachable!(),
     }
@@ -219,7 +232,7 @@ fn mapping_from_pairs(pairs: Pairs<Rule>) -> Result<Mapping> {
     for pair in pairs {
         match pair.as_rule() {
             // Rules expected at the root of a mapping statement.
-            Rule::assignment | Rule::deletion | Rule::if_statement => {
+            Rule::assignment | Rule::function | Rule::if_statement => {
                 assignments.push(statement_from_pair(pair)?);
             }
             Rule::EOI => (),
@@ -278,14 +291,14 @@ mod test {
                 ". = \"bar\"",
                 vec![
                     " 1:1\n",
-                    "= expected if_statement, target_path, or deletion",
+                    "= expected if_statement, target_path, or function",
                 ],
             ),
             (
                 "foo = \"bar\"",
                 vec![
                     " 1:1\n",
-                    "= expected if_statement, target_path, or deletion",
+                    "= expected if_statement, target_path, or function",
                 ],
             ),
             (
@@ -305,7 +318,7 @@ mod test {
                 r#"if .foo { }"#,
                 vec![
                     " 1:11\n",
-                    "= expected if_statement, target_path, or deletion",
+                    "= expected if_statement, target_path, or function",
                 ],
             ),
             (
@@ -316,6 +329,18 @@ mod test {
                 r#"if .foo > .bar { del(.foo) } else { .bar = .baz"#,
                 // This message isn't great, ideally I'd like "expected closing bracket"
                 vec![" 1:48\n", "= expected operator"],
+            ),
+            (
+                r#"only_fields(.foo,)"#,
+                vec![" 1:18\n", "= expected target_path"],
+            ),
+            (
+                r#"only_fields()"#,
+                vec![" 1:13\n", "= expected target_path"],
+            ),
+            (
+                r#"only_fields(,)"#,
+                vec![" 1:13\n", "= expected target_path"],
             ),
         ];
 
@@ -550,6 +575,17 @@ mod test {
                     )),
                     Box::new(Noop {}),
                 ))]),
+            ),
+            (
+                "only_fields(.foo)",
+                Mapping::new(vec![Box::new(OnlyFields::new(vec!["foo".to_string()]))]),
+            ),
+            (
+                "only_fields(.foo.bar, .baz)",
+                Mapping::new(vec![Box::new(OnlyFields::new(vec![
+                    "foo.bar".to_string(),
+                    "baz".to_string(),
+                ]))]),
             ),
         ];
 

@@ -1,6 +1,6 @@
 mapping = _{ SOI ~ statement ~ (NEWLINE+ ~ statement)* ~ NEWLINE* ~ EOI }
 
-statement = _{ assignment | deletion | if_statement }
+statement = _{ assignment | function | if_statement }
 
 assignment = { target_path ~ "=" ~ query_arithmetic }
 
@@ -17,12 +17,16 @@ path_segment = @{ ('a'..'z' | 'A'..'Z' | "_" | "-" )+ ~ ( "[" ~ ('0'..'9')+ ~ "]
 
 target_path = @{ ("." ~ path_segment)+ }
 
+// Functions
+function = { deletion | only_fields }
+
+deletion = { "del(" ~ target_path ~ ")" }
+only_fields = { "only_fields(" ~ target_path ~ ("," ~ target_path)* ~ ")" }
+
 // Queries
 path_coalesce = !{ "(" ~ path_segment ~ ("|" ~ path_segment)+ ~ ")" }
 
 dot_path = ${ ("." ~ (path_segment | path_coalesce))+ }
-
-deletion = ${ "del(" ~ dot_path ~ ")" }
 
 group = { "(" ~ query_arithmetic ~ ")" }
 

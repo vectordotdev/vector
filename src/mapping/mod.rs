@@ -59,6 +59,40 @@ impl Function for Deletion {
 //------------------------------------------------------------------------------
 
 #[derive(Debug)]
+pub(self) struct OnlyFields {
+    paths: Vec<String>,
+}
+
+impl OnlyFields {
+    pub(self) fn new(paths: Vec<String>) -> Self {
+        Self { paths }
+    }
+}
+
+impl Function for OnlyFields {
+    fn apply(&self, target: &mut Event) -> Result<()> {
+        let target_log = target.as_mut_log();
+
+        let keys: Vec<String> = target_log.keys().collect();
+
+        for key in keys {
+            if self
+                .paths
+                .iter()
+                .find(|p| key.starts_with(p.as_str()))
+                .is_none()
+            {
+                target_log.remove_prune(&Atom::from(key), true);
+            }
+        }
+
+        Ok(())
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug)]
 pub(self) struct IfStatement {
     query: Box<dyn query::Function>,
     true_statement: Box<dyn Function>,
@@ -264,6 +298,51 @@ mod test {
                     )),
                     Box::new(Deletion::new("bar".to_string())),
                 ))]),
+                Ok(()),
+            ),
+            (
+                {
+                    let mut event = Event::from("foo body");
+                    event
+                        .as_mut_log()
+                        .insert("bar.baz.buz", Value::from("first"));
+                    event
+                        .as_mut_log()
+                        .insert("bar.baz.remove_this", Value::from("second"));
+                    event.as_mut_log().insert("bev", Value::from("third"));
+                    event
+                        .as_mut_log()
+                        .insert("and.remove_this", Value::from("fourth"));
+                    event
+                        .as_mut_log()
+                        .insert("nested.stuff.here", Value::from("fifth"));
+                    event
+                        .as_mut_log()
+                        .insert("nested.and_here", Value::from("sixth"));
+                    event
+                },
+                {
+                    let mut event = Event::from("foo body");
+                    event
+                        .as_mut_log()
+                        .insert("bar.baz.buz", Value::from("first"));
+                    event.as_mut_log().insert("bev", Value::from("third"));
+                    event
+                        .as_mut_log()
+                        .insert("nested.stuff.here", Value::from("fifth"));
+                    event
+                        .as_mut_log()
+                        .insert("nested.and_here", Value::from("sixth"));
+                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event.as_mut_log().remove(&Atom::from("message"));
+                    event
+                },
+                Mapping::new(vec![Box::new(OnlyFields::new(vec![
+                    "bar.baz.buz".to_string(),
+                    "bev".to_string(),
+                    "doesnt_exist.anyway".to_string(),
+                    "nested".to_string(),
+                ]))]),
                 Ok(()),
             ),
         ];

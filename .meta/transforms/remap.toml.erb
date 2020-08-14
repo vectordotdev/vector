@@ -22,6 +22,7 @@ examples = [
   """.type = "foo"""",
   """.new_field = .old_field * 2
 del(.old_field)""",
+  """only_fields(.message, .timestamp, .name)""",
 ]
 
 [[transforms.remap.examples]]
