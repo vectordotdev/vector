@@ -21,7 +21,7 @@ mod vars;
 pub mod watcher;
 
 pub use diff::ConfigDiff;
-pub use loading::{process_paths, read_configs, CONFIG_PATHS};
+pub use loading::{from_paths, process_paths, CONFIG_PATHS};
 pub use validation::check;
 
 #[derive(Deserialize, Serialize, Debug)]
