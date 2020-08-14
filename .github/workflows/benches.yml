@@ -12,14 +12,6 @@ env:
   AWS_SECRET_ACCESS_KEY: "dummy"
 
 jobs:
-  cancel-previous:
-    runs-on: ubuntu-latest
-    timeout-minutes: 3
-    steps:
-      - uses: styfle/cancel-workflow-action@0.4.1
-        with:
-          access_token: ${{ secrets.GITHUB_TOKEN }}
-
   bench:
     name: All - Linux
     # Full CI suites for this platform were only recently introduced.
