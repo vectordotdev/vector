@@ -233,7 +233,7 @@ impl Display for Metric {
     /// and `Y` is the value or bucket.
     ///
     /// example:
-    /// ```
+    /// ```text
     /// 2020-08-12T20:23:37.248661343Z bytes_processed{component_kind="sink",component_type="blackhole"} = 6391
     /// ```
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
