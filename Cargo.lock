@@ -1090,16 +1090,6 @@ dependencies = [
 
 [[package]]
 name = "evmap"
-version = "7.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5589ce096bbfc5465cc2f3f6de6605803d6b4ef741ad6d38172dc30bfeea5f95"
-dependencies = [
- "bytes 0.4.12",
- "smallvec 1.2.0",
-]
-
-[[package]]
-name = "evmap"
 version = "10.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e3ea06a83f97d3dc2eb06e51e7a729b418f0717a5558a5c870e3d5156dc558d"
@@ -5406,8 +5396,7 @@ dependencies = [
  "derive_is_enum_variant",
  "dirs",
  "elastic_responses",
- "evmap 10.0.2",
- "evmap 7.1.3",
+ "evmap",
  "exitcode",
  "file-source",
  "flate2",

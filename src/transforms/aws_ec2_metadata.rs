@@ -5,7 +5,7 @@ use crate::{
     hyper::body_to_bytes,
     sinks::util::http::HttpClient,
 };
-use bytes::Bytes;
+use bytes05::Bytes;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::Body;
 use serde::{Deserialize, Serialize};
@@ -14,8 +14,8 @@ use string_cache::DefaultAtom as Atom;
 use tokio::time::{delay_for, Duration, Instant};
 use tracing_futures::Instrument;
 
-type WriteHandle = evmap07::WriteHandle<Atom, Bytes, (), RandomState>;
-type ReadHandle = evmap07::ReadHandle<Atom, Bytes, (), RandomState>;
+type WriteHandle = evmap::WriteHandle<Atom, Bytes, (), RandomState>;
+type ReadHandle = evmap::ReadHandle<Atom, Bytes, (), RandomState>;
 
 lazy_static::lazy_static! {
     static ref AMI_ID: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/ami-id");
@@ -118,7 +118,7 @@ impl TransformConfig for Ec2Metadata {
     }
 
     async fn build_async(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        let (read, write) = evmap07::new();
+        let (read, write) = evmap::new();
 
         // Check if the namespace is set to `""` which should mean that we do
         // not want a prefixed namespace.
@@ -183,11 +183,13 @@ impl Transform for Ec2MetadataTransform {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
 
-        self.state.for_each(|k, v| {
-            if let Some(value) = v.get(0) {
-                log.insert(k.clone(), value.clone());
-            }
-        });
+        if let Some(read_ref) = self.state.read() {
+            read_ref.into_iter().for_each(|(k, v)| {
+                if let Some(value) = v.get_one() {
+                    log.insert(k.clone(), value.clone());
+                }
+            });
+        }
 
         Some(event)
     }
@@ -434,7 +436,7 @@ impl MetadataClient {
                 for (i, role_name) in role_names.lines().enumerate() {
                     self.state.update(
                         format!("{}[{}]", self.keys.role_name_key, i).into(),
-                        role_name.into(),
+                        role_name.to_string().into(),
                     );
                 }
             }
