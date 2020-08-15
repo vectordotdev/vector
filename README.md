@@ -147,7 +147,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 
 * **Hot reload** - [Reload configuration on the fly][docs.process-management#reloading] without disrupting data flow.
 * **Zero delay start** - [Starts and restarts][docs.administration.process-management] without a delay.
-* **Multi-platform** - [Linux, MacOS, Windows, x86_64, ARM64, and ARMv7][docs.installation].
+* **Multi-platform** - [Linux, MacOS, Windows, x86_64, ARM64][docs.installation].
 * **CI friendly** - [Config validating][docs.administration.validating] and [unit tests][guides.advanced.unit-testing] make Vector CI friendly.
 * **Configurable concurrency** - All CPU cores ([service][docs.strategies#service]) or just one ([daemon][docs.strategies#daemon]) via the [`--threads` flag][docs.process-management#starting].
 * **Optional static binary** - [Optional MUSL static binaries][pages.releases] mean zero required dependencies.
