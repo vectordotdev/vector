@@ -55,6 +55,7 @@ pub struct KinesisSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub assume_role: Option<String>,
+    pub use_eks_web_identity: Option<bool>,
 }
 
 lazy_static! {
@@ -123,7 +124,11 @@ impl KinesisSinkConfig {
         let region = (&self.region).try_into()?;
 
         let client = rusoto::client(resolver)?;
-        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+        let creds = rusoto::AwsCredentialsProvider::new(
+            &region,
+            self.assume_role.clone(),
+            self.use_eks_web_identity.clone(),
+        )?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
         Ok(KinesisClient::new_with_client(client, region))
@@ -404,6 +409,7 @@ mod integration_tests {
             },
             request: Default::default(),
             assume_role: None,
+            use_eks_web_identity: None,
         };
 
         let cx = SinkContext::new_test();

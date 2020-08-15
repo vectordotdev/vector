@@ -80,8 +80,14 @@ pub enum Encoding {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 pub enum ElasticSearchAuth {
-    Basic { user: String, password: String },
-    Aws { assume_role: Option<String> },
+    Basic {
+        user: String,
+        password: String,
+    },
+    Aws {
+        assume_role: Option<String>,
+        use_eks_web_identity: Option<bool>,
+    },
 }
 
 impl ElasticSearchAuth {
@@ -365,9 +371,14 @@ impl ElasticSearchCommon {
 
         let credentials = match &config.auth {
             Some(ElasticSearchAuth::Basic { .. }) | None => None,
-            Some(ElasticSearchAuth::Aws { assume_role }) => Some(
-                rusoto::AwsCredentialsProvider::new(&region, assume_role.clone())?,
-            ),
+            Some(ElasticSearchAuth::Aws {
+                assume_role,
+                use_eks_web_identity,
+            }) => Some(rusoto::AwsCredentialsProvider::new(
+                &region,
+                assume_role.clone(),
+                use_eks_web_identity.clone(),
+            )?),
         };
 
         // Only allow compression if we are running with no AWS credentials.
@@ -705,7 +716,10 @@ mod integration_tests {
 
         run_insert_tests(
             ElasticSearchConfig {
-                auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
+                auth: Some(ElasticSearchAuth::Aws {
+                    assume_role: None,
+                    use_eks_web_identity: None,
+                }),
                 endpoint: "http://localhost:4571".into(),
                 ..config()
             },

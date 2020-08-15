@@ -79,6 +79,7 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig<Option<usize>>,
     pub assume_role: Option<String>,
+    pub use_eks_web_identity: Option<bool>,
 }
 
 inventory::submit! {
@@ -98,6 +99,7 @@ fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {
         batch: Default::default(),
         request: Default::default(),
         assume_role: Default::default(),
+        use_eks_web_identity: Default::default(),
     }
 }
 
@@ -159,7 +161,11 @@ impl CloudwatchLogsSinkConfig {
         let region = (&self.region).try_into()?;
 
         let client = rusoto::client(resolver)?;
-        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+        let creds = rusoto::AwsCredentialsProvider::new(
+            &region,
+            self.assume_role.clone(),
+            self.use_eks_web_identity.clone(),
+        )?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
         Ok(CloudWatchLogsClient::new_with_client(client, region))
@@ -919,6 +925,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            use_eks_web_identity: None,
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).unwrap();
@@ -982,6 +989,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            use_eks_web_identity: None,
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).unwrap();
@@ -1051,6 +1059,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            use_eks_web_identity: None,
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).unwrap();
@@ -1100,6 +1109,7 @@ mod integration_tests {
             },
             request: Default::default(),
             assume_role: None,
+            use_eks_web_identity: None,
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).unwrap();
@@ -1150,6 +1160,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            use_eks_web_identity: None,
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).unwrap();
@@ -1231,6 +1242,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            use_eks_web_identity: None,
         };
 
         let client = config.create_client(Resolver).unwrap();

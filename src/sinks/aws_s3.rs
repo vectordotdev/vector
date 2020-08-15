@@ -64,6 +64,7 @@ pub struct S3SinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub assume_role: Option<String>,
+    pub use_eks_web_identity: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -241,7 +242,11 @@ impl S3SinkConfig {
         let region = (&self.region).try_into()?;
         let client = rusoto::client(resolver)?;
 
-        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+        let creds = rusoto::AwsCredentialsProvider::new(
+            &region,
+            self.assume_role.clone(),
+            self.use_eks_web_identity.clone(),
+        )?;
 
         Ok(S3Client::new_with(client, creds, region))
     }

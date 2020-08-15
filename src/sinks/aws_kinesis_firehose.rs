@@ -50,6 +50,7 @@ pub struct KinesisFirehoseSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub assume_role: Option<String>,
+    pub use_eks_web_identity: Option<bool>,
 }
 
 lazy_static! {
@@ -118,7 +119,11 @@ impl KinesisFirehoseSinkConfig {
         let region = (&self.region).try_into()?;
 
         let client = rusoto::client(resolver)?;
-        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+        let creds = rusoto::AwsCredentialsProvider::new(
+            &region,
+            self.assume_role.clone(),
+            self.use_eks_web_identity.clone(),
+        )?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
         Ok(KinesisFirehoseClient::new_with_client(client, region))
@@ -323,6 +328,7 @@ mod integration_tests {
                 ..Default::default()
             },
             assume_role: None,
+            use_eks_web_identity: None,
         };
 
         let cx = SinkContext::new_test();
@@ -338,7 +344,10 @@ mod integration_tests {
         delay_for(Duration::from_secs(1)).await;
 
         let config = ElasticSearchConfig {
-            auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
+            auth: Some(ElasticSearchAuth::Aws {
+                assume_role: None,
+                use_eks_web_identity: None,
+            }),
             endpoint: "http://localhost:4571".into(),
             index: Some(stream.clone()),
             ..Default::default()
