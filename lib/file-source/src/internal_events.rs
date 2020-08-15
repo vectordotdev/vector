@@ -18,7 +18,9 @@ pub trait FileSourceInternalEvents: Send + 'static {
 
     fn emit_file_fingerprint_read_failed(&self, path: &Path, error: Error);
 
-    fn emit_file_fingerprint_failed(&self, path: &Path);
+    fn emit_file_checkpointed(&self, count: usize);
+
+    fn emit_file_checksum_failed(&self, path: &Path);
 
     fn emit_file_checkpoint_write_failed(&self, error: Error);
 }

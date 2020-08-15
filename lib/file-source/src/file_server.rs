@@ -133,6 +133,7 @@ where
                 checkpointer
                     .write_checkpoints()
                     .map_err(|error| self.emitter.emit_file_checkpoint_write_failed(error))
+                    .map(|count| self.emitter.emit_file_checkpointed(count))
                     .ok();
 
                 // Search (glob) for files to detect major file changes.
@@ -376,13 +377,13 @@ impl Checkpointer {
         self.checkpoints.get(&fng).cloned()
     }
 
-    pub fn write_checkpoints(&mut self) -> Result<(), io::Error> {
+    pub fn write_checkpoints(&mut self) -> Result<usize, io::Error> {
         fs::remove_dir_all(&self.directory).ok();
         fs::create_dir_all(&self.directory)?;
         for (&fng, &pos) in self.checkpoints.iter() {
             fs::File::create(self.encode(fng, pos))?;
         }
-        Ok(())
+        Ok(self.checkpoints.len())
     }
 
     pub fn read_checkpoints(&mut self, ignore_before: Option<time::SystemTime>) {
@@ -460,7 +461,7 @@ impl Fingerprinter {
             .map_err(|err| {
                 if err.kind() == io::ErrorKind::UnexpectedEof {
                     if !known_small_files.contains(path) {
-                        emitter.emit_file_fingerprint_failed(path);
+                        emitter.emit_file_checksum_failed(path);
                         known_small_files.insert(path.clone());
                     }
                 } else {
