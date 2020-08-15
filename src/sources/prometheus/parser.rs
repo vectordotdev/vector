@@ -1,5 +1,6 @@
 use crate::event::metric::{Metric, MetricKind, MetricValue};
 use indexmap::IndexMap;
+use std::collections::BTreeMap;
 
 pub use prometheus_parser::*;
 
@@ -19,6 +20,14 @@ struct AggregatedSummary {
     sum: f64,
 }
 
+fn has_values_or_none(tags: BTreeMap<String, String>) -> Option<BTreeMap<String, String>> {
+    if tags.is_empty() {
+        None
+    } else {
+        Some(tags)
+    }
+}
+
 pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
     let mut result = Vec::new();
 
@@ -31,16 +40,10 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
         match group.metrics {
             GroupKind::Counter(vec) => {
                 for metric in vec {
-                    let tags = if !metric.labels.is_empty() {
-                        Some(metric.labels)
-                    } else {
-                        None
-                    };
-
                     let counter = Metric {
                         name: group.name.clone(),
                         timestamp: None,
-                        tags,
+                        tags: has_values_or_none(metric.labels),
                         kind: MetricKind::Absolute,
                         value: MetricValue::Counter {
                             value: metric.value,
@@ -52,16 +55,10 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
             }
             GroupKind::Gauge(vec) | GroupKind::Untyped(vec) => {
                 for metric in vec {
-                    let tags = if !metric.labels.is_empty() {
-                        Some(metric.labels)
-                    } else {
-                        None
-                    };
-
                     let gauge = Metric {
                         name: group.name.clone(),
                         timestamp: None,
-                        tags,
+                        tags: has_values_or_none(metric.labels),
                         kind: MetricKind::Absolute,
                         value: MetricValue::Gauge {
                             value: metric.value,
@@ -95,12 +92,10 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                 }
 
                 for (tags, aggregate) in aggregates {
-                    let tags = if tags.is_empty() { None } else { Some(tags) };
-
                     let hist = Metric {
                         name: group.name.clone(),
                         timestamp: None,
-                        tags,
+                        tags: has_values_or_none(tags),
                         kind: MetricKind::Absolute,
                         value: MetricValue::AggregatedHistogram {
                             buckets: aggregate.buckets,
@@ -135,12 +130,10 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                 }
 
                 for (tags, aggregate) in aggregates {
-                    let tags = if tags.is_empty() { None } else { Some(tags) };
-
                     let summary = Metric {
                         name: group.name.clone(),
                         timestamp: None,
-                        tags,
+                        tags: has_values_or_none(tags),
                         kind: MetricKind::Absolute,
                         value: MetricValue::AggregatedSummary {
                             quantiles: aggregate.quantiles,
