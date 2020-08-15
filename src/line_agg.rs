@@ -1,3 +1,5 @@
+//! A reusable line aggregation implementation.
+
 #![deny(missing_docs)]
 
 use bytes05::{Bytes, BytesMut};
