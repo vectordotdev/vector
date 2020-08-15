@@ -34,7 +34,7 @@ pub(crate) struct SplunkEventEncodeError {
 impl InternalEvent for SplunkEventEncodeError {
     fn emit_logs(&self) {
         error!(
-            message = "error encoding Splunk HEC event to json.",
+            message = "error encoding Splunk HEC event to JSON.",
             error = ?self.error,
             rate_limit_secs = 30,
         );
