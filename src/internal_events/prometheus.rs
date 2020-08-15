@@ -44,7 +44,7 @@ impl InternalEvent for PrometheusRequestCompleted {
             "component_kind" => "source",
             "component_type" => "prometheus",
         );
-        timing!("request_duration_nanoseconds", self.start,self.end,
+        timing!("request_duration_nanoseconds", self.start, self.end,
             "component_kind" => "source",
             "component_type" => "prometheus",
         );
@@ -59,7 +59,7 @@ pub struct PrometheusParseError {
 
 impl InternalEvent for PrometheusParseError {
     fn emit_logs(&self) {
-        error!(message = "parsing error.", url=%self.url, error = %self.error);
+        error!(message = "parsing error.", url = %self.url, error = %self.error);
     }
 
     fn emit_metrics(&self) {
@@ -78,7 +78,7 @@ pub struct PrometheusErrorResponse {
 
 impl InternalEvent for PrometheusErrorResponse {
     fn emit_logs(&self) {
-        error!(message = "http error response.", url=%self.url, code = %self.code);
+        error!(message = "http error response.", url = %self.url, code = %self.code);
     }
 
     fn emit_metrics(&self) {
@@ -97,7 +97,7 @@ pub struct PrometheusHttpError {
 
 impl InternalEvent for PrometheusHttpError {
     fn emit_logs(&self) {
-        error!(message = "http request processing error.", url=%self.url, error = %self.error);
+        error!(message = "HTTP request processing error.", url = %self.url, error = %self.error);
     }
 
     fn emit_metrics(&self) {
