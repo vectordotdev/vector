@@ -2,6 +2,7 @@ use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::{self, Event},
     internal_events::{FileEventReceived, FileSourceInternalEventsEmitter},
+    line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
     trace::{current_span, Instrument},
     Pipeline,
@@ -24,9 +25,6 @@ use std::convert::{TryFrom, TryInto};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 use tokio::task::spawn_blocking;
-
-mod line_agg;
-use line_agg::LineAgg;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
