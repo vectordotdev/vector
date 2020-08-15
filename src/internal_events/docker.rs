@@ -152,7 +152,7 @@ pub struct DockerTimestampParseFailed<'a> {
 impl<'a> InternalEvent for DockerTimestampParseFailed<'a> {
     fn emit_logs(&self) {
         error!(
-            message = "failed parsing timestamp as rfc3339 timestamp.",
+            message = "failed to parse timestamp as rfc3339 timestamp.",
             error = %self.error,
             container_id = ?self.container_id,
             rate_limit_secs = 10
