@@ -126,7 +126,7 @@ impl SourceConfig for DockerConfig {
             match source.handle_running_containers().await {
                 Ok(source) => source.run().await,
                 Err(error) => {
-                    error!(message = "listing currently running containers, failed.", %error);
+                    error!(message = "listing currently running containers failed.", %error);
                 }
             }
         };
@@ -271,7 +271,7 @@ impl DockerSource {
 
         // main event stream, with whom only newly started/restarted containers will be loged.
         let events = core.docker_event_stream();
-        info!(message = "listening docker events.");
+        info!(message = "listening to docker events.");
 
         // Channel of communication between main future and event_stream futures
         let (main_send, main_recv) =
@@ -392,7 +392,7 @@ impl DockerSource {
                         }
                         None => {
                             error!(message = "docker source main stream has ended unexpectedly.");
-                            info!(message = "shuting down docker source.");
+                            info!(message = "shutting down docker source.");
                             return;
                         }
                     };
@@ -444,7 +444,7 @@ impl DockerSource {
                         None => {
                             // TODO: this could be fixed, but should be tryed with some timeoff and exponential backoff
                             error!(message = "docker event stream has ended unexpectedly.");
-                            info!(message = "shuting down docker source.");
+                            info!(message = "shutting down docker source.");
                             return;
                         }
                     };
@@ -468,7 +468,7 @@ impl DockerSource {
                 .unwrap_or(false);
             if hostname_hint || image_hint {
                 // This container is probably itself.
-                info!(message = "setected self container.", id);
+                info!(message = "detected self container.", id);
                 return false;
             }
         }
@@ -735,7 +735,7 @@ impl ContainerLogInfo {
                     None if self.created <= timestamp.with_timezone(&Utc) => (),
                     _ => {
                         trace!(
-                            message = "recieved older log.",
+                            message = "received older log.",
                             timestamp = %timestamp_str
                         );
                         return None;
@@ -1010,7 +1010,7 @@ mod tests {
         } else {
             // Maybe a before created container is present
             info!(
-                message = "assums that named container remained from previous tests.",
+                message = "assumes that named container remained from previous tests.",
                 name = name
             );
             name.to_owned()

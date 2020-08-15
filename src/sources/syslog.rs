@@ -256,7 +256,7 @@ pub fn udp(
         async move {
             let socket = UdpSocket::bind(&addr)
                 .await
-                .expect("failed to bind to udp listener socket");
+                .expect("failed to bind to UDP listener socket");
             info!(
                 message = "listening.",
                 addr = &field::display(addr),

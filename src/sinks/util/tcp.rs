@@ -135,7 +135,7 @@ impl TcpSink {
         loop {
             self.state = match self.state {
                 TcpSinkState::Disconnected => {
-                    debug!(message = "resolving dns.", host = %self.host);
+                    debug!(message = "resolving DNS.", host = %self.host);
                     let fut = self.resolver.lookup_ip_01(self.host.clone());
 
                     TcpSinkState::ResolvingDns(fut)
@@ -160,7 +160,7 @@ impl TcpSink {
                     }
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Err(error) => {
-                        error!(message = "unable to resolve dns.", %error);
+                        error!(message = "unable to resolve DNS.", %error);
                         TcpSinkState::Backoff(self.next_delay01())
                     }
                 },
