@@ -20,7 +20,7 @@ use rusoto_credential::{
     StaticProvider,
 };
 use rusoto_signature::{SignedRequest, SignedRequestPayload};
-use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
+use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient, WebIdentityProvider};
 use snafu::{ResultExt, Snafu};
 use std::{
     fmt, io,
@@ -48,6 +48,7 @@ enum RusotoError {
 pub enum AwsCredentialsProvider {
     Default(AutoRefreshingProvider<ChainProvider>),
     Role(AutoRefreshingProvider<StsAssumeRoleSessionCredentialsProvider>),
+    WebIdentity(AutoRefreshingProvider<WebIdentityProvider>),
     Static(StaticProvider),
 }
 
@@ -57,6 +58,7 @@ impl fmt::Debug for AwsCredentialsProvider {
             Self::Default(_) => "default",
             Self::Role(_) => "role",
             Self::Static(_) => "static",
+            Self::WebIdentity(_) => "webidentity",
         };
 
         f.debug_tuple("AwsCredentialsProvider")
@@ -66,7 +68,11 @@ impl fmt::Debug for AwsCredentialsProvider {
 }
 
 impl AwsCredentialsProvider {
-    pub fn new(region: &Region, assume_role: Option<String>) -> crate::Result<Self> {
+    pub fn new(
+        region: &Region,
+        assume_role: Option<String>,
+        use_eks_web_identity: Option<bool>,
+    ) -> crate::Result<Self> {
         if let Some(role) = assume_role {
             debug!("using sts assume role credentials for AWS.");
             let sts = StsClient::new(region.clone());
@@ -83,6 +89,11 @@ impl AwsCredentialsProvider {
 
             let creds = AutoRefreshingProvider::new(provider).context(InvalidAWSCredentials)?;
             Ok(Self::Role(creds))
+        } else if use_eks_web_identity == Some(true) {
+            debug!("using IAM Roles via EKS Service Accounts for AWS.");
+            let provider = WebIdentityProvider::from_k8s_env();
+            let creds = AutoRefreshingProvider::new(provider).context(InvalidAWSCredentials)?;
+            Ok(Self::WebIdentity(creds))
         } else {
             debug!("using default credentials provider for AWS.");
             let mut chain = ChainProvider::new();
@@ -111,6 +122,7 @@ impl ProvideAwsCredentials for AwsCredentialsProvider {
             Self::Default(p) => p.credentials(),
             Self::Role(p) => p.credentials(),
             Self::Static(p) => p.credentials(),
+            Self::WebIdentity(p) => p.credentials(),
         };
         fut.await
     }
