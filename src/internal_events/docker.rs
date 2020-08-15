@@ -128,7 +128,7 @@ pub struct DockerContainerMetadataFetchFailed<'a> {
 impl<'a> InternalEvent for DockerContainerMetadataFetchFailed<'a> {
     fn emit_logs(&self) {
         error!(
-            message = "failed fetching container metadata.",
+            message = "failed to fetch container metadata.",
             error = %self.error,
             container_id = ?self.container_id,
             rate_limit_secs = 10
