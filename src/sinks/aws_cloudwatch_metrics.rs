@@ -108,7 +108,7 @@ impl CloudWatchMetricsSinkConfig {
         let creds = rusoto::AwsCredentialsProvider::new(
             &region,
             self.assume_role.clone(),
-            self.use_eks_web_identity.clone(),
+            self.use_eks_web_identity,
         )?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());

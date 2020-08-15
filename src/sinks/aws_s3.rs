@@ -245,7 +245,7 @@ impl S3SinkConfig {
         let creds = rusoto::AwsCredentialsProvider::new(
             &region,
             self.assume_role.clone(),
-            self.use_eks_web_identity.clone(),
+            self.use_eks_web_identity,
         )?;
 
         Ok(S3Client::new_with(client, creds, region))

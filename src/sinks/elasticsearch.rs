@@ -377,7 +377,7 @@ impl ElasticSearchCommon {
             }) => Some(rusoto::AwsCredentialsProvider::new(
                 &region,
                 assume_role.clone(),
-                use_eks_web_identity.clone(),
+                *use_eks_web_identity,
             )?),
         };
 
