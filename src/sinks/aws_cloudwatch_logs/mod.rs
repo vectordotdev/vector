@@ -881,6 +881,7 @@ mod integration_tests {
             batch: Default::default(),
             request: Default::default(),
             assume_role: None,
+            use_eks_web_identity: None,
         };
 
         let (sink, _) = config.build(SinkContext::new_test()).unwrap();
@@ -1256,7 +1257,7 @@ mod integration_tests {
         };
 
         let client = rusoto::client(Resolver).unwrap();
-        let creds = rusoto::AwsCredentialsProvider::new(&region, None).unwrap();
+        let creds = rusoto::AwsCredentialsProvider::new(&region, None, None).unwrap();
         CloudWatchLogsClient::new_with(client, creds, region)
     }
 
