@@ -12,7 +12,7 @@ use crate::{
         BatchConfig, BatchSettings, Compression, EncodedLength, VecBuffer,
     },
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use futures::{future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;

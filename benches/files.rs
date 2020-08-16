@@ -1,4 +1,4 @@
-use bytes05::Bytes;
+use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 use futures::{compat::Future01CompatExt, stream, SinkExt, StreamExt};
 use futures01::Future;

@@ -7,7 +7,7 @@ use crate::{
     trace::{current_span, Instrument},
     Pipeline,
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
     FileServer, Fingerprinter,

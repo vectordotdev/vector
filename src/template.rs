@@ -58,7 +58,7 @@ impl TryFrom<&str> for Template {
         } else {
             Ok(Template {
                 src: src.into(),
-                src_bytes: src.into(),
+                src_bytes: Vec::from(src.as_bytes()).into(),
                 has_ts: is_dynamic,
                 has_fields: RE.is_match(src),
             })

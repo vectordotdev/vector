@@ -25,7 +25,7 @@ impl<'a> ToLua<'a> for Value {
 impl<'a> FromLua<'a> for Value {
     fn from_lua(value: LuaValue<'a>, _: LuaContext<'a>) -> LuaResult<Self> {
         match value {
-            LuaValue::String(s) => Ok(Value::Bytes(s.as_bytes().into())),
+            LuaValue::String(s) => Ok(Value::Bytes(Vec::from(s.as_bytes()).into())),
             LuaValue::Integer(i) => Ok(Value::Integer(i)),
             LuaValue::Number(f) => Ok(Value::Float(f)),
             LuaValue::Boolean(b) => Ok(Value::Boolean(b)),

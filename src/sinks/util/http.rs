@@ -9,7 +9,7 @@ use crate::{
     event::Event,
     tls::{tls_connector_builder, MaybeTlsSettings},
 };
-use bytes05::{Buf, Bytes};
+use bytes::{Buf, Bytes};
 use futures::future::BoxFuture;
 use futures01::{Async, AsyncSink, Poll as Poll01, Sink, StartSend};
 use http::header::HeaderValue;
@@ -401,7 +401,6 @@ impl Auth {
 mod test {
     use super::*;
     use crate::test_util::runtime;
-    use bytes05::Buf;
     use futures::future::ready;
     use futures01::{Future, Stream};
     use hyper::service::{make_service_fn, service_fn};

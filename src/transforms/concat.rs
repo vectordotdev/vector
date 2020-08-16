@@ -167,7 +167,7 @@ impl Transform for Concat {
                     );
                     return None;
                 }
-                content_vec.push(b.slice(start, end));
+                content_vec.push(b.slice(start..end));
             }
         }
 

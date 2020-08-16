@@ -31,7 +31,6 @@ pub mod wasm;
 #[macro_use]
 pub mod internal_events;
 pub mod async_read;
-pub mod hyper;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
 pub mod kubernetes;

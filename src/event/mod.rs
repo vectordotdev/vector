@@ -295,12 +295,6 @@ impl From<Bytes> for Value {
     }
 }
 
-impl From<bytes05::Bytes> for Value {
-    fn from(bytes: bytes05::Bytes) -> Self {
-        Value::Bytes(bytes.as_ref().into())
-    }
-}
-
 impl From<Vec<u8>> for Value {
     fn from(bytes: Vec<u8>) -> Self {
         Value::Bytes(bytes.into())
@@ -309,7 +303,7 @@ impl From<Vec<u8>> for Value {
 
 impl From<&[u8]> for Value {
     fn from(bytes: &[u8]) -> Self {
-        Value::Bytes(bytes.into())
+        Value::Bytes(Vec::from(bytes).into())
     }
 }
 
@@ -327,7 +321,7 @@ impl From<&String> for Value {
 
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
-        Value::Bytes(s.into())
+        Value::Bytes(Vec::from(s.as_bytes()).into())
     }
 }
 
@@ -714,23 +708,6 @@ impl From<Event> for Vec<u8> {
 
 impl From<Bytes> for Event {
     fn from(message: Bytes) -> Self {
-        let mut event = Event::Log(LogEvent {
-            fields: BTreeMap::new(),
-        });
-
-        event
-            .as_mut_log()
-            .insert(log_schema().message_key().clone(), message);
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), Utc::now());
-
-        event
-    }
-}
-
-impl From<bytes05::Bytes> for Event {
-    fn from(message: bytes05::Bytes) -> Self {
         let mut event = Event::Log(LogEvent {
             fields: BTreeMap::new(),
         });

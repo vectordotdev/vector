@@ -2,7 +2,7 @@ use crate::{
     config::{SinkConfig, SinkContext},
     Error,
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::{sync::mpsc, Sink};
 use hyper::{

@@ -4,7 +4,7 @@
 
 use super::path_helpers::build_pod_logs_directory;
 use crate::kubernetes as k8s;
-use evmap10::ReadHandle;
+use evmap::ReadHandle;
 use file_source::paths_provider::PathsProvider;
 use k8s_openapi::api::core::v1::Pod;
 use std::path::PathBuf;

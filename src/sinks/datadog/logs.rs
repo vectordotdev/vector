@@ -54,10 +54,9 @@ impl SinkConfig for DatadogLogsConfig {
         let healthcheck = sink.healthcheck();
 
         let encoding = self.encoding.clone();
-        let api_key = Bytes::from(format!("{} ", self.api_key));
+        let api_key = self.api_key.clone();
 
-        let sink =
-            sink.with_flat_map(move |e| iter_ok(encode_event(e, api_key.clone(), &encoding)));
+        let sink = sink.with_flat_map(move |e| iter_ok(encode_event(e, &api_key, &encoding)));
 
         Ok((Box::new(sink), Box::new(healthcheck)))
     }
@@ -73,7 +72,7 @@ impl SinkConfig for DatadogLogsConfig {
 
 fn encode_event(
     mut event: Event,
-    mut api_key: Bytes,
+    api_key: &str,
     encoding: &EncodingConfig<Encoding>,
 ) -> Option<Bytes> {
     encoding.apply_rules(&mut event);
@@ -95,9 +94,8 @@ fn encode_event(
     if let Some(bytes) = util::encode_event(event, encoding) {
         // Prepend the api_key:
         // {API_KEY} {EVENT_BYTES}
-        api_key.extend(bytes);
-
-        Some(api_key)
+        let api_key = format!("{} {}", api_key, String::from_utf8_lossy(&bytes));
+        Some(Bytes::from(api_key))
     } else {
         None
     }

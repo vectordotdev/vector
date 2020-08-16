@@ -1,5 +1,5 @@
 use crate::event::{proto, Event};
-use bytes05::Bytes;
+use bytes::Bytes;
 use futures01::{
     task::{self, AtomicTask, Task},
     Async, AsyncSink, Poll, Sink, Stream,

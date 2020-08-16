@@ -5,7 +5,7 @@ use crate::{
     sources::{util::build_unix_source, Source},
     Pipeline,
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tokio_util::codec::LinesCodec;
