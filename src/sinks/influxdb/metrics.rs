@@ -11,6 +11,7 @@ use crate::{
         BatchConfig, BatchSettings, MetricBuffer,
     },
 };
+use bytes::Bytes;
 use futures::future::{ready, BoxFuture};
 use futures01::Sink;
 use lazy_static::lazy_static;
@@ -128,7 +129,7 @@ impl InfluxDBSvc {
 }
 
 impl Service<Vec<Metric>> for InfluxDBSvc {
-    type Response = http::Response<bytes05::Bytes>;
+    type Response = http::Response<Bytes>;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 

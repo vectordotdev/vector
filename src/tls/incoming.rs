@@ -2,7 +2,7 @@ use super::{
     CreateAcceptor, Handshake, MaybeTls, MaybeTlsSettings, MaybeTlsStream, PeerAddress, TcpBind,
     TlsError, TlsSettings,
 };
-use bytes05::{Buf, BufMut};
+use bytes::{Buf, BufMut};
 use futures::{future::BoxFuture, FutureExt, Stream, StreamExt};
 use openssl::ssl::{SslAcceptor, SslMethod};
 use snafu::ResultExt;

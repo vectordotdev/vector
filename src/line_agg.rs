@@ -1,6 +1,8 @@
+//! A reusable line aggregation implementation.
+
 #![deny(missing_docs)]
 
-use bytes05::{Bytes, BytesMut};
+use bytes::{Bytes, BytesMut};
 use futures::{Stream, StreamExt};
 use pin_project::pin_project;
 use regex::bytes::Regex;

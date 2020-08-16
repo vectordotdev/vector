@@ -8,7 +8,7 @@ use crate::{
     Pipeline,
 };
 use async_trait::async_trait;
-use bytes05::{buf::BufExt, Bytes};
+use bytes::{buf::BufExt, Bytes};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{

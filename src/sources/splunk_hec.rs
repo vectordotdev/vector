@@ -10,7 +10,7 @@ use crate::{
     Pipeline,
 };
 use async_trait::async_trait;
-use bytes05::{buf::BufExt, Bytes};
+use bytes::{buf::BufExt, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};

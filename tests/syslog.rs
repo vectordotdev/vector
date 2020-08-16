@@ -1,6 +1,6 @@
 #![cfg(all(feature = "sources-syslog", feature = "sinks-socket"))]
 
-use bytes05::Bytes;
+use bytes::Bytes;
 use futures::compat::Future01CompatExt;
 #[cfg(unix)]
 use futures::{stream, SinkExt, StreamExt};

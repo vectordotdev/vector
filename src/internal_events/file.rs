@@ -34,11 +34,11 @@ impl InternalEvent for FileEventReceived<'_> {
 }
 
 #[derive(Debug)]
-pub struct FileFingerprintFailed<'a> {
+pub struct FileChecksumFailed<'a> {
     pub path: &'a Path,
 }
 
-impl<'a> InternalEvent for FileFingerprintFailed<'a> {
+impl<'a> InternalEvent for FileChecksumFailed<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "currently ignoring file too small for fingerprinting.",
@@ -48,7 +48,7 @@ impl<'a> InternalEvent for FileFingerprintFailed<'a> {
 
     fn emit_metrics(&self) {
         counter!(
-            "fingerprint_errors", 1,
+            "checksum_errors", 1,
             "component_kind" => "source",
             "component_type" => "file",
         );
@@ -219,6 +219,25 @@ impl<'a> InternalEvent for FileAdded<'a> {
 }
 
 #[derive(Debug)]
+pub struct FileCheckpointed {
+    pub count: usize,
+}
+
+impl InternalEvent for FileCheckpointed {
+    fn emit_logs(&self) {
+        debug!(message = "files checkpointed.", count = %self.count);
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "checkpoints", self.count as u64,
+            "component_kind" => "source",
+            "component_type" => "file",
+        );
+    }
+}
+
+#[derive(Debug)]
 pub struct FileCheckpointWriteFailed {
     pub error: Error,
 }
@@ -271,8 +290,12 @@ impl FileSourceInternalEvents for FileSourceInternalEventsEmitter {
         emit!(FileFingerprintReadFailed { path, error });
     }
 
-    fn emit_file_fingerprint_failed(&self, path: &Path) {
-        emit!(FileFingerprintFailed { path });
+    fn emit_file_checksum_failed(&self, path: &Path) {
+        emit!(FileChecksumFailed { path });
+    }
+
+    fn emit_file_checkpointed(&self, count: usize) {
+        emit!(FileCheckpointed { count });
     }
 
     fn emit_file_checkpoint_write_failed(&self, error: Error) {

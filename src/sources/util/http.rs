@@ -6,7 +6,7 @@ use crate::{
     Pipeline,
 };
 use async_trait::async_trait;
-use bytes05::Bytes;
+use bytes::Bytes;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::Sink;
 use serde::Serialize;

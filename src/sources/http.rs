@@ -7,7 +7,7 @@ use crate::{
     Pipeline,
 };
 use async_trait::async_trait;
-use bytes05::{Bytes, BytesMut};
+use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use codec::BytesDelimitedCodec;
 use serde::{Deserialize, Serialize};

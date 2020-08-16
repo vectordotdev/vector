@@ -1,4 +1,4 @@
-use bytes05::{Buf, BufMut};
+use bytes::{Buf, BufMut};
 use pin_project::pin_project;
 use std::{
     fmt,

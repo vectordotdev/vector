@@ -4,7 +4,7 @@ use crate::{
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     Event, Pipeline,
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     future::{self, BoxFuture},
