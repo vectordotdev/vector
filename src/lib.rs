@@ -34,6 +34,7 @@ pub mod async_read;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
 pub mod kubernetes;
+pub mod line_agg;
 pub mod list;
 pub mod metrics;
 pub(crate) mod pipeline;

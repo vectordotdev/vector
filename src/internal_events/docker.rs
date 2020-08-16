@@ -82,7 +82,7 @@ pub struct DockerContainerUnwatch<'a> {
 impl<'a> InternalEvent for DockerContainerUnwatch<'a> {
     fn emit_logs(&self) {
         info!(
-            message = "stoped watching for logs of container.",
+            message = "stopped watching for logs of container.",
             container_id = %self.container_id,
         );
     }
