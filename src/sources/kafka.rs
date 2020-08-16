@@ -6,7 +6,6 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{
     compat::{Compat, Future01CompatExt},
@@ -126,7 +125,7 @@ fn kafka_source(
 
                             let payload = match msg.payload() {
                                 None => return Err(()), // skip messages with empty payload
-                                Some(payload) => Bytes::from(payload),
+                                Some(payload) => payload,
                             };
                             let mut event = Event::new_empty_log();
                             let log = event.as_mut_log();

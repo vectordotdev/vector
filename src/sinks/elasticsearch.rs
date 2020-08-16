@@ -15,7 +15,7 @@ use crate::{
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
 use http::{

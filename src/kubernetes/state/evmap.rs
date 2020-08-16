@@ -1,8 +1,8 @@
-//! A state implementation backed by [`evmap10`].
+//! A state implementation backed by [`evmap`].
 
 use crate::kubernetes::{debounce::Debounce, hash_value::HashValue};
 use async_trait::async_trait;
-use evmap10::WriteHandle;
+use evmap::WriteHandle;
 use futures::future::BoxFuture;
 use k8s_openapi::{apimachinery::pkg::apis::meta::v1::ObjectMeta, Metadata};
 use std::time::Duration;
@@ -151,7 +151,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_without_debounce() {
-        let (state_reader, state_writer) = evmap10::new();
+        let (state_reader, state_writer) = evmap::new();
         let mut state_writer = Writer::new(state_writer, None);
 
         assert_eq!(state_reader.is_empty(), true);
@@ -170,7 +170,7 @@ mod tests {
         // Due to https://github.com/tokio-rs/tokio/issues/2090 we're not
         // pausing the time.
 
-        let (state_reader, state_writer) = evmap10::new();
+        let (state_reader, state_writer) = evmap::new();
         let flush_debounce_timeout = Duration::from_millis(100);
         let mut state_writer = Writer::new(state_writer, Some(flush_debounce_timeout));
 

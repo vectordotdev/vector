@@ -15,7 +15,7 @@ use crate::{
     },
     template::Template,
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, Sink};
@@ -533,7 +533,7 @@ mod integration_tests {
         region::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string, runtime},
     };
-    use bytes05::{buf::BufExt, BytesMut};
+    use bytes::{buf::BufExt, BytesMut};
     use flate2::read::GzDecoder;
     use futures::compat::Future01CompatExt;
     use futures::stream::{self, StreamExt};
