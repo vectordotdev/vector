@@ -282,7 +282,7 @@ impl DockerSource {
         // Only somewhat exception to this is case where:
         // t0 -- outside: container running
         // t1 -- now_timestamp
-        // t2 -- outside: container stoped
+        // t2 -- outside: container stopped
         // t3 -- list_containers
         // In that case, logs between [t1,t2] will be pulled to vector only on next start/unpause of that container.
         let esb = EventStreamBuilder {
@@ -413,7 +413,7 @@ impl DockerSource {
                             match action.as_str() {
                                 "die" | "pause" => {
                                     if let Some(state) = self.containers.get_mut(&id) {
-                                        state.stoped();
+                                        state.stopped();
                                     }
                                 }
                                 "start" | "unpause" => {
@@ -639,7 +639,7 @@ impl ContainerState {
         self.generation += 1;
     }
 
-    fn stoped(&mut self) {
+    fn stopped(&mut self) {
         self.running = false;
     }
 
