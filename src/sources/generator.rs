@@ -138,8 +138,8 @@ mod tests {
                     let message = log[&message_key].to_string_lossy();
                     assert_eq!(message, *line);
                 }
-                Ready(None) => panic!("premature end of input"),
-                NotReady => panic!("generator was not ready"),
+                Ready(None) => panic!("Premature end of input"),
+                NotReady => panic!("Generator was not ready"),
             }
         }
 
@@ -176,8 +176,8 @@ mod tests {
                     let message = log[&message_key].to_string_lossy();
                     assert_eq!(message, *line);
                 }
-                Ready(None) => panic!("premature end of input"),
-                NotReady => panic!("generator was not ready"),
+                Ready(None) => panic!("Premature end of input"),
+                NotReady => panic!("Generator was not ready"),
             }
         }
 
