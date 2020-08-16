@@ -362,9 +362,7 @@ fn create_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        config::Config, event, shutdown::ShutdownSignal, sources::file, test_util::trace_init,
-    };
+    use crate::{config::Config, event, shutdown::ShutdownSignal, sources::file, test_util};
     use futures01::Stream;
     use pretty_assertions::assert_eq;
     use std::{
@@ -489,7 +487,7 @@ mod tests {
         assert_eq!(log[event::log_schema().source_type_key()], "file".into());
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn file_happy_path() {
         let n = 5;
         let (tx, rx) = Pipeline::new_test();
@@ -547,7 +545,7 @@ mod tests {
         assert_eq!(goodbye_i, n);
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn file_truncate() {
         let n = 5;
         let (tx, rx) = Pipeline::new_test();
@@ -612,7 +610,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn file_rotate() {
         let n = 5;
         let (tx, rx) = Pipeline::new_test();
@@ -678,7 +676,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn file_multiple_paths() {
         let n = 5;
         let (tx, rx) = Pipeline::new_test();
@@ -734,7 +732,7 @@ mod tests {
         assert_eq!(is, [n as usize; 3]);
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn file_file_key() {
         // Default
         {
@@ -854,7 +852,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn file_start_position_server_restart() {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -940,7 +938,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn file_start_position_server_restart_with_file_rotation() {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -1000,7 +998,7 @@ mod tests {
     }
 
     #[cfg(unix)] // this test uses unix-specific function `futimes` during test time
-    #[tokio::test]
+    #[test_util::test]
     async fn file_start_position_ignore_old_files() {
         use std::os::unix::io::AsRawFd;
         use std::time::{Duration, SystemTime};
@@ -1086,7 +1084,7 @@ mod tests {
         assert_eq!(after_lines, vec!["_first line", "_second line"]);
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn file_max_line_bytes() {
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
@@ -1144,7 +1142,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn test_multi_line_aggregation_legacy() {
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
@@ -1215,7 +1213,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn test_multi_line_aggregation() {
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
@@ -1290,7 +1288,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn test_fair_reads() {
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
@@ -1355,7 +1353,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn test_oldest_first() {
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
@@ -1420,7 +1418,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn test_gzipped_file() {
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
@@ -1463,10 +1461,8 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn remove_file() {
-        trace_init();
-
         let n = 5;
         let remove_after = 2;
 

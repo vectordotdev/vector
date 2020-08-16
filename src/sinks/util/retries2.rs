@@ -175,17 +175,16 @@ impl RetryAction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::trace_init;
+    use crate::test_util;
     use std::{fmt, time::Duration};
     use tokio::time;
     use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok, task};
     use tower03::retry::RetryLayer;
     use tower_test03::{assert_request_eq, mock};
 
-    #[tokio::test]
+    #[test_util::test(basic_scheduler)]
     async fn service_error_retry() {
         time::pause();
-        trace_init();
 
         let policy = FixedRetryPolicy::new(
             5,
@@ -212,10 +211,8 @@ mod tests {
         assert_eq!(fut.await.unwrap(), "world");
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn service_error_no_retry() {
-        trace_init();
-
         let policy = FixedRetryPolicy::new(
             5,
             Duration::from_secs(1),
@@ -232,10 +229,9 @@ mod tests {
         assert_ready_err!(fut.poll());
     }
 
-    #[tokio::test]
+    #[test_util::test(basic_scheduler)]
     async fn timeout_error() {
         time::pause();
-        trace_init();
 
         let policy = FixedRetryPolicy::new(
             5,

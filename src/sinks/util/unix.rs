@@ -195,7 +195,7 @@ impl Sink for UnixSink {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::{random_lines_with_stream, CountReceiver};
+    use crate::test_util::{self, random_lines_with_stream, CountReceiver};
     use futures::compat::Future01CompatExt;
     use futures01::Sink;
     use tokio::net::UnixListener;
@@ -204,7 +204,7 @@ mod tests {
         tempfile::tempdir().unwrap().into_path().join(name)
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn unix_sink_healthcheck() {
         let good_path = temp_uds_path("valid_uds");
         let _listener = UnixListener::bind(&good_path).unwrap();
@@ -214,7 +214,7 @@ mod tests {
         assert!(healthcheck(bad_path).await.is_err());
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn basic_unix_sink() {
         let num_lines = 1000;
         let out_path = temp_uds_path("unix_test");

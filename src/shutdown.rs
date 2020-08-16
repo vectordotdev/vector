@@ -303,12 +303,12 @@ impl SourceShutdownCoordinator {
 
 #[cfg(test)]
 mod test {
-    use crate::shutdown::SourceShutdownCoordinator;
+    use crate::{shutdown::SourceShutdownCoordinator, test_util};
     use futures::compat::Future01CompatExt;
     use futures01::future::Future;
     use tokio::time::{Duration, Instant};
 
-    #[tokio::test]
+    #[test_util::test]
     async fn shutdown_coordinator_shutdown_source_clean() {
         let mut shutdown = SourceShutdownCoordinator::default();
         let name = "test";
@@ -324,7 +324,7 @@ mod test {
         assert_eq!(true, success);
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn shutdown_coordinator_shutdown_source_force() {
         let mut shutdown = SourceShutdownCoordinator::default();
         let name = "test";

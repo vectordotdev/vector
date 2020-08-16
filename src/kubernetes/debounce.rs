@@ -55,12 +55,13 @@ impl Debounce {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_util;
     use futures::{pin_mut, poll};
 
     const TEST_DELAY_FRACTION: Duration = Duration::from_secs(60 * 60); // one hour
     const TEST_DELAY: Duration = Duration::from_secs(24 * 60 * 60); // one day
 
-    #[tokio::test]
+    #[test_util::test]
     async fn one_signal() {
         tokio::time::pause();
 
@@ -98,7 +99,7 @@ mod tests {
         tokio::time::resume();
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn late_request() {
         tokio::time::pause();
 
@@ -127,7 +128,7 @@ mod tests {
         tokio::time::resume();
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn multiple_signals() {
         tokio::time::pause();
 
@@ -167,7 +168,7 @@ mod tests {
         tokio::time::resume();
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn sequence() {
         tokio::time::pause();
 
@@ -222,7 +223,7 @@ mod tests {
         tokio::time::resume();
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn is_debouncing() {
         tokio::time::pause();
 

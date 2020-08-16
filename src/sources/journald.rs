@@ -556,7 +556,7 @@ mod checkpointer_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Pipeline;
+    use crate::{test_util, Pipeline};
     use futures01::stream::Stream;
     use std::{
         io::{self, BufReader, Cursor},
@@ -648,7 +648,7 @@ mod tests {
             .unwrap()
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn reads_journal() {
         let received = run_journal(&[], &[], None).await;
         assert_eq!(received.len(), 5);
@@ -667,7 +667,7 @@ mod tests {
         assert_eq!(priority(&received[1]), Value::Bytes("DEBUG".into()));
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn includes_units() {
         let received = run_journal(&["unit.service"], &[], None).await;
         assert_eq!(received.len(), 1);
@@ -675,7 +675,7 @@ mod tests {
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn excludes_units() {
         let received = run_journal(&[], &["unit.service", "badunit.service"], None).await;
         assert_eq!(received.len(), 3);
@@ -693,7 +693,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn handles_checkpoint() {
         let received = run_journal(&[], &[], Some("1")).await;
         assert_eq!(received.len(), 4);
@@ -701,14 +701,14 @@ mod tests {
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn parses_array_messages() {
         let received = run_journal(&["badunit.service"], &[], None).await;
         assert_eq!(received.len(), 1);
         assert_eq!(message(&received[0]), Value::Bytes("¿Hello?".into()));
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn handles_missing_timestamp() {
         let received = run_journal(&["stdout"], &[], None).await;
         assert_eq!(received.len(), 2);

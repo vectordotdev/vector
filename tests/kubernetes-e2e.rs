@@ -11,6 +11,7 @@ use k8s_test_framework::{
     lock, test_pod, wait_for_resource::WaitFor, Framework, Interface, Reader,
 };
 use std::collections::HashSet;
+use vector::test_util;
 
 const VECTOR_CONFIG: &str = r#"
 apiVersion: v1
@@ -155,7 +156,7 @@ where
 /// This test validates that vector picks up logs at the simplest case
 /// possible - a new pod is deployed and prints to stdout, and we assert that
 /// vector picks that up.
-#[tokio::test]
+#[test_util::test]
 async fn simple() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
@@ -223,7 +224,7 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
 
 /// This test validates that vector properly merges a log message that
 /// kubernetes has internally split into multiple partial log lines.
-#[tokio::test]
+#[test_util::test]
 async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
@@ -292,7 +293,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
 
 /// This test validates that vector picks up preexisting logs - logs that
 /// existed before vector was deployed.
-#[tokio::test]
+#[test_util::test]
 async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
@@ -363,7 +364,7 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
 
 /// This test validates that vector picks up multiple log lines, and that they
 /// arrive at the proper order.
-#[tokio::test]
+#[test_util::test]
 async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
@@ -433,7 +434,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
 
 /// This test validates that vector properly annotates log events with pod
 /// metadata obtained from the k8s API.
-#[tokio::test]
+#[test_util::test]
 async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
@@ -509,7 +510,7 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
 
 /// This test validates that vector properly filters out the logs that are
 /// requested to be excluded from collection, based on k8s API `Pod` labels.
-#[tokio::test]
+#[test_util::test]
 async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
@@ -649,7 +650,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
 
 /// This test validates that vector properly collects logs from multiple
 /// `Namespace`s and `Pod`s.
-#[tokio::test]
+#[test_util::test]
 async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();

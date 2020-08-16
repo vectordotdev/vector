@@ -194,8 +194,9 @@ async fn healthcheck(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_util;
 
-    #[tokio::test]
+    #[test_util::test]
     async fn fails_missing_creds() {
         let config: PubsubConfig = toml::from_str(
             r#"

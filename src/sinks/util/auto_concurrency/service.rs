@@ -112,13 +112,17 @@ impl fmt::Debug for State {
 
 #[cfg(test)]
 mod tests {
-    use super::super::controller::{ControllerStatistics, Inner};
-    use super::super::AutoConcurrencyLimitLayer;
+    use super::super::{
+        controller::{ControllerStatistics, Inner},
+        AutoConcurrencyLimitLayer,
+    };
     use super::*;
-    use crate::assert_downcast_matches;
+    use crate::{assert_downcast_matches, test_util};
     use snafu::Snafu;
-    use std::sync::{Mutex, MutexGuard};
-    use std::time::Duration;
+    use std::{
+        sync::{Mutex, MutexGuard},
+        time::Duration,
+    };
     use tokio::time::{advance, pause};
     use tokio_test::{assert_pending, assert_ready_ok};
     use tower_test03::{
@@ -228,7 +232,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn startup_conditions() {
         TestService::run(|mut svc| async move {
             // Concurrency starts at 1
@@ -238,7 +242,7 @@ mod tests {
         .await;
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn increases_limit() {
         let stats = TestService::run(|mut svc| async move {
             // Concurrency starts at 1
@@ -266,7 +270,7 @@ mod tests {
         assert_eq!(observed_rtt.mean, 1.0);
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn handles_deferral() {
         TestService::run(|mut svc| async move {
             assert_eq!(svc.inner().current_limit, 1);
@@ -290,7 +294,7 @@ mod tests {
     }
 
     #[allow(clippy::needless_range_loop)]
-    #[tokio::test]
+    #[test_util::test]
     async fn rapid_decrease() {
         TestService::run(|mut svc| async move {
             let mut reqs = [None, None, None];

@@ -1,20 +1,24 @@
 mod support;
 
-use crate::support::{sink, sink_failing_healthcheck, source, transform, MockSourceConfig};
 use futures::compat::Future01CompatExt;
 use futures01::{
     future, future::Future, sink::Sink, stream::iter_ok, stream::Stream, sync::mpsc::SendError,
 };
-use std::iter;
-use std::sync::{
-    atomic::{AtomicBool, AtomicUsize, Ordering},
-    Arc,
+use std::{
+    iter,
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc,
+    },
 };
+use support::{sink, sink_failing_healthcheck, source, transform, MockSourceConfig};
 use tokio::time::{delay_for, Duration};
-use vector::config::Config;
-use vector::event::{self, Event};
-use vector::test_util::{runtime, start_topology, trace_init};
-use vector::topology;
+use vector::{
+    config::Config,
+    event::{self, Event},
+    test_util::{self, runtime, start_topology},
+    topology,
+};
 
 fn basic_config() -> Config {
     let mut config = Config::empty();
@@ -38,7 +42,7 @@ fn into_message(event: Event) -> String {
         .to_string_lossy()
 }
 
-#[tokio::test(core_threads = 2)]
+#[test_util::test]
 async fn topology_shutdown_while_active() {
     let source_event_counter = Arc::new(AtomicUsize::new(0));
     let source_event_total = source_event_counter.clone();
@@ -95,7 +99,7 @@ async fn topology_shutdown_while_active() {
     let _err: SendError<Event> = pump_handle.await.unwrap().unwrap_err();
 }
 
-#[tokio::test(core_threads = 2)]
+#[test_util::test]
 async fn topology_source_and_sink() {
     let (in1, source1) = source();
     let (out1, sink1) = sink(10);
@@ -116,7 +120,7 @@ async fn topology_source_and_sink() {
     assert_eq!(vec![event], res);
 }
 
-#[tokio::test(core_threads = 2)]
+#[test_util::test]
 async fn topology_multiple_sources() {
     let (in1, source1) = source();
     let (in2, source2) = source();
@@ -146,7 +150,7 @@ async fn topology_multiple_sources() {
     assert_eq!(out_event2, Some(event2));
 }
 
-#[tokio::test(core_threads = 2)]
+#[test_util::test]
 async fn topology_multiple_sinks() {
     let (in1, source1) = source();
     let (out1, sink1) = sink(10);
@@ -172,7 +176,7 @@ async fn topology_multiple_sinks() {
     assert_eq!(vec![event], res2);
 }
 
-#[tokio::test(core_threads = 2)]
+#[test_util::test]
 async fn topology_transform_chain() {
     let (in1, source1) = source();
     let transform1 = transform(" first", 0.0);
@@ -198,7 +202,7 @@ async fn topology_transform_chain() {
     assert_eq!(vec!["this first second"], res);
 }
 
-#[tokio::test]
+#[test_util::test]
 async fn topology_remove_one_source() {
     let (in1, source1) = source();
     let (in2, source2) = source();
@@ -235,7 +239,7 @@ async fn topology_remove_one_source() {
     assert_eq!(vec![event1], res);
 }
 
-#[tokio::test]
+#[test_util::test]
 async fn topology_remove_one_sink() {
     let (in1, source1) = source();
     let (out1, sink1) = sink(10);
@@ -270,7 +274,7 @@ async fn topology_remove_one_sink() {
     assert_eq!(Vec::<Event>::new(), res2);
 }
 
-#[tokio::test]
+#[test_util::test]
 async fn topology_remove_one_transform() {
     let (in1, source1) = source();
     let transform1 = transform(" transformed", 0.0);
@@ -306,7 +310,7 @@ async fn topology_remove_one_transform() {
     assert_eq!(vec!["this transformed"], res);
 }
 
-#[tokio::test]
+#[test_util::test]
 async fn topology_swap_source() {
     let (in1, source1) = source();
     let (out1v1, sink1v1) = sink(10);
@@ -346,9 +350,8 @@ async fn topology_swap_source() {
     assert_eq!(vec![event2], res1v2);
 }
 
-#[tokio::test]
+#[test_util::test]
 async fn topology_swap_sink() {
-    trace_init();
     let (in1, source1) = source();
     let (out1, sink1) = sink(10);
 
@@ -383,7 +386,7 @@ async fn topology_swap_sink() {
     assert_eq!(vec![event], res2);
 }
 
-#[tokio::test]
+#[test_util::test]
 async fn topology_swap_transform() {
     let (in1, source1) = source();
     let transform1 = transform(" transformed", 0.0);
@@ -423,7 +426,7 @@ async fn topology_swap_transform() {
 }
 
 #[ignore] // TODO: issue #2186
-#[tokio::test]
+#[test_util::test]
 async fn topology_swap_transform_is_atomic() {
     let (in1, source1) = source();
     let transform1v1 = transform(" transformed", 0.0);

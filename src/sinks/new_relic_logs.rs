@@ -147,7 +147,7 @@ mod tests {
         config::SinkConfig,
         event::Event,
         sinks::util::{service2::InFlightLimit, test::build_test_server},
-        test_util::next_addr,
+        test_util::{self, next_addr},
     };
     use bytes::buf::BufExt;
     use futures::compat::Future01CompatExt;
@@ -271,7 +271,7 @@ mod tests {
         assert!(http_config.auth.is_none());
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[test_util::test]
     async fn new_relic_logs_happy_path() {
         let in_addr = next_addr();
 

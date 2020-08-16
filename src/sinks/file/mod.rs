@@ -366,11 +366,9 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn reopening() {
         use pretty_assertions::assert_eq;
-
-        test_util::trace_init();
 
         let template = temp_file();
 

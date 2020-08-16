@@ -128,7 +128,10 @@ fn kv<T: Metadata<Ty = ObjectMeta>>(object: T) -> Option<(String, Value<T>)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::kubernetes::state::{MaintainedWrite, Write};
+    use crate::{
+        kubernetes::state::{MaintainedWrite, Write},
+        test_util,
+    };
     use k8s_openapi::api::core::v1::Pod;
 
     fn make_pod(uid: &str) -> Pod {
@@ -149,7 +152,7 @@ mod tests {
         assert_eq!(val, Box::new(HashValue::new(pod)));
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn test_without_debounce() {
         let (state_reader, state_writer) = evmap::new();
         let mut state_writer = Writer::new(state_writer, None);
@@ -165,7 +168,7 @@ mod tests {
         drop(state_writer);
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn test_with_debounce() {
         // Due to https://github.com/tokio-rs/tokio/issues/2090 we're not
         // pausing the time.

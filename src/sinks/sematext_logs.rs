@@ -99,14 +99,16 @@ fn map_timestamp(mut event: Event) -> impl Future<Item = Event, Error = ()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::SinkConfig;
-    use crate::event::Event;
-    use crate::sinks::util::test::{build_test_server, load_sink};
-    use crate::test_util;
+    use crate::{
+        config::SinkConfig,
+        event::Event,
+        sinks::util::test::{build_test_server, load_sink},
+        test_util,
+    };
     use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
 
-    #[tokio::test]
+    #[test_util::test]
     async fn smoke() {
         let (mut config, cx) = load_sink::<SematextLogsConfig>(
             r#"

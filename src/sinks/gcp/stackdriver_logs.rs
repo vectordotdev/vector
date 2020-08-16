@@ -270,7 +270,7 @@ mod tests {
     use super::*;
     use crate::{
         event::{LogEvent, Value},
-        test_util::runtime,
+        test_util::{self, runtime},
     };
     use serde_json::value::RawValue;
     use std::iter::FromIterator;
@@ -405,7 +405,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn fails_missing_creds() {
         let config: StackdriverConfig = toml::from_str(
             r#"

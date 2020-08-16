@@ -130,7 +130,7 @@ mod test {
     use crate::{
         config,
         sinks::prometheus::PrometheusSinkConfig,
-        test_util::{next_addr, start_topology},
+        test_util::{self, next_addr, start_topology},
         Error,
     };
     use futures::compat::Future01CompatExt;
@@ -139,7 +139,7 @@ mod test {
     use pretty_assertions::assert_eq;
     use tokio::time::{delay_for, Duration};
 
-    #[tokio::test]
+    #[test_util::test]
     async fn test_prometheus_routing() {
         let in_addr = next_addr();
         let out_addr = next_addr();

@@ -212,13 +212,14 @@ impl Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Event;
-    use crate::sinks::influxdb::test_util::{assert_fields, split_line_protocol, ts};
-    use crate::sinks::util::http::HttpSink;
-    use crate::sinks::util::test::build_test_server;
-    use crate::test_util;
-    use chrono::offset::TimeZone;
-    use chrono::Utc;
+    use crate::{
+        event::Event,
+        sinks::influxdb::test_util::{assert_fields, split_line_protocol, ts},
+        sinks::util::http::HttpSink,
+        sinks::util::test::build_test_server,
+        test_util,
+    };
+    use chrono::{offset::TimeZone, Utc};
     use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
 
@@ -426,7 +427,7 @@ mod tests {
         assert_eq!("1542182950000000011\n", line_protocol.3);
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn smoke_v1() {
         let (mut config, cx) = crate::sinks::util::test::load_sink::<InfluxDBLogsConfig>(
             r#"
@@ -488,7 +489,7 @@ mod tests {
         assert_line_protocol(0, lines.next());
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn smoke_v2() {
         let (mut config, cx) = crate::sinks::util::test::load_sink::<InfluxDBLogsConfig>(
             r#"

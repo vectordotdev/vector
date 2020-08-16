@@ -203,6 +203,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_util;
     use std::task::Poll;
     use tokio_test::{assert_pending, assert_ready, task};
 
@@ -221,7 +222,7 @@ mod tests {
         assert!(unwrap_ready(fut.poll()).is_none());
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn next_expired_is_pending_with_a_non_empty_map() {
         let mut map = ExpiringHashMap::<String, String>::default();
 
@@ -232,7 +233,7 @@ mod tests {
         assert_pending!(fut.poll());
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn next_expired_does_not_wake_when_the_value_is_available_upfront() {
         let mut map = ExpiringHashMap::<String, String>::default();
 
@@ -249,7 +250,7 @@ mod tests {
     // In theory, this is only possible when the runtime timer used in the
     // underlying delay queue and the means by which we fresse/adjust time are
     // working together.
-    #[tokio::test]
+    #[test_util::test]
     async fn next_expired_wakes_and_becomes_ready_when_value_ttl_expires() {
         let mut map = ExpiringHashMap::<String, String>::default();
 
@@ -273,7 +274,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn next_expired_api_allows_inserting_items() {
         let mut map = ExpiringHashMap::<String, String>::default();
 

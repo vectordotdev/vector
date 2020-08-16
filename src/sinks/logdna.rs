@@ -218,10 +218,12 @@ async fn healthcheck(config: LogdnaConfig, mut client: HttpClient) -> crate::Res
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::SinkConfig;
-    use crate::event::Event;
-    use crate::sinks::util::test::{build_test_server, load_sink};
-    use crate::test_util;
+    use crate::{
+        config::SinkConfig,
+        event::Event,
+        sinks::util::test::{build_test_server, load_sink},
+        test_util,
+    };
     use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
     use serde_json::json;
@@ -256,9 +258,8 @@ mod tests {
         assert_eq!(event3_out.get("app").unwrap(), &json!("vector"));
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn smoke() {
-        crate::test_util::trace_init();
         let (mut config, cx) = load_sink::<LogdnaConfig>(
             r#"
             api_key = "mylogtoken"

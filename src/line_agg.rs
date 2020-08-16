@@ -359,9 +359,10 @@ fn add_next_line(buffered: &mut BytesMut, line: Bytes) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_util;
     use pretty_assertions::assert_eq;
 
-    #[tokio::test]
+    #[test_util::test]
     async fn mode_continue_through_1() {
         let lines = vec![
             "some usual line",
@@ -392,7 +393,7 @@ mod tests {
         run_and_assert(&lines, config, &expected).await;
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn mode_continue_past_1() {
         let lines = vec![
             "some usual line",
@@ -423,7 +424,7 @@ mod tests {
         run_and_assert(&lines, config, &expected).await;
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn mode_halt_before_1() {
         let lines = vec![
             "INFO some usual line",
@@ -454,7 +455,7 @@ mod tests {
         run_and_assert(&lines, config, &expected).await;
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn mode_halt_with_1() {
         let lines = vec![
             "some usual line;",
@@ -485,7 +486,7 @@ mod tests {
         run_and_assert(&lines, config, &expected).await;
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn use_case_java_exception() {
         let lines = vec![
             "java.lang.Exception",
@@ -506,7 +507,7 @@ mod tests {
         run_and_assert(&lines, config, &expected).await;
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn use_case_ruby_exception() {
         let lines = vec![
             "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)",
@@ -530,7 +531,7 @@ mod tests {
     }
 
     /// https://github.com/timberio/vector/issues/3237
-    #[tokio::test]
+    #[test_util::test]
     async fn two_lines_emit_with_continue_through() {
         let lines = vec![
             "not merged 1", // will NOT be stashed, but passthroughed
@@ -569,7 +570,7 @@ mod tests {
         run_and_assert(&lines, config, &expected).await;
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn two_lines_emit_with_halt_before() {
         let lines = vec![
             "part 0.1",
@@ -603,7 +604,7 @@ mod tests {
         run_and_assert(&lines, config, &expected).await;
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn legacy() {
         let lines = vec![
             "INFO some usual line",

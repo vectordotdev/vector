@@ -171,8 +171,11 @@ impl Batch for Buffer {
 #[cfg(test)]
 mod test {
     use super::{Buffer, Compression};
-    use crate::buffers::Acker;
-    use crate::sinks::util::{BatchSettings, BatchSink};
+    use crate::{
+        buffers::Acker,
+        sinks::util::{BatchSettings, BatchSink},
+        test_util,
+    };
     use futures01::{future, Future, Sink};
     use std::{
         io::Read,
@@ -180,7 +183,7 @@ mod test {
     };
     use tokio::time::Duration;
 
-    #[tokio::test(core_threads = 2)]
+    #[test_util::test]
     async fn gzip() {
         use flate2::read::GzDecoder;
 

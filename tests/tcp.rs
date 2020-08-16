@@ -12,8 +12,8 @@ use vector::{
     runtime::Runtime,
     sinks, sources,
     test_util::{
-        next_addr, random_lines, runtime, send_lines, start_topology, trace_init, wait_for_tcp,
-        CountReceiver,
+        self, next_addr, random_lines, runtime, send_lines, start_topology, trace_init,
+        wait_for_tcp, CountReceiver,
     },
     transforms,
 };
@@ -288,7 +288,7 @@ fn reconnect() {
     });
 }
 
-#[tokio::test]
+#[test_util::test]
 async fn healthcheck() {
     let addr = next_addr();
     let resolver = vector::dns::Resolver;

@@ -249,16 +249,15 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::config::SinkConfig;
-    use crate::sinks::util::test::load_sink;
-    use crate::template::Template;
-    use crate::Event;
+    use crate::{
+        config::SinkConfig, sinks::util::test::load_sink, template::Template, test_util, Event,
+    };
     use bytes::Bytes;
     use futures::compat::Future01CompatExt;
     use futures01::Sink;
     use std::convert::TryFrom;
 
-    #[tokio::test]
+    #[test_util::test]
     async fn text() {
         let stream = uuid::Uuid::new_v4();
 
@@ -295,7 +294,7 @@ mod integration_tests {
         }
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn json() {
         let stream = uuid::Uuid::new_v4();
 
@@ -333,7 +332,7 @@ mod integration_tests {
         }
     }
 
-    #[tokio::test]
+    #[test_util::test]
     async fn many_streams() {
         let stream1 = uuid::Uuid::new_v4();
         let stream2 = uuid::Uuid::new_v4();
