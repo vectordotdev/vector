@@ -57,6 +57,11 @@ where
         self.map.get_mut(k).map(|&mut (ref mut v, _)| v)
     }
 
+    /// Iterate over key and mutable value pairs.
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&K, &mut V)> {
+        self.map.iter_mut().map(|(key, (value, _))| (key, value))
+    }
+
     /// Reset the deadline for a key, and return a mut ref to the value.
     pub fn reset_at<Q>(&mut self, k: &Q, when: Instant) -> Option<&mut V>
     where

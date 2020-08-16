@@ -181,6 +181,14 @@ impl FileSink {
                                 }
                             }
 
+                            // Before returning, let's make sure all the data and metadata
+                            // have reached the filesystem.
+                            for (path, file) in self.files.iterate_map() {
+                                if let Err(error) = file.sync_all().await {
+                                    warn!(message = "Failed to sync data to filesystem.", ?path, %error);
+                                }
+                            }
+
                             break;
                         }
                         Some(event) => self.process_event(event).await,

@@ -101,7 +101,7 @@ dependencies = [
  "futures-core",
  "memchr",
  "pin-project-lite",
- "tokio 0.2.21",
+ "tokio",
 ]
 
 [[package]]
