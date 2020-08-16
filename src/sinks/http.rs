@@ -165,7 +165,7 @@ impl HttpSink for HttpSinkConfig {
                     b
                 } else {
                     warn!(
-                        message = "Event missing the message key; Dropping event.",
+                        message = "Event missing the message key; dropping event.",
                         rate_limit_secs = 30,
                     );
                     return None;
