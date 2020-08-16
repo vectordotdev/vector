@@ -78,7 +78,7 @@ pub struct PrometheusErrorResponse {
 
 impl InternalEvent for PrometheusErrorResponse {
     fn emit_logs(&self) {
-        error!(message = "http error response.", url = %self.url, code = %self.code);
+        error!(message = "HTTP error response.", url = %self.url, code = %self.code);
     }
 
     fn emit_metrics(&self) {
