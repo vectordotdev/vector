@@ -22,7 +22,7 @@ pub struct ANSIStripperFieldMissing<'a> {
 impl InternalEvent for ANSIStripperFieldMissing<'_> {
     fn emit_logs(&self) {
         debug!(
-            message = "field does not exist.",
+            message = "Field does not exist.",
             field = %self.field,
             rate_limit_secs = 10
         );

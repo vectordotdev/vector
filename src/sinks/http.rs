@@ -124,7 +124,7 @@ impl SinkConfig for HttpSinkConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal http sink error: {}", e));
+        .sink_map_err(|e| error!("Fatal HTTP sink error: {}", e));
 
         let sink = Box::new(sink);
 

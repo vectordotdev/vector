@@ -169,7 +169,7 @@ impl DockerSourceCore {
         // Only log events created at-or-after this moment are logged.
         let now = Local::now();
         info!(
-            message = "capturing logs from now on.",
+            message = "Capturing logs from now on.",
             now = %now.to_rfc3339()
         );
 
@@ -271,7 +271,7 @@ impl DockerSource {
 
         // main event stream, with whom only newly started/restarted containers will be loged.
         let events = core.docker_event_stream();
-        info!(message = "listening to docker events.");
+        info!(message = "Listening to docker events.");
 
         // Channel of communication between main future and event_stream futures
         let (main_send, main_recv) =
@@ -1026,7 +1026,7 @@ mod tests {
     ) -> Option<String> {
         pull_busybox(docker).await;
 
-        trace!("creating container.");
+        trace!("Creating container.");
 
         let options = Some(CreateContainerOptions { name });
         let config = ContainerConfig {
@@ -1073,7 +1073,7 @@ mod tests {
 
     /// Returns once container has started
     async fn container_start(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
-        trace!("starting container.");
+        trace!("Starting container.");
 
         let options = None::<StartContainerOptions<&str>>;
         docker.start_container(id, options).await
@@ -1081,12 +1081,12 @@ mod tests {
 
     /// Returns once container is done running
     async fn container_wait(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
-        trace!("waiting container.");
+        trace!("Waiting container.");
 
         docker
             .wait_container(id, None::<WaitContainerOptions<&str>>)
             .try_for_each(|exit| async move {
-                info!("container exited with status code: {}.", exit.status_code);
+                info!("Container exited with status code: {}.", exit.status_code);
                 Ok(())
             })
             .await
@@ -1094,7 +1094,7 @@ mod tests {
 
     /// Returns once container is killed
     async fn container_kill(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
-        trace!("waiting container.");
+        trace!("Waiting container.");
 
         docker
             .kill_container(id, None::<KillContainerOptions<&str>>)
@@ -1108,7 +1108,7 @@ mod tests {
     }
 
     async fn container_remove(id: &str, docker: &Docker) {
-        trace!("removing container.");
+        trace!("Removing container.");
 
         // Don't panick, as this is unreleated to test, and there possibly other containers that need to be removed
         let _ = docker

@@ -21,7 +21,7 @@ where
     try_stream! {
         let mut decoder: MultiResponseDecoder<T> = MultiResponseDecoder::new();
 
-        debug!(message = "streaming the HTTP body");
+        debug!(message = "Streaming the HTTP body");
 
         pin_mut!(body);
         while let Some(buf) = body.data().await {

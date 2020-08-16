@@ -66,16 +66,16 @@ impl<'bound> Lifecycle<'bound> {
         let global_shutdown_fut = Compat01As03::new(&mut global_shutdown);
         let token = match select(first_task_fut, global_shutdown_fut).await {
             Either::Left((None, _)) => {
-                trace!(message = "lifecycle had no tasks upon run, we're done");
+                trace!(message = "Lifecycle had no tasks upon run, we're done");
                 GlobalShutdownToken::Ununsed(global_shutdown)
             }
             Either::Left((Some(()), _)) => {
-                trace!(message = "lifecycle had the first task completed");
+                trace!(message = "Lifecycle had the first task completed");
                 GlobalShutdownToken::Ununsed(global_shutdown)
             }
             Either::Right((shutdown_signal_token_result, _)) => {
                 let shutdown_signal_token = shutdown_signal_token_result.unwrap();
-                trace!(message = "lifecycle got a global shutdown request");
+                trace!(message = "Lifecycle got a global shutdown request");
                 GlobalShutdownToken::Token(shutdown_signal_token)
             }
         };
@@ -84,7 +84,7 @@ impl<'bound> Lifecycle<'bound> {
         for fut_shutdown in self.fut_shutdowns {
             if fut_shutdown.send(()).is_err() {
                 trace!(
-                    message = "error while sending a future shutdown, \
+                    message = "Error while sending a future shutdown, \
                         the receiver is already dropped; \
                         this is not a problem"
                 );
@@ -93,7 +93,7 @@ impl<'bound> Lifecycle<'bound> {
 
         // Wait for all the futures to complete.
         while let Some(()) = self.futs.next().await {
-            trace!(message = "a lifecycle-managed future completed after shutdown was requested");
+            trace!(message = "A lifecycle-managed future completed after shutdown was requested");
         }
 
         // Return the global shutdown token so that caller can perform it's
