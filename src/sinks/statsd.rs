@@ -16,7 +16,7 @@ use tower03::{Service, ServiceBuilder};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("failed to bind to udp listener socket, error = {:?}", source))]
+    #[snafu(display("failed to bind to UDP listener socket, error = {:?}", source))]
     SocketBindError { source: std::io::Error },
 }
 
