@@ -152,23 +152,20 @@ impl Sink for UnixSink {
             Err(_) => {
                 unreachable!(); // poll_ready() should never return an error
             }
-            Ok(Async::Ready(connection)) => {
-                let line = Bytes::copy_from_slice(&line);
-                match connection.start_send(line) {
-                    Err(error) => {
-                        emit!(UnixSocketError {
-                            error,
-                            path: &self.path
-                        });
-                        self.state = UnixSinkState::Disconnected;
-                        Ok(AsyncSink::Ready)
-                    }
-                    Ok(res) => {
-                        emit!(UnixSocketEventSent { byte_size });
-                        Ok(res)
-                    }
+            Ok(Async::Ready(connection)) => match connection.start_send(line) {
+                Err(error) => {
+                    emit!(UnixSocketError {
+                        error,
+                        path: &self.path
+                    });
+                    self.state = UnixSinkState::Disconnected;
+                    Ok(AsyncSink::Ready)
                 }
-            }
+                Ok(res) => {
+                    emit!(UnixSocketEventSent { byte_size });
+                    Ok(res)
+                }
+            },
         }
     }
 

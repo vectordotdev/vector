@@ -242,7 +242,6 @@ impl Sink for TcpSink {
                         emit!(TcpEventSent {
                             byte_size: line.len()
                         });
-                        let line = Bytes::copy_from_slice(&line);
                         match connection.start_send(line) {
                             Err(error) => {
                                 error!(message = "connection disconnected.", %error);
