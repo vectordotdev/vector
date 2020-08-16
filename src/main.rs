@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate tracing;
+#[macro_use]
+extern crate vector;
 
 mod cli;
 
@@ -13,7 +15,9 @@ use std::cmp::max;
 use tokio::select;
 use vector::{
     config::{self, Config, ConfigDiff},
-    event, generate, list, metrics, runtime,
+    event, generate,
+    internal_events::{VectorReloaded, VectorStarted, VectorStopped},
+    list, metrics, runtime,
     signal::{self, SignalTo},
     topology, trace, unit_test, validate,
 };
@@ -110,13 +114,7 @@ fn main() {
             .set(config.global.log_schema.clone())
             .expect("Couldn't set schema");
 
-        info!(
-            message = "Vector is starting.",
-            version = built_info::PKG_VERSION,
-            git_version = built_info::GIT_VERSION.unwrap_or(""),
-            released = built_info::BUILT_TIME_UTC,
-            arch = built_info::CFG_TARGET_ARCH
-        );
+        emit!(VectorStarted);
 
         let diff = ConfigDiff::initial(&config);
         let pieces = topology::validate(&config, &diff).await.unwrap_or_else(|| {
@@ -137,10 +135,8 @@ fn main() {
                 Some(signal) = signals.next() => {
                     if signal == SignalTo::Reload {
                         // Reload config
-                        info!(
-                            message = "Reloading configs.",
-                            path = ?config_paths
-                        );
+                        emit!(VectorReloaded { config_paths: &config_paths });
+
                         let new_config = config::read_configs(&config_paths);
 
                         trace!("Parsing config");
@@ -169,9 +165,10 @@ fn main() {
             }
         };
 
+        emit!(VectorStopped);
+
         match signal {
             SignalTo::Shutdown => {
-                info!("Shutting down.");
                 select! {
                     _ = topology.stop().compat() => (), // Graceful shutdown finished
                     _ = signals.next() => {
@@ -201,9 +198,4 @@ fn handle_config_errors(config: Result<Config, Vec<String>>) -> Option<Config> {
         }
         Ok(config) => Some(config),
     }
-}
-
-#[allow(unused)]
-mod built_info {
-    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
