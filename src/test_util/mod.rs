@@ -25,6 +25,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
     sync::Arc,
 };
+pub use test_util_macros::test;
 use tokio::{
     io::{AsyncRead, AsyncWrite, Result as IoResult},
     net::{TcpListener, TcpStream},

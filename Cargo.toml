@@ -28,16 +28,19 @@ extended-description-file = "target/debian-extended-description.txt"
 [workspace]
 members = [
   ".",
+  "lib/codec",
   "lib/file-source",
+  "lib/k8s-test-framework",
+  "lib/test-util-macros",
   "lib/tracing-limit",
   "lib/vector-wasm",
-  "lib/k8s-test-framework",
 ]
 
 [dependencies]
 # Internal libs
 codec = { path = "lib/codec" }
 file-source = { path = "lib/file-source" }
+test-util-macros = { path = "lib/test-util-macros" }
 tracing-limit = { path = "lib/tracing-limit" }
 
 # Tokio / Futures
