@@ -188,7 +188,7 @@ mod test {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
-        let svc = tower03::service_fn(|req| {
+        let svc = tower::service_fn(|req| {
             let sent_requests = Arc::clone(&sent_requests);
             sent_requests.lock().unwrap().push(req);
             future::ok::<_, std::io::Error>(())

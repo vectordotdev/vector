@@ -35,7 +35,7 @@ use std::{
     task::{Context, Poll},
 };
 use tokio::sync::oneshot;
-use tower03::{
+use tower::{
     buffer::Buffer,
     limit::{concurrency::ConcurrencyLimit, rate::RateLimit},
     retry::Retry,

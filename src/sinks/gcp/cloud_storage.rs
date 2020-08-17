@@ -31,7 +31,7 @@ use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::task::Poll;
-use tower03::{Service, ServiceBuilder};
+use tower::{Service, ServiceBuilder};
 use tracing::field;
 use uuid::Uuid;
 

@@ -12,7 +12,7 @@ use snafu::{ResultExt, Snafu};
 use std::collections::BTreeMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::task::{Context, Poll};
-use tower03::{Service, ServiceBuilder};
+use tower::{Service, ServiceBuilder};
 
 #[derive(Debug, Snafu)]
 enum BuildError {

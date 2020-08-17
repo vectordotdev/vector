@@ -35,7 +35,7 @@ fn batching(
                     .events(num_events)
                     .size;
                 let batch_sink = BatchSink::new(
-                    tower03::service_fn(|_| future::ok::<_, Infallible>(())),
+                    tower::service_fn(|_| future::ok::<_, Infallible>(())),
                     Buffer::new(batch, compression),
                     Duration::from_secs(1),
                     acker,
@@ -80,7 +80,7 @@ fn partitioned_batching(
                     .events(num_events)
                     .size;
                 let batch_sink = PartitionBatchSink::new(
-                    tower03::service_fn(|_| future::ok::<_, Infallible>(())),
+                    tower::service_fn(|_| future::ok::<_, Infallible>(())),
                     PartitionedBuffer::new(batch, compression),
                     Duration::from_secs(1),
                     acker,

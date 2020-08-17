@@ -12,7 +12,7 @@ use std::fmt;
 use std::sync::Arc;
 use std::task::Poll;
 use std::time::Duration;
-use tower03::{
+use tower::{
     layer::{util::Stack, Layer},
     limit::RateLimit,
     retry::Retry,

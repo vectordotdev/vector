@@ -319,7 +319,7 @@ mod test {
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
         let sent_requests1 = Arc::clone(&sent_requests);
 
-        let svc = tower03::service_fn(move |req| {
+        let svc = tower::service_fn(move |req| {
             let sent_requests = Arc::clone(&sent_requests1);
             sent_requests.lock().unwrap().push(req);
             future::ok::<_, std::io::Error>(())

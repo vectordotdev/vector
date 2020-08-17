@@ -53,7 +53,7 @@ use std::{
     marker::PhantomData,
 };
 use tokio::time::{delay_for, Duration};
-use tower03::Service;
+use tower::Service;
 use tracing_futures::Instrument;
 
 // === StreamSink ===
@@ -767,7 +767,7 @@ mod tests {
     async fn batch_sink_acking_sequential() {
         let (acker, ack_counter) = Acker::new_for_testing();
 
-        let svc = tower03::service_fn(|_| future::ok::<_, std::io::Error>(()));
+        let svc = tower::service_fn(|_| future::ok::<_, std::io::Error>(()));
         let batch = BatchSettings::default().events(10).bytes(9999);
         let buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
@@ -786,7 +786,7 @@ mod tests {
             // Services future will be spawned and work between `yield_now` calls.
             let (acker, ack_counter) = Acker::new_for_testing();
 
-            let svc = tower03::service_fn(|req: Vec<usize>| async move {
+            let svc = tower::service_fn(|req: Vec<usize>| async move {
                 let duration = match req[0] {
                     0 => Duration::from_secs(1),
                     1 => Duration::from_secs(1),
@@ -857,7 +857,7 @@ mod tests {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
-        let svc = tower03::service_fn(|req| {
+        let svc = tower::service_fn(|req| {
             let sent_requests = Arc::clone(&sent_requests);
 
             sent_requests.lock().unwrap().push(req);
@@ -889,7 +889,7 @@ mod tests {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
-        let svc = tower03::service_fn(|req| {
+        let svc = tower::service_fn(|req| {
             let sent_requests = Arc::clone(&sent_requests);
             sent_requests.lock().unwrap().push(req);
             future::ok::<_, std::io::Error>(())
@@ -915,7 +915,7 @@ mod tests {
             let (acker, _) = Acker::new_for_testing();
             let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
-            let svc = tower03::service_fn(|req| {
+            let svc = tower::service_fn(|req| {
                 let sent_requests = Arc::clone(&sent_requests);
                 sent_requests.lock().unwrap().push(req);
                 future::ok::<_, std::io::Error>(())
@@ -944,7 +944,7 @@ mod tests {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
-        let svc = tower03::service_fn(|req| {
+        let svc = tower::service_fn(|req| {
             let sent_requests = Arc::clone(&sent_requests);
             sent_requests.lock().unwrap().push(req);
             future::ok::<_, std::io::Error>(())
@@ -975,7 +975,7 @@ mod tests {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
-        let svc = tower03::service_fn(|req| {
+        let svc = tower::service_fn(|req| {
             let sent_requests = Arc::clone(&sent_requests);
             sent_requests.lock().unwrap().push(req);
             future::ok::<_, std::io::Error>(())
@@ -1001,7 +1001,7 @@ mod tests {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
-        let svc = tower03::service_fn(|req| {
+        let svc = tower::service_fn(|req| {
             let sent_requests = Arc::clone(&sent_requests);
             sent_requests.lock().unwrap().push(req);
             future::ok::<_, std::io::Error>(())
@@ -1034,7 +1034,7 @@ mod tests {
             let (acker, _) = Acker::new_for_testing();
             let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
-            let svc = tower03::service_fn(|req| {
+            let svc = tower::service_fn(|req| {
                 let sent_requests = Arc::clone(&sent_requests);
                 sent_requests.lock().unwrap().push(req);
                 future::ok::<_, std::io::Error>(())
@@ -1067,7 +1067,7 @@ mod tests {
             // "spawned" futures.
             let (acker, ack_counter) = Acker::new_for_testing();
 
-            let svc = tower03::service_fn(|req: u8| {
+            let svc = tower::service_fn(|req: u8| {
                 if req == 3 {
                     future::err("bad")
                 } else {
