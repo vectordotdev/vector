@@ -42,6 +42,7 @@ mod journald;
 mod json_parser;
 #[cfg(feature = "sources-kafka")]
 mod kafka;
+mod key_value;
 #[cfg(feature = "sources-kubernetes-logs")]
 mod kubernetes_logs;
 #[cfg(feature = "transforms-log_to_metric")]
