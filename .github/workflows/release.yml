@@ -314,3 +314,20 @@ jobs:
           export VERSION=$(make version)
           export GITHUB_TOKEN="${{ secrets.GH_PACKAGE_PUBLISHER_TOKEN }}"
           make release-homebrew
+
+  release-helm:
+    runs-on: ubuntu-latest
+    needs:
+      # This is not strictly required, but ensures that Helm Chart doesn't
+      # appear before the image it refers to.
+      - release-docker
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install Helm
+        run: scripts/ci-setup-helm.sh
+      - name: Release Helm Chart
+        env:
+          AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
+          AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
+          USE_CONTAINER: none
+        run: make release-helm
