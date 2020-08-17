@@ -10,7 +10,7 @@ use crate::{
         rusoto,
         sink::Response,
         BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
-        PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerCompat, TowerRequestConfig,
+        PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
     },
     template::Template,
 };
@@ -209,10 +209,9 @@ impl S3SinkConfig {
 
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, self.compression));
 
-        let sink =
-            PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch.timeout, cx.acker())
-                .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
-                .sink_map_err(|error| error!("Sink failed to flush: {}", error));
+        let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
+            .sink_map_err(|error| error!("Sink failed to flush: {}", error));
 
         Ok(Box::new(sink))
     }

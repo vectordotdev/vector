@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
-use futures01::{future, Sink, Stream};
+use futures::future;
+use futures01::{Sink, Stream};
 use std::convert::Infallible;
 use std::time::Duration;
 use vector::buffers::Acker;
@@ -34,7 +35,7 @@ fn batching(
                     .events(num_events)
                     .size;
                 let batch_sink = BatchSink::new(
-                    tower::service_fn(|_| future::ok::<_, Infallible>(())),
+                    tower03::service_fn(|_| future::ok::<_, Infallible>(())),
                     Buffer::new(batch, compression),
                     Duration::from_secs(1),
                     acker,
@@ -79,7 +80,7 @@ fn partitioned_batching(
                     .events(num_events)
                     .size;
                 let batch_sink = PartitionBatchSink::new(
-                    tower::service_fn(|_| future::ok::<_, Infallible>(())),
+                    tower03::service_fn(|_| future::ok::<_, Infallible>(())),
                     PartitionedBuffer::new(batch, compression),
                     Duration::from_secs(1),
                     acker,

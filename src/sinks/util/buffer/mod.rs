@@ -173,7 +173,8 @@ mod test {
     use super::{Buffer, Compression};
     use crate::buffers::Acker;
     use crate::sinks::util::{BatchSettings, BatchSink};
-    use futures01::{future, Future, Sink};
+    use futures::future;
+    use futures01::{Future, Sink};
     use std::{
         io::Read,
         sync::{Arc, Mutex},
@@ -187,7 +188,7 @@ mod test {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
-        let svc = tower::service_fn(|req| {
+        let svc = tower03::service_fn(|req| {
             let sent_requests = Arc::clone(&sent_requests);
             sent_requests.lock().unwrap().push(req);
             future::ok::<_, std::io::Error>(())

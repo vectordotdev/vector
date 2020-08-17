@@ -290,7 +290,8 @@ mod test {
         event::metric::{Metric, MetricValue, StatisticKind},
         Event,
     };
-    use futures01::{future, Future, Sink};
+    use futures::future;
+    use futures01::{Future, Sink};
     use pretty_assertions::assert_eq;
     use std::{
         collections::BTreeMap,
@@ -318,7 +319,7 @@ mod test {
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
         let sent_requests1 = Arc::clone(&sent_requests);
 
-        let svc = tower::service_fn(move |req| {
+        let svc = tower03::service_fn(move |req| {
             let sent_requests = Arc::clone(&sent_requests1);
             sent_requests.lock().unwrap().push(req);
             future::ok::<_, std::io::Error>(())
