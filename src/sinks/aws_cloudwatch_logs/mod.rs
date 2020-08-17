@@ -178,7 +178,11 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 
         let client = self.create_client(cx.resolver())?;
         let svc = ServiceBuilder::new()
-            .concurrency_limit(request.in_flight_limit.expect("in_flight_limit=auto is not allowed"))
+            .concurrency_limit(
+                request
+                    .in_flight_limit
+                    .expect("in_flight_limit=auto is not allowed"),
+            )
             .service(CloudwatchLogsPartitionSvc::new(
                 self.clone(),
                 client.clone(),
@@ -246,7 +250,11 @@ impl Service<PartitionInnerBuffer<Vec<InputLogEvent>, CloudwatchKey>>
             // Buffer size is in_flight_limit because current service always ready.
             // Concurrency limit is 1 because we need token from previous request.
             let svc = ServiceBuilder::new()
-                .buffer(self.request_settings.in_flight_limit.expect("in_flight_limit=auto is not allowed"))
+                .buffer(
+                    self.request_settings
+                        .in_flight_limit
+                        .expect("in_flight_limit=auto is not allowed"),
+                )
                 .concurrency_limit(1)
                 .rate_limit(
                     self.request_settings.rate_limit_num,
