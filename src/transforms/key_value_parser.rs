@@ -97,7 +97,7 @@ impl KeyValue {
         let field_split = self
             .field_split
             .as_ref()
-            .ok_or(Some("".to_string()))
+            .ok_or_else(|| Some("".to_string()))
             .unwrap();
 
         let fields = if field_split.is_empty() {
