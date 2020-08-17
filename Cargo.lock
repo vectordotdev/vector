@@ -1663,7 +1663,7 @@ dependencies = [
  "openssl",
  "openssl-sys",
  "tokio",
- "tokio-openssl 0.4.0",
+ "tokio-openssl",
 ]
 
 [[package]]
@@ -4677,17 +4677,6 @@ dependencies = [
 
 [[package]]
 name = "tokio-openssl"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "771d6246b170ae108d67d9963c23f31a579016c016d73bd4bd7d6ef0252afda7"
-dependencies = [
- "futures 0.1.29",
- "openssl",
- "tokio-io",
-]
-
-[[package]]
-name = "tokio-openssl"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c4b08c5f4208e699ede3df2520aca2e82401b2de33f45e96696a074480be594"
@@ -5413,8 +5402,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-compat",
- "tokio-openssl 0.3.0",
- "tokio-openssl 0.4.0",
+ "tokio-openssl",
  "tokio-retry",
  "tokio-signal",
  "tokio-test",
