@@ -812,6 +812,7 @@ mod tests {
             assert!(sink.start_send(0).unwrap().is_ready());
             assert!(sink.start_send(1).unwrap().is_ready());
             assert!(sink.start_send(2).unwrap().is_ready());
+            yield_now().await;
 
             assert_eq!(ack_counter.load(Relaxed), 0);
 
@@ -846,7 +847,7 @@ mod tests {
             advance_time(Duration::from_secs(5)).await;
 
             yield_now().await;
-            sink.flush().wait().unwrap();
+            sink.flush().compat().await.unwrap();
 
             assert_eq!(ack_counter.load(Relaxed), 6);
         });
