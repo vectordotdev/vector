@@ -232,6 +232,16 @@ services:
     command:
       ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
 
+  verify-deb-artifact-on-ubuntu-14-04:
+    build:
+      context: .
+      dockerfile: scripts/ci-docker-images/verifier-ubuntu-14-04/Dockerfile
+    volumes:
+      - $PWD:$PWD
+    working_dir: $PWD
+    command:
+      ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
+
   verify-deb-artifact-on-ubuntu-16-04:
     build:
       context: .
@@ -252,10 +262,10 @@ services:
     command:
       ["sh", "-ec", "dpkg -i target/artifacts/*-amd64.deb && vector --version"]
 
-  verify-deb-artifact-on-ubuntu-19-04:
+  verify-deb-artifact-on-ubuntu-20-04:
     build:
       context: .
-      dockerfile: scripts/ci-docker-images/verifier-ubuntu-19-04/Dockerfile
+      dockerfile: scripts/ci-docker-images/verifier-ubuntu-20-04/Dockerfile
     volumes:
       - $PWD:$PWD
     working_dir: $PWD
