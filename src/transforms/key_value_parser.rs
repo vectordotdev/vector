@@ -142,7 +142,6 @@ impl KeyValue {
     }
 }
 
-
 impl Transform for KeyValue {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
