@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     event::{self, Event},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -40,6 +40,18 @@ impl TransformConfig for KeyValueConfig {
 
         let conversions = parse_conversion_map(&self.types)?;
 
+        let trim_key = if let Some(key) = &self.trim_key {
+            Some(key.chars().collect())
+        } else {
+            None
+        };
+
+        let trim_value = if let Some(val) = &self.trim_value {
+            Some(val.chars().collect())
+        } else {
+            None
+        };
+
         Ok(Box::new(KeyValue {
             conversions,
             drop_field: self.drop_field,
@@ -48,8 +60,8 @@ impl TransformConfig for KeyValueConfig {
             overwrite_target: self.overwrite_target,
             separator: self.separator.clone(),
             target_field: self.target_field.clone(),
-            trim_key: self.trim_key.clone(),
-            trim_value: self.trim_value.clone(),
+            trim_key,
+            trim_value,
         }))
     }
 
@@ -74,60 +86,57 @@ pub struct KeyValue {
     overwrite_target: bool,
     separator: String,
     target_field: Option<Atom>,
-    trim_key: Option<String>,
-    trim_value: Option<String>,
+    trim_key: Option<Vec<char>>,
+    trim_value: Option<Vec<char>>,
 }
 
-fn kv_parser(
-    pair: &str,
-    field_split: &str,
-    trim_key: &Option<String>,
-    trim_value: &Option<String>,
-) -> Option<(Atom, String)> {
-    let pair = pair.trim();
+impl KeyValue {
+    pub fn parse_pair(&self, pair: &str) -> Option<(Atom, String)> {
+        let pair = pair.trim();
+        let field_split = self.field_split.as_ref().ok_or(Some("".to_string())).unwrap();
 
-    let fields = if field_split.is_empty() {
-        let mut kv_pair = pair.split_whitespace();
-        let key = kv_pair.next()?;
-        let val = kv_pair.next()?;
-        if kv_pair.next().is_some() {
-            error!(
-                message = "KV parser saw more than one separator",
-                rate_limit_secs = 30
-            );
-            return None;
-        }
+        let fields = if field_split.is_empty() {
+            let mut kv_pair = pair.split_whitespace();
+            let key = kv_pair.next()?;
+            let val = kv_pair.next()?;
+            if kv_pair.next().is_some() {
+                error!(
+                    message = "KV parser saw more than one separator",
+                    rate_limit_secs = 30
+                );
+                return None;
+            }
 
-        (key, val)
-    } else {
-        let split_index = pair.find(field_split).unwrap_or(0);
-        let (key, _val) = pair.split_at(split_index);
-        let key = key.trim();
-        let val = pair[split_index + field_split.len()..].trim();
+            (key, val)
+        } else {
+            let split_index = pair.find(field_split).unwrap_or(0);
+            let (key, _val) = pair.split_at(split_index);
+            let key = key.trim();
+            let val = pair[split_index + field_split.len()..].trim();
 
-        if key.is_empty() || val.is_empty() {
-            return None;
-        }
+            if key.is_empty() || val.is_empty() {
+                return None;
+            }
 
-        (key, val)
-    };
+            (key, val)
+        };
 
-    let key = if let Some(trim_key) = trim_key {
-        let trim_key: Vec<char> = trim_key.chars().collect();
-        fields.0.trim_matches(&trim_key as &[_])
-    } else {
-        fields.0
-    };
+        let key = if let Some(trim_key) = &self.trim_key {
+            fields.0.trim_matches(trim_key as &[_])
+        } else {
+            fields.0
+        };
 
-    let val = if let Some(trim_value) = trim_value {
-        let trim_val: Vec<char> = trim_value.chars().collect();
-        fields.1.trim_matches(&trim_val as &[_])
-    } else {
-        fields.1
-    };
+        let val = if let Some(trim_value) = &self.trim_value {
+            fields.1.trim_matches(trim_value as &[_])
+        } else {
+            fields.1
+        };
 
-    Some((Atom::from(key), val.to_string()))
+        Some((Atom::from(key), val.to_string()))
+    }
 }
+
 
 impl Transform for KeyValue {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
@@ -135,14 +144,8 @@ impl Transform for KeyValue {
         let value = log.get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
-            let field_split = self.field_split.as_ref();
             let pairs = value.split(&self.separator).filter_map(|pair| {
-                kv_parser(
-                    pair,
-                    &field_split?,
-                    &self.trim_key,
-                    &self.trim_value,
-                )
+                self.parse_pair(pair)
             });
 
             // Handle optional overwriting of the target field
@@ -200,7 +203,7 @@ mod tests {
     use super::KeyValueConfig;
     use crate::{
         event::{LogEvent, Value},
-        topology::config::{TransformConfig, TransformContext},
+        config::{TransformConfig, TransformContext},
         Event,
     };
     use string_cache::DefaultAtom as Atom;
@@ -363,10 +366,6 @@ mod tests {
             Some("\"{}".to_string()),
             None,
         );
-
-        // println!("{}", log.keys().fold("".to_string(), |res, key| [res, key].join(", ")));
-        // Review: This fails and I don't know why. The key is missing from the results.
-        // assert!(log.contains(&"[score]".into()));
         assert_eq!(log[&"bop".into()], Value::Bytes("[beep]".into()))
     }
 
