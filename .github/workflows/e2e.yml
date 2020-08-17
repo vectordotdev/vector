@@ -51,7 +51,7 @@ jobs:
     name: Cancel redundant jobs
     runs-on: ubuntu-latest
     timeout-minutes: 3
-    if: github.event_name != 'schedule'
+    if: github.ref != 'refs/heads/master' && github.event_name != 'schedule'
     steps:
       - uses: styfle/cancel-workflow-action@0.4.1
         with:
