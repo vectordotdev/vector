@@ -9,6 +9,7 @@ use crate::{
     },
     tls::{TlsOptions, TlsSettings},
 };
+use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
 use http::{Request, StatusCode, Uri};
@@ -176,7 +177,7 @@ struct ClickhouseRetryLogic {
 }
 
 impl RetryLogic for ClickhouseRetryLogic {
-    type Response = http::Response<bytes05::Bytes>;
+    type Response = http::Response<Bytes>;
     type Error = hyper::Error;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

@@ -2,7 +2,7 @@ use crate::{
     async_read::VecAsyncReadExt, emit, event::Event, internal_events::UnixSocketError,
     shutdown::ShutdownSignal, sources::Source, Pipeline,
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     future, FutureExt, SinkExt, StreamExt, TryFutureExt,

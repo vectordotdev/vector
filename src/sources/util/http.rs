@@ -5,7 +5,7 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use futures::{
     compat::{AsyncRead01CompatExt, Future01CompatExt, Stream01CompatExt},
     FutureExt, TryFutureExt, TryStreamExt,
@@ -53,11 +53,7 @@ impl fmt::Debug for RejectShuttingDown {
 impl warp::reject::Reject for RejectShuttingDown {}
 
 pub trait HttpSource: Clone + Send + Sync + 'static {
-    fn build_event(
-        &self,
-        body: bytes05::Bytes,
-        header_map: HeaderMap,
-    ) -> Result<Vec<Event>, ErrorMessage>;
+    fn build_event(&self, body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage>;
 
     fn run(
         self,

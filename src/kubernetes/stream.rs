@@ -3,7 +3,7 @@
 use super::multi_response_decoder::MultiResponseDecoder;
 use crate::internal_events::kubernetes::stream as internal_events;
 use async_stream::try_stream;
-use bytes05::Buf;
+use bytes::Buf;
 use futures::pin_mut;
 use futures::stream::Stream;
 use hyper::body::HttpBody as Body;

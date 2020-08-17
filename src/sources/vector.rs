@@ -7,7 +7,7 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     Event, Pipeline,
 };
-use bytes05::{Bytes, BytesMut};
+use bytes::{Bytes, BytesMut};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::LengthDelimitedCodec;
