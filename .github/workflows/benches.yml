@@ -15,6 +15,7 @@ jobs:
   cancel-previous:
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    if: github.ref != 'refs/heads/master'
     steps:
       - uses: styfle/cancel-workflow-action@0.4.1
         with:
