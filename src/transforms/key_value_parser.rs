@@ -19,6 +19,7 @@ pub struct KeyValueConfig {
     pub field_split: String,
     #[derivative(Default(value = "true"))]
     pub overwrite_target: bool,
+    #[derivative(Default(value = " "))]
     pub separator: String,
     pub target_field: Option<Atom>,
     pub trim_key: Option<String>,
