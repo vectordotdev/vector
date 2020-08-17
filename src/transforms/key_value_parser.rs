@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
-    event::{self, Event},
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::{self, Event},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -93,7 +93,11 @@ pub struct KeyValue {
 impl KeyValue {
     pub fn parse_pair(&self, pair: &str) -> Option<(Atom, String)> {
         let pair = pair.trim();
-        let field_split = self.field_split.as_ref().ok_or(Some("".to_string())).unwrap();
+        let field_split = self
+            .field_split
+            .as_ref()
+            .ok_or(Some("".to_string()))
+            .unwrap();
 
         let fields = if field_split.is_empty() {
             let mut kv_pair = pair.split_whitespace();
@@ -137,16 +141,15 @@ impl KeyValue {
     }
 }
 
-
 impl Transform for KeyValue {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
         let value = log.get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
-            let pairs = value.split(&self.separator).filter_map(|pair| {
-                self.parse_pair(pair)
-            });
+            let pairs = value
+                .split(&self.separator)
+                .filter_map(|pair| self.parse_pair(pair));
 
             // Handle optional overwriting of the target field
             if let Some(target_field) = &self.target_field {
@@ -202,8 +205,8 @@ impl Transform for KeyValue {
 mod tests {
     use super::KeyValueConfig;
     use crate::{
-        event::{LogEvent, Value},
         config::{TransformConfig, TransformContext},
+        event::{LogEvent, Value},
         Event,
     };
     use string_cache::DefaultAtom as Atom;
