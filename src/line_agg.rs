@@ -2,7 +2,6 @@
 
 #![deny(missing_docs)]
 
-use bytes::{Bytes, BytesMut};
 use futures::{Stream, StreamExt};
 use pin_project::pin_project;
 use regex::bytes::Regex;
@@ -86,23 +85,26 @@ impl Config {
 /// Provides a `Stream` implementation that reads lines from the `inner` stream
 /// and yields aggregated lines.
 #[pin_project(project = LineAggProj)]
-pub struct LineAgg<T, K> {
+pub struct LineAgg<T, K, A>
+where
+    A: aggregatable::ReadOnly,
+{
     /// The stream from which we read the lines.
     #[pin]
     inner: T,
 
     /// The core line aggregation logic.
-    logic: Logic<K>,
+    logic: Logic<K, A>,
 
     /// Stashed lines. When line aggreation results in more than one line being
     /// emitted, we have to stash lines and return them into the stream after
     /// that before doing any other work.
-    stashed: Option<(Bytes, K)>,
+    stashed: Option<(A, K)>,
 
     /// Draining queue. We switch to draining mode when we get `None` from
     /// the inner stream. In this mode we stop polling `inner` for new lines
     /// and just flush all the buffered data.
-    draining: Option<Vec<(Bytes, K)>>,
+    draining: Option<Vec<(A, K)>>,
 
     /// A queue of keys with expired timeouts.
     expired: VecDeque<K>,
@@ -112,19 +114,25 @@ pub struct LineAgg<T, K> {
 ///
 /// Encapsulates the essential state and the core logic for the line
 /// aggregation algorithm.
-pub struct Logic<K> {
+pub struct Logic<K, A>
+where
+    A: aggregatable::ReadOnly,
+{
     /// Configuration parameters to use.
     config: Config,
 
     /// Line per key.
     /// Key is usually a filename or other line source identifier.
-    buffers: HashMap<K, BytesMut>,
+    buffers: HashMap<K, <A as aggregatable::ReadOnly>::ReadWrite>,
 
     /// A queue of key timeouts.
     timeouts: DelayQueue<K>,
 }
 
-impl<K> Logic<K> {
+impl<K, A> Logic<K, A>
+where
+    A: aggregatable::ReadOnly,
+{
     /// Create a new `Logic` using the specified `Config`.
     pub fn new(config: Config) -> Self {
         Self {
@@ -135,14 +143,15 @@ impl<K> Logic<K> {
     }
 }
 
-impl<T, K> LineAgg<T, K>
+impl<T, K, A> LineAgg<T, K, A>
 where
-    T: Stream<Item = (Bytes, K)> + Unpin,
+    T: Stream<Item = (A, K)> + Unpin,
     K: Hash + Eq + Clone,
+    A: aggregatable::ReadOnly,
 {
     /// Create a new `LineAgg` using the specified `inner` stream and
     /// preconfigured `logic`.
-    pub fn new(inner: T, logic: Logic<K>) -> Self {
+    pub fn new(inner: T, logic: Logic<K, A>) -> Self {
         Self {
             inner,
             logic,
@@ -153,13 +162,14 @@ where
     }
 }
 
-impl<T, K> Stream for LineAgg<T, K>
+impl<T, K, A> Stream for LineAgg<T, K, A>
 where
-    T: Stream<Item = (Bytes, K)> + Unpin,
+    T: Stream<Item = (A, K)> + Unpin,
     K: Hash + Eq + Clone,
+    A: aggregatable::ReadOnly,
 {
-    /// `Bytes` - the line data; `K` - file name, or other line source.
-    type Item = (Bytes, K);
+    /// `A` - the line data; `K` - file name, or other line source.
+    type Item = (A, K);
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
@@ -206,7 +216,7 @@ where
                         this.logic
                             .buffers
                             .drain()
-                            .map(|(k, v)| (v.into(), k))
+                            .map(|(k, v)| (v.freeze(), k))
                             .collect(),
                     );
                 }
@@ -226,19 +236,20 @@ where
     }
 }
 
-impl<T, K> LineAgg<T, K>
+impl<T, K, A> LineAgg<T, K, A>
 where
-    T: Stream<Item = (Bytes, K)> + Unpin,
+    T: Stream<Item = (A, K)> + Unpin,
     K: Hash + Eq + Clone,
+    A: aggregatable::ReadOnly,
 {
     /// Handle line and do stashing of extra emitted lines.
     /// Requires that the `stashed` item is empty (i.e. entry is vacant). This
     /// invariant has to be taken care of by the caller.
     fn handle_line_and_stashing(
-        this: &mut LineAggProj<'_, T, K>,
-        line: Bytes,
+        this: &mut LineAggProj<'_, T, K, A>,
+        line: A,
         src: K,
-    ) -> Option<(Bytes, K)> {
+    ) -> Option<(A, K)> {
         // Stashed line is always consumed at the start of the `poll`
         // loop before entering this line processing logic. If it's
         // non-empty here - it's a bug.
@@ -263,23 +274,27 @@ where
 
 /// Specifies the amount of lines to emit in response to a single input line.
 /// We have to emit either one or two lines.
-pub enum Emit {
+pub enum Emit<T> {
     /// Emit one line.
-    One(Bytes),
+    One(T),
     /// Emit two lines, in the order they're specified.
-    Two(Bytes, Bytes),
+    Two(T, T),
 }
 
-impl<K> Logic<K>
+impl<K, A> Logic<K, A>
 where
     K: Hash + Eq + Clone,
+    A: aggregatable::ReadOnly,
 {
     /// Handle line, if we have something to output - return it.
-    pub fn handle_line(&mut self, line: Bytes, src: K) -> Option<(Emit, K)> {
+    pub fn handle_line(&mut self, line: A, src: K) -> Option<(Emit<A>, K)> {
         // Check if we already have the buffered data for the source.
         match self.buffers.entry(src) {
             Entry::Occupied(mut entry) => {
-                let condition_matched = self.config.condition_pattern.is_match(line.as_ref());
+                let condition_matched = self
+                    .config
+                    .condition_pattern
+                    .is_match(line.bytes().as_ref());
                 match self.config.mode {
                     // All consecutive lines matching this pattern are included in
                     // the group.
@@ -335,12 +350,12 @@ where
             }
             Entry::Vacant(entry) => {
                 // This line is a candidate for buffering, or passing through.
-                if self.config.start_pattern.is_match(line.as_ref()) {
+                if self.config.start_pattern.is_match(line.bytes().as_ref()) {
                     // It was indeed a new line we need to filter.
                     // Set the timeout and buffer this line.
                     self.timeouts
                         .insert(entry.key().clone(), self.config.timeout);
-                    entry.insert(line.as_ref().into());
+                    entry.insert(line.unfreeze());
                     None
                 } else {
                     // It's just a regular line we don't really care about.
@@ -351,14 +366,62 @@ where
     }
 }
 
-fn add_next_line(buffered: &mut BytesMut, line: Bytes) {
-    buffered.extend_from_slice(b"\n");
-    buffered.extend_from_slice(&line);
+pub mod aggregatable {
+    // This is temporary
+
+    #![allow(missing_docs)]
+
+    use bytes::{Bytes, BytesMut};
+
+    pub trait ReadOnly: Sized {
+        type ReadWrite: ReadWrite<ReadOnly = Self>;
+        fn unfreeze(self) -> Self::ReadWrite;
+        fn bytes(&self) -> &Bytes;
+    }
+
+    pub trait ReadWrite: Sized {
+        type ReadOnly: ReadOnly<ReadWrite = Self>;
+        fn freeze(self) -> Self::ReadOnly;
+        fn bytes_mut(&mut self) -> &mut BytesMut;
+    }
+
+    impl ReadOnly for Bytes {
+        type ReadWrite = BytesMut;
+
+        fn unfreeze(self) -> Self::ReadWrite {
+            self.as_ref().into()
+        }
+
+        fn bytes(&self) -> &Bytes {
+            self
+        }
+    }
+
+    impl ReadWrite for BytesMut {
+        type ReadOnly = Bytes;
+
+        fn freeze(self) -> Self::ReadOnly {
+            BytesMut::freeze(self)
+        }
+
+        fn bytes_mut(&mut self) -> &mut BytesMut {
+            self
+        }
+    }
+}
+
+use aggregatable::*;
+
+fn add_next_line<A: ReadOnly>(buffered: &mut <A as ReadOnly>::ReadWrite, line: A) {
+    let bytes_mut = buffered.bytes_mut();
+    bytes_mut.extend_from_slice(b"\n");
+    bytes_mut.extend_from_slice(&line.bytes());
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bytes::Bytes;
     use pretty_assertions::assert_eq;
 
     #[tokio::test]
