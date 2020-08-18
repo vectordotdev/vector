@@ -249,7 +249,7 @@ mod tests {
         assert_ready_ok!(svc.poll_ready());
 
         let mut fut = task::spawn(svc.call("hello"));
-        assert_request_eq!(handle, "hello").send_error(tower::timeout::error::Elapsed::new());
+        assert_request_eq!(handle, "hello").send_error(Elapsed::new());
         assert_pending!(fut.poll());
 
         time::advance(Duration::from_secs(2)).await;
