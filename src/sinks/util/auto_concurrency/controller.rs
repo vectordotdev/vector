@@ -105,12 +105,17 @@ impl<L> Controller<L> {
         });
     }
 
-    fn adjust_to_back_pressure(&self, start: Instant, is_back_pressure: bool) {
+    /// Adjust the controller to a response, based on type of response
+    /// given (backpressure or not) and if it should be used as a valid
+    /// RTT measurement.
+    fn adjust_to_response_inner(&self, start: Instant, is_back_pressure: bool, use_rtt: bool) {
         let now = instant_now();
         let mut inner = self.inner.lock().expect("Controller mutex is poisoned");
 
         let rtt = now.saturating_duration_since(start);
-        emit!(AutoConcurrencyObservedRtt { rtt });
+        if use_rtt {
+            emit!(AutoConcurrencyObservedRtt { rtt });
+        }
         let rtt = rtt.as_secs_f64();
 
         if is_back_pressure {
@@ -122,7 +127,9 @@ impl<L> Controller<L> {
 
         #[cfg(test)]
         {
-            stats.observed_rtt.add(rtt, now);
+            if use_rtt {
+                stats.observed_rtt.add(rtt, now);
+            }
             stats.in_flight.add(inner.in_flight, now);
         }
 
@@ -131,29 +138,35 @@ impl<L> Controller<L> {
             in_flight: inner.in_flight as u64
         });
 
-        let current_rtt = inner.current_rtt.update(rtt);
+        if use_rtt {
+            inner.current_rtt.update(rtt);
+        }
+        let current_rtt = inner.current_rtt.average();
         let past_rtt = inner.past_rtt.average();
 
-        if past_rtt == 0.0 {
-            // No past measurements, set up initial values.
+        if past_rtt == 0.0 && current_rtt.is_some() {
+            // No past measurements but valid current measurement, set up initial values.
+            let current_rtt = current_rtt.unwrap();
             inner.past_rtt.update(current_rtt);
             inner.next_update = now + Duration::from_secs_f64(current_rtt);
         } else if past_rtt > 0.0 && now >= inner.next_update {
             #[cfg(test)]
             {
-                stats.averaged_rtt.add(current_rtt, now);
+                current_rtt.map(|rtt| stats.averaged_rtt.add(rtt, now));
                 stats.concurrency_limit.add(inner.current_limit, now);
                 drop(stats); // Drop the stats lock a little earlier on this path
             }
 
-            emit!(AutoConcurrencyAveragedRtt {
-                rtt: Duration::from_secs_f64(current_rtt)
-            });
-
-            let threshold = past_rtt * THRESHOLD_RATIO;
+            if let Some(current_rtt) = current_rtt {
+                emit!(AutoConcurrencyAveragedRtt {
+                    rtt: Duration::from_secs_f64(current_rtt)
+                });
+            }
 
             // Only manage the concurrency if in_flight_limit was set to "auto"
             if self.in_flight_limit.is_none() {
+                let threshold = past_rtt * THRESHOLD_RATIO;
+
                 // Normal quick responses trigger an increase in the
                 // concurrency limit. Note that we only check this if we had
                 // requests to go beyond the current limit to prevent
@@ -161,7 +174,8 @@ impl<L> Controller<L> {
                 if inner.current_limit < super::MAX_CONCURRENCY
                     && inner.reached_limit
                     && !inner.had_back_pressure
-                    && current_rtt <= past_rtt
+                    && current_rtt.is_some()
+                    && current_rtt.unwrap() <= past_rtt
                 {
                     // Increase (additive) the current concurrency limit
                     self.semaphore.add_permits(1);
@@ -171,7 +185,8 @@ impl<L> Controller<L> {
                 // to increasing response times, trigger a decrease in the
                 // concurrency limit.
                 else if inner.current_limit > 1
-                    && (inner.had_back_pressure || current_rtt >= past_rtt + threshold)
+                    && (inner.had_back_pressure
+                        || current_rtt.unwrap_or(0.0) >= past_rtt + threshold)
                 {
                     // Decrease (multiplicative) the current concurrency limit
                     let to_forget = inner.current_limit / 2;
@@ -182,14 +197,14 @@ impl<L> Controller<L> {
                     concurrency: inner.current_limit as u64,
                     reached_limit: inner.reached_limit,
                     had_back_pressure: inner.had_back_pressure,
-                    current_rtt: Duration::from_secs_f64(current_rtt),
+                    current_rtt: current_rtt.map(|rtt| Duration::from_secs_f64(rtt)),
                     past_rtt: Duration::from_secs_f64(past_rtt),
                 });
             }
 
             // Reset values for next interval
-            let new_avg = inner.past_rtt.update(current_rtt);
-            inner.next_update = now + Duration::from_secs_f64(new_avg);
+            current_rtt.map(|rtt| inner.past_rtt.update(rtt));
+            inner.next_update = now + Duration::from_secs_f64(inner.past_rtt.average());
             inner.current_rtt.reset();
             inner.had_back_pressure = false;
             inner.reached_limit = false;
@@ -218,7 +233,9 @@ where
                 }
             }
         };
-        self.adjust_to_back_pressure(start, is_back_pressure)
+        // Only adjust to the RTT when the request was successfully processed.
+        let use_rtt = response.is_ok();
+        self.adjust_to_response_inner(start, is_back_pressure, use_rtt)
     }
 }
 
@@ -234,12 +251,11 @@ impl EWMA {
     }
 
     /// Update and return the current average
-    fn update(&mut self, point: f64) -> f64 {
+    fn update(&mut self, point: f64) {
         self.average = match self.average {
             avg if avg == 0.0 => point,
             avg => point * EWMA_ALPHA + avg * (1.0 - EWMA_ALPHA),
         };
-        self.average
     }
 }
 
@@ -251,11 +267,17 @@ struct Mean {
 }
 
 impl Mean {
-    /// Update and return the current average
-    fn update(&mut self, point: f64) -> f64 {
+    /// Update the and return the current average
+    fn update(&mut self, point: f64) {
         self.sum += point;
         self.count += 1;
-        self.sum / self.count as f64
+    }
+
+    fn average(&self) -> Option<f64> {
+        match self.count {
+            0 => None,
+            _ => Some(self.sum / self.count as f64),
+        }
     }
 
     fn reset(&mut self) {
@@ -271,9 +293,13 @@ mod tests {
     #[test]
     fn mean_update_works() {
         let mut mean = Mean::default();
-        assert_eq!(mean.update(0.0), 0.0);
-        assert_eq!(mean.update(2.0), 1.0);
-        assert_eq!(mean.update(4.0), 2.0);
+        assert_eq!(mean.average(), None);
+        mean.update(0.0);
+        assert_eq!(mean.average(), Some(0.0));
+        mean.update(2.0);
+        assert_eq!(mean.average(), Some(1.0));
+        mean.update(4.0);
+        assert_eq!(mean.average(), Some(2.0));
         assert_eq!(mean.count, 3);
         assert_eq!(mean.sum, 6.0);
     }
@@ -281,11 +307,15 @@ mod tests {
     #[test]
     fn ewma_update_works() {
         let mut mean = EWMA::default();
-        assert_eq!(mean.average, 0.0);
-        assert_eq!(mean.update(2.0), 2.0);
-        assert_eq!(mean.update(2.0), 2.0);
-        assert_eq!(mean.update(1.0), 1.5);
-        assert_eq!(mean.update(2.0), 1.75);
+        assert_eq!(mean.average(), 0.0);
+        mean.update(2.0);
+        assert_eq!(mean.average(), 2.0);
+        mean.update(2.0);
+        assert_eq!(mean.average(), 2.0);
+        mean.update(1.0);
+        assert_eq!(mean.average(), 1.5);
+        mean.update(2.0);
+        assert_eq!(mean.average(), 1.75);
         assert_eq!(mean.average, 1.75);
     }
 }
