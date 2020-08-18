@@ -27,8 +27,8 @@ pub enum ParserError {
         error: ErrorKind,
     },
 
-    #[snafu(display("value must be non-negative, found: {}", value))]
-    ExpectNonNegativeValue { value: f64 },
+    #[snafu(display("expected value in range [0, {}], found: {}", u32::MAX, value))]
+    ValueOutOfRange { value: f64 },
 }
 
 #[derive(Debug, PartialEq)]
@@ -91,10 +91,10 @@ impl GroupKind {
 }
 
 fn try_f64_to_u32(f: f64) -> Result<u32, ParserError> {
-    if f < 0.0 {
-        Err(ParserError::ExpectNonNegativeValue { value: f })
-    } else {
+    if 0.0 <= f && f <= u32::MAX as f64 {
         Ok(f as u32)
+    } else {
+        Err(ParserError::ValueOutOfRange { value: f })
     }
 }
 
@@ -278,6 +278,37 @@ mod test {
             rpc_duration_seconds_count 2693
             "##;
         group_metrics(input).unwrap();
+    }
+
+    #[test]
+    fn test_f64_to_u32() {
+        let value = -1.0;
+        let error = try_f64_to_u32(value).unwrap_err();
+        println!("{}", error);
+        assert_eq!(error, ParserError::ValueOutOfRange { value });
+
+        let value = u32::MAX as f64 + 1.0;
+        let error = try_f64_to_u32(value).unwrap_err();
+        println!("{}", error);
+        assert_eq!(error, ParserError::ValueOutOfRange { value });
+
+        let value = f64::NAN;
+        let error = try_f64_to_u32(value).unwrap_err();
+        println!("{}", error);
+        assert!(matches!(error, ParserError::ValueOutOfRange { value } if value.is_nan()));
+
+        let value = f64::INFINITY;
+        let error = try_f64_to_u32(value).unwrap_err();
+        println!("{}", error);
+        assert_eq!(error, ParserError::ValueOutOfRange { value });
+
+        let value = f64::NEG_INFINITY;
+        let error = try_f64_to_u32(value).unwrap_err();
+        println!("{}", error);
+        assert_eq!(error, ParserError::ValueOutOfRange { value });
+
+        assert_eq!(try_f64_to_u32(0.0).unwrap(), 0);
+        assert_eq!(try_f64_to_u32(u32::MAX as f64).unwrap(), u32::MAX);
     }
 
     #[test]
