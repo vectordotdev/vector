@@ -1063,8 +1063,8 @@ mod tests {
     }
 
     #[test]
-    fn no_autorization() {
-        let message = "no_autorization";
+    fn no_authorization() {
+        let message = "no_authorization";
         let mut rt = runtime();
         let (source, address) = source_with(&mut rt, None);
         let (sink, health) = sink(address, Encoding::Text, Compression::Gzip);

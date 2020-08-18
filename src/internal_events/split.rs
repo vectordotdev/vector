@@ -22,7 +22,7 @@ pub struct SplitFieldMissing<'a> {
 impl<'a> InternalEvent for SplitFieldMissing<'a> {
     fn emit_logs(&self) {
         debug!(
-            message = "field does not exist.",
+            message = "Field does not exist.",
             field = %self.field,
             rate_limit_secs = 10
         );

@@ -8,7 +8,7 @@ pub struct StdinEventReceived {
 
 impl InternalEvent for StdinEventReceived {
     fn emit_logs(&self) {
-        trace!(message = "received one event.");
+        trace!(message = "Received one event.");
     }
 
     fn emit_metrics(&self) {

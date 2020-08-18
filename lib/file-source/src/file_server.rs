@@ -153,21 +153,21 @@ where
                             watcher.set_file_findable(true);
                             if watcher.path == path {
                                 trace!(
-                                    message = "continue watching file.",
+                                    message = "Continue watching file.",
                                     path = field::debug(&path),
                                 );
                             } else {
                                 // matches a file with a different path
                                 if !was_found_this_cycle {
                                     info!(
-                                        message = "watched file has been renamed.",
+                                        message = "Watched file has been renamed.",
                                         path = field::debug(&path),
                                         old_path = field::debug(&watcher.path)
                                     );
                                     watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
                                 } else {
                                     info!(
-                                        message = "more than one file has the same fingerprint.",
+                                        message = "More than one file has the same fingerprint.",
                                         path = field::debug(&path),
                                         old_path = field::debug(&watcher.path)
                                     );

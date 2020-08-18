@@ -96,7 +96,7 @@ impl FileSink {
             Ok(b) => b,
             Err(missing_keys) => {
                 warn!(
-                    message = "Keys do not exist on the event. Dropping event.",
+                    message = "Keys do not exist on the event; dropping event.",
                     ?missing_keys
                 );
                 return None;

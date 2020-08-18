@@ -166,7 +166,7 @@ where
 
     let fut = receiver
         .take_until(shutdown.compat())
-        .map_err(|error| error!("error reading line: {:?}", error))
+        .map_err(|error| error!("Error reading line: {:?}", error))
         .map_ok(move |line| {
             emit!(StdinEventReceived {
                 byte_size: line.len()
@@ -177,7 +177,7 @@ where
             out.sink_map_err(|error| error!(message = "Unable to send event to out.", %error))
                 .sink_compat(),
         )
-        .inspect(|_| info!("finished sending"));
+        .inspect(|_| info!("Finished sending"));
     Ok(Box::new(fut.boxed().compat()))
 }
 

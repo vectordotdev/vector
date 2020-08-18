@@ -302,7 +302,7 @@ impl RetryLogic for ElasticSearchRetryLogic {
             _ if status.is_client_error() => {
                 let body = String::from_utf8_lossy(response.body());
                 warn!(
-                    message = "client error",
+                    message = "Client error",
                     body = %body,
                     rate_limit_secs = 30
                 );
@@ -314,12 +314,12 @@ impl RetryLogic for ElasticSearchRetryLogic {
                     Some(_) => match serde_json::from_str::<ESResultResponse>(&body) {
                         Err(json_error) => {
                             warn!(
-                                message = "ElasticSearch unparsable error response",
+                                message = "Elasticsearch unparsable error response",
                                 %json_error,
                                 rate_limit_secs = 30
                             );
                             RetryAction::DontRetry(
-                                "some messages failed, and invalid response from elasticsearch"
+                                "Some messages failed, and invalid response from Elasticsearch"
                                     .into(),
                             )
                         }

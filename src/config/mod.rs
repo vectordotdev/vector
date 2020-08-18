@@ -510,8 +510,8 @@ impl Clone for Config {
     fn clone(&self) -> Self {
         // This is a hack around the issue of cloning
         // trait objects. So instead to clone the config
-        // we first serialize it into json, then back from
-        // json. Originally we used toml here but toml does not
+        // we first serialize it into JSON, then back from
+        // JSON. Originally we used TOML here but TOML does not
         // support serializing `None`.
         let json = serde_json::to_vec(self).unwrap();
         serde_json::from_slice(&json[..]).unwrap()

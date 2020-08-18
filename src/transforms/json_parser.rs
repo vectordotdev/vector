@@ -102,7 +102,7 @@ impl Transform for JsonParser {
                     let contains_target = log.contains(&target_field);
 
                     if contains_target && !self.overwrite_target {
-                        error!(message = "target field already exists", %target_field);
+                        error!(message = "Target field already exists", %target_field);
                     } else {
                         if self.drop_field {
                             log.remove(&self.field);

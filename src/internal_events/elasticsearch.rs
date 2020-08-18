@@ -10,7 +10,7 @@ pub struct ElasticSearchEventReceived {
 
 impl InternalEvent for ElasticSearchEventReceived {
     fn emit_logs(&self) {
-        trace!(message = "inserting event", index = %self.index);
+        trace!(message = "Inserting event", index = %self.index);
     }
 
     fn emit_metrics(&self) {

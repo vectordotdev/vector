@@ -307,7 +307,7 @@ fn handle(
     }
 
     info!(
-        message = "request complete",
+        message = "Request complete",
         response_code = field::debug(response.status())
     );
     Box::new(future::ok(response))

@@ -8,7 +8,7 @@ pub struct KafkaEventReceived {
 
 impl InternalEvent for KafkaEventReceived {
     fn emit_logs(&self) {
-        trace!(message = "received one event.", rate_limit_secs = 10);
+        trace!(message = "Received one event.", rate_limit_secs = 10);
     }
 
     fn emit_metrics(&self) {
@@ -32,7 +32,7 @@ pub struct KafkaOffsetUpdateFailed {
 
 impl InternalEvent for KafkaOffsetUpdateFailed {
     fn emit_logs(&self) {
-        error!(message = "unable to update consumer offset.", error = %self.error);
+        error!(message = "Unable to update consumer offset.", error = %self.error);
     }
 
     fn emit_metrics(&self) {

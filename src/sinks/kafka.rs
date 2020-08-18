@@ -197,11 +197,11 @@ impl Sink for KafkaSink {
                 Ok(Async::Ready(Some((result, seqno)))) => {
                     match result {
                         Ok((partition, offset)) => trace!(
-                            "produced message to partition {} at offset {}",
+                            "Produced message to partition {} at offset {}",
                             partition,
                             offset
                         ),
-                        Err((e, _msg)) => error!("kafka error: {}", e),
+                        Err((e, _msg)) => error!("Kafka error: {}", e),
                     };
 
                     self.pending_acks.insert(seqno);

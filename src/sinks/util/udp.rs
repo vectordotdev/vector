@@ -116,7 +116,7 @@ impl UdpSink {
         loop {
             self.state = match self.state {
                 State::Initializing => {
-                    debug!(message = "resolving dns", host = %self.host);
+                    debug!(message = "resolving DNS", host = %self.host);
                     State::ResolvingDns(self.resolver.lookup_ip_01(self.host.clone()))
                 }
                 State::ResolvingDns(ref mut dns) => match dns.poll() {

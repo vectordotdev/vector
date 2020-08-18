@@ -49,7 +49,7 @@ pub struct SyslogUdpUtf8Error {
 
 impl InternalEvent for SyslogUdpUtf8Error {
     fn emit_logs(&self) {
-        error!(message = "error converting bytes to utf8 string in udp mode.", error = %self.error, rate_limit_secs = 10);
+        error!(message = "error converting bytes to UTF8 string in UDP mode.", error = %self.error, rate_limit_secs = 10);
     }
 
     fn emit_metrics(&self) {

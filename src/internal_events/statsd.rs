@@ -79,8 +79,8 @@ impl<T> StatsdSocketError<T> {
 impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for StatsdSocketError<T> {
     fn emit_logs(&self) {
         let message = match self.r#type {
-            StatsdSocketErrorType::Bind => "failed to bind to udp listener socket.",
-            StatsdSocketErrorType::Read => "failed to read udp datagram.",
+            StatsdSocketErrorType::Bind => "failed to bind to UDP listener socket.",
+            StatsdSocketErrorType::Read => "failed to read UDP datagram.",
         };
         error!(message, error = %self.error);
     }

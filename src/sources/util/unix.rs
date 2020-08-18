@@ -31,18 +31,18 @@ where
     D: Decoder<Item = String, Error = E> + Clone + Send + 'static,
     E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display,
 {
-    let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
+    let out = out.sink_map_err(|e| error!("Error sending line: {:?}", e));
 
     let fut = async move {
         let mut listener =
-            UnixListener::bind(&listen_path).expect("failed to bind to listener socket");
-        info!(message = "listening.", ?listen_path, r#type = "unix");
+            UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
+        info!(message = "Listening.", ?listen_path, r#type = "unix");
 
         let mut stream = listener.incoming().take_until(shutdown.clone().compat());
         while let Some(socket) = stream.next().await {
             let socket = match socket {
                 Err(error) => {
-                    error!("failed to accept socket; error = {:?}", error);
+                    error!("Failed to accept socket; error = {:?}", error);
                     continue;
                 }
                 Ok(socket) => socket,
@@ -85,7 +85,7 @@ where
             tokio::spawn(
                 async move {
                     let _ = out.send_all(&mut stream).await;
-                    info!("finished sending");
+                    info!("Finished sending");
 
                     let socket: &UnixStream = stream.get_ref().get_ref().get_ref();
                     let _ = socket.shutdown(std::net::Shutdown::Both);

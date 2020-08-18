@@ -51,7 +51,7 @@ pub fn build_test_server(
     let server = Server::bind(&addr)
         .serve(service)
         .with_graceful_shutdown(tripwire.compat().map(|_| ()))
-        .map_err(|e| panic!("server error: {}", e));
+        .map_err(|e| panic!("Server error: {}", e));
 
     (rx, trigger, server)
 }

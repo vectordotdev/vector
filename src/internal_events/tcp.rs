@@ -9,9 +9,9 @@ pub struct TcpConnectionEstablished {
 impl InternalEvent for TcpConnectionEstablished {
     fn emit_logs(&self) {
         if let Some(peer_addr) = self.peer_addr {
-            debug!(message = "connected", %peer_addr);
+            debug!(message = "Connected", %peer_addr);
         } else {
-            debug!(message = "connected", peer_addr = "unknown");
+            debug!(message = "Connected", peer_addr = "unknown");
         }
     }
 
@@ -29,7 +29,7 @@ pub struct TcpConnectionFailed {
 
 impl InternalEvent for TcpConnectionFailed {
     fn emit_logs(&self) {
-        error!(message = "unable to connect.", error = %self.error);
+        error!(message = "Unable to connect.", error = %self.error);
     }
 
     fn emit_metrics(&self) {

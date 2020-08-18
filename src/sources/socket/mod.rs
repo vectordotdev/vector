@@ -474,7 +474,7 @@ mod test {
         let rt = runtime();
         let source_handle = oneshot::spawn(server, &rt.executor());
 
-        // Wait for udp to start listening
+        // Wait for UDP to start listening
         thread::sleep(Duration::from_millis(100));
 
         (addr, rt, source_handle)

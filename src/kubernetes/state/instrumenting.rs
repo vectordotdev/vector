@@ -134,7 +134,7 @@ mod tests {
                 metrics_runtime::Measurement::Counter(before),
                 metrics_runtime::Measurement::Counter(after),
             ) => (before, after),
-            _ => panic!("metrics kind mismatch"),
+            _ => panic!("Metrics kind mismatch"),
         };
 
         let difference = after - before;

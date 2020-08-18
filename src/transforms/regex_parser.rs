@@ -268,7 +268,7 @@ impl Transform for RegexParser {
                         if self.overwrite_target {
                             log.remove(target_field);
                         } else {
-                            error!(message = "target field already exists", %target_field, rate_limit_secs = 30);
+                            error!(message = "Target field already exists", %target_field, rate_limit_secs = 30);
                             return Some(event);
                         }
                     }

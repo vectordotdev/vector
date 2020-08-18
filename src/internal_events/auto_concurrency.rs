@@ -14,7 +14,7 @@ pub struct AutoConcurrencyLimit {
 impl InternalEvent for AutoConcurrencyLimit {
     fn emit_logs(&self) {
         trace!(
-            message = "changed concurrency.",
+            message = "Changed concurrency.",
             concurrency = %self.concurrency,
             reached_limit = %self.reached_limit,
             had_back_pressure = %self.had_back_pressure,

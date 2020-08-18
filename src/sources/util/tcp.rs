@@ -80,7 +80,7 @@ pub trait TcpSource: Clone + Send + 'static {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
-        let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
+        let out = out.sink_map_err(|e| error!("Error sending event: {:?}", e));
 
         let listenfd = ListenFd::from_env();
 
@@ -91,7 +91,7 @@ pub trait TcpSource: Clone + Send + 'static {
             };
 
             info!(
-                message = "listening.",
+                message = "Listening.",
                 addr = field::display(
                     listener
                         .local_addr()

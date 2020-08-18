@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn grok_parser_does_nothing_on_no_match() {
         let event = parse_log(
-            r#"help i'm stuck in an http server"#,
+            r#"Help I'm stuck in an HTTP server"#,
             "%{HTTPD_COMMONLOG}",
             None,
             true,
@@ -196,7 +196,7 @@ mod tests {
 
         assert_eq!(2, event.keys().count());
         assert_eq!(
-            event::Value::from("help i'm stuck in an http server"),
+            event::Value::from("Help I'm stuck in an HTTP server"),
             event[&event::log_schema().message_key()]
         );
         assert!(!event[&event::log_schema().timestamp_key()]

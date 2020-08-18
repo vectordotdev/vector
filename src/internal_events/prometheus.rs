@@ -11,7 +11,7 @@ pub struct PrometheusEventReceived {
 
 impl InternalEvent for PrometheusEventReceived {
     fn emit_logs(&self) {
-        debug!(message = "scraped events.", ?self.count);
+        debug!(message = "Scraped events.", ?self.count);
     }
 
     fn emit_metrics(&self) {
@@ -36,7 +36,7 @@ pub struct PrometheusRequestCompleted {
 
 impl InternalEvent for PrometheusRequestCompleted {
     fn emit_logs(&self) {
-        debug!(message = "request completed.");
+        debug!(message = "Request completed.");
     }
 
     fn emit_metrics(&self) {

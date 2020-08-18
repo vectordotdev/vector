@@ -108,7 +108,7 @@ mod tests {
             // is desirable in the real-life usage to read-up the whole stdout
             // buffer.
             if expected_num > 200 {
-                panic!("went too far without stop being effective");
+                panic!("Went too far without stop being effective");
             }
 
             // Bump the expected num for the next iteration.
