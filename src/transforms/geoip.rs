@@ -303,7 +303,6 @@ mod tests {
 
         for field in exp_geoip_attr.keys() {
             let k = Atom::from(format!("geo.{}", field).to_string());
-            println!("Looking for {:?}", k);
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
         }
@@ -376,7 +375,6 @@ mod tests {
 
         for field in exp_geoip_attr.keys() {
             let k = Atom::from(format!("geo.{}", field).to_string());
-            println!("Looking for {:?}", k);
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
         }
