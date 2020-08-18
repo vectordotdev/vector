@@ -1,5 +1,5 @@
 use crate::{
-    internal_events::{SocketMode, SocketSendError, TcpConnectionError},
+    internal_events::TcpConnectionError,
     shutdown::ShutdownSignal,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     Event, Pipeline,
@@ -80,12 +80,7 @@ pub trait TcpSource: Clone + Send + 'static {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
-        let out = out.sink_map_err(|error| {
-            emit!(SocketSendError {
-                error,
-                mode: SocketMode::Tcp
-            })
-        });
+        let out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 
         let listenfd = ListenFd::from_env();
 

@@ -1,6 +1,4 @@
 use super::InternalEvent;
-use crate::event::Event;
-use futures01::sync::mpsc::SendError;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -62,17 +60,5 @@ impl InternalEvent for SocketReceiveError {
             "component_type" => "socket",
             "mode" => self.mode.as_str(),
         );
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct SocketSendError {
-    pub mode: SocketMode,
-    pub error: SendError<Event>,
-}
-
-impl InternalEvent for SocketSendError {
-    fn emit_logs(&self) {
-        error!(message = "error sending event.", error = ?self.error, mode = %self.mode.as_str());
     }
 }

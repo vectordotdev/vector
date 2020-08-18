@@ -1,6 +1,6 @@
 use crate::{
     event::{self, Event},
-    internal_events::{SocketEventReceived, SocketMode, SocketReceiveError, SocketSendError},
+    internal_events::{SocketEventReceived, SocketMode, SocketReceiveError},
     shutdown::ShutdownSignal,
     sources::Source,
     Pipeline,
@@ -46,12 +46,7 @@ pub fn udp(
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
-    let mut out = out.sink_map_err(|error| {
-        emit!(SocketSendError {
-            error,
-            mode: SocketMode::Udp
-        })
-    });
+    let mut out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
 
     Box::new(
         async move {
