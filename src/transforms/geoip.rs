@@ -63,6 +63,12 @@ impl Geoip {
     }
 }
 
+// MaxMind GeoIP database file have a type field we can use to recognize specific
+// products. If we encounter one of these two types, we look for ASN/ISP information;
+// otherwise we expect to be working with a City database.
+const ASN_DATABASE_TYPE: &str = "GeoLite2-ASN";
+const ISP_DATABASE_TYPE: &str = "GeoIP2-ISP";
+
 impl Transform for Geoip {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let target_field = self.target.clone();
@@ -72,8 +78,8 @@ impl Transform for Geoip {
             .map(|s| s.to_string_lossy());
         if let Some(ipaddress) = &ipaddress {
             if let Ok(ip) = FromStr::from_str(ipaddress) {
-                if self.dbreader.metadata.database_type == "GeoLite2-ASN"
-                    || self.dbreader.metadata.database_type == "GeoIP2-ISP"
+                if self.dbreader.metadata.database_type == ASN_DATABASE_TYPE
+                    || self.dbreader.metadata.database_type == ISP_DATABASE_TYPE
                 {
                     if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::Isp>(ip) {
                         if let Some(autonomous_system_number) = data.autonomous_system_number {
