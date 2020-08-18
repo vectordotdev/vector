@@ -1,9 +1,9 @@
 use super::Transform;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{RemapEventProcessed, RemapFailedMapping},
     mapping::{parser::parse as parse_mapping, Mapping},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
 

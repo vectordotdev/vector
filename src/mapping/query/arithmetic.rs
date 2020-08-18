@@ -3,6 +3,7 @@ use crate::{
     event::{Event, Value},
     mapping::Result,
 };
+use bytes::BytesMut;
 
 #[derive(Debug, Clone)]
 pub(in crate::mapping) enum Operator {
@@ -149,10 +150,12 @@ impl Function for Arithmetic {
                         Value::Integer(ir) => Value::Integer(il + ir),
                         vr => return Err(format!("unable to add right-hand field type {:?}", vr)),
                     },
-                    Value::Bytes(mut sl) => match right {
+                    Value::Bytes(sl) => match right {
                         Value::Bytes(sr) => {
-                            sl.extend_from_slice(&sr);
-                            Value::Bytes(sl)
+                            let mut buf = BytesMut::with_capacity(sl.len() + sr.len());
+                            buf.extend_from_slice(&sl);
+                            buf.extend_from_slice(&sr);
+                            Value::Bytes(buf.into())
                         }
                         vr => return Err(format!("unable to add right-hand field type {:?}", vr)),
                     },
