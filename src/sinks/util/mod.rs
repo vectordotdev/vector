@@ -4,11 +4,9 @@ pub mod buffer;
 pub mod encoding;
 pub mod http;
 pub mod retries;
-pub mod retries2;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod service;
-pub mod service2;
 pub mod sink;
 pub mod tcp;
 #[cfg(test)]
@@ -30,7 +28,10 @@ pub use buffer::metrics::{MetricBuffer, MetricEntry};
 pub use buffer::partition::Partition;
 pub use buffer::vec::{EncodedLength, VecBuffer};
 pub use buffer::{Buffer, Compression, PartitionBuffer, PartitionInnerBuffer};
-pub use service::{ServiceBuilderExt, TowerRequestConfig, TowerRequestLayer, TowerRequestSettings};
+pub use service::{
+    InFlightLimit, ServiceBuilderExt, TowerBatchedSink, TowerCompat, TowerRequestConfig,
+    TowerRequestLayer, TowerRequestSettings,
+};
 pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 pub use uri::UriSerde;
 

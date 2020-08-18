@@ -1,7 +1,6 @@
 use super::{
-    retries2::{RetryAction, RetryLogic},
-    service2::{TowerBatchedSink, TowerRequestSettings},
-    sink, Batch,
+    retries::{RetryAction, RetryLogic},
+    sink, Batch, TowerBatchedSink, TowerRequestSettings,
 };
 use crate::{
     buffers::Acker,

@@ -78,7 +78,7 @@ rusoto_signature = { package = "rusoto_signature", version = "0.44.0", optional 
 
 # Tower
 tower = "0.1.1"
-tower03 = { package = "tower", version = "0.3", git = "https://github.com/tower-rs/tower", rev = "43168944220ed32dab83cb4f11f7b97abc5818d5", features = ["limit", "retry", "timeout", "util"] }
+tower03 = { package = "tower", version = "0.3", git = "https://github.com/tower-rs/tower", rev = "43168944220ed32dab83cb4f11f7b97abc5818d5", features = ["buffer", "limit", "retry", "timeout", "util"] }
 
 # Serde
 serde = { version = "1.0.80", features = ["derive"] }

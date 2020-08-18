@@ -6,12 +6,11 @@ use crate::{
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        retries2::RetryLogic,
+        retries::RetryLogic,
         rusoto,
-        service2::{InFlightLimit, ServiceBuilderExt, TowerCompat, TowerRequestConfig},
         sink::Response,
-        BatchConfig, BatchSettings, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
-        PartitionInnerBuffer,
+        BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
+        PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerCompat, TowerRequestConfig,
     },
     template::Template,
 };

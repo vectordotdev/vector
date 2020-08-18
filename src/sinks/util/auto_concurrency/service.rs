@@ -1,6 +1,6 @@
 use super::controller::Controller;
 use super::future::ResponseFuture;
-use crate::sinks::util::retries2::RetryLogic;
+use crate::sinks::util::retries::RetryLogic;
 
 use tower03::Service;
 

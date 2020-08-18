@@ -3,8 +3,7 @@ use crate::{
     event::{log_schema, Event, Value},
     sinks::util::{
         http::{BatchedHttpSink, HttpClient, HttpSink},
-        service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, UriSerde,
+        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
     },
 };
 use futures::TryFutureExt;

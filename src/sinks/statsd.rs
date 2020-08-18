@@ -3,9 +3,7 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{MetricKind, MetricValue, StatisticKind},
     event::Event,
-    sinks::util::{
-        service2::TowerCompat, BatchConfig, BatchSettings, BatchSink, Buffer, Compression,
-    },
+    sinks::util::{BatchConfig, BatchSettings, BatchSink, Buffer, Compression, TowerCompat},
 };
 use futures::{future, FutureExt, TryFutureExt};
 use futures01::{stream, Sink};

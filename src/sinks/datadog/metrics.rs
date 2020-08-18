@@ -6,8 +6,7 @@ use crate::{
     },
     sinks::util::{
         http::{BatchedHttpSink, HttpClient, HttpSink},
-        service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, MetricBuffer,
+        BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
     },
 };
 use chrono::{DateTime, Utc};

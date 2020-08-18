@@ -2,7 +2,7 @@
 //!
 use super::controller::Controller;
 use super::instant_now;
-use crate::sinks::util::retries2::RetryLogic;
+use crate::sinks::util::retries::RetryLogic;
 use futures::ready;
 use pin_project::pin_project;
 use std::{

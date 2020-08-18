@@ -11,9 +11,8 @@ use crate::{
     metrics::{self, capture_metrics, get_controller},
     sinks::{
         util::{
-            retries2::RetryLogic,
-            service2::{InFlightLimit, TowerRequestConfig},
-            BatchSettings, EncodedLength, VecBuffer,
+            retries::RetryLogic, BatchSettings, EncodedLength, InFlightLimit, TowerRequestConfig,
+            VecBuffer,
         },
         Healthcheck, RouterSink,
     },

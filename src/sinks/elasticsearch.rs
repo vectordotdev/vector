@@ -7,10 +7,8 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpClient, HttpSink},
-        retries2::{RetryAction, RetryLogic},
-        rusoto,
-        service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, Buffer, Compression,
+        retries::{RetryAction, RetryLogic},
+        rusoto, BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
@@ -503,7 +501,7 @@ fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{sinks::util::retries2::RetryAction, Event};
+    use crate::{sinks::util::retries::RetryAction, Event};
     use http::{Response, StatusCode};
     use serde_json::json;
     use string_cache::DefaultAtom as Atom;
