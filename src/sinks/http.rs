@@ -4,8 +4,8 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
-        service2::{InFlightLimit, TowerRequestConfig},
-        BatchConfig, BatchSettings, Buffer, Compression, UriSerde,
+        BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, TowerRequestConfig,
+        UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
 };
