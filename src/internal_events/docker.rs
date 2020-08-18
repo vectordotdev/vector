@@ -82,7 +82,7 @@ pub struct DockerContainerUnwatch<'a> {
 impl<'a> InternalEvent for DockerContainerUnwatch<'a> {
     fn emit_logs(&self) {
         info!(
-            message = "stoped watching for logs of container.",
+            message = "stopped watching for logs of container.",
             container_id = %self.container_id,
         );
     }
@@ -112,7 +112,7 @@ impl<'a> InternalEvent for DockerCommunicationError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("communication_error", 1,
+        counter!("communication_errors", 1,
                  "component_kind" => "source",
                  "component_name" => "docker",
         );
@@ -136,7 +136,7 @@ impl<'a> InternalEvent for DockerContainerMetadataFetchFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("container_metadata_fetch_failed", 1,
+        counter!("container_metadata_fetch_errors", 1,
                  "component_kind" => "source",
                  "component_name" => "docker",
         );

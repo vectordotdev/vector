@@ -263,7 +263,7 @@ mod tests {
     use std::time::Duration;
 
     /// A helper function to simplify assertion on the `evmap` state.
-    fn gather_state<T>(handle: &evmap10::ReadHandle<String, state::evmap::Value<T>>) -> Vec<T>
+    fn gather_state<T>(handle: &evmap::ReadHandle<String, state::evmap::Value<T>>) -> Vec<T>
     where
         T: Metadata<Ty = ObjectMeta> + Clone,
     {
@@ -885,7 +885,7 @@ mod tests {
             tokio::time::pause();
 
             // Prepare state.
-            let (state_reader, state_writer) = evmap10::new();
+            let (state_reader, state_writer) = evmap::new();
             let state_writer = state::evmap::Writer::new(state_writer, None); // test without debounce to avouid complexity
             let state_writer = state::instrumenting::Writer::new(state_writer);
             let resulting_state_reader = state_reader.clone();

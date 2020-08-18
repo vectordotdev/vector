@@ -4,7 +4,7 @@
 
 use super::path_helpers::parse_log_file_path;
 use crate::{event::LogEvent, kubernetes as k8s, Event};
-use evmap10::ReadHandle;
+use evmap::ReadHandle;
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use serde::{Deserialize, Serialize};
 

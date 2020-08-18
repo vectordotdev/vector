@@ -1,7 +1,7 @@
 #![recursion_limit = "256"] // for async-stream
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
-#![allow(clippy::blocks_in_if_conditions)]
+#![allow(clippy::block_in_if_condition_stmt)]
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::new_ret_no_self)]
 #![allow(clippy::too_many_arguments)]
@@ -31,10 +31,10 @@ pub mod wasm;
 #[macro_use]
 pub mod internal_events;
 pub mod async_read;
-pub mod hyper;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
 pub mod kubernetes;
+pub mod line_agg;
 pub mod list;
 pub mod metrics;
 pub(crate) mod pipeline;

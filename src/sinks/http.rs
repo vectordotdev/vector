@@ -296,7 +296,7 @@ mod tests {
         sinks::util::test::build_test_server,
         test_util::{next_addr, random_lines_with_stream},
     };
-    use bytes05::buf::BufExt;
+    use bytes::buf::BufExt;
     use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
     use headers::{Authorization, HeaderMapExt};

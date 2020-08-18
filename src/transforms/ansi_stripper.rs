@@ -2,6 +2,10 @@ use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{self, Value},
+    internal_events::{
+        ANSIStripperEventProcessed, ANSIStripperFailed, ANSIStripperFieldInvalid,
+        ANSIStripperFieldMissing,
+    },
     Event,
 };
 use serde::{Deserialize, Serialize};
@@ -52,29 +56,20 @@ impl Transform for AnsiStripper {
         let log = event.as_mut_log();
 
         match log.get_mut(&self.field) {
-            None => debug!(
-                message = "Field does not exist.",
-                field = self.field.as_ref(),
-            ),
+            None => emit!(ANSIStripperFieldMissing { field: &self.field }),
             Some(Value::Bytes(ref mut bytes)) => {
-                *bytes = match strip_ansi_escapes::strip(bytes.clone()) {
-                    Ok(b) => b.into(),
-                    Err(error) => {
-                        debug!(
-                            message = "Could not strip ANSI escape sequences.",
-                            field = self.field.as_ref(),
-                            %error,
-                            rate_limit_secs = 30,
-                        );
-                        return Some(event);
-                    }
+                match strip_ansi_escapes::strip(&bytes) {
+                    Ok(b) => *bytes = b.into(),
+                    Err(error) => emit!(ANSIStripperFailed {
+                        field: &self.field,
+                        error
+                    }),
                 };
             }
-            _ => debug!(
-                message = "Field value must be a string.",
-                field = self.field.as_ref(),
-            ),
+            _ => emit!(ANSIStripperFieldInvalid { field: &self.field }),
         }
+
+        emit!(ANSIStripperEventProcessed);
 
         Some(event)
     }

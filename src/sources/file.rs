@@ -1,12 +1,13 @@
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::{self, Event},
-    internal_events::FileEventReceived,
+    internal_events::{FileEventReceived, FileSourceInternalEventsEmitter},
+    line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
     trace::{current_span, Instrument},
     Pipeline,
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
     FileServer, Fingerprinter,
@@ -24,9 +25,6 @@ use std::convert::{TryFrom, TryInto};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 use tokio::task::spawn_blocking;
-
-mod line_agg;
-use line_agg::LineAgg;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -253,6 +251,7 @@ pub fn file_source(
         fingerprinter: config.fingerprinting.clone().into(),
         oldest_first: config.oldest_first,
         remove_after: config.remove_after.map(Duration::from_secs),
+        emitter: FileSourceInternalEventsEmitter,
     };
 
     let file_key = config.file_key.clone();
@@ -268,7 +267,7 @@ pub fn file_source(
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
     Box::new(future::lazy(move || {
-        info!(message = "Starting file server.", ?include, ?exclude);
+        info!(message = "starting file server.", ?include, ?exclude);
 
         // sizing here is just a guess
         let (tx, rx) = futures01::sync::mpsc::channel(100);
@@ -307,10 +306,6 @@ pub fn file_source(
             messages
                 .map(move |(msg, file): (Bytes, String)| {
                     let _enter = span2.enter();
-                    emit!(FileEventReceived {
-                        file: &file,
-                        byte_size: msg.len(),
-                    });
                     create_event(msg, file, &host_key, &hostname, &file_key)
                 })
                 .forward(out.sink_map_err(|e| error!(%e)))
@@ -330,7 +325,7 @@ pub fn file_source(
         })
         .boxed()
         .compat()
-        .map_err(|error| error!(message="File server unexpectedly stopped.",%error))
+        .map_err(|error| error!(message="file server unexpectedly stopped.",%error))
     }))
 }
 
@@ -341,6 +336,11 @@ fn create_event(
     hostname: &Option<String>,
     file_key: &Option<String>,
 ) -> Event {
+    emit!(FileEventReceived {
+        file: &file,
+        byte_size: line.len(),
+    });
+
     let mut event = Event::from(line);
 
     // Add source type

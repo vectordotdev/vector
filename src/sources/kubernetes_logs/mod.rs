@@ -6,7 +6,10 @@
 #![deny(missing_docs)]
 
 use crate::event::{self, Event};
-use crate::internal_events::{KubernetesLogsEventAnnotationFailed, KubernetesLogsEventReceived};
+use crate::internal_events::{
+    FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
+    KubernetesLogsEventReceived,
+};
 use crate::kubernetes as k8s;
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
@@ -16,8 +19,7 @@ use crate::{
     transforms::Transform,
     Pipeline,
 };
-use bytes05::Bytes;
-use evmap10::{self as evmap};
+use bytes::Bytes;
 use file_source::{FileServer, FileServerShutdown, Fingerprinter};
 use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
 use k8s_openapi::api::core::v1::Pod;
@@ -203,6 +205,7 @@ impl Source {
             },
             oldest_first: false,
             remove_after: None,
+            emitter: FileSourceInternalEventsEmitter,
         };
 
         let (file_source_tx, file_source_rx) =

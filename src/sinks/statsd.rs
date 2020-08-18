@@ -233,7 +233,7 @@ mod test {
         test_util::{collect_n, runtime},
         Event,
     };
-    use bytes05::Bytes;
+    use bytes::Bytes;
     use futures::compat::{Future01CompatExt, Sink01CompatExt};
     use futures::{SinkExt, StreamExt, TryStreamExt};
     use futures01::{sync::mpsc, Sink};

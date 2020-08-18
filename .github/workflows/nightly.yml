@@ -1,6 +1,7 @@
 name: nightly
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: "0 4 * * *"
 
@@ -168,14 +169,10 @@ jobs:
         with:
           name: vector-arm64.deb
           path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
-          name: vector-armhf.deb
-          path: target/artifacts
       - env:
           DOCKER_USERNAME: "${{ secrets.CI_DOCKER_USERNAME }}"
           DOCKER_PASSWORD: "${{ secrets.CI_DOCKER_PASSWORD }}"
-          PLATFORM: "linux/amd64,linux/arm64,linux/arm"
+          PLATFORM: "linux/amd64,linux/arm64"
           USE_CONTAINER: none
         run: |
           ./scripts/upgrade-docker.sh
@@ -214,10 +211,6 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v1
         with:
-          name: vector-armhf.deb
-          path: target/artifacts
-      - uses: actions/download-artifact@v1
-        with:
           name: vector-x86_64-apple-darwin.tar.gz
           path: target/artifacts
       - uses: actions/download-artifact@v1
@@ -251,19 +244,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: Install Helm
-        run: |
-          set -xeuo pipefail
-
-          KUBERNETES_VERSION="v1.18.6"
-          HELM_VERSION="v3.2.4"
-
-          curl -Lo kubectl \
-            "https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/kubectl"
-          sudo install kubectl /usr/local/bin/ && rm kubectl
-
-          curl -L "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" \
-            | tar -xzv --strip-components=1 --occurrence linux-amd64/helm
-          sudo install helm /usr/local/bin/ && rm helm
+        run: scripts/ci-setup-helm.sh
       - name: Release Helm Chart
         env:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"

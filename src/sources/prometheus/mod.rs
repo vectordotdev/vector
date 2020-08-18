@@ -12,7 +12,7 @@ use futures::{
     future, stream, FutureExt, StreamExt, TryFutureExt,
 };
 use futures01::Sink;
-use hyper::{Body, Client, Request};
+use hyper::{body::to_bytes as body_to_bytes, Body, Client, Request};
 use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -147,7 +147,6 @@ mod test {
     use super::*;
     use crate::{
         config,
-        hyper::body_to_bytes,
         sinks::prometheus::PrometheusSinkConfig,
         test_util::{next_addr, start_topology},
         Error,

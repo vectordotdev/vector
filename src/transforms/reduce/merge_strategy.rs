@@ -47,7 +47,9 @@ struct ConcatMerger {
 
 impl ConcatMerger {
     fn new(v: Bytes) -> Self {
-        Self { v: v.into() }
+        Self {
+            v: BytesMut::from(&v[..]),
+        }
     }
 }
 
