@@ -100,7 +100,6 @@ impl TcpSink {
             resolver,
             tls,
             state: TcpSinkState::Disconnected,
-            // state2: TcpSinkState2::Disconnected,
             backoff: Self::fresh_backoff(),
             span,
         }
