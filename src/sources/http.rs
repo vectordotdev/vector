@@ -216,7 +216,7 @@ mod tests {
         config::{GlobalOptions, SourceConfig},
         event::{self, Event},
         runtime::Runtime,
-        test_util::{self, collect_n, runtime},
+        test_util::{self, collect_n, runtime, wait_for_tcp},
         Pipeline,
     };
     use futures::compat::Future01CompatExt;
@@ -253,6 +253,7 @@ mod tests {
             .await
             .unwrap();
         });
+        rt.block_on_std(async move { wait_for_tcp(address).await });
         (recv, address)
     }
 
