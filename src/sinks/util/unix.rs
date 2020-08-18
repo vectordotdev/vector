@@ -130,7 +130,7 @@ impl UnixSink {
                 },
                 UnixSinkState::Disconnected => {
                     debug!(
-                        message = "connecting",
+                        message = "Connecting",
                         path = &field::display(self.path.to_str().unwrap())
                     );
                     let connect_future = UnixStream::connect(self.path.clone()).boxed().compat();

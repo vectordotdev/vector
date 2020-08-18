@@ -1,26 +1,30 @@
-use super::{
-    retries::{FixedRetryPolicy, RetryLogic},
-    sink::Response,
-    Batch, BatchSink,
-};
+use super::auto_concurrency::{AutoConcurrencyLimit, AutoConcurrencyLimitLayer};
+use super::retries::{FixedRetryPolicy, RetryLogic};
+use super::sink::Response;
+use super::{Batch, BatchSink};
 use crate::buffers::Acker;
-use futures::{FutureExt, TryFutureExt};
-use futures01::{Async, Future, Poll};
-use serde::{Deserialize, Serialize};
+use futures::TryFutureExt;
+use serde::{
+    de::{self, Unexpected, Visitor},
+    Deserialize, Deserializer, Serialize,
+};
+use std::fmt;
 use std::sync::Arc;
+use std::task::Poll;
 use std::time::Duration;
-use std::{error, fmt};
-use tokio::time::delay_for;
-use tower::{
+use tower03::{
     layer::{util::Stack, Layer},
-    limit::{concurrency::ConcurrencyLimit, rate::RateLimit},
+    limit::RateLimit,
     retry::Retry,
+    timeout::Timeout,
     util::BoxService,
     Service, ServiceBuilder,
 };
 
-pub type TowerBatchedSink<S, B, L, Request> =
-    BatchSink<ConcurrencyLimit<RateLimit<Retry<FixedRetryPolicy<L>, Timeout<S>>>>, B, Request>;
+pub use compat::TowerCompat;
+
+pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, AutoConcurrencyLimit<Timeout<S>, L>>>;
+pub type TowerBatchedSink<S, B, L, Request> = BatchSink<TowerCompat<Svc<S, L>>, B, Request>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -55,10 +59,79 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
     }
 }
 
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq, Serialize)]
+#[derivative(Default)]
+pub enum InFlightLimit {
+    #[derivative(Default)]
+    None,
+    Auto,
+    Fixed(usize),
+}
+
+impl InFlightLimit {
+    pub fn if_none(self, other: Self) -> Self {
+        match self {
+            Self::None => other,
+            _ => self,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for InFlightLimit {
+    // Deserialize either a positive integer or the string "auto"
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct UsizeOrAuto;
+
+        impl<'de> Visitor<'de> for UsizeOrAuto {
+            type Value = InFlightLimit;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str(r#"positive integer or "auto""#)
+            }
+
+            fn visit_str<E: de::Error>(self, value: &str) -> Result<InFlightLimit, E> {
+                if value == "auto" {
+                    Ok(InFlightLimit::Auto)
+                } else {
+                    Err(de::Error::unknown_variant(value, &["auto"]))
+                }
+            }
+
+            fn visit_i64<E: de::Error>(self, value: i64) -> Result<InFlightLimit, E> {
+                if value > 0 {
+                    Ok(InFlightLimit::Fixed(value as usize))
+                } else {
+                    Err(de::Error::invalid_value(
+                        Unexpected::Signed(value),
+                        &"positive integer",
+                    ))
+                }
+            }
+
+            fn visit_u64<E: de::Error>(self, value: u64) -> Result<InFlightLimit, E> {
+                if value > 0 {
+                    Ok(InFlightLimit::Fixed(value as usize))
+                } else {
+                    Err(de::Error::invalid_value(
+                        Unexpected::Unsigned(value),
+                        &"positive integer",
+                    ))
+                }
+            }
+        }
+
+        deserializer.deserialize_any(UsizeOrAuto)
+    }
+}
+
 /// Tower Request based configuration
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
 pub struct TowerRequestConfig {
-    pub in_flight_limit: Option<usize>,        // 5
+    #[serde(default)]
+    pub in_flight_limit: InFlightLimit, // 5
     pub timeout_secs: Option<u64>,             // 60
     pub rate_limit_duration_secs: Option<u64>, // 1
     pub rate_limit_num: Option<u64>,           // 5
@@ -70,10 +143,11 @@ pub struct TowerRequestConfig {
 impl TowerRequestConfig {
     pub fn unwrap_with(&self, defaults: &TowerRequestConfig) -> TowerRequestSettings {
         TowerRequestSettings {
-            in_flight_limit: self
-                .in_flight_limit
-                .or(defaults.in_flight_limit)
-                .unwrap_or(5),
+            in_flight_limit: match self.in_flight_limit.if_none(defaults.in_flight_limit) {
+                InFlightLimit::None => Some(5),
+                InFlightLimit::Auto => None,
+                InFlightLimit::Fixed(limit) => Some(limit),
+            },
             timeout: Duration::from_secs(self.timeout_secs.or(defaults.timeout_secs).unwrap_or(60)),
             rate_limit_duration: Duration::from_secs(
                 self.rate_limit_duration_secs
@@ -101,7 +175,7 @@ impl TowerRequestConfig {
 
 #[derive(Debug, Clone)]
 pub struct TowerRequestSettings {
-    pub in_flight_limit: usize,
+    pub in_flight_limit: Option<usize>,
     pub timeout: Duration,
     pub rate_limit_duration: Duration,
     pub rate_limit_num: u64,
@@ -133,7 +207,7 @@ impl TowerRequestSettings {
     // `trait SinkExt` above), as it is missing a bound on the
     // associated types that cannot be expressed in stable Rust.
     where
-        L: RetryLogic<Response = S::Response> + Send + 'static,
+        L: RetryLogic<Response = S::Response>,
         S: Service<Request> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send + Response,
@@ -141,16 +215,18 @@ impl TowerRequestSettings {
         B: Batch<Output = Request>,
         Request: Send + Clone + 'static,
     {
-        let policy = self.retry_policy(retry_logic);
+        let policy = self.retry_policy(retry_logic.clone());
         let service = ServiceBuilder::new()
-            .concurrency_limit(self.in_flight_limit)
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
             .retry(policy)
-            .layer(TimeoutLayer {
-                timeout: self.timeout,
-            })
+            .layer(AutoConcurrencyLimitLayer::new(
+                self.in_flight_limit,
+                retry_logic,
+            ))
+            .timeout(self.timeout)
             .service(service);
 
+        let service = TowerCompat::new(service);
         BatchSink::new(service, batch, batch_timeout, acker)
     }
 }
@@ -162,7 +238,7 @@ pub struct TowerRequestLayer<L, Request> {
     _pd: std::marker::PhantomData<Request>,
 }
 
-impl<S, L, Request> tower::layer::Layer<S> for TowerRequestLayer<L, Request>
+impl<S, L, Request> Layer<S> for TowerRequestLayer<L, Request>
 where
     S: Service<Request> + Send + Clone + 'static,
     S::Response: Response + Send + 'static,
@@ -177,15 +253,13 @@ where
         let policy = self.settings.retry_policy(self.retry_logic.clone());
 
         let l = ServiceBuilder::new()
-            .concurrency_limit(self.settings.in_flight_limit)
+            .concurrency_limit(self.settings.in_flight_limit.unwrap_or(5))
             .rate_limit(
                 self.settings.rate_limit_num,
                 self.settings.rate_limit_duration,
             )
             .retry(policy)
-            .layer(TimeoutLayer {
-                timeout: self.settings.timeout,
-            })
+            .timeout(self.settings.timeout)
             .service(inner);
 
         BoxService::new(l)
@@ -224,15 +298,17 @@ where
 {
     type Response = S::Response;
     type Error = crate::Error;
-    type Future = futures01::future::MapErr<S::Future, fn(S::Error) -> crate::Error>;
+    type Future = futures::future::MapErr<S::Future, fn(S::Error) -> crate::Error>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        self.inner.poll_ready().map_err(Into::into)
+    fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner
+            .poll_ready(cx)
+            .map(|result| result.map_err(|e| e.into()))
     }
 
     fn call(&mut self, req: R1) -> Self::Future {
         let req = (self.f)(req);
-        self.inner.call(req).map_err(|e| e.into())
+        self.inner.call(req).map_err(Into::into)
     }
 }
 
@@ -245,137 +321,69 @@ impl<S: Clone, R1, R2> Clone for Map<S, R1, R2> {
     }
 }
 
-// === timeout ===
+mod compat {
+    use futures::compat::Compat;
+    use futures01::Poll;
+    use std::pin::Pin;
+    use tower::Service as Service01;
+    use tower03::Service as Service03;
 
-/// Applies a timeout to requests.
-///
-/// We require our own timeout layer because the current
-/// 0.1 version uses From intead of Into bounds for errors
-/// this casues the whole stack to not align and not compile.
-/// In future versions of tower this should be fixed.
-#[derive(Debug, Clone)]
-pub struct Timeout<T> {
-    inner: T,
-    timeout: Duration,
-}
-
-// ===== impl Timeout =====
-
-impl<S, Request> Service<Request> for Timeout<S>
-where
-    S: Service<Request>,
-    S::Error: Into<crate::Error>,
-{
-    type Response = S::Response;
-    type Error = crate::Error;
-    type Future = ResponseFuture<S::Future>;
-
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        self.inner.poll_ready().map_err(Into::into)
+    pub struct TowerCompat<S> {
+        inner: S,
     }
 
-    fn call(&mut self, request: Request) -> Self::Future {
-        let response = self.inner.call(request);
-        let delay = delay_for(self.timeout);
-        let sleep = Box::new(async move { Ok(delay.await) }.boxed().compat());
+    impl<S> TowerCompat<S> {
+        pub fn new(inner: S) -> Self {
+            Self { inner }
+        }
 
-        ResponseFuture { response, sleep }
+        pub fn get_ref(&self) -> &S {
+            &self.inner
+        }
+
+        pub fn get_mut(&mut self) -> &S {
+            &mut self.inner
+        }
     }
-}
 
-/// Applies a timeout to requests via the supplied inner service.
-#[derive(Debug)]
-pub struct TimeoutLayer {
-    timeout: Duration,
-}
+    impl<S, Request> Service01<Request> for TowerCompat<S>
+    where
+        S: Service03<Request>,
+    {
+        type Response = S::Response;
+        type Error = S::Error;
+        type Future = Compat<Pin<Box<S::Future>>>;
 
-impl TimeoutLayer {
-    /// Create a timeout from a duration
-    pub fn new(timeout: Duration) -> Self {
-        TimeoutLayer { timeout }
-    }
-}
+        fn poll_ready(&mut self) -> Poll<(), Self::Error> {
+            let p = task_compat::with_context(|cx| self.inner.poll_ready(cx));
+            task_compat::poll_03_to_01(p)
+        }
 
-impl<S> Layer<S> for TimeoutLayer {
-    type Service = Timeout<S>;
-
-    fn layer(&self, service: S) -> Self::Service {
-        Timeout {
-            inner: service,
-            timeout: self.timeout,
+        fn call(&mut self, req: Request) -> Self::Future {
+            Compat::new(Box::pin(self.inner.call(req)))
         }
     }
 }
 
-/// `Timeout` response future
-pub struct ResponseFuture<T> {
-    response: T,
-    sleep: Box<dyn Future<Item = (), Error = ()> + Send>,
-}
-
-impl<T> Future for ResponseFuture<T>
-where
-    T: Future,
-    T::Error: Into<crate::Error>,
-{
-    type Item = T::Item;
-    type Error = crate::Error;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        // First, try polling the future
-        match self.response.poll().map_err(Into::into)? {
-            Async::Ready(v) => return Ok(Async::Ready(v)),
-            Async::NotReady => {}
-        }
-
-        // Now check the sleep
-        match self.sleep.poll() {
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Ok(Async::Ready(())) => Err(Elapsed(()).into()),
-            Err(_) => unreachable!(),
-        }
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct Elapsed(pub(super) ());
-
-impl fmt::Display for Elapsed {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.pad("request timed out")
-    }
-}
-
-impl error::Error for Elapsed {}
-
-// rustc issue: https://github.com/rust-lang/rust/issues/71259
-#[cfg(feature = "disabled")]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures01::Future;
-    use std::sync::Arc;
-    use tokio01_test::{assert_ready, task::MockTask};
-    use tower::layer::Layer;
-    use tower_test::{assert_request_eq, mock};
 
     #[test]
-    fn map() {
-        let mut task = MockTask::new();
-        let (mock, mut handle) = mock::pair();
-
-        let f = |r| r;
-
-        let map_layer = MapLayer { f: Arc::new(f) };
-
-        let mut svc = map_layer.layer(mock);
-
-        task.enter(|| assert_ready!(svc.poll_ready()));
-
-        let res = svc.call("hello world");
-
-        assert_request_eq!(handle, "hello world").send_response("world bye");
-
-        res.wait().unwrap();
+    fn in_flight_limit_works() {
+        let cfg = toml::from_str::<TowerRequestConfig>("").expect("Empty config failed");
+        assert_eq!(cfg.in_flight_limit, InFlightLimit::None);
+        let cfg = toml::from_str::<TowerRequestConfig>("in_flight_limit = 10")
+            .expect("Fixed in_flight_limit failed");
+        assert_eq!(cfg.in_flight_limit, InFlightLimit::Fixed(10));
+        let cfg = toml::from_str::<TowerRequestConfig>(r#"in_flight_limit = "auto""#)
+            .expect("Auto in_flight_limit failed");
+        assert_eq!(cfg.in_flight_limit, InFlightLimit::Auto);
+        toml::from_str::<TowerRequestConfig>(r#"in_flight_limit = "broken""#)
+            .expect_err("Invalid in_flight_limit didn't fail");
+        toml::from_str::<TowerRequestConfig>(r#"in_flight_limit = 0"#)
+            .expect_err("Invalid in_flight_limit didn't fail on zero");
+        toml::from_str::<TowerRequestConfig>(r#"in_flight_limit = -9"#)
+            .expect_err("Invalid in_flight_limit didn't fail on negative number");
     }
 }

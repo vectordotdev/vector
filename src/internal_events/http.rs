@@ -10,7 +10,7 @@ pub struct HTTPEventsReceived {
 impl InternalEvent for HTTPEventsReceived {
     fn emit_logs(&self) {
         trace!(
-            message = "sending events.",
+            message = "Sending events.",
             events_count = %self.events_count,
             byte_size = %self.byte_size,
         );
