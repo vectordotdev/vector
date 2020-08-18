@@ -96,9 +96,9 @@ fn prometheus(
                             });
 
                             let byte_size = body.len();
-                            let packet = String::from_utf8_lossy(&body);
+                            let body = String::from_utf8_lossy(&body);
 
-                            match parser::parse(&packet) {
+                            match parser::parse(&body) {
                                 Ok(metrics) => {
                                     emit!(PrometheusEventReceived {
                                         byte_size,
@@ -110,12 +110,8 @@ fn prometheus(
                                     emit!(PrometheusParseError {
                                         error,
                                         url: url.clone(),
+                                        body,
                                     });
-                                    debug!(
-                                        message = %format!("failed to parse response:\n\n{}\n\n", packet),
-                                        url=%url.clone(),
-                                        rate_limit_secs = 10
-                                    );
                                     None
                                 }
                             }

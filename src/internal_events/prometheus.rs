@@ -1,6 +1,7 @@
 use super::InternalEvent;
 use crate::sources::prometheus::parser::ParserError;
 use metrics::{counter, timing};
+use std::borrow::Cow;
 use std::time::Instant;
 
 #[derive(Debug)]
@@ -52,14 +53,20 @@ impl InternalEvent for PrometheusRequestCompleted {
 }
 
 #[derive(Debug)]
-pub struct PrometheusParseError {
+pub struct PrometheusParseError<'a> {
     pub error: ParserError,
     pub url: String,
+    pub body: Cow<'a, str>,
 }
 
-impl InternalEvent for PrometheusParseError {
+impl<'a> InternalEvent for PrometheusParseError<'a> {
     fn emit_logs(&self) {
         error!(message = "parsing error.", url = %self.url, error = %self.error);
+        debug!(
+            message = %format!("failed to parse response:\n\n{}\n\n", self.body),
+            url = %self.url,
+            rate_limit_secs = 10
+        );
     }
 
     fn emit_metrics(&self) {
