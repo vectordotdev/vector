@@ -11,6 +11,7 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::fs::DirBuilder;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::{collections::HashMap, path::PathBuf};
 
 pub mod component;
@@ -29,6 +30,8 @@ pub use validation::check;
 pub struct Config {
     #[serde(flatten)]
     pub global: GlobalOptions,
+    #[serde(default)]
+    pub api: ApiOptions,
     #[serde(default)]
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
     #[serde(default)]
@@ -52,6 +55,29 @@ pub struct GlobalOptions {
 
 pub fn default_data_dir() -> Option<PathBuf> {
     Some(PathBuf::from("/var/lib/vector/"))
+}
+
+#[derive(Default, Debug, Deserialize, Serialize)]
+pub struct ApiOptions {
+    #[serde(default = "default_api_enabled")]
+    pub enabled: bool,
+
+    #[serde(default = "default_api_bind")]
+    pub bind: Option<SocketAddr>,
+}
+
+// impl ApiOptions {
+//     pub fn validate_bind(&self) -> Result<SocketAddr> {}
+// }
+
+pub fn default_api_enabled() -> bool {
+    false
+}
+pub fn default_api_bind() -> Option<SocketAddr> {
+    Some(SocketAddr::new(
+        IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+        8686,
+    ))
 }
 
 #[derive(Debug, Snafu)]
@@ -325,6 +351,10 @@ impl Config {
                 data_dir: None,
                 log_schema: event::LogSchema::default(),
             },
+            api: ApiOptions {
+                enabled: false,
+                bind: None,
+            },
             sources: IndexMap::new(),
             sinks: IndexMap::new(),
             transforms: IndexMap::new(),
@@ -467,6 +497,14 @@ impl Config {
                     .log_schema
                     .set_timestamp_key(with.global.log_schema.timestamp_key().clone());
             }
+        }
+
+        // api
+        if with.api.enabled != default_api_enabled() {
+            self.api.enabled = with.api.enabled
+        }
+        if let Some(bind) = with.api.bind {
+            self.api.bind = Some(bind)
         }
 
         with.sources.keys().for_each(|k| {
