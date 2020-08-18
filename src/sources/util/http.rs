@@ -74,7 +74,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             .and(warp::header::headers_cloned())
             .and(warp::body::bytes())
             .and_then(move |headers: HeaderMap, body: Bytes| {
-                info!("Handling http request: {:?}", headers);
+                info!("Handling HTTP request: {:?}", headers);
 
                 let this = self.clone();
                 let out = out.clone();
@@ -124,7 +124,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             }
         });
 
-        info!(message = "building http server", addr = %address);
+        info!(message = "Building HTTP server", addr = %address);
 
         let tls = MaybeTlsSettings::from_config(tls, true).unwrap();
         let incoming = tls.bind(&address).unwrap().incoming();

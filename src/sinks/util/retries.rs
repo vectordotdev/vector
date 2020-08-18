@@ -97,18 +97,18 @@ where
         match result {
             Ok(response) => {
                 if self.remaining_attempts == 0 {
-                    error!("retries exhausted");
+                    error!("Retries exhausted");
                     return None;
                 }
 
                 match self.logic.should_retry_response(response) {
                     RetryAction::Retry(reason) => {
-                        warn!(message = "retrying after response.", %reason);
+                        warn!(message = "Retrying after response.", %reason);
                         Some(self.build_retry())
                     }
 
                     RetryAction::DontRetry(reason) => {
-                        error!(message = "request is not retryable; dropping the request.", %reason);
+                        error!(message = "Request is not retryable; dropping the request.", %reason);
                         None
                     }
 

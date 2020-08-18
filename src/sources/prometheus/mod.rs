@@ -115,10 +115,10 @@ fn prometheus(
         })
         .flatten()
         .forward(
-            out.sink_map_err(|e| error!("error sending metric: {:?}", e))
+            out.sink_map_err(|e| error!("Error sending metric: {:?}", e))
                 .sink_compat(),
         )
-        .inspect(|_| info!("finished sending"));
+        .inspect(|_| info!("Finished sending"));
 
     Box::new(task.boxed().compat())
 }

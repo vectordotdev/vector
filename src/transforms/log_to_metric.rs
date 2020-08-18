@@ -109,7 +109,7 @@ fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
     let template = Template::try_from(s).map_err(TransformError::TemplateError)?;
     let name = template.render(&event).map_err(|e| {
         TransformError::RenderError(format!(
-            "Keys ({:?}) do not exist on the event. Dropping event.",
+            "Keys ({:?}) do not exist on the event; dropping event.",
             e
         ))
     })?;

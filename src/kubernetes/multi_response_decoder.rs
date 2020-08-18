@@ -96,7 +96,7 @@ mod tests {
             (WatchResponse::Ok(actual_event), WatchResponse::Ok(expected_event)) => {
                 assert_eq!(actual_event, expected_event)
             }
-            _ => panic!("expected an event, got something else"),
+            _ => panic!("Expected an event, got something else"),
         }
     }
 
@@ -489,7 +489,7 @@ mod tests {
             };
             match actual_to {
                 WatchResponse::Ok(actual_event) => assert_eq!(actual_event, expected_event),
-                _ => panic!("expected an event, got something else"),
+                _ => panic!("Expected an event, got something else"),
             }
         }
 
