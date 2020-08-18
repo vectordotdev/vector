@@ -13,7 +13,7 @@ mod maybe_tls;
 mod outgoing;
 mod settings;
 
-#[cfg(feature = "sources-tls")]
+#[cfg(all(feature = "sources-tls", feature = "listenfd"))]
 pub(crate) use incoming::{MaybeTlsIncomingStream, MaybeTlsListener};
 pub(crate) use maybe_tls::MaybeTls;
 pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};

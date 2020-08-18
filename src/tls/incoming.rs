@@ -1,7 +1,6 @@
-use super::{
-    CreateAcceptor, Handshake, MaybeTls, MaybeTlsSettings, MaybeTlsStream, PeerAddress, TcpBind,
-    TlsError, TlsSettings,
-};
+use super::{CreateAcceptor, MaybeTlsSettings, MaybeTlsStream, TcpBind, TlsError, TlsSettings};
+#[cfg(feature = "listenfd")]
+use super::{Handshake, MaybeTls, PeerAddress};
 use bytes::{Buf, BufMut};
 use futures::{future::BoxFuture, FutureExt, Stream, StreamExt};
 use openssl::ssl::{SslAcceptor, SslMethod};
@@ -63,6 +62,7 @@ impl MaybeTlsListener {
             })
     }
 
+    #[cfg(feature = "listenfd")]
     pub(crate) fn local_addr(&self) -> Result<SocketAddr, std::io::Error> {
         self.listener.local_addr()
     }
@@ -82,6 +82,7 @@ pub struct MaybeTlsIncomingStream<S> {
     // BoxFuture doesn't allow access to the inner stream, but users
     // of MaybeTlsIncomingStream want access to the peer address while
     // still handshaking, so we have to cache it here.
+    #[cfg(feature = "listenfd")]
     peer_addr: SocketAddr,
 }
 
@@ -90,6 +91,7 @@ enum StreamState<S> {
     Accepting(BoxFuture<'static, Result<SslStream<S>, HandshakeError<S>>>),
 }
 
+#[cfg(feature = "listenfd")]
 impl<S> MaybeTlsIncomingStream<S> {
     pub fn peer_addr(&self) -> SocketAddr {
         self.peer_addr
@@ -108,6 +110,7 @@ impl<S> MaybeTlsIncomingStream<S> {
 }
 
 impl MaybeTlsIncomingStream<TcpStream> {
+    #[cfg(feature = "listenfd")]
     pub(super) fn new(
         stream: TcpStream,
         acceptor: Option<SslAcceptor>,
@@ -122,7 +125,22 @@ impl MaybeTlsIncomingStream<TcpStream> {
         Ok(Self { peer_addr, state })
     }
 
+    #[cfg(not(feature = "listenfd"))]
+    pub(super) fn new(
+        stream: TcpStream,
+        acceptor: Option<SslAcceptor>,
+    ) -> crate::tls::Result<Self> {
+        let state = match acceptor {
+            Some(acceptor) => StreamState::Accepting(
+                async move { tokio_openssl::accept(&acceptor, stream).await }.boxed(),
+            ),
+            None => StreamState::Accepted(MaybeTlsStream::Raw(stream)),
+        };
+        Ok(Self { state })
+    }
+
     // Explicit handshake method
+    #[cfg(feature = "listenfd")]
     pub(crate) async fn handshake(&mut self) -> crate::tls::Result<()> {
         if let StreamState::Accepting(fut) = &mut self.state {
             let stream = fut.await.context(Handshake)?;
