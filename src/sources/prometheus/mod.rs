@@ -231,7 +231,7 @@ mod test {
             .unwrap();
         assert!(response.status().is_success());
 
-        let body = body_to_bytes(response.into_body()).await.unwrap();
+        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
         let lines = std::str::from_utf8(&body)
             .unwrap()
             .lines()
