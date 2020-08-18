@@ -11,7 +11,9 @@ use vector_wasm::{Role, WasmModuleConfig};
 
 pub mod defaults {
     pub(super) const HEAP_MEMORY_SIZE: usize = 16 * 64 * 1024 * 10; // 10MB
-    pub const fn heap_memory_size() -> usize { HEAP_MEMORY_SIZE }
+    pub const fn heap_memory_size() -> usize {
+        HEAP_MEMORY_SIZE
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -171,6 +173,8 @@ mod tests {
             r#"
             module = "target/wasm32-wasi/release/add_fields.wasm"
             artifact_cache = "target/artifacts"
+            options.new_field = "new_value"
+            options.new_field_2 = "new_value_2"
             "#,
         )?;
 

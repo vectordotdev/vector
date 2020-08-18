@@ -6,9 +6,12 @@
 
 #![deny(improper_ctypes)]
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::convert::TryInto;
 use vector_wasm::{hostcall, Registration, Role};
+use once_cell::sync::OnceCell;
+
+static FIELDS: OnceCell<HashMap<String, Value>> = OnceCell::new();
 
 /// Perform one time initialization and registration.
 /// 
@@ -23,6 +26,7 @@ pub extern "C" fn init() {
     assert_eq!(config.role, Role::Transform);
 
     // At this point, you should do any one-time initialization needed...
+    FIELDS.set(config.options.into()).unwrap();
 
     // Finally, pass Vector a `vector_wasm::Registration`
     Registration::transform().register().unwrap();
@@ -55,13 +59,15 @@ pub extern "C" fn process(data: u32, length: u32) -> u32 {
     // **Please note that WASM support is still unstable!**
     //
     // We expect to alter this format in the future after some event data model improvements.
-    let mut event: BTreeMap<String, Value> = serde_json::from_slice(data).unwrap();
+    let mut event: HashMap<String, Value> = serde_json::from_slice(data).unwrap();
 
     // You can mutate/reallocate freely. Vector plugins have a sandboxed heap, so
     // large storage sizes may require adjustments to the `max_heap_size` variable during module
     // registration.
-    event.insert("new_field".into(), "new_value".into());
-    event.insert("new_field_2".into(), "new_value_2".into());
+    let fields = FIELDS.get().unwrap();
+    for (key, value) in fields {
+        event.insert(key.into(), value.clone().into());
+    }
 
     // As with all data, it returns to bytes in the end.
     let output_buffer = serde_json::to_vec(&event).unwrap();

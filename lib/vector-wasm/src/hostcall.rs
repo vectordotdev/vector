@@ -1,4 +1,4 @@
-use crate::{WasmModuleConfig, Registration};
+use crate::{Registration, WasmModuleConfig};
 use anyhow::{Context, Result};
 use std::fmt::Display;
 

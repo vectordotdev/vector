@@ -10,12 +10,8 @@ use lucet_runtime::{DlModule, InstanceHandle, Limits, MmapRegion, Region};
 use lucet_wasi::WasiCtxBuilder;
 use lucetc::{Bindings, Lucetc, LucetcOpts};
 use std::collections::LinkedList;
-use std::{
-    fmt::Debug,
-    fs,
-    path::{Path},
-};
-use vector_wasm::{WasmModuleConfig, Registration, Role};
+use std::{fmt::Debug, fs, path::Path};
+use vector_wasm::{Registration, Role, WasmModuleConfig};
 mod artifact_cache;
 mod fingerprint;
 pub use artifact_cache::ArtifactCache;
@@ -193,8 +189,8 @@ impl WasmModule {
 fn protobuf() -> Result<()> {
     use serde_json::json;
     use std::{
-        io::{Read, Write},
         collections::HashMap,
+        io::{Read, Write},
     };
     use string_cache::DefaultAtom as Atom;
     crate::test_util::trace_init();
