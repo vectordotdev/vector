@@ -136,63 +136,66 @@ fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
     let mut buf = Vec::new();
 
     let metric = event.as_metric();
-    match metric.kind {
-        MetricKind::Incremental => match &metric.value {
-            MetricValue::Counter { value } => {
-                buf.push(format!("{}:{}", metric.name, value));
-                buf.push("c".to_string());
-                if let Some(t) = &metric.tags {
-                    buf.push(format!("#{}", encode_tags(t)));
-                };
-            }
-            MetricValue::Gauge { value } => {
+    match &metric.value {
+        MetricValue::Counter { value } => {
+            buf.push(format!("{}:{}", metric.name, value));
+            buf.push("c".to_string());
+            if let Some(t) = &metric.tags {
+                buf.push(format!("#{}", encode_tags(t)));
+            };
+        }
+        MetricValue::Gauge { value } => match metric.kind {
+            MetricKind::Incremental => {
                 buf.push(format!("{}:{:+}", metric.name, value));
                 buf.push("g".to_string());
                 if let Some(t) = &metric.tags {
                     buf.push(format!("#{}", encode_tags(t)));
                 };
             }
-            MetricValue::Distribution {
-                values,
-                sample_rates,
-                statistic,
-            } => {
-                let metric_type = match statistic {
-                    StatisticKind::Histogram => "h",
-                    StatisticKind::Summary => "d",
-                };
-                for (val, sample_rate) in values.iter().zip(sample_rates.iter()) {
-                    buf.push(format!("{}:{}", metric.name, val));
-                    buf.push(metric_type.to_string());
-                    if *sample_rate != 1 {
-                        buf.push(format!("@{}", 1.0 / f64::from(*sample_rate)));
-                    };
-                    if let Some(t) = &metric.tags {
-                        buf.push(format!("#{}", encode_tags(t)));
-                    };
-                }
-            }
-            MetricValue::Set { values } => {
-                for val in values {
-                    buf.push(format!("{}:{}", metric.name, val));
-                    buf.push("s".to_string());
-                    if let Some(t) = &metric.tags {
-                        buf.push(format!("#{}", encode_tags(t)));
-                    };
-                }
-            }
-            _ => {}
-        },
-        MetricKind::Absolute => {
-            if let MetricValue::Gauge { value } = &metric.value {
+            MetricKind::Absolute => {
                 buf.push(format!("{}:{}", metric.name, value));
                 buf.push("g".to_string());
                 if let Some(t) = &metric.tags {
                     buf.push(format!("#{}", encode_tags(t)));
                 };
+            }
+        },
+        MetricValue::Distribution {
+            values,
+            sample_rates,
+            statistic,
+        } => {
+            let metric_type = match statistic {
+                StatisticKind::Histogram => "h",
+                StatisticKind::Summary => "d",
             };
+            for (val, sample_rate) in values.iter().zip(sample_rates.iter()) {
+                buf.push(format!("{}:{}", metric.name, val));
+                buf.push(metric_type.to_string());
+                if *sample_rate != 1 {
+                    buf.push(format!("@{}", 1.0 / f64::from(*sample_rate)));
+                };
+                if let Some(t) = &metric.tags {
+                    buf.push(format!("#{}", encode_tags(t)));
+                };
+            }
         }
-    }
+        MetricValue::Set { values } => {
+            for val in values {
+                buf.push(format!("{}:{}", metric.name, val));
+                buf.push("s".to_string());
+                if let Some(t) = &metric.tags {
+                    buf.push(format!("#{}", encode_tags(t)));
+                };
+            }
+        }
+        _ => {
+            warn!(
+                "invalid metric sent to statsd sink ({:?}) ({:?})",
+                metric.kind, metric.value
+            );
+        }
+    };
 
     let mut message: String = buf.join("|");
     if !namespace.is_empty() {
@@ -278,6 +281,23 @@ mod test {
 
     #[cfg(feature = "sources-statsd")]
     #[test]
+    fn test_encode_absolute_counter() {
+        let metric1 = Metric {
+            name: "counter".to_owned(),
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Absolute,
+            value: MetricValue::Counter { value: 1.5 },
+        };
+        let event = Event::Metric(metric1.clone());
+        let frame = &encode_event(event, "").unwrap();
+        // The statsd parser will parse the counter as Incremental,
+        // so we can't compare it with the parsed value.
+        assert_eq!("counter:1.5|c\n", from_utf8(&frame).unwrap());
+    }
+
+    #[cfg(feature = "sources-statsd")]
+    #[test]
     fn test_encode_gauge() {
         let metric1 = Metric {
             name: "gauge".to_owned(),
@@ -285,6 +305,22 @@ mod test {
             tags: Some(tags()),
             kind: MetricKind::Incremental,
             value: MetricValue::Gauge { value: -1.5 },
+        };
+        let event = Event::Metric(metric1.clone());
+        let frame = &encode_event(event, "").unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
+        assert_eq!(metric1, metric2);
+    }
+
+    #[cfg(feature = "sources-statsd")]
+    #[test]
+    fn test_encode_absolute_gauge() {
+        let metric1 = Metric {
+            name: "gauge".to_owned(),
+            timestamp: None,
+            tags: Some(tags()),
+            kind: MetricKind::Absolute,
+            value: MetricValue::Gauge { value: 1.5 },
         };
         let event = Event::Metric(metric1.clone());
         let frame = &encode_event(event, "").unwrap();
