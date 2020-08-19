@@ -25,7 +25,7 @@ impl<'a> ToLua<'a> for Value {
 impl<'a> FromLua<'a> for Value {
     fn from_lua(value: LuaValue<'a>, _: LuaContext<'a>) -> LuaResult<Self> {
         match value {
-            LuaValue::String(s) => Ok(Value::Bytes(s.as_bytes().into())),
+            LuaValue::String(s) => Ok(Value::Bytes(Vec::from(s.as_bytes()).into())),
             LuaValue::Integer(i) => Ok(Value::Integer(i)),
             LuaValue::Number(f) => Ok(Value::Float(f)),
             LuaValue::Boolean(b) => Ok(Value::Boolean(b)),
@@ -194,16 +194,16 @@ mod test {
         Lua::new().context(move |ctx| {
             for (value, test_src) in pairs.into_iter() {
                 let test_fn: LuaFunction = ctx.load(test_src).eval().unwrap_or_else(|_| {
-                    panic!("failed to load {} for value {:?}", test_src, value)
+                    panic!("Failed to load {} for value {:?}", test_src, value)
                 });
                 assert!(
                     test_fn
                         .call::<_, bool>(value.clone())
                         .unwrap_or_else(|_| panic!(
-                            "failed to call {} for value {:?}",
+                            "Failed to call {} for value {:?}",
                             test_src, value
                         )),
-                    "test function: {}, value: {:?}",
+                    "Test function: {}, value: {:?}",
                     test_src,
                     value
                 );

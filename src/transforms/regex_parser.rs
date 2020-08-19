@@ -1,8 +1,8 @@
 use super::Transform;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{self, Event, Value},
     internal_events::{RegexEventProcessed, RegexFailedMatch, RegexMissingField},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     types::{parse_check_conversion_map, Conversion},
 };
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
@@ -268,7 +268,7 @@ impl Transform for RegexParser {
                         if self.overwrite_target {
                             log.remove(target_field);
                         } else {
-                            error!(message = "target field already exists", %target_field, rate_limit_secs = 30);
+                            error!(message = "Target field already exists", %target_field, rate_limit_secs = 30);
                             return Some(event);
                         }
                     }
@@ -304,7 +304,7 @@ mod tests {
     use super::RegexParserConfig;
     use crate::event::{LogEvent, Value};
     use crate::{
-        topology::config::{TransformConfig, TransformContext},
+        config::{TransformConfig, TransformContext},
         Event,
     };
 

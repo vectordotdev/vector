@@ -1,14 +1,13 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
     },
     sinks::util::{
         http::{BatchedHttpSink, HttpClient, HttpSink},
-        service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, MetricBuffer,
+        BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, Utc};
 use futures::{FutureExt, TryFutureExt};
@@ -407,7 +406,7 @@ mod tests {
 
     #[test]
     fn test_request() {
-        let (sink, _, _) = load_sink::<DatadogConfig>(
+        let (sink, _cx) = load_sink::<DatadogConfig>(
             r#"
             namespace = "test"
             api_key = "test"

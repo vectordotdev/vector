@@ -19,7 +19,7 @@ scopes:
   # domains
   - administration
   - architecture
-  - blog
+  - auth
   - buffers
   - cli
   - ci
@@ -30,7 +30,7 @@ scopes:
   - compression
   - dev
   - enriching
-  - guides
+  - filtering
   - external docs
   - internal docs
   - extensions
@@ -48,12 +48,15 @@ scopes:
   - performance
   - releasing
   - reliability
+  - reload
+  - rfcs
   - security
   - setup
   - shutdown
   - sinks
   - sources
   - startup
+  - templating
   - tests
   - traces
   - transforms

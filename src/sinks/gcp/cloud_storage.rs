@@ -1,21 +1,20 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event},
     serde::to_string,
     sinks::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
             http::{HttpClient, HttpClientFuture},
-            retries2::{RetryAction, RetryLogic},
-            service2::{ServiceBuilderExt, TowerCompat, TowerRequestConfig},
-            BatchConfig, BatchSettings, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
-            PartitionInnerBuffer,
+            retries::{RetryAction, RetryLogic},
+            BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
+            PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, RouterSink,
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
 use chrono::Utc;
@@ -32,7 +31,7 @@ use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::task::Poll;
-use tower03::{Service, ServiceBuilder};
+use tower::{Service, ServiceBuilder};
 use tracing::field;
 use uuid::Uuid;
 
@@ -123,7 +122,7 @@ enum GcsStorageClass {
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        in_flight_limit: Some(25),
+        in_flight_limit: InFlightLimit::Fixed(25),
         rate_limit_num: Some(25),
         ..Default::default()
     };
@@ -224,10 +223,9 @@ impl GcsSink {
 
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, config.compression));
 
-        let sink =
-            PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch.timeout, cx.acker())
-                .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
-                .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
+        let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+            .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
+            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
         Ok(Box::new(sink))
     }
@@ -409,7 +407,7 @@ fn encode_event(
         .render_string(&event)
         .map_err(|missing_keys| {
             warn!(
-                message = "Keys do not exist on the event. Dropping event.",
+                message = "Keys do not exist on the event; dropping event.",
                 ?missing_keys,
                 rate_limit_secs = 30,
             );

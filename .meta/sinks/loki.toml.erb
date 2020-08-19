@@ -39,7 +39,6 @@ write_to_description = "[Loki][urls.loki]"
   "_partials/fields/_request_options.toml",
   namespace: "sinks.loki.options",
   common: false,
-  in_flight_limit: 5,
   rate_limit_duration_secs: 1,
   rate_limit_num: 5,
   retry_initial_backoff_secs: 1,
@@ -89,7 +88,7 @@ to reduce the amount of unique label values.\
 type = "string"
 required = true
 templateable = true
-examples = [ {key = "value"}, {key = "{{ event_field }}"}]
+examples = [ {forwarder = "vector"}, {event = "{{ event_field }}"}, {key = "value"}]
 description = "A key-value pair for labels."
 
 [sinks.loki.options.remove_label_fields]

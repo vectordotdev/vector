@@ -12,6 +12,7 @@
 /scripts/package-* @a-rodin
 /scripts/release-* @a-rodin
 /scripts/upgrade-* @a-rodin
+/scripts/ci-setup-minikube.sh @MOZGIII
 
 /src/buffers/ @a-rodin
 
@@ -25,6 +26,7 @@
 /src/tls.rs @bruceg
 /src/trace.rs @LucioFranco
 /src/types.rs @bruceg
+/src/line_agg.rs @MOZGIII
 
 /src/sinks/*_metrics.rs @lukesteensen
 /src/sinks/aws_kinesis_streams.rs @LucioFranco
@@ -41,10 +43,10 @@
 /src/sinks/statsd.rs @lukesteensen
 /src/sinks/tcp.rs @bruceg
 /src/sinks/tcp.rs @lukesteensen
+/src/sinks/util/auto_concurrency @bruceg
 
 /src/sources/docker.rs @LucioFranco
-/src/sources/file/mod.rs @LucioFranco
-/src/sources/file/line_agg.rs @MOZGIII
+/src/sources/file.rs @LucioFranco
 /src/sources/generator.rs @bruceg
 /src/sources/journald.rs @bruceg
 /src/sources/kafka.rs @a-rodin
@@ -81,3 +83,5 @@
 /lib/file-source/src/paths_provider/glob.rs @MOZGIII
 
 /tests/buffering.rs @MOZGIII
+
+/.github/workflows/e2e.yml @MOZGIII

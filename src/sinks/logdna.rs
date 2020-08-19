@@ -1,12 +1,11 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event},
     sinks::util::{
         encoding::EncodingConfigWithDefault,
         http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
-        service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, UriSerde,
+        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
@@ -218,16 +217,17 @@ async fn healthcheck(config: LogdnaConfig, mut client: HttpClient) -> crate::Res
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::SinkConfig;
     use crate::event::Event;
     use crate::sinks::util::test::{build_test_server, load_sink};
     use crate::test_util;
-    use crate::topology::config::SinkConfig;
+    use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
     use serde_json::json;
 
     #[test]
     fn encode_event() {
-        let (config, _, _) = load_sink::<LogdnaConfig>(
+        let (config, _cx) = load_sink::<LogdnaConfig>(
             r#"
             api_key = "mylogtoken"
             hostname = "vector"
@@ -255,10 +255,10 @@ mod tests {
         assert_eq!(event3_out.get("app").unwrap(), &json!("vector"));
     }
 
-    #[test]
-    fn smoke() {
+    #[tokio::test]
+    async fn smoke() {
         crate::test_util::trace_init();
-        let (mut config, cx, mut rt) = load_sink::<LogdnaConfig>(
+        let (mut config, cx) = load_sink::<LogdnaConfig>(
             r#"
             api_key = "mylogtoken"
             ip = "127.0.0.1"
@@ -280,8 +280,8 @@ mod tests {
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let (rx, _trigger, server) = build_test_server(addr, &mut rt);
-        rt.spawn(server);
+        let (rx, _trigger, server) = build_test_server(addr);
+        tokio::spawn(server);
 
         let lines = test_util::random_lines(100).take(10).collect::<Vec<_>>();
         let mut events = Vec::new();
@@ -301,7 +301,7 @@ mod tests {
         }
 
         let pump = sink.send_all(futures01::stream::iter_ok(events));
-        let _ = rt.block_on(pump).unwrap();
+        let _ = pump.compat().await.unwrap();
 
         let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();
 

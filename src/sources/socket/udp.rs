@@ -5,7 +5,7 @@ use crate::{
     sources::Source,
     Pipeline,
 };
-use bytes05::BytesMut;
+use bytes::BytesMut;
 use codec::BytesDelimitedCodec;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::Sink;
@@ -46,14 +46,14 @@ pub fn udp(
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
-    let mut out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
+    let mut out = out.sink_map_err(|e| error!("Error sending event: {:?}", e));
 
     Box::new(
         async move {
             let mut socket = UdpSocket::bind(&address)
                 .await
-                .expect("failed to bind to udp listener socket");
-            info!(message = "listening.", %address);
+                .expect("Failed to bind to udp listener socket");
+            info!(message = "Listening.", %address);
 
             let mut shutdown = shutdown.compat();
             let mut buf = BytesMut::with_capacity(max_length);

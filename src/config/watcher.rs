@@ -15,7 +15,8 @@ use std::{
 ///  - Invalid config, caused either by user or by data race.
 ///  - Frequent changes, caused by user/editor modifying/saving file in small chunks.
 /// so we can use smaller, more responsive delay.
-pub const CONFIG_WATCH_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
+#[cfg(unix)]
+const CONFIG_WATCH_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
 
 #[cfg(unix)]
 const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
@@ -25,7 +26,13 @@ const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 /// Has best effort guarante of detecting all file changes from the end of
 /// this function until the main thread stops.
 #[cfg(unix)]
-pub fn config_watcher(config_paths: Vec<PathBuf>, delay: Duration) -> Result<(), Error> {
+pub fn spawn_thread(
+    config_paths: &[PathBuf],
+    delay: impl Into<Option<Duration>>,
+) -> Result<(), Error> {
+    let config_paths = config_paths.to_vec();
+    let delay = delay.into().unwrap_or(CONFIG_WATCH_DELAY);
+
     // Create watcher now so not to miss any changes happening between
     // returning from this function and the thread starting.
     let mut watcher = Some(create_watcher(&config_paths)?);
@@ -41,10 +48,10 @@ pub fn config_watcher(config_paths: Vec<PathBuf>, delay: Duration) -> Result<(),
                     // Consume events until delay amount of time has passed since the latest event.
                     while let Ok(..) = receiver.recv_timeout(delay) {}
 
-                    // We need to readd paths to resolve any inode changes that may have happened.
+                    // We need to read paths to resolve any inode changes that may have happened.
                     // And we need to do it before raising sighup to avoid missing any change.
                     if let Err(error) = add_paths(&mut watcher, &config_paths) {
-                        error!(message = "Failed to readd files to watch.", ?error);
+                        error!(message = "Failed to read files to watch.", ?error);
                         break;
                     }
 
@@ -76,7 +83,10 @@ pub fn config_watcher(config_paths: Vec<PathBuf>, delay: Duration) -> Result<(),
 
 #[cfg(windows)]
 /// Errors on Windows.
-pub fn config_watcher(_config_paths: Vec<PathBuf>, _delay: Duration) -> Result<(), Error> {
+pub fn spawn_thread(
+    _config_paths: &[PathBuf],
+    _delay: impl Into<Option<Duration>>,
+) -> Result<(), Error> {
     Err("Reloading config on Windows isn't currently supported. Related issue https://github.com/timberio/vector/issues/938 .".into())
 }
 
@@ -136,7 +146,7 @@ mod tests {
         let file_path = temp_file();
         let mut file = File::create(&file_path).unwrap();
 
-        let _ = config_watcher(vec![file_path], delay).unwrap();
+        let _ = spawn_thread(&[file_path], delay).unwrap();
 
         if !test(&mut file, delay * 5).await {
             panic!("Test timed out");
@@ -152,7 +162,7 @@ mod tests {
         let mut file = File::create(&file_path).unwrap();
         std::os::unix::fs::symlink(&file_path, &sym_file).unwrap();
 
-        let _ = config_watcher(vec![sym_file], delay).unwrap();
+        let _ = spawn_thread(&[sym_file], delay).unwrap();
 
         if !test(&mut file, delay * 5).await {
             panic!("Test timed out");

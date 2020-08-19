@@ -1,12 +1,11 @@
 use crate::{
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::{self, Event},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::KafkaAuthConfig,
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Pipeline,
 };
-use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{
     compat::{Compat, Future01CompatExt},
@@ -126,7 +125,7 @@ fn kafka_source(
 
                             let payload = match msg.payload() {
                                 None => return Err(()), // skip messages with empty payload
-                                Some(payload) => Bytes::from(payload),
+                                Some(payload) => payload,
                             };
                             let mut event = Event::new_empty_log();
                             let log = event.as_mut_log();

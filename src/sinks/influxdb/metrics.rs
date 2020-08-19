@@ -1,4 +1,5 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricValue},
     sinks::influxdb::{
         encode_namespace, encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings,
@@ -6,11 +7,10 @@ use crate::{
     },
     sinks::util::{
         http::{HttpBatchService, HttpClient, HttpRetryLogic},
-        service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, MetricBuffer,
+        BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
+use bytes::Bytes;
 use futures::future::{ready, BoxFuture};
 use futures01::Sink;
 use lazy_static::lazy_static;
@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::task::Poll;
-use tower03::Service;
+use tower::Service;
 
 #[derive(Clone)]
 struct InfluxDBSvc {
@@ -128,7 +128,7 @@ impl InfluxDBSvc {
 }
 
 impl Service<Vec<Metric>> for InfluxDBSvc {
-    type Response = http::Response<bytes05::Bytes>;
+    type Response = http::Response<Bytes>;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -735,15 +735,20 @@ mod tests {
 #[cfg(feature = "influxdb-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use crate::event::metric::{MetricKind, MetricValue};
-    use crate::event::Metric;
-    use crate::sinks::influxdb::metrics::{InfluxDBConfig, InfluxDBSvc};
-    use crate::sinks::influxdb::test_util::{onboarding_v2, BUCKET, ORG, TOKEN};
-    use crate::sinks::influxdb::InfluxDB2Settings;
-    use crate::sinks::util::http::HttpClient;
-    use crate::test_util::runtime;
-    use crate::topology::SinkContext;
-    use crate::Event;
+    use crate::{
+        config::SinkContext,
+        event::metric::{Metric, MetricKind, MetricValue},
+        sinks::{
+            influxdb::{
+                metrics::{InfluxDBConfig, InfluxDBSvc},
+                test_util::{onboarding_v2, BUCKET, ORG, TOKEN},
+                InfluxDB2Settings,
+            },
+            util::http::HttpClient,
+        },
+        test_util::runtime,
+        Event,
+    };
     use chrono::Utc;
     use futures::compat::Future01CompatExt;
     use futures01::{stream as stream01, Sink};

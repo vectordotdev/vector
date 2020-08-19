@@ -1,14 +1,25 @@
-use vector::topology::{self, Config, ConfigDiff};
+use vector::{
+    config::{self, Config, ConfigDiff},
+    topology,
+};
 
 fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
     let mut rt = vector::runtime::Runtime::new().unwrap();
-    Config::load(config.as_bytes())
-        .and_then(|c| {
-            rt.block_on_std(async move {
-                topology::builder::check_build(&c, &ConfigDiff::initial(&c)).await
-            })
+    Config::load(config.as_bytes()).and_then(|c| {
+        let diff = ConfigDiff::initial(&c);
+        rt.block_on_std(async move {
+            match (
+                config::check(&c),
+                topology::builder::build_pieces(&c, &diff).await,
+            ) {
+                (Ok(warnings), Ok(_new_pieces)) => Ok(warnings),
+                (Err(t_errors), Err(p_errors)) => {
+                    Err(t_errors.into_iter().chain(p_errors).collect())
+                }
+                (Err(errors), Ok(_)) | (Ok(_), Err(errors)) => Err(errors),
+            }
         })
-        .map(|(_topology, warnings)| warnings)
+    })
 }
 
 #[cfg(all(

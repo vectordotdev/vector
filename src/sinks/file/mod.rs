@@ -1,12 +1,12 @@
 use crate::expiring_hash_map::ExpiringHashMap;
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         StreamSink,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use async_compression::tokio_02::write::GzipEncoder;
 use async_trait::async_trait;
@@ -144,7 +144,7 @@ impl FileSink {
             Ok(b) => b,
             Err(missing_keys) => {
                 warn!(
-                    message = "Keys do not exist on the event. Dropping event.",
+                    message = "Keys do not exist on the event; dropping event.",
                     ?missing_keys
                 );
                 return None;

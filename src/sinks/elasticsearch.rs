@@ -1,4 +1,5 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
     event::Event,
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
@@ -6,16 +7,13 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpClient, HttpSink},
-        retries2::{RetryAction, RetryLogic},
-        rusoto,
-        service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, Buffer, Compression,
+        retries::{RetryAction, RetryLogic},
+        rusoto, BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
 use http::{
@@ -304,7 +302,7 @@ impl RetryLogic for ElasticSearchRetryLogic {
             _ if status.is_client_error() => {
                 let body = String::from_utf8_lossy(response.body());
                 warn!(
-                    message = "client error",
+                    message = "Client error",
                     body = %body,
                     rate_limit_secs = 30
                 );
@@ -316,12 +314,12 @@ impl RetryLogic for ElasticSearchRetryLogic {
                     Some(_) => match serde_json::from_str::<ESResultResponse>(&body) {
                         Err(json_error) => {
                             warn!(
-                                message = "ElasticSearch unparsable error response",
+                                message = "Elasticsearch unparsable error response",
                                 %json_error,
                                 rate_limit_secs = 30
                             );
                             RetryAction::DontRetry(
-                                "some messages failed, and invalid response from elasticsearch"
+                                "Some messages failed, and invalid response from Elasticsearch"
                                     .into(),
                             )
                         }
@@ -503,7 +501,7 @@ fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{sinks::util::retries2::RetryAction, Event};
+    use crate::{sinks::util::retries::RetryAction, Event};
     use http::{Response, StatusCode};
     use serde_json::json;
     use string_cache::DefaultAtom as Atom;
@@ -565,12 +563,12 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        config::{SinkConfig, SinkContext},
         dns::Resolver,
         event,
         sinks::util::http::HttpClient,
         test_util::{random_events_with_stream, random_string, runtime},
         tls::TlsOptions,
-        topology::config::{SinkConfig, SinkContext},
         Event,
     };
     use futures::compat::Future01CompatExt;

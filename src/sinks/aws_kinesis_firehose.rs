@@ -1,18 +1,17 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        retries2::RetryLogic,
+        retries::RetryLogic,
         rusoto,
-        service2::TowerRequestConfig,
         sink::Response,
-        BatchConfig, BatchSettings, Compression, EncodedLength, VecBuffer,
+        BatchConfig, BatchSettings, Compression, EncodedLength, TowerRequestConfig, VecBuffer,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use futures::{future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
@@ -28,7 +27,7 @@ use std::{
     fmt,
     task::{Context, Poll},
 };
-use tower03::Service;
+use tower::Service;
 use tracing_futures::Instrument;
 
 #[derive(Clone)]
@@ -275,13 +274,13 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        config::SinkContext,
         region::RegionOrEndpoint,
         sinks::{
             elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
             util::BatchConfig,
         },
         test_util::{random_events_with_stream, random_string, runtime},
-        topology::config::SinkContext,
     };
     use futures::compat::Future01CompatExt;
     use futures01::Sink;

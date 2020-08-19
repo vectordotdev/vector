@@ -1,15 +1,15 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{Auth, BatchedHttpSink, HttpClient, HttpRetryLogic, HttpSink},
-        retries2::{RetryAction, RetryLogic},
-        service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, Buffer, Compression,
+        retries::{RetryAction, RetryLogic},
+        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
     },
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
+use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
 use http::{Request, StatusCode, Uri};
@@ -177,7 +177,7 @@ struct ClickhouseRetryLogic {
 }
 
 impl RetryLogic for ClickhouseRetryLogic {
-    type Response = http::Response<bytes05::Bytes>;
+    type Response = http::Response<Bytes>;
     type Error = hyper::Error;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
@@ -232,17 +232,16 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        config::{SinkConfig, SinkContext},
         event,
         event::Event,
         sinks::util::encoding::TimestampFormat,
         test_util::{random_string, runtime},
-        topology::config::{SinkConfig, SinkContext},
     };
     use futures::compat::Future01CompatExt;
     use futures01::Sink;
     use serde_json::Value;
-    use std::time::Duration;
-    use tokio01::util::FutureExt;
+    use tokio::time::{timeout, Duration};
 
     #[test]
     fn insert_events() {
@@ -451,11 +450,13 @@ timestamp_format = "unix""#,
 
             // Retries should go on forever, so if we are retrying incorrectly
             // this timeout should trigger.
-            sink.send(input_event.clone())
-                .timeout(Duration::from_secs(5))
-                .compat()
-                .await
-                .unwrap();
+            timeout(
+                Duration::from_secs(5),
+                sink.send(input_event.clone()).compat(),
+            )
+            .await
+            .unwrap()
+            .unwrap();
         });
     }
 

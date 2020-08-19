@@ -1,9 +1,9 @@
 use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::discriminant::Discriminant,
     event::{Event, LogEvent},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use async_stream::stream;
 use futures::{
@@ -265,7 +265,7 @@ impl Transform for Reduce {
                       me.transform_into(&mut output, event);
                       false
                     }
-                    Some(Err(())) => panic!("unexpected error reading channel"),
+                    Some(Err(())) => panic!("Unexpected error reading channel"),
                   }
                 }
             };
@@ -286,8 +286,8 @@ impl Transform for Reduce {
 mod test {
     use super::ReduceConfig;
     use crate::{
+        config::{TransformConfig, TransformContext},
         event::Value,
-        topology::config::{TransformConfig, TransformContext},
         Event,
     };
     use serde_json::json;

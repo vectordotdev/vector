@@ -1,21 +1,20 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::{self, Event},
     region::RegionOrEndpoint,
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        retries2::RetryLogic,
+        retries::RetryLogic,
         rusoto,
-        service2::{ServiceBuilderExt, TowerCompat, TowerRequestConfig},
         sink::Response,
-        BatchConfig, BatchSettings, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
-        PartitionInnerBuffer,
+        BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
+        PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
     },
     template::Template,
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, Sink};
@@ -31,7 +30,7 @@ use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::task::Context;
 use std::task::Poll;
-use tower03::{Service, ServiceBuilder};
+use tower::{Service, ServiceBuilder};
 use tracing::field;
 use tracing_futures::Instrument;
 use uuid::Uuid;
@@ -92,6 +91,8 @@ enum S3CannedAcl {
     PublicReadWrite,
     AwsExecRead,
     AuthenticatedRead,
+    BucketOwnerRead,
+    BucketOwnerFullControl,
     LogDeliveryWrite,
 }
 
@@ -119,7 +120,7 @@ enum S3StorageClass {
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        in_flight_limit: Some(50),
+        in_flight_limit: InFlightLimit::Fixed(50),
         rate_limit_num: Some(250),
         ..Default::default()
     };
@@ -208,10 +209,9 @@ impl S3SinkConfig {
 
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, self.compression));
 
-        let sink =
-            PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch.timeout, cx.acker())
-                .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
-                .sink_map_err(|error| error!("Sink failed to flush: {}", error));
+        let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
+            .sink_map_err(|error| error!("Sink failed to flush: {}", error));
 
         Ok(Box::new(sink))
     }
@@ -377,7 +377,7 @@ fn encode_event(
         .render_string(&event)
         .map_err(|missing_keys| {
             warn!(
-                message = "Keys do not exist on the event. Dropping event.",
+                message = "Keys do not exist on the event; dropping event.",
                 ?missing_keys,
                 rate_limit_secs = 30,
             );
@@ -525,13 +525,13 @@ mod integration_tests {
     use super::*;
     use crate::{
         assert_downcast_matches,
+        config::SinkContext,
         dns::Resolver,
         event::Event,
         region::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string, runtime},
-        topology::config::SinkContext,
     };
-    use bytes05::{buf::BufExt, BytesMut};
+    use bytes::{buf::BufExt, BytesMut};
     use flate2::read::GzDecoder;
     use futures::compat::Future01CompatExt;
     use futures::stream::{self, StreamExt};

@@ -4,7 +4,7 @@
 
 use super::path_helpers::build_pod_logs_directory;
 use crate::kubernetes as k8s;
-use evmap10::ReadHandle;
+use evmap::ReadHandle;
 use file_source::paths_provider::PathsProvider;
 use k8s_openapi::api::core::v1::Pod;
 use std::path::PathBuf;
@@ -34,7 +34,7 @@ impl PathsProvider for K8sPathsProvider {
                 // TODO: consider `panic`ing here instead - fail-fast appoach
                 // is always better if possible, but it's not clear if it's
                 // a sane strategy here.
-                warn!(message = "unable to read the state of the pods");
+                warn!(message = "Unable to read the state of the pods");
                 return Vec::new();
             }
         };
@@ -45,7 +45,7 @@ impl PathsProvider for K8sPathsProvider {
                 let pod = values
                     .get_one()
                     .expect("we are supposed to be working with single-item values only");
-                trace!(message = "providing log paths for pod", ?uid);
+                trace!(message = "Providing log paths for pod", ?uid);
                 list_pod_log_paths(real_glob, pod)
             })
             .collect()

@@ -1,13 +1,13 @@
 use crate::{
+    config::SinkContext,
     internal_events::{
         UnixSocketConnectionEstablished, UnixSocketConnectionFailure, UnixSocketError,
         UnixSocketEventSent,
     },
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, StreamSink},
     sinks::{Healthcheck, RouterSink},
-    topology::config::SinkContext,
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use futures::{compat::CompatSink, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
@@ -130,7 +130,7 @@ impl UnixSink {
                 },
                 UnixSinkState::Disconnected => {
                     debug!(
-                        message = "connecting",
+                        message = "Connecting",
                         path = &field::display(self.path.to_str().unwrap())
                     );
                     let connect_future = UnixStream::connect(self.path.clone()).boxed().compat();
@@ -142,7 +142,7 @@ impl UnixSink {
 }
 
 impl Sink for UnixSink {
-    type SinkItem = bytes::Bytes;
+    type SinkItem = Bytes;
     type SinkError = ();
 
     fn start_send(&mut self, line: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
@@ -152,29 +152,20 @@ impl Sink for UnixSink {
             Err(_) => {
                 unreachable!(); // poll_ready() should never return an error
             }
-            Ok(Async::Ready(connection)) => {
-                let line = Bytes::copy_from_slice(&line);
-                match connection.start_send(line) {
-                    Err(error) => {
-                        emit!(UnixSocketError {
-                            error,
-                            path: &self.path
-                        });
-                        self.state = UnixSinkState::Disconnected;
-                        Ok(AsyncSink::Ready)
-                    }
-                    Ok(res) => {
-                        emit!(UnixSocketEventSent { byte_size });
-                        Ok(match res {
-                            AsyncSink::Ready => AsyncSink::Ready,
-                            AsyncSink::NotReady(bytes) => {
-                                let bytes = bytes::Bytes::from(&bytes[..]);
-                                AsyncSink::NotReady(bytes)
-                            }
-                        })
-                    }
+            Ok(Async::Ready(connection)) => match connection.start_send(line) {
+                Err(error) => {
+                    emit!(UnixSocketError {
+                        error,
+                        path: &self.path
+                    });
+                    self.state = UnixSinkState::Disconnected;
+                    Ok(AsyncSink::Ready)
                 }
-            }
+                Ok(res) => {
+                    emit!(UnixSocketEventSent { byte_size });
+                    Ok(res)
+                }
+            },
         }
     }
 
@@ -204,7 +195,7 @@ impl Sink for UnixSink {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::{random_lines_with_stream, runtime, shutdown_on_idle, CountReceiver};
+    use crate::test_util::{random_lines_with_stream, CountReceiver};
     use futures::compat::Future01CompatExt;
     use futures01::Sink;
     use tokio::net::UnixListener;
@@ -223,31 +214,27 @@ mod tests {
         assert!(healthcheck(bad_path).await.is_err());
     }
 
-    #[test]
-    fn basic_unix_sink() {
-        let mut rt = runtime();
-        rt.block_on_std(async move {
-            let num_lines = 1000;
-            let out_path = temp_uds_path("unix_test");
+    #[tokio::test]
+    async fn basic_unix_sink() {
+        let num_lines = 1000;
+        let out_path = temp_uds_path("unix_test");
 
-            // Set up server to receive events from the Sink.
-            let mut receiver = CountReceiver::receive_lines_unix(out_path.clone());
+        // Set up server to receive events from the Sink.
+        let mut receiver = CountReceiver::receive_lines_unix(out_path.clone());
 
-            // Set up Sink
-            let config = UnixSinkConfig::new(out_path, Encoding::Text.into());
-            let cx = SinkContext::new_test();
-            let (sink, _healthcheck) = config.build(cx).unwrap();
+        // Set up Sink
+        let config = UnixSinkConfig::new(out_path, Encoding::Text.into());
+        let cx = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(cx).unwrap();
 
-            // Send the test data
-            let (input_lines, events) = random_lines_with_stream(100, num_lines);
-            let _ = sink.send_all(events).compat().await.unwrap();
+        // Send the test data
+        let (input_lines, events) = random_lines_with_stream(100, num_lines);
+        let _ = sink.send_all(events).compat().await.unwrap();
 
-            // Wait for output to connect
-            receiver.connected().await;
+        // Wait for output to connect
+        receiver.connected().await;
 
-            // Receive the data sent by the Sink to the receiver
-            assert_eq!(input_lines, receiver.wait().await);
-        });
-        shutdown_on_idle(rt);
+        // Receive the data sent by the Sink to the receiver
+        assert_eq!(input_lines, receiver.wait().await);
     }
 }

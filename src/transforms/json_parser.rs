@@ -1,8 +1,8 @@
 use super::Transform;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{self, Event},
     internal_events::{JsonEventProcessed, JsonFailedParse},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -102,7 +102,7 @@ impl Transform for JsonParser {
                     let contains_target = log.contains(&target_field);
 
                     if contains_target && !self.overwrite_target {
-                        error!(message = "target field already exists", %target_field);
+                        error!(message = "Target field already exists", %target_field);
                     } else {
                         if self.drop_field {
                             log.remove(&self.field);

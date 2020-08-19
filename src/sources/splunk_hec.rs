@@ -1,4 +1,5 @@
 use crate::{
+    config::{DataType, GlobalOptions, SourceConfig},
     event::{self, Event, LogEvent, Value},
     internal_events::{
         SplunkHECEventReceived, SplunkHECRequestBodyInvalid, SplunkHECRequestError,
@@ -6,16 +7,13 @@ use crate::{
     },
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
     Pipeline,
 };
-use bytes05::{buf::BufExt, Bytes};
+use async_trait::async_trait;
+use bytes::{buf::BufExt, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
-use futures::{
-    compat::{AsyncRead01CompatExt, Future01CompatExt, Stream01CompatExt},
-    FutureExt, TryFutureExt, TryStreamExt,
-};
+use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::{Async, Future, Sink, Stream};
 use http::StatusCode;
 use lazy_static::lazy_static;
@@ -27,7 +25,6 @@ use std::{
     net::{Ipv4Addr, SocketAddr},
 };
 use string_cache::DefaultAtom as Atom;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 // Event fields unique to splunk_hec source
@@ -75,8 +72,19 @@ fn default_socket_address() -> SocketAddr {
 }
 
 #[typetag::serde(name = "splunk_hec")]
+#[async_trait]
 impl SourceConfig for SplunkConfig {
     fn build(
+        &self,
+        _name: &str,
+        _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
+        _out: Pipeline,
+    ) -> crate::Result<super::Source> {
+        unimplemented!()
+    }
+
+    async fn build_async(
         &self,
         _: &str,
         _: &GlobalOptions,
@@ -112,12 +120,12 @@ impl SourceConfig for SplunkConfig {
             .or_else(finish_err);
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
-        let incoming = tls.bind(&self.address)?.incoming();
+        let mut listener = tls.bind(&self.address).await?;
 
         let fut = async move {
             let _ = warp::serve(services)
                 .serve_incoming_with_graceful_shutdown(
-                    incoming.compat().map_ok(|s| s.compat().compat()),
+                    listener.incoming(),
                     shutdown.clone().compat().map(|_| ()),
                 )
                 .await;
@@ -754,6 +762,7 @@ mod tests {
     use crate::runtime::Runtime;
     use crate::test_util::{self, collect_n, runtime};
     use crate::{
+        config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
         event::{self, Event},
         shutdown::ShutdownSignal,
         sinks::{
@@ -761,7 +770,6 @@ mod tests {
             util::{encoding::EncodingConfigWithDefault, Compression},
             Healthcheck, RouterSink,
         },
-        topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
         Pipeline,
     };
     use chrono::{TimeZone, Utc};
@@ -780,20 +788,24 @@ mod tests {
         test_util::trace_init();
         let (sender, recv) = Pipeline::new_test();
         let address = test_util::next_addr();
-        rt.spawn(
+        rt.spawn_std(async move {
             SplunkConfig {
                 address,
                 token,
                 tls: None,
             }
-            .build(
+            .build_async(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 sender,
             )
-            .unwrap(),
-        );
+            .await
+            .unwrap()
+            .compat()
+            .await
+            .unwrap()
+        });
         (recv, address)
     }
 
@@ -1063,8 +1075,8 @@ mod tests {
     }
 
     #[test]
-    fn no_autorization() {
-        let message = "no_autorization";
+    fn no_authorization() {
+        let message = "no_authorization";
         let mut rt = runtime();
         let (source, address) = source_with(&mut rt, None);
         let (sink, health) = sink(address, Encoding::Text, Compression::Gzip);

@@ -1,17 +1,18 @@
-use crate::event::Value;
-use crate::sinks::influxdb::{
-    encode_namespace, encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings,
-    Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
-};
-use crate::sinks::util::encoding::EncodingConfigWithDefault;
-use crate::sinks::util::http::{BatchedHttpSink, HttpClient, HttpSink};
-use crate::sinks::util::{
-    service2::TowerRequestConfig, BatchConfig, BatchSettings, Buffer, Compression,
-};
-use crate::sinks::Healthcheck;
 use crate::{
-    event::{log_schema, Event},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    event::{log_schema, Event, Value},
+    sinks::{
+        influxdb::{
+            encode_namespace, encode_timestamp, healthcheck, influx_line_protocol,
+            influxdb_settings, Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
+        },
+        util::{
+            encoding::EncodingConfigWithDefault,
+            http::{BatchedHttpSink, HttpClient, HttpSink},
+            BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
+        },
+        Healthcheck,
+    },
 };
 use futures01::Sink;
 use http::{Request, Uri};
@@ -216,6 +217,7 @@ mod tests {
     use crate::test_util;
     use chrono::offset::TimeZone;
     use chrono::Utc;
+    use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
 
     #[test]
@@ -422,9 +424,9 @@ mod tests {
         assert_eq!("1542182950000000011\n", line_protocol.3);
     }
 
-    #[test]
-    fn smoke_v1() {
-        let (mut config, cx, mut rt) = crate::sinks::util::test::load_sink::<InfluxDBLogsConfig>(
+    #[tokio::test]
+    async fn smoke_v1() {
+        let (mut config, cx) = crate::sinks::util::test::load_sink::<InfluxDBLogsConfig>(
             r#"
             namespace = "ns"
             endpoint = "http://localhost:9999"
@@ -444,8 +446,8 @@ mod tests {
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let (rx, _trigger, server) = build_test_server(addr, &mut rt);
-        rt.spawn(server);
+        let (rx, _trigger, server) = build_test_server(addr);
+        tokio::spawn(server);
 
         let lines = std::iter::repeat(())
             .map(move |_| "message_value")
@@ -468,7 +470,7 @@ mod tests {
         }
 
         let pump = sink.send_all(futures01::stream::iter_ok(events));
-        let _ = rt.block_on(pump).unwrap();
+        let _ = pump.compat().await.unwrap();
 
         let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();
 
@@ -484,9 +486,9 @@ mod tests {
         assert_line_protocol(0, lines.next());
     }
 
-    #[test]
-    fn smoke_v2() {
-        let (mut config, cx, mut rt) = crate::sinks::util::test::load_sink::<InfluxDBLogsConfig>(
+    #[tokio::test]
+    async fn smoke_v2() {
+        let (mut config, cx) = crate::sinks::util::test::load_sink::<InfluxDBLogsConfig>(
             r#"
             namespace = "ns"
             endpoint = "http://localhost:9999"
@@ -508,8 +510,8 @@ mod tests {
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let (rx, _trigger, server) = build_test_server(addr, &mut rt);
-        rt.spawn(server);
+        let (rx, _trigger, server) = build_test_server(addr);
+        tokio::spawn(server);
 
         let lines = std::iter::repeat(())
             .map(move |_| "message_value")
@@ -532,7 +534,7 @@ mod tests {
         }
 
         let pump = sink.send_all(futures01::stream::iter_ok(events));
-        let _ = rt.block_on(pump).unwrap();
+        let _ = pump.compat().await.unwrap();
 
         let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();
 
@@ -591,11 +593,15 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::sinks::influxdb::logs::InfluxDBLogsConfig;
-    use crate::sinks::influxdb::test_util::{onboarding_v2, BUCKET, ORG, TOKEN};
-    use crate::sinks::influxdb::InfluxDB2Settings;
-    use crate::test_util::runtime;
-    use crate::topology::SinkContext;
+    use crate::{
+        config::SinkContext,
+        sinks::influxdb::{
+            logs::InfluxDBLogsConfig,
+            test_util::{onboarding_v2, BUCKET, ORG, TOKEN},
+            InfluxDB2Settings,
+        },
+        test_util::runtime,
+    };
     use chrono::Utc;
     use futures::compat::Future01CompatExt;
     use futures01::Sink;
