@@ -308,8 +308,8 @@ mod tests {
     use crate::{
         event,
         test_util::{
-            self, lines_from_file, random_events_with_stream, random_lines_with_stream, temp_dir,
-            temp_file,
+            self, lines_from_file, lines_from_gzip_file, random_events_with_stream,
+            random_lines_with_stream, temp_dir, temp_file,
         },
     };
     use futures::stream;
@@ -339,6 +339,35 @@ mod tests {
             .unwrap();
 
         let output = lines_from_file(template);
+        for (input, output) in input.into_iter().zip(output) {
+            assert_eq!(input, output);
+        }
+    }
+
+    #[test]
+    fn single_partition_gzip() {
+        test_util::trace_init();
+
+        let template = temp_file();
+
+        let config = FileSinkConfig {
+            path: template.clone().try_into().unwrap(),
+            idle_timeout_secs: None,
+            encoding: Encoding::Text.into(),
+            compression: Compression::Gzip,
+        };
+
+        let mut sink = FileSink::new(&config);
+        let (input, _) = random_lines_with_stream(100, 64);
+
+        let events = stream::iter(input.clone().into_iter().map(Event::from));
+
+        let mut rt = crate::test_util::runtime();
+        let _ = rt
+            .block_on_std(async move { sink.run(events).await })
+            .unwrap();
+
+        let output = lines_from_gzip_file(template);
         for (input, output) in input.into_iter().zip(output) {
             assert_eq!(input, output);
         }
