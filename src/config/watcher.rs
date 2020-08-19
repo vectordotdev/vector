@@ -48,10 +48,10 @@ pub fn spawn_thread(
                     // Consume events until delay amount of time has passed since the latest event.
                     while let Ok(..) = receiver.recv_timeout(delay) {}
 
-                    // We need to readd paths to resolve any inode changes that may have happened.
+                    // We need to read paths to resolve any inode changes that may have happened.
                     // And we need to do it before raising sighup to avoid missing any change.
                     if let Err(error) = add_paths(&mut watcher, &config_paths) {
-                        error!(message = "Failed to readd files to watch.", ?error);
+                        error!(message = "Failed to read files to watch.", ?error);
                         break;
                     }
 

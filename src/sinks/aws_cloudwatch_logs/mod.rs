@@ -444,7 +444,7 @@ fn partition_encode(
         Ok(b) => b,
         Err(missing_keys) => {
             warn!(
-                message = "keys in group template do not exist on the event; dropping event.",
+                message = "Keys in group template do not exist on the event; dropping event.",
                 ?missing_keys,
                 rate_limit_secs = 30
             );
@@ -456,7 +456,7 @@ fn partition_encode(
         Ok(b) => b,
         Err(missing_keys) => {
             warn!(
-                message = "keys in stream template do not exist on the event; dropping event.",
+                message = "Keys in stream template do not exist on the event; dropping event.",
                 ?missing_keys,
                 rate_limit_secs = 30
             );
@@ -493,7 +493,7 @@ async fn healthcheck(
     client: CloudWatchLogsClient,
 ) -> crate::Result<()> {
     if config.group_name.is_dynamic() {
-        info!("cloudwatch group_name is dynamic; skipping healthcheck.");
+        info!("Cloudwatch group_name is dynamic; skipping healthcheck.");
         return Ok(());
     }
 
@@ -542,12 +542,12 @@ impl RetryLogic for CloudwatchRetryLogic {
         match error {
             CloudwatchError::Put(err) => match err {
                 RusotoError::Service(PutLogEventsError::ServiceUnavailable(error)) => {
-                    error!(message = "put logs service unavailable.", %error);
+                    error!(message = "Put logs service unavailable.", %error);
                     true
                 }
 
                 RusotoError::HttpDispatch(error) => {
-                    error!(message = "put logs http dispatch.", %error);
+                    error!(message = "Put logs HTTP dispatch.", %error);
                     true
                 }
 
@@ -559,7 +559,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                     let body = String::from_utf8_lossy(&body[..]);
                     let body = &body[..body.len().min(50)];
 
-                    error!(message = "put logs http error.", %status, %body);
+                    error!(message = "Put logs HTTP error.", %status, %body);
                     true
                 }
 
@@ -576,7 +576,7 @@ impl RetryLogic for CloudwatchRetryLogic {
 
             CloudwatchError::Describe(err) => match err {
                 RusotoError::Service(DescribeLogStreamsError::ServiceUnavailable(error)) => {
-                    error!(message = "describe streams service unavailable.", %error);
+                    error!(message = "Describe streams service unavailable.", %error);
                     true
                 }
 
@@ -588,12 +588,12 @@ impl RetryLogic for CloudwatchRetryLogic {
                     let body = String::from_utf8_lossy(&body[..]);
                     let body = &body[..body.len().min(50)];
 
-                    error!(message = "describe streams http error.", %status, %body);
+                    error!(message = "Describe streams HTTP error.", %status, %body);
                     true
                 }
 
                 RusotoError::HttpDispatch(error) => {
-                    error!(message = "describe streams http dispatch.", %error);
+                    error!(message = "Describe streams HTTP dispatch.", %error);
                     true
                 }
 
@@ -602,7 +602,7 @@ impl RetryLogic for CloudwatchRetryLogic {
 
             CloudwatchError::CreateStream(err) => match err {
                 RusotoError::Service(CreateLogStreamError::ServiceUnavailable(error)) => {
-                    error!(message = "create stream service unavailable.", %error);
+                    error!(message = "Create stream service unavailable.", %error);
                     true
                 }
 
@@ -614,12 +614,12 @@ impl RetryLogic for CloudwatchRetryLogic {
                     let body = String::from_utf8_lossy(&body[..]);
                     let body = &body[..body.len().min(50)];
 
-                    error!(message = "create stream http error.", %status, %body);
+                    error!(message = "Create stream HTTP error.", %status, %body);
                     true
                 }
 
                 RusotoError::HttpDispatch(error) => {
-                    error!(message = "create stream http dispatch.", %error);
+                    error!(message = "Create stream HTTP dispatch.", %error);
                     true
                 }
 

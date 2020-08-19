@@ -45,7 +45,7 @@ impl crate::config::SourceConfig for StatsdConfig {
 }
 
 fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> super::Source {
-    let out = out.sink_map_err(|e| error!("error sending metric: {:?}", e));
+    let out = out.sink_map_err(|e| error!("Error sending metric: {:?}", e));
 
     Box::new(
         async move {
@@ -54,7 +54,7 @@ fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> super::S
                 .await?;
 
             info!(
-                message = "listening.",
+                message = "Listening.",
                 addr = &field::display(addr),
                 r#type = "udp"
             );
@@ -92,7 +92,7 @@ fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> super::S
                 .forward(out.sink_compat())
                 .await;
 
-            info!("finished sending");
+            info!("Finished sending");
             Ok(())
         }
         .boxed()

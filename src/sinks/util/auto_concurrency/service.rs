@@ -71,7 +71,7 @@ where
             // Take the permit.
             State::Ready(permit) => permit,
             // whoopsie!
-            _ => panic!("max requests in-flight; poll_ready must be called first"),
+            _ => panic!("Maximum requests in-flight; poll_ready must be called first"),
         };
 
         self.controller.start_request();

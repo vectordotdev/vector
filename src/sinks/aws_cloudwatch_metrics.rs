@@ -215,7 +215,7 @@ impl Service<Vec<Metric>> for CloudWatchMetricsSvc {
             if input.metric_data.is_empty() {
                 Ok(())
             } else {
-                debug!(message = "sending data.", ?input);
+                debug!(message = "Sending data.", ?input);
                 client.put_metric_data(input).await
             }
         })

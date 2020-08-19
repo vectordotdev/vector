@@ -18,7 +18,7 @@ pub struct WatchRequestInvocationFailed<E> {
 
 impl<E: Debug> InternalEvent for WatchRequestInvocationFailed<E> {
     fn emit_logs(&self) {
-        error!(message = "watch invocation failed", error = ?self.error, rate_limit_secs = 5);
+        error!(message = "Watch invocation failed", error = ?self.error, rate_limit_secs = 5);
     }
 
     fn emit_metrics(&self) {

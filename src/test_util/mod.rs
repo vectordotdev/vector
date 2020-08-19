@@ -41,7 +41,7 @@ macro_rules! assert_downcast_matches {
     ($e:expr, $t:ty, $v:pat) => {{
         match $e.downcast_ref::<$t>() {
             Some($v) => (),
-            got => panic!("assertion failed: got wrong error variant {:?}", got),
+            got => panic!("Assertion failed: got wrong error variant {:?}", got),
         }
     }};
 }
@@ -319,7 +319,7 @@ where
     while !f().await {
         delay_for(Duration::from_millis(5)).await;
         if started.elapsed().as_secs() > 5 {
-            panic!("timed out while waiting");
+            panic!("Timed out while waiting");
         }
     }
 }
@@ -336,7 +336,7 @@ pub fn wait_for_sync(mut f: impl FnMut() -> bool) {
         std::thread::sleep(wait);
         attempts += 1;
         if attempts * wait > limit {
-            panic!("timed out while waiting");
+            panic!("Timed out while waiting");
         }
     }
 }
