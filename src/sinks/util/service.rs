@@ -12,7 +12,7 @@ use std::fmt;
 use std::sync::Arc;
 use std::task::Poll;
 use std::time::Duration;
-use tower03::{
+use tower::{
     layer::{util::Stack, Layer},
     limit::RateLimit,
     retry::Retry,
@@ -21,10 +21,8 @@ use tower03::{
     Service, ServiceBuilder,
 };
 
-pub use compat::TowerCompat;
-
 pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, AutoConcurrencyLimit<Timeout<S>, L>>>;
-pub type TowerBatchedSink<S, B, L, Request> = BatchSink<TowerCompat<Svc<S, L>>, B, Request>;
+pub type TowerBatchedSink<S, B, L, Request> = BatchSink<Svc<S, L>, B, Request>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -226,7 +224,6 @@ impl TowerRequestSettings {
             .timeout(self.timeout)
             .service(service);
 
-        let service = TowerCompat::new(service);
         BatchSink::new(service, batch, batch_timeout, acker)
     }
 }
@@ -317,50 +314,6 @@ impl<S: Clone, R1, R2> Clone for Map<S, R1, R2> {
         Self {
             f: Arc::clone(&self.f),
             inner: self.inner.clone(),
-        }
-    }
-}
-
-mod compat {
-    use futures::compat::Compat;
-    use futures01::Poll;
-    use std::pin::Pin;
-    use tower::Service as Service01;
-    use tower03::Service as Service03;
-
-    pub struct TowerCompat<S> {
-        inner: S,
-    }
-
-    impl<S> TowerCompat<S> {
-        pub fn new(inner: S) -> Self {
-            Self { inner }
-        }
-
-        pub fn get_ref(&self) -> &S {
-            &self.inner
-        }
-
-        pub fn get_mut(&mut self) -> &S {
-            &mut self.inner
-        }
-    }
-
-    impl<S, Request> Service01<Request> for TowerCompat<S>
-    where
-        S: Service03<Request>,
-    {
-        type Response = S::Response;
-        type Error = S::Error;
-        type Future = Compat<Pin<Box<S::Future>>>;
-
-        fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-            let p = task_compat::with_context(|cx| self.inner.poll_ready(cx));
-            task_compat::poll_03_to_01(p)
-        }
-
-        fn call(&mut self, req: Request) -> Self::Future {
-            Compat::new(Box::pin(self.inner.call(req)))
         }
     }
 }

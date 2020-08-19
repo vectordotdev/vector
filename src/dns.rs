@@ -7,7 +7,7 @@ use std::{
     task::{Context, Poll},
 };
 use tokio::task::spawn_blocking;
-use tower03::Service;
+use tower::Service;
 
 pub type ResolverFuture = Box<dyn Future<Item = LookupIp, Error = DnsError> + Send + 'static>;
 

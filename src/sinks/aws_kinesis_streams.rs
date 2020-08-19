@@ -31,7 +31,7 @@ use std::{
     task::{Context, Poll},
 };
 use string_cache::DefaultAtom as Atom;
-use tower03::Service;
+use tower::Service;
 use tracing_futures::Instrument;
 
 #[derive(Clone)]

@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::task::Poll;
-use tower03::Service;
+use tower::Service;
 
 #[derive(Clone)]
 struct InfluxDBSvc {

@@ -27,7 +27,7 @@ use std::{
     fmt,
     task::{Context, Poll},
 };
-use tower03::Service;
+use tower::Service;
 use tracing_futures::Instrument;
 
 #[derive(Clone)]

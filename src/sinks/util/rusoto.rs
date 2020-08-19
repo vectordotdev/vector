@@ -28,7 +28,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tower03::{Service, ServiceExt};
+use tower::{Service, ServiceExt};
 
 pub type Client = HttpClient<util::http::HttpClient<RusotoBody>>;
 

@@ -3,7 +3,7 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{MetricKind, MetricValue, StatisticKind},
     event::Event,
-    sinks::util::{BatchConfig, BatchSettings, BatchSink, Buffer, Compression, TowerCompat},
+    sinks::util::{BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
 };
 use futures::{future, FutureExt, TryFutureExt};
 use futures01::{stream, Sink};
@@ -12,7 +12,7 @@ use snafu::{ResultExt, Snafu};
 use std::collections::BTreeMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::task::{Context, Poll};
-use tower03::{Service, ServiceBuilder};
+use tower::{Service, ServiceBuilder};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -99,7 +99,7 @@ impl StatsdSvc {
         let svc = ServiceBuilder::new().service(service);
 
         let sink = BatchSink::new(
-            TowerCompat::new(svc),
+            svc,
             Buffer::new(batch.size, Compression::None),
             batch.timeout,
             acker,
