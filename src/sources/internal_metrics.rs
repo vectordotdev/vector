@@ -9,7 +9,7 @@ use futures::{
     future::{FutureExt, TryFutureExt},
     stream::StreamExt,
 };
-use futures01::{Future, Sink};
+use futures01::Sink;
 use metrics_runtime::Controller;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
