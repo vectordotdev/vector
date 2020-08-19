@@ -9,11 +9,11 @@ use futures::{
     future::{FutureExt, TryFutureExt},
     stream::StreamExt,
 };
-use futures01::{Future, Sink};
+use futures01::Sink;
 use metrics_runtime::Controller;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tokio::time::interval;
+use tokio::{select, time::interval};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct InternalMetricsConfig;
@@ -47,15 +47,18 @@ impl SourceConfig for InternalMetricsConfig {
 async fn run(
     controller: Controller,
     mut out: Pipeline,
-    mut shutdown: ShutdownSignal,
+    shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
     let mut interval = interval(Duration::from_secs(2)).map(|_| ());
+    let mut shutdown = shutdown.compat();
 
-    while let Some(()) = interval.next().await {
-        // Check for shutdown signal
-        if shutdown.poll().expect("polling shutdown").is_ready() {
-            break;
-        }
+    let mut run = true;
+    while run {
+        run = select! {
+            Some(()) = interval.next() => true,
+            _ = &mut shutdown => false,
+            else => false,
+        };
 
         let metrics = capture_metrics(&controller);
 
