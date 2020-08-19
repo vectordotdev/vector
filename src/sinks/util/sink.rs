@@ -35,7 +35,10 @@
 use super::batch::{Batch, PushResult, StatefulBatch};
 use super::buffer::partition::Partition;
 use crate::buffers::Acker;
-use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
+use futures::{
+    compat::{Compat, Future01CompatExt},
+    FutureExt, TryFutureExt,
+};
 use futures01::{
     future::Either,
     stream::FuturesUnordered,
@@ -631,7 +634,8 @@ where
     }
 
     fn poll_ready(&mut self) -> Poll<(), crate::Error> {
-        self.service.poll_ready().map_err(Into::into)
+        let p = task_compat::with_context(|cx| self.service.poll_ready(cx));
+        task_compat::poll_03_to_01(p).map_err(Into::into)
     }
 
     fn call(
@@ -653,9 +657,7 @@ where
             message = "submitting service request.",
             in_flight_requests = self.in_flight.len()
         );
-        let response = self
-            .service
-            .call(req)
+        let response = Compat::new(Box::pin(self.service.call(req)))
             .map_err(Into::into)
             .then(move |result| {
                 match result {
@@ -736,13 +738,14 @@ impl<'a> Response for &'a str {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::buffers::Acker;
-    use crate::sinks::util::{
-        buffer::partition::Partition, BatchSettings, EncodedLength, VecBuffer,
+    use crate::{
+        buffers::Acker,
+        sinks::util::{buffer::partition::Partition, BatchSettings, EncodedLength, VecBuffer},
+        test_util::{basic_scheduler_block_on_std, runtime},
     };
-    use crate::test_util::{basic_scheduler_block_on_std, runtime};
     use bytes::Bytes;
-    use futures01::{future, Sink};
+    use futures::future;
+    use futures01::Sink;
     use std::sync::{atomic::Ordering::Relaxed, Arc, Mutex};
     use tokio::task::yield_now;
 
@@ -783,7 +786,7 @@ mod tests {
             // Services future will be spawned and work between `yield_now` calls.
             let (acker, ack_counter) = Acker::new_for_testing();
 
-            let svc = tower::service_fn(|req: Vec<usize>| {
+            let svc = tower::service_fn(|req: Vec<usize>| async move {
                 let duration = match req[0] {
                     0 => Duration::from_secs(1),
                     1 => Duration::from_secs(1),
@@ -798,7 +801,8 @@ mod tests {
                     _ => unreachable!(),
                 };
 
-                delay_for(duration).never_error().boxed().compat().map(drop)
+                delay_for(duration).await;
+                Ok::<(), Infallible>(())
             });
 
             let batch = BatchSettings::default().bytes(9999).events(1);
@@ -808,6 +812,7 @@ mod tests {
             assert!(sink.start_send(0).unwrap().is_ready());
             assert!(sink.start_send(1).unwrap().is_ready());
             assert!(sink.start_send(2).unwrap().is_ready());
+            yield_now().await;
 
             assert_eq!(ack_counter.load(Relaxed), 0);
 
@@ -842,7 +847,7 @@ mod tests {
             advance_time(Duration::from_secs(5)).await;
 
             yield_now().await;
-            sink.flush().wait().unwrap();
+            sink.flush().compat().await.unwrap();
 
             assert_eq!(ack_counter.load(Relaxed), 6);
         });
@@ -897,7 +902,9 @@ mod tests {
         assert!(buffered.start_send(0).unwrap().is_ready());
         assert!(buffered.start_send(1).unwrap().is_ready());
 
-        future::poll_fn(|| buffered.close()).wait().unwrap();
+        futures01::future::poll_fn(|| buffered.close())
+            .wait()
+            .unwrap();
 
         let output = sent_requests.lock().unwrap();
         assert_eq!(&*output, &vec![vec![0, 1]]);
@@ -1061,7 +1068,13 @@ mod tests {
             // "spawned" futures.
             let (acker, ack_counter) = Acker::new_for_testing();
 
-            let svc = tower::service_fn(|req: u8| if req == 3 { Err("bad") } else { Ok("good") });
+            let svc = tower::service_fn(|req: u8| {
+                if req == 3 {
+                    future::err("bad")
+                } else {
+                    future::ok("good")
+                }
+            });
             let mut sink = ServiceSink::new(svc, acker);
 
             // send some initial requests

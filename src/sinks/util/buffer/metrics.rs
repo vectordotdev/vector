@@ -290,7 +290,8 @@ mod test {
         event::metric::{Metric, MetricValue, StatisticKind},
         Event,
     };
-    use futures01::{future, Future, Sink};
+    use futures::future;
+    use futures01::{Future, Sink};
     use pretty_assertions::assert_eq;
     use std::{
         collections::BTreeMap,

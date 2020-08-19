@@ -4828,24 +4828,6 @@ dependencies = [
 
 [[package]]
 name = "tower"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc72f33b6a72c75c9df0037afce313018bae845f0ec7fdb9201b8768427a917f"
-dependencies = [
- "futures 0.1.29",
- "tower-buffer",
- "tower-discover",
- "tower-layer 0.1.0",
- "tower-limit",
- "tower-load-shed",
- "tower-retry",
- "tower-service 0.2.0",
- "tower-timeout",
- "tower-util",
-]
-
-[[package]]
-name = "tower"
 version = "0.3.1"
 source = "git+https://github.com/tower-rs/tower?rev=43168944220ed32dab83cb4f11f7b97abc5818d5#43168944220ed32dab83cb4f11f7b97abc5818d5"
 dependencies = [
@@ -4856,30 +4838,6 @@ dependencies = [
  "tower-layer 0.3.0",
  "tower-service 0.3.0",
  "tracing",
-]
-
-[[package]]
-name = "tower-buffer"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c7b83e1ccf5b23dd109dd6ae2c07b8e2beec7a51a21f29da2dba576317370e0"
-dependencies = [
- "futures 0.1.29",
- "tokio-executor",
- "tokio-sync",
- "tower-layer 0.1.0",
- "tower-service 0.2.0",
- "tracing",
-]
-
-[[package]]
-name = "tower-discover"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73a7632286f78164d65d18fd0e570307acde9362489aa5c8c53e6315cc2bde47"
-dependencies = [
- "futures 0.1.29",
- "tower-service 0.2.0",
 ]
 
 [[package]]
@@ -4899,43 +4857,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a35d656f2638b288b33495d1053ea74c40dc05ec0b92084dd71ca5566c4ed1dc"
 
 [[package]]
-name = "tower-limit"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c21ba835a08fd54b63cd91ae0548a7b6e2a91075147dfa3dc8e1a940c1b6f18f"
-dependencies = [
- "futures 0.1.29",
- "tokio-sync",
- "tokio-timer",
- "tower-layer 0.1.0",
- "tower-service 0.2.0",
- "tracing",
-]
-
-[[package]]
-name = "tower-load-shed"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04fbaf5bfb63d84204db87b9b2aeec61549613f2bbb8706dcc36f5f3ea8cd769"
-dependencies = [
- "futures 0.1.29",
- "tower-layer 0.1.0",
- "tower-service 0.2.0",
-]
-
-[[package]]
-name = "tower-retry"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09e80588125061f276ed2a7b0939988b411e570a2dbb2965b1382ef4f71036f7"
-dependencies = [
- "futures 0.1.29",
- "tokio-timer",
- "tower-layer 0.1.0",
- "tower-service 0.2.0",
-]
-
-[[package]]
 name = "tower-service"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4952,17 +4873,6 @@ checksum = "e987b6bf443f4b5b3b6f38704195592cca41c5bb7aedd3c3693c7081f8289860"
 
 [[package]]
 name = "tower-test"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99a0b25036e2c58f681a04a5b312e9283d229445ad5e1221a1b7a4630df6fbdf"
-dependencies = [
- "futures 0.1.29",
- "tokio-sync",
- "tower-service 0.2.0",
-]
-
-[[package]]
-name = "tower-test"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ba4bbc2c1e4a8543c30d4c13a4c8314ed72d6e07581910f665aa13fde0153c8"
@@ -4976,25 +4886,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "tower-timeout"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c06bbc2fbd056f810940a8c6f0cc194557d36da3c22999a755a7a6612447da9"
-dependencies = [
- "futures 0.1.29",
- "tokio-timer",
- "tower-layer 0.1.0",
- "tower-service 0.2.0",
-]
-
-[[package]]
 name = "tower-util"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4792342fac093db5d2558655055a89a04ca909663467a4310c7739d9f8b64698"
 dependencies = [
  "futures 0.1.29",
- "tokio-io",
  "tower-layer 0.1.0",
  "tower-service 0.2.0",
 ]
@@ -5417,10 +5314,8 @@ dependencies = [
  "tokio-util",
  "tokio01-test",
  "toml 0.4.10",
- "tower 0.1.1",
- "tower 0.3.1",
- "tower-test 0.1.0",
- "tower-test 0.3.0",
+ "tower",
+ "tower-test",
  "tracing",
  "tracing-futures 0.2.1",
  "tracing-limit",

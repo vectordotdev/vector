@@ -12,7 +12,7 @@ use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::sync::OwnedSemaphorePermit;
-use tower03::timeout::error::Elapsed;
+use tower::timeout::error::Elapsed;
 
 // This value was picked as a reasonable default while we ensure the
 // viability of the system. This value may need adjustment if later
