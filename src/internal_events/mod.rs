@@ -1,5 +1,5 @@
-mod add_tags;
 mod add_fields;
+mod add_tags;
 mod ansi_stripper;
 mod auto_concurrency;
 mod aws_kinesis_streams;
@@ -38,8 +38,8 @@ mod wasm;
 
 pub mod kubernetes;
 
-pub use self::add_tags::*;
 pub use self::add_fields::*;
+pub use self::add_tags::*;
 pub use self::ansi_stripper::*;
 pub use self::auto_concurrency::*;
 pub use self::aws_kinesis_streams::*;

@@ -2,11 +2,11 @@ use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
-    internal_events::{AddTagsEventProcessed, AddTagsTagOverwritten, AddTagsTagNotOverwritten},
+    internal_events::{AddTagsEventProcessed, AddTagsTagNotOverwritten, AddTagsTagOverwritten},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, btree_map::Entry};
+use std::collections::{btree_map::Entry, BTreeMap};
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -67,14 +67,17 @@ impl Transform for AddTags {
 
                 let entry = map.entry(name.to_string());
                 match (entry, self.overwrite) {
-                    (Entry::Vacant(entry), _) => { entry.insert(value.clone()); },
+                    (Entry::Vacant(entry), _) => {
+                        entry.insert(value.clone());
+                    }
                     (Entry::Occupied(mut entry), true) => {
                         emit!(AddTagsTagOverwritten { tag: name.as_ref() });
                         entry.insert(value.clone());
-                    },
-                    (Entry::Occupied(_entry), false) => emit!(AddTagsTagNotOverwritten { tag: name.as_ref() }),
+                    }
+                    (Entry::Occupied(_entry), false) => {
+                        emit!(AddTagsTagNotOverwritten { tag: name.as_ref() })
+                    }
                 }
-
             }
         }
 
