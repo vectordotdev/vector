@@ -112,13 +112,17 @@ impl fmt::Debug for State {
 
 #[cfg(test)]
 mod tests {
-    use super::super::controller::{ControllerStatistics, Inner};
-    use super::super::AutoConcurrencyLimitLayer;
+    use super::super::{
+        controller::{ControllerStatistics, Inner},
+        AutoConcurrencyLimitLayer,
+    };
     use super::*;
-    use crate::assert_downcast_matches;
+    use crate::{assert_downcast_matches, test_util::trace_init};
     use snafu::Snafu;
-    use std::sync::{Mutex, MutexGuard};
-    use std::time::Duration;
+    use std::{
+        sync::{Mutex, MutexGuard},
+        time::Duration,
+    };
     use tokio::time::{advance, pause};
     use tokio_test::{assert_pending, assert_ready_ok};
     use tower_test::{
@@ -230,6 +234,8 @@ mod tests {
 
     #[tokio::test]
     async fn startup_conditions() {
+        trace_init();
+
         TestService::run(|mut svc| async move {
             // Concurrency starts at 1
             assert_eq!(svc.inner().current_limit, 1);
@@ -240,6 +246,8 @@ mod tests {
 
     #[tokio::test]
     async fn increases_limit() {
+        trace_init();
+
         let stats = TestService::run(|mut svc| async move {
             // Concurrency starts at 1
             assert_eq!(svc.inner().current_limit, 1);
@@ -268,6 +276,8 @@ mod tests {
 
     #[tokio::test]
     async fn handles_deferral() {
+        trace_init();
+
         TestService::run(|mut svc| async move {
             assert_eq!(svc.inner().current_limit, 1);
             let req = svc.send(false).await;
@@ -292,6 +302,8 @@ mod tests {
     #[allow(clippy::needless_range_loop)]
     #[tokio::test]
     async fn rapid_decrease() {
+        trace_init();
+
         TestService::run(|mut svc| async move {
             let mut reqs = [None, None, None];
             for &concurrent in &[1, 1, 2, 3] {

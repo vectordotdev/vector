@@ -99,15 +99,19 @@ fn map_timestamp(mut event: Event) -> impl Future<Item = Event, Error = ()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::SinkConfig;
-    use crate::event::Event;
-    use crate::sinks::util::test::{build_test_server, load_sink};
-    use crate::test_util;
+    use crate::{
+        config::SinkConfig,
+        event::Event,
+        sinks::util::test::{build_test_server, load_sink},
+        test_util::{next_addr, random_lines_with_stream, trace_init},
+    };
     use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
 
     #[tokio::test]
     async fn smoke() {
+        trace_init();
+
         let (mut config, cx) = load_sink::<SematextLogsConfig>(
             r#"
             region = "na"
@@ -119,7 +123,7 @@ mod tests {
         // Make sure we can build the config
         let _ = config.build(cx.clone()).unwrap();
 
-        let addr = test_util::next_addr();
+        let addr = next_addr();
         // Swap out the host so we can force send it
         // to our local server
         config.host = Some(format!("http://{}", addr));
@@ -130,7 +134,7 @@ mod tests {
         let (rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
-        let (expected, lines) = test_util::random_lines_with_stream(100, 10);
+        let (expected, lines) = random_lines_with_stream(100, 10);
         let pump = sink.send_all(lines.map(Event::from));
         let _ = pump.compat().await.unwrap();
 

@@ -290,6 +290,8 @@ fn reconnect() {
 
 #[tokio::test]
 async fn healthcheck() {
+    trace_init();
+
     let addr = next_addr();
     let resolver = vector::dns::Resolver;
 

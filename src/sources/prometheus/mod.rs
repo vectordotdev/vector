@@ -148,17 +148,21 @@ mod test {
     use crate::{
         config,
         sinks::prometheus::PrometheusSinkConfig,
-        test_util::{next_addr, start_topology},
+        test_util::{next_addr, start_topology, trace_init},
         Error,
     };
     use futures::compat::Future01CompatExt;
-    use hyper::service::{make_service_fn, service_fn};
-    use hyper::{Body, Client, Response, Server};
+    use hyper::{
+        service::{make_service_fn, service_fn},
+        {Body, Client, Response, Server},
+    };
     use pretty_assertions::assert_eq;
     use tokio::time::{delay_for, Duration};
 
     #[tokio::test]
     async fn test_prometheus_routing() {
+        trace_init();
+
         let in_addr = next_addr();
         let out_addr = next_addr();
 

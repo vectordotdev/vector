@@ -55,6 +55,7 @@ impl Debounce {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_util::trace_init;
     use futures::{pin_mut, poll};
 
     const TEST_DELAY_FRACTION: Duration = Duration::from_secs(60 * 60); // one hour
@@ -62,6 +63,8 @@ mod tests {
 
     #[tokio::test]
     async fn one_signal() {
+        trace_init();
+
         tokio::time::pause();
 
         let mut debounce = Debounce::new(TEST_DELAY);
@@ -100,6 +103,8 @@ mod tests {
 
     #[tokio::test]
     async fn late_request() {
+        trace_init();
+
         tokio::time::pause();
 
         let mut debounce = Debounce::new(TEST_DELAY);
@@ -129,6 +134,8 @@ mod tests {
 
     #[tokio::test]
     async fn multiple_signals() {
+        trace_init();
+
         tokio::time::pause();
 
         let mut debounce = Debounce::new(TEST_DELAY);
@@ -224,6 +231,8 @@ mod tests {
 
     #[tokio::test]
     async fn is_debouncing() {
+        trace_init();
+
         tokio::time::pause();
 
         let mut debounce = Debounce::new(TEST_DELAY);

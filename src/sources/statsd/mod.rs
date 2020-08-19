@@ -107,7 +107,7 @@ mod test {
     use crate::{
         config,
         sinks::prometheus::PrometheusSinkConfig,
-        test_util::{next_addr, start_topology},
+        test_util::{next_addr, start_topology, trace_init},
     };
     use futures::{compat::Future01CompatExt, TryStreamExt};
     use futures01::Stream;
@@ -125,6 +125,8 @@ mod test {
 
     #[tokio::test]
     async fn test_statsd() {
+        trace_init();
+
         let in_addr = next_addr();
         let out_addr = next_addr();
 

@@ -245,8 +245,8 @@ mod tests {
     use crate::{
         event,
         test_util::{
-            self, lines_from_file, random_events_with_stream, random_lines_with_stream, temp_dir,
-            temp_file,
+            lines_from_file, random_events_with_stream, random_lines_with_stream, runtime,
+            temp_dir, temp_file, trace_init,
         },
     };
     use futures::stream;
@@ -254,7 +254,7 @@ mod tests {
 
     #[test]
     fn single_partition() {
-        test_util::trace_init();
+        trace_init();
 
         let template = temp_file();
 
@@ -269,7 +269,7 @@ mod tests {
 
         let events = stream::iter(input.clone().into_iter().map(Event::from));
 
-        let mut rt = crate::test_util::runtime();
+        let mut rt = runtime();
         let _ = rt
             .block_on_std(async move { sink.run(events).await })
             .unwrap();
@@ -282,7 +282,7 @@ mod tests {
 
     #[test]
     fn many_partitions() {
-        test_util::trace_init();
+        trace_init();
 
         let directory = temp_dir();
 
@@ -318,7 +318,7 @@ mod tests {
         input[7].as_mut_log().insert("level", "error");
 
         let events = stream::iter(input.clone().into_iter());
-        let mut rt = crate::test_util::runtime();
+        let mut rt = runtime();
         let _ = rt
             .block_on_std(async move { sink.run(events).await })
             .unwrap();
@@ -370,7 +370,7 @@ mod tests {
     async fn reopening() {
         use pretty_assertions::assert_eq;
 
-        test_util::trace_init();
+        trace_init();
 
         let template = temp_file();
 

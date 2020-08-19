@@ -248,10 +248,13 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::config::SinkConfig;
-    use crate::sinks::util::test::load_sink;
-    use crate::template::Template;
-    use crate::Event;
+    use crate::{
+        config::SinkConfig,
+        sinks::util::test::load_sink,
+        template::Template,
+        test_util::{random_lines, trace_init},
+        Event,
+    };
     use bytes::Bytes;
     use futures::compat::Future01CompatExt;
     use futures01::Sink;
@@ -259,6 +262,8 @@ mod integration_tests {
 
     #[tokio::test]
     async fn text() {
+        trace_init();
+
         let stream = uuid::Uuid::new_v4();
 
         let (mut config, cx) = load_sink::<LokiConfig>(
@@ -277,9 +282,7 @@ mod integration_tests {
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let lines = crate::test_util::random_lines(100)
-            .take(10)
-            .collect::<Vec<_>>();
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
 
         let events = lines.clone().into_iter().map(Event::from);
         let _ = sink
@@ -296,6 +299,8 @@ mod integration_tests {
 
     #[tokio::test]
     async fn json() {
+        trace_init();
+
         let stream = uuid::Uuid::new_v4();
 
         let (mut config, cx) = load_sink::<LokiConfig>(
@@ -315,7 +320,7 @@ mod integration_tests {
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let events = crate::test_util::random_lines(100)
+        let events = random_lines(100)
             .take(10)
             .map(Event::from)
             .collect::<Vec<_>>();
@@ -334,6 +339,8 @@ mod integration_tests {
 
     #[tokio::test]
     async fn many_streams() {
+        trace_init();
+
         let stream1 = uuid::Uuid::new_v4();
         let stream2 = uuid::Uuid::new_v4();
 
@@ -348,9 +355,7 @@ mod integration_tests {
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let lines = crate::test_util::random_lines(100)
-            .take(10)
-            .collect::<Vec<_>>();
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
 
         let mut events = lines
             .clone()

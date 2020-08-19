@@ -11,6 +11,7 @@ use k8s_test_framework::{
     lock, test_pod, wait_for_resource::WaitFor, Framework, Interface, Reader,
 };
 use std::collections::HashSet;
+use vector::test_util::trace_init;
 
 const VECTOR_CONFIG: &str = r#"
 apiVersion: v1
@@ -157,6 +158,8 @@ where
 /// vector picks that up.
 #[tokio::test]
 async fn simple() -> Result<(), Box<dyn std::error::Error>> {
+    trace_init();
+
     let _guard = lock();
     let framework = make_framework();
 
@@ -225,6 +228,8 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
 /// kubernetes has internally split into multiple partial log lines.
 #[tokio::test]
 async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
+    trace_init();
+
     let _guard = lock();
     let framework = make_framework();
 
@@ -294,6 +299,8 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
 /// existed before vector was deployed.
 #[tokio::test]
 async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
+    trace_init();
+
     let _guard = lock();
     let framework = make_framework();
 
@@ -365,6 +372,8 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
 /// arrive at the proper order.
 #[tokio::test]
 async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
+    trace_init();
+
     let _guard = lock();
     let framework = make_framework();
 
@@ -435,6 +444,8 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
 /// metadata obtained from the k8s API.
 #[tokio::test]
 async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
+    trace_init();
+
     let _guard = lock();
     let framework = make_framework();
 
@@ -511,6 +522,8 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
 /// requested to be excluded from collection, based on k8s API `Pod` labels.
 #[tokio::test]
 async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
+    trace_init();
+
     let _guard = lock();
     let framework = make_framework();
 
@@ -651,6 +664,8 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
 /// `Namespace`s and `Pod`s.
 #[tokio::test]
 async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
+    trace_init();
+
     let _guard = lock();
     let framework = make_framework();
 

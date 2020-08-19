@@ -210,13 +210,16 @@ impl Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Event;
-    use crate::sinks::influxdb::test_util::{assert_fields, split_line_protocol, ts};
-    use crate::sinks::util::http::HttpSink;
-    use crate::sinks::util::test::build_test_server;
-    use crate::test_util;
-    use chrono::offset::TimeZone;
-    use chrono::Utc;
+    use crate::{
+        event::Event,
+        sinks::influxdb::test_util::{assert_fields, split_line_protocol, ts},
+        sinks::util::{
+            http::HttpSink,
+            test::{build_test_server, load_sink},
+        },
+        test_util::{next_addr, trace_init},
+    };
+    use chrono::{offset::TimeZone, Utc};
     use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
 
@@ -426,7 +429,9 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_v1() {
-        let (mut config, cx) = crate::sinks::util::test::load_sink::<InfluxDBLogsConfig>(
+        trace_init();
+
+        let (mut config, cx) = load_sink::<InfluxDBLogsConfig>(
             r#"
             namespace = "ns"
             endpoint = "http://localhost:9999"
@@ -438,7 +443,7 @@ mod tests {
         // Make sure we can build the config
         let _ = config.build(cx.clone()).unwrap();
 
-        let addr = test_util::next_addr();
+        let addr = next_addr();
         // Swap out the host so we can force send it
         // to our local server
         let host = format!("http://{}", addr);
@@ -488,7 +493,9 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_v2() {
-        let (mut config, cx) = crate::sinks::util::test::load_sink::<InfluxDBLogsConfig>(
+        trace_init();
+
+        let (mut config, cx) = load_sink::<InfluxDBLogsConfig>(
             r#"
             namespace = "ns"
             endpoint = "http://localhost:9999"
@@ -502,7 +509,7 @@ mod tests {
         // Make sure we can build the config
         let _ = config.build(cx.clone()).unwrap();
 
-        let addr = test_util::next_addr();
+        let addr = next_addr();
         // Swap out the host so we can force send it
         // to our local server
         let host = format!("http://{}", addr);

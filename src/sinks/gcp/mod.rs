@@ -182,11 +182,13 @@ pub fn healthcheck_response(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assert_downcast_matches;
+    use crate::{assert_downcast_matches, test_util::trace_init};
 
     #[tokio::test]
     #[ignore]
     async fn fails_missing_creds() {
+        trace_init();
+
         let config: GcpAuthConfig = toml::from_str("").unwrap();
         match config.make_credentials(Scope::Compute).await {
             Ok(_) => panic!("make_credentials failed to error"),

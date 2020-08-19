@@ -359,10 +359,13 @@ fn add_next_line(buffered: &mut BytesMut, line: Bytes) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_util::trace_init;
     use pretty_assertions::assert_eq;
 
     #[tokio::test]
     async fn mode_continue_through_1() {
+        trace_init();
+
         let lines = vec![
             "some usual line",
             "some other usual line",
@@ -394,6 +397,8 @@ mod tests {
 
     #[tokio::test]
     async fn mode_continue_past_1() {
+        trace_init();
+
         let lines = vec![
             "some usual line",
             "some other usual line",
@@ -425,6 +430,8 @@ mod tests {
 
     #[tokio::test]
     async fn mode_halt_before_1() {
+        trace_init();
+
         let lines = vec![
             "INFO some usual line",
             "INFO some other usual line",
@@ -456,6 +463,8 @@ mod tests {
 
     #[tokio::test]
     async fn mode_halt_with_1() {
+        trace_init();
+
         let lines = vec![
             "some usual line;",
             "some other usual line;",
@@ -487,6 +496,8 @@ mod tests {
 
     #[tokio::test]
     async fn use_case_java_exception() {
+        trace_init();
+
         let lines = vec![
             "java.lang.Exception",
             "    at com.foo.bar(bar.java:123)",
@@ -508,6 +519,8 @@ mod tests {
 
     #[tokio::test]
     async fn use_case_ruby_exception() {
+        trace_init();
+
         let lines = vec![
             "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)",
             "\tfrom foobar.rb:6:in `bar'",
@@ -532,6 +545,8 @@ mod tests {
     /// https://github.com/timberio/vector/issues/3237
     #[tokio::test]
     async fn two_lines_emit_with_continue_through() {
+        trace_init();
+
         let lines = vec![
             "not merged 1", // will NOT be stashed, but passthroughed
             " merged 1",
@@ -571,6 +586,8 @@ mod tests {
 
     #[tokio::test]
     async fn two_lines_emit_with_halt_before() {
+        trace_init();
+
         let lines = vec![
             "part 0.1",
             "part 0.2",
@@ -605,6 +622,8 @@ mod tests {
 
     #[tokio::test]
     async fn legacy() {
+        trace_init();
+
         let lines = vec![
             "INFO some usual line",
             "INFO some other usual line",

@@ -786,15 +786,19 @@ mod reload_tests {
 
 #[cfg(all(test, feature = "sinks-console", feature = "sources-generator"))]
 mod source_finished_tests {
-    use crate::config::Config;
-    use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
-    use crate::sources::generator::GeneratorConfig;
-    use crate::test_util::start_topology;
+    use crate::{
+        config::Config,
+        sinks::console::{ConsoleSinkConfig, Encoding, Target},
+        sources::generator::GeneratorConfig,
+        test_util::{start_topology, trace_init},
+    };
     use futures::compat::Future01CompatExt;
     use tokio::time::{timeout, Duration};
 
     #[tokio::test]
     async fn sources_finished() {
+        trace_init();
+
         let mut old_config = Config::empty();
         let generator = GeneratorConfig::repeat(vec!["text".to_owned()], 1, None);
         old_config.add_source("in", generator);
