@@ -60,7 +60,7 @@ pub fn adapt_to_topology(mut streaming_sink: impl StreamingSink + 'static) -> si
     let synched = SynchedSink {
         sink,
         synching: false,
-        sync: Box::new(handle.compat().map_err(|_| ())),
+        sync: Box::new(handle.compat().map(|res| res.unwrap())),
     };
 
     Box::new(synched)
