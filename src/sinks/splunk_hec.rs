@@ -8,8 +8,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpClient, HttpSink},
-        service2::{InFlightLimit, TowerRequestConfig},
-        BatchConfig, BatchSettings, Buffer, Compression,
+        BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, TowerRequestConfig,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},

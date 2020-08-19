@@ -6,12 +6,11 @@ use crate::{
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        retries2::RetryLogic,
+        retries::RetryLogic,
         rusoto,
-        service2::{InFlightLimit, ServiceBuilderExt, TowerCompat, TowerRequestConfig},
         sink::Response,
-        BatchConfig, BatchSettings, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
-        PartitionInnerBuffer,
+        BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
+        PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerCompat, TowerRequestConfig,
     },
     template::Template,
 };
@@ -379,7 +378,7 @@ fn encode_event(
         .render_string(&event)
         .map_err(|missing_keys| {
             warn!(
-                message = "Keys do not exist on the event. Dropping event.",
+                message = "Keys do not exist on the event; dropping event.",
                 ?missing_keys,
                 rate_limit_secs = 30,
             );

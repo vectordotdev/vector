@@ -55,12 +55,12 @@ where
         let now = Instant::now();
         while let Some((_, deadline)) = self.queue.front() {
             let deadline = *deadline;
-            trace!(message = "got delayed deletion deadline", ?deadline, ?now);
+            trace!(message = "Got delayed deletion deadline", ?deadline, ?now);
             if deadline > now {
                 break;
             }
             trace!(
-                message = "processing delayed deletion for deadline",
+                message = "Processing delayed deletion for deadline",
                 ?deadline,
                 ?now
             );

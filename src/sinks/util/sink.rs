@@ -16,7 +16,7 @@
 //! `Acker` and will provide full batching, request dipstaching and acking based on
 //! the settings passed.
 //!
-//! For more advanced use cases like http based sinks, one should use the
+//! For more advanced use cases like HTTP based sinks, one should use the
 //! `BatchedHttpSink` type, which is a wrapper for `BatchSink` and `HttpSink`.
 //!
 //! # Driving to completetion
@@ -85,11 +85,11 @@ impl<T: Sink> Sink for StreamSink<T> {
     type SinkError = T::SinkError;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        trace!("sending item.");
+        trace!("Sending item.");
         match self.inner.start_send(item)? {
             AsyncSink::Ready => {
                 self.pending += 1;
-                trace!(message = "submit successful.", pending_acks = self.pending);
+                trace!(message = "Submit successful.", pending_acks = self.pending);
 
                 if self.pending >= STREAM_SINK_MAX {
                     self.poll_complete()?;
@@ -197,7 +197,7 @@ where
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         if self.batch.was_full() {
-            trace!("batch full.");
+            trace!("Batch full.");
             self.poll_complete()?;
 
             if !self.batch.is_empty() {
@@ -230,7 +230,7 @@ where
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
         loop {
             if self.batch.is_empty() {
-                trace!("no batches; driving service to completion.");
+                trace!("No batches; driving service to completion.");
                 return self.service.poll_complete();
             } else {
                 // We have data to send, so check if we should send it and either attempt the send
@@ -257,7 +257,7 @@ where
                     // to poll the inner futures but still return
                     // NotReady if the linger timeout is not complete yet.
                     if let Some(linger) = &mut self.linger {
-                        trace!("polling batch linger.");
+                        trace!("Polling batch linger.");
                         self.service.poll_complete()?;
                         try_ready!(linger.poll());
                     } else {
@@ -269,7 +269,7 @@ where
     }
 
     fn close(&mut self) -> Poll<(), Self::SinkError> {
-        trace!("closing batch sink.");
+        trace!("Closing batch sink.");
         self.closing = true;
         self.poll_complete()
     }
@@ -376,16 +376,15 @@ where
     fn poll_send(&mut self, batch: B) -> Poll<(), crate::Error> {
         if let Async::NotReady = self.service.poll_ready()? {
             self.sending.push_front(batch);
-            Ok(Async::NotReady)
         } else {
             let batch_size = batch.num_items();
             let batch = batch.finish();
 
             let fut = self.service.call(batch, batch_size).compat();
             tokio::spawn(fut);
-
-            self.service.poll_complete()
         }
+
+        self.service.poll_complete()
     }
 
     fn handle_full_batch(&mut self, item: B::Input, partition: &K) -> FullBatchResult<B::Input> {
@@ -470,7 +469,7 @@ where
                         FullBatchResult::Continue(item) => item,
                     }
                 } else {
-                    trace!("adding event to batch.");
+                    trace!("Adding event to batch.");
                     match batch.push(item) {
                         PushResult::Ok(full) => {
                             if full {
@@ -490,7 +489,7 @@ where
             None => item,
         };
 
-        trace!("replacing batch.");
+        trace!("Replacing batch.");
         // We fall through to this case, when there is no batch already
         // or the batch got submitted by polling_complete above.
         let mut batch = self.batch.fresh();
@@ -515,7 +514,9 @@ where
         self.service.poll_complete()?;
 
         while let Some(batch) = self.sending.pop_front() {
-            self.poll_send(batch)?;
+            if self.poll_send(batch)? == Async::Ready(()) {
+                break;
+            }
         }
 
         let closing = self.closing;
@@ -525,7 +526,7 @@ where
         while let Ok(Async::Ready(Some(linger))) = self.lingers.poll() {
             // Only if the linger has elapsed trigger the removal
             if let LingerState::Elapsed(partition) = linger {
-                trace!("batch linger expired.");
+                trace!("Batch linger expired.");
                 self.linger_handles.remove(&partition);
 
                 if let Some(batch) = self.partitions.remove(&partition) {
@@ -553,6 +554,12 @@ where
                 ready_batches.push(batch);
             }
         }
+        if !self.partitions.is_empty() {
+            assert!(
+                !self.lingers.is_empty(),
+                "If partitions are not empty, then there must be a linger"
+            );
+        }
 
         for batch in ready_batches.into_iter().chain(partitions) {
             self.poll_send(batch.into_inner())?;
@@ -561,11 +568,7 @@ where
         // If we still have an inflight partition then
         // we should have a linger associated with it that
         // will wake up this task when it is ready to be flushed.
-        if !self.partitions.is_empty() {
-            assert!(
-                !self.lingers.is_empty(),
-                "If partitions are not empty, then there must be a linger"
-            );
+        if !self.partitions.is_empty() || !self.sending.is_empty() {
             self.service.poll_complete()?;
             Ok(Async::NotReady)
         } else {
@@ -574,7 +577,7 @@ where
     }
 
     fn close(&mut self) -> Poll<(), Self::SinkError> {
-        trace!("closing partition batch sink.");
+        trace!("Closing partition batch sink.");
         self.closing = true;
         self.poll_complete()
     }

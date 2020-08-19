@@ -6,11 +6,10 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        retries2::RetryLogic,
+        retries::RetryLogic,
         rusoto,
-        service2::TowerRequestConfig,
         sink::Response,
-        BatchConfig, BatchSettings, Compression, EncodedLength, VecBuffer,
+        BatchConfig, BatchSettings, Compression, EncodedLength, TowerRequestConfig, VecBuffer,
     },
 };
 use bytes::Bytes;
@@ -254,7 +253,7 @@ fn encode_event(
             v.to_string_lossy()
         } else {
             warn!(
-                message = "Partition key does not exist; Dropping event.",
+                message = "Partition key does not exist; dropping event.",
                 %partition_key_field,
                 rate_limit_secs = 30,
             );

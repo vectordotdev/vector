@@ -29,7 +29,7 @@ pub struct VectorEventReceived {
 
 impl InternalEvent for VectorEventReceived {
     fn emit_logs(&self) {
-        trace!(message = "received one event.",);
+        trace!(message = "Received one event.",);
     }
 
     fn emit_metrics(&self) {

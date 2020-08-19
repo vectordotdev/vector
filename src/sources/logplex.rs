@@ -142,7 +142,7 @@ fn line_to_event(line: String) -> Event {
         event
     } else {
         warn!(
-            message = "line didn't match expected logplex format, so raw message is forwarded.",
+            message = "Line didn't match expected logplex format, so raw message is forwarded.",
             fields = parts.len(),
             rate_limit_secs = 10
         );

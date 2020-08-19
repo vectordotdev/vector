@@ -88,7 +88,7 @@ impl SourceConfig for Config {
         let fut = source.run(out, shutdown);
         let fut = fut.map(|result| {
             result.map_err(|error| {
-                error!(message = "source future failed", ?error);
+                error!(message = "Source future failed", ?error);
             })
         });
         let fut = Box::pin(fut);

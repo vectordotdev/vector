@@ -496,7 +496,7 @@ mod tests {
                 // the passed `watch_optional`.
                 let watch_optional = match invocation_event {
                     mock_watcher::ScenarioEvent::Invocation(val) => val,
-                    _ => panic!("unexpected event from watcher mock"),
+                    _ => panic!("Unexpected event from watcher mock"),
                 };
 
                 // Assert that the arguments are passed properly.
@@ -917,7 +917,7 @@ mod tests {
                     // Assert that we obtained an invocation event.
                     let watch_optional = match invocation_event {
                         mock_watcher::ScenarioEvent::Invocation(val) => val,
-                        _ => panic!("unexpected event from watcher mock"),
+                        _ => panic!("Unexpected event from watcher mock"),
                     };
 
                     // Assert the current state while within the watcher stream

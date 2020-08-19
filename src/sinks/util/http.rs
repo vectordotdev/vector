@@ -1,7 +1,6 @@
 use super::{
-    retries2::{RetryAction, RetryLogic},
-    service2::{TowerBatchedSink, TowerRequestSettings},
-    sink, Batch,
+    retries::{RetryAction, RetryLogic},
+    sink, Batch, TowerBatchedSink, TowerRequestSettings,
 };
 use crate::{
     buffers::Acker,
@@ -246,14 +245,14 @@ where
                 .insert("User-Agent", self.user_agent.clone());
         }
 
-        debug!(message = "sending request.", uri = %request.uri(), method = %request.method());
+        debug!(message = "Sending request.", uri = %request.uri(), method = %request.method());
 
         let response = self.client.request(request);
 
         let fut = async move {
             let res = response.await?;
             debug!(
-                    message = "response.",
+                    message = "Response.",
                     status = ?res.status(),
                     version = ?res.version(),
             );
