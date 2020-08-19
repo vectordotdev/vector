@@ -3,7 +3,10 @@ use crate::serde::Fields;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
-    internal_events::AddFieldsEventProcessed,
+    internal_events::{
+        AddFieldsEventProcessed, AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten,
+        AddFieldsTemplateInvalid, AddFieldsTemplateRenderingError,
+    },
     template::Template,
 };
 use chrono::{DateTime, Utc};
@@ -94,10 +97,7 @@ impl Transform for AddFields {
                 TemplateOrValue::Template(v) => match v.render_string(&event) {
                     Ok(v) => v,
                     Err(_) => {
-                        warn!(
-                            "Failed to render templated value at key `{}`, dropping.",
-                            key
-                        );
+                        emit!(AddFieldsTemplateRenderingError { field: key });
                         continue;
                     }
                 }
@@ -106,18 +106,10 @@ impl Transform for AddFields {
             };
             if self.overwrite {
                 if event.as_mut_log().insert(&key, value).is_some() {
-                    debug!(
-                        message = "Field overwritten",
-                        field = key.as_ref(),
-                        rate_limit_secs = 30,
-                    )
+                    emit!(AddFieldsFieldOverwritten { field: key });
                 }
             } else if event.as_mut_log().contains(&key) {
-                debug!(
-                    message = "Field not overwritten",
-                    field = key.as_ref(),
-                    rate_limit_secs = 30,
-                )
+                emit!(AddFieldsFieldNotOverwritten { field: key });
             } else {
                 event.as_mut_log().insert(key, value);
             }
@@ -132,7 +124,10 @@ fn flatten_field(key: Atom, value: TomlValue, new_fields: &mut IndexMap<Atom, Te
         TomlValue::String(s) => match Template::try_from(s.as_str()) {
             Ok(t) => new_fields.insert(key, t.into()),
             Err(error) => {
-                error!(message = "Invalid template", %error);
+                emit!(AddFieldsTemplateInvalid {
+                    field: key.clone(),
+                    error
+                });
                 new_fields.insert(key, Value::from(s).into())
             }
         },
