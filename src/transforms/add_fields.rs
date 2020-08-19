@@ -97,7 +97,9 @@ impl Transform for AddFields {
                 TemplateOrValue::Template(v) => match v.render_string(&event) {
                     Ok(v) => v,
                     Err(_) => {
-                        emit!(AddFieldsTemplateRenderingError { field: key.as_ref() });
+                        emit!(AddFieldsTemplateRenderingError {
+                            field: key.as_ref()
+                        });
                         continue;
                     }
                 }
@@ -106,10 +108,14 @@ impl Transform for AddFields {
             };
             if self.overwrite {
                 if event.as_mut_log().insert(&key, value).is_some() {
-                    emit!(AddFieldsFieldOverwritten { field: key.as_ref() });
+                    emit!(AddFieldsFieldOverwritten {
+                        field: key.as_ref()
+                    });
                 }
             } else if event.as_mut_log().contains(&key) {
-                emit!(AddFieldsFieldNotOverwritten { field: key.as_ref() });
+                emit!(AddFieldsFieldNotOverwritten {
+                    field: key.as_ref()
+                });
             } else {
                 event.as_mut_log().insert(key, value);
             }
