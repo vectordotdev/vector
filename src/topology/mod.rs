@@ -126,7 +126,7 @@ impl RunningTopology {
     pub fn stop(self) -> impl Future<Item = (), Error = ()> {
         // Create handy handles collections of all tasks for the subsequent operations.
         let mut wait_handles = Vec::new();
-        // We need a Vec here since source compnents have two tasks. One for pump in self.tasks,
+        // We need a Vec here since source components have two tasks. One for pump in self.tasks,
         // and the other for source in self.source_tasks.
         let mut check_handles = HashMap::<String, Vec<_>>::new();
 
@@ -166,7 +166,7 @@ impl RunningTopology {
             Ok(())
         });
 
-        // Reports in intervals which componenets are still running.
+        // Reports in intervals which components are still running.
         let reporter = interval(Duration::from_secs(5))
             .inspect(move |_| {
                 // Remove all tasks that have shutdown.
@@ -201,7 +201,7 @@ impl RunningTopology {
             .map_err(|_: futures01::future::SharedError<()>| ())
             .compat();
 
-        // Aggregate future that ends once anything detectes that all tasks have shutdown.
+        // Aggregate future that ends once anything detects that all tasks have shutdown.
         let shutdown_complete_future = future::select_all(vec![
             Box::pin(timeout) as future::BoxFuture<'static, Result<(), ()>>,
             Box::pin(reporter) as future::BoxFuture<'static, Result<(), ()>>,
@@ -250,7 +250,7 @@ impl RunningTopology {
                 self.connect_diff(&diff, &mut new_pieces);
                 self.spawn_diff(&diff, new_pieces);
                 self.config = new_config;
-                // We have succesfully changed to new config.
+                // We have successfully changed to new config.
                 return Ok(true);
             }
         }
@@ -265,7 +265,7 @@ impl RunningTopology {
             {
                 self.connect_diff(&diff, &mut new_pieces);
                 self.spawn_diff(&diff, new_pieces);
-                // We have succesfully returned to old config.
+                // We have successfully returned to old config.
                 return Ok(false);
             }
         }

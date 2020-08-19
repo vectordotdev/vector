@@ -1,8 +1,10 @@
 use super::Config;
+use crate::config::ApiOptions;
 use indexmap::IndexMap;
 use std::collections::HashSet;
 
 pub struct ConfigDiff {
+    pub api: Option<Service>,
     pub sources: Difference,
     pub transforms: Difference,
     pub sinks: Difference,
@@ -15,6 +17,7 @@ impl ConfigDiff {
 
     pub fn new(old: &Config, new: &Config) -> Self {
         ConfigDiff {
+            api: Service::from_api(&old.api, &new.api),
             sources: Difference::new(&old.sources, &new.sources),
             transforms: Difference::new(&old.transforms, &new.transforms),
             sinks: Difference::new(&old.sinks, &new.sinks),
@@ -27,6 +30,23 @@ impl ConfigDiff {
         self.transforms.flip();
         self.sinks.flip();
         self
+    }
+}
+
+pub enum Service {
+    Start,
+    Stop,
+    Restart,
+}
+
+impl Service {
+    fn from_api(old: &ApiOptions, new: &ApiOptions) -> Option<Self> {
+        match (old.enabled, new.enabled) {
+            (false, true) => Some(Service::Start),
+            (true, false) => Some(Service::Stop),
+            (true, true) if *old != *new => Some(Service::Restart),
+            _ => None,
+        }
     }
 }
 

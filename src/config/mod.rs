@@ -11,7 +11,7 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::fs::DirBuilder;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{Ipv4Addr, SocketAddr};
 use std::{collections::HashMap, path::PathBuf};
 
 pub mod component;
@@ -57,7 +57,7 @@ pub fn default_data_dir() -> Option<PathBuf> {
     Some(PathBuf::from("/var/lib/vector/"))
 }
 
-#[derive(Default, Debug, Deserialize, Serialize)]
+#[derive(Default, Debug, Deserialize, Serialize, PartialEq)]
 pub struct ApiOptions {
     #[serde(default = "default_api_enabled")]
     pub enabled: bool,
@@ -66,18 +66,11 @@ pub struct ApiOptions {
     pub bind: Option<SocketAddr>,
 }
 
-// impl ApiOptions {
-//     pub fn validate_bind(&self) -> Result<SocketAddr> {}
-// }
-
 pub fn default_api_enabled() -> bool {
     false
 }
 pub fn default_api_bind() -> Option<SocketAddr> {
-    Some(SocketAddr::new(
-        IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-        8686,
-    ))
+    Some(SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 8686))
 }
 
 #[derive(Debug, Snafu)]

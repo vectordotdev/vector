@@ -118,6 +118,19 @@ fn main() {
             arch = built_info::CFG_TARGET_ARCH
         );
 
+        // if config.api.enabled {
+        //     let bind = config.api.bind.unwrap_or_else(|| {
+        //         std::process::exit(exitcode::CONFIG);
+        //     });
+        //
+        //     info!(
+        //         message = "Vector API server started",
+        //         // tracing::Value is implemented for &str
+        //         ip = bind.port().to_string().as_str(),
+        //         port = bind.port().to_string().as_str()
+        //     );
+        // }
+
         let diff = ConfigDiff::initial(&config);
         let pieces = topology::validate(&config, &diff).await.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);

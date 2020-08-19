@@ -19,6 +19,7 @@ extern crate derivative;
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
+pub mod api;
 pub mod buffers;
 pub mod conditions;
 pub mod config;
