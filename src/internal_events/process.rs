@@ -9,7 +9,7 @@ impl InternalEvent for VectorStarted {
     fn emit_logs(&self) {
         info!(
             target: "vector",
-            message = "Vector is starting.",
+            message = "Vector has started.",
             version = built_info::PKG_VERSION,
             git_version = built_info::GIT_VERSION.unwrap_or(""),
             released = built_info::BUILT_TIME_UTC,
@@ -31,7 +31,7 @@ impl InternalEvent for VectorReloaded<'_> {
     fn emit_logs(&self) {
         info!(
             target: "vector",
-            message = "Vector is reloading.",
+            message = "Vector has reloaded.",
             path = ?self.config_paths
         );
     }
@@ -48,7 +48,7 @@ impl InternalEvent for VectorStopped {
     fn emit_logs(&self) {
         info!(
             target: "vector",
-            message = "Vector is stopping."
+            message = "Vector has stopped."
         );
     }
 
