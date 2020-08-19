@@ -114,8 +114,6 @@ fn main() {
             .set(config.global.log_schema.clone())
             .expect("Couldn't set schema");
 
-        emit!(VectorStarted);
-
         let diff = ConfigDiff::initial(&config);
         let pieces = topology::validate(&config, &diff).await.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
@@ -126,6 +124,8 @@ fn main() {
             std::process::exit(exitcode::CONFIG);
         });
 
+        emit!(VectorStarted);
+
         let mut signals = signal::signals();
         let mut sources_finished = topology.sources_finished().compat();
         let mut graceful_crash = graceful_crash.compat();
@@ -135,8 +135,6 @@ fn main() {
                 Some(signal) = signals.next() => {
                     if signal == SignalTo::Reload {
                         // Reload config
-                        emit!(VectorReloaded { config_paths: &config_paths });
-
                         let new_config = config::read_configs(&config_paths);
 
                         trace!("Parsing config");
@@ -146,7 +144,7 @@ fn main() {
                                 .reload_config_and_respawn(new_config, opts.require_healthy)
                                 .await
                             {
-                                Ok(true) => (),
+                                Ok(true) =>  emit!(VectorReloaded { config_paths: &config_paths }),
                                 Ok(false) => error!("Reload was not successful."),
                                 // Trigger graceful shutdown for what remains of the topology
                                 Err(()) => break SignalTo::Shutdown,
@@ -165,10 +163,9 @@ fn main() {
             }
         };
 
-        emit!(VectorStopped);
-
         match signal {
             SignalTo::Shutdown => {
+                emit!(VectorStopped);
                 select! {
                     _ = topology.stop().compat() => (), // Graceful shutdown finished
                     _ = signals.next() => {
