@@ -269,17 +269,6 @@ pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     output.lines().map(|s| s.to_owned()).collect()
 }
 
-pub fn block_on<F, R, E>(future: F) -> Result<R, E>
-where
-    F: Send + 'static + Future<Item = R, Error = E>,
-    R: Send + 'static,
-    E: Send + 'static,
-{
-    let mut rt = runtime();
-
-    rt.block_on(future)
-}
-
 pub fn runtime() -> Runtime {
     Runtime::single_threaded().unwrap()
 }
