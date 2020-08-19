@@ -28,6 +28,18 @@ path_coalesce = !{ "(" ~ path_segment ~ ("|" ~ path_segment)+ ~ ")" }
 
 dot_path = ${ ("." ~ (path_segment | path_coalesce))+ }
 
+// Query functions
+//
+// NOTE: Not including delete here yet, but there's no reason we can't slot it
+// in at some point and get `.nested = del(.foo)`, same with `only_fields`.
+query_function = { to_string | to_int | to_float | to_bool | to_timestamp }
+
+to_string = { "string(" ~ query_arithmetic ~ ("," ~ (string | null) )? ~ ")"}
+to_int = { "int(" ~ query_arithmetic ~ ("," ~ (number | null) )? ~ ")"}
+to_float = { "float(" ~ query_arithmetic ~ ("," ~ (number | null) )? ~ ")"}
+to_bool = { "bool(" ~ query_arithmetic ~ ("," ~ (boolean | null) )? ~ ")"}
+to_timestamp = { "timestamp(" ~ query_arithmetic ~ "," ~ string ~ ")"}
+
 group = { "(" ~ query_arithmetic ~ ")" }
 
 value = _{ string | number | boolean | null }
@@ -53,9 +65,7 @@ number = @{
     ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?
 }
 
-// NOTE: Not including delete here yet, but there's no reason we can't slot it
-// in at some point and get `.nested = del(.foo)`.
-query_leaf = _{ value | dot_path | group }
+query_leaf = _{ value | dot_path | group | query_function }
 
 // Arithmetic, broken down into tiers in order to support operator precedence.
 // Operators of the same tier are resolved from left to right.

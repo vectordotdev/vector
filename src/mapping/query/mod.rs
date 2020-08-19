@@ -4,6 +4,7 @@ use crate::{
 };
 
 pub mod arithmetic;
+pub mod functions;
 pub mod path;
 
 pub(in crate::mapping) trait Function: Send + core::fmt::Debug {

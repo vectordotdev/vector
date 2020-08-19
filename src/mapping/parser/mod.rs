@@ -3,8 +3,14 @@ extern crate pest;
 use crate::{
     event::Value,
     mapping::{
-        query,
-        query::{arithmetic::Arithmetic, arithmetic::Operator, path::Path as QueryPath, Literal},
+        query::{
+            self,
+            arithmetic::Arithmetic,
+            arithmetic::Operator,
+            functions::{ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn},
+            path::Path as QueryPath,
+            Literal,
+        },
         Assignment, Deletion, Function, IfStatement, Mapping, Noop, OnlyFields, Result,
     },
 };
@@ -153,21 +159,77 @@ fn query_arithmetic_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Functio
     query_arithmetic_boolean_from_pairs(pair.into_inner())
 }
 
+fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
+    match pair.as_rule() {
+        Rule::to_string => {
+            let mut inner_rules = pair.into_inner();
+            let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
+            let default = inner_rules.next().map(|r| match r.as_rule() {
+                Rule::string => Value::from(unquoted_string_from_pair(r)),
+                Rule::null => Value::Null,
+                _ => unreachable!(),
+            });
+            Ok(Box::new(ToStringFn::new(query, default)))
+        }
+        Rule::to_int => {
+            let mut inner_rules = pair.into_inner();
+            let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
+            let default = inner_rules.next().map(|r| match r.as_rule() {
+                // TODO: Try parsing directly into int first. Maybe return error
+                // if the string is not a valid int.
+                Rule::number => Value::Integer(r.as_str().parse::<f64>().unwrap() as i64),
+                Rule::null => Value::Null,
+                _ => unreachable!(),
+            });
+            Ok(Box::new(ToIntegerFn::new(query, default)))
+        }
+        Rule::to_float => {
+            let mut inner_rules = pair.into_inner();
+            let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
+            let default = inner_rules.next().map(|r| match r.as_rule() {
+                Rule::number => Value::Float(r.as_str().parse::<f64>().unwrap()),
+                Rule::null => Value::Null,
+                _ => unreachable!(),
+            });
+            Ok(Box::new(ToFloatFn::new(query, default)))
+        }
+        Rule::to_bool => {
+            let mut inner_rules = pair.into_inner();
+            let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
+            let default = inner_rules.next().map(|r| match r.as_rule() {
+                Rule::boolean => Value::Boolean(r.as_str() == "true"),
+                Rule::null => Value::Null,
+                _ => unreachable!(),
+            });
+            Ok(Box::new(ToBooleanFn::new(query, default)))
+        }
+        Rule::to_timestamp => {
+            let mut inner_rules = pair.into_inner();
+            let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
+            let format = unquoted_string_from_pair(inner_rules.next().unwrap());
+            Ok(Box::new(ToTimestampFn::new(&format, query, None)?))
+        }
+        _ => unreachable!(),
+    }
+}
+
+fn unquoted_string_from_pair(pair: Pair<Rule>) -> String {
+    pair.into_inner()
+        .next()
+        .unwrap()
+        .as_str()
+        // TODO: Include unicode escape sequences, surely there must be
+        // a standard lib opposite of https://doc.rust-lang.org/std/primitive.str.html#method.escape_default
+        // but I can't find it anywhere.
+        .replace("\\\"", "\"")
+        .replace("\\n", "\n")
+        .replace("\\t", "\t")
+        .replace("\\\\", "\\")
+}
+
 fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
     Ok(match pair.as_rule() {
-        Rule::string => Box::new(Literal::from(Value::from(
-            pair.into_inner()
-                .next()
-                .unwrap()
-                .as_str()
-                // TODO: Include unicode escape sequences, surely there must be
-                // a standard lib opposite of https://doc.rust-lang.org/std/primitive.str.html#method.escape_default
-                // but I can't find it anywhere.
-                .replace("\\\"", "\"")
-                .replace("\\n", "\n")
-                .replace("\\t", "\t")
-                .replace("\\\\", "\\"),
-        ))),
+        Rule::string => Box::new(Literal::from(Value::from(unquoted_string_from_pair(pair)))),
         Rule::null => Box::new(Literal::from(Value::Null)),
         Rule::number => Box::new(Literal::from(Value::from(
             pair.as_str().parse::<f64>().unwrap(),
@@ -178,6 +240,7 @@ fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
         }
         Rule::dot_path => Box::new(QueryPath::from(path_segments_from_pair(pair)?)),
         Rule::group => query_arithmetic_from_pair(pair.into_inner().next().unwrap())?,
+        Rule::query_function => query_function_from_pair(pair.into_inner().next().unwrap())?,
         _ => unreachable!(),
     })
 }
@@ -341,6 +404,10 @@ mod test {
             (
                 r#"only_fields(,)"#,
                 vec![" 1:13\n", "= expected target_path"],
+            ),
+            (
+                ".foo = string(\"bar\",)",
+                vec![" 1:21\n", "= expected null or string"],
             ),
         ];
 
@@ -586,6 +653,94 @@ mod test {
                     "foo.bar".to_string(),
                     "baz".to_string(),
                 ]))]),
+            ),
+            (
+                ".foo = string(.foo, \"bar\")",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToStringFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Some(Value::from("bar")),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = string(.bar)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToStringFn::new(Box::new(QueryPath::from("bar")), None)),
+                ))]),
+            ),
+            (
+                ".foo = int(.foo, 5)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToIntegerFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Some(Value::Integer(5)),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = int(.foo, 5.0)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToIntegerFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Some(Value::Integer(5)),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = int(.bar)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToIntegerFn::new(Box::new(QueryPath::from("bar")), None)),
+                ))]),
+            ),
+            (
+                ".foo = float(.foo, 5.5)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToFloatFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Some(Value::Float(5.5)),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = float(.bar)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToFloatFn::new(Box::new(QueryPath::from("bar")), None)),
+                ))]),
+            ),
+            (
+                ".foo = bool(.foo, true)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToBooleanFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Some(Value::Boolean(true)),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = bool(.bar)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToBooleanFn::new(Box::new(QueryPath::from("bar")), None)),
+                ))]),
+            ),
+            (
+                ".foo = timestamp(.foo, \"%d %m %Y\")",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(
+                        ToTimestampFn::new("%d %m %Y", Box::new(QueryPath::from("foo")), None)
+                            .unwrap(),
+                    ),
+                ))]),
             ),
         ];
 

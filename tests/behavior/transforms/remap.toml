@@ -99,3 +99,59 @@
       "result_b.equals" = false
       "result_c.equals" = true
       "result_d.equals" = false
+
+[transforms.remap_delete_only_fields]
+  inputs = []
+  type = "remap"
+  mapping = """
+    only_fields(.foo, .bar, .buz.second)
+    del(.foo.second)
+  """
+[[tests]]
+  name = "remap_delete_only_fields"
+  [tests.input]
+    insert_at = "remap_delete_only_fields"
+    type = "log"
+    [tests.input.log_fields]
+      "foo.first" = "foo first value"
+      "foo.second" = "foo second value"
+      bar = "bar value"
+      baz = "baz value"
+      "buz.first" = "buz first value"
+      "buz.second" = "buz second value"
+  [[tests.outputs]]
+    extract_from = "remap_delete_only_fields"
+    [[tests.outputs.conditions]]
+      "foo.first.equals" = "foo first value"
+      "foo.second.exists" = false
+      "bar.equals" = "bar value"
+      "baz.exists" = false
+      "buz.first.exists" = false
+      "buz.second.equals" = "buz second value"
+
+[transforms.remap_coercion]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .foo = string(.foo)
+    .bar = int(.bar)
+    .baz = float(.baz)
+    .bev = bool(.bev)
+  """
+[[tests]]
+  name = "remap_coercion"
+  [tests.input]
+    insert_at = "remap_coercion"
+    type = "log"
+    [tests.input.log_fields]
+      foo = 10
+      bar = "20"
+      baz = "30.3"
+      bev = "true"
+  [[tests.outputs]]
+    extract_from = "remap_coercion"
+    [[tests.outputs.conditions]]
+      "foo.equals" = "10"
+      "bar.equals" = 20
+      "baz.equals" = 30.3
+      "bev.equals" = true

@@ -14,8 +14,6 @@ use vector::event::Event;
 use vector::test_util::{
     next_addr, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver,
 };
-use vector::topology::config::{TransformConfig, TransformContext};
-use vector::topology::{self, config};
 use vector::transforms::{
     add_fields::AddFields,
     remap::{Remap, RemapConfig},
