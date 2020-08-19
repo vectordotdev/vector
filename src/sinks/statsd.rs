@@ -3,9 +3,7 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{MetricKind, MetricValue, StatisticKind},
     event::Event,
-    sinks::util::{
-        service2::TowerCompat, BatchConfig, BatchSettings, BatchSink, Buffer, Compression,
-    },
+    sinks::util::{BatchConfig, BatchSettings, BatchSink, Buffer, Compression, TowerCompat},
 };
 use futures::{future, FutureExt, TryFutureExt};
 use futures01::{stream, Sink};
@@ -18,7 +16,7 @@ use tower03::{Service, ServiceBuilder};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("failed to bind to udp listener socket, error = {:?}", source))]
+    #[snafu(display("failed to bind to UDP listener socket, error = {:?}", source))]
     SocketBindError { source: std::io::Error },
 }
 
@@ -41,7 +39,7 @@ impl Client {
     pub fn send(&self, buf: &[u8]) -> usize {
         self.socket
             .send_to(buf, &self.address)
-            .map_err(|e| error!("error sending datagram: {:?}", e))
+            .map_err(|e| error!("Error sending datagram: {:?}", e))
             .unwrap_or_default()
     }
 }
@@ -372,11 +370,11 @@ mod test {
             let socket = UdpSocket::bind(default_address()).await.unwrap();
             tokio::spawn(async move {
                 UdpFramed::new(socket, BytesCodec::new())
-                    .map_err(|e| error!("error reading line: {:?}", e))
+                    .map_err(|e| error!("Error reading line: {:?}", e))
                     .map_ok(|(bytes, _addr)| bytes.freeze())
                     .forward(
                         tx.sink_compat()
-                            .sink_map_err(|e| error!("error sending event: {:?}", e)),
+                            .sink_map_err(|e| error!("Error sending event: {:?}", e)),
                     )
                     .await
                     .unwrap()

@@ -1,6 +1,6 @@
 use super::controller::Controller;
 use super::future::ResponseFuture;
-use crate::sinks::util::retries2::RetryLogic;
+use crate::sinks::util::retries::RetryLogic;
 
 use tower03::Service;
 
@@ -71,7 +71,7 @@ where
             // Take the permit.
             State::Ready(permit) => permit,
             // whoopsie!
-            _ => panic!("max requests in-flight; poll_ready must be called first"),
+            _ => panic!("Maximum requests in-flight; poll_ready must be called first"),
         };
 
         self.controller.start_request();

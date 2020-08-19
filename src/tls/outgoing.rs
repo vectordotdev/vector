@@ -65,7 +65,7 @@ impl Future for MaybeTlsConnector {
                     }
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Ok(Async::Ready(stream)) => {
-                        debug!(message = "negotiated TLS");
+                        debug!(message = "Negotiated TLS");
                         return Ok(Async::Ready(MaybeTlsStream::Tls(stream)));
                     }
                 },

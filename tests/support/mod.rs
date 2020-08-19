@@ -131,7 +131,7 @@ impl SourceConfig for MockSourceConfig {
                 x
             })
             .forward(out.sink_map_err(|e| error!("Error sending in sink {}", e)))
-            .map(|_| info!("finished sending"))
+            .map(|_| info!("Finished sending"))
         });
         Ok(Box::new(source))
     }

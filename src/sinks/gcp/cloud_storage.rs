@@ -7,10 +7,10 @@ use crate::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
             http::{HttpClient, HttpClientFuture},
-            retries2::{RetryAction, RetryLogic},
-            service2::{InFlightLimit, ServiceBuilderExt, TowerCompat, TowerRequestConfig},
-            BatchConfig, BatchSettings, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
-            PartitionInnerBuffer,
+            retries::{RetryAction, RetryLogic},
+            BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
+            PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerCompat,
+            TowerRequestConfig,
         },
         Healthcheck, RouterSink,
     },
@@ -409,7 +409,7 @@ fn encode_event(
         .render_string(&event)
         .map_err(|missing_keys| {
             warn!(
-                message = "Keys do not exist on the event. Dropping event.",
+                message = "Keys do not exist on the event; dropping event.",
                 ?missing_keys,
                 rate_limit_secs = 30,
             );

@@ -156,7 +156,7 @@ mod tests {
         let region: Result<Region, ParseError> = config.inner.region.try_into();
         match region {
             Err(ParseError::MissingRegionAndEndpoint) => {}
-            other => panic!("assertion failed, wrong result {:?}", other),
+            other => panic!("Assertion failed, wrong result {:?}", other),
         }
     }
 

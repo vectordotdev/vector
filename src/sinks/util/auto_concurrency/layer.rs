@@ -1,5 +1,5 @@
 use super::AutoConcurrencyLimit;
-use crate::sinks::util::retries2::RetryLogic;
+use crate::sinks::util::retries::RetryLogic;
 use tower03::Layer;
 
 /// Enforces a limit on the concurrent number of requests the underlying

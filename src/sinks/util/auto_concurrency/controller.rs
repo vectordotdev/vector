@@ -5,7 +5,7 @@ use crate::internal_events::{
     AutoConcurrencyAveragedRtt, AutoConcurrencyInFlight, AutoConcurrencyLimit,
     AutoConcurrencyObservedRtt,
 };
-use crate::sinks::util::retries2::RetryLogic;
+use crate::sinks::util::retries::RetryLogic;
 #[cfg(test)]
 use crate::test_util::stats::{TimeHistogram, TimeWeightedSum};
 use std::future::Future;
