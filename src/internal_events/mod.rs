@@ -3,6 +3,7 @@ mod ansi_stripper;
 mod auto_concurrency;
 mod aws_kinesis_streams;
 mod blackhole;
+mod concat;
 #[cfg(feature = "sources-docker")]
 mod docker;
 mod elasticsearch;
@@ -42,6 +43,7 @@ pub use self::ansi_stripper::*;
 pub use self::auto_concurrency::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
+pub use self::concat::*;
 #[cfg(feature = "sources-docker")]
 pub use self::docker::*;
 pub use self::elasticsearch::*;
