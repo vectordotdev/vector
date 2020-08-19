@@ -60,7 +60,12 @@ pub fn adapt_to_topology(mut streaming_sink: impl StreamingSink + 'static) -> si
     let synched = SynchedSink {
         sink,
         synching: false,
-        sync: Box::new(handle.compat().map(|res| res.unwrap())),
+        sync: Box::new(handle.compat().map_err(|res| {
+            if res.is_panic() {
+                // We are propagating panic as if this spawn indirection isn't here.
+                panic!(res);
+            }
+        })),
     };
 
     Box::new(synched)
