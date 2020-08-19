@@ -284,7 +284,7 @@ mod test {
             kind: MetricKind::Absolute,
             value: MetricValue::Counter { value: 1.5 },
         };
-        let event = Event::Metric(metric1.clone());
+        let event = Event::Metric(metric1);
         let frame = &encode_event(event, "").unwrap();
         // The statsd parser will parse the counter as Incremental,
         // so we can't compare it with the parsed value.
