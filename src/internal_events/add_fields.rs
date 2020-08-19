@@ -14,11 +14,11 @@ impl InternalEvent for AddFieldsEventProcessed {
 }
 
 #[derive(Debug)]
-pub struct AddFieldsTemplateRenderingError {
-    pub field: string_cache::atom::DefaultAtom,
+pub struct AddFieldsTemplateRenderingError<'a> {
+    pub field: &'a str,
 }
 
-impl InternalEvent for AddFieldsTemplateRenderingError {
+impl<'a> InternalEvent for AddFieldsTemplateRenderingError<'a> {
     fn emit_logs(&self) {
         error!(message = "Failed to render templated value; discarding value.", %self.field, rate_limit_secs = 30);
     }
@@ -32,12 +32,12 @@ impl InternalEvent for AddFieldsTemplateRenderingError {
 }
 
 #[derive(Debug)]
-pub struct AddFieldsTemplateInvalid {
+pub struct AddFieldsTemplateInvalid<'a> {
     pub error: crate::template::TemplateError,
-    pub field: string_cache::atom::DefaultAtom,
+    pub field: &'a str,
 }
 
-impl InternalEvent for AddFieldsTemplateInvalid {
+impl<'a> InternalEvent for AddFieldsTemplateInvalid<'a> {
     fn emit_logs(&self) {
         error!(message = "Invalid template; using as string", %self.field, %self.error, rate_limit_secs = 30);
     }
@@ -51,22 +51,22 @@ impl InternalEvent for AddFieldsTemplateInvalid {
 }
 
 #[derive(Debug)]
-pub struct AddFieldsFieldOverwritten {
-    pub field: string_cache::atom::DefaultAtom,
+pub struct AddFieldsFieldOverwritten<'a> {
+    pub field: &'a str,
 }
 
-impl InternalEvent for AddFieldsFieldOverwritten {
+impl<'a> InternalEvent for AddFieldsFieldOverwritten<'a> {
     fn emit_logs(&self) {
         error!(message = "Field overwritten.", %self.field, rate_limit_secs = 30);
     }
 }
 
 #[derive(Debug)]
-pub struct AddFieldsFieldNotOverwritten {
-    pub field: string_cache::atom::DefaultAtom,
+pub struct AddFieldsFieldNotOverwritten<'a> {
+    pub field: &'a str,
 }
 
-impl InternalEvent for AddFieldsFieldNotOverwritten {
+impl<'a> InternalEvent for AddFieldsFieldNotOverwritten<'a> {
     fn emit_logs(&self) {
         error!(message = "Field not overwritten.", %self.field, rate_limit_secs = 30);
     }
