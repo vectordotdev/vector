@@ -6,6 +6,7 @@ use crate::{
     tls::TlsConfig,
     Pipeline,
 };
+use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use codec::BytesDelimitedCodec;
@@ -61,8 +62,19 @@ impl HttpSource for SimpleHttpSource {
 }
 
 #[typetag::serde(name = "http")]
+#[async_trait]
 impl SourceConfig for SimpleHttpConfig {
     fn build(
+        &self,
+        _name: &str,
+        _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
+        _out: Pipeline,
+    ) -> crate::Result<super::Source> {
+        unimplemented!()
+    }
+
+    async fn build_async(
         &self,
         _: &str,
         _: &GlobalOptions,
@@ -204,7 +216,7 @@ mod tests {
         config::{GlobalOptions, SourceConfig},
         event::{self, Event},
         runtime::Runtime,
-        test_util::{self, collect_n, runtime},
+        test_util::{self, collect_n, runtime, wait_for_tcp},
         Pipeline,
     };
     use futures::compat::Future01CompatExt;
@@ -222,21 +234,26 @@ mod tests {
         test_util::trace_init();
         let (sender, recv) = Pipeline::new_test();
         let address = test_util::next_addr();
-        rt.spawn(
+        rt.spawn_std(async move {
             SimpleHttpConfig {
                 address,
                 encoding,
                 headers,
                 tls: None,
             }
-            .build(
+            .build_async(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 sender,
             )
-            .unwrap(),
-        );
+            .await
+            .unwrap()
+            .compat()
+            .await
+            .unwrap();
+        });
+        rt.block_on_std(async move { wait_for_tcp(address).await });
         (recv, address)
     }
 
