@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 use tokio::time::{delay_for, Delay};
-use tower03::{retry::Policy, timeout::error::Elapsed};
+use tower::{retry::Policy, timeout::error::Elapsed};
 
 pub enum RetryAction {
     /// Indicate that this request should be retried with a reason
@@ -179,8 +179,8 @@ mod tests {
     use std::{fmt, time::Duration};
     use tokio::time;
     use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok, task};
-    use tower03::retry::RetryLayer;
-    use tower_test03::{assert_request_eq, mock};
+    use tower::retry::RetryLayer;
+    use tower_test::{assert_request_eq, mock};
 
     #[tokio::test]
     async fn service_error_retry() {
@@ -249,7 +249,7 @@ mod tests {
         assert_ready_ok!(svc.poll_ready());
 
         let mut fut = task::spawn(svc.call("hello"));
-        assert_request_eq!(handle, "hello").send_error(tower03::timeout::error::Elapsed::new());
+        assert_request_eq!(handle, "hello").send_error(Elapsed::new());
         assert_pending!(fut.poll());
 
         time::advance(Duration::from_secs(2)).await;
