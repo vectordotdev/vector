@@ -71,6 +71,7 @@ pub struct StreamSink<T> {
     inner: T,
     acker: Acker,
     pending: usize,
+    closing_inner: bool,
 }
 
 impl<T> StreamSink<T> {
@@ -79,6 +80,7 @@ impl<T> StreamSink<T> {
             inner,
             acker,
             pending: 0,
+            closing_inner: false,
         }
     }
 }
@@ -116,6 +118,16 @@ impl<T: Sink> Sink for StreamSink<T> {
         self.pending = 0;
 
         Ok(().into())
+    }
+
+    fn close(&mut self) -> Poll<(), Self::SinkError> {
+        if !self.closing_inner {
+            if let Async::NotReady = self.poll_complete()? {
+                return Ok(Async::NotReady);
+            }
+            self.closing_inner = true;
+        }
+        self.inner.close()
     }
 }
 
