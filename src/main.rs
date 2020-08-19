@@ -13,7 +13,7 @@ use std::cmp::max;
 use tokio::select;
 use vector::{
     config::{self, Config, ConfigDiff},
-    event, generate, list, metrics, runtime,
+    event, generate, heartbeat, list, metrics, runtime,
     signal::{self, SignalTo},
     topology, trace, unit_test, validate,
 };
@@ -127,6 +127,8 @@ fn main() {
         let (mut topology, graceful_crash) = result.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });
+
+        tokio::spawn(heartbeat::heartbeat());
 
         let mut signals = signal::signals();
         let mut sources_finished = topology.sources_finished().compat();
