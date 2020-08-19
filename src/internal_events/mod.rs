@@ -1,3 +1,4 @@
+mod add_tags;
 mod add_fields;
 mod ansi_stripper;
 mod auto_concurrency;
@@ -37,6 +38,7 @@ mod wasm;
 
 pub mod kubernetes;
 
+pub use self::add_tags::*;
 pub use self::add_fields::*;
 pub use self::ansi_stripper::*;
 pub use self::auto_concurrency::*;
