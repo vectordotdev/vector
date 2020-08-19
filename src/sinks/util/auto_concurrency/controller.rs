@@ -144,15 +144,18 @@ impl<L> Controller<L> {
         let current_rtt = inner.current_rtt.average();
         let past_rtt = inner.past_rtt.average();
 
-        if past_rtt == 0.0 && current_rtt.is_some() {
-            // No past measurements but valid current measurement, set up initial values.
-            let current_rtt = current_rtt.unwrap();
-            inner.past_rtt.update(current_rtt);
-            inner.next_update = now + Duration::from_secs_f64(current_rtt);
+        // No past measurements, set up initial values.
+        if past_rtt == 0.0 {
+            if let Some(current_rtt) = current_rtt {
+                inner.past_rtt.update(current_rtt);
+                inner.next_update = now + Duration::from_secs_f64(current_rtt);
+            }
         } else if past_rtt > 0.0 && now >= inner.next_update {
             #[cfg(test)]
             {
-                current_rtt.map(|rtt| stats.averaged_rtt.add(rtt, now));
+                if let Some(current_rtt) = current_rtt {
+                    stats.averaged_rtt.add(current_rtt, now);
+                }
                 stats.concurrency_limit.add(inner.current_limit, now);
                 drop(stats); // Drop the stats lock a little earlier on this path
             }
@@ -197,13 +200,15 @@ impl<L> Controller<L> {
                     concurrency: inner.current_limit as u64,
                     reached_limit: inner.reached_limit,
                     had_back_pressure: inner.had_back_pressure,
-                    current_rtt: current_rtt.map(|rtt| Duration::from_secs_f64(rtt)),
+                    current_rtt: current_rtt.map(Duration::from_secs_f64),
                     past_rtt: Duration::from_secs_f64(past_rtt),
                 });
             }
 
             // Reset values for next interval
-            current_rtt.map(|rtt| inner.past_rtt.update(rtt));
+            if let Some(current_rtt) = current_rtt {
+                inner.past_rtt.update(current_rtt);
+            }
             inner.next_update = now + Duration::from_secs_f64(inner.past_rtt.average());
             inner.current_rtt.reset();
             inner.had_back_pressure = false;
