@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate tracing;
+#[macro_use]
+extern crate vector;
 
 mod cli;
 
@@ -13,7 +15,9 @@ use std::cmp::max;
 use tokio::select;
 use vector::{
     config::{self, Config, ConfigDiff},
-    event, generate, list, metrics, runtime,
+    event, generate,
+    internal_events::{VectorReloaded, VectorStarted, VectorStopped},
+    list, metrics, runtime,
     signal::{self, SignalTo},
     topology, trace, unit_test, validate,
 };
@@ -110,14 +114,6 @@ fn main() {
             .set(config.global.log_schema.clone())
             .expect("Couldn't set schema");
 
-        info!(
-            message = "Vector is starting.",
-            version = built_info::PKG_VERSION,
-            git_version = built_info::GIT_VERSION.unwrap_or(""),
-            released = built_info::BUILT_TIME_UTC,
-            arch = built_info::CFG_TARGET_ARCH
-        );
-
         let diff = ConfigDiff::initial(&config);
         let pieces = topology::validate(&config, &diff).await.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
@@ -128,6 +124,8 @@ fn main() {
             std::process::exit(exitcode::CONFIG);
         });
 
+        emit!(VectorStarted);
+
         let mut signals = signal::signals();
         let mut sources_finished = topology.sources_finished().compat();
         let mut graceful_crash = graceful_crash.compat();
@@ -137,10 +135,6 @@ fn main() {
                 Some(signal) = signals.next() => {
                     if signal == SignalTo::Reload {
                         // Reload config
-                        info!(
-                            message = "Reloading configs.",
-                            path = ?config_paths
-                        );
                         let new_config = config::read_configs(&config_paths);
 
                         trace!("Parsing config");
@@ -150,7 +144,7 @@ fn main() {
                                 .reload_config_and_respawn(new_config, opts.require_healthy)
                                 .await
                             {
-                                Ok(true) => (),
+                                Ok(true) =>  emit!(VectorReloaded { config_paths: &config_paths }),
                                 Ok(false) => error!("Reload was not successful."),
                                 // Trigger graceful shutdown for what remains of the topology
                                 Err(()) => break SignalTo::Shutdown,
@@ -171,7 +165,7 @@ fn main() {
 
         match signal {
             SignalTo::Shutdown => {
-                info!("Shutting down.");
+                emit!(VectorStopped);
                 select! {
                     _ = topology.stop().compat() => (), // Graceful shutdown finished
                     _ = signals.next() => {
@@ -201,9 +195,4 @@ fn handle_config_errors(config: Result<Config, Vec<String>>) -> Option<Config> {
         }
         Ok(config) => Some(config),
     }
-}
-
-#[allow(unused)]
-mod built_info {
-    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }

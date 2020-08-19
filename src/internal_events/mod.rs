@@ -17,6 +17,7 @@ mod kubernetes_logs;
 mod logplex;
 #[cfg(feature = "transforms-lua")]
 mod lua;
+mod process;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
 mod regex;
@@ -57,6 +58,7 @@ pub use self::kubernetes_logs::*;
 pub use self::logplex::*;
 #[cfg(feature = "transforms-lua")]
 pub use self::lua::*;
+pub use self::process::*;
 #[cfg(feature = "sources-prometheus")]
 pub use self::prometheus::*;
 pub use self::regex::*;
