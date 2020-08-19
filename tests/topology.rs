@@ -38,7 +38,7 @@ fn into_message(event: Event) -> String {
         .to_string_lossy()
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(threaded_scheduler)]
 async fn topology_shutdown_while_active() {
     let source_event_counter = Arc::new(AtomicUsize::new(0));
     let source_event_total = source_event_counter.clone();
@@ -95,7 +95,7 @@ async fn topology_shutdown_while_active() {
     let _err: SendError<Event> = pump_handle.await.unwrap().unwrap_err();
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(threaded_scheduler)]
 async fn topology_source_and_sink() {
     let (in1, source1) = source();
     let (out1, sink1) = sink(10);
@@ -116,7 +116,7 @@ async fn topology_source_and_sink() {
     assert_eq!(vec![event], res);
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(threaded_scheduler)]
 async fn topology_multiple_sources() {
     let (in1, source1) = source();
     let (in2, source2) = source();
@@ -146,7 +146,7 @@ async fn topology_multiple_sources() {
     assert_eq!(out_event2, Some(event2));
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(threaded_scheduler)]
 async fn topology_multiple_sinks() {
     let (in1, source1) = source();
     let (out1, sink1) = sink(10);
@@ -172,7 +172,7 @@ async fn topology_multiple_sinks() {
     assert_eq!(vec![event], res2);
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(threaded_scheduler)]
 async fn topology_transform_chain() {
     let (in1, source1) = source();
     let transform1 = transform(" first", 0.0);
