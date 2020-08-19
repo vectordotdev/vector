@@ -69,10 +69,10 @@ impl Transform for AddTags {
                 match (entry, self.overwrite) {
                     (Entry::Vacant(entry), _) => { entry.insert(value.clone()); },
                     (Entry::Occupied(mut entry), true) => {
-                        emit!(AddTagsTagOverwritten { tag: name.clone() });
+                        emit!(AddTagsTagOverwritten { tag: name.as_ref() });
                         entry.insert(value.clone());
                     },
-                    (Entry::Occupied(_entry), false) => emit!(AddTagsTagNotOverwritten { tag: name.clone() }),
+                    (Entry::Occupied(_entry), false) => emit!(AddTagsTagNotOverwritten { tag: name.as_ref() }),
                 }
 
             }

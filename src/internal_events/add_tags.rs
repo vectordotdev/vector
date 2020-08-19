@@ -14,22 +14,22 @@ impl InternalEvent for AddTagsEventProcessed {
 }
 
 #[derive(Debug)]
-pub struct AddTagsTagOverwritten {
-    pub tag: string_cache::atom::DefaultAtom,
+pub struct AddTagsTagOverwritten<'a> {
+    pub tag: &'a str,
 }
 
-impl InternalEvent for AddTagsTagOverwritten {
+impl<'a> InternalEvent for AddTagsTagOverwritten<'a> {
     fn emit_logs(&self) {
         error!(message = "Tag overwritten.", %self.tag, rate_limit_secs = 30);
     }
 }
 
 #[derive(Debug)]
-pub struct AddTagsTagNotOverwritten {
-    pub tag: string_cache::atom::DefaultAtom,
+pub struct AddTagsTagNotOverwritten<'a> {
+    pub tag: &'a str,
 }
 
-impl InternalEvent for AddTagsTagNotOverwritten {
+impl<'a> InternalEvent for AddTagsTagNotOverwritten<'a> {
     fn emit_logs(&self) {
         error!(message = "Tag not overwritten.", %self.tag, rate_limit_secs = 30);
     }
