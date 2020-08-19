@@ -144,21 +144,18 @@ fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
                 buf.push(format!("#{}", encode_tags(t)));
             };
         }
-        MetricValue::Gauge { value } => match metric.kind {
-            MetricKind::Incremental => {
-                buf.push(format!("{}:{:+}", metric.name, value));
-                buf.push("g".to_string());
-                if let Some(t) = &metric.tags {
-                    buf.push(format!("#{}", encode_tags(t)));
-                };
-            }
-            MetricKind::Absolute => {
-                buf.push(format!("{}:{}", metric.name, value));
-                buf.push("g".to_string());
-                if let Some(t) = &metric.tags {
-                    buf.push(format!("#{}", encode_tags(t)));
-                };
-            }
+        MetricValue::Gauge { value } => {
+            match metric.kind {
+                MetricKind::Incremental => 
+                    buf.push(format!("{}:{:+}", metric.name, value)),
+                MetricKind::Absolute => 
+                    buf.push(format!("{}:{}", metric.name, value))
+            };
+        
+            buf.push("g".to_string());
+            if let Some(t) = &metric.tags {
+                buf.push(format!("#{}", encode_tags(t)));
+            };
         },
         MetricValue::Distribution {
             values,
