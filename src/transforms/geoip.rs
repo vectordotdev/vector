@@ -75,22 +75,22 @@ impl Geoip {
 }
 
 #[derive(Default, Serialize)]
-struct ISP {
+struct ISP<'a> {
     autonomous_system_number: i64,
-    autonomous_system_organization: String,
-    isp: String,
-    organization: String,
+    autonomous_system_organization: &'a str,
+    isp: &'a str,
+    organization: &'a str,
 }
 
 #[derive(Default, Serialize)]
-struct City {
-    city_name: String,
-    continent_code: String,
-    country_code: String,
-    timezone: String,
-    latitude: String,
-    longitude: String,
-    postal_code: String,
+struct City<'a> {
+    city_name: &'a str,
+    continent_code: &'a str,
+    country_code: &'a str,
+    timezone: &'a str,
+    latitude: String,  // converted from f64 as per original design
+    longitude: String, // converted from f64 as per original design
+    postal_code: &'a str,
 }
 
 impl Transform for Geoip {
@@ -106,39 +106,36 @@ impl Transform for Geoip {
             if let Ok(ip) = FromStr::from_str(ipaddress) {
                 if self.has_isp_db() {
                     if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::Isp>(ip) {
-                        if let Some(autonomous_system_number) = data.autonomous_system_number {
-                            isp.autonomous_system_number = autonomous_system_number as i64;
+                        if let Some(as_number) = data.autonomous_system_number {
+                            isp.autonomous_system_number = as_number as i64;
                         }
-                        if let Some(autonomous_system_organization) =
-                            data.autonomous_system_organization
-                        {
-                            isp.autonomous_system_organization =
-                                autonomous_system_organization.to_string();
+                        if let Some(as_organization) = data.autonomous_system_organization {
+                            isp.autonomous_system_organization = as_organization;
                         }
                         if let Some(isp_name) = data.isp {
-                            isp.isp = isp_name.to_string();
+                            isp.isp = isp_name;
                         }
                         if let Some(organization) = data.organization {
-                            isp.organization = organization.to_string();
+                            isp.organization = organization;
                         }
                     }
                 } else if let Ok(data) = self.dbreader.lookup::<maxminddb::geoip2::City>(ip) {
                     if let Some(city_names) = data.city.and_then(|c| c.names) {
                         if let Some(city_name) = city_names.get("en") {
-                            city.city_name = city_name.to_string();
+                            city.city_name = city_name;
                         }
                     }
 
                     if let Some(continent_code) = data.continent.and_then(|c| c.code) {
-                        city.continent_code = continent_code.to_string();
+                        city.continent_code = continent_code;
                     }
 
                     if let Some(country_code) = data.country.and_then(|cy| cy.iso_code) {
-                        city.country_code = country_code.to_string();
+                        city.country_code = country_code;
                     };
 
                     if let Some(time_zone) = data.location.clone().and_then(|loc| loc.time_zone) {
-                        city.timezone = time_zone.to_string();
+                        city.timezone = time_zone;
                     }
 
                     if let Some(latitude) = data.location.clone().and_then(|loc| loc.latitude) {
@@ -150,7 +147,7 @@ impl Transform for Geoip {
                     }
 
                     if let Some(postal_code) = data.postal.clone().and_then(|p| p.code) {
-                        city.postal_code = postal_code.to_string();
+                        city.postal_code = postal_code;
                     }
                 }
             } else {
