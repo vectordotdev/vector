@@ -25,7 +25,7 @@ pub enum Field {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum ProtocolVersion {
+pub enum ProtocolVersion {
     V1,
     V2,
 }
@@ -168,7 +168,7 @@ fn healthcheck(
 }
 
 // https://v2.docs.influxdata.com/v2.0/reference/syntax/line-protocol/
-fn influx_line_protocol(
+pub fn influx_line_protocol(
     protocol_version: ProtocolVersion,
     measurement: String,
     metric_type: &str,
@@ -274,7 +274,7 @@ fn encode_string(key: String, output: &mut String) {
     }
 }
 
-fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
+pub fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     if let Some(ts) = timestamp {
         ts.timestamp_nanos()
     } else {
@@ -282,7 +282,15 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     }
 }
 
-fn encode_uri(endpoint: &str, path: &str, pairs: &[(&str, Option<String>)]) -> crate::Result<Uri> {
+fn encode_namespace(namespace: &str, name: &str) -> String {
+    if !namespace.is_empty() {
+        format!("{}.{}", namespace, name)
+    } else {
+        name.to_string()
+    }
+}
+
+pub fn encode_uri(endpoint: &str, path: &str, pairs: &[(&str, Option<String>)]) -> crate::Result<Uri> {
     let mut serializer = url::form_urlencoded::Serializer::new(String::new());
 
     for pair in pairs {

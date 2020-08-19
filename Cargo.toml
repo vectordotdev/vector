@@ -407,6 +407,7 @@ sinks = [
   "sinks-papertrail",
   "sinks-prometheus",
   "sinks-sematext_logs",
+  "sinks-sematext_metrics",
   "sinks-socket",
   "sinks-splunk_hec",
   "sinks-statsd",
@@ -436,6 +437,7 @@ sinks-loki = ["bytesize"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-prometheus = []
 sinks-sematext_logs = ["sinks-elasticsearch"]
+sinks-sematext_metrics = ["sinks-influxdb"]
 sinks-socket = []
 sinks-papertrail = []
 sinks-splunk_hec = ["bytesize"]
