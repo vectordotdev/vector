@@ -790,15 +790,13 @@ mod source_finished_tests {
         config::Config,
         sinks::console::{ConsoleSinkConfig, Encoding, Target},
         sources::generator::GeneratorConfig,
-        test_util::{start_topology, trace_init},
+        test_util::start_topology,
     };
     use futures::compat::Future01CompatExt;
     use tokio::time::{timeout, Duration};
 
     #[tokio::test]
     async fn sources_finished() {
-        trace_init();
-
         let mut old_config = Config::empty();
         let generator = GeneratorConfig::repeat(vec!["text".to_owned()], 1, None);
         old_config.add_source("in", generator);
@@ -827,15 +825,16 @@ mod source_finished_tests {
     feature = "transforms-json_parser"
 ))]
 mod transient_state_tests {
-    use crate::config::{Config, DataType, GlobalOptions, SourceConfig};
-    use crate::shutdown::ShutdownSignal;
-    use crate::sinks::blackhole::BlackholeConfig;
-    use crate::sources::stdin::StdinConfig;
-    use crate::sources::Source;
-    use crate::test_util::{runtime, start_topology};
-    use crate::transforms::json_parser::JsonParserConfig;
-    use crate::Error;
-    use crate::Pipeline;
+    use crate::{
+        config::{Config, DataType, GlobalOptions, SourceConfig},
+        shutdown::ShutdownSignal,
+        sinks::blackhole::BlackholeConfig,
+        sources::stdin::StdinConfig,
+        sources::Source,
+        test_util::{runtime, start_topology, trace_init},
+        transforms::json_parser::JsonParserConfig,
+        Error, Pipeline,
+    };
     use futures::compat::Future01CompatExt;
     use futures01::Future;
     use serde::{Deserialize, Serialize};
@@ -933,7 +932,8 @@ mod transient_state_tests {
 
     #[test]
     fn remove_sink() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let mut rt = runtime();
 
         let mut old_config = Config::empty();
@@ -973,7 +973,8 @@ mod transient_state_tests {
 
     #[test]
     fn remove_transform() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let mut rt = runtime();
 
         let mut old_config = Config::empty();

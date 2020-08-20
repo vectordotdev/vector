@@ -491,8 +491,6 @@ mod tests {
 
     #[tokio::test]
     async fn file_happy_path() {
-        trace_init();
-
         let n = 5;
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
@@ -551,8 +549,6 @@ mod tests {
 
     #[tokio::test]
     async fn file_truncate() {
-        trace_init();
-
         let n = 5;
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
@@ -618,8 +614,6 @@ mod tests {
 
     #[tokio::test]
     async fn file_rotate() {
-        trace_init();
-
         let n = 5;
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
@@ -686,8 +680,6 @@ mod tests {
 
     #[tokio::test]
     async fn file_multiple_paths() {
-        trace_init();
-
         let n = 5;
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
@@ -744,8 +736,6 @@ mod tests {
 
     #[tokio::test]
     async fn file_file_key() {
-        trace_init();
-
         // Default
         {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
@@ -866,8 +856,6 @@ mod tests {
 
     #[tokio::test]
     async fn file_start_position_server_restart() {
-        trace_init();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -954,8 +942,6 @@ mod tests {
 
     #[tokio::test]
     async fn file_start_position_server_restart_with_file_rotation() {
-        trace_init();
-
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![dir.path().join("*")],
@@ -1018,8 +1004,6 @@ mod tests {
     async fn file_start_position_ignore_old_files() {
         use std::os::unix::io::AsRawFd;
         use std::time::{Duration, SystemTime};
-
-        trace_init();
 
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
@@ -1104,8 +1088,6 @@ mod tests {
 
     #[tokio::test]
     async fn file_max_line_bytes() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
@@ -1164,8 +1146,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_multi_line_aggregation_legacy() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
@@ -1237,8 +1217,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_multi_line_aggregation() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
@@ -1314,8 +1292,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_fair_reads() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
@@ -1381,8 +1357,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_oldest_first() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
@@ -1448,8 +1422,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_gzipped_file() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 

@@ -193,12 +193,9 @@ async fn healthcheck(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::trace_init;
 
     #[tokio::test]
     async fn fails_missing_creds() {
-        trace_init();
-
         let config: PubsubConfig = toml::from_str(
             r#"
            project = "project"

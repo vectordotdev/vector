@@ -117,7 +117,7 @@ mod tests {
         AutoConcurrencyLimitLayer,
     };
     use super::*;
-    use crate::{assert_downcast_matches, test_util::trace_init};
+    use crate::assert_downcast_matches;
     use snafu::Snafu;
     use std::{
         sync::{Mutex, MutexGuard},
@@ -234,8 +234,6 @@ mod tests {
 
     #[tokio::test]
     async fn startup_conditions() {
-        trace_init();
-
         TestService::run(|mut svc| async move {
             // Concurrency starts at 1
             assert_eq!(svc.inner().current_limit, 1);
@@ -246,8 +244,6 @@ mod tests {
 
     #[tokio::test]
     async fn increases_limit() {
-        trace_init();
-
         let stats = TestService::run(|mut svc| async move {
             // Concurrency starts at 1
             assert_eq!(svc.inner().current_limit, 1);
@@ -276,8 +272,6 @@ mod tests {
 
     #[tokio::test]
     async fn handles_deferral() {
-        trace_init();
-
         TestService::run(|mut svc| async move {
             assert_eq!(svc.inner().current_limit, 1);
             let req = svc.send(false).await;
@@ -302,8 +296,6 @@ mod tests {
     #[allow(clippy::needless_range_loop)]
     #[tokio::test]
     async fn rapid_decrease() {
-        trace_init();
-
         TestService::run(|mut svc| async move {
             let mut reqs = [None, None, None];
             for &concurrent in &[1, 1, 2, 3] {

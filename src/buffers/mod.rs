@@ -196,7 +196,6 @@ impl<S: Sink> Sink for DropWhenFull<S> {
 #[cfg(test)]
 mod test {
     use super::{Acker, BufferConfig, DropWhenFull, WhenFull};
-    use crate::test_util::trace_init;
     use futures::compat::Future01CompatExt;
     use futures01::{future, sync::mpsc, task::AtomicTask, Async, AsyncSink, Sink, Stream};
     use std::sync::{atomic::AtomicUsize, Arc};
@@ -204,8 +203,6 @@ mod test {
 
     #[tokio::test]
     async fn drop_when_full() {
-        trace_init();
-
         future::lazy(|| {
             let (tx, mut rx) = mpsc::channel(2);
 
@@ -230,8 +227,6 @@ mod test {
 
     #[test]
     fn ack_with_none() {
-        trace_init();
-
         let counter = Arc::new(AtomicUsize::new(0));
         let task = Arc::new(AtomicTask::new());
         let acker = Acker::Disk(counter, Arc::clone(&task));
@@ -249,8 +244,6 @@ mod test {
 
     #[test]
     fn config_default_values() {
-        trace_init();
-
         fn check(source: &str, config: BufferConfig) {
             let conf: BufferConfig = toml::from_str(source).unwrap();
             assert_eq!(toml::to_string(&conf), toml::to_string(&config));

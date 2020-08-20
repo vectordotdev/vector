@@ -217,7 +217,7 @@ mod tests {
             http::HttpSink,
             test::{build_test_server, load_sink},
         },
-        test_util::{next_addr, trace_init},
+        test_util::next_addr,
     };
     use chrono::{offset::TimeZone, Utc};
     use futures::compat::Future01CompatExt;
@@ -429,8 +429,6 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_v1() {
-        trace_init();
-
         let (mut config, cx) = load_sink::<InfluxDBLogsConfig>(
             r#"
             namespace = "ns"
@@ -493,8 +491,6 @@ mod tests {
 
     #[tokio::test]
     async fn smoke_v2() {
-        trace_init();
-
         let (mut config, cx) = load_sink::<InfluxDBLogsConfig>(
             r#"
             namespace = "ns"

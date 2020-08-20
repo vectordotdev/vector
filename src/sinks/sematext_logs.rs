@@ -103,15 +103,13 @@ mod tests {
         config::SinkConfig,
         event::Event,
         sinks::util::test::{build_test_server, load_sink},
-        test_util::{next_addr, random_lines_with_stream, trace_init},
+        test_util::{next_addr, random_lines_with_stream},
     };
     use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
 
     #[tokio::test]
     async fn smoke() {
-        trace_init();
-
         let (mut config, cx) = load_sink::<SematextLogsConfig>(
             r#"
             region = "na"

@@ -140,8 +140,7 @@ mod test {
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSink,
         test_util::{
-            collect_n, next_addr, random_string, send_lines, send_lines_tls, trace_init,
-            wait_for_tcp, CollectN,
+            collect_n, next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp, CollectN,
         },
         tls::{MaybeTlsSettings, TlsConfig, TlsOptions},
         Pipeline,
@@ -176,8 +175,6 @@ mod test {
     //////// TCP TESTS ////////
     #[tokio::test(threaded_scheduler)]
     async fn tcp_it_includes_host() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let addr = next_addr();
 
@@ -206,8 +203,6 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn tcp_it_includes_source_type() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let addr = next_addr();
 
@@ -236,8 +231,6 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn tcp_continue_after_long_line() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let addr = next_addr();
 
@@ -279,8 +272,6 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn tcp_with_tls() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let addr = next_addr();
 
@@ -332,8 +323,6 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn tcp_shutdown_simple() {
-        trace_init();
-
         let source_name = "tcp_shutdown_simple";
         let (tx, rx) = Pipeline::new_test();
         let addr = next_addr();
@@ -372,8 +361,6 @@ mod test {
 
     #[tokio::test(threaded_scheduler, core_threads = 2)]
     async fn tcp_shutdown_infinite_stream() {
-        trace_init();
-
         // It's important that the buffer be large enough that the TCP source doesn't have
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
@@ -500,8 +487,6 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn udp_message() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let address = init_udp(tx);
 
@@ -516,8 +501,6 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn udp_multiple_messages() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let address = init_udp(tx);
 
@@ -536,8 +519,6 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn udp_multiple_packets() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let address = init_udp(tx);
 
@@ -556,8 +537,6 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn udp_it_includes_host() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let address = init_udp(tx);
 
@@ -572,8 +551,6 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn udp_it_includes_source_type() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let address = init_udp(tx);
 
@@ -588,8 +565,6 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn udp_shutdown_simple() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let source_name = "udp_shutdown_simple";
 
@@ -616,8 +591,6 @@ mod test {
 
     #[tokio::test(threaded_scheduler)]
     async fn udp_shutdown_infinite_stream() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let source_name = "udp_shutdown_infinite_stream";
 
@@ -696,8 +669,6 @@ mod test {
     #[cfg(unix)]
     #[tokio::test(threaded_scheduler)]
     async fn unix_message() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let path = init_unix(tx);
 
@@ -719,8 +690,6 @@ mod test {
     #[cfg(unix)]
     #[tokio::test(threaded_scheduler)]
     async fn unix_multiple_messages() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let path = init_unix(tx);
 
@@ -741,8 +710,6 @@ mod test {
     #[cfg(unix)]
     #[tokio::test(threaded_scheduler)]
     async fn unix_multiple_packets() {
-        trace_init();
-
         let (tx, rx) = Pipeline::new_test();
         let path = init_unix(tx);
 

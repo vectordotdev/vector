@@ -148,7 +148,7 @@ mod test {
     use crate::{
         config,
         sinks::prometheus::PrometheusSinkConfig,
-        test_util::{next_addr, start_topology, trace_init},
+        test_util::{next_addr, start_topology},
         Error,
     };
     use futures::compat::Future01CompatExt;
@@ -161,8 +161,6 @@ mod test {
 
     #[tokio::test]
     async fn test_prometheus_routing() {
-        trace_init();
-
         let in_addr = next_addr();
         let out_addr = next_addr();
 

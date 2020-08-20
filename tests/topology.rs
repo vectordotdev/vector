@@ -16,7 +16,7 @@ use tokio::time::{delay_for, Duration};
 use vector::{
     config::Config,
     event::{self, Event},
-    test_util::{runtime, start_topology, trace_init},
+    test_util::{runtime, start_topology},
     topology,
 };
 
@@ -44,8 +44,6 @@ fn into_message(event: Event) -> String {
 
 #[tokio::test(threaded_scheduler)]
 async fn topology_shutdown_while_active() {
-    trace_init();
-
     let source_event_counter = Arc::new(AtomicUsize::new(0));
     let source_event_total = source_event_counter.clone();
 
@@ -103,8 +101,6 @@ async fn topology_shutdown_while_active() {
 
 #[tokio::test(threaded_scheduler)]
 async fn topology_source_and_sink() {
-    trace_init();
-
     let (in1, source1) = source();
     let (out1, sink1) = sink(10);
 
@@ -126,8 +122,6 @@ async fn topology_source_and_sink() {
 
 #[tokio::test(threaded_scheduler)]
 async fn topology_multiple_sources() {
-    trace_init();
-
     let (in1, source1) = source();
     let (in2, source2) = source();
     let (out1, sink1) = sink(10);
@@ -158,8 +152,6 @@ async fn topology_multiple_sources() {
 
 #[tokio::test(threaded_scheduler)]
 async fn topology_multiple_sinks() {
-    trace_init();
-
     let (in1, source1) = source();
     let (out1, sink1) = sink(10);
     let (out2, sink2) = sink(10);
@@ -186,8 +178,6 @@ async fn topology_multiple_sinks() {
 
 #[tokio::test(threaded_scheduler)]
 async fn topology_transform_chain() {
-    trace_init();
-
     let (in1, source1) = source();
     let transform1 = transform(" first", 0.0);
     let transform2 = transform(" second", 0.0);
@@ -214,8 +204,6 @@ async fn topology_transform_chain() {
 
 #[tokio::test]
 async fn topology_remove_one_source() {
-    trace_init();
-
     let (in1, source1) = source();
     let (in2, source2) = source();
     let (_out1, sink1) = sink(10);
@@ -253,8 +241,6 @@ async fn topology_remove_one_source() {
 
 #[tokio::test]
 async fn topology_remove_one_sink() {
-    trace_init();
-
     let (in1, source1) = source();
     let (out1, sink1) = sink(10);
     let (out2, sink2) = sink(10);
@@ -290,8 +276,6 @@ async fn topology_remove_one_sink() {
 
 #[tokio::test]
 async fn topology_remove_one_transform() {
-    trace_init();
-
     let (in1, source1) = source();
     let transform1 = transform(" transformed", 0.0);
     let transform2 = transform(" transformed", 0.0);
@@ -328,8 +312,6 @@ async fn topology_remove_one_transform() {
 
 #[tokio::test]
 async fn topology_swap_source() {
-    trace_init();
-
     let (in1, source1) = source();
     let (out1v1, sink1v1) = sink(10);
 
@@ -370,8 +352,6 @@ async fn topology_swap_source() {
 
 #[tokio::test]
 async fn topology_swap_sink() {
-    trace_init();
-
     let (in1, source1) = source();
     let (out1, sink1) = sink(10);
 
@@ -408,8 +388,6 @@ async fn topology_swap_sink() {
 
 #[tokio::test]
 async fn topology_swap_transform() {
-    trace_init();
-
     let (in1, source1) = source();
     let transform1 = transform(" transformed", 0.0);
     let (out1v1, sink1v1) = sink(10);
@@ -450,8 +428,6 @@ async fn topology_swap_transform() {
 #[ignore] // TODO: issue #2186
 #[tokio::test]
 async fn topology_swap_transform_is_atomic() {
-    trace_init();
-
     let (in1, source1) = source();
     let transform1v1 = transform(" transformed", 0.0);
     let (out1, sink1) = sink(10);

@@ -249,11 +249,8 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::SinkConfig,
-        sinks::util::test::load_sink,
-        template::Template,
-        test_util::{random_lines, trace_init},
-        Event,
+        config::SinkConfig, sinks::util::test::load_sink, template::Template,
+        test_util::random_lines, Event,
     };
     use bytes::Bytes;
     use futures::compat::Future01CompatExt;
@@ -262,8 +259,6 @@ mod integration_tests {
 
     #[tokio::test]
     async fn text() {
-        trace_init();
-
         let stream = uuid::Uuid::new_v4();
 
         let (mut config, cx) = load_sink::<LokiConfig>(
@@ -299,8 +294,6 @@ mod integration_tests {
 
     #[tokio::test]
     async fn json() {
-        trace_init();
-
         let stream = uuid::Uuid::new_v4();
 
         let (mut config, cx) = load_sink::<LokiConfig>(
@@ -339,8 +332,6 @@ mod integration_tests {
 
     #[tokio::test]
     async fn many_streams() {
-        trace_init();
-
         let stream1 = uuid::Uuid::new_v4();
         let stream2 = uuid::Uuid::new_v4();
 

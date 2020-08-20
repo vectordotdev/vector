@@ -17,7 +17,7 @@ use crate::{
         Healthcheck, RouterSink,
     },
     sources::generator::GeneratorConfig,
-    test_util::{start_topology, stats::LevelTimeHistogram, trace_init},
+    test_util::{start_topology, stats::LevelTimeHistogram},
 };
 use core::task::Context;
 use futures::{
@@ -308,8 +308,6 @@ async fn run_test4(
 
 #[tokio::test]
 async fn fixed_concurrency() {
-    trace_init();
-
     // Simulate a very jittery link, but with a fixed concurrency
     let results = run_test4(
         200,
@@ -338,8 +336,6 @@ async fn fixed_concurrency() {
 
 #[tokio::test]
 async fn constant_link() {
-    trace_init();
-
     let results = run_test(
         500,
         None,
@@ -392,8 +388,6 @@ async fn constant_link() {
 
 #[tokio::test]
 async fn defers_at_high_concurrency() {
-    trace_init();
-
     let results = run_test(
         500,
         None,
@@ -437,8 +431,6 @@ async fn defers_at_high_concurrency() {
 
 #[tokio::test]
 async fn drops_at_high_concurrency() {
-    trace_init();
-
     let results = run_test(
         500,
         None,
@@ -476,8 +468,6 @@ async fn drops_at_high_concurrency() {
 
 #[tokio::test]
 async fn slow_link() {
-    trace_init();
-
     let results = run_test(
         200,
         None,
@@ -515,8 +505,6 @@ async fn slow_link() {
 
 #[tokio::test]
 async fn slow_send_1() {
-    trace_init();
-
     let results = run_test(
         100,
         Some(0.100),
@@ -551,8 +539,6 @@ async fn slow_send_1() {
 
 #[tokio::test]
 async fn slow_send_2() {
-    trace_init();
-
     let results = run_test(
         100,
         Some(0.050),
@@ -587,8 +573,6 @@ async fn slow_send_2() {
 
 #[tokio::test]
 async fn medium_send() {
-    trace_init();
-
     let results = run_test(
         500,
         Some(0.025),
@@ -622,8 +606,6 @@ async fn medium_send() {
 
 #[tokio::test]
 async fn jittery_link_small() {
-    trace_init();
-
     let results = run_test(
         500,
         None,

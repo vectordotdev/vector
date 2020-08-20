@@ -144,15 +144,13 @@ impl Sink for Fanout {
 #[cfg(test)]
 mod tests {
     use super::{ControlMessage, Fanout};
-    use crate::test_util::{runtime, trace_init, CollectCurrent};
+    use crate::test_util::{runtime, CollectCurrent};
     use crate::Event;
     use futures01::sync::mpsc;
     use futures01::{stream, Future, Sink, Stream};
 
     #[test]
     fn fanout_writes_to_all() {
-        trace_init();
-
         let (tx_a, rx_a) = mpsc::unbounded();
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::unbounded();
@@ -181,8 +179,6 @@ mod tests {
 
     #[test]
     fn fanout_notready() {
-        trace_init();
-
         let (tx_a, rx_a) = mpsc::channel(1);
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::channel(0);
@@ -220,8 +216,6 @@ mod tests {
 
     #[test]
     fn fanout_grow() {
-        trace_init();
-
         let (tx_a, rx_a) = mpsc::unbounded();
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::unbounded();
@@ -258,8 +252,6 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_shrink() {
-        trace_init();
-
         let (tx_a, rx_a) = mpsc::unbounded();
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::unbounded();
@@ -296,8 +288,6 @@ mod tests {
 
     #[test]
     fn fanout_shrink_after_notready() {
-        trace_init();
-
         let (tx_a, rx_a) = mpsc::channel(1);
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::channel(0);
@@ -338,8 +328,6 @@ mod tests {
 
     #[test]
     fn fanout_shrink_at_notready() {
-        trace_init();
-
         let (tx_a, rx_a) = mpsc::channel(1);
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::channel(0);
@@ -380,8 +368,6 @@ mod tests {
 
     #[test]
     fn fanout_shrink_before_notready() {
-        trace_init();
-
         let (tx_a, rx_a) = mpsc::channel(1);
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::channel(0);
@@ -423,8 +409,6 @@ mod tests {
 
     #[test]
     fn fanout_no_sinks() {
-        trace_init();
-
         let fanout = Fanout::new().0;
 
         let rec1 = Event::from("line 1".to_string());
@@ -436,8 +420,6 @@ mod tests {
 
     #[test]
     fn fanout_replace() {
-        trace_init();
-
         let (tx_a1, rx_a1) = mpsc::unbounded();
         let tx_a1 = Box::new(tx_a1.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::unbounded();

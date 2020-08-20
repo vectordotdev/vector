@@ -203,7 +203,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::trace_init;
     use std::task::Poll;
     use tokio_test::{assert_pending, assert_ready, task};
 
@@ -224,8 +223,6 @@ mod tests {
 
     #[tokio::test]
     async fn next_expired_is_pending_with_a_non_empty_map() {
-        trace_init();
-
         let mut map = ExpiringHashMap::<String, String>::default();
 
         map.insert("key".to_owned(), "val".to_owned(), Duration::from_secs(1));
@@ -237,8 +234,6 @@ mod tests {
 
     #[tokio::test]
     async fn next_expired_does_not_wake_when_the_value_is_available_upfront() {
-        trace_init();
-
         let mut map = ExpiringHashMap::<String, String>::default();
 
         let a_minute_ago = Instant::now() - Duration::from_secs(60);
@@ -256,8 +251,6 @@ mod tests {
     // working together.
     #[tokio::test]
     async fn next_expired_wakes_and_becomes_ready_when_value_ttl_expires() {
-        trace_init();
-
         let mut map = ExpiringHashMap::<String, String>::default();
 
         let ttl = Duration::from_secs(1);
@@ -282,8 +275,6 @@ mod tests {
 
     #[tokio::test]
     async fn next_expired_api_allows_inserting_items() {
-        trace_init();
-
         let mut map = ExpiringHashMap::<String, String>::default();
 
         // At first, has to be pending.
