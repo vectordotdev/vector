@@ -255,7 +255,7 @@ impl EWMA {
         self.average
     }
 
-    /// Update and return the current average
+    /// Update the current average
     fn update(&mut self, point: f64) {
         self.average = match self.average {
             avg if avg == 0.0 => point,
