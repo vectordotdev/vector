@@ -75,17 +75,18 @@ impl Function for OnlyFields {
     fn apply(&self, target: &mut Event) -> Result<()> {
         let target_log = target.as_mut_log();
 
-        let keys: Vec<String> = target_log.keys().collect();
+        let keys: Vec<String> = target_log
+            .keys()
+            .filter(|k| {
+                self.paths
+                    .iter()
+                    .find(|p| k.starts_with(p.as_str()))
+                    .is_none()
+            })
+            .collect();
 
         for key in keys {
-            if self
-                .paths
-                .iter()
-                .find(|p| key.starts_with(p.as_str()))
-                .is_none()
-            {
-                target_log.remove_prune(&Atom::from(key), true);
-            }
+            target_log.remove_prune(&Atom::from(key), true);
         }
 
         Ok(())
