@@ -6,11 +6,12 @@ use crate::{
     trace, Event,
 };
 use futures::{
-    compat::Stream01CompatExt, stream, FutureExt as _, SinkExt, Stream, StreamExt, TryFutureExt,
+    compat::Stream01CompatExt, future, stream, FutureExt, SinkExt, Stream, StreamExt, TryFutureExt,
     TryStreamExt,
 };
 use futures01::{
-    future, stream as stream01, sync::mpsc, try_ready, Async, Future, Poll, Stream as Stream01,
+    future as future01, stream as stream01, sync::mpsc, try_ready, Async, Future, Poll,
+    Stream as Stream01,
 };
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -252,7 +253,7 @@ pub fn random_maps(
 pub fn collect_n<T>(mut rx: mpsc::Receiver<T>, n: usize) -> impl Future<Item = Vec<T>, Error = ()> {
     let mut events = Vec::new();
 
-    future::poll_fn(move || {
+    future01::poll_fn(move || {
         while events.len() < n {
             let e = try_ready!(rx.poll()).unwrap();
             events.push(e);
@@ -320,13 +321,17 @@ pub fn wait_for_sync(mut f: impl FnMut() -> bool) {
     }
 }
 
-pub fn wait_for_atomic_usize_sync<T, F>(val: T, unblock: F)
+pub async fn wait_for_atomic_usize<T, F>(value: T, unblock: F)
 where
     T: AsRef<AtomicUsize>,
     F: Fn(usize) -> bool,
 {
-    let val = val.as_ref();
-    wait_for_sync(|| unblock(val.load(Ordering::SeqCst)))
+    let value = value.as_ref();
+    wait_for(|| {
+        let result = unblock(value.load(Ordering::SeqCst));
+        future::ready(result)
+    })
+    .await
 }
 
 #[derive(Debug)]
