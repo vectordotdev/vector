@@ -38,20 +38,22 @@ impl Function for Assignment {
 #[derive(Debug)]
 pub(self) struct Deletion {
     // TODO: Switch to String once Event API is cleaned up.
-    path: Atom,
+    paths: Vec<Atom>,
 }
 
 impl Deletion {
-    pub(self) fn new(path: String) -> Self {
+    pub(self) fn new(mut paths: Vec<String>) -> Self {
         Self {
-            path: Atom::from(path),
+            paths: paths.drain(..).map(Atom::from).collect(),
         }
     }
 }
 
 impl Function for Deletion {
     fn apply(&self, target: &mut Event) -> Result<()> {
-        target.as_mut_log().remove(&self.path);
+        for path in &self.paths {
+            target.as_mut_log().remove(&path);
+        }
         Ok(())
     }
 }
@@ -191,6 +193,26 @@ mod test {
                 {
                     let mut event = Event::from("foo body");
                     event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event
+                },
+                {
+                    let mut event = Event::from("foo body");
+                    event
+                        .as_mut_log()
+                        .insert("foo bar\\.baz.buz", Value::from("quack"));
+                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event
+                },
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo bar\\.baz.buz".to_string(),
+                    Box::new(Literal::from(Value::from("quack"))),
+                ))]),
+                Ok(()),
+            ),
+            (
+                {
+                    let mut event = Event::from("foo body");
+                    event.as_mut_log().remove(&Atom::from("timestamp"));
                     event.as_mut_log().insert("foo", Value::from("bar"));
                     event
                 },
@@ -199,7 +221,7 @@ mod test {
                     event.as_mut_log().remove(&Atom::from("timestamp"));
                     event
                 },
-                Mapping::new(vec![Box::new(Deletion::new("foo".to_string()))]),
+                Mapping::new(vec![Box::new(Deletion::new(vec!["foo".to_string()]))]),
                 Ok(()),
             ),
             (
@@ -220,7 +242,7 @@ mod test {
                         "foo".to_string(),
                         Box::new(Literal::from(Value::from("bar"))),
                     )),
-                    Box::new(Deletion::new("bar".to_string())),
+                    Box::new(Deletion::new(vec!["bar".to_string()])),
                 ]),
                 Ok(()),
             ),
@@ -248,7 +270,7 @@ mod test {
                         "foo".to_string(),
                         Box::new(Literal::from(Value::from("bar is baz"))),
                     )),
-                    Box::new(Deletion::new("bar".to_string())),
+                    Box::new(Deletion::new(vec!["bar".to_string()])),
                 ))]),
                 Ok(()),
             ),
@@ -274,7 +296,7 @@ mod test {
                         "foo".to_string(),
                         Box::new(Literal::from(Value::from("bar is baz"))),
                     )),
-                    Box::new(Deletion::new("bar".to_string())),
+                    Box::new(Deletion::new(vec!["bar".to_string()])),
                 ))]),
                 Ok(()),
             ),
@@ -296,7 +318,7 @@ mod test {
                         "foo".to_string(),
                         Box::new(Literal::from(Value::from("bar is baz"))),
                     )),
-                    Box::new(Deletion::new("bar".to_string())),
+                    Box::new(Deletion::new(vec!["bar".to_string()])),
                 ))]),
                 Ok(()),
             ),

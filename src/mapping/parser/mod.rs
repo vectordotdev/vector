@@ -14,7 +14,6 @@ use crate::{
         Assignment, Deletion, Function, IfStatement, Mapping, Noop, OnlyFields, Result,
     },
 };
-
 use pest::{
     error::ErrorVariant,
     iterators::{Pair, Pairs},
@@ -25,8 +24,28 @@ use pest::{
 #[grammar = "./mapping/parser/grammar.pest"]
 struct MappingParser;
 
-fn path_from_pair(pair: Pair<Rule>) -> Result<String> {
-    Ok(pair.as_str().get(1..).unwrap().to_string())
+fn target_path_from_pair(pair: Pair<Rule>) -> String {
+    let mut segments = Vec::new();
+    for segment in pair.into_inner() {
+        match segment.as_rule() {
+            Rule::path_segment => segments.push(segment.as_str().to_string()),
+            Rule::quoted_path_segment => {
+                segments.push(quoted_path_from_pair(segment).replace(".", "\\."))
+            }
+            _ => unreachable!(),
+        }
+    }
+    segments.join(".")
+}
+
+fn quoted_path_from_pair(pair: Pair<Rule>) -> String {
+    let mut pairs = pair.into_inner();
+    let base = inner_quoted_string_escaped_from_pair(pairs.next().unwrap());
+    if let Some(pair) = pairs.next() {
+        base + pair.as_str()
+    } else {
+        base
+    }
 }
 
 fn path_segments_from_pair(pair: Pair<Rule>) -> Result<Vec<Vec<String>>> {
@@ -34,11 +53,13 @@ fn path_segments_from_pair(pair: Pair<Rule>) -> Result<Vec<Vec<String>>> {
     for segment in pair.into_inner() {
         match segment.as_rule() {
             Rule::path_segment => segments.push(vec![segment.as_str().to_string()]),
+            Rule::quoted_path_segment => segments.push(vec![quoted_path_from_pair(segment)]),
             Rule::path_coalesce => {
                 let mut options = Vec::new();
                 for option in segment.into_inner() {
                     match option.as_rule() {
                         Rule::path_segment => options.push(option.as_str().to_string()),
+                        Rule::quoted_path_segment => options.push(quoted_path_from_pair(option)),
                         _ => unreachable!(),
                     }
                 }
@@ -165,7 +186,9 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
             let mut inner_rules = pair.into_inner();
             let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
             let default = inner_rules.next().map(|r| match r.as_rule() {
-                Rule::string => Value::from(unquoted_string_from_pair(r)),
+                Rule::string => Value::from(inner_quoted_string_escaped_from_pair(
+                    r.into_inner().next().unwrap(),
+                )),
                 Rule::null => Value::Null,
                 _ => unreachable!(),
             });
@@ -206,18 +229,17 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
         Rule::to_timestamp => {
             let mut inner_rules = pair.into_inner();
             let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
-            let format = unquoted_string_from_pair(inner_rules.next().unwrap());
+            let format = inner_quoted_string_escaped_from_pair(
+                inner_rules.next().unwrap().into_inner().next().unwrap(),
+            );
             Ok(Box::new(ToTimestampFn::new(&format, query, None)?))
         }
         _ => unreachable!(),
     }
 }
 
-fn unquoted_string_from_pair(pair: Pair<Rule>) -> String {
-    pair.into_inner()
-        .next()
-        .unwrap()
-        .as_str()
+fn inner_quoted_string_escaped_from_pair(pair: Pair<Rule>) -> String {
+    pair.as_str()
         // TODO: Include unicode escape sequences, surely there must be
         // a standard lib opposite of https://doc.rust-lang.org/std/primitive.str.html#method.escape_default
         // but I can't find it anywhere.
@@ -229,7 +251,9 @@ fn unquoted_string_from_pair(pair: Pair<Rule>) -> String {
 
 fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
     Ok(match pair.as_rule() {
-        Rule::string => Box::new(Literal::from(Value::from(unquoted_string_from_pair(pair)))),
+        Rule::string => Box::new(Literal::from(Value::from(
+            inner_quoted_string_escaped_from_pair(pair.into_inner().next().unwrap()),
+        ))),
         Rule::null => Box::new(Literal::from(Value::Null)),
         Rule::number => Box::new(Literal::from(Value::from(
             pair.as_str().parse::<f64>().unwrap(),
@@ -262,13 +286,16 @@ fn if_statement_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn Function>> 
 fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
         Rule::deletion => {
-            let path = path_from_pair(pair.into_inner().next().unwrap())?;
-            Ok(Box::new(Deletion::new(path)))
+            let mut paths = Vec::new();
+            for pair in pair.into_inner() {
+                paths.push(target_path_from_pair(pair));
+            }
+            Ok(Box::new(Deletion::new(paths)))
         }
         Rule::only_fields => {
             let mut paths = Vec::new();
             for pair in pair.into_inner() {
-                paths.push(path_from_pair(pair)?);
+                paths.push(target_path_from_pair(pair));
             }
             Ok(Box::new(OnlyFields::new(paths)))
         }
@@ -280,7 +307,7 @@ fn statement_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
         Rule::assignment => {
             let mut inner_rules = pair.into_inner();
-            let path = path_from_pair(inner_rules.next().unwrap())?;
+            let path = target_path_from_pair(inner_rules.next().unwrap());
             let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
             Ok(Box::new(Assignment::new(path, query)))
         }
@@ -352,10 +379,7 @@ mod test {
             (".foo = {\"bar\"}", vec![" 1:8\n", "= expected query"]),
             (
                 ". = \"bar\"",
-                vec![
-                    " 1:1\n",
-                    "= expected if_statement, target_path, or function",
-                ],
+                vec![" 1:2\n", "= expected path_segment or quoted_path_segment"],
             ),
             (
                 "foo = \"bar\"",
@@ -391,7 +415,7 @@ mod test {
             (
                 r#"if .foo > .bar { del(.foo) } else { .bar = .baz"#,
                 // This message isn't great, ideally I'd like "expected closing bracket"
-                vec![" 1:48\n", "= expected operator"],
+                vec![" 1:48\n", "= expected path_index or operator"],
             ),
             (
                 r#"only_fields(.foo,)"#,
@@ -432,6 +456,13 @@ mod test {
                 ".foo = \"bar\"",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
+                    Box::new(Literal::from(Value::from("bar"))),
+                ))]),
+            ),
+            (
+                ".foo.\"bar baz\".\"buz.bev\"[5].quz = \"bar\"",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo.bar baz.buz\\.bev[5].quz".to_string(),
                     Box::new(Literal::from(Value::from("bar"))),
                 ))]),
             ),
@@ -492,6 +523,18 @@ mod test {
                 ))]),
             ),
             (
+                ".foo = .foo.\"bar baz\".\"buz.bev\"[5].quz",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(QueryPath::from(vec![
+                        vec!["foo"],
+                        vec!["bar baz"],
+                        vec!["buz.bev[5]"],
+                        vec!["quz"],
+                    ])),
+                ))]),
+            ),
+            (
                 ".foo = .bar\n.bar.buz = .qux.quz",
                 Mapping::new(vec![
                     Box::new(Assignment::new(
@@ -526,6 +569,13 @@ mod test {
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(QueryPath::from(vec![vec!["bar", "baz"]])),
+                ))]),
+            ),
+            (
+                ".foo = .(bar | \"baz buz\")\n",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(QueryPath::from(vec![vec!["bar", "baz buz"]])),
                 ))]),
             ),
             (
@@ -600,14 +650,25 @@ mod test {
             ),
             (
                 "del(.foo)",
-                Mapping::new(vec![Box::new(Deletion::new("foo".to_string()))]),
+                Mapping::new(vec![Box::new(Deletion::new(vec!["foo".to_string()]))]),
+            ),
+            (
+                "del(.\"foo bar\")",
+                Mapping::new(vec![Box::new(Deletion::new(vec!["foo bar".to_string()]))]),
             ),
             (
                 "del(.foo)\ndel(.bar.baz)",
                 Mapping::new(vec![
-                    Box::new(Deletion::new("foo".to_string())),
-                    Box::new(Deletion::new("bar.baz".to_string())),
+                    Box::new(Deletion::new(vec!["foo".to_string()])),
+                    Box::new(Deletion::new(vec!["bar.baz".to_string()])),
                 ]),
+            ),
+            (
+                "del(.foo, .bar.baz)",
+                Mapping::new(vec![Box::new(Deletion::new(vec![
+                    "foo".to_string(),
+                    "bar.baz".to_string(),
+                ]))]),
             ),
             (
                 r#"if .foo == 5 {
@@ -625,7 +686,7 @@ mod test {
                         "foo".to_string(),
                         Box::new(QueryPath::from("bar")),
                     )),
-                    Box::new(Deletion::new("buz".to_string())),
+                    Box::new(Deletion::new(vec!["buz".to_string()])),
                 ))]),
             ),
             (

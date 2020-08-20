@@ -39,10 +39,10 @@ impl Arithmetic {
     }
 }
 
-// If either value is a floating point number type and the other value is an
-// integer type the integer is "degraded" into a float. This allows us to
-// perform arithmetic on common values, but if both are integers then their
-// precision is preserved.
+/// If either value is a floating point number type and the other value is an
+/// integer type the integer is "degraded" into a float. This allows us to
+/// perform arithmetic on common values, but if both are integers then their
+/// precision is preserved.
 fn consistent_number_types(mut left: Value, mut right: Value) -> (Value, Value) {
     if let Value::Float(_) = left {
         if let Value::Integer(ri) = right {
