@@ -1,6 +1,6 @@
 use super::AutoConcurrencyLimit;
-use crate::sinks::util::retries2::RetryLogic;
-use tower03::Layer;
+use crate::sinks::util::retries::RetryLogic;
+use tower::Layer;
 
 /// Enforces a limit on the concurrent number of requests the underlying
 /// service can handle.

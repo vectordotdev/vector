@@ -7,8 +7,7 @@ use crate::{
     },
     sinks::util::{
         http::{HttpBatchService, HttpClient, HttpRetryLogic},
-        service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, MetricBuffer,
+        BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
     },
 };
 use bytes::Bytes;
@@ -19,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::task::Poll;
-use tower03::Service;
+use tower::Service;
 
 #[derive(Clone)]
 struct InfluxDBSvc {

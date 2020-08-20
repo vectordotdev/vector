@@ -5,11 +5,10 @@ use crate::{
     region::RegionOrEndpoint,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        retries2::RetryLogic,
+        retries::RetryLogic,
         rusoto,
-        service2::TowerRequestConfig,
         sink::Response,
-        BatchConfig, BatchSettings, Compression, EncodedLength, VecBuffer,
+        BatchConfig, BatchSettings, Compression, EncodedLength, TowerRequestConfig, VecBuffer,
     },
 };
 use bytes::Bytes;
@@ -28,7 +27,7 @@ use std::{
     fmt,
     task::{Context, Poll},
 };
-use tower03::Service;
+use tower::Service;
 use tracing_futures::Instrument;
 
 #[derive(Clone)]

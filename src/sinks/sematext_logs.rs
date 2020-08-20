@@ -2,7 +2,7 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     sinks::elasticsearch::{ElasticSearchConfig, Encoding},
     sinks::util::{
-        encoding::EncodingConfigWithDefault, service2::TowerRequestConfig, BatchConfig, Compression,
+        encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
     },
     Event,
 };
@@ -144,7 +144,7 @@ mod tests {
         let mut expected_message_idx = 0;
         for (i, val) in json.enumerate() {
             // Every even message is the index which contains the token for sematext
-            // Every odd message is the actual message in json format.
+            // Every odd message is the actual message in JSON format.
             if i % 2 == 0 {
                 // Fetch {index: {_index: ""}}
                 let token = val

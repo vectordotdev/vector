@@ -4,8 +4,8 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
-        service2::{InFlightLimit, TowerRequestConfig},
-        BatchConfig, BatchSettings, Buffer, Compression, UriSerde,
+        BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, TowerRequestConfig,
+        UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -124,7 +124,7 @@ impl SinkConfig for HttpSinkConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal http sink error: {}", e));
+        .sink_map_err(|e| error!("Fatal HTTP sink error: {}", e));
 
         let sink = Box::new(sink);
 
@@ -165,7 +165,7 @@ impl HttpSink for HttpSinkConfig {
                     b
                 } else {
                     warn!(
-                        message = "Event missing the message key; Dropping event.",
+                        message = "Event missing the message key; dropping event.",
                         rate_limit_secs = 30,
                     );
                     return None;

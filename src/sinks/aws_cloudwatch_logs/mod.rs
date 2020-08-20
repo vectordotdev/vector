@@ -15,8 +15,11 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::{Duration, Utc};
-use futures::future::{FutureExt, TryFutureExt};
-use futures01::{stream::iter_ok, sync::oneshot, Async, Future, Poll, Sink};
+use futures::{
+    future::{BoxFuture, FutureExt, TryFutureExt},
+    ready,
+};
+use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::{request::BufferedHttpResponse, RusotoError};
 use rusoto_logs::{
@@ -25,13 +28,16 @@ use rusoto_logs::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{collections::HashMap, convert::TryInto, fmt};
+use std::{
+    collections::HashMap,
+    convert::TryInto,
+    fmt,
+    task::{Context, Poll},
+};
+use tokio::sync::oneshot;
 use tower::{
     buffer::Buffer,
-    limit::{
-        concurrency::ConcurrencyLimit,
-        rate::{Rate, RateLimit},
-    },
+    limit::{concurrency::ConcurrencyLimit, rate::RateLimit},
     retry::Retry,
     timeout::Timeout,
     Service, ServiceBuilder, ServiceExt,
@@ -171,7 +177,11 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 
         let client = self.create_client(cx.resolver())?;
         let svc = ServiceBuilder::new()
-            .concurrency_limit(request.in_flight_limit)
+            .concurrency_limit(
+                request
+                    .in_flight_limit
+                    .expect("in_flight_limit=auto is not allowed"),
+            )
             .service(CloudwatchLogsPartitionSvc::new(
                 self.clone(),
                 client.clone(),
@@ -220,10 +230,10 @@ impl Service<PartitionInnerBuffer<Vec<InputLogEvent>, CloudwatchKey>>
 {
     type Response = ();
     type Error = crate::Error;
-    type Future = Box<dyn Future<Item = Self::Response, Error = Self::Error> + Send + 'static>;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(().into())
+    fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     fn call(
@@ -235,36 +245,33 @@ impl Service<PartitionInnerBuffer<Vec<InputLogEvent>, CloudwatchKey>>
         let svc = if let Some(svc) = &mut self.clients.get_mut(&key) {
             svc.clone()
         } else {
-            let svc = {
-                let policy = self.request_settings.retry_policy(CloudwatchRetryLogic);
-
-                let cloudwatch = CloudwatchLogsSvc::new(&self.config, &key, self.client.clone());
-                let timeout = Timeout::new(cloudwatch, self.request_settings.timeout);
-
-                let buffer = Buffer::new(timeout, 1);
-                let retry = Retry::new(policy, buffer);
-
-                let rate = Rate::new(
+            // Buffer size is in_flight_limit because current service always ready.
+            // Concurrency limit is 1 because we need token from previous request.
+            let svc = ServiceBuilder::new()
+                .buffer(
+                    self.request_settings
+                        .in_flight_limit
+                        .expect("in_flight_limit=auto is not allowed"),
+                )
+                .concurrency_limit(1)
+                .rate_limit(
                     self.request_settings.rate_limit_num,
                     self.request_settings.rate_limit_duration,
-                );
-                let rate = RateLimit::new(retry, rate);
-                let concurrency = ConcurrencyLimit::new(rate, 1);
-
-                Buffer::new(concurrency, 1)
-            };
+                )
+                .retry(self.request_settings.retry_policy(CloudwatchRetryLogic))
+                .buffer(1)
+                .timeout(self.request_settings.timeout)
+                .service(CloudwatchLogsSvc::new(
+                    &self.config,
+                    &key,
+                    self.client.clone(),
+                ));
 
             self.clients.insert(key, svc.clone());
             svc
         };
 
-        let fut = svc
-            .ready()
-            .map_err(Into::into)
-            .and_then(move |mut svc| svc.call(events))
-            .map_err(Into::into);
-
-        Box::new(fut)
+        svc.oneshot(events).map_err(Into::into).boxed()
     }
 }
 
@@ -351,26 +358,22 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
     type Error = CloudwatchError;
     type Future = request::CloudwatchFuture;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
+    fn poll_ready(&mut self, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         if let Some(rx) = &mut self.token_rx {
-            match rx.poll() {
-                Ok(Async::Ready(token)) => {
+            match ready!(rx.poll_unpin(cx)) {
+                Ok(token) => {
                     self.token = token;
                     self.token_rx = None;
-                    Ok(().into())
                 }
-                Ok(Async::NotReady) => Ok(Async::NotReady),
-                Err(oneshot::Canceled) => {
+                Err(_) => {
                     // This case only happens when the `tx` end gets dropped due to an error
                     // in this case we just reset the token and try again.
                     self.token = None;
                     self.token_rx = None;
-                    Ok(().into())
                 }
             }
-        } else {
-            Ok(().into())
         }
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, req: Vec<InputLogEvent>) -> Self::Future {
@@ -441,7 +444,7 @@ fn partition_encode(
         Ok(b) => b,
         Err(missing_keys) => {
             warn!(
-                message = "keys in group template do not exist on the event; dropping event.",
+                message = "Keys in group template do not exist on the event; dropping event.",
                 ?missing_keys,
                 rate_limit_secs = 30
             );
@@ -453,7 +456,7 @@ fn partition_encode(
         Ok(b) => b,
         Err(missing_keys) => {
             warn!(
-                message = "keys in stream template do not exist on the event; dropping event.",
+                message = "Keys in stream template do not exist on the event; dropping event.",
                 ?missing_keys,
                 rate_limit_secs = 30
             );
@@ -490,7 +493,7 @@ async fn healthcheck(
     client: CloudWatchLogsClient,
 ) -> crate::Result<()> {
     if config.group_name.is_dynamic() {
-        info!("cloudwatch group_name is dynamic; skipping healthcheck.");
+        info!("Cloudwatch group_name is dynamic; skipping healthcheck.");
         return Ok(());
     }
 
@@ -539,12 +542,12 @@ impl RetryLogic for CloudwatchRetryLogic {
         match error {
             CloudwatchError::Put(err) => match err {
                 RusotoError::Service(PutLogEventsError::ServiceUnavailable(error)) => {
-                    error!(message = "put logs service unavailable.", %error);
+                    error!(message = "Put logs service unavailable.", %error);
                     true
                 }
 
                 RusotoError::HttpDispatch(error) => {
-                    error!(message = "put logs http dispatch.", %error);
+                    error!(message = "Put logs HTTP dispatch.", %error);
                     true
                 }
 
@@ -556,7 +559,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                     let body = String::from_utf8_lossy(&body[..]);
                     let body = &body[..body.len().min(50)];
 
-                    error!(message = "put logs http error.", %status, %body);
+                    error!(message = "Put logs HTTP error.", %status, %body);
                     true
                 }
 
@@ -573,7 +576,7 @@ impl RetryLogic for CloudwatchRetryLogic {
 
             CloudwatchError::Describe(err) => match err {
                 RusotoError::Service(DescribeLogStreamsError::ServiceUnavailable(error)) => {
-                    error!(message = "describe streams service unavailable.", %error);
+                    error!(message = "Describe streams service unavailable.", %error);
                     true
                 }
 
@@ -585,12 +588,12 @@ impl RetryLogic for CloudwatchRetryLogic {
                     let body = String::from_utf8_lossy(&body[..]);
                     let body = &body[..body.len().min(50)];
 
-                    error!(message = "describe streams http error.", %status, %body);
+                    error!(message = "Describe streams HTTP error.", %status, %body);
                     true
                 }
 
                 RusotoError::HttpDispatch(error) => {
-                    error!(message = "describe streams http dispatch.", %error);
+                    error!(message = "Describe streams HTTP dispatch.", %error);
                     true
                 }
 
@@ -599,7 +602,7 @@ impl RetryLogic for CloudwatchRetryLogic {
 
             CloudwatchError::CreateStream(err) => match err {
                 RusotoError::Service(CreateLogStreamError::ServiceUnavailable(error)) => {
-                    error!(message = "create stream service unavailable.", %error);
+                    error!(message = "Create stream service unavailable.", %error);
                     true
                 }
 
@@ -611,12 +614,12 @@ impl RetryLogic for CloudwatchRetryLogic {
                     let body = String::from_utf8_lossy(&body[..]);
                     let body = &body[..body.len().min(50)];
 
-                    error!(message = "create stream http error.", %status, %body);
+                    error!(message = "Create stream HTTP error.", %status, %body);
                     true
                 }
 
                 RusotoError::HttpDispatch(error) => {
-                    error!(message = "create stream http dispatch.", %error);
+                    error!(message = "Create stream HTTP dispatch.", %error);
                     true
                 }
 
@@ -848,8 +851,9 @@ mod integration_tests {
     use crate::{
         config::{SinkConfig, SinkContext},
         region::RegionOrEndpoint,
-        test_util::{random_lines, random_lines_with_stream, random_string, runtime},
+        test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
     };
+    use futures::compat::Future01CompatExt;
     use futures01::{
         stream::{self, Stream},
         Sink,
@@ -861,14 +865,13 @@ mod integration_tests {
 
     const GROUP_NAME: &'static str = "vector-cw";
 
-    #[test]
-    fn cloudwatch_insert_log_event() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn cloudwatch_insert_log_event() {
+        trace_init();
+
+        ensure_group().await;
 
         let stream_name = gen_name();
-
-        ensure_group();
-
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
             group_name: Template::try_from(GROUP_NAME).unwrap(),
@@ -889,7 +892,7 @@ mod integration_tests {
         let (input_lines, events) = random_lines_with_stream(100, 11);
 
         let pump = sink.send_all(events);
-        let (sink, _) = rt.block_on(pump).unwrap();
+        let (sink, _) = pump.compat().await.unwrap();
         // drop the sink so it closes all its connections
         drop(sink);
 
@@ -898,9 +901,7 @@ mod integration_tests {
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let response = rt
-            .block_on_std(async move { create_client_test().get_log_events(request).await })
-            .unwrap();
+        let response = create_client_test().get_log_events(request).await.unwrap();
 
         let events = response.events.unwrap();
 
@@ -912,14 +913,13 @@ mod integration_tests {
         assert_eq!(output_lines, input_lines);
     }
 
-    #[test]
-    fn cloudwatch_insert_log_events_sorted() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn cloudwatch_insert_log_events_sorted() {
+        trace_init();
+
+        ensure_group().await;
 
         let stream_name = gen_name();
-
-        ensure_group();
-
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
             group_name: Template::try_from(GROUP_NAME).unwrap(),
@@ -955,7 +955,7 @@ mod integration_tests {
 
             event
         }));
-        let (sink, _) = rt.block_on(pump).unwrap();
+        let (sink, _) = pump.compat().await.unwrap();
         // drop the sink so it closes all its connections
         drop(sink);
 
@@ -964,9 +964,7 @@ mod integration_tests {
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let response = rt
-            .block_on_std(async move { create_client_test().get_log_events(request).await })
-            .unwrap();
+        let response = create_client_test().get_log_events(request).await.unwrap();
 
         let events = response.events.unwrap();
 
@@ -981,13 +979,12 @@ mod integration_tests {
         assert_eq!(output_lines, input_lines);
     }
 
-    #[test]
-    fn cloudwatch_insert_out_of_range_timestamp() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn cloudwatch_insert_out_of_range_timestamp() {
+        trace_init();
+        ensure_group().await;
 
         let stream_name = gen_name();
-        ensure_group();
-
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
             group_name: Template::try_from(GROUP_NAME).unwrap(),
@@ -1032,7 +1029,7 @@ mod integration_tests {
         lines.push(add_event(Duration::days(-13)));
 
         let pump = sink.send_all(stream::iter_ok(events));
-        let (sink, _) = rt.block_on(pump).unwrap();
+        let (sink, _) = pump.compat().await.unwrap();
         // drop the sink so it closes all its connections
         drop(sink);
 
@@ -1041,9 +1038,7 @@ mod integration_tests {
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some((now - Duration::days(30)).timestamp_millis());
 
-        let response = rt
-            .block_on_std(async move { create_client_test().get_log_events(request).await })
-            .unwrap();
+        let response = create_client_test().get_log_events(request).await.unwrap();
 
         let events = response.events.unwrap();
 
@@ -1055,12 +1050,12 @@ mod integration_tests {
         assert_eq!(output_lines, lines);
     }
 
-    #[test]
-    fn cloudwatch_dynamic_group_and_stream_creation() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn cloudwatch_dynamic_group_and_stream_creation() {
+        trace_init();
 
-        let group_name = gen_name();
         let stream_name = gen_name();
+        let group_name = gen_name();
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
@@ -1082,7 +1077,7 @@ mod integration_tests {
         let (input_lines, events) = random_lines_with_stream(100, 11);
 
         let pump = sink.send_all(events);
-        let (sink, _) = rt.block_on(pump).unwrap();
+        let (sink, _) = pump.compat().await.unwrap();
         // drop the sink so it closes all its connections
         drop(sink);
 
@@ -1091,9 +1086,7 @@ mod integration_tests {
         request.log_group_name = group_name;
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let response = rt
-            .block_on_std(async move { create_client_test().get_log_events(request).await })
-            .unwrap();
+        let response = create_client_test().get_log_events(request).await.unwrap();
 
         let events = response.events.unwrap();
 
@@ -1105,14 +1098,13 @@ mod integration_tests {
         assert_eq!(output_lines, input_lines);
     }
 
-    #[test]
-    fn cloudwatch_insert_log_event_batched() {
-        let mut rt = runtime();
+    #[tokio::test(core_threads = 2)]
+    async fn cloudwatch_insert_log_event_batched() {
+        trace_init();
+        ensure_group().await;
 
-        let group_name = gen_name();
         let stream_name = gen_name();
-
-        ensure_group();
+        let group_name = gen_name();
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from(stream_name.as_str()).unwrap(),
@@ -1137,7 +1129,7 @@ mod integration_tests {
         let (input_lines, events) = random_lines_with_stream(100, 11);
 
         let pump = sink.send_all(events);
-        let (sink, _) = rt.block_on(pump).unwrap();
+        let (sink, _) = pump.compat().await.unwrap();
         // drop the sink so it closes all its connections
         drop(sink);
 
@@ -1146,9 +1138,7 @@ mod integration_tests {
         request.log_group_name = group_name.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let response = rt
-            .block_on_std(async move { create_client_test().get_log_events(request).await })
-            .unwrap();
+        let response = create_client_test().get_log_events(request).await.unwrap();
 
         let events = response.events.unwrap();
 
@@ -1160,15 +1150,12 @@ mod integration_tests {
         assert_eq!(output_lines, input_lines);
     }
 
-    #[test]
-    fn cloudwatch_insert_log_event_partitioned() {
-        crate::test_util::trace_init();
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn cloudwatch_insert_log_event_partitioned() {
+        trace_init();
+        ensure_group().await;
 
         let stream_name = gen_name();
-
-        ensure_group();
-
         let config = CloudwatchLogsSinkConfig {
             group_name: Template::try_from(GROUP_NAME).unwrap(),
             stream_name: Template::try_from(format!("{}-{{{{key}}}}", stream_name)).unwrap(),
@@ -1201,8 +1188,8 @@ mod integration_tests {
             .collect::<Vec<_>>();
 
         let pump = sink.send_all(iter_ok(events));
-        let (sink, _) = rt.block_on(pump).unwrap();
-        let sink = rt.block_on(sink.flush()).unwrap();
+        let (sink, _) = pump.compat().await.unwrap();
+        let sink = sink.flush().compat().await.unwrap();
         // drop the sink so it closes all its connections
         drop(sink);
 
@@ -1211,9 +1198,7 @@ mod integration_tests {
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let response = rt
-            .block_on_std(async move { create_client_test().get_log_events(request).await })
-            .unwrap();
+        let response = create_client_test().get_log_events(request).await.unwrap();
         let events = response.events.unwrap();
         let output_lines = events
             .into_iter()
@@ -1234,9 +1219,7 @@ mod integration_tests {
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
-        let response = rt
-            .block_on_std(async move { create_client_test().get_log_events(request).await })
-            .unwrap();
+        let response = create_client_test().get_log_events(request).await.unwrap();
         let events = response.events.unwrap();
         let output_lines = events
             .into_iter()
@@ -1253,9 +1236,10 @@ mod integration_tests {
         assert_eq!(output_lines, expected_output);
     }
 
-    #[test]
-    fn cloudwatch_healthcheck() {
-        ensure_group();
+    #[tokio::test]
+    async fn cloudwatch_healthcheck() {
+        trace_init();
+        ensure_group().await;
 
         let config = CloudwatchLogsSinkConfig {
             stream_name: Template::try_from("test-stream").unwrap(),
@@ -1270,10 +1254,8 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let mut rt = runtime();
-
         let client = config.create_client(Resolver).unwrap();
-        rt.block_on_std(healthcheck(config, client)).unwrap();
+        healthcheck(config, client).await.unwrap();
     }
 
     fn create_client_test() -> CloudWatchLogsClient {
@@ -1287,17 +1269,13 @@ mod integration_tests {
         CloudWatchLogsClient::new_with(client, creds, region)
     }
 
-    fn ensure_group() {
-        let mut rt = runtime();
-
-        let _ = rt.block_on_std(async move {
-            let client = create_client_test();
-            let req = CreateLogGroupRequest {
-                log_group_name: GROUP_NAME.into(),
-                ..Default::default()
-            };
-            client.create_log_group(req).await
-        });
+    async fn ensure_group() {
+        let client = create_client_test();
+        let req = CreateLogGroupRequest {
+            log_group_name: GROUP_NAME.into(),
+            ..Default::default()
+        };
+        let _ = client.create_log_group(req).await;
     }
 
     fn gen_name() -> String {

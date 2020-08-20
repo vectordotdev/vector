@@ -1,7 +1,6 @@
 use super::{
-    retries2::{RetryAction, RetryLogic},
-    service2::{TowerBatchedSink, TowerRequestSettings},
-    sink, Batch,
+    retries::{RetryAction, RetryLogic},
+    sink, Batch, TowerBatchedSink, TowerRequestSettings,
 };
 use crate::{
     buffers::Acker,
@@ -26,7 +25,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tower03::Service;
+use tower::Service;
 use tracing::Span;
 use tracing_futures::Instrument;
 
@@ -246,14 +245,14 @@ where
                 .insert("User-Agent", self.user_agent.clone());
         }
 
-        debug!(message = "sending request.", uri = %request.uri(), method = %request.method());
+        debug!(message = "Sending request.", uri = %request.uri(), method = %request.method());
 
         let response = self.client.request(request);
 
         let fut = async move {
             let res = response.await?;
             debug!(
-                    message = "response.",
+                    message = "Response.",
                     status = ?res.status(),
                     version = ?res.version(),
             );
@@ -405,7 +404,7 @@ mod test {
     use futures01::{Future, Stream};
     use hyper::service::{make_service_fn, service_fn};
     use hyper::{Body, Response, Server, Uri};
-    use tower03::Service;
+    use tower::Service;
 
     #[test]
     fn util_http_retry_logic() {

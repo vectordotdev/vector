@@ -10,7 +10,7 @@ pub struct DesyncReceived<E> {
 
 impl<E: std::fmt::Debug> InternalEvent for DesyncReceived<E> {
     fn emit_logs(&self) {
-        warn!(message = "handling desync", error = ?self.error);
+        warn!(message = "Handling desync", error = ?self.error);
     }
 
     fn emit_metrics(&self) {

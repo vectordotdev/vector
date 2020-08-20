@@ -6,12 +6,11 @@ use crate::{
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        retries2::RetryLogic,
+        retries::RetryLogic,
         rusoto,
-        service2::{InFlightLimit, ServiceBuilderExt, TowerCompat, TowerRequestConfig},
         sink::Response,
-        BatchConfig, BatchSettings, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
-        PartitionInnerBuffer,
+        BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
+        PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
     },
     template::Template,
 };
@@ -31,7 +30,7 @@ use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::task::Context;
 use std::task::Poll;
-use tower03::{Service, ServiceBuilder};
+use tower::{Service, ServiceBuilder};
 use tracing::field;
 use tracing_futures::Instrument;
 use uuid::Uuid;
@@ -210,10 +209,9 @@ impl S3SinkConfig {
 
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, self.compression));
 
-        let sink =
-            PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch.timeout, cx.acker())
-                .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
-                .sink_map_err(|error| error!("Sink failed to flush: {}", error));
+        let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
+            .sink_map_err(|error| error!("Sink failed to flush: {}", error));
 
         Ok(Box::new(sink))
     }
@@ -379,7 +377,7 @@ fn encode_event(
         .render_string(&event)
         .map_err(|missing_keys| {
             warn!(
-                message = "Keys do not exist on the event. Dropping event.",
+                message = "Keys do not exist on the event; dropping event.",
                 ?missing_keys,
                 rate_limit_secs = 30,
             );
