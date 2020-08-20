@@ -17,11 +17,13 @@ use tokio::net::UnixStream;
 use tokio_util::codec::BytesCodec;
 #[cfg(unix)]
 use tokio_util::codec::{FramedWrite, LinesCodec};
+#[cfg(unix)]
+use vector::test_util::runtime;
 use vector::{
     config, sinks,
     sources::syslog::{Mode, SyslogConfig},
     test_util::{
-        next_addr, random_maps, random_string, runtime, send_encodable, send_lines, start_topology,
+        next_addr, random_maps, random_string, send_encodable, send_lines, start_topology,
         trace_init, wait_for_tcp, CountReceiver,
     },
 };
