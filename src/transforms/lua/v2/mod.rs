@@ -8,13 +8,14 @@ use crate::{
         util::runtime_transform::{RuntimeTransform, Timer},
         Transform,
     },
+    internal_events::{LuaEventProcessed, LuaBuildError, LuaGcTriggered}
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::path::PathBuf;
 
 #[derive(Debug, Snafu)]
-enum BuildError {
+pub enum BuildError {
     #[snafu(display("Invalid \"search_dirs\": {}", source))]
     InvalidSearchDirs { source: rlua::Error },
     #[snafu(display("Cannot evaluate Lua code in \"source\": {}", source))]
@@ -216,6 +217,9 @@ impl Lua {
     fn attempt_gc(&mut self) {
         self.invocations_after_gc += 1;
         if self.invocations_after_gc % GC_INTERVAL == 0 {
+            emit!(LuaGcTriggered {
+                used_memory: self.lua.used_memory()
+            });
             let _ = self
                 .lua
                 .gc_collect()
@@ -245,6 +249,7 @@ impl RuntimeTransform for Lua {
     where
         F: FnMut(Event),
     {
+        emit!(LuaEventProcessed);
         let _ = self
             .lua
             .context(|ctx: rlua::Context<'_>| {
@@ -255,7 +260,7 @@ impl RuntimeTransform for Lua {
                 })
             })
             .context(RuntimeErrorHooksProcess)
-            .map_err(|e| error!(error = %e, rate_limit = 30));
+            .map_err(|e| emit!(LuaBuildError { error: e }));
 
         self.attempt_gc();
     }
@@ -329,7 +334,7 @@ impl RuntimeTransform for Lua {
 }
 
 #[cfg(test)]
-fn format_error(error: &rlua::Error) -> String {
+pub(crate) fn format_error(error: &rlua::Error) -> String {
     match error {
         rlua::Error::CallbackError { traceback, cause } => format_error(&cause) + "\n" + traceback,
         err => err.to_string(),
