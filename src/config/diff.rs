@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use std::collections::HashSet;
 
 pub struct ConfigDiff {
-    pub api: Option<Service>,
+    pub api: Option<ServiceDiff>,
     pub sources: Difference,
     pub transforms: Difference,
     pub sinks: Difference,
@@ -17,7 +17,7 @@ impl ConfigDiff {
 
     pub fn new(old: &Config, new: &Config) -> Self {
         ConfigDiff {
-            api: Service::from_api(&old.api, &new.api),
+            api: ServiceDiff::from_api(&old.api, &new.api),
             sources: Difference::new(&old.sources, &new.sources),
             transforms: Difference::new(&old.transforms, &new.transforms),
             sinks: Difference::new(&old.sinks, &new.sinks),
@@ -33,18 +33,18 @@ impl ConfigDiff {
     }
 }
 
-pub enum Service {
+pub enum ServiceDiff {
     Start,
     Stop,
     Restart,
 }
 
-impl Service {
+impl ServiceDiff {
     fn from_api(old: &ApiOptions, new: &ApiOptions) -> Option<Self> {
         match (old.enabled, new.enabled) {
-            (false, true) => Some(Service::Start),
-            (true, false) => Some(Service::Stop),
-            (true, true) if *old != *new => Some(Service::Restart),
+            (false, true) => Some(ServiceDiff::Start),
+            (true, false) => Some(ServiceDiff::Stop),
+            (true, true) if *old != *new => Some(ServiceDiff::Restart),
             _ => None,
         }
     }

@@ -21,7 +21,7 @@ mod validation;
 mod vars;
 pub mod watcher;
 
-pub use diff::ConfigDiff;
+pub use diff::{ConfigDiff, ServiceDiff};
 pub use loading::*;
 pub use validation::check;
 

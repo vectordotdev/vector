@@ -4,8 +4,9 @@ use super::{
     ConfigDiff,
 };
 use crate::{
+    api::server::Server,
     buffers,
-    config::{DataType, SinkContext, TransformContext},
+    config::{DataType, ServiceDiff, SinkContext, TransformContext},
     dns::Resolver,
     event::Event,
     shutdown::SourceShutdownCoordinator,
@@ -17,6 +18,7 @@ use std::collections::HashMap;
 use tokio::time::{timeout, Duration};
 
 pub struct Pieces {
+    pub api: Option<Server>,
     pub inputs: HashMap<String, (buffers::BufferInputCloner, Vec<String>)>,
     pub outputs: HashMap<String, fanout::ControlChannel>,
     pub tasks: HashMap<String, Task>,
@@ -36,6 +38,7 @@ pub async fn build_pieces(
     let mut source_tasks = HashMap::new();
     let mut healthchecks = HashMap::new();
     let mut shutdown_coordinator = SourceShutdownCoordinator::default();
+    let mut api = None;
 
     let mut errors = vec![];
 
@@ -193,8 +196,19 @@ pub async fn build_pieces(
         tasks.insert(name.clone(), task);
     }
 
+    // API server
+    if let Some(api_diff) = &diff.api {
+        api = match api_diff {
+            ServiceDiff::Start | ServiceDiff::Restart => {
+                Some(Server::new(config.api.bind.unwrap()))
+            }
+            _ => None,
+        }
+    }
+
     if errors.is_empty() {
         let pieces = Pieces {
+            api,
             inputs,
             outputs,
             tasks,

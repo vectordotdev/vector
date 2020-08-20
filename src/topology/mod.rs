@@ -13,11 +13,13 @@ pub mod unit_test;
 
 use crate::{
     buffers,
-    config::{self, Config, ConfigDiff},
+    config::{self, Config, ConfigDiff, ServiceDiff},
     shutdown::SourceShutdownCoordinator,
     topology::{builder::Pieces, task::Task},
 };
-use futures::{compat::Future01CompatExt, future, FutureExt, StreamExt, TryFutureExt};
+use futures::{
+    channel::oneshot, compat::Future01CompatExt, future, FutureExt, StreamExt, TryFutureExt,
+};
 use futures01::{sync::mpsc, Future};
 use std::{
     collections::{HashMap, HashSet},
@@ -31,6 +33,7 @@ type TaskHandle = tokio::task::JoinHandle<Result<(), ()>>;
 
 #[allow(dead_code)]
 pub struct RunningTopology {
+    api: Option<oneshot::Sender<()>>,
     inputs: HashMap<String, buffers::BufferInputCloner>,
     outputs: HashMap<String, fanout::ControlChannel>,
     source_tasks: HashMap<String, TaskHandle>,
@@ -49,6 +52,7 @@ pub async fn start_validated(
     let (abort_tx, abort_rx) = mpsc::unbounded();
 
     let mut running_topology = RunningTopology {
+        api: None,
         inputs: HashMap::new(),
         outputs: HashMap::new(),
         config: Config::empty(),
@@ -306,6 +310,12 @@ impl RunningTopology {
 
     /// Shutdowns removed and replaced pieces of topology.
     async fn shutdown_diff(&mut self, diff: &ConfigDiff) {
+        // API
+        if let Some(stop_api) = self.api.take() {
+            info!("Stopping API server");
+            let _ = stop_api.send(());
+        }
+
         // Sources
         let timeout = Duration::from_secs(30); //sec
 
@@ -453,6 +463,32 @@ impl RunningTopology {
             info!("Starting sink {:?}", name);
             self.spawn_sink(&name, &mut new_pieces);
         }
+
+        // API
+        if let Some(diff) = &diff.api {
+            self.spawn_api(diff, &mut new_pieces)
+        }
+    }
+
+    fn spawn_api(&mut self, diff: &ServiceDiff, new_pieces: &mut builder::Pieces) {
+        let message = match diff {
+            ServiceDiff::Start => "Starting",
+            ServiceDiff::Restart => "Restarting",
+            _ => return, // no effect if the server has stopped
+        };
+
+        let server = new_pieces.api.take().unwrap();
+
+        info!(
+            message = format!("{} API server", message).as_str(),
+            ip = server.ip().as_str(),
+            port = server.port().as_str()
+        );
+
+        let (tx, rx) = oneshot::channel();
+        tokio::spawn(async { server.run(rx).await });
+
+        self.api = Some(tx);
     }
 
     fn spawn_sink(&mut self, name: &str, new_pieces: &mut builder::Pieces) {

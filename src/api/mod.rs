@@ -1,2 +1,4 @@
 mod handler;
-mod server;
+mod schema;
+
+pub mod server;
