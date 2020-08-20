@@ -54,7 +54,7 @@ will be populated.\
 [transforms.geoip.fields.log.fields.geoip.children.city_name]
 type = "string"
 examples = ["New York", "Brooklyn", "Chicago"]
-groups: ["City"]
+groups = ["City"]
 required = false
 description = """\
 The city name associated with the IP address. \
@@ -63,9 +63,9 @@ Available with the GeoIP2-City or GeoLite2-City database.\
 
 [transforms.geoip.fields.log.fields.geoip.children.continent_code]
 type = "string"
+groups = ["City"]
 required = false
 description = """\
-groups: ["City"]
 The continent code associated with the IP address. \
 Available with the GeoIP2-City or GeoLite2-City database.\
 """
@@ -82,7 +82,7 @@ SA = "South America"
 [transforms.geoip.fields.log.fields.geoip.children.country_code]
 type = "string"
 examples = ["US", "US-PR", "FR", "FR-BL", "GB", "A1", "A2"]
-groups: ["City"]
+groups = ["City"]
 required = false
 description = """\
 The [ISO 3166-2 country codes][urls.iso3166-2] associated with the IP address. \
@@ -102,7 +102,7 @@ Available with the GeoIP2-City or GeoLite2-City database.\
 [transforms.geoip.fields.log.fields.geoip.children.longitude]
 type = "string"
 examples = ["-1.25"]
-groups: ["City"]
+groups = ["City"]
 required = false
 description = """\
 The longitude associated with the IP address. \
@@ -112,7 +112,7 @@ Available with the GeoIP2-City or GeoLite2-City database.\
 [transforms.geoip.fields.log.fields.geoip.children.postal_code]
 type = "string"
 examples = ["07094", "10010", "OX1"]
-groups: ["City"]
+groups = ["City"]
 required = false
 description = """\
 The postal code associated with the IP address. \
@@ -122,7 +122,7 @@ Available with the GeoIP2-City or GeoLite2-City database.\
 [transforms.geoip.fields.log.fields.geoip.children.timezone]
 type = "string"
 examples = ["America/New_York", "Asia/Atyrau", "Europe/London"]
-groups: ["City"]
+groups = ["City"]
 required = false
 description = """\
 The timezone associated with the IP address in [IANA time zone \
@@ -133,7 +133,7 @@ format][urls.iana_time_zone_format]. A full list of time zones can be found \
 [transforms.geoip.fields.log.fields.geoip.children.autonomous_system_number]
 type = "uint"
 examples = [701, 721]
-groups: ["ASN", "ISP"]
+groups = ["ASN", "ISP"]
 required = false
 description = """\
 The Autonomous System (AS) number associated with the \
@@ -143,7 +143,7 @@ IP address. Zero if unknown. Available with the GeoIP2-ISP or GeoLite2-ASN datab
 [transforms.geoip.fields.log.fields.geoip.children.autonomous_system_organization]
 type = "string"
 examples = ["MCI Communications Services, Inc. d/b/a Verizon Business", "DoD Network Information Center"]
-groups: ["ASN", "ISP"]
+groups = ["ASN", "ISP"]
 required = false
 description = """\
 The organization associated with the registered autonomous system number for \
@@ -153,7 +153,7 @@ the IP address. Available with the GeoIP2-ISP or GeoLite2-ASN database.\
 [transforms.geoip.fields.log.fields.geoip.children.isp]
 type = "string"
 examples = ["Verizon Business"]
-groups: ["ISP"]
+groups = ["ISP"]
 required = false
 description = """\
 The name of the ISP associated with the IP address. \
@@ -163,7 +163,7 @@ Available with the GeoIP2-ISP database.\
 [transforms.geoip.fields.log.fields.geoip.children.organization]
 type = "string"
 examples = ["Verizon Business"]
-groups: ["ISP"]
+groups = ["ISP"]
 required = false
 description = """\
 The name of the organization associated with the IP address. \
