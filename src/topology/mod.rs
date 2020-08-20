@@ -627,10 +627,12 @@ fn retain<T>(vec: &mut Vec<T>, mut retain_filter: impl FnMut(&mut T) -> bool) {
 
 #[cfg(all(test, feature = "sinks-console", feature = "sources-socket"))]
 mod tests {
-    use crate::config::Config;
-    use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
-    use crate::sources::socket::SocketConfig;
-    use crate::test_util::{next_addr, runtime, start_topology};
+    use crate::{
+        config::Config,
+        sinks::console::{ConsoleSinkConfig, Encoding, Target},
+        sources::socket::SocketConfig,
+        test_util::{next_addr, runtime, start_topology},
+    };
 
     #[test]
     fn topology_doesnt_reload_new_data_dir() {

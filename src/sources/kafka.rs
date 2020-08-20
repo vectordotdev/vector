@@ -264,13 +264,13 @@ mod integration_test {
         Pipeline,
     };
     use chrono::Utc;
+    use futures::compat::Future01CompatExt;
     use rdkafka::{
         config::ClientConfig,
         producer::{FutureProducer, FutureRecord},
         util::Timeout,
     };
     use string_cache::DefaultAtom as Atom;
-    use futures::compat::Future01CompatExt;
 
     const BOOTSTRAP_SERVER: &str = "localhost:9092";
 
@@ -319,11 +319,16 @@ mod integration_test {
             "my key",
             "my message",
             now.timestamp_millis(),
-        ).await;
+        )
+        .await;
 
         println!("Receiving event...");
         let (tx, rx) = Pipeline::new_test();
-        tokio::spawn(kafka_source(&config, ShutdownSignal::noop(), tx).unwrap().compat());
+        tokio::spawn(
+            kafka_source(&config, ShutdownSignal::noop(), tx)
+                .unwrap()
+                .compat(),
+        );
         let events = collect_n(rx, 1).compat().await.ok().unwrap();
 
         assert_eq!(

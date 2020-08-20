@@ -176,7 +176,7 @@ mod tests {
     use crate::{
         config::{GlobalOptions, SourceConfig},
         event::{self, Event},
-        test_util::{next_addr, trace_init, collect_n, wait_for_tcp},
+        test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
     };
     use chrono::{DateTime, Utc};

@@ -146,7 +146,8 @@ mod test {
             }),
         ];
 
-        let _ = sink.send_all(stream::iter_ok(events.clone().into_iter()))
+        let _ = sink
+            .send_all(stream::iter_ok(events.clone().into_iter()))
             .compat()
             .await
             .unwrap();
