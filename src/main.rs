@@ -15,7 +15,7 @@ use std::cmp::max;
 use tokio::select;
 use vector::{
     config::{self, Config, ConfigDiff},
-    event, generate,
+    event, generate, heartbeat,
     internal_events::{VectorReloaded, VectorStarted, VectorStopped},
     list, metrics, runtime,
     signal::{self, SignalTo},
@@ -125,6 +125,7 @@ fn main() {
         });
 
         emit!(VectorStarted);
+        tokio::spawn(heartbeat::heartbeat());
 
         let mut signals = signal::signals();
         let mut sources_finished = topology.sources_finished().compat();
