@@ -105,7 +105,7 @@ openssl-probe = "0.1.2"
 string_cache = "0.7.3"
 flate2 = "1.0.6"
 structopt = "0.3.13"
-indexmap = {version = "1.0.2", features = ["serde-1"]}
+indexmap = {version = "1.5.1", features = ["serde-1"]}
 http = "0.2"
 typetag = "0.1"
 toml = "0.4"
