@@ -48,5 +48,5 @@ Reduce detail of internal logging. Overrides VECTOR_VERBOSE.
 [env_vars.VECTOR_WATCH_CONFIG]
 type = "bool"
 description = """\
-Watch for changes in configuration file, and reload according.
+Watch for changes in configuration file, and reload accordingly.
 """
