@@ -9,6 +9,9 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use vector_wasm::Role;
 
+/// Transform specific information needed to construct a [`WasmModuleConfig`].
+// Note: We have a separate type here for crate boundary purposes.
+//       `WasmConfig` is in `vector-wasm`, so we can't do impl's on it here.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct WasmConfig {

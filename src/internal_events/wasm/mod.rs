@@ -1,17 +1,18 @@
 mod compilation;
-pub use compilation::WasmCompilation;
+pub use compilation::WasmCompilationProgress;
 
 mod hostcall;
-pub use hostcall::Hostcall;
+pub use hostcall::WasmHostcallProgress;
 
 mod event_processing;
-pub use event_processing::EventProcessing;
+pub use event_processing::EventProcessingProgress;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum State {
     Beginning,
     Cached,
     Completed,
+    Errored,
 }
 
 impl State {
@@ -20,6 +21,7 @@ impl State {
         match self {
             State::Beginning => BEGINNING,
             State::Completed => COMPLETED,
+            State::Errored => ERRORED,
             State::Cached => CACHED,
         }
     }
@@ -28,3 +30,4 @@ impl State {
 const BEGINNING: &str = "beginning";
 const COMPLETED: &str = "completed";
 const CACHED: &str = "cached";
+const ERRORED: &str = "errored";

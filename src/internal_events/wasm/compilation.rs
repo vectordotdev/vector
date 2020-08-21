@@ -5,37 +5,43 @@ use metrics::counter;
 use std::time::{Duration, Instant};
 use vector_wasm::Role;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[must_use]
-pub struct WasmCompilation {
+pub struct WasmCompilationProgress {
     role: Role,
     state: State,
-    #[cfg(feature = "wasm-timings")]
+    error: Option<String>,
     epoch: Instant,
-    #[cfg(feature = "wasm-timings")]
     elapsed: Duration,
 }
 
-impl WasmCompilation {
+impl WasmCompilationProgress {
     pub fn begin(role: Role) -> Self {
         let me = Self {
             state: State::Beginning,
             role,
-            #[cfg(feature = "wasm-timings")]
+            error: Default::default(),
             epoch: Instant::now(),
-            #[cfg(feature = "wasm-timings")]
             elapsed: Default::default(),
         };
-        emit!(me);
+        emit!(me.clone());
         me
     }
     pub fn complete(self) {
         emit!(Self {
             state: State::Completed,
             role: self.role,
-            #[cfg(feature = "wasm-timings")]
+            error: self.error,
             epoch: self.epoch,
-            #[cfg(feature = "wasm-timings")]
+            elapsed: self.epoch.elapsed()
+        })
+    }
+    pub fn error(self, error: String) {
+        emit!(Self {
+            state: State::Cached,
+            role: self.role,
+            error: Some(error),
+            epoch: self.epoch,
             elapsed: self.epoch.elapsed()
         })
     }
@@ -43,38 +49,36 @@ impl WasmCompilation {
         emit!(Self {
             state: State::Cached,
             role: self.role,
-            #[cfg(feature = "wasm-timings")]
+            error: self.error,
             epoch: self.epoch,
-            #[cfg(feature = "wasm-timings")]
             elapsed: self.epoch.elapsed()
         })
     }
 }
 
-impl InternalEvent for WasmCompilation {
+impl InternalEvent for WasmCompilationProgress {
     fn emit_logs(&self) {
-        #[cfg(not(feature = "wasm-timings"))]
-        info!(
-            message = "WASM Compilation via `lucet`",
-            state = self.state.as_const_str(),
-            role = self.role.as_const_str(),
-        );
-        #[cfg(feature = "wasm-timings")]
-        {
-            if self.elapsed.as_nanos() == 0 {
-                info!(
-                    message = "Compilation via vendored `lucet`",
-                    state = self.state.as_const_str(),
-                    role = self.role.as_const_str(),
-                );
-            } else {
-                info!(
-                    message = "Compilation via vendored `lucet`",
+        match self.state {
+            State::Beginning | State::Cached | State::Completed => event!(
+                tracing::Level::INFO,
+                {
                     state = self.state.as_const_str(),
                     role = self.role.as_const_str(),
                     elapsed_micros = self.elapsed.as_micros() as u64,
-                );
-            }
+                },
+                "WASM Compilation via `lucet`.",
+            ),
+            State::Errored => event!(
+                tracing::Level::ERROR,
+                {
+                    state = self.state.as_const_str(),
+                    role = self.role.as_const_str(),
+                    error = tracing::field::display(self.error.as_ref().unwrap_or(&String::from(""))),
+                    elapsed_micros = self.elapsed.as_micros() as u64,
+                    // We do not rate limit this since it should never spam, it's a oneshot at startup.
+                },
+                "WASM Compilation via `lucet`.",
+            ),
         }
     }
 
@@ -84,6 +88,5 @@ impl InternalEvent for WasmCompilation {
             "component_type" => "wasm",
             "state" => self.state.as_const_str(),
         );
-        // TODO: Add timings metrics!
     }
 }
