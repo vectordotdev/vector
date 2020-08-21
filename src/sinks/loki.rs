@@ -15,7 +15,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
-    runtime::FutureExt,
     sinks::util::{
         buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -26,6 +25,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use derivative::Derivative;
+use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -95,7 +95,7 @@ impl SinkConfig for LokiConfig {
         )
         .sink_map_err(|e| error!("Fatal loki sink error: {}", e));
 
-        let healthcheck = healthcheck(self.clone(), client).boxed_compat();
+        let healthcheck = healthcheck(self.clone(), client).boxed().compat();
 
         Ok((Box::new(sink), Box::new(healthcheck)))
     }
