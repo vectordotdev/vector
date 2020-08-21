@@ -4,11 +4,11 @@ use crate::{
     config::CONFIG_PATHS,
     config::{DataType, TransformContext},
     event::Event,
+    internal_events::{LuaBuildError, LuaEventProcessed, LuaGcTriggered},
     transforms::{
         util::runtime_transform::{RuntimeTransform, Timer},
         Transform,
     },
-    internal_events::{LuaEventProcessed, LuaBuildError, LuaGcTriggered}
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
