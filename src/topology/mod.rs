@@ -69,7 +69,7 @@ pub async fn start_validated(
         return None;
     }
     running_topology.connect_diff(&diff, &mut pieces);
-    running_topology.spawn_diff(&diff, pieces);
+    running_topology.spawn_diff(&diff, pieces).await;
     running_topology.config = config;
 
     Some((running_topology, abort_rx))
@@ -252,7 +252,7 @@ impl RunningTopology {
                 .await
             {
                 self.connect_diff(&diff, &mut new_pieces);
-                self.spawn_diff(&diff, new_pieces);
+                self.spawn_diff(&diff, new_pieces).await;
                 self.config = new_config;
                 // We have successfully changed to new config.
                 return Ok(true);
@@ -268,7 +268,7 @@ impl RunningTopology {
                 .await
             {
                 self.connect_diff(&diff, &mut new_pieces);
-                self.spawn_diff(&diff, new_pieces);
+                self.spawn_diff(&diff, new_pieces).await;
                 // We have successfully returned to old config.
                 return Ok(false);
             }
@@ -430,7 +430,7 @@ impl RunningTopology {
     }
 
     /// Starts new and changed pieces of topology.
-    fn spawn_diff(&mut self, diff: &ConfigDiff, mut new_pieces: Pieces) {
+    async fn spawn_diff(&mut self, diff: &ConfigDiff, mut new_pieces: Pieces) {
         // Sources
         for name in &diff.sources.to_change {
             info!("Rebuilding source {:?}", name);
@@ -466,11 +466,11 @@ impl RunningTopology {
 
         // API
         if let Some(diff) = &diff.api {
-            self.spawn_api(diff, &mut new_pieces)
+            self.spawn_api(diff, &mut new_pieces).await
         }
     }
 
-    fn spawn_api(&mut self, diff: &ServiceDiff, new_pieces: &mut builder::Pieces) {
+    async fn spawn_api(&mut self, diff: &ServiceDiff, new_pieces: &mut builder::Pieces) {
         let message = match diff {
             ServiceDiff::Start => "Starting",
             ServiceDiff::Restart => "Restarting",
@@ -485,8 +485,7 @@ impl RunningTopology {
             port = server.port().as_str()
         );
 
-        let (tx, rx) = oneshot::channel();
-        tokio::spawn(async { server.run(rx).await });
+        let tx = server.run().await;
 
         self.api = Some(tx);
     }
