@@ -43,17 +43,12 @@ impl Arithmetic {
 /// integer type the integer is "degraded" into a float. This allows us to
 /// perform arithmetic on common values, but if both are integers then their
 /// precision is preserved.
-fn consistent_number_types(mut left: Value, mut right: Value) -> (Value, Value) {
-    if let Value::Float(_) = left {
-        if let Value::Integer(ri) = right {
-            right = Value::Float(ri as f64);
-        }
-    } else if let Value::Float(_) = right {
-        if let Value::Integer(li) = left {
-            left = Value::Float(li as f64);
-        }
+fn consistent_number_types(left: Value, right: Value) -> (Value, Value) {
+    match (&left, &right) {
+        (Value::Float(lf), Value::Integer(ri)) => (Value::Float(*lf), Value::Float(*ri as f64)),
+        (Value::Integer(li), Value::Float(rf)) => (Value::Float(*li as f64), Value::Float(*rf)),
+        _ => (left, right),
     }
-    (left, right)
 }
 
 // Degrades non-float numerical types into floats for the purposes of convenient
@@ -63,18 +58,16 @@ fn compare_number_types(
     right: Value,
     compare_fn: &dyn Fn(f64, f64) -> bool,
 ) -> Result<Value> {
-    let (left, right) = consistent_number_types(left, right);
-    Ok(Value::Boolean(match left {
-        Value::Float(fl) => match right {
-            Value::Float(fr) => compare_fn(fl, fr),
-            vr => return Err(format!("unable to compare right-hand field type {:?}", vr)),
-        },
-        Value::Integer(il) => match right {
-            Value::Integer(ir) => compare_fn(il as f64, ir as f64),
-            vr => return Err(format!("unable to compare right-hand field type {:?}", vr)),
-        },
-        vl => return Err(format!("unable to compare left-hand field type {:?}", vl)),
-    }))
+    match consistent_number_types(left, right) {
+        (Value::Integer(li), Value::Integer(ri)) => {
+            Ok(Value::Boolean(compare_fn(li as f64, ri as f64)))
+        }
+        (Value::Float(lf), Value::Float(rf)) => Ok(Value::Boolean(compare_fn(lf, rf))),
+        (l, r) => Err(format!(
+            "unable to numerically compare field types {:?} and {:?}",
+            l, r
+        )),
+    }
 }
 
 impl Function for Arithmetic {

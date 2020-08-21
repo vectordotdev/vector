@@ -67,7 +67,10 @@ number = @{
     ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?
 }
 
-query_leaf = _{ value | dot_path | group | query_function }
+
+not_operator = { "!" ~ query_leaf }
+
+query_leaf = _{ not_operator | value | dot_path | group | query_function }
 
 // Arithmetic, broken down into tiers in order to support operator precedence.
 // Operators of the same tier are resolved from left to right.

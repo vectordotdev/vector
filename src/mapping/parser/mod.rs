@@ -7,7 +7,7 @@ use crate::{
             self,
             arithmetic::Arithmetic,
             arithmetic::Operator,
-            functions::{ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn},
+            functions::{NotFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn},
             path::Path as QueryPath,
             Literal,
         },
@@ -277,6 +277,10 @@ fn inner_quoted_string_escaped_from_pair(pair: Pair<Rule>) -> Result<String> {
 
 fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
     Ok(match pair.as_rule() {
+        Rule::not_operator => {
+            let inner_query = query_from_pair(pair.into_inner().next().unwrap())?;
+            Box::new(NotFn::new(inner_query))
+        }
         Rule::string => Box::new(Literal::from(Value::from(
             inner_quoted_string_escaped_from_pair(pair.into_inner().next().unwrap())?,
         ))),
@@ -405,6 +409,10 @@ mod test {
             (
                 ". = \"bar\"",
                 vec![" 1:2\n", "= expected path_segment or quoted_path_segment"],
+            ),
+            (
+                ".foo = !",
+                vec![" 1:9\n", "= expected dot_path, query_function, group, boolean, null, string, number, or not_operator"],
             ),
             (
                 "foo = \"bar\"",
@@ -636,6 +644,22 @@ mod test {
                         vec!["foo", "zap"],
                         vec!["bar", "baz", "buz"],
                     ])),
+                ))]),
+            ),
+            (
+                ".foo = !.bar",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(NotFn::new(Box::new(QueryPath::from(vec![vec!["bar"]])))),
+                ))]),
+            ),
+            (
+                ".foo = !!.bar",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(NotFn::new(Box::new(NotFn::new(Box::new(QueryPath::from(
+                        vec![vec!["bar"]],
+                    )))))),
                 ))]),
             ),
             (
