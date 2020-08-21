@@ -29,7 +29,7 @@ I expect to largely copy the existing [prometheus
 source](https://github.com/timberio/vector/blob/61e806d01d4cc6d2a527b52aa9388d4547f1ebc2/src/sources/prometheus/mod.rs)
 and modify it to parse the output of the httpd status page which looks like:
 
-```
+```text
 localhost
 ServerVersion: Apache/2.4.46 (Unix)
 ServerMPM: event
@@ -71,38 +71,38 @@ Scoreboard: ________________________________________________________W___________
 
 I'll use this to generate the following metrics:
 
-* `apache.uptime_seconds` (counter)
-* `apache.total_accesses` (counter; extended)
-* `apache.total_kilobytes` (counter; extended)
-* `apache.total_duration` (counter; extended)
-* `apache.cpu_user` (gauge; extended)
-* `apache.cpu_system` (gauge; extended)
-* `apache.cpu_children_user` (gauge; extended)
-* `apache.cpu_children_system` (gauge; extended)
-* `apache.cpu_load` (gauge; extended)
-* `apache.requests_per_second` (gauge; extended)
-* `apache.bytes_per_second` (gauge; extended)
-* `apache.bytes_per_request` (gauge; extended)
-* `apache.duration_per_request` (gauge; extended)
-* `apache.busy_workers` (gauge)
-* `apache.idle_workers` (gauge)
-* `apache.processes` (gauge)
-* `apache.stopping` (gauge)
-* `apache.conns_total` (gauge)
-* `apache.conns_async_writing` (gauge)
-* `apache.conns_async_keepalive` (gauge)
-* `apache.conns_async_closing` (gauge)
-* `apache.scoreboard_waiting` (gauge)
-* `apache.scoreboard_starting` (gauge)
-* `apache.scoreboard_reading` (gauge)
-* `apache.scoreboard_sending` (gauge)
-* `apache.scoreboard_keepalive` (gauge)
-* `apache.scoreboard_dnslookup` (gauge)
-* `apache.scoreboard_closing` (gauge)
-* `apache.scoreboard_logging` (gauge)
-* `apache.scoreboard_finishing` (gauge)
-* `apache.scoreboard_idle_cleanup` (gauge)
-* `apache.scoreboard_open` (gauge)
+- `apache.uptime_seconds` (counter)
+- `apache.total_accesses` (counter; extended)
+- `apache.total_kilobytes` (counter; extended)
+- `apache.total_duration` (counter; extended)
+- `apache.cpu_user` (gauge; extended)
+- `apache.cpu_system` (gauge; extended)
+- `apache.cpu_children_user` (gauge; extended)
+- `apache.cpu_children_system` (gauge; extended)
+- `apache.cpu_load` (gauge; extended)
+- `apache.requests_per_second` (gauge; extended)
+- `apache.bytes_per_second` (gauge; extended)
+- `apache.bytes_per_request` (gauge; extended)
+- `apache.duration_per_request` (gauge; extended)
+- `apache.busy_workers` (gauge)
+- `apache.idle_workers` (gauge)
+- `apache.processes` (gauge)
+- `apache.stopping` (gauge)
+- `apache.conns_total` (gauge)
+- `apache.conns_async_writing` (gauge)
+- `apache.conns_async_keepalive` (gauge)
+- `apache.conns_async_closing` (gauge)
+- `apache.scoreboard_waiting` (gauge)
+- `apache.scoreboard_starting` (gauge)
+- `apache.scoreboard_reading` (gauge)
+- `apache.scoreboard_sending` (gauge)
+- `apache.scoreboard_keepalive` (gauge)
+- `apache.scoreboard_dnslookup` (gauge)
+- `apache.scoreboard_closing` (gauge)
+- `apache.scoreboard_logging` (gauge)
+- `apache.scoreboard_finishing` (gauge)
+- `apache.scoreboard_idle_cleanup` (gauge)
+- `apache.scoreboard_open` (gauge)
 
 Metrics labeled `extended` are only available if `ExtendedStatus` is enabled
 for Apache. This is the default in newer versions (>= 2.4; released 2012), but
@@ -113,7 +113,7 @@ metrics published.
 
 I figure we probably don't want metrics for:
 
-* Load (should be handled by a `cpu` or similar metrics source)
+- Load (should be handled by a `cpu` or similar metrics source)
 
 ## Doc-level Proposal
 
@@ -133,8 +133,8 @@ The following additional source configuration will be added:
 
 Some possible configuration improvements we could add in the future would be:
 
-* `response_timeout`; to cap request lengths
-* `tls`: settings to allow setting specific chains of trust and client certs
+- `response_timeout`; to cap request lengths
+- `tls`: settings to allow setting specific chains of trust and client certs
 
 But I chose to leave those out for now given the prometheous source doesn't
 support them either. We could add support to both at the same time (see Future
