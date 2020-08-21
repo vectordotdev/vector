@@ -32,7 +32,7 @@ fn target_path_from_pair(pair: Pair<Rule>) -> Result<String> {
             Rule::quoted_path_segment => {
                 segments.push(quoted_path_from_pair(segment)?.replace(".", "\\."))
             }
-            _ => unreachable!(),
+            _ => unreachable!("parser should not allow other target_path child rules here"),
         }
     }
     Ok(segments.join("."))
@@ -60,12 +60,14 @@ fn path_segments_from_pair(pair: Pair<Rule>) -> Result<Vec<Vec<String>>> {
                     match option.as_rule() {
                         Rule::path_segment => options.push(option.as_str().to_string()),
                         Rule::quoted_path_segment => options.push(quoted_path_from_pair(option)?),
-                        _ => unreachable!(),
+                        _ => unreachable!(
+                            "parser should not allow other path_coalesce child rules here"
+                        ),
                     }
                 }
                 segments.push(options);
             }
-            _ => unreachable!(),
+            _ => unreachable!("parser should not allow other path_segments child rules here"),
         }
     }
     Ok(segments)
@@ -191,7 +193,9 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
                         r.into_inner().next().unwrap(),
                     )?),
                     Rule::null => Value::Null,
-                    _ => unreachable!(),
+                    _ => unreachable!(
+                        "parser should not allow other to_string default arg child rules here"
+                    ),
                 })
             } else {
                 None
@@ -206,7 +210,9 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
                 // if the string is not a valid int.
                 Rule::number => Value::Integer(r.as_str().parse::<f64>().unwrap() as i64),
                 Rule::null => Value::Null,
-                _ => unreachable!(),
+                _ => unreachable!(
+                    "parser should not allow other to_int default arg child rules here"
+                ),
             });
             Ok(Box::new(ToIntegerFn::new(query, default)))
         }
@@ -216,7 +222,9 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
             let default = inner_rules.next().map(|r| match r.as_rule() {
                 Rule::number => Value::Float(r.as_str().parse::<f64>().unwrap()),
                 Rule::null => Value::Null,
-                _ => unreachable!(),
+                _ => unreachable!(
+                    "parser should not allow other to_float default arg child rules here"
+                ),
             });
             Ok(Box::new(ToFloatFn::new(query, default)))
         }
@@ -226,7 +234,9 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
             let default = inner_rules.next().map(|r| match r.as_rule() {
                 Rule::boolean => Value::Boolean(r.as_str() == "true"),
                 Rule::null => Value::Null,
-                _ => unreachable!(),
+                _ => unreachable!(
+                    "parser should not allow other to_bool default arg child rules here"
+                ),
             });
             Ok(Box::new(ToBooleanFn::new(query, default)))
         }
@@ -238,7 +248,7 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
             )?;
             Ok(Box::new(ToTimestampFn::new(&format, query, None)?))
         }
-        _ => unreachable!(),
+        _ => unreachable!("parser should not allow other query_function child rules here"),
     }
 }
 
@@ -295,7 +305,7 @@ fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
         Rule::dot_path => Box::new(QueryPath::from(path_segments_from_pair(pair)?)),
         Rule::group => query_arithmetic_from_pair(pair.into_inner().next().unwrap())?,
         Rule::query_function => query_function_from_pair(pair.into_inner().next().unwrap())?,
-        _ => unreachable!(),
+        _ => unreachable!("parser should not allow other query child rules here"),
     })
 }
 
@@ -328,7 +338,7 @@ fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
             }
             Ok(Box::new(OnlyFields::new(paths)))
         }
-        _ => unreachable!(),
+        _ => unreachable!("parser should not allow other function child rules here"),
     }
 }
 
@@ -342,7 +352,7 @@ fn statement_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
         }
         Rule::function => function_from_pair(pair.into_inner().next().unwrap()),
         Rule::if_statement => if_statement_from_pairs(pair.into_inner()),
-        _ => unreachable!(),
+        _ => unreachable!("parser should not allow other statement child rules here"),
     }
 }
 
@@ -355,7 +365,7 @@ fn mapping_from_pairs(pairs: Pairs<Rule>) -> Result<Mapping> {
                 assignments.push(statement_from_pair(pair)?);
             }
             Rule::EOI => (),
-            _ => unreachable!(),
+            _ => unreachable!("parser should not allow other mapping child rules here"),
         }
     }
     Ok(Mapping::new(assignments))

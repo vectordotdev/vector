@@ -120,7 +120,8 @@ impl Function for IfStatement {
     fn apply(&self, target: &mut Event) -> Result<()> {
         match self.query.execute(target)? {
             Value::Boolean(true) => self.true_statement.apply(target),
-            _ => self.false_statement.apply(target),
+            Value::Boolean(false) => self.false_statement.apply(target),
+            _ => Err("query returned non-boolean value".to_string()),
         }
     }
 }
@@ -310,6 +311,7 @@ mod test {
                 },
                 {
                     let mut event = Event::from("foo body");
+                    event.as_mut_log().insert("bar", Value::from("buz"));
                     event.as_mut_log().remove(&Atom::from("timestamp"));
                     event
                 },
@@ -321,7 +323,7 @@ mod test {
                     )),
                     Box::new(Deletion::new(vec!["bar".to_string()])),
                 ))]),
-                Ok(()),
+                Err("failed to apply mapping 0: query returned non-boolean value".to_string()),
             ),
             (
                 {

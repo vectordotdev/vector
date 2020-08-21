@@ -43,7 +43,7 @@ impl Arithmetic {
 /// integer type the integer is "degraded" into a float. This allows us to
 /// perform arithmetic on common values, but if both are integers then their
 /// precision is preserved.
-fn consistent_number_types(left: Value, right: Value) -> (Value, Value) {
+fn coerce_number_types(left: Value, right: Value) -> (Value, Value) {
     match (&left, &right) {
         (Value::Float(lf), Value::Integer(ri)) => (Value::Float(*lf), Value::Float(*ri as f64)),
         (Value::Integer(li), Value::Float(rf)) => (Value::Float(*li as f64), Value::Float(*rf)),
@@ -58,7 +58,7 @@ fn compare_number_types(
     right: Value,
     compare_fn: &dyn Fn(f64, f64) -> bool,
 ) -> Result<Value> {
-    match consistent_number_types(left, right) {
+    match coerce_number_types(left, right) {
         (Value::Integer(li), Value::Integer(ri)) => {
             Ok(Value::Boolean(compare_fn(li as f64, ri as f64)))
         }
@@ -81,7 +81,7 @@ impl Function for Arithmetic {
 
         Ok(match self.op {
             Operator::Multiply => {
-                let (left, right) = consistent_number_types(left?, right?);
+                let (left, right) = coerce_number_types(left?, right?);
                 match left {
                     Value::Float(fl) => match right {
                         Value::Float(fr) => Value::Float(fl * fr),
@@ -106,7 +106,7 @@ impl Function for Arithmetic {
             }
 
             Operator::Divide => {
-                let (left, right) = consistent_number_types(left?, right?);
+                let (left, right) = coerce_number_types(left?, right?);
                 match left {
                     Value::Float(fl) => match right {
                         Value::Float(fr) => Value::Float(fl / fr),
@@ -133,7 +133,7 @@ impl Function for Arithmetic {
             },
 
             Operator::Add => {
-                let (left, right) = consistent_number_types(left?, right?);
+                let (left, right) = coerce_number_types(left?, right?);
                 match left {
                     Value::Float(fl) => match right {
                         Value::Float(fr) => Value::Float(fl + fr),
@@ -157,7 +157,7 @@ impl Function for Arithmetic {
             }
 
             Operator::Subtract => {
-                let (left, right) = consistent_number_types(left?, right?);
+                let (left, right) = coerce_number_types(left?, right?);
                 match left {
                     Value::Float(fl) => match right {
                         Value::Float(fr) => Value::Float(fl - fr),
@@ -182,11 +182,11 @@ impl Function for Arithmetic {
             }
 
             Operator::Equal => {
-                let (left, right) = consistent_number_types(left?, right?);
+                let (left, right) = coerce_number_types(left?, right?);
                 Value::Boolean(left == right)
             }
             Operator::NotEqual => {
-                let (left, right) = consistent_number_types(left?, right?);
+                let (left, right) = coerce_number_types(left?, right?);
                 Value::Boolean(left != right)
             }
             Operator::Greater => compare_number_types(left?, right?, &|lf, rf| lf > rf)?,
