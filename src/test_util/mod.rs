@@ -308,19 +308,6 @@ pub async fn wait_for_tcp(addr: SocketAddr) {
     wait_for(|| async move { TcpStream::connect(addr).await.is_ok() }).await
 }
 
-pub fn wait_for_sync(mut f: impl FnMut() -> bool) {
-    let wait = std::time::Duration::from_millis(5);
-    let limit = std::time::Duration::from_secs(5);
-    let mut attempts = 0;
-    while !f() {
-        std::thread::sleep(wait);
-        attempts += 1;
-        if attempts * wait > limit {
-            panic!("Timed out while waiting");
-        }
-    }
-}
-
 pub async fn wait_for_atomic_usize<T, F>(value: T, unblock: F)
 where
     T: AsRef<AtomicUsize>,
