@@ -206,10 +206,10 @@ first-class source for each type of endpoint we support scraping.
 ## Outstanding Questions
 
 - Do we want to apply any metric labels based on the other information
-	available via the status page? I could see labeling the `url` at least
+  available via the status page? I could see labeling the `url` at least
 - Do we want to have one apache source able to scrape multiple endpoints?
 - Are there preferences between `apache` or `httpd` for the nomenclature? I
-	feel like `apache` is more well-known though `httpd` is more accurate
+  feel like `apache` is more well-known though `httpd` is more accurate
 - Should the `host` key include the port from the `endpoint` , if any? Or just
   the hostname.
 
