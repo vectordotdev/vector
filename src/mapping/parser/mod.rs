@@ -24,28 +24,28 @@ use pest::{
 #[grammar = "./mapping/parser/grammar.pest"]
 struct MappingParser;
 
-fn target_path_from_pair(pair: Pair<Rule>) -> String {
+fn target_path_from_pair(pair: Pair<Rule>) -> Result<String> {
     let mut segments = Vec::new();
     for segment in pair.into_inner() {
         match segment.as_rule() {
             Rule::path_segment => segments.push(segment.as_str().to_string()),
             Rule::quoted_path_segment => {
-                segments.push(quoted_path_from_pair(segment).replace(".", "\\."))
+                segments.push(quoted_path_from_pair(segment)?.replace(".", "\\."))
             }
             _ => unreachable!(),
         }
     }
-    segments.join(".")
+    Ok(segments.join("."))
 }
 
-fn quoted_path_from_pair(pair: Pair<Rule>) -> String {
+fn quoted_path_from_pair(pair: Pair<Rule>) -> Result<String> {
     let mut pairs = pair.into_inner();
-    let base = inner_quoted_string_escaped_from_pair(pairs.next().unwrap());
-    if let Some(pair) = pairs.next() {
+    let base = inner_quoted_string_escaped_from_pair(pairs.next().unwrap())?;
+    Ok(if let Some(pair) = pairs.next() {
         base + pair.as_str()
     } else {
         base
-    }
+    })
 }
 
 fn path_segments_from_pair(pair: Pair<Rule>) -> Result<Vec<Vec<String>>> {
@@ -53,13 +53,13 @@ fn path_segments_from_pair(pair: Pair<Rule>) -> Result<Vec<Vec<String>>> {
     for segment in pair.into_inner() {
         match segment.as_rule() {
             Rule::path_segment => segments.push(vec![segment.as_str().to_string()]),
-            Rule::quoted_path_segment => segments.push(vec![quoted_path_from_pair(segment)]),
+            Rule::quoted_path_segment => segments.push(vec![quoted_path_from_pair(segment)?]),
             Rule::path_coalesce => {
                 let mut options = Vec::new();
                 for option in segment.into_inner() {
                     match option.as_rule() {
                         Rule::path_segment => options.push(option.as_str().to_string()),
-                        Rule::quoted_path_segment => options.push(quoted_path_from_pair(option)),
+                        Rule::quoted_path_segment => options.push(quoted_path_from_pair(option)?),
                         _ => unreachable!(),
                     }
                 }
@@ -185,13 +185,17 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
         Rule::to_string => {
             let mut inner_rules = pair.into_inner();
             let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
-            let default = inner_rules.next().map(|r| match r.as_rule() {
-                Rule::string => Value::from(inner_quoted_string_escaped_from_pair(
-                    r.into_inner().next().unwrap(),
-                )),
-                Rule::null => Value::Null,
-                _ => unreachable!(),
-            });
+            let default = if let Some(r) = inner_rules.next() {
+                Some(match r.as_rule() {
+                    Rule::string => Value::from(inner_quoted_string_escaped_from_pair(
+                        r.into_inner().next().unwrap(),
+                    )?),
+                    Rule::null => Value::Null,
+                    _ => unreachable!(),
+                })
+            } else {
+                None
+            };
             Ok(Box::new(ToStringFn::new(query, default)))
         }
         Rule::to_int => {
@@ -231,28 +235,50 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
             let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
             let format = inner_quoted_string_escaped_from_pair(
                 inner_rules.next().unwrap().into_inner().next().unwrap(),
-            );
+            )?;
             Ok(Box::new(ToTimestampFn::new(&format, query, None)?))
         }
         _ => unreachable!(),
     }
 }
 
-fn inner_quoted_string_escaped_from_pair(pair: Pair<Rule>) -> String {
-    pair.as_str()
-        // TODO: Include unicode escape sequences, surely there must be
-        // a standard lib opposite of https://doc.rust-lang.org/std/primitive.str.html#method.escape_default
-        // but I can't find it anywhere.
-        .replace("\\\"", "\"")
-        .replace("\\n", "\n")
-        .replace("\\t", "\t")
-        .replace("\\\\", "\\")
+fn inner_quoted_string_escaped_from_pair(pair: Pair<Rule>) -> Result<String> {
+    // This is only executed once per string at parse time, and so I'm not
+    // losing sleep over the reallocation. However, if we want to mutate the
+    // underlying string then we can take some inspiration from:
+    // https://github.com/rust-lang/rust/blob/master/src/librustc_lexer/src/unescape.rs
+
+    let literal_str = pair.as_str();
+    let mut escaped_chars: Vec<char> = Vec::with_capacity(literal_str.len());
+
+    let mut is_escaped = false;
+    for c in literal_str.chars() {
+        if is_escaped {
+            match c {
+                '\\' => escaped_chars.push(c),
+                'n' => escaped_chars.push('\n'),
+                't' => escaped_chars.push('\t'),
+                '"' => escaped_chars.push('"'),
+                // This isn't reachable currently due to the explicit list of
+                // allowed escape chars in our parser grammar. However, if that
+                // changes then we might need to rely on this error.
+                _ => return Err(format!("invalid escape char '{}'", c)),
+            }
+            is_escaped = false;
+        } else if c == '\\' {
+            is_escaped = true;
+        } else {
+            escaped_chars.push(c);
+        }
+    }
+
+    Ok(escaped_chars.into_iter().collect())
 }
 
 fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
     Ok(match pair.as_rule() {
         Rule::string => Box::new(Literal::from(Value::from(
-            inner_quoted_string_escaped_from_pair(pair.into_inner().next().unwrap()),
+            inner_quoted_string_escaped_from_pair(pair.into_inner().next().unwrap())?,
         ))),
         Rule::null => Box::new(Literal::from(Value::Null)),
         Rule::number => Box::new(Literal::from(Value::from(
@@ -288,14 +314,14 @@ fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
         Rule::deletion => {
             let mut paths = Vec::new();
             for pair in pair.into_inner() {
-                paths.push(target_path_from_pair(pair));
+                paths.push(target_path_from_pair(pair)?);
             }
             Ok(Box::new(Deletion::new(paths)))
         }
         Rule::only_fields => {
             let mut paths = Vec::new();
             for pair in pair.into_inner() {
-                paths.push(target_path_from_pair(pair));
+                paths.push(target_path_from_pair(pair)?);
             }
             Ok(Box::new(OnlyFields::new(paths)))
         }
@@ -307,7 +333,7 @@ fn statement_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
         Rule::assignment => {
             let mut inner_rules = pair.into_inner();
-            let path = target_path_from_pair(inner_rules.next().unwrap());
+            let path = target_path_from_pair(inner_rules.next().unwrap())?;
             let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
             Ok(Box::new(Assignment::new(path, query)))
         }
@@ -433,6 +459,17 @@ mod test {
                 ".foo = string(\"bar\",)",
                 vec![" 1:21\n", "= expected null or string"],
             ),
+            (
+                // Due to the explicit list of allowed escape chars our grammar
+                // doesn't actually recognize this as a string literal.
+                r#".foo = "invalid escape \k sequence""#,
+                vec![" 1:8\n", "= expected query"],
+            ),
+            (
+                // Same here as above.
+                r#".foo."invalid \k escape".sequence = "foo""#,
+                vec![" 1:6\n", "= expected path_segment or quoted_path_segment"],
+            ),
         ];
 
         for (mapping, exp_expressions) in cases {
@@ -457,6 +494,13 @@ mod test {
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(Literal::from(Value::from("bar"))),
+                ))]),
+            ),
+            (
+                r#".foo = "bar\t\n\\\n and also \\n""#,
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Literal::from(Value::from("bar\t\n\\\n and also \\n"))),
                 ))]),
             ),
             (

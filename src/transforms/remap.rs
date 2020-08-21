@@ -58,7 +58,6 @@ impl Transform for Remap {
         emit!(RemapEventProcessed);
 
         if let Err(err) = self.mapping.execute(&mut event) {
-            error!(message = "mapping failed", %err);
             emit!(RemapFailedMapping { error: err });
 
             if self.drop_on_err {
