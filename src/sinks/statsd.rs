@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::metric::{MetricKind, MetricValue, StatisticKind},
+    event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::Event,
     sinks::util::{
         service2::TowerCompat, BatchConfig, BatchSettings, BatchSink, Buffer, Compression,
@@ -132,28 +132,48 @@ fn encode_tags(tags: &BTreeMap<String, String>) -> String {
     parts.join(",")
 }
 
+/// The value for incremental gauges includes the sign.
+fn value_incr(val: &f64) -> String {
+    format!("{:+}", val)
+}
+
+fn push_event(
+    buf: &mut Vec<String>,
+    metric: &Metric,
+    val: String,
+    metric_type: &str,
+    sample_rate: Option<u32>,
+) {
+    buf.push(format!("{}:{}", metric.name, val));
+    buf.push(metric_type.to_string());
+
+    match sample_rate {
+        Some(sample_rate) if sample_rate != 1 => {
+            buf.push(format!("@{}", 1.0 / f64::from(sample_rate)))
+        }
+        _ => (),
+    };
+
+    if let Some(t) = &metric.tags {
+        buf.push(format!("#{}", encode_tags(t)));
+    };
+}
+
 fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
     let mut buf = Vec::new();
 
     let metric = event.as_metric();
     match &metric.value {
         MetricValue::Counter { value } => {
-            buf.push(format!("{}:{}", metric.name, value));
-            buf.push("c".to_string());
-            if let Some(t) = &metric.tags {
-                buf.push(format!("#{}", encode_tags(t)));
-            };
+            push_event(&mut buf, &metric, value.to_string(), "c", None);
         }
         MetricValue::Gauge { value } => {
-            match metric.kind {
-                MetricKind::Incremental => buf.push(format!("{}:{:+}", metric.name, value)),
-                MetricKind::Absolute => buf.push(format!("{}:{}", metric.name, value)),
+            let val = match metric.kind {
+                MetricKind::Incremental => value_incr(value),
+                MetricKind::Absolute => value.to_string(),
             };
 
-            buf.push("g".to_string());
-            if let Some(t) = &metric.tags {
-                buf.push(format!("#{}", encode_tags(t)));
-            };
+            push_event(&mut buf, &metric, val, "g", None);
         }
         MetricValue::Distribution {
             values,
@@ -165,23 +185,18 @@ fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
                 StatisticKind::Summary => "d",
             };
             for (val, sample_rate) in values.iter().zip(sample_rates.iter()) {
-                buf.push(format!("{}:{}", metric.name, val));
-                buf.push(metric_type.to_string());
-                if *sample_rate != 1 {
-                    buf.push(format!("@{}", 1.0 / f64::from(*sample_rate)));
-                };
-                if let Some(t) = &metric.tags {
-                    buf.push(format!("#{}", encode_tags(t)));
-                };
+                push_event(
+                    &mut buf,
+                    &metric,
+                    val.to_string(),
+                    metric_type,
+                    Some(*sample_rate),
+                );
             }
         }
         MetricValue::Set { values } => {
             for val in values {
-                buf.push(format!("{}:{}", metric.name, val));
-                buf.push("s".to_string());
-                if let Some(t) = &metric.tags {
-                    buf.push(format!("#{}", encode_tags(t)));
-                };
+                push_event(&mut buf, &metric, val.to_string(), "s", None);
             }
         }
         _ => {
