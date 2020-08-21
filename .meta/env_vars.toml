@@ -42,7 +42,7 @@ Enable more detailed internal logging.
 [env_vars.VECTOR_QUIET]
 type = "bool"
 description = """\
-Reduce detail of internal logging. Overrides VERBOSE.
+Reduce detail of internal logging. Overrides VECTOR_VERBOSE.
 """
 
 [env_vars.VECTOR_WATCH_CONFIG]
