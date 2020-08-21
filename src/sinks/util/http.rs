@@ -25,7 +25,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tower03::Service;
+use tower::Service;
 use tracing::Span;
 use tracing_futures::Instrument;
 
@@ -404,7 +404,7 @@ mod test {
     use futures01::{Future, Stream};
     use hyper::service::{make_service_fn, service_fn};
     use hyper::{Body, Response, Server, Uri};
-    use tower03::Service;
+    use tower::Service;
 
     #[test]
     fn util_http_retry_logic() {

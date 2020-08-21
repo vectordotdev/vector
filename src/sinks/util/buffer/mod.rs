@@ -173,7 +173,8 @@ mod test {
     use super::{Buffer, Compression};
     use crate::buffers::Acker;
     use crate::sinks::util::{BatchSettings, BatchSink};
-    use futures01::{future, Future, Sink};
+    use futures::future;
+    use futures01::{Future, Sink};
     use std::{
         io::Read,
         sync::{Arc, Mutex},

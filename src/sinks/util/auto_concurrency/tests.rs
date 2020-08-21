@@ -31,7 +31,7 @@ use std::sync::{Arc, Mutex};
 use std::task::Poll;
 use std::time::{Duration, Instant};
 use tokio::time::{delay_for, delay_until};
-use tower03::Service;
+use tower::Service;
 
 #[derive(Copy, Clone, Debug, Default, Serialize)]
 struct TestParams {
@@ -95,7 +95,6 @@ impl SinkConfig for TestConfig {
         // Dig deep to get at the internal controller statistics
         let stats = Arc::clone(
             &sink
-                .get_ref()
                 .get_ref()
                 .get_ref()
                 .get_ref()

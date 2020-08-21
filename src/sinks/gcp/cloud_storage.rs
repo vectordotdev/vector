@@ -9,8 +9,7 @@ use crate::{
             http::{HttpClient, HttpClientFuture},
             retries::{RetryAction, RetryLogic},
             BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
-            PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerCompat,
-            TowerRequestConfig,
+            PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, RouterSink,
     },
@@ -32,7 +31,7 @@ use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::task::Poll;
-use tower03::{Service, ServiceBuilder};
+use tower::{Service, ServiceBuilder};
 use tracing::field;
 use uuid::Uuid;
 
@@ -224,10 +223,9 @@ impl GcsSink {
 
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, config.compression));
 
-        let sink =
-            PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch.timeout, cx.acker())
-                .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
-                .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
+        let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+            .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
+            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
         Ok(Box::new(sink))
     }

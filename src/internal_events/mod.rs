@@ -1,4 +1,5 @@
 mod add_fields;
+mod add_tags;
 mod ansi_stripper;
 mod auto_concurrency;
 mod aws_kinesis_streams;
@@ -6,6 +7,7 @@ mod blackhole;
 #[cfg(feature = "sources-docker")]
 mod docker;
 mod elasticsearch;
+mod heartbeat;
 mod http;
 #[cfg(all(unix, feature = "sources-journald"))]
 mod journald;
@@ -17,6 +19,7 @@ mod kubernetes_logs;
 mod logplex;
 #[cfg(feature = "transforms-lua")]
 mod lua;
+mod process;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
 mod regex;
@@ -38,6 +41,7 @@ mod wasm;
 pub mod kubernetes;
 
 pub use self::add_fields::*;
+pub use self::add_tags::*;
 pub use self::ansi_stripper::*;
 pub use self::auto_concurrency::*;
 pub use self::aws_kinesis_streams::*;
@@ -46,6 +50,7 @@ pub use self::blackhole::*;
 pub use self::docker::*;
 pub use self::elasticsearch::*;
 pub use self::file::*;
+pub use self::heartbeat::*;
 pub use self::http::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
@@ -57,6 +62,7 @@ pub use self::kubernetes_logs::*;
 pub use self::logplex::*;
 #[cfg(feature = "transforms-lua")]
 pub use self::lua::*;
+pub use self::process::*;
 #[cfg(feature = "sources-prometheus")]
 pub use self::prometheus::*;
 pub use self::regex::*;

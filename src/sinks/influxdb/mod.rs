@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use snafu::Snafu;
 use std::collections::{BTreeMap, HashMap};
-use tower03::Service;
+use tower::Service;
 
 pub enum Field {
     /// string
