@@ -245,15 +245,15 @@ mod tests {
     use crate::{
         event,
         test_util::{
-            lines_from_file, random_events_with_stream, random_lines_with_stream, runtime,
-            temp_dir, temp_file, trace_init,
+            lines_from_file, random_events_with_stream, random_lines_with_stream, temp_dir,
+            temp_file, trace_init,
         },
     };
     use futures::stream;
     use std::convert::TryInto;
 
-    #[test]
-    fn single_partition() {
+    #[tokio::test]
+    async fn single_partition() {
         trace_init();
 
         let template = temp_file();
@@ -268,11 +268,7 @@ mod tests {
         let (input, _) = random_lines_with_stream(100, 64);
 
         let events = stream::iter(input.clone().into_iter().map(Event::from));
-
-        let mut rt = runtime();
-        let _ = rt
-            .block_on_std(async move { sink.run(events).await })
-            .unwrap();
+        sink.run(events).await.unwrap();
 
         let output = lines_from_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -280,8 +276,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn many_partitions() {
+    #[tokio::test]
+    async fn many_partitions() {
         trace_init();
 
         let directory = temp_dir();
@@ -318,10 +314,7 @@ mod tests {
         input[7].as_mut_log().insert("level", "error");
 
         let events = stream::iter(input.clone().into_iter());
-        let mut rt = runtime();
-        let _ = rt
-            .block_on_std(async move { sink.run(events).await })
-            .unwrap();
+        sink.run(events).await.unwrap();
 
         let output = vec![
             lines_from_file(&directory.join("warnings-2019-26-07.log")),
