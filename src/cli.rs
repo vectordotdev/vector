@@ -55,23 +55,23 @@ pub struct RootOpts {
     /// Read configuration from one or more files. Wildcard paths are supported.
     /// If zero files are specified the default config path
     /// `/etc/vector/vector.toml` will be targeted.
-    #[structopt(name = "config", short, long)]
+    #[structopt(name = "config", short, long, env = "VECTOR_CONFIG")]
     pub config_paths: Vec<PathBuf>,
 
     /// Exit on startup if any sinks fail healthchecks
-    #[structopt(short, long)]
+    #[structopt(short, long, env = "VECTOR_REQUIRE_HEALTHY")]
     pub require_healthy: bool,
 
     /// Number of threads to use for processing (default is number of available cores)
-    #[structopt(short, long)]
+    #[structopt(short, long, env = "VECTOR_THREADS")]
     pub threads: Option<usize>,
 
     /// Enable more detailed internal logging. Repeat to increase level. Overridden by `--quiet`.
-    #[structopt(short, long, parse(from_occurrences))]
+    #[structopt(short, long, env = "VECTOR_VERBOSE", parse(from_occurrences))]
     pub verbose: u8,
 
     /// Reduce detail of internal logging. Repeat to reduce further. Overrides `--verbose`.
-    #[structopt(short, long, parse(from_occurrences))]
+    #[structopt(short, long, env = "VECTOR_QUIET", parse(from_occurrences))]
     pub quiet: u8,
 
     /// Set the logging format
@@ -89,7 +89,7 @@ pub struct RootOpts {
     pub color: Color,
 
     /// Watch for changes in configuration file, and reload accordingly.
-    #[structopt(short, long)]
+    #[structopt(short, long, env = "VECTOR_WATCH_CONFIG")]
     pub watch_config: bool,
 }
 
