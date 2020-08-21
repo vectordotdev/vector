@@ -11,13 +11,13 @@ mod fanout;
 mod task;
 pub mod unit_test;
 
-use crate::api::server::Server;
 use crate::{
     buffers,
     config::{self, Config, ConfigDiff, ServiceDiff},
     shutdown::SourceShutdownCoordinator,
     topology::{builder::Pieces, task::Task},
 };
+use api::Server;
 use futures::{compat::Future01CompatExt, future, FutureExt, StreamExt, TryFutureExt};
 use futures01::{sync::mpsc, Future};
 use std::{

@@ -1,7 +1,6 @@
 use super::handler;
 
-use crate::api::schema::{schema, Context};
-use crate::tls::{MaybeTlsSettings, TlsConfig};
+use crate::schema::{schema, Context};
 use juniper::futures::FutureExt;
 use juniper_graphql_ws::ConnectionConfig;
 use juniper_warp::playground_filter;
@@ -18,7 +17,6 @@ pub struct Server {
     address: SocketAddr,
     trigger_cancel: Sender<()>,
     cancel_signal: Option<Receiver<()>>,
-    tls: Option<TlsConfig>,
 }
 
 impl Server {
@@ -30,7 +28,6 @@ impl Server {
             address,
             trigger_cancel,
             cancel_signal: Some(cancel_signal),
-            tls: None,
         }
     }
 
@@ -50,21 +47,17 @@ impl Server {
 
     /// Run the API server
     pub async fn run(mut self) -> Self {
-        let tls = MaybeTlsSettings::from_config(&self.tls, true).unwrap();
-        let mut listener = tls.bind(&self.address).await.unwrap();
-
         let rx = self
             .cancel_signal
             .take()
             .expect("Run can only be called once");
 
-        tokio::spawn(async move {
-            warp::serve(make_routes())
-                .serve_incoming_with_graceful_shutdown(listener.incoming(), async {
-                    let _ = rx.await;
-                })
-                .await;
-        });
+        let (_, server) =
+            warp::serve(make_routes()).bind_with_graceful_shutdown(self.address, async move {
+                let _ = rx.await;
+            });
+
+        tokio::spawn(server);
 
         self
     }

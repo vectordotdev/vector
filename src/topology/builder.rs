@@ -4,7 +4,6 @@ use super::{
     ConfigDiff,
 };
 use crate::{
-    api::server::Server,
     buffers,
     config::{DataType, ServiceDiff, SinkContext, TransformContext},
     dns::Resolver,
@@ -12,6 +11,7 @@ use crate::{
     shutdown::SourceShutdownCoordinator,
     Pipeline,
 };
+use api::Server;
 use futures::{compat::Future01CompatExt, FutureExt};
 use futures01::{sync::mpsc, Future, Stream};
 use std::collections::HashMap;

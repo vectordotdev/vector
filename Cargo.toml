@@ -33,6 +33,7 @@ members = [
   "lib/vector-wasm",
   "lib/k8s-test-framework",
   "lib/prometheus-parser",
+  "lib/api"
 ]
 
 [dependencies]
@@ -41,6 +42,7 @@ codec = { path = "lib/codec" }
 file-source = { path = "lib/file-source" }
 tracing-limit = { path = "lib/tracing-limit" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
+api = { path = "lib/api" }
 
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
@@ -91,12 +93,6 @@ prost-types = "0.6.1"
 # GCP
 goauth = { version = "0.7.1", optional = true }
 smpl_jwt = { version = "0.5.0", optional = true }
-
-# API - GraphQL
-juniper = { git = "https://github.com/graphql-rust/juniper", branch = "master" }
-juniper_subscriptions = { git = "https://github.com/graphql-rust/juniper", branch = "master" }
-juniper_warp = { git = "https://github.com/graphql-rust/juniper", branch = "master", features = ["subscriptions"] }
-juniper_graphql_ws = { git = "https://github.com/graphql-rust/juniper", branch = "master" }
 
 # External libs
 derivative = "1.0"

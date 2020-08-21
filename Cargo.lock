@@ -46,6 +46,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9a60d744a80c30fcb657dfe2c1b22bcb3e814c1a1e3674f32bf5820b570fbff"
 
 [[package]]
+name = "api"
+version = "0.1.0"
+dependencies = [
+ "juniper",
+ "juniper_graphql_ws",
+ "juniper_subscriptions",
+ "juniper_warp",
+ "serde",
+ "serde_json",
+ "tokio",
+ "warp",
+]
+
+[[package]]
 name = "approx"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5614,6 +5628,7 @@ name = "vector"
 version = "0.11.0"
 dependencies = [
  "anyhow",
+ "api",
  "approx",
  "assert_cmd",
  "async-stream",
@@ -5653,10 +5668,6 @@ dependencies = [
  "indexmap",
  "inventory",
  "jemallocator",
- "juniper",
- "juniper_graphql_ws",
- "juniper_subscriptions",
- "juniper_warp",
  "k8s-openapi",
  "k8s-test-framework",
  "lazy_static 1.4.0",

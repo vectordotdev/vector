@@ -1,0 +1,24 @@
+[package]
+name = "api"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+
+# Tokio
+tokio = "0.2"
+
+# Serde
+serde = { version = "1.0.80", features = ["derive"] }
+serde_json = { version = "1.0.33", features = ["raw_value"] }
+
+# Warp
+warp = "0.2.4"
+
+# API - GraphQL
+juniper = { git = "https://github.com/graphql-rust/juniper", branch = "master" }
+juniper_subscriptions = { git = "https://github.com/graphql-rust/juniper", branch = "master" }
+juniper_warp = { git = "https://github.com/graphql-rust/juniper", branch = "master", features = ["subscriptions"] }
+juniper_graphql_ws = { git = "https://github.com/graphql-rust/juniper", branch = "master" }
