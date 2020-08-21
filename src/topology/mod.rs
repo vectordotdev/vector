@@ -490,9 +490,7 @@ impl RunningTopology {
             port = server.port().as_str()
         );
 
-        let tx = server.run().await;
-
-        self.api = Some(tx);
+        self.api = Some(server.run().await);
     }
 
     /// Stop the API server, if applicable
