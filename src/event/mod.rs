@@ -16,7 +16,7 @@ pub mod merge_state;
 pub mod metric;
 mod util;
 
-pub use metric::Metric;
+pub use metric::{Metric, StatisticKind};
 pub(crate) use util::log::PathComponent;
 pub(crate) use util::log::PathIter;
 
@@ -57,42 +57,42 @@ impl Event {
     pub fn as_log(&self) -> &LogEvent {
         match self {
             Event::Log(log) => log,
-            _ => panic!("failed type coercion, {:?} is not a log event", self),
+            _ => panic!("Failed type coercion, {:?} is not a log event", self),
         }
     }
 
     pub fn as_mut_log(&mut self) -> &mut LogEvent {
         match self {
             Event::Log(log) => log,
-            _ => panic!("failed type coercion, {:?} is not a log event", self),
+            _ => panic!("Failed type coercion, {:?} is not a log event", self),
         }
     }
 
     pub fn into_log(self) -> LogEvent {
         match self {
             Event::Log(log) => log,
-            _ => panic!("failed type coercion, {:?} is not a log event", self),
+            _ => panic!("Failed type coercion, {:?} is not a log event", self),
         }
     }
 
     pub fn as_metric(&self) -> &Metric {
         match self {
             Event::Metric(metric) => metric,
-            _ => panic!("failed type coercion, {:?} is not a metric", self),
+            _ => panic!("Failed type coercion, {:?} is not a metric", self),
         }
     }
 
     pub fn as_mut_metric(&mut self) -> &mut Metric {
         match self {
             Event::Metric(metric) => metric,
-            _ => panic!("failed type coercion, {:?} is not a metric", self),
+            _ => panic!("Failed type coercion, {:?} is not a metric", self),
         }
     }
 
     pub fn into_metric(self) -> Metric {
         match self {
             Event::Metric(metric) => metric,
-            _ => panic!("failed type coercion, {:?} is not a metric", self),
+            _ => panic!("Failed type coercion, {:?} is not a metric", self),
         }
     }
 }
@@ -295,12 +295,6 @@ impl From<Bytes> for Value {
     }
 }
 
-impl From<bytes05::Bytes> for Value {
-    fn from(bytes: bytes05::Bytes) -> Self {
-        Value::Bytes(bytes.as_ref().into())
-    }
-}
-
 impl From<Vec<u8>> for Value {
     fn from(bytes: Vec<u8>) -> Self {
         Value::Bytes(bytes.into())
@@ -309,7 +303,7 @@ impl From<Vec<u8>> for Value {
 
 impl From<&[u8]> for Value {
     fn from(bytes: &[u8]) -> Self {
-        Value::Bytes(bytes.into())
+        Value::Bytes(Vec::from(bytes).into())
     }
 }
 
@@ -327,7 +321,7 @@ impl From<&String> for Value {
 
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
-        Value::Bytes(s.into())
+        Value::Bytes(Vec::from(s.as_bytes()).into())
     }
 }
 
@@ -538,6 +532,12 @@ impl From<proto::EventWrapper> for Event {
                         values: set.values.into_iter().collect(),
                     },
                     MetricProto::Distribution(dist) => MetricValue::Distribution {
+                        statistic: match dist.statistic() {
+                            proto::distribution::StatisticKind::Histogram => {
+                                StatisticKind::Histogram
+                            }
+                            proto::distribution::StatisticKind::Summary => StatisticKind::Summary,
+                        },
                         values: dist.values,
                         sample_rates: dist.sample_rates,
                     },
@@ -644,9 +644,17 @@ impl From<Event> for proto::EventWrapper {
                     MetricValue::Distribution {
                         values,
                         sample_rates,
+                        statistic,
                     } => MetricProto::Distribution(proto::Distribution {
                         values,
                         sample_rates,
+                        statistic: match statistic {
+                            StatisticKind::Histogram => {
+                                proto::distribution::StatisticKind::Histogram
+                            }
+                            StatisticKind::Summary => proto::distribution::StatisticKind::Summary,
+                        }
+                        .into(),
                     }),
                     MetricValue::AggregatedHistogram {
                         buckets,
@@ -700,23 +708,6 @@ impl From<Event> for Vec<u8> {
 
 impl From<Bytes> for Event {
     fn from(message: Bytes) -> Self {
-        let mut event = Event::Log(LogEvent {
-            fields: BTreeMap::new(),
-        });
-
-        event
-            .as_mut_log()
-            .insert(log_schema().message_key().clone(), message);
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), Utc::now());
-
-        event
-    }
-}
-
-impl From<bytes05::Bytes> for Event {
-    fn from(message: bytes05::Bytes) -> Self {
         let mut event = Event::Log(LogEvent {
             fields: BTreeMap::new(),
         });

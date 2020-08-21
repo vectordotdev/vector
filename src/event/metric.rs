@@ -1,7 +1,10 @@
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
+use metrics_core::Key;
+use metrics_runtime::Measurement;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Metric {
@@ -35,6 +38,7 @@ pub enum MetricValue {
     Distribution {
         values: Vec<f64>,
         sample_rates: Vec<u32>,
+        statistic: StatisticKind,
     },
     AggregatedHistogram {
         buckets: Vec<f64>,
@@ -48,6 +52,15 @@ pub enum MetricValue {
         count: u32,
         sum: f64,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize, is_enum_variant)]
+#[serde(rename_all = "snake_case")]
+pub enum StatisticKind {
+    Histogram,
+    /// Corresponds to DataDog's Distribution Metric
+    /// https://docs.datadoghq.com/developers/metrics/types/?tab=distribution#definition
+    Summary,
 }
 
 impl Metric {
@@ -82,12 +95,14 @@ impl Metric {
                 MetricValue::Distribution {
                     ref mut values,
                     ref mut sample_rates,
+                    statistic: statistic_a,
                 },
                 MetricValue::Distribution {
                     values: values2,
                     sample_rates: sample_rates2,
+                    statistic: statistic_b,
                 },
-            ) => {
+            ) if statistic_a == statistic_b => {
                 values.extend_from_slice(&values2);
                 sample_rates.extend_from_slice(&sample_rates2);
             }
@@ -131,6 +146,7 @@ impl Metric {
             MetricValue::Distribution {
                 ref mut values,
                 ref mut sample_rates,
+                ..
             } => {
                 values.clear();
                 sample_rates.clear();
@@ -160,6 +176,167 @@ impl Metric {
                 *sum = 0.0;
             }
         }
+    }
+
+    pub fn from_measurement(key: Key, measurement: Measurement) -> Self {
+        let value = match measurement {
+            Measurement::Counter(v) => MetricValue::Counter { value: v as f64 },
+            Measurement::Gauge(v) => MetricValue::Gauge { value: v as f64 },
+            Measurement::Histogram(packed) => {
+                let values = packed
+                    .decompress()
+                    .into_iter()
+                    .map(|i| i as f64)
+                    .collect::<Vec<_>>();
+                let sample_rates = vec![1; values.len()];
+                MetricValue::Distribution {
+                    values,
+                    sample_rates,
+                    statistic: StatisticKind::Histogram,
+                }
+            }
+        };
+
+        let labels = key
+            .labels()
+            .map(|label| (String::from(label.key()), String::from(label.value())))
+            .collect::<BTreeMap<_, _>>();
+
+        Self {
+            name: key.name().to_string(),
+            timestamp: Some(Utc::now()),
+            tags: if labels.is_empty() {
+                None
+            } else {
+                Some(labels)
+            },
+            kind: MetricKind::Absolute,
+            value,
+        }
+    }
+}
+
+impl Display for Metric {
+    /// Display a metric using something like Prometheus' text format:
+    ///
+    /// TIMESTAMP NAME{TAGS} KIND DATA
+    ///
+    /// TIMESTAMP is in ISO 8601 format with UTC time zone.
+    ///
+    /// KIND is either `=` for absolute metrics, or `+` for incremental
+    /// metrics.
+    ///
+    /// DATA is dependent on the type of metric, and is a simplified
+    /// representation of the data contents. In particular,
+    /// distributions, histograms, and summaries are represented as a
+    /// list of `X@Y` words, where `X` is the rate, count, or quantile,
+    /// and `Y` is the value or bucket.
+    ///
+    /// example:
+    /// ```text
+    /// 2020-08-12T20:23:37.248661343Z bytes_processed{component_kind="sink",component_type="blackhole"} = 6391
+    /// ```
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        if let Some(timestamp) = &self.timestamp {
+            write!(fmt, "{:?} ", timestamp)?;
+        }
+        write_word(fmt, &self.name)?;
+        write!(fmt, "{{")?;
+        if let Some(tags) = &self.tags {
+            write_list(fmt, ",", tags.iter(), |fmt, (tag, value)| {
+                write_word(fmt, tag).and_then(|()| write!(fmt, "={:?}", value))
+            })?;
+        }
+        write!(
+            fmt,
+            "}} {} ",
+            match self.kind {
+                MetricKind::Absolute => '=',
+                MetricKind::Incremental => '+',
+            }
+        )?;
+        match &self.value {
+            MetricValue::Counter { value } => write!(fmt, "{}", value),
+            MetricValue::Gauge { value } => write!(fmt, "{}", value),
+            MetricValue::Set { values } => {
+                write_list(fmt, " ", values.iter(), |fmt, value| write_word(fmt, value))
+            }
+            MetricValue::Distribution {
+                values,
+                sample_rates,
+                statistic,
+            } => {
+                write!(
+                    fmt,
+                    "{} ",
+                    match statistic {
+                        StatisticKind::Histogram => "histogram",
+                        StatisticKind::Summary => "summary",
+                    }
+                )?;
+                write_list(
+                    fmt,
+                    " ",
+                    values.iter().zip(sample_rates.iter()),
+                    |fmt, (value, rate)| write!(fmt, "{}@{}", rate, value),
+                )
+            }
+            MetricValue::AggregatedHistogram {
+                buckets,
+                counts,
+                count,
+                sum,
+            } => {
+                write!(fmt, "count={} sum={} ", count, sum)?;
+                write_list(
+                    fmt,
+                    " ",
+                    buckets.iter().zip(counts.iter()),
+                    |fmt, (bucket, count)| write!(fmt, "{}@{}", count, bucket),
+                )
+            }
+            MetricValue::AggregatedSummary {
+                quantiles,
+                values,
+                count,
+                sum,
+            } => {
+                write!(fmt, "count={} sum={} ", count, sum)?;
+                write_list(
+                    fmt,
+                    " ",
+                    quantiles.iter().zip(values.iter()),
+                    |fmt, (quantile, value)| write!(fmt, "{}@{}", quantile, value),
+                )
+            }
+        }
+    }
+}
+
+fn write_list<I, T, W>(
+    fmt: &mut Formatter<'_>,
+    sep: &str,
+    items: I,
+    writer: W,
+) -> Result<(), fmt::Error>
+where
+    I: Iterator<Item = T>,
+    W: Fn(&mut Formatter<'_>, T) -> Result<(), fmt::Error>,
+{
+    let mut this_sep = "";
+    for item in items {
+        write!(fmt, "{}", this_sep)?;
+        writer(fmt, item)?;
+        this_sep = sep;
+    }
+    Ok(())
+}
+
+fn write_word(fmt: &mut Formatter<'_>, word: &str) -> Result<(), fmt::Error> {
+    if word.contains(|c: char| !c.is_ascii_alphanumeric() && c != '_') {
+        write!(fmt, "{:?}", word)
+    } else {
+        write!(fmt, "{}", word)
     }
 }
 
@@ -291,6 +468,7 @@ mod test {
             value: MetricValue::Distribution {
                 values: vec![1.0],
                 sample_rates: vec![10],
+                statistic: StatisticKind::Histogram,
             },
         };
 
@@ -302,6 +480,7 @@ mod test {
             value: MetricValue::Distribution {
                 values: vec![1.0],
                 sample_rates: vec![20],
+                statistic: StatisticKind::Histogram,
             },
         };
 
@@ -316,8 +495,115 @@ mod test {
                 value: MetricValue::Distribution {
                     values: vec![1.0, 1.0],
                     sample_rates: vec![10, 20],
+                    statistic: StatisticKind::Histogram
                 },
             }
         )
+    }
+
+    #[test]
+    fn display() {
+        assert_eq!(
+            format!(
+                "{}",
+                Metric {
+                    name: "one".into(),
+                    timestamp: None,
+                    tags: Some(tags()),
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 1.23 },
+                }
+            ),
+            r#"one{empty_tag="",normal_tag="value",true_tag="true"} = 1.23"#
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                Metric {
+                    name: "two word".into(),
+                    timestamp: Some(ts()),
+                    tags: None,
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Gauge { value: 2.0 }
+                }
+            ),
+            r#"2018-11-14T08:09:10.000000011Z "two word"{} + 2"#
+        );
+
+        let mut values = BTreeSet::<String>::new();
+        values.insert("v1".into());
+        values.insert("v2_two".into());
+        values.insert("thrəë".into());
+        values.insert("four=4".into());
+        assert_eq!(
+            format!(
+                "{}",
+                Metric {
+                    name: "three".into(),
+                    timestamp: None,
+                    tags: None,
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Set { values }
+                }
+            ),
+            r#"three{} = "four=4" "thrəë" v1 v2_two"#
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                Metric {
+                    name: "four".into(),
+                    timestamp: None,
+                    tags: None,
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Distribution {
+                        values: vec![1.0, 2.0],
+                        sample_rates: vec![3, 4],
+                        statistic: StatisticKind::Histogram,
+                    }
+                }
+            ),
+            r#"four{} = histogram 3@1 4@2"#
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                Metric {
+                    name: "five".into(),
+                    timestamp: None,
+                    tags: None,
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::AggregatedHistogram {
+                        buckets: vec![51.0, 52.0],
+                        counts: vec![53, 54],
+                        count: 107,
+                        sum: 103.0,
+                    }
+                }
+            ),
+            r#"five{} = count=107 sum=103 53@51 54@52"#
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                Metric {
+                    name: "six".into(),
+                    timestamp: None,
+                    tags: None,
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::AggregatedSummary {
+                        quantiles: vec![1.0, 2.0],
+                        values: vec![63.0, 64.0],
+                        count: 2,
+                        sum: 127.0,
+                    }
+                }
+            ),
+            r#"six{} = count=2 sum=127 1@63 2@64"#
+        );
     }
 }

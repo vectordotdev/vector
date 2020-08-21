@@ -8,7 +8,7 @@ pub(crate) struct JournaldEventReceived {
 
 impl InternalEvent for JournaldEventReceived {
     fn emit_logs(&self) {
-        trace!(message = "received line.", byte_size = %self.byte_size);
+        trace!(message = "Received line.", byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {

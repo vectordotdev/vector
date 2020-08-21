@@ -1,10 +1,10 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use async_trait::async_trait;
 use futures::pin_mut;
@@ -15,17 +15,13 @@ use tokio::io::{self, AsyncWriteExt};
 
 use super::streaming_sink::{self, StreamingSink};
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Target {
+    #[derivative(Default)]
     Stdout,
     Stderr,
-}
-
-impl Default for Target {
-    fn default() -> Self {
-        Target::Stdout
-    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -89,7 +85,10 @@ fn encode_event(
                 Ok(s)
             }
         },
-        Event::Metric(metric) => serde_json::to_string(&metric),
+        Event::Metric(metric) => match encoding.codec() {
+            Encoding::Json => serde_json::to_string(&metric),
+            Encoding::Text => Ok(format!("{}", metric)),
+        },
     }
 }
 
@@ -129,7 +128,7 @@ impl StreamingSink for WriterSink {
 #[cfg(test)]
 mod test {
     use super::{encode_event, Encoding, EncodingConfig};
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use crate::event::{Event, Value};
     use chrono::{offset::TimeZone, Utc};
 
@@ -174,7 +173,7 @@ mod test {
         });
         assert_eq!(
             r#"{"name":"foos","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"Key3":"Value3","key1":"value1","key2":"value2"},"kind":"incremental","counter":{"value":100.0}}"#,
-            encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
+            encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
         );
     }
 
@@ -191,7 +190,7 @@ mod test {
         });
         assert_eq!(
             r#"{"name":"users","timestamp":null,"tags":null,"kind":"incremental","set":{"values":["bob"]}}"#,
-            encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
+            encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
         );
     }
 
@@ -205,10 +204,28 @@ mod test {
             value: MetricValue::Distribution {
                 values: vec![10.0],
                 sample_rates: vec![1],
+                statistic: StatisticKind::Histogram,
             },
         });
         assert_eq!(
-            r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","distribution":{"values":[10.0],"sample_rates":[1]}}"#,
+            r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","distribution":{"values":[10.0],"sample_rates":[1],"statistic":"histogram"}}"#,
+            encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
+        );
+    }
+
+    #[test]
+    fn encodes_metric_text() {
+        let event = Event::Metric(Metric {
+            name: "users".into(),
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Set {
+                values: vec!["bob".into()].into_iter().collect(),
+            },
+        });
+        assert_eq!(
+            "users{} + bob",
             encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
         );
     }

@@ -1,18 +1,18 @@
-use crate::event::Event;
 use crate::{
+    event::Event,
+    internal_events::{HTTPBadRequest, HTTPEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
+    Pipeline,
 };
-use futures::{
-    compat::{AsyncRead01CompatExt, Future01CompatExt, Stream01CompatExt},
-    FutureExt, TryFutureExt, TryStreamExt,
-};
-use futures01::{sync::mpsc, Sink};
+use async_trait::async_trait;
+use bytes::Bytes;
+use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
+use futures01::Sink;
 use serde::Serialize;
 use std::error::Error;
 use std::fmt;
 use std::net::SocketAddr;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
 use warp::{
     filters::BoxedFilter,
     http::{HeaderMap, StatusCode},
@@ -49,19 +49,16 @@ impl fmt::Debug for RejectShuttingDown {
 }
 impl warp::reject::Reject for RejectShuttingDown {}
 
+#[async_trait]
 pub trait HttpSource: Clone + Send + Sync + 'static {
-    fn build_event(
-        &self,
-        body: bytes05::Bytes,
-        header_map: HeaderMap,
-    ) -> Result<Vec<Event>, ErrorMessage>;
+    fn build_event(&self, body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage>;
 
     fn run(
         self,
         address: SocketAddr,
         path: &'static str,
         tls: &Option<TlsConfig>,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
         shutdown: ShutdownSignal,
     ) -> crate::Result<crate::sources::Source> {
         let mut filter: BoxedFilter<()> = warp::post().boxed();
@@ -74,18 +71,23 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             .and(warp::path::end())
             .and(warp::header::headers_cloned())
             .and(warp::body::bytes())
-            .and_then(move |headers: HeaderMap, body| {
-                info!("Handling http request: {:?}", headers);
+            .and_then(move |headers: HeaderMap, body: Bytes| {
+                info!("Handling HTTP request: {:?}", headers);
 
                 let this = self.clone();
                 let out = out.clone();
 
                 async move {
+                    let body_size = body.len();
                     match this.build_event(body, headers) {
                         Ok(events) => {
+                            emit!(HTTPEventsReceived {
+                                events_count: events.len(),
+                                byte_size: body_size,
+                            });
                             out.send_all(futures01::stream::iter_ok(events))
                                 .compat()
-                                .map_err(move |e: mpsc::SendError<Event>| {
+                                .map_err(move |e: futures01::sync::mpsc::SendError<Event>| {
                                     // can only fail if receiving end disconnected, so we are shuting down,
                                     // probably not gracefully.
                                     error!("Failed to forward events, downstream is closed");
@@ -95,7 +97,13 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                 .map_ok(|_| warp::reply())
                                 .await
                         }
-                        Err(err) => Err(warp::reject::custom(err)),
+                        Err(err) => {
+                            emit!(HTTPBadRequest {
+                                error_code: err.code,
+                                error_message: err.message.as_str(),
+                            });
+                            Err(warp::reject::custom(err))
+                        }
                     }
                 }
             });
@@ -114,15 +122,14 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             }
         });
 
-        info!(message = "building http server", addr = %address);
+        info!(message = "Building HTTP server", addr = %address);
 
-        let tls = MaybeTlsSettings::from_config(tls, true).unwrap();
-        let incoming = tls.bind(&address).unwrap().incoming();
-
+        let tls = MaybeTlsSettings::from_config(tls, true)?;
         let fut = async move {
+            let mut listener = tls.bind(&address).await.unwrap();
             let _ = warp::serve(routes)
                 .serve_incoming_with_graceful_shutdown(
-                    incoming.compat().map_ok(|s| s.compat().compat()),
+                    listener.incoming(),
                     shutdown.clone().compat().map(|_| ()),
                 )
                 .await;

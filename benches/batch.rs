@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
-use futures01::{future, Sink, Stream};
+use futures::future;
+use futures01::{Sink, Stream};
 use std::convert::Infallible;
 use std::time::Duration;
 use vector::buffers::Acker;

@@ -5,12 +5,12 @@ mod unix;
 
 use super::util::TcpSource;
 use crate::{
-    event::{self, Event},
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    event,
     shutdown::ShutdownSignal,
     tls::MaybeTlsSettings,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    Pipeline,
 };
-use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
@@ -73,7 +73,7 @@ impl SourceConfig for SocketConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         match self.mode.clone() {
             Mode::Tcp(config) => {
@@ -135,23 +135,26 @@ mod test {
     #[cfg(unix)]
     use super::unix::UnixConfig;
     use super::SocketConfig;
+    use crate::config::{GlobalOptions, SourceConfig};
     use crate::dns::Resolver;
     use crate::event;
     use crate::runtime::Runtime;
     use crate::shutdown::{ShutdownSignal, SourceShutdownCoordinator};
     use crate::sinks::util::tcp::TcpSink;
     use crate::test_util::{
-        block_on, collect_n, next_addr, runtime, send_lines, send_lines_tls, wait_for_tcp, CollectN,
+        block_on, collect_n, next_addr, random_string, runtime, send_lines, send_lines_tls,
+        trace_init, wait_for_tcp, CollectN,
     };
     use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions};
-    use crate::topology::config::{GlobalOptions, SourceConfig};
+    use crate::Pipeline;
     use bytes::Bytes;
     #[cfg(unix)]
-    use futures::{compat::Future01CompatExt, stream, SinkExt};
-    use futures01::{
-        sync::{mpsc, oneshot},
-        Future, Stream,
+    use futures::SinkExt;
+    use futures::{
+        compat::{Future01CompatExt, Sink01CompatExt},
+        stream, StreamExt,
     };
+    use futures01::{sync::oneshot, Stream};
     #[cfg(unix)]
     use std::path::PathBuf;
     use std::{
@@ -161,17 +164,17 @@ mod test {
             Arc,
         },
         thread,
-        time::{Duration, Instant},
     };
     #[cfg(unix)]
     use tokio::net::UnixStream;
+    use tokio::time::{Duration, Instant};
     #[cfg(unix)]
     use tokio_util::codec::{FramedWrite, LinesCodec};
 
     //////// TCP TESTS ////////
     #[test]
     fn tcp_it_includes_host() {
-        let (tx, rx) = mpsc::channel(1);
+        let (tx, rx) = Pipeline::new_test();
 
         let addr = next_addr();
 
@@ -185,7 +188,7 @@ mod test {
             .unwrap();
         let mut rt = runtime();
         rt.spawn(server);
-        wait_for_tcp(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         rt.block_on_std(send_lines(addr, vec!["test".to_owned()].into_iter()))
             .unwrap();
@@ -199,7 +202,7 @@ mod test {
 
     #[test]
     fn tcp_it_includes_source_type() {
-        let (tx, rx) = mpsc::channel(1);
+        let (tx, rx) = Pipeline::new_test();
 
         let addr = next_addr();
 
@@ -213,7 +216,7 @@ mod test {
             .unwrap();
         let mut rt = runtime();
         rt.spawn(server);
-        wait_for_tcp(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         rt.block_on_std(send_lines(addr, vec!["test".to_owned()].into_iter()))
             .unwrap();
@@ -227,7 +230,7 @@ mod test {
 
     #[test]
     fn tcp_continue_after_long_line() {
-        let (tx, rx) = mpsc::channel(10);
+        let (tx, rx) = Pipeline::new_test();
 
         let addr = next_addr();
 
@@ -244,7 +247,7 @@ mod test {
             .unwrap();
         let mut rt = runtime();
         rt.spawn(server);
-        wait_for_tcp(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         let lines = vec![
             "short".to_owned(),
@@ -270,7 +273,7 @@ mod test {
 
     #[test]
     fn tcp_with_tls() {
-        let (tx, rx) = mpsc::channel(10);
+        let (tx, rx) = Pipeline::new_test();
 
         let addr = next_addr();
 
@@ -295,7 +298,7 @@ mod test {
             .unwrap();
         let mut rt = runtime();
         rt.spawn(server);
-        wait_for_tcp(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         let lines = vec![
             "short".to_owned(),
@@ -322,7 +325,7 @@ mod test {
     #[test]
     fn tcp_shutdown_simple() {
         let source_name = "tcp_shutdown_simple";
-        let (tx, rx) = mpsc::channel(2);
+        let (tx, rx) = Pipeline::new_test();
         let addr = next_addr();
 
         let mut shutdown = SourceShutdownCoordinator::default();
@@ -334,7 +337,7 @@ mod test {
             .unwrap();
         let mut rt = runtime();
         let source_handle = oneshot::spawn(server, &rt.executor());
-        wait_for_tcp(addr);
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         // Send data to Source.
         rt.block_on_std(send_lines(addr, vec!["test".to_owned()].into_iter()))
@@ -358,10 +361,12 @@ mod test {
 
     #[test]
     fn tcp_shutdown_infinite_stream() {
+        trace_init();
+
         // It's important that the buffer be large enough that the TCP source doesn't have
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
-        let (tx, rx) = mpsc::channel(10000);
+        let (tx, rx) = Pipeline::new_with_buffer(10_000);
         let source_name = "tcp_shutdown_infinite_stream";
 
         let addr = next_addr();
@@ -377,8 +382,8 @@ mod test {
         .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
         .unwrap();
         let mut rt = Runtime::with_thread_count(2).unwrap();
-        let source_handle = oneshot::spawn(server, &rt.executor());
-        wait_for_tcp(addr);
+        let source_handle = rt.spawn_handle_std(server.compat());
+        rt.block_on_std(async move { wait_for_tcp(addr).await });
 
         // Spawn future that keeps sending lines to the TCP source forever.
         let sink = TcpSink::new(
@@ -387,13 +392,15 @@ mod test {
             Resolver,
             MaybeTlsSettings::Raw(()),
         );
-        rt.spawn(
-            futures01::stream::iter_ok::<_, ()>(std::iter::repeat(()))
-                .map(|_| Bytes::from("test\n"))
-                .map_err(|_| ())
-                .forward(sink)
-                .map(|_| ()),
-        );
+        let message = random_string(512);
+        let message_event = Bytes::from(message.clone() + "\n");
+        rt.spawn_std(async move {
+            let _ = stream::repeat(())
+                .map(move |_| Ok(message_event.clone()))
+                .forward(sink.sink_compat())
+                .await
+                .unwrap();
+        });
 
         // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
         let (_rx, events) = rt.block_on(CollectN::new(rx, 100)).ok().unwrap();
@@ -401,7 +408,7 @@ mod test {
         for event in events {
             assert_eq!(
                 event.as_log()[&event::log_schema().message_key()],
-                "test".into()
+                message.clone().into()
             );
         }
 
@@ -411,7 +418,9 @@ mod test {
         assert_eq!(true, shutdown_success);
 
         // Ensure that the source has actually shut down.
-        rt.block_on(source_handle).unwrap();
+        rt.block_on_std(async move {
+            let _ = source_handle.await.unwrap();
+        })
     }
 
     //////// UDP TESTS ////////
@@ -444,7 +453,7 @@ mod test {
     }
 
     fn init_udp_with_shutdown(
-        sender: mpsc::Sender<event::Event>,
+        sender: Pipeline,
         source_name: &str,
         shutdown: &mut SourceShutdownCoordinator,
     ) -> (SocketAddr, Runtime, oneshot::SpawnHandle<(), ()>) {
@@ -452,14 +461,14 @@ mod test {
         init_udp_inner(sender, source_name, shutdown_signal)
     }
 
-    fn init_udp(sender: mpsc::Sender<event::Event>) -> (SocketAddr, Runtime) {
+    fn init_udp(sender: Pipeline) -> (SocketAddr, Runtime) {
         let (addr, rt, handle) = init_udp_inner(sender, "default", ShutdownSignal::noop());
         handle.forget();
         (addr, rt)
     }
 
     fn init_udp_inner(
-        sender: mpsc::Sender<event::Event>,
+        sender: Pipeline,
         source_name: &str,
         shutdown_signal: ShutdownSignal,
     ) -> (SocketAddr, Runtime, oneshot::SpawnHandle<(), ()>) {
@@ -476,7 +485,7 @@ mod test {
         let rt = runtime();
         let source_handle = oneshot::spawn(server, &rt.executor());
 
-        // Wait for udp to start listening
+        // Wait for UDP to start listening
         thread::sleep(Duration::from_millis(100));
 
         (addr, rt, source_handle)
@@ -484,7 +493,7 @@ mod test {
 
     #[test]
     fn udp_message() {
-        let (tx, rx) = mpsc::channel(2);
+        let (tx, rx) = Pipeline::new_test();
 
         let (address, mut rt) = init_udp(tx);
 
@@ -499,7 +508,7 @@ mod test {
 
     #[test]
     fn udp_multiple_messages() {
-        let (tx, rx) = mpsc::channel(10);
+        let (tx, rx) = Pipeline::new_test();
 
         let (address, mut rt) = init_udp(tx);
 
@@ -518,7 +527,7 @@ mod test {
 
     #[test]
     fn udp_multiple_packets() {
-        let (tx, rx) = mpsc::channel(10);
+        let (tx, rx) = Pipeline::new_test();
 
         let (address, mut rt) = init_udp(tx);
 
@@ -537,7 +546,7 @@ mod test {
 
     #[test]
     fn udp_it_includes_host() {
-        let (tx, rx) = mpsc::channel(2);
+        let (tx, rx) = Pipeline::new_test();
 
         let (address, mut rt) = init_udp(tx);
 
@@ -552,7 +561,7 @@ mod test {
 
     #[test]
     fn udp_it_includes_source_type() {
-        let (tx, rx) = mpsc::channel(2);
+        let (tx, rx) = Pipeline::new_test();
 
         let (address, mut rt) = init_udp(tx);
 
@@ -567,7 +576,7 @@ mod test {
 
     #[test]
     fn udp_shutdown_simple() {
-        let (tx, rx) = mpsc::channel(2);
+        let (tx, rx) = Pipeline::new_test();
         let source_name = "udp_shutdown_simple";
 
         let mut shutdown = SourceShutdownCoordinator::default();
@@ -594,7 +603,7 @@ mod test {
 
     #[test]
     fn udp_shutdown_infinite_stream() {
-        let (tx, rx) = mpsc::channel(10);
+        let (tx, rx) = Pipeline::new_test();
         let source_name = "udp_shutdown_infinite_stream";
 
         let mut shutdown = SourceShutdownCoordinator::default();
@@ -637,7 +646,7 @@ mod test {
 
     ////////////// UNIX TESTS //////////////
     #[cfg(unix)]
-    fn init_unix(sender: mpsc::Sender<event::Event>) -> (PathBuf, Runtime) {
+    fn init_unix(sender: Pipeline) -> (PathBuf, Runtime) {
         let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
 
         let server = SocketConfig::from(UnixConfig::new(in_path.clone()))
@@ -674,7 +683,7 @@ mod test {
     #[cfg(unix)]
     #[test]
     fn unix_message() {
-        let (tx, rx) = mpsc::channel(2);
+        let (tx, rx) = Pipeline::new_test();
         let (path, mut rt) = init_unix(tx);
         rt.block_on_std(async move {
             send_lines_unix(path, vec!["test"]).await;
@@ -696,7 +705,7 @@ mod test {
     #[cfg(unix)]
     #[test]
     fn unix_multiple_messages() {
-        let (tx, rx) = mpsc::channel(10);
+        let (tx, rx) = Pipeline::new_test();
         let (path, mut rt) = init_unix(tx);
         rt.block_on_std(async move {
             send_lines_unix(path, vec!["test\ntest2"]).await;
@@ -717,7 +726,7 @@ mod test {
     #[cfg(unix)]
     #[test]
     fn unix_multiple_packets() {
-        let (tx, rx) = mpsc::channel(10);
+        let (tx, rx) = Pipeline::new_test();
         let (path, mut rt) = init_unix(tx);
         rt.block_on_std(async move {
             send_lines_unix(path, vec!["test", "test2"]).await;

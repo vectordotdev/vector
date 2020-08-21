@@ -1,10 +1,10 @@
 use super::Transform;
 use crate::serde::Fields;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::AddFieldsEventProcessed,
     template::Template,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
@@ -132,7 +132,7 @@ fn flatten_field(key: Atom, value: TomlValue, new_fields: &mut IndexMap<Atom, Te
         TomlValue::String(s) => match Template::try_from(s.as_str()) {
             Ok(t) => new_fields.insert(key, t.into()),
             Err(error) => {
-                error!(message = "invalid template", %error);
+                error!(message = "Invalid template", %error);
                 new_fields.insert(key, Value::from(s).into())
             }
         },

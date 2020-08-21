@@ -1,14 +1,17 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, LogEvent, Value},
-    internal_events::{SplunkEventEncodeError, SplunkEventSent},
+    internal_events::{
+        SplunkEventEncodeError, SplunkEventSent, SplunkSourceMissingKeys,
+        SplunkSourceTypeMissingKeys,
+    },
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpClient, HttpSink},
-        service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, Buffer, Compression,
+        BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, TowerRequestConfig,
     },
+    template::Template,
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
@@ -37,6 +40,8 @@ pub struct HecSinkConfig {
     #[serde(default)]
     pub indexed_fields: Vec<Atom>,
     pub index: Option<String>,
+    pub sourcetype: Option<Template>,
+    pub source: Option<Template>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -53,7 +58,7 @@ pub struct HecSinkConfig {
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        in_flight_limit: Some(10),
+        in_flight_limit: InFlightLimit::Fixed(10),
         rate_limit_num: Some(10),
         ..Default::default()
     };
@@ -121,6 +126,24 @@ impl HttpSink for HecSinkConfig {
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
 
+        let sourcetype = self.sourcetype.as_ref().and_then(|sourcetype| {
+            sourcetype
+                .render_string(&event)
+                .map_err(|missing_keys| {
+                    emit!(SplunkSourceTypeMissingKeys { keys: missing_keys });
+                })
+                .ok()
+        });
+
+        let source = self.source.as_ref().and_then(|source| {
+            source
+                .render_string(&event)
+                .map_err(|missing_keys| {
+                    emit!(SplunkSourceMissingKeys { keys: missing_keys });
+                })
+                .ok()
+        });
+
         let mut event = event.into_log();
 
         let host = event.get(&self.host_key).cloned();
@@ -130,8 +153,6 @@ impl HttpSink for HecSinkConfig {
             _ => chrono::Utc::now(),
         };
         let timestamp = (timestamp.timestamp_millis() as f64) / 1000f64;
-
-        let sourcetype = event.get(&event::log_schema().source_type_key()).cloned();
 
         let fields = self
             .indexed_fields
@@ -162,8 +183,11 @@ impl HttpSink for HecSinkConfig {
             body["index"] = json!(index);
         }
 
-        if let Some(sourcetype) = sourcetype {
-            let sourcetype = sourcetype.to_string_lossy();
+        if let Some(source) = source {
+            body["source"] = json!(source);
+        }
+
+        if let Some(sourcetype) = &sourcetype {
             body["sourcetype"] = json!(sourcetype);
         }
 
@@ -263,7 +287,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", "value");
 
-        let (config, _, _) = load_sink::<HecSinkConfig>(
+        let (config, _cx) = load_sink::<HecSinkConfig>(
             r#"
             host = "test.com"
             token = "alksjdfo"
@@ -310,7 +334,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", "value");
 
-        let (config, _, _) = load_sink::<HecSinkConfig>(
+        let (config, _cx) = load_sink::<HecSinkConfig>(
             r#"
             host = "test.com"
             token = "alksjdfo"
@@ -367,9 +391,10 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        assert_downcast_matches, sinks,
+        assert_downcast_matches,
+        config::{SinkConfig, SinkContext},
+        sinks,
         test_util::{random_lines_with_stream, random_string, runtime},
-        topology::config::{SinkConfig, SinkContext},
         Event,
     };
     use futures::compat::Future01CompatExt;
@@ -384,12 +409,11 @@ mod integration_tests {
     // It usually takes ~1 second for the event to show up in search, so poll until
     // we see it.
     async fn find_entry(message: &str) -> serde_json::value::Value {
-        let value = Some(message);
         for _ in 0..20usize {
             match recent_entries(None)
                 .await
                 .into_iter()
-                .find(|entry| entry["message"].as_str() == value)
+                .find(|entry| entry["_raw"].as_str().unwrap_or("").contains(&message))
             {
                 Some(value) => return value,
                 None => std::thread::sleep(std::time::Duration::from_millis(100)),
@@ -415,6 +439,27 @@ mod integration_tests {
 
             assert_eq!(message, entry["_raw"].as_str().unwrap());
             assert!(entry.get("message").is_none());
+        });
+    }
+
+    #[test]
+    fn splunk_insert_source() {
+        let mut rt = runtime();
+        let cx = SinkContext::new_test();
+
+        rt.block_on_std(async move {
+            let mut config = config(Encoding::Text, vec![]).await;
+            config.source = Template::try_from("/var/log/syslog".to_string()).ok();
+
+            let (sink, _) = config.build(cx).unwrap();
+
+            let message = random_string(100);
+            let event = Event::from(message.clone());
+            sink.send(event).compat().await.unwrap();
+
+            let entry = find_entry(message.as_str()).await;
+
+            assert_eq!(entry["source"].as_str(), Some("/var/log/syslog"));
         });
     }
 
@@ -527,15 +572,14 @@ mod integration_tests {
 
         rt.block_on_std(async move {
             let indexed_fields = vec![Atom::from("asdf")];
-            let config = config(Encoding::Json, indexed_fields).await;
+            let mut config = config(Encoding::Json, indexed_fields).await;
+            config.sourcetype = Template::try_from("_json".to_string()).ok();
+
             let (sink, _) = config.build(cx).unwrap();
 
             let message = random_string(100);
             let mut event = Event::from(message.clone());
             event.as_mut_log().insert("asdf", "hello");
-            event
-                .as_mut_log()
-                .insert(event::log_schema().source_type_key(), "file");
             sink.send(event).compat().await.unwrap();
 
             let entry = find_entry(message.as_str()).await;
@@ -544,7 +588,7 @@ mod integration_tests {
             let asdf = entry["asdf"].as_array().unwrap()[0].as_str().unwrap();
             assert_eq!("hello", asdf);
             let sourcetype = entry["sourcetype"].as_str().unwrap();
-            assert_eq!("file", sourcetype);
+            assert_eq!("_json", sourcetype);
         });
     }
 

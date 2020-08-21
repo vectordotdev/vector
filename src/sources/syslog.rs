@@ -2,20 +2,21 @@ use super::util::{SocketListenAddr, TcpSource};
 #[cfg(unix)]
 use crate::sources::util::build_unix_source;
 use crate::{
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::{self, Event, Value},
-    internal_events::{SyslogEventReceived, SyslogUdpReadError},
+    internal_events::{SyslogEventReceived, SyslogUdpReadError, SyslogUdpUtf8Error},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    Pipeline,
 };
-use bytes05::{Buf, Bytes, BytesMut};
+use bytes::{Buf, Bytes, BytesMut};
 use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     FutureExt, StreamExt, TryFutureExt,
 };
-use futures01::{sync::mpsc, Sink};
+use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::io;
 use std::net::SocketAddr;
@@ -82,7 +83,7 @@ impl SourceConfig for SyslogConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let host_key = self
             .host_key
@@ -136,14 +137,7 @@ impl TcpSource for SyslogTcpSource {
     }
 
     fn build_event(&self, frame: String, host: Bytes) -> Option<Event> {
-        event_from_str(&self.host_key, Some(host), &frame).map(|event| {
-            trace!(
-                message = "Received one event.",
-                event = field::debug(&event)
-            );
-
-            event
-        })
+        event_from_str(&self.host_key, Some(host), &frame)
     }
 }
 
@@ -204,7 +198,7 @@ impl SyslogDecoder {
             // This is certainly mallformed, and there is no recovering from this.
             Err(LinesCodecError::Io(io::Error::new(
                 io::ErrorKind::Other,
-                "frame length limit exceeded",
+                "Frame length limit exceeded",
             )))
         }
     }
@@ -254,17 +248,17 @@ pub fn udp(
     _max_length: usize,
     host_key: String,
     shutdown: ShutdownSignal,
-    out: mpsc::Sender<Event>,
+    out: Pipeline,
 ) -> super::Source {
-    let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
+    let out = out.sink_map_err(|e| error!("Error sending line: {:?}.", e));
 
     Box::new(
         async move {
             let socket = UdpSocket::bind(&addr)
                 .await
-                .expect("failed to bind to udp listener socket");
+                .expect("Failed to bind to UDP listener socket");
             info!(
-                message = "listening.",
+                message = "Listening.",
                 addr = &field::display(addr),
                 r#type = "udp"
             );
@@ -278,9 +272,12 @@ pub fn udp(
                             Ok((bytes, received_from)) => {
                                 let received_from = received_from.to_string().into();
 
-                                std::str::from_utf8(&bytes).ok().and_then(|s| {
-                                    event_from_str(&host_key, Some(received_from), s).map(Ok)
-                                })
+                                std::str::from_utf8(&bytes)
+                                    .map_err(|error| emit!(SyslogUdpUtf8Error { error }))
+                                    .ok()
+                                    .and_then(|s| {
+                                        event_from_str(&host_key, Some(received_from), s).map(Ok)
+                                    })
                             }
                             Err(error) => {
                                 emit!(SyslogUdpReadError { error });
@@ -292,7 +289,7 @@ pub fn udp(
                 .forward(out.sink_compat())
                 .await;
 
-            info!("finished sending");
+            info!("Finished sending.");
             Ok(())
         }
         .boxed()
@@ -320,10 +317,6 @@ fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
 // octet framing (i.e. num bytes as ascii string prefix) with and without delimiters
 // null byte delimiter in place of newline
 fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Option<Event> {
-    emit!(SyslogEventReceived {
-        byte_size: line.len()
-    });
-
     let line = line.trim();
     let parsed = syslog_loose::parse_message_with_year(line, resolve_year);
     let mut event = Event::from(&parsed.msg[..]);
@@ -351,6 +344,10 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
         .insert(event::log_schema().timestamp_key().clone(), timestamp);
 
     insert_fields_from_syslog(&mut event, parsed);
+
+    emit!(SyslogEventReceived {
+        byte_size: line.len()
+    });
 
     trace!(
         message = "processing one event.",

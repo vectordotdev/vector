@@ -1,10 +1,9 @@
 #![recursion_limit = "256"] // for async-stream
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
-#![allow(clippy::blocks_in_if_conditions)]
+#![allow(clippy::block_in_if_condition_stmt)]
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::new_ret_no_self)]
-#![allow(clippy::ptr_arg)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::trivial_regex)]
 #![allow(clippy::type_complexity)]
@@ -22,7 +21,7 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 pub mod buffers;
 pub mod conditions;
-pub mod config_paths;
+pub mod config;
 pub mod dns;
 pub mod event;
 pub mod expiring_hash_map;
@@ -32,12 +31,14 @@ pub mod wasm;
 #[macro_use]
 pub mod internal_events;
 pub mod async_read;
-pub mod hyper;
+pub mod heartbeat;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
 pub mod kubernetes;
+pub mod line_agg;
 pub mod list;
 pub mod metrics;
+pub(crate) mod pipeline;
 pub mod region;
 pub mod runtime;
 pub mod serde;
@@ -57,6 +58,7 @@ pub mod unit_test;
 pub mod validate;
 
 pub use event::Event;
+pub use pipeline::Pipeline;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 

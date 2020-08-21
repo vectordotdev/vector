@@ -1,11 +1,9 @@
 use crate::{
     buffers::Acker,
-    event::metric::{MetricKind, MetricValue},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    event::metric::{MetricKind, MetricValue, StatisticKind},
     event::Event,
-    sinks::util::{
-        service2::TowerCompat, BatchConfig, BatchSettings, BatchSink, Buffer, Compression,
-    },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    sinks::util::{BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
 };
 use futures::{future, FutureExt, TryFutureExt};
 use futures01::{stream, Sink};
@@ -14,11 +12,11 @@ use snafu::{ResultExt, Snafu};
 use std::collections::BTreeMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::task::{Context, Poll};
-use tower03::{Service, ServiceBuilder};
+use tower::{Service, ServiceBuilder};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("failed to bind to udp listener socket, error = {:?}", source))]
+    #[snafu(display("failed to bind to UDP listener socket, error = {:?}", source))]
     SocketBindError { source: std::io::Error },
 }
 
@@ -41,7 +39,7 @@ impl Client {
     pub fn send(&self, buf: &[u8]) -> usize {
         self.socket
             .send_to(buf, &self.address)
-            .map_err(|e| error!("error sending datagram: {:?}", e))
+            .map_err(|e| error!("Error sending datagram: {:?}", e))
             .unwrap_or_default()
     }
 }
@@ -101,7 +99,7 @@ impl StatsdSvc {
         let svc = ServiceBuilder::new().service(service);
 
         let sink = BatchSink::new(
-            TowerCompat::new(svc),
+            svc,
             Buffer::new(batch.size, Compression::None),
             batch.timeout,
             acker,
@@ -155,10 +153,15 @@ fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
             MetricValue::Distribution {
                 values,
                 sample_rates,
+                statistic,
             } => {
+                let metric_type = match statistic {
+                    StatisticKind::Histogram => "h",
+                    StatisticKind::Summary => "d",
+                };
                 for (val, sample_rate) in values.iter().zip(sample_rates.iter()) {
                     buf.push(format!("{}:{}", metric.name, val));
-                    buf.push("h".to_string());
+                    buf.push(metric_type.to_string());
                     if *sample_rate != 1 {
                         buf.push(format!("@{}", 1.0 / f64::from(*sample_rate)));
                     };
@@ -224,11 +227,11 @@ mod test {
     use super::*;
     use crate::{
         buffers::Acker,
-        event::{metric::MetricKind, metric::MetricValue, Metric},
+        event::{metric::MetricKind, metric::MetricValue, metric::StatisticKind, Metric},
         test_util::{collect_n, runtime},
         Event,
     };
-    use bytes05::Bytes;
+    use bytes::Bytes;
     use futures::compat::{Future01CompatExt, Sink01CompatExt};
     use futures::{SinkExt, StreamExt, TryStreamExt};
     use futures01::{sync::mpsc, Sink};
@@ -298,6 +301,7 @@ mod test {
             value: MetricValue::Distribution {
                 values: vec![1.5],
                 sample_rates: vec![1],
+                statistic: StatisticKind::Histogram,
             },
         };
         let event = Event::Metric(metric1.clone());
@@ -357,6 +361,7 @@ mod test {
                     value: MetricValue::Distribution {
                         values: vec![2.0],
                         sample_rates: vec![100],
+                        statistic: StatisticKind::Histogram
                     },
                 }),
             ];
@@ -365,11 +370,11 @@ mod test {
             let socket = UdpSocket::bind(default_address()).await.unwrap();
             tokio::spawn(async move {
                 UdpFramed::new(socket, BytesCodec::new())
-                    .map_err(|e| error!("error reading line: {:?}", e))
+                    .map_err(|e| error!("Error reading line: {:?}", e))
                     .map_ok(|(bytes, _addr)| bytes.freeze())
                     .forward(
                         tx.sink_compat()
-                            .sink_map_err(|e| error!("error sending event: {:?}", e)),
+                            .sink_map_err(|e| error!("Error sending event: {:?}", e)),
                     )
                     .await
                     .unwrap()

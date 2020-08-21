@@ -23,7 +23,7 @@ pub struct RegexFailedMatch<'a> {
 impl InternalEvent for RegexFailedMatch<'_> {
     fn emit_logs(&self) {
         warn!(
-            message = "regex pattern failed to match.",
+            message = "Regex pattern failed to match.",
             field = &truncate_string_at(&String::from_utf8_lossy(&self.value), 60)[..],
             rate_limit_secs = 30
         );

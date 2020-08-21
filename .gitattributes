@@ -1,3 +1,4 @@
+*.erb linguist-detectable=false
 distribution/* linguist-detectable=false
 lib/* linguist-vendored
 scripts/* linguist-detectable=false

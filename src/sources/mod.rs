@@ -11,7 +11,7 @@ pub mod generator;
 pub mod http;
 #[cfg(feature = "sources-internal_metrics")]
 pub mod internal_metrics;
-#[cfg(all(feature = "sources-journald", feature = "unix"))]
+#[cfg(all(unix, feature = "sources-journald"))]
 pub mod journald;
 #[cfg(all(feature = "sources-kafka", feature = "rdkafka"))]
 pub mod kafka;

@@ -8,11 +8,13 @@ use approx::assert_relative_eq;
 use futures::compat::Future01CompatExt;
 use tokio::net::TcpListener;
 use vector::{
+    config,
+    runtime::Runtime,
     sinks, sources,
     test_util::{
-        next_addr, random_lines, runtime, send_lines, shutdown_on_idle, wait_for_tcp, CountReceiver,
+        next_addr, random_lines, runtime, send_lines, start_topology, trace_init, wait_for_tcp,
+        CountReceiver,
     },
-    topology::{self, config},
     transforms,
 };
 
@@ -36,11 +38,14 @@ fn pipe() {
 
     let mut rt = runtime();
     rt.block_on_std(async move {
-        let output_lines = CountReceiver::receive_lines(out_addr);
+        let mut output_lines = CountReceiver::receive_lines(out_addr);
 
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr);
+        wait_for_tcp(in_addr).await;
+
+        // Wait for output to connect
+        output_lines.connected().await;
 
         let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
         send_lines(in_addr, input_lines.clone()).await.unwrap();
@@ -52,7 +57,6 @@ fn pipe() {
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
     });
-    shutdown_on_idle(rt);
 }
 
 #[test]
@@ -84,11 +88,14 @@ fn sample() {
 
     let mut rt = runtime();
     rt.block_on_std(async move {
-        let output_lines = CountReceiver::receive_lines(out_addr);
+        let mut output_lines = CountReceiver::receive_lines(out_addr);
 
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr);
+        wait_for_tcp(in_addr).await;
+
+        // Wait for output to connect
+        output_lines.connected().await;
 
         let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
         send_lines(in_addr, input_lines.clone()).await.unwrap();
@@ -109,7 +116,6 @@ fn sample() {
             assert_eq!(Some(output_line), next_line);
         }
     });
-    shutdown_on_idle(rt);
 }
 
 #[test]
@@ -138,12 +144,16 @@ fn fork() {
 
     let mut rt = runtime();
     rt.block_on_std(async move {
-        let output_lines1 = CountReceiver::receive_lines(out_addr1);
-        let output_lines2 = CountReceiver::receive_lines(out_addr2);
+        let mut output_lines1 = CountReceiver::receive_lines(out_addr1);
+        let mut output_lines2 = CountReceiver::receive_lines(out_addr2);
 
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr);
+        wait_for_tcp(in_addr).await;
+
+        // Wait for output to connect
+        output_lines1.connected().await;
+        output_lines2.connected().await;
 
         let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
         send_lines(in_addr, input_lines.clone()).await.unwrap();
@@ -158,11 +168,12 @@ fn fork() {
         assert_eq!(input_lines, output_lines1);
         assert_eq!(input_lines, output_lines2);
     });
-    shutdown_on_idle(rt);
 }
 
 #[test]
 fn merge_and_fork() {
+    trace_init();
+
     let num_lines: usize = 10000;
 
     let in_addr1 = next_addr();
@@ -192,15 +203,19 @@ fn merge_and_fork() {
         sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr2.to_string()),
     );
 
-    let mut rt = runtime();
+    let mut rt = Runtime::with_thread_count(2).unwrap();
     rt.block_on_std(async move {
-        let output_lines1 = CountReceiver::receive_lines(out_addr1);
-        let output_lines2 = CountReceiver::receive_lines(out_addr2);
+        let mut output_lines1 = CountReceiver::receive_lines(out_addr1);
+        let mut output_lines2 = CountReceiver::receive_lines(out_addr2);
 
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr1);
-        wait_for_tcp(in_addr2);
+        wait_for_tcp(in_addr1).await;
+        wait_for_tcp(in_addr2).await;
+
+        // Wait for output to connect
+        output_lines1.connected().await;
+        output_lines2.connected().await;
 
         let input_lines1 = random_lines(100).take(num_lines).collect::<Vec<_>>();
         let input_lines2 = random_lines(100).take(num_lines).collect::<Vec<_>>();
@@ -233,7 +248,6 @@ fn merge_and_fork() {
         assert_eq!(input_lines1.next(), None);
         assert_eq!(input_lines2.next(), None);
     });
-    shutdown_on_idle(rt);
 }
 
 #[test]
@@ -258,9 +272,9 @@ fn reconnect() {
     rt.block_on_std(async move {
         let output_lines = CountReceiver::receive_lines(out_addr);
 
-        let (topology, _crash) = topology::start(config, false).await.unwrap();
+        let (topology, _crash) = start_topology(config, false).await;
         // Wait for server to accept traffic
-        wait_for_tcp(in_addr);
+        wait_for_tcp(in_addr).await;
 
         let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
         send_lines(in_addr, input_lines.clone()).await.unwrap();
@@ -272,7 +286,6 @@ fn reconnect() {
         assert!(num_lines >= 2);
         assert!(output_lines.iter().all(|line| input_lines.contains(line)))
     });
-    shutdown_on_idle(rt);
 }
 
 #[tokio::test]
@@ -289,7 +302,7 @@ async fn healthcheck() {
         None.into(),
     );
 
-    assert!(healthcheck.compat().await.is_ok());
+    assert!(healthcheck.await.is_ok());
 
     let bad_addr = next_addr();
     let bad_healthcheck = vector::sinks::util::tcp::tcp_healthcheck(
@@ -299,5 +312,5 @@ async fn healthcheck() {
         None.into(),
     );
 
-    assert!(bad_healthcheck.compat().await.is_err());
+    assert!(bad_healthcheck.await.is_err());
 }

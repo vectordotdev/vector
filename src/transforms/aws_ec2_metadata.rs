@@ -1,19 +1,16 @@
 use super::Transform;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
-    hyper::body_to_bytes,
     sinks::util::http::HttpClient,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use bytes::Bytes;
-use futures::compat::Future01CompatExt;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
-use hyper::Body;
+use hyper::{body::to_bytes as body_to_bytes, Body};
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::RandomState, HashSet};
-use std::time::{Duration, Instant};
 use string_cache::DefaultAtom as Atom;
-use tokio01::timer::Delay;
+use tokio::time::{delay_for, Duration, Instant};
 use tracing_futures::Instrument;
 
 type WriteHandle = evmap::WriteHandle<Atom, Bytes, (), RandomState>;
@@ -185,11 +182,13 @@ impl Transform for Ec2MetadataTransform {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
 
-        self.state.for_each(|k, v| {
-            if let Some(value) = v.get(0) {
-                log.insert(k.clone(), value.clone());
-            }
-        });
+        if let Some(read_ref) = self.state.read() {
+            read_ref.into_iter().for_each(|(k, v)| {
+                if let Some(value) = v.get_one() {
+                    log.insert(k.clone(), value.clone());
+                }
+            });
+        }
 
         Some(event)
     }
@@ -241,19 +240,12 @@ impl MetadataClient {
     async fn run(&mut self) {
         loop {
             if let Err(error) = self.refresh_metadata().await {
-                error!(message="Unable to fetch EC2 metadata; Retrying.", %error);
-
-                Delay::new(Instant::now() + Duration::from_secs(1))
-                    .compat()
-                    .await
-                    .expect("Timer not set.");
-
+                error!(message = "Unable to fetch EC2 metadata; Retrying.", %error);
+                delay_for(Duration::from_secs(1)).await;
                 continue;
             }
 
-            let deadline = Instant::now() + self.refresh_interval;
-
-            Delay::new(deadline).compat().await.expect("Timer not set.");
+            delay_for(self.refresh_interval).await;
         }
     }
 
@@ -443,7 +435,7 @@ impl MetadataClient {
                 for (i, role_name) in role_names.lines().enumerate() {
                     self.state.update(
                         format!("{}[{}]", self.keys.role_name_key, i).into(),
-                        role_name.into(),
+                        role_name.to_string().into(),
                     );
                 }
             }

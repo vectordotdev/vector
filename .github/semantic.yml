@@ -17,23 +17,50 @@ scopes:
   - new sink
 
   # domains
+  - administration
+  - architecture
+  - auth
   - buffers
   - cli
+  - ci
+  - codecs
   - config
+  - data model
   - deps
-  - networking
+  - compression
+  - dev
+  - enriching
+  - filtering
+  - external docs
+  - internal docs
+  - extensions
+  - healthchecks
+  - logs
+  - mapping
+  - marketing
+  - metrics
   - observability
-  - operations
+  - parsing
   - platforms
   - privacy
+  - processing
+  - networking
+  - performance
+  - releasing
+  - reliability
+  - reload
+  - rfcs
   - security
+  - setup
+  - shutdown
   - sinks
   - sources
+  - startup
+  - templating
   - tests
-  - topology
+  - traces
   - transforms
-  - ux
-  - website
+  - topology
 
   # platforms
   - arm64 platform

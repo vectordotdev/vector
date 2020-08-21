@@ -1,19 +1,18 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::{self, Event},
     internal_events::AwsKinesisStreamsEventSent,
     region::RegionOrEndpoint,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        retries2::RetryLogic,
+        retries::RetryLogic,
         rusoto,
-        service2::TowerRequestConfig,
         sink::Response,
-        BatchConfig, BatchSettings, Compression, EncodedLength, VecBuffer,
+        BatchConfig, BatchSettings, Compression, EncodedLength, TowerRequestConfig, VecBuffer,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use futures::{future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
@@ -32,7 +31,7 @@ use std::{
     task::{Context, Poll},
 };
 use string_cache::DefaultAtom as Atom;
-use tower03::Service;
+use tower::Service;
 use tracing_futures::Instrument;
 
 #[derive(Clone)]
@@ -254,7 +253,7 @@ fn encode_event(
             v.to_string_lossy()
         } else {
             warn!(
-                message = "Partition key does not exist; Dropping event.",
+                message = "Partition key does not exist; dropping event.",
                 %partition_key_field,
                 rate_limit_secs = 30,
             );
@@ -356,9 +355,9 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        config::SinkContext,
         region::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string, runtime},
-        topology::config::SinkContext,
     };
     use futures01::Sink;
     use rusoto_core::Region;

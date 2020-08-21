@@ -5,10 +5,12 @@ extern crate tracing;
 
 mod file_server;
 mod file_watcher;
+mod internal_events;
 mod metadata_ext;
 pub mod paths_provider;
 
 pub use self::file_server::{FileServer, Fingerprinter, Shutdown as FileServerShutdown};
+pub use self::internal_events::FileSourceInternalEvents;
 
 type FileFingerprint = u64;
 type FilePosition = u64;

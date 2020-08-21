@@ -1,9 +1,9 @@
 use super::Transform;
 use crate::{
-    event::metric::{Metric, MetricKind, MetricValue},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::{self, Value},
     template::{Template, TemplateError},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     Event,
 };
 use indexmap::IndexMap;
@@ -109,7 +109,7 @@ fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
     let template = Template::try_from(s).map_err(TransformError::TemplateError)?;
     let name = template.render(&event).map_err(|e| {
         TransformError::RenderError(format!(
-            "Keys ({:?}) do not exist on the event. Dropping event.",
+            "Keys ({:?}) do not exist on the event; dropping event.",
             e
         ))
     })?;
@@ -193,6 +193,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 value: MetricValue::Distribution {
                     values: vec![value],
                     sample_rates: vec![1],
+                    statistic: StatisticKind::Histogram,
                 },
             })
         }
@@ -271,7 +272,7 @@ impl Transform for LogToMetric {
 mod tests {
     use super::{LogToMetric, LogToMetricConfig};
     use crate::{
-        event::metric::{Metric, MetricKind, MetricValue},
+        event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
         event::{self, Event},
         transforms::Transform,
     };
@@ -650,6 +651,7 @@ mod tests {
                 value: MetricValue::Distribution {
                     values: vec![2.5],
                     sample_rates: vec![1],
+                    statistic: StatisticKind::Histogram
                 },
             }
         );

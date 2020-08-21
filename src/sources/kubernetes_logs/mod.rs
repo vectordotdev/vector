@@ -6,20 +6,22 @@
 #![deny(missing_docs)]
 
 use crate::event::{self, Event};
-use crate::internal_events::{KubernetesLogsEventAnnotationFailed, KubernetesLogsEventReceived};
+use crate::internal_events::{
+    FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
+    KubernetesLogsEventReceived,
+};
 use crate::kubernetes as k8s;
 use crate::{
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     dns::Resolver,
     shutdown::ShutdownSignal,
     sources,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     transforms::Transform,
+    Pipeline,
 };
-use bytes05::Bytes;
-use evmap10::{self as evmap};
+use bytes::Bytes;
 use file_source::{FileServer, FileServerShutdown, Fingerprinter};
 use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
-use futures01::sync::mpsc;
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -75,7 +77,7 @@ impl SourceConfig for Config {
         name: &str,
         globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<sources::Source> {
         let source = Source::new(self, Resolver, globals, name)?;
 
@@ -86,7 +88,7 @@ impl SourceConfig for Config {
         let fut = source.run(out, shutdown);
         let fut = fut.map(|result| {
             result.map_err(|error| {
-                error!(message = "source future failed", ?error);
+                error!(message = "Source future failed", ?error);
             })
         });
         let fut = Box::pin(fut);
@@ -203,6 +205,7 @@ impl Source {
             },
             oldest_first: false,
             remove_after: None,
+            emitter: FileSourceInternalEventsEmitter,
         };
 
         let (file_source_tx, file_source_rx) =

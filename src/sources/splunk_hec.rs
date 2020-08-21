@@ -1,17 +1,20 @@
 use crate::{
+    config::{DataType, GlobalOptions, SourceConfig},
     event::{self, Event, LogEvent, Value},
+    internal_events::{
+        SplunkHECEventReceived, SplunkHECRequestBodyInvalid, SplunkHECRequestError,
+        SplunkHECRequestReceived,
+    },
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    Pipeline,
 };
-use bytes05::{buf::BufExt, Bytes};
+use async_trait::async_trait;
+use bytes::{buf::BufExt, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
-use futures::{
-    compat::{AsyncRead01CompatExt, Future01CompatExt, Stream01CompatExt},
-    FutureExt, TryFutureExt, TryStreamExt,
-};
-use futures01::{sync::mpsc, Async, Future, Sink, Stream};
+use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
+use futures01::{Async, Future, Sink, Stream};
 use http::StatusCode;
 use lazy_static::lazy_static;
 use serde::{de, Deserialize, Serialize};
@@ -22,7 +25,6 @@ use std::{
     net::{Ipv4Addr, SocketAddr},
 };
 use string_cache::DefaultAtom as Atom;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 // Event fields unique to splunk_hec source
@@ -70,13 +72,24 @@ fn default_socket_address() -> SocketAddr {
 }
 
 #[typetag::serde(name = "splunk_hec")]
+#[async_trait]
 impl SourceConfig for SplunkConfig {
     fn build(
+        &self,
+        _name: &str,
+        _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
+        _out: Pipeline,
+    ) -> crate::Result<super::Source> {
+        unimplemented!()
+    }
+
+    async fn build_async(
         &self,
         _: &str,
         _: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let source = SplunkSource::new(self);
 
@@ -86,6 +99,15 @@ impl SourceConfig for SplunkConfig {
         let options = SplunkSource::options();
 
         let services = path!("services" / "collector" / ..)
+            .and(
+                warp::path::full()
+                    .map(|path: warp::filters::path::FullPath| {
+                        emit!(SplunkHECRequestReceived {
+                            path: path.as_str()
+                        });
+                    })
+                    .untuple_one(),
+            )
             .and(
                 event_service
                     .or(raw_service)
@@ -98,12 +120,12 @@ impl SourceConfig for SplunkConfig {
             .or_else(finish_err);
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
-        let incoming = tls.bind(&self.address)?.incoming();
+        let mut listener = tls.bind(&self.address).await?;
 
         let fut = async move {
             let _ = warp::serve(services)
                 .serve_incoming_with_graceful_shutdown(
-                    incoming.compat().map_ok(|s| s.compat().compat()),
+                    listener.incoming(),
                     shutdown.clone().compat().map(|_| ()),
                 )
                 .await;
@@ -138,7 +160,7 @@ impl SplunkSource {
         }
     }
 
-    fn event_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response,)> {
+    fn event_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
         warp::post()
             .and(path!("event").or(path!("event" / "1.0")))
             .and(self.authorization())
@@ -176,7 +198,7 @@ impl SplunkSource {
             .boxed()
     }
 
-    fn raw_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response,)> {
+    fn raw_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
         warp::post()
             .and(path!("raw" / "1.0").or(path!("raw")))
             .and(self.authorization())
@@ -211,7 +233,7 @@ impl SplunkSource {
             .boxed()
     }
 
-    fn health_service(&self, out: mpsc::Sender<Event>) -> BoxedFilter<(Response,)> {
+    fn health_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
         let credentials = self.credentials.clone();
         let authorize =
             warp::header::optional("Authorization").and_then(move |token: Option<String>| {
@@ -366,7 +388,9 @@ impl<R: Read> Stream for EventStream<R> {
                 };
             }
             Err(error) => {
-                error!(message = "Malformed request body",%error);
+                emit!(SplunkHECRequestBodyInvalid {
+                    error: error.into()
+                });
                 return Err(ApiError::InvalidDataFormat { event: self.events }.into());
             }
         };
@@ -465,6 +489,7 @@ impl<R: Read> Stream for EventStream<R> {
             de.extract(log, &mut json);
         }
 
+        emit!(SplunkHECEventReceived);
         self.events += 1;
 
         Ok(Async::Ready(Some(event)))
@@ -567,7 +592,7 @@ fn raw_event(
             Ok(0) => return Err(ApiError::NoData.into()),
             Ok(_) => data.into(),
             Err(error) => {
-                error!(message = "Malformed request body",%error);
+                emit!(SplunkHECRequestBodyInvalid { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
             }
         }
@@ -598,11 +623,13 @@ fn raw_event(
         .as_mut_log()
         .try_insert(event::log_schema().source_type_key(), "splunk_hec");
 
+    emit!(SplunkHECEventReceived);
+
     Ok(event)
 }
 
-#[derive(Debug, Snafu)]
-enum ApiError {
+#[derive(Clone, Copy, Debug, Snafu)]
+pub(crate) enum ApiError {
     MissingAuthorization,
     InvalidAuthorization,
     UnsupportedEncoding,
@@ -656,7 +683,8 @@ fn finish_ok(_: ()) -> Response {
 }
 
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
-    if let Some(error) = rejection.find::<ApiError>() {
+    if let Some(&error) = rejection.find::<ApiError>() {
+        emit!(SplunkHECRequestError { error });
         Ok((match error {
             ApiError::MissingAuthorization => response_json(
                 StatusCode::UNAUTHORIZED,
@@ -681,12 +709,12 @@ async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
                 StatusCode::SERVICE_UNAVAILABLE,
                 splunk_response::SERVER_SHUTDOWN.as_ref(),
             ),
-            ApiError::InvalidDataFormat { event } => event_error("Invalid data format", 6, *event),
+            ApiError::InvalidDataFormat { event } => event_error("Invalid data format", 6, event),
             ApiError::EmptyEventField { event } => {
-                event_error("Event field cannot be blank", 13, *event)
+                event_error("Event field cannot be blank", 13, event)
             }
             ApiError::MissingEventField { event } => {
-                event_error("Event field is required", 12, *event)
+                event_error("Event field is required", 12, event)
             }
             ApiError::BadRequest => empty_response(StatusCode::BAD_REQUEST),
         },))
@@ -717,7 +745,8 @@ fn event_error(text: &str, code: u16, event: usize) -> Response {
     match serde_json::to_string(&body) {
         Ok(string) => response_json(StatusCode::BAD_REQUEST, string),
         Err(error) => {
-            error!("Error encoding json body: {}", error);
+            // This should never happen.
+            error!("error encoding json body: {}.", error);
             response_json(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 splunk_response::SERVER_ERROR.clone(),
@@ -733,6 +762,7 @@ mod tests {
     use crate::runtime::Runtime;
     use crate::test_util::{self, collect_n, runtime};
     use crate::{
+        config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
         event::{self, Event},
         shutdown::ShutdownSignal,
         sinks::{
@@ -740,17 +770,15 @@ mod tests {
             util::{encoding::EncodingConfigWithDefault, Compression},
             Healthcheck, RouterSink,
         },
-        topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
+        Pipeline,
     };
     use chrono::{TimeZone, Utc};
     use futures::compat::Future01CompatExt;
-    use futures01::{stream, sync::mpsc, Sink};
+    use futures01::{stream, sync::mpsc, Future, Sink};
     use std::net::SocketAddr;
 
     /// Splunk token
     const TOKEN: &str = "token";
-
-    const CHANNEL_CAPACITY: usize = 1000;
 
     fn source(rt: &mut Runtime) -> (mpsc::Receiver<Event>, SocketAddr) {
         source_with(rt, Some(TOKEN.to_owned()))
@@ -758,22 +786,26 @@ mod tests {
 
     fn source_with(rt: &mut Runtime, token: Option<String>) -> (mpsc::Receiver<Event>, SocketAddr) {
         test_util::trace_init();
-        let (sender, recv) = mpsc::channel(CHANNEL_CAPACITY);
+        let (sender, recv) = Pipeline::new_test();
         let address = test_util::next_addr();
-        rt.spawn(
+        rt.spawn_std(async move {
             SplunkConfig {
                 address,
                 token,
                 tls: None,
             }
-            .build(
+            .build_async(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 sender,
             )
-            .unwrap(),
-        );
+            .await
+            .unwrap()
+            .compat()
+            .await
+            .unwrap()
+        });
         (recv, address)
     }
 
@@ -811,12 +843,8 @@ mod tests {
         rt: &mut Runtime,
     ) -> Vec<Event> {
         let n = messages.len();
-        assert!(
-            n <= CHANNEL_CAPACITY,
-            "To much messages for the sink channel"
-        );
         let pump = sink.send_all(stream::iter_ok(messages.into_iter().map(Into::into)));
-        let _ = rt.block_on(pump).unwrap();
+        rt.spawn(pump.map(|_| ()).map_err(|()| panic!()));
         let events = rt.block_on(collect_n(source, n)).unwrap();
 
         assert_eq!(n, events.len());
@@ -1047,8 +1075,8 @@ mod tests {
     }
 
     #[test]
-    fn no_autorization() {
-        let message = "no_autorization";
+    fn no_authorization() {
+        let message = "no_authorization";
         let mut rt = runtime();
         let (source, address) = source_with(&mut rt, None);
         let (sink, health) = sink(address, Encoding::Text, Compression::Gzip);

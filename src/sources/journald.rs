@@ -1,9 +1,10 @@
 use crate::{
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     event,
     event::{Event, LogEvent, Value},
     internal_events::{JournaldEventReceived, JournaldInvalidRecord},
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    Pipeline,
 };
 use chrono::TimeZone;
 use futures::{
@@ -11,7 +12,7 @@ use futures::{
     executor::block_on,
     future::{select, Either, FutureExt, TryFutureExt},
 };
-use futures01::{future, sync::mpsc, Future, Sink};
+use futures01::{future, Future, Sink};
 use lazy_static::lazy_static;
 use nix::{
     sys::signal::{kill, Signal},
@@ -27,9 +28,11 @@ use std::iter::FromIterator;
 use std::path::PathBuf;
 use std::process::{Child, ChildStdout, Command, Stdio};
 use std::str::FromStr;
-use std::time;
 use string_cache::DefaultAtom as Atom;
-use tokio::{task::spawn_blocking, time::delay_for};
+use tokio::{
+    task::spawn_blocking,
+    time::{delay_for, Duration},
+};
 use tracing::{dispatcher, field};
 
 const DEFAULT_BATCH_SIZE: usize = 16;
@@ -84,7 +87,7 @@ impl SourceConfig for JournaldConfig {
         name: &str,
         globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
@@ -98,8 +101,9 @@ impl SourceConfig for JournaldConfig {
             (false, _) => &self.include_units,
         };
 
-        let include_units: HashSet<String> = include_units.iter().map(fixup_unit).collect();
-        let exclude_units: HashSet<String> = self.exclude_units.iter().map(fixup_unit).collect();
+        let include_units: HashSet<String> = include_units.iter().map(|s| fixup_unit(&s)).collect();
+        let exclude_units: HashSet<String> =
+            self.exclude_units.iter().map(|s| fixup_unit(&s)).collect();
         if let Some(unit) = include_units
             .iter()
             .find(|unit| exclude_units.contains(&unit[..]))
@@ -134,7 +138,7 @@ impl SourceConfig for JournaldConfig {
 impl JournaldConfig {
     fn source<J>(
         &self,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
         shutdown: ShutdownSignal,
         mut checkpointer: Checkpointer,
         include_units: HashSet<String>,
@@ -226,7 +230,7 @@ fn create_event(record: Record) -> Event {
 
 /// Map the given unit name into a valid systemd unit
 /// by appending ".service" if no extension is present.
-fn fixup_unit(unit: &String) -> String {
+fn fixup_unit(unit: &str) -> String {
     if unit.contains('.') {
         unit.into()
     } else {
@@ -323,7 +327,7 @@ where
     T: Sink<SinkItem = Record, SinkError = ()>,
 {
     pub fn run(mut self) {
-        let timeout = time::Duration::from_millis(500); // arbitrary timeout
+        let timeout = Duration::from_millis(500); // arbitrary timeout
         let channel = &mut self.channel;
         let mut shutdown = self.shutdown.compat();
 
@@ -409,7 +413,7 @@ fn decode_record(text: &str, remap: bool) -> Result<Record, JsonError> {
     record.get_mut("MESSAGE").and_then(|message| {
         message
             .as_array()
-            .and_then(decode_array)
+            .and_then(|v| decode_array(&v))
             .map(|decoded| *message = decoded)
     });
     if remap {
@@ -418,7 +422,7 @@ fn decode_record(text: &str, remap: bool) -> Result<Record, JsonError> {
     serde_json::from_value(record)
 }
 
-fn decode_array(array: &Vec<JsonValue>) -> Option<JsonValue> {
+fn decode_array(array: &[JsonValue]) -> Option<JsonValue> {
     // From the array of values, turn all the numbers into bytes, and
     // then the bytes into a string, but return None if any value in the
     // array was not a valid byte.
@@ -552,13 +556,14 @@ mod checkpointer_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::{block_on, runtime, shutdown_on_idle};
+    use crate::Pipeline;
     use futures01::stream::Stream;
-    use std::io::{self, BufReader, Cursor};
-    use std::iter::FromIterator;
-    use std::time::Duration;
+    use std::{
+        io::{self, BufReader, Cursor},
+        iter::FromIterator,
+    };
     use tempfile::tempdir;
-    use tokio01::util::FutureExt;
+    use tokio::time::timeout;
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}
@@ -607,8 +612,8 @@ mod tests {
         }
     }
 
-    fn run_journal(iunits: &[&str], xunits: &[&str], cursor: Option<&str>) -> Vec<Event> {
-        let (tx, rx) = futures01::sync::mpsc::channel(10);
+    async fn run_journal(iunits: &[&str], xunits: &[&str], cursor: Option<&str>) -> Vec<Event> {
+        let (tx, rx) = Pipeline::new_test();
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
         let tempdir = tempdir().unwrap();
         let mut checkpointer =
@@ -632,19 +637,20 @@ mod tests {
                 true,
             )
             .expect("Creating journald source failed");
-        let mut rt = runtime();
-        rt.spawn(source);
+        tokio::spawn(source.compat());
 
-        std::thread::sleep(Duration::from_millis(100));
+        delay_for(Duration::from_millis(100)).await;
         drop(trigger);
-        shutdown_on_idle(rt);
 
-        block_on(rx.collect().timeout(Duration::from_secs(1))).expect("Unclosed channel")
+        timeout(Duration::from_secs(1), rx.collect().compat())
+            .await
+            .expect("Unclosed channel")
+            .unwrap()
     }
 
-    #[test]
-    fn reads_journal() {
-        let received = run_journal(&[], &[], None);
+    #[tokio::test]
+    async fn reads_journal() {
+        let received = run_journal(&[], &[], None).await;
         assert_eq!(received.len(), 5);
         assert_eq!(
             message(&received[0]),
@@ -661,17 +667,17 @@ mod tests {
         assert_eq!(priority(&received[1]), Value::Bytes("DEBUG".into()));
     }
 
-    #[test]
-    fn includes_units() {
-        let received = run_journal(&["unit.service"], &[], None);
+    #[tokio::test]
+    async fn includes_units() {
+        let received = run_journal(&["unit.service"], &[], None).await;
         assert_eq!(received.len(), 1);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
 
-    #[test]
-    fn excludes_units() {
-        let received = run_journal(&[], &["unit.service", "badunit.service"], None);
+    #[tokio::test]
+    async fn excludes_units() {
+        let received = run_journal(&[], &["unit.service", "badunit.service"], None).await;
         assert_eq!(received.len(), 3);
         assert_eq!(
             message(&received[0]),
@@ -687,24 +693,24 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handles_checkpoint() {
-        let received = run_journal(&[], &[], Some("1"));
+    #[tokio::test]
+    async fn handles_checkpoint() {
+        let received = run_journal(&[], &[], Some("1")).await;
         assert_eq!(received.len(), 4);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
 
-    #[test]
-    fn parses_array_messages() {
-        let received = run_journal(&["badunit.service"], &[], None);
+    #[tokio::test]
+    async fn parses_array_messages() {
+        let received = run_journal(&["badunit.service"], &[], None).await;
         assert_eq!(received.len(), 1);
         assert_eq!(message(&received[0]), Value::Bytes("¿Hello?".into()));
     }
 
-    #[test]
-    fn handles_missing_timestamp() {
-        let received = run_journal(&["stdout"], &[], None);
+    #[tokio::test]
+    async fn handles_missing_timestamp() {
+        let received = run_journal(&["stdout"], &[], None).await;
         assert_eq!(received.len(), 2);
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140004000));
         assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140005000));

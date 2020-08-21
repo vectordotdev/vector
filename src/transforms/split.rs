@@ -1,7 +1,8 @@
 use super::Transform;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{self, Event},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    internal_events::{SplitConvertFailed, SplitEventProcessed, SplitFieldMissing},
     types::{parse_check_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -106,11 +107,7 @@ impl Transform for Split {
                         event.as_mut_log().insert(name.clone(), value);
                     }
                     Err(error) => {
-                        debug!(
-                            message = "Could not convert types.",
-                            name = &name[..],
-                            %error
-                        );
+                        emit!(SplitConvertFailed { field: name, error });
                     }
                 }
             }
@@ -118,11 +115,10 @@ impl Transform for Split {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            debug!(
-                message = "Field does not exist.",
-                field = self.field.as_ref(),
-            );
+            emit!(SplitFieldMissing { field: &self.field });
         };
+
+        emit!(SplitEventProcessed);
 
         Some(event)
     }
@@ -143,7 +139,7 @@ mod tests {
     use super::SplitConfig;
     use crate::event::{LogEvent, Value};
     use crate::{
-        topology::config::{TransformConfig, TransformContext},
+        config::{TransformConfig, TransformContext},
         Event,
     };
     use string_cache::DefaultAtom as Atom;

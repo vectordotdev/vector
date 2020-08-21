@@ -3,11 +3,12 @@ use crate::{
     internal_events::{UdpEventReceived, UdpSocketError},
     shutdown::ShutdownSignal,
     sources::Source,
+    Pipeline,
 };
-use bytes05::BytesMut;
+use bytes::BytesMut;
 use codec::BytesDelimitedCodec;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
-use futures01::{sync::mpsc, Sink};
+use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use string_cache::DefaultAtom as Atom;
@@ -43,16 +44,16 @@ pub fn udp(
     max_length: usize,
     host_key: Atom,
     shutdown: ShutdownSignal,
-    out: mpsc::Sender<Event>,
+    out: Pipeline,
 ) -> Source {
-    let mut out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
+    let mut out = out.sink_map_err(|e| error!("Error sending event: {:?}", e));
 
     Box::new(
         async move {
             let mut socket = UdpSocket::bind(&address)
                 .await
-                .expect("failed to bind to udp listener socket");
-            info!(message = "listening.", %address);
+                .expect("Failed to bind to udp listener socket");
+            info!(message = "Listening.", %address);
 
             let mut shutdown = shutdown.compat();
             let mut buf = BytesMut::with_capacity(max_length);

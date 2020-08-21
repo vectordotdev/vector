@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate tracing;
+#[macro_use]
+extern crate vector;
 
 mod cli;
 
@@ -9,15 +11,13 @@ use futures::{
     StreamExt,
 };
 use futures01::Future;
-use std::{
-    cmp::max,
-    fs::File,
-    path::{Path, PathBuf},
-};
+use std::cmp::max;
 use tokio::select;
-use topology::Config;
 use vector::{
-    config_paths, event, generate, list, metrics, runtime,
+    config::{self, Config, ConfigDiff},
+    event, generate, heartbeat,
+    internal_events::{VectorReloaded, VectorStarted, VectorStopped},
+    list, metrics, runtime,
     signal::{self, SignalTo},
     topology, trace, unit_test, validate,
 };
@@ -88,17 +88,13 @@ fn main() {
             })
         };
 
-        let config_paths = config_paths::prepare(opts.config_paths.clone()).unwrap_or_else(|| {
+        let config_paths = config::process_paths(&opts.config_paths).unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });
 
         if opts.watch_config {
             // Start listening for config changes immediately.
-            vector::topology::config::watcher::config_watcher(
-                config_paths.clone(),
-                vector::topology::config::watcher::CONFIG_WATCH_DELAY,
-            )
-            .unwrap_or_else(|error| {
+            config::watcher::spawn_thread(&config_paths, None).unwrap_or_else(|error| {
                 error!(message = "Unable to start config watcher.", %error);
                 std::process::exit(exitcode::CONFIG);
             });
@@ -109,7 +105,7 @@ fn main() {
             path = ?config_paths
         );
 
-        let read_config = read_configs(&config_paths);
+        let read_config = config::read_configs(&config_paths);
         let maybe_config = handle_config_errors(read_config);
         let config = maybe_config.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
@@ -118,15 +114,7 @@ fn main() {
             .set(config.global.log_schema.clone())
             .expect("Couldn't set schema");
 
-        info!(
-            message = "Vector is starting.",
-            version = built_info::PKG_VERSION,
-            git_version = built_info::GIT_VERSION.unwrap_or(""),
-            released = built_info::BUILT_TIME_UTC,
-            arch = built_info::CFG_TARGET_ARCH
-        );
-
-        let diff = topology::ConfigDiff::initial(&config);
+        let diff = ConfigDiff::initial(&config);
         let pieces = topology::validate(&config, &diff).await.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });
@@ -135,6 +123,9 @@ fn main() {
         let (mut topology, graceful_crash) = result.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });
+
+        emit!(VectorStarted);
+        tokio::spawn(heartbeat::heartbeat());
 
         let mut signals = signal::signals();
         let mut sources_finished = topology.sources_finished().compat();
@@ -145,11 +136,7 @@ fn main() {
                 Some(signal) = signals.next() => {
                     if signal == SignalTo::Reload {
                         // Reload config
-                        info!(
-                            message = "Reloading configs.",
-                            path = ?config_paths
-                        );
-                        let new_config = read_configs(&config_paths);
+                        let new_config = config::read_configs(&config_paths);
 
                         trace!("Parsing config");
                         let new_config = handle_config_errors(new_config);
@@ -158,7 +145,7 @@ fn main() {
                                 .reload_config_and_respawn(new_config, opts.require_healthy)
                                 .await
                             {
-                                Ok(true) => (),
+                                Ok(true) =>  emit!(VectorReloaded { config_paths: &config_paths }),
                                 Ok(false) => error!("Reload was not successful."),
                                 // Trigger graceful shutdown for what remains of the topology
                                 Err(()) => break SignalTo::Shutdown,
@@ -179,7 +166,7 @@ fn main() {
 
         match signal {
             SignalTo::Shutdown => {
-                info!("Shutting down.");
+                emit!(VectorStopped);
                 select! {
                     _ = topology.stop().compat() => (), // Graceful shutdown finished
                     _ = signals.next() => {
@@ -209,57 +196,4 @@ fn handle_config_errors(config: Result<Config, Vec<String>>) -> Option<Config> {
         }
         Ok(config) => Some(config),
     }
-}
-
-fn read_configs(config_paths: &[PathBuf]) -> Result<Config, Vec<String>> {
-    let mut config = vector::topology::Config::empty();
-    let mut errors = Vec::new();
-
-    config_paths.iter().for_each(|p| {
-        let file = if let Some(file) = open_config(&p) {
-            file
-        } else {
-            errors.push(format!("Config file not found in path: {:?}.", p));
-            return;
-        };
-
-        trace!(
-            message = "Parsing config.",
-            path = ?p
-        );
-
-        if let Err(errs) = Config::load(file).and_then(|n| config.append(n)) {
-            errors.extend(errs.iter().map(|e| format!("{:?}: {}", p, e)));
-        }
-    });
-
-    if let Err(mut errs) = config.expand_macros() {
-        errors.append(&mut errs);
-    }
-
-    if !errors.is_empty() {
-        Err(errors)
-    } else {
-        Ok(config)
-    }
-}
-
-fn open_config(path: &Path) -> Option<File> {
-    match File::open(path) {
-        Ok(f) => Some(f),
-        Err(error) => {
-            if let std::io::ErrorKind::NotFound = error.kind() {
-                error!(message = "Config file not found in path.", ?path);
-                None
-            } else {
-                error!(message = "Error opening config file.", %error);
-                None
-            }
-        }
-    }
-}
-
-#[allow(unused)]
-mod built_info {
-    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }

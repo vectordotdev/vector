@@ -1,12 +1,12 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::metric::{Metric, MetricKind, MetricValue},
     region::RegionOrEndpoint,
     sinks::util::{
-        retries2::RetryLogic, rusoto, service2::TowerRequestConfig, BatchConfig, BatchSettings,
-        Compression, MetricBuffer,
+        retries::RetryLogic, rusoto, BatchConfig, BatchSettings, Compression, MetricBuffer,
+        TowerRequestConfig,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use chrono::{DateTime, SecondsFormat, Utc};
 use futures::{future::BoxFuture, FutureExt, TryFutureExt};
@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::task::{Context, Poll};
-use tower03::Service;
+use tower::Service;
 
 #[derive(Clone)]
 pub struct CloudWatchMetricsSvc {
@@ -157,6 +157,7 @@ impl CloudWatchMetricsSvc {
                         MetricValue::Distribution {
                             values,
                             sample_rates,
+                            statistic: _,
                         } => Some(MetricDatum {
                             metric_name,
                             values: Some(values.to_vec()),
@@ -214,7 +215,7 @@ impl Service<Vec<Metric>> for CloudWatchMetricsSvc {
             if input.metric_data.is_empty() {
                 Ok(())
             } else {
-                debug!(message = "sending data.", ?input);
+                debug!(message = "Sending data.", ?input);
                 client.put_metric_data(input).await
             }
         })
@@ -262,7 +263,7 @@ fn tags_to_dimensions(tags: BTreeMap<String, String>) -> Vec<Dimension> {
 mod tests {
     use super::*;
     use crate::dns::Resolver;
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
     use rusoto_cloudwatch::PutMetricDataInput;
@@ -376,6 +377,7 @@ mod tests {
             value: MetricValue::Distribution {
                 values: vec![11.0, 12.0],
                 sample_rates: vec![100, 50],
+                statistic: StatisticKind::Histogram,
             },
         }];
 
@@ -423,10 +425,10 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::event::Event;
+    use crate::config::SinkContext;
+    use crate::event::{metric::StatisticKind, Event};
     use crate::region::RegionOrEndpoint;
     use crate::test_util::{random_string, runtime};
-    use crate::topology::config::SinkContext;
     use chrono::offset::TimeZone;
     use futures01::{stream, Sink};
 
@@ -497,6 +499,7 @@ mod integration_tests {
                 value: MetricValue::Distribution {
                     values: vec![i as f64],
                     sample_rates: vec![100],
+                    statistic: StatisticKind::Histogram,
                 },
             });
             events.push(event);

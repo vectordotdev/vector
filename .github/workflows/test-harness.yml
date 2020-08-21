@@ -97,7 +97,7 @@ jobs:
       with:
         args: |
           bash -o pipefail -xc "cd /vector-test-harness \
-          && bin/compare -s vector -c default $(echo '${{ github.event.comment.body }}' | head -n 1 | sed 's|^/test ||') | tee \"$GITHUB_WORKSPACE/output\""
+          && bin/compare -s vector -c default -v nightly/latest -v ${{ steps.cloned-repo-info.outputs.test_harness_vector_version }} $(echo '${{ github.event.comment.body }}' | head -n 1 | sed 's|^/test ||') | tee \"$GITHUB_WORKSPACE/output\""
       env:
         GENERATE_SSH_KEY: true
         VECTOR_TEST_RESULTS_S3_BUCKET_NAME: test-results.vector.dev

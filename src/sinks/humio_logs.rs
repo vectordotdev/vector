@@ -1,23 +1,28 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     sinks::splunk_hec::{self, HecSinkConfig},
     sinks::util::{
-        encoding::EncodingConfigWithDefault, service2::TowerRequestConfig, BatchConfig, Compression,
+        encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    template::Template,
 };
 use serde::{Deserialize, Serialize};
 
 const HOST: &str = "https://cloud.humio.com";
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct HumioLogsConfig {
     token: String,
     host: Option<String>,
+    source: Option<Template>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
     encoding: EncodingConfigWithDefault<Encoding>,
+
+    event_type: Option<Template>,
+
     #[serde(default)]
     pub compression: Compression,
 
@@ -72,6 +77,8 @@ impl HumioLogsConfig {
         HecSinkConfig {
             token: self.token.clone(),
             host,
+            source: self.source.clone(),
+            sourcetype: self.event_type.clone(),
             encoding: self.encoding.clone().transmute(),
             compression: self.compression,
             batch: self.batch,
@@ -98,7 +105,7 @@ mod tests {
     fn humio_valid_time_field() {
         let event = Event::from("hello world");
 
-        let (config, _, _) = load_sink::<HumioLogsConfig>(
+        let (config, _cx) = load_sink::<HumioLogsConfig>(
             r#"
             token = "alsdkfjaslkdfjsalkfj"
             host = "https://127.0.0.1"
@@ -116,5 +123,281 @@ mod tests {
             format!("hec_event.time = {}, now = {}", hec_event.time, now)
         );
         assert_eq!((hec_event.time * 1000f64).fract(), 0f64);
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "humio-integration-tests")]
+mod integration_tests {
+    use super::*;
+    use crate::{
+        config::{SinkConfig, SinkContext},
+        sinks::util::Compression,
+        test_util::{random_string, runtime},
+        Event,
+    };
+    use chrono::Utc;
+    use futures::compat::Future01CompatExt;
+    use futures01::Sink;
+    use serde_json::json;
+    use serde_json::Value as JsonValue;
+    use std::collections::HashMap;
+    use std::convert::TryFrom;
+
+    // matches humio container address
+    const HOST: &str = "http://localhost:8080";
+
+    #[test]
+    fn humio_insert_message() {
+        let mut rt = runtime();
+        let cx = SinkContext::new_test();
+
+        rt.block_on_std(async move {
+            let repo = create_repository().await;
+
+            let config = config(&repo.default_ingest_token);
+
+            let (sink, _) = config.build(cx).unwrap();
+
+            let message = random_string(100);
+            let event = Event::from(message.clone());
+
+            sink.send(event).compat().await.unwrap();
+
+            let entry = find_entry(repo.name.as_str(), message.as_str()).await;
+
+            assert_eq!(
+                message,
+                entry
+                    .fields
+                    .get("message")
+                    .expect("no message key")
+                    .as_str()
+                    .unwrap()
+            );
+            assert!(
+                entry.error.is_none(),
+                "Humio encountered an error parsing this message: {}",
+                entry.error_msg.unwrap_or("no error message".to_string())
+            );
+        });
+    }
+
+    #[test]
+    fn humio_insert_source() {
+        let mut rt = runtime();
+        let cx = SinkContext::new_test();
+
+        rt.block_on_std(async move {
+            let repo = create_repository().await;
+
+            let mut config = config(&repo.default_ingest_token);
+            config.source = Template::try_from("/var/log/syslog".to_string()).ok();
+
+            let (sink, _) = config.build(cx).unwrap();
+
+            let message = random_string(100);
+            let event = Event::from(message.clone());
+            sink.send(event).compat().await.unwrap();
+
+            let entry = find_entry(repo.name.as_str(), message.as_str()).await;
+
+            assert_eq!(entry.source, Some("/var/log/syslog".to_owned()));
+            assert!(
+                entry.error.is_none(),
+                "Humio encountered an error parsing this message: {}",
+                entry.error_msg.unwrap_or("no error message".to_string())
+            );
+        });
+    }
+
+    #[test]
+    fn humio_type() {
+        let mut rt = runtime();
+
+        rt.block_on_std(async move {
+            let repo = create_repository().await;
+
+            // sets type
+            {
+                let mut config = config(&repo.default_ingest_token);
+                config.event_type = Template::try_from("json".to_string()).ok();
+
+                let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+
+                let message = random_string(100);
+                let mut event = Event::from(message.clone());
+                // Humio expects to find an @timestamp field for JSON lines
+                // https://docs.humio.com/ingesting-data/parsers/built-in-parsers/#json
+                event
+                    .as_mut_log()
+                    .insert("@timestamp", Utc::now().to_rfc3339());
+
+                sink.send(event).compat().await.unwrap();
+
+                let entry = find_entry(repo.name.as_str(), message.as_str()).await;
+
+                assert_eq!(entry.humio_type, "json");
+                assert!(
+                    entry.error.is_none(),
+                    "Humio encountered an error parsing this message: {}",
+                    entry.error_msg.unwrap_or("no error message".to_string())
+                );
+            }
+
+            // defaults to none
+            {
+                let config = config(&repo.default_ingest_token);
+
+                let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+
+                let message = random_string(100);
+                let event = Event::from(message.clone());
+
+                sink.send(event).compat().await.unwrap();
+
+                let entry = find_entry(repo.name.as_str(), message.as_str()).await;
+
+                assert_eq!(entry.humio_type, "none");
+            }
+        });
+    }
+
+    /// create a new test config with the given ingest token
+    fn config(token: &str) -> super::HumioLogsConfig {
+        super::HumioLogsConfig {
+            host: Some(HOST.to_string()),
+            token: token.to_string(),
+            compression: Compression::None,
+            encoding: Encoding::Json.into(),
+            batch: BatchConfig {
+                max_events: Some(1),
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    /// create a new test humio repository to publish to
+    async fn create_repository() -> HumioRepository {
+        let client = reqwest::Client::builder().build().unwrap();
+
+        // https://docs.humio.com/api/graphql/
+        let graphql_url = format!("{}/graphql", HOST);
+
+        let name = random_string(50);
+
+        let params = json!({
+        "query": format!(
+            r#"
+mutation {{
+  createRepository(name:"{}") {{
+    repository {{
+      name
+      type
+      ingestTokens {{
+        name
+        token
+      }}
+    }}
+  }}
+}}
+"#,
+            name
+        ),
+        });
+
+        let res = client
+            .post(&graphql_url)
+            .json(&params)
+            .send()
+            .await
+            .unwrap();
+
+        let json: JsonValue = res.json().await.unwrap();
+        let repository = &json["data"]["createRepository"]["repository"];
+
+        let token = repository["ingestTokens"].as_array().unwrap()[0]["token"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        HumioRepository {
+            name: repository["name"].as_str().unwrap().to_string(),
+            default_ingest_token: token,
+        }
+    }
+
+    /// fetch event from the repository that has a matching message value
+    async fn find_entry(repository_name: &str, message: &str) -> HumioLog {
+        let client = reqwest::Client::builder().build().unwrap();
+
+        // https://docs.humio.com/api/using-the-search-api-with-humio
+        let search_url = format!("{}/api/v1/repositories/{}/query", HOST, repository_name);
+        let search_query = format!(r#"message="{}""#, message);
+
+        // events are not available to search API immediately
+        // poll up 20 times for event to show up
+        for _ in 0..20usize {
+            let res = client
+                .post(&search_url)
+                .json(&json!({
+                    "queryString": search_query,
+                }))
+                .header(reqwest::header::ACCEPT, "application/json")
+                .send()
+                .await
+                .unwrap();
+
+            let logs: Vec<HumioLog> = res.json().await.unwrap();
+
+            if !logs.is_empty() {
+                return logs[0].clone();
+            }
+        }
+        panic!(
+            "did not find event in Humio repository {} with message {}",
+            repository_name, message
+        );
+    }
+
+    #[derive(Debug)]
+    struct HumioRepository {
+        name: String,
+        default_ingest_token: String,
+    }
+
+    #[derive(Clone, Deserialize)]
+    struct HumioLog {
+        #[serde(rename = "#repo")]
+        humio_repo: String,
+
+        #[serde(rename = "#type")]
+        humio_type: String,
+
+        #[serde(rename = "@error")]
+        error: Option<String>,
+
+        #[serde(rename = "@error_msg")]
+        error_msg: Option<String>,
+
+        #[serde(rename = "@rawstring")]
+        rawstring: String,
+
+        #[serde(rename = "@id")]
+        id: String,
+
+        #[serde(rename = "@timestamp")]
+        timestamp_millis: u64,
+
+        #[serde(rename = "@timezone")]
+        timezone: String,
+
+        #[serde(rename = "@source")]
+        source: Option<String>,
+
+        // fields parsed from ingested log
+        #[serde(flatten)]
+        fields: HashMap<String, JsonValue>,
     }
 }
