@@ -19,19 +19,16 @@ impl ToStringFn {
 
 impl Function for ToStringFn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
-        let result = match self.query.execute(ctx) {
-            Ok(v) => match v {
-                Value::Bytes(_) => Ok(v),
-                _ => Ok(Value::Bytes(v.as_bytes())),
+        match self.query.execute(ctx) {
+            Ok(v) => Ok(match v {
+                Value::Bytes(_) => v,
+                _ => Value::Bytes(v.as_bytes()),
+            }),
+            Err(err) => match &self.default {
+                Some(v) => Ok(v.clone()),
+                None => Err(err),
             },
-            Err(err) => Err(err),
-        };
-        if result.is_err() {
-            if let Some(v) = &self.default {
-                return Ok(v.clone());
-            }
         }
-        result
     }
 }
 
@@ -51,7 +48,7 @@ impl ToIntegerFn {
 
 impl Function for ToIntegerFn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
-        let result = match self.query.execute(ctx) {
+        match self.query.execute(ctx) {
             Ok(v) => match v {
                 Value::Integer(_) => Ok(v),
                 Value::Float(f) => Ok(Value::Integer(f as i64)),
@@ -62,13 +59,11 @@ impl Function for ToIntegerFn {
                 _ => Err("unable to convert array or object into int".to_string()),
             },
             Err(err) => Err(err),
-        };
-        if result.is_err() {
-            if let Some(v) = &self.default {
-                return Ok(v.clone());
-            }
         }
-        result
+        .or_else(|err| match &self.default {
+            Some(v) => Ok(v.clone()),
+            None => Err(err),
+        })
     }
 }
 
@@ -88,7 +83,7 @@ impl ToFloatFn {
 
 impl Function for ToFloatFn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
-        let result = match self.query.execute(ctx) {
+        match self.query.execute(ctx) {
             Ok(v) => match v {
                 Value::Float(_) => Ok(v),
                 Value::Integer(i) => Ok(Value::Float(i as f64)),
@@ -99,13 +94,11 @@ impl Function for ToFloatFn {
                 _ => Err("unable to convert array or object into float".to_string()),
             },
             Err(err) => Err(err),
-        };
-        if result.is_err() {
-            if let Some(v) = &self.default {
-                return Ok(v.clone());
-            }
         }
-        result
+        .or_else(|err| match &self.default {
+            Some(v) => Ok(v.clone()),
+            None => Err(err),
+        })
     }
 }
 
@@ -128,8 +121,8 @@ impl Function for ToBooleanFn {
         let result = match self.query.execute(ctx) {
             Ok(v) => match v {
                 Value::Boolean(_) => Ok(v),
-                Value::Float(f) => Ok(Value::Boolean(f > 0.0)),
-                Value::Integer(i) => Ok(Value::Boolean(i > 0)),
+                Value::Float(f) => Ok(Value::Boolean(f != 0.0)),
+                Value::Integer(i) => Ok(Value::Boolean(i != 0)),
                 Value::Bytes(_) => Conversion::Boolean.convert(v).map_err(|e| e.to_string()),
                 Value::Timestamp(_) => Err("unable to convert timestamp into bool".to_string()),
                 Value::Null => Err("value is null".to_string()),

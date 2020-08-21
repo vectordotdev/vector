@@ -300,10 +300,9 @@ fn if_statement_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn Function>> 
 
     let first = statement_from_pair(pairs.next().unwrap())?;
 
-    let second = if let Some(pair) = pairs.next() {
-        statement_from_pair(pair)?
-    } else {
-        Box::new(Noop {})
+    let second = match pairs.next() {
+        Some(pair) => statement_from_pair(pair)?,
+        None => Box::new(Noop {}),
     };
 
     Ok(Box::new(IfStatement::new(query, first, second)))
