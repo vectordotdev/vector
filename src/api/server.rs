@@ -2,7 +2,6 @@ use super::handler;
 
 use crate::api::schema::{schema, Context};
 use crate::tls::{MaybeTlsSettings, TlsConfig};
-use futures::channel::oneshot;
 use juniper::futures::FutureExt;
 use juniper_graphql_ws::ConnectionConfig;
 use juniper_warp::playground_filter;
@@ -10,18 +9,29 @@ use juniper_warp::subscriptions::serve_graphql_ws;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio;
+use tokio::sync::oneshot;
+use tokio::sync::oneshot::{Receiver, Sender};
 use warp::filters::BoxedFilter;
 use warp::{Filter, Reply};
 
 pub struct Server {
     address: SocketAddr,
+    trigger_cancel: Sender<()>,
+    cancel_signal: Option<Receiver<()>>,
     tls: Option<TlsConfig>,
 }
 
 impl Server {
     /// Returns a new API Server
     pub fn new(address: SocketAddr) -> Server {
-        Server { address, tls: None }
+        let (trigger_cancel, cancel_signal) = oneshot::channel::<()>();
+
+        Server {
+            address,
+            trigger_cancel,
+            cancel_signal: Some(cancel_signal),
+            tls: None,
+        }
     }
 
     /// String representation of the bound IP address
@@ -34,12 +44,19 @@ impl Server {
         self.address.port().to_string()
     }
 
+    pub fn stop(self) {
+        let _ = self.trigger_cancel.send(());
+    }
+
     /// Run the API server
-    pub async fn run(self) -> oneshot::Sender<()> {
+    pub async fn run(mut self) -> Self {
         let tls = MaybeTlsSettings::from_config(&self.tls, true).unwrap();
         let mut listener = tls.bind(&self.address).await.unwrap();
 
-        let (tx, rx) = oneshot::channel();
+        let rx = self
+            .cancel_signal
+            .take()
+            .expect("Run can only be called once");
 
         tokio::spawn(async move {
             warp::serve(make_routes())
@@ -49,7 +66,7 @@ impl Server {
                 .await;
         });
 
-        tx
+        self
     }
 }
 
@@ -104,7 +121,7 @@ fn make_routes() -> BoxedFilter<(impl Reply,)> {
                 "Access-Control-Allow-Origin",
                 "Access-Control-Request-Headers",
                 "Content-Type",
-                "X-Apollo-Tracing",
+                "X-Apollo-Tracing", // for Apollo GraphQL clients
                 "Pragma",
                 "Host",
                 "Connection",

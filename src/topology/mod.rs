@@ -11,15 +11,14 @@ mod fanout;
 mod task;
 pub mod unit_test;
 
+use crate::api::server::Server;
 use crate::{
     buffers,
     config::{self, Config, ConfigDiff, ServiceDiff},
     shutdown::SourceShutdownCoordinator,
     topology::{builder::Pieces, task::Task},
 };
-use futures::{
-    channel::oneshot, compat::Future01CompatExt, future, FutureExt, StreamExt, TryFutureExt,
-};
+use futures::{compat::Future01CompatExt, future, FutureExt, StreamExt, TryFutureExt};
 use futures01::{sync::mpsc, Future};
 use std::{
     collections::{HashMap, HashSet},
@@ -33,7 +32,7 @@ type TaskHandle = tokio::task::JoinHandle<Result<(), ()>>;
 
 #[allow(dead_code)]
 pub struct RunningTopology {
-    api: Option<oneshot::Sender<()>>,
+    api: Option<Server>,
     inputs: HashMap<String, buffers::BufferInputCloner>,
     outputs: HashMap<String, fanout::ControlChannel>,
     source_tasks: HashMap<String, TaskHandle>,
@@ -127,7 +126,10 @@ impl RunningTopology {
     /// into the returned future and is used to poll for when the tasks have completed. One the
     /// returned future is dropped then everything from this RunningTopology instance is fully
     /// dropped.
-    pub fn stop(self) -> impl Future<Item = (), Error = ()> {
+    pub fn stop(mut self) -> impl Future<Item = (), Error = ()> {
+        // Shut down the API server
+        self.stop_api();
+
         // Create handy handles collections of all tasks for the subsequent operations.
         let mut wait_handles = Vec::new();
         // We need a Vec here since source components have two tasks. One for pump in self.tasks,
@@ -310,12 +312,6 @@ impl RunningTopology {
 
     /// Shutdowns removed and replaced pieces of topology.
     async fn shutdown_diff(&mut self, diff: &ConfigDiff) {
-        // API
-        if let Some(stop_api) = self.api.take() {
-            info!("Stopping API server");
-            let _ = stop_api.send(());
-        }
-
         // Sources
         let timeout = Duration::from_secs(30); //sec
 
@@ -395,6 +391,14 @@ impl RunningTopology {
 
             self.remove_inputs(&name);
         }
+
+        // Shutdown the API server, if applicable
+        if let Some(api_diff) = &diff.api {
+            match api_diff {
+                ServiceDiff::Stop | ServiceDiff::Restart => self.stop_api(),
+                _ => return,
+            }
+        }
     }
 
     /// Rewires topology
@@ -470,6 +474,7 @@ impl RunningTopology {
         }
     }
 
+    /// Starts/restarts the API server, if enabled in configuration
     async fn spawn_api(&mut self, diff: &ServiceDiff, new_pieces: &mut builder::Pieces) {
         let message = match diff {
             ServiceDiff::Start => "Starting",
@@ -488,6 +493,14 @@ impl RunningTopology {
         let tx = server.run().await;
 
         self.api = Some(tx);
+    }
+
+    /// Stop the API server, if applicable
+    fn stop_api(&mut self) {
+        if let Some(api) = self.api.take() {
+            info!("Stopping API server");
+            api.stop();
+        }
     }
 
     fn spawn_sink(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
