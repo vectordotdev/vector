@@ -127,7 +127,7 @@ The following additional source configuration will be added:
 ```toml
 [sources.my_source_id]
   type = "apache" # required
-  endpoint = "http://localhost:8080/server-status" # required
+  endpoint = "http://localhost/server-status?auto" # required, default
   scrape_interval_secs = 15 # optional, default, seconds
 ```
 
@@ -143,6 +143,8 @@ Work section below).
 [Datadog's
 plugin](https://github.com/DataDog/integrations-core/blob/master/apache/datadog_checks/apache/data/conf.yaml.example)
 has numerous more options we could also consider in the future.
+
+The `host` key will be set to the host parsed out of the `endpoint`.
 
 ## Rationale
 
@@ -208,6 +210,8 @@ first-class source for each type of endpoint we support scraping.
 - Do we want to have one apache source able to scrape multiple endpoints?
 - Are there preferences between `apache` or `httpd` for the nomenclature? I
 	feel like `apache` is more well-known though `httpd` is more accurate
+- Should the `host` key include the port from the `endpoint` , if any? Or just
+  the hostname.
 
 ## Plan Of Attack
 
