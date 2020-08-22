@@ -244,11 +244,7 @@ impl Transform for RegexParser {
                 Some(id) => id,
                 None => {
                     emit!(RegexParserFailedMatch { value });
-                    if self.drop_failed {
-                        return None;
-                    } else {
-                        return Some(event);
-                    }
+                    return if self.drop_failed { None } else { Some(event) };
                 }
             };
 
