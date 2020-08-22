@@ -159,8 +159,8 @@ The sum of all values contained within the histogram.\
 type = "struct"
 description = """\
 Similar to a histogram, a summary samples observations (usually things like \
-request durations and response sizes). While it also provides a total count \
-of observations and a sum of all observed values, it calculates configurable \
+request durations and response sizes).It provides a total count \
+of observations, a sum of all observed values, and it calculates configurable \
 quantiles over a sliding time window.
 """
 
