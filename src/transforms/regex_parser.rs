@@ -2,7 +2,10 @@ use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{self, Event, Value},
-    internal_events::{RegexEventProcessed, RegexFailedMatch, RegexMissingField},
+    internal_events::{
+        RegexParserConversionFailed, RegexParserEventProcessed, RegexParserFailedMatch,
+        RegexParserMissingField, RegexParserTargetExists,
+    },
     types::{parse_check_conversion_map, Conversion},
 };
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
@@ -112,12 +115,7 @@ impl CompiledRegex {
                                 match conversion.convert(capture) {
                                     Ok(value) => Some((name.clone(), value)),
                                     Err(error) => {
-                                        debug!(
-                                            message = "Could not convert types.",
-                                            name = &name[..],
-                                            %error,
-                                            rate_limit_secs = 30
-                                        );
+                                        emit!(RegexParserConversionFailed { name, error });
                                         None
                                     }
                                 }
@@ -238,14 +236,14 @@ impl Transform for RegexParser {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
         let value = log.get(&self.field).map(|s| s.as_bytes());
-        emit!(RegexEventProcessed);
+        emit!(RegexParserEventProcessed);
 
         if let Some(value) = &value {
             let regex_id = self.regexset.matches(&value).into_iter().next();
             let id = match regex_id {
                 Some(id) => id,
                 None => {
-                    emit!(RegexFailedMatch { value });
+                    emit!(RegexParserFailedMatch { value });
                     if self.drop_failed {
                         return None;
                     } else {
@@ -268,7 +266,7 @@ impl Transform for RegexParser {
                         if self.overwrite_target {
                             log.remove(target_field);
                         } else {
-                            error!(message = "Target field already exists", %target_field, rate_limit_secs = 30);
+                            emit!(RegexParserTargetExists { target_field });
                             return Some(event);
                         }
                     }
@@ -285,10 +283,10 @@ impl Transform for RegexParser {
                 }
                 return Some(event);
             } else {
-                emit!(RegexFailedMatch { value });
+                emit!(RegexParserFailedMatch { value });
             }
         } else {
-            emit!(RegexMissingField { field: &self.field });
+            emit!(RegexParserMissingField { field: &self.field });
         }
 
         if self.drop_failed {

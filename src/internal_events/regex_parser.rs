@@ -4,9 +4,13 @@ use std::borrow::Cow;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug)]
-pub struct RegexEventProcessed;
+pub(crate) struct RegexParserEventProcessed;
 
-impl InternalEvent for RegexEventProcessed {
+impl InternalEvent for RegexParserEventProcessed {
+    fn emit_logs(&self) {
+        trace!(message = "processed one event.");
+    }
+
     fn emit_metrics(&self) {
         counter!("events_processed", 1,
             "component_kind" => "transform",
@@ -16,14 +20,14 @@ impl InternalEvent for RegexEventProcessed {
 }
 
 #[derive(Debug)]
-pub struct RegexFailedMatch<'a> {
+pub(crate) struct RegexParserFailedMatch<'a> {
     pub value: &'a [u8],
 }
 
-impl InternalEvent for RegexFailedMatch<'_> {
+impl InternalEvent for RegexParserFailedMatch<'_> {
     fn emit_logs(&self) {
         warn!(
-            message = "Regex pattern failed to match.",
+            message = "regex pattern failed to match.",
             field = &truncate_string_at(&String::from_utf8_lossy(&self.value), 60)[..],
             rate_limit_secs = 30
         );
@@ -39,11 +43,11 @@ impl InternalEvent for RegexFailedMatch<'_> {
 }
 
 #[derive(Debug)]
-pub struct RegexMissingField<'a> {
+pub(crate) struct RegexParserMissingField<'a> {
     pub field: &'a Atom,
 }
 
-impl InternalEvent for RegexMissingField<'_> {
+impl InternalEvent for RegexParserMissingField<'_> {
     fn emit_logs(&self) {
         debug!(message = "field does not exist.", field = %self.field);
     }
@@ -53,6 +57,54 @@ impl InternalEvent for RegexMissingField<'_> {
             "component_kind" => "transform",
             "component_type" => "regex_parser",
             "error_type" => "missing_field",
+        );
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct RegexParserTargetExists<'a> {
+    pub target_field: &'a Atom,
+}
+
+impl<'a> InternalEvent for RegexParserTargetExists<'a> {
+    fn emit_logs(&self) {
+        warn!(
+            message = "target field already exists",
+            target_field = %self.target_field,
+            rate_limit_secs = 30
+        )
+    }
+
+    fn emit_metrics(&self) {
+        counter!("processing_error", 1,
+            "component_kind" => "transform",
+            "component_type" => "regex_parser",
+            "error_type" => "target_field_exists",
+        );
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct RegexParserConversionFailed<'a> {
+    pub name: &'a Atom,
+    pub error: crate::types::Error,
+}
+
+impl<'a> InternalEvent for RegexParserConversionFailed<'a> {
+    fn emit_logs(&self) {
+        debug!(
+            message = "could not convert types.",
+            name = %self.name,
+            error = %self.error,
+            rate_limit_secs = 30
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("processing_error", 1,
+            "component_kind" => "transform",
+            "component_type" => "regex_parser",
+            "error_type" => "type_conversion_failed",
         );
     }
 }
