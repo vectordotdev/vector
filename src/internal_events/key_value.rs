@@ -15,12 +15,12 @@ impl InternalEvent for KeyValueEventProcessed {
 }
 
 #[derive(Debug)]
-pub struct KeyValueFailedParse<'a> {
-    pub field: &'a Atom,
+pub struct KeyValueFailedParse {
+    pub field: Atom,
     pub error: crate::types::Error,
 }
 
-impl InternalEvent for KeyValueFailedParse<'_> {
+impl InternalEvent for KeyValueFailedParse {
     fn emit_logs(&self) {
         warn!(
             message = "Event failed to parse as KeyValue",
