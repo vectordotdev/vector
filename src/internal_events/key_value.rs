@@ -25,7 +25,7 @@ impl InternalEvent for KeyValueFailedParse {
         warn!(
             message = "Event failed to parse as KeyValue",
             field = %self.field,
-            %self.error,
+            error = %self.error,
             rate_limit_secs = 30
         )
     }
