@@ -361,7 +361,7 @@ mod tests {
     #[test]
     fn it_accepts_brackets() {
         let log = parse_log(
-            "{\"foo\"}:0, \"\"bop\":[beep], [score]:78",
+            r#"{"foo"}:0, ""bop":[beep], [score]:78"#,
             ",".to_string(),
             ":".to_string(),
             false,
