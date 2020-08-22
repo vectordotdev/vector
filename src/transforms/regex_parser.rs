@@ -123,7 +123,10 @@ impl CompiledRegex {
                         });
                 Some(values)
             }
-            None => None,
+            None => {
+                emit!(RegexParserFailedMatch { value });
+                None
+            }
         }
     }
 }
@@ -278,8 +281,6 @@ impl Transform for RegexParser {
                     log.remove(&self.field);
                 }
                 return Some(event);
-            } else {
-                emit!(RegexParserFailedMatch { value });
             }
         } else {
             emit!(RegexParserMissingField { field: &self.field });
