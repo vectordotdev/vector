@@ -22,3 +22,6 @@ juniper = { git = "https://github.com/graphql-rust/juniper", branch = "master" }
 juniper_subscriptions = { git = "https://github.com/graphql-rust/juniper", branch = "master" }
 juniper_warp = { git = "https://github.com/graphql-rust/juniper", branch = "master", features = ["subscriptions"] }
 juniper_graphql_ws = { git = "https://github.com/graphql-rust/juniper", branch = "master" }
+
+# Scalar support
+chrono = { version = "0.4.6", features = ["serde"] }
