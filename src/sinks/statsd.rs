@@ -12,6 +12,7 @@ use futures01::{stream, Sink};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::BTreeMap;
+use std::fmt::Display;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::task::{Context, Poll};
 use tower03::{Service, ServiceBuilder};
@@ -132,26 +133,19 @@ fn encode_tags(tags: &BTreeMap<String, String>) -> String {
     parts.join(",")
 }
 
-/// The value for incremental gauges includes the sign.
-fn value_incr(val: &f64) -> String {
-    format!("{:+}", val)
-}
-
-fn push_event(
+fn push_event<V: Display>(
     buf: &mut Vec<String>,
     metric: &Metric,
-    val: String,
+    val: V,
     metric_type: &str,
     sample_rate: Option<u32>,
 ) {
-    buf.push(format!("{}:{}", metric.name, val));
-    buf.push(metric_type.to_string());
+    buf.push(format!("{}:{}|{}", metric.name, val, metric_type));
 
-    match sample_rate {
-        Some(sample_rate) if sample_rate != 1 => {
+    if let Some(sample_rate) = sample_rate {
+        if sample_rate != 1 {
             buf.push(format!("@{}", 1.0 / f64::from(sample_rate)))
         }
-        _ => (),
     };
 
     if let Some(t) = &metric.tags {
@@ -165,15 +159,15 @@ fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
     let metric = event.as_metric();
     match &metric.value {
         MetricValue::Counter { value } => {
-            push_event(&mut buf, &metric, value.to_string(), "c", None);
+            push_event(&mut buf, &metric, value, "c", None);
         }
         MetricValue::Gauge { value } => {
-            let val = match metric.kind {
-                MetricKind::Incremental => value_incr(value),
-                MetricKind::Absolute => value.to_string(),
+            match metric.kind {
+                MetricKind::Incremental => {
+                    push_event(&mut buf, &metric, format!("{:+}", value), "g", None)
+                }
+                MetricKind::Absolute => push_event(&mut buf, &metric, value, "g", None),
             };
-
-            push_event(&mut buf, &metric, val, "g", None);
         }
         MetricValue::Distribution {
             values,
@@ -185,18 +179,12 @@ fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
                 StatisticKind::Summary => "d",
             };
             for (val, sample_rate) in values.iter().zip(sample_rates.iter()) {
-                push_event(
-                    &mut buf,
-                    &metric,
-                    val.to_string(),
-                    metric_type,
-                    Some(*sample_rate),
-                );
+                push_event(&mut buf, &metric, val, metric_type, Some(*sample_rate));
             }
         }
         MetricValue::Set { values } => {
             for val in values {
-                push_event(&mut buf, &metric, val.to_string(), "s", None);
+                push_event(&mut buf, &metric, val, "s", None);
             }
         }
         _ => {
