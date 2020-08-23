@@ -324,7 +324,7 @@ mod tests {
         .unwrap();
 
         let sink = AzureMonitorLogsSink::new(&config).unwrap();
-        let mut log = LogEvent::from_iter([("message", "hello world")].iter().map(|&s| s));
+        let mut log = LogEvent::from_iter([("message", "hello world")].iter().copied());
         let (timestamp_key, timestamp_value) = insert_timestamp_kv(&mut log);
 
         let event = Event::from(log);
@@ -351,10 +351,10 @@ mod tests {
 
         let sink = AzureMonitorLogsSink::new(&config).unwrap();
 
-        let mut log1 = LogEvent::from_iter([("message", "hello")].iter().map(|&s| s));
+        let mut log1 = LogEvent::from_iter([("message", "hello")].iter().copied());
         let (timestamp_key1, timestamp_value1) = insert_timestamp_kv(&mut log1);
 
-        let mut log2 = LogEvent::from_iter([("message", "world")].iter().map(|&s| s));
+        let mut log2 = LogEvent::from_iter([("message", "world")].iter().copied());
         let (timestamp_key2, timestamp_value2) = insert_timestamp_kv(&mut log2);
 
         let event1 = sink.encode_event(Event::from(log1)).unwrap();
