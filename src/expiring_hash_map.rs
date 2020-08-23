@@ -57,11 +57,6 @@ where
         self.map.get_mut(k).map(|&mut (ref mut v, _)| v)
     }
 
-    /// Iterate over key and mutable value pairs.
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&K, &mut V)> {
-        self.map.iter_mut().map(|(key, (value, _))| (key, value))
-    }
-
     /// Reset the deadline for a key, and return a mut ref to the value.
     pub fn reset_at<Q>(&mut self, k: &Q, when: Instant) -> Option<&mut V>
     where
@@ -88,7 +83,7 @@ where
     /// Return an iterator over keys and values of ExpiringHashMap. Useful for
     /// processing all values in ExpiringHashMap irrespective of expiration. This
     /// may be required for processing shutdown or other operations.
-    pub fn iterate_map(&mut self) -> impl Iterator<Item = (&K, &mut V)> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&K, &mut V)> {
         self.map.iter_mut().map(|(k, (v, _delayed_key))| (k, v))
     }
 
