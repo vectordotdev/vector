@@ -32,8 +32,7 @@ members = [
   "lib/tracing-limit",
   "lib/vector-wasm",
   "lib/k8s-test-framework",
-  "lib/prometheus-parser",
-  "lib/api"
+  "lib/prometheus-parser"
 ]
 
 [dependencies]
@@ -42,7 +41,6 @@ codec = { path = "lib/codec" }
 file-source = { path = "lib/file-source" }
 tracing-limit = { path = "lib/tracing-limit" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
-api = { path = "lib/api" }
 
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
@@ -92,6 +90,10 @@ prost-types = "0.6.1"
 # GCP
 goauth = { version = "0.7.1", optional = true }
 smpl_jwt = { version = "0.5.0", optional = true }
+
+# API - GraphQL
+async-graphql = "1.17.10"
+async-graphql-warp = "1.17.3"
 
 # External libs
 derivative = "1.0"
