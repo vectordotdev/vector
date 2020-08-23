@@ -101,12 +101,12 @@ mod test {
             Metric,
         },
         sinks::vector::VectorSinkConfig,
-        test_util::{next_addr, wait_for_tcp, CollectCurrent},
+        test_util::{collect_ready, next_addr, wait_for_tcp},
         tls::{TlsConfig, TlsOptions},
         Event, Pipeline,
     };
     use futures::compat::Future01CompatExt;
-    use futures01::{stream, Future, Sink};
+    use futures01::{stream, Sink};
     use std::net::SocketAddr;
     use tokio::time::{delay_for, Duration};
 
@@ -154,7 +154,7 @@ mod test {
 
         delay_for(Duration::from_millis(50)).await;
 
-        let (_, output) = CollectCurrent::new(rx).wait().unwrap();
+        let output = collect_ready(rx).await.unwrap();
         assert_eq!(events, output);
     }
 

@@ -6,10 +6,10 @@ use crate::{
 };
 use flate2::read::GzDecoder;
 use futures::{
-    compat::Stream01CompatExt, future, stream, FutureExt, SinkExt, Stream, StreamExt, TryFutureExt,
-    TryStreamExt,
+    compat::Stream01CompatExt, future, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream,
+    StreamExt, TryFutureExt, TryStreamExt,
 };
-use futures01::{sync::mpsc, Async, Future as Future01, Poll as Poll01, Stream as Stream01};
+use futures01::{sync::mpsc, Stream as Stream01};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::{
@@ -21,10 +21,12 @@ use std::{
     iter,
     net::{Shutdown, SocketAddr},
     path::{Path, PathBuf},
+    pin::Pin,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
+    task::{Context, Poll},
 };
 use tokio::{
     io::{AsyncRead, AsyncWrite, Result as IoResult},
@@ -248,6 +250,25 @@ pub async fn collect_n<T>(rx: mpsc::Receiver<T>, n: usize) -> Result<Vec<T>, ()>
     rx.compat().take(n).try_collect().await
 }
 
+pub async fn collect_ready<S>(rx: S) -> Result<Vec<S::Item>, ()>
+where
+    S: Stream01<Item = Event, Error = ()>,
+{
+    let mut rx = rx.compat();
+
+    let waker = noop_waker_ref();
+    let mut cx = Context::from_waker(waker);
+
+    let mut vec = Vec::new();
+    loop {
+        match Pin::new(&mut rx).poll_next(&mut cx) {
+            Poll::Ready(Some(Ok(item))) => vec.push(item),
+            Poll::Ready(Some(Err(()))) => return Err(()),
+            Poll::Ready(None) | Poll::Pending => return Ok(vec),
+        }
+    }
+}
+
 pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading file.", path = %path.as_ref().display());
     let mut file = File::open(path).unwrap();
@@ -317,48 +338,6 @@ where
         future::ready(result)
     })
     .await
-}
-
-#[derive(Debug)]
-pub struct CollectCurrent<S>
-where
-    S: Stream01,
-{
-    stream: Option<S>,
-}
-
-impl<S: Stream01> CollectCurrent<S> {
-    pub fn new(s: S) -> Self {
-        Self { stream: Some(s) }
-    }
-}
-
-impl<S> Future01 for CollectCurrent<S>
-where
-    S: Stream01,
-{
-    type Item = (S, Vec<S::Item>);
-    type Error = S::Error;
-
-    fn poll(&mut self) -> Poll01<(S, Vec<S::Item>), S::Error> {
-        if let Some(mut stream) = self.stream.take() {
-            let mut items = vec![];
-
-            loop {
-                match stream.poll() {
-                    Ok(Async::Ready(Some(e))) => items.push(e),
-                    Ok(Async::Ready(None)) | Ok(Async::NotReady) => {
-                        return Ok(Async::Ready((stream, items)));
-                    }
-                    Err(e) => {
-                        return Err(e);
-                    }
-                }
-            }
-        } else {
-            panic!("Future already completed");
-        }
-    }
 }
 
 pub struct CountReceiver<T> {
