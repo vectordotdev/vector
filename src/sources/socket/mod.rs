@@ -140,7 +140,7 @@ mod test {
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSink,
         test_util::{
-            collect_n, next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp, CollectN,
+            collect_n, next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
         tls::{MaybeTlsSettings, TlsConfig, TlsOptions},
         Pipeline,
@@ -401,7 +401,7 @@ mod test {
         });
 
         // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
-        let (_rx, events) = CollectN::new(rx, 100).compat().await.ok().unwrap();
+        let events = collect_n(rx, 100).await.unwrap();
         assert_eq!(100, events.len());
         for event in events {
             assert_eq!(
@@ -609,7 +609,7 @@ mod test {
         });
 
         // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
-        let (_rx, events) = CollectN::new(rx, 100).compat().await.ok().unwrap();
+        let events = collect_n(rx, 100).await.unwrap();
         assert_eq!(100, events.len());
         for event in events {
             assert_eq!(

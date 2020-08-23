@@ -9,19 +9,22 @@ use futures::{
     compat::Stream01CompatExt, future, stream, FutureExt, SinkExt, Stream, StreamExt, TryFutureExt,
     TryStreamExt,
 };
-use futures01::{sync::mpsc, Async, Future, Poll, Stream as Stream01};
+use futures01::{sync::mpsc, Async, Future as Future01, Poll as Poll01, Stream as Stream01};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::{
     collections::HashMap,
     convert::Infallible,
     fs::File,
+    future::Future,
     io::Read,
     iter,
     net::{Shutdown, SocketAddr},
     path::{Path, PathBuf},
-    sync::atomic::{AtomicUsize, Ordering},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
 use tokio::{
     io::{AsyncRead, AsyncWrite, Result as IoResult},
@@ -271,7 +274,7 @@ pub fn runtime() -> Runtime {
 
 pub fn basic_scheduler_block_on_std<F>(future: F) -> F::Output
 where
-    F: std::future::Future + Send + 'static,
+    F: Future + Send + 'static,
     F::Output: Send + 'static,
 {
     // `tokio::time::advance` is not work on threaded scheduler
@@ -288,7 +291,7 @@ where
 pub async fn wait_for<F, Fut>(mut f: F)
 where
     F: FnMut() -> Fut,
-    Fut: std::future::Future<Output = bool> + Send + 'static,
+    Fut: Future<Output = bool> + Send + 'static,
 {
     let started = Instant::now();
     while !f().await {
@@ -317,64 +320,6 @@ where
 }
 
 #[derive(Debug)]
-pub struct CollectN<S>
-where
-    S: Stream01,
-{
-    stream: Option<S>,
-    remaining: usize,
-    items: Option<Vec<S::Item>>,
-}
-
-impl<S: Stream01> CollectN<S> {
-    pub fn new(s: S, n: usize) -> Self {
-        Self {
-            stream: Some(s),
-            remaining: n,
-            items: Some(Vec::new()),
-        }
-    }
-}
-
-impl<S> Future for CollectN<S>
-where
-    S: Stream01,
-{
-    type Item = (S, Vec<S::Item>);
-    type Error = S::Error;
-
-    fn poll(&mut self) -> Poll<(S, Vec<S::Item>), S::Error> {
-        let stream = self.stream.take();
-        if stream.is_none() {
-            panic!("Stream is missing");
-        }
-        let mut stream = stream.unwrap();
-
-        loop {
-            if self.remaining == 0 {
-                return Ok(Async::Ready((stream, self.items.take().unwrap())));
-            }
-            match stream.poll() {
-                Ok(Async::Ready(Some(e))) => {
-                    self.items.as_mut().unwrap().push(e);
-                    self.remaining -= 1;
-                }
-                Ok(Async::Ready(None)) => {
-                    return Ok(Async::Ready((stream, self.items.take().unwrap())));
-                }
-                Ok(Async::NotReady) => {
-                    self.stream.replace(stream);
-                    return Ok(Async::NotReady);
-                }
-                Err(e) => {
-                    return Err(e);
-                }
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
 pub struct CollectCurrent<S>
 where
     S: Stream01,
@@ -388,14 +333,14 @@ impl<S: Stream01> CollectCurrent<S> {
     }
 }
 
-impl<S> Future for CollectCurrent<S>
+impl<S> Future01 for CollectCurrent<S>
 where
     S: Stream01,
 {
     type Item = (S, Vec<S::Item>);
     type Error = S::Error;
 
-    fn poll(&mut self) -> Poll<(S, Vec<S::Item>), S::Error> {
+    fn poll(&mut self) -> Poll01<(S, Vec<S::Item>), S::Error> {
         if let Some(mut stream) = self.stream.take() {
             let mut items = vec![];
 
@@ -443,7 +388,7 @@ impl<T: Send + 'static> CountReceiver<T> {
     fn new<F, Fut>(make_fut: F) -> CountReceiver<T>
     where
         F: FnOnce(Arc<AtomicUsize>, oneshot::Receiver<()>, oneshot::Sender<()>) -> Fut,
-        Fut: std::future::Future<Output = Vec<T>> + Send + 'static,
+        Fut: Future<Output = Vec<T>> + Send + 'static,
     {
         let count = Arc::new(AtomicUsize::new(0));
         let (trigger, tripwire) = oneshot::channel();
