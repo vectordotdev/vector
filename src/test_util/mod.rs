@@ -9,9 +9,7 @@ use futures::{
     compat::Stream01CompatExt, future, stream, FutureExt, SinkExt, Stream, StreamExt, TryFutureExt,
     TryStreamExt,
 };
-use futures01::{
-    future as future01, sync::mpsc, try_ready, Async, Future, Poll, Stream as Stream01,
-};
+use futures01::{sync::mpsc, Async, Future, Poll, Stream as Stream01};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::{
@@ -19,7 +17,7 @@ use std::{
     convert::Infallible,
     fs::File,
     io::Read,
-    iter, mem,
+    iter,
     net::{Shutdown, SocketAddr},
     path::{Path, PathBuf},
     sync::atomic::{AtomicUsize, Ordering},
@@ -243,16 +241,8 @@ pub fn random_maps(
     iter::repeat(()).map(move |_| random_map(max_size, field_len))
 }
 
-pub fn collect_n<T>(mut rx: mpsc::Receiver<T>, n: usize) -> impl Future<Item = Vec<T>, Error = ()> {
-    let mut events = Vec::new();
-
-    future01::poll_fn(move || {
-        while events.len() < n {
-            let e = try_ready!(rx.poll()).unwrap();
-            events.push(e);
-        }
-        Ok(Async::Ready(mem::replace(&mut events, Vec::new())))
-    })
+pub async fn collect_n<T>(rx: mpsc::Receiver<T>, n: usize) -> Result<Vec<T>, ()> {
+    rx.compat().take(n).try_collect().await
 }
 
 pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {

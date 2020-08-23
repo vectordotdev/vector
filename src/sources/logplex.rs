@@ -231,7 +231,7 @@ mod tests {
 
         assert_eq!(200, send(addr, body).await);
 
-        let mut events = collect_n(rx, body.lines().count()).compat().await.unwrap();
+        let mut events = collect_n(rx, body.lines().count()).await.unwrap();
         let event = events.remove(0);
         let log = event.as_log();
 
