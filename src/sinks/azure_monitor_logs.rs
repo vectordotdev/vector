@@ -1,24 +1,23 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http2::{BatchedHttpSink, HttpClient, HttpSink},
-            service2::TowerRequestConfig,
-            BatchBytesConfig, BoxedRawValue, JsonArrayBuffer,
+            http::{BatchedHttpSink, HttpClient, HttpSink},
+            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, RouterSink,
     },
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytesize::ByteSize;
-use futures::{FutureExt, TryFutureExt};
+use futures::TryFutureExt;
 use futures01::Sink;
-use http02::{
+use http::{
     header, header::HeaderMap, header::HeaderName, header::HeaderValue, Request, StatusCode, Uri,
 };
-use hyper13::Body;
+use hyper::Body;
 use lazy_static::lazy_static;
 use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
@@ -38,7 +37,7 @@ pub struct AzureMonitorLogsConfig {
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
@@ -72,50 +71,50 @@ inventory::submit! {
 /// Max number of bytes in request body
 const MAX_BATCH_SIZE_MB: u64 = 30;
 /// API endpoint for submitting logs
-const RESOURCE: &'static str = "/api/logs";
+const RESOURCE: &str = "/api/logs";
 /// JSON content type of logs
-const CONTENT_TYPE: &'static str = "application/json";
+const CONTENT_TYPE: &str = "application/json";
 /// Custom header used for signing logs
-const X_MS_DATE: &'static str = "x-ms-date";
+const X_MS_DATE: &str = "x-ms-date";
 /// Shared key prefix
-const SHARED_KEY: &'static str = "SharedKey";
+const SHARED_KEY: &str = "SharedKey";
 /// API version
-const API_VERSION: &'static str = "2016-04-01";
+const API_VERSION: &str = "2016-04-01";
 
 #[typetag::serde(name = "azure_monitor_logs")]
 impl SinkConfig for AzureMonitorLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let batch = self.batch.unwrap_or(bytesize::mb(10u64), 1);
-        let batch_size = batch.size as u64;
+        let batch_settings = BatchSettings::default()
+            .bytes(bytesize::kib(5000u64))
+            .timeout(1)
+            .parse_config(self.batch)?;
 
-        if batch_size > bytesize::mb(MAX_BATCH_SIZE_MB) {
+        let batch_bytes = batch_settings.size.bytes as u64;
+
+        if batch_bytes > bytesize::mb(MAX_BATCH_SIZE_MB) {
             return Err(format!(
                 "provided batch size is too big for Azure Monitor: {}, max is {}",
-                ByteSize::b(batch_size),
+                ByteSize::b(batch_bytes),
                 ByteSize::mb(MAX_BATCH_SIZE_MB)
             )
             .into());
         }
 
-        let sink = AzureMonitorLogsSink::new(self)?;
-        let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(cx.resolver(), Some(tls_settings))?;
 
-        let healthcheck = healthcheck(
-            cx.clone(),
-            sink.clone(),
-            TlsSettings::from_options(&self.tls)?,
-        )
-        .boxed()
-        .compat();
+        let sink = AzureMonitorLogsSink::new(self)?;
+        let request_settings = self.request.unwrap_with(&REQUEST_DEFAULTS);
+
+        let healthcheck = Box::new(Box::pin(healthcheck(sink.clone(), client.clone())).compat());
 
         let sink = BatchedHttpSink::new(
             sink,
-            JsonArrayBuffer::default(),
-            request,
-            batch,
-            tls_settings,
-            &cx,
+            JsonArrayBuffer::new(batch_settings.size),
+            request_settings,
+            batch_settings.timeout,
+            client,
+            cx.acker(),
         )
         .sink_map_err(|e| error!("Fatal azure_monitor_logs sink error: {}", e));
 
@@ -140,6 +139,7 @@ struct AzureMonitorLogsSink {
     default_headers: HeaderMap,
 }
 
+#[async_trait::async_trait]
 impl HttpSink for AzureMonitorLogsSink {
     type Input = serde_json::Value;
     type Output = Vec<BoxedRawValue>;
@@ -168,28 +168,26 @@ impl HttpSink for AzureMonitorLogsSink {
         Some(entry)
     }
 
-    fn build_request(&self, events: Self::Output) -> Request<Vec<u8>> {
-        let body = serde_json::to_vec(&events).unwrap();
+    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+        let body = serde_json::to_vec(&events)?;
         let len = body.len();
 
-        let mut request = Request::post(self.uri.clone()).body(body).unwrap();
+        let mut request = Request::post(self.uri.clone()).body(body)?;
         let rfc1123date = chrono::Utc::now()
             .format("%a, %d %b %Y %H:%M:%S GMT")
             .to_string();
 
-        let authorization = self
-            .build_authorization_header_value(&rfc1123date, len)
-            .unwrap();
+        let authorization = self.build_authorization_header_value(&rfc1123date, len)?;
 
         *request.headers_mut() = self.default_headers.clone();
         request
             .headers_mut()
-            .insert(header::AUTHORIZATION, authorization.parse().unwrap());
+            .insert(header::AUTHORIZATION, authorization.parse()?);
         request
             .headers_mut()
-            .insert(X_MS_DATE_HEADER.clone(), rfc1123date.parse().unwrap());
+            .insert(X_MS_DATE_HEADER.clone(), rfc1123date.parse()?);
 
-        request
+        Ok(request)
     }
 }
 
@@ -202,7 +200,7 @@ impl AzureMonitorLogsSink {
         let uri: Uri = url.parse()?;
 
         if config.shared_key.is_empty() {
-            return Err(format!("shared_key can't be an empty string").into());
+            return Err("shared_key can't be an empty string".into());
         }
 
         let shared_key_bytes = base64::decode_block(&config.shared_key)?;
@@ -227,7 +225,7 @@ impl AzureMonitorLogsSink {
 
         if let Some(azure_resource_id) = &config.azure_resource_id {
             if azure_resource_id.is_empty() {
-                return Err(format!("azure_resource_id can't be an empty string").into());
+                return Err("azure_resource_id can't be an empty string".into());
             }
 
             default_headers.insert(
@@ -256,9 +254,8 @@ impl AzureMonitorLogsSink {
             "POST\n{}\n{}\n{}:{}\n{}",
             len, CONTENT_TYPE, X_MS_DATE, rfc1123date, RESOURCE
         );
-        let signer = sign::Signer::new(hash::MessageDigest::sha256(), &self.shared_key)?;
+        let mut signer = sign::Signer::new(hash::MessageDigest::sha256(), &self.shared_key)?;
 
-        // needs mut signer starting from openssl 0.10.28
         let signature = signer.sign_oneshot_to_vec(string_to_hash.as_bytes())?;
         let signature_base64 = base64::encode_block(&signature);
 
@@ -269,32 +266,25 @@ impl AzureMonitorLogsSink {
     }
 }
 
-async fn healthcheck(
-    cx: SinkContext,
-    sink: AzureMonitorLogsSink,
-    tls: TlsSettings,
-) -> crate::Result<()> {
-    let request = sink.build_request(vec![]).map(Body::from);
+async fn healthcheck(sink: AzureMonitorLogsSink, mut client: HttpClient) -> crate::Result<()> {
+    let request = sink.build_request(vec![]).await?.map(Body::from);
 
-    let mut client = HttpClient::new(cx.resolver(), tls)?;
     let res = client.send(request).await?;
 
     if res.status().is_server_error() {
-        return Err(format!("Server returned a server error").into());
+        return Err("Server returned a server error".into());
     }
 
     if res.status() == StatusCode::FORBIDDEN {
-        return Err(format!("The service failed to authenticate the request. Verify that the workspace ID and connection key are valid").into());
+        return Err("The service failed to authenticate the request. Verify that the workspace ID and connection key are valid".into());
     }
 
     if res.status() == StatusCode::NOT_FOUND {
-        return Err(
-            format!("Either the URL provided is incorrect, or the request is too large").into(),
-        );
+        return Err("Either the URL provided is incorrect, or the request is too large".into());
     }
 
     if res.status() == StatusCode::BAD_REQUEST {
-        return Err(format!("The workspace has been closed or the request was invalid").into());
+        return Err("The workspace has been closed or the request was invalid".into());
     }
 
     Ok(())
