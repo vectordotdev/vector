@@ -22,6 +22,13 @@ write_to_description = "a file"
   encodings: ["text", "ndjson"]
 ) %>
 
+<%= render("_partials/fields/_compression_options.toml",
+           namespace: "sinks.file.options",
+           options: {
+             "description" => "The compression strategy to use for writing file."
+           }
+  ) %>
+
 [sinks.file.options.path]
 type = "string"
 common = true
