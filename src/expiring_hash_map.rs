@@ -80,6 +80,13 @@ where
         Some((value, expired))
     }
 
+    /// Return an iterator over keys and values of ExpiringHashMap. Useful for
+    /// processing all values in ExpiringHashMap irrespective of expiration. This
+    /// may be required for processing shutdown or other operations.
+    pub fn iterate_map(&mut self) -> impl Iterator<Item = (&K, &mut V)> {
+        self.map.iter_mut().map(|(k, (v, _delayed_key))| (k, v))
+    }
+
     /// Check whether the [`ExpiringHashMap`] is empty.
     /// If it's empty, the `next_expired` function immediately resolves to
     /// [`None`]. Be aware that this may cause a spinlock behaviour if the
