@@ -1,6 +1,5 @@
 use crate::{
     config::{Config, ConfigDiff},
-    event::LogEvent,
     runtime::Runtime,
     topology::{self, RunningTopology},
     trace, Event,
@@ -11,8 +10,7 @@ use futures::{
     TryStreamExt,
 };
 use futures01::{
-    future as future01, stream as stream01, sync::mpsc, try_ready, Async, Future, Poll,
-    Stream as Stream01,
+    future as future01, sync::mpsc, try_ready, Async, Future, Poll, Stream as Stream01,
 };
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -203,38 +201,20 @@ pub fn random_lines_with_stream(
 fn random_events_with_stream_generic<F>(
     count: usize,
     generator: F,
-) -> (Vec<Event>, impl Stream01<Item = Event, Error = ()>)
+) -> (Vec<Event>, impl Stream<Item = Result<Event, ()>>)
 where
     F: Fn() -> Event,
 {
     let events = (0..count).map(|_| generator()).collect::<Vec<_>>();
-    let stream = stream01::iter_ok(events.clone().into_iter());
+    let stream = stream::iter(events.clone()).map(Ok);
     (events, stream)
 }
 
 pub fn random_events_with_stream(
     len: usize,
     count: usize,
-) -> (Vec<Event>, impl Stream01<Item = Event, Error = ()>) {
+) -> (Vec<Event>, impl Stream<Item = Result<Event, ()>>) {
     random_events_with_stream_generic(count, move || Event::from(random_string(len)))
-}
-
-pub fn random_nested_events_with_stream(
-    len: usize,
-    breadth: usize,
-    depth: usize,
-    count: usize,
-) -> (Vec<Event>, impl Stream01<Item = Event, Error = ()>) {
-    random_events_with_stream_generic(count, move || {
-        let mut log = LogEvent::default();
-
-        let tree = random_pseudonested_map(len, breadth, depth);
-        for (k, v) in tree.into_iter() {
-            log.insert(k, v);
-        }
-
-        Event::Log(log)
-    })
 }
 
 pub fn random_string(len: usize) -> String {
@@ -565,38 +545,6 @@ impl CountReceiver<Event> {
                 .await
         })
     }
-}
-
-fn random_pseudonested_map(len: usize, breadth: usize, depth: usize) -> HashMap<String, String> {
-    if breadth == 0 || depth == 0 {
-        return HashMap::new();
-    }
-
-    if depth == 1 {
-        let mut leaf = HashMap::new();
-        leaf.insert(random_string(len), random_string(len));
-        return leaf;
-    }
-
-    let mut tree = HashMap::new();
-    for _ in 0..breadth {
-        let prefix = random_string(len);
-        let subtree = random_pseudonested_map(len, breadth, depth - 1);
-
-        let subtree: HashMap<String, String> = subtree
-            .into_iter()
-            .map(|(mut key, value)| {
-                key.insert(0, '.');
-                key.insert_str(0, &prefix[..]);
-                (key, value)
-            })
-            .collect();
-
-        for (key, value) in subtree.into_iter() {
-            tree.insert(key, value);
-        }
-    }
-    tree
 }
 
 pub async fn start_topology(
