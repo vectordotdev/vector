@@ -7,7 +7,6 @@ use async_graphql::{
 use async_graphql_warp::{graphql_subscription, GQLResponse};
 use std::convert::Infallible;
 use std::net::SocketAddr;
-use tokio;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::{Receiver, Sender};
 use warp::filters::BoxedFilter;
