@@ -13,6 +13,11 @@ META_PATH="/.meta"
 
 echo "Validating ${META_PATH}..."
 
+if ! [ -x "$(command -v jsonschema)" ]; then
+  echo 'Error: jsonschema is not installed.' >&2
+  exit 1
+fi
+
 td="$(mktemp -d)"
 scripts/load-meta.rb > "$td/meta.json"
 errors=$(jsonschema -i "$td/meta.json" -F "* Message: {error.message}
