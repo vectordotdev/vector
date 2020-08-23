@@ -169,25 +169,7 @@ impl HttpSink for AzureMonitorLogsSink {
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
-        let body = serde_json::to_vec(&events)?;
-        let len = body.len();
-
-        let mut request = Request::post(self.uri.clone()).body(body)?;
-        let rfc1123date = chrono::Utc::now()
-            .format("%a, %d %b %Y %H:%M:%S GMT")
-            .to_string();
-
-        let authorization = self.build_authorization_header_value(&rfc1123date, len)?;
-
-        *request.headers_mut() = self.default_headers.clone();
-        request
-            .headers_mut()
-            .insert(header::AUTHORIZATION, authorization.parse()?);
-        request
-            .headers_mut()
-            .insert(X_MS_DATE_HEADER.clone(), rfc1123date.parse()?);
-
-        Ok(request)
+        self.build_request_sync(events)
     }
 }
 
@@ -245,6 +227,28 @@ impl AzureMonitorLogsSink {
         })
     }
 
+    fn build_request_sync(&self, events: Vec<BoxedRawValue>) -> crate::Result<Request<Vec<u8>>> {
+        let body = serde_json::to_vec(&events)?;
+        let len = body.len();
+
+        let mut request = Request::post(self.uri.clone()).body(body)?;
+        let rfc1123date = chrono::Utc::now()
+            .format("%a, %d %b %Y %H:%M:%S GMT")
+            .to_string();
+
+        let authorization = self.build_authorization_header_value(&rfc1123date, len)?;
+
+        *request.headers_mut() = self.default_headers.clone();
+        request
+            .headers_mut()
+            .insert(header::AUTHORIZATION, authorization.parse()?);
+        request
+            .headers_mut()
+            .insert(X_MS_DATE_HEADER.clone(), rfc1123date.parse()?);
+
+        Ok(request)
+    }
+
     fn build_authorization_header_value(
         &self,
         rfc1123date: &str,
@@ -293,7 +297,7 @@ async fn healthcheck(sink: AzureMonitorLogsSink, mut client: HttpClient) -> crat
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::LogEvent, test_util::runtime};
+    use crate::event::LogEvent;
     use serde_json::value::RawValue;
     use std::iter::FromIterator;
 
@@ -363,9 +367,9 @@ mod tests {
 
         let events = vec![raw1, raw2];
 
-        let request = sink.build_request(events);
+        let request = sink.build_request_sync(events);
 
-        let (parts, body) = request.into_parts();
+        let (parts, body) = request.unwrap().into_parts();
         assert_eq!(&parts.method.to_string(), "POST");
 
         let json: serde_json::Value = serde_json::from_slice(&body[..]).unwrap();
@@ -424,10 +428,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config
-            .build(SinkContext::new_test(runtime().executor()))
-            .is_ok()
-        {
+        if config.build(SinkContext::new_test()).is_ok() {
             panic!("config.build failed to error");
         }
     }
@@ -443,10 +444,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config
-            .build(SinkContext::new_test(runtime().executor()))
-            .is_ok()
-        {
+        if config.build(SinkContext::new_test()).is_ok() {
             panic!("config.build failed to error");
         }
     }
