@@ -343,7 +343,7 @@ mod tests {
         };
 
         let mut sink = FileSink::new(&config);
-        let (input, _) = random_lines_with_stream(100, 64);
+        let (input, _events) = random_lines_with_stream(100, 64);
 
         let events = stream::iter(input.clone().into_iter().map(Event::from));
         sink.run(events).await.unwrap();
@@ -480,7 +480,7 @@ mod tests {
         };
 
         let mut sink = FileSink::new(&config);
-        let (mut input, _) = random_lines_with_stream(10, 64);
+        let (mut input, _events) = random_lines_with_stream(10, 64);
 
         let (mut tx, rx) = tokio::sync::mpsc::channel(1);
 

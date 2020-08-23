@@ -297,8 +297,8 @@ mod tests {
         test_util::{next_addr, random_lines_with_stream},
     };
     use bytes::buf::BufExt;
-    use futures::compat::Future01CompatExt;
-    use futures01::{Sink, Stream};
+    use futures::{compat::Sink01CompatExt, SinkExt};
+    use futures01::Stream;
     use headers::{Authorization, HeaderMapExt};
     use hyper::Method;
     use serde::Deserialize;
@@ -410,14 +410,15 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).unwrap();
+        let mut sink = sink.sink_compat();
         let (rx, trigger, server) = build_test_server(in_addr);
 
-        let (input_lines, events) = random_lines_with_stream(100, num_lines);
-        let pump = sink.send_all(events);
+        let (input_lines, mut events) = random_lines_with_stream(100, num_lines);
+        let pump = sink.send_all(&mut events);
 
         tokio::spawn(server);
 
-        let _ = pump.compat().await.unwrap();
+        let _ = pump.await.unwrap();
         drop(trigger);
 
         let output_lines = rx
@@ -469,14 +470,15 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).unwrap();
+        let mut sink = sink.sink_compat();
         let (rx, trigger, server) = build_test_server(in_addr);
 
-        let (input_lines, events) = random_lines_with_stream(100, num_lines);
-        let pump = sink.send_all(events);
+        let (input_lines, mut events) = random_lines_with_stream(100, num_lines);
+        let pump = sink.send_all(&mut events);
 
         tokio::spawn(server);
 
-        let _ = pump.compat().await.unwrap();
+        let _ = pump.await.unwrap();
         drop(trigger);
 
         let output_lines = rx
@@ -525,14 +527,15 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).unwrap();
+        let mut sink = sink.sink_compat();
         let (rx, trigger, server) = build_test_server(in_addr);
 
-        let (input_lines, events) = random_lines_with_stream(100, num_lines);
-        let pump = sink.send_all(events);
+        let (input_lines, mut events) = random_lines_with_stream(100, num_lines);
+        let pump = sink.send_all(&mut events);
 
         tokio::spawn(server);
 
-        let _ = pump.compat().await.unwrap();
+        let _ = pump.await.unwrap();
         drop(trigger);
 
         let output_lines = rx

@@ -359,7 +359,10 @@ mod integration_tests {
         region::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string},
     };
-    use futures::compat::Future01CompatExt;
+    use futures::{
+        compat::{Future01CompatExt, Sink01CompatExt},
+        SinkExt,
+    };
     use futures01::Sink;
     use rusoto_core::Region;
     use rusoto_kinesis::{Kinesis, KinesisClient};
@@ -398,9 +401,9 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 
-        let (mut input_lines, events) = random_lines_with_stream(100, 11);
+        let (mut input_lines, mut events) = random_lines_with_stream(100, 11);
 
-        let _ = sink.send_all(events).compat().await.unwrap();
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 
         delay_for(Duration::from_secs(1)).await;
 

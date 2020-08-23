@@ -194,10 +194,22 @@ pub fn temp_dir() -> PathBuf {
 pub fn random_lines_with_stream(
     len: usize,
     count: usize,
-) -> (Vec<String>, impl Stream01<Item = Event, Error = ()>) {
+) -> (Vec<String>, impl Stream<Item = Result<Event, ()>>) {
     let lines = (0..count).map(|_| random_string(len)).collect::<Vec<_>>();
-    let stream = stream01::iter_ok(lines.clone().into_iter().map(Event::from));
+    let stream = stream::iter(lines.clone()).map(Event::from).map(Ok);
     (lines, stream)
+}
+
+fn random_events_with_stream_generic<F>(
+    count: usize,
+    generator: F,
+) -> (Vec<Event>, impl Stream01<Item = Event, Error = ()>)
+where
+    F: Fn() -> Event,
+{
+    let events = (0..count).map(|_| generator()).collect::<Vec<_>>();
+    let stream = stream01::iter_ok(events.clone().into_iter());
+    (events, stream)
 }
 
 pub fn random_events_with_stream(
@@ -553,18 +565,6 @@ impl CountReceiver<Event> {
                 .await
         })
     }
-}
-
-fn random_events_with_stream_generic<F>(
-    count: usize,
-    generator: F,
-) -> (Vec<Event>, impl Stream01<Item = Event, Error = ()>)
-where
-    F: Fn() -> Event,
-{
-    let events = (0..count).map(|_| generator()).collect::<Vec<_>>();
-    let stream = stream01::iter_ok(events.clone().into_iter());
-    (events, stream)
 }
 
 fn random_pseudonested_map(len: usize, breadth: usize, depth: usize) -> HashMap<String, String> {
