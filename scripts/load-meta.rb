@@ -11,10 +11,17 @@
 #   TODO: We should consider switching to YAML, JSONNET, or another format that
 #   allows for reuse.
 
-require "date"
-require "erb"
-require "json"
-require "toml-rb"
+
+begin
+  require "date"
+  require "erb"
+  require "json"
+  require "toml-rb"
+rescue LoadError => ex
+  puts "Load error: #{ex.message}"
+  exit
+end
+
 
 META_ROOT = "#{Dir.pwd}/.meta"
 
