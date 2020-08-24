@@ -5,7 +5,7 @@ type = "table"
 category = "Buffer"
 common = <%= common.to_toml %>
 groups = <%= groups.to_toml %>
-description = "Configures the sink specific buffer behavior."
+description = "Configures the sink-specific buffer behavior."
 
 [<%= namespace %>.buffer.children.max_events]
 type = "uint"
@@ -26,7 +26,7 @@ groups = <%= groups.to_toml %>
 relevant_when = {type = "disk"}
 required = true
 unit = "bytes"
-description = "The maximum size of the buffer on the disk."
+description = "The maximum size of the buffer on disk."
 
 [<%= namespace %>.buffer.children.type]
 type = "string"
@@ -49,4 +49,4 @@ description = "The behavior when the buffer becomes full."
 
 [<%= namespace %>.buffer.children.when_full.enum]
 block = "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."
-drop_newest = "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."
+drop_newest = "Drops new data as it is received. This data is lost. This should be used when performance is the highest priority."

@@ -53,7 +53,7 @@ groups = <%= groups.to_toml %>
 unit = "seconds"
 description = """\
 The amount of time to wait before attempting the first retry for a failed \
-request. Once, the first retry has failed the fibonacci sequence will be used \
+request. Once, the first retry has failed the Fibonacci sequence will be used \
 to select future backoffs.\
 """
 
@@ -73,7 +73,7 @@ groups = <%= groups.to_toml %>
 unit = "seconds"
 description = """\
 The maximum time a request can take before being aborted. It is highly \
-recommended that you do not lower value below the service's internal timeout, \
+recommended that you do not lower this value below the service's internal timeout, \
 as this could create orphaned requests, pile on retries, and result in \
 duplicate data downstream.\
 """

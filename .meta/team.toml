@@ -131,3 +131,11 @@ github = "https://github.com/zsherman"
 keybase = "https://keybase.io/zsherman"
 twitter = "https://twitter.com/zsherman"
 name = "Zach"
+
+[[team]]
+id = "james"
+avatar = "https://avatars1.githubusercontent.com/u/4365?s=400&u=541e15c0dde9034022efa8a71c646bb4440a2109&v=4"
+github = "https://github.com/jamtur01"
+keybase = "https://keybase.io/jamtur01"
+twitter = "https://twitter.com/kartar"
+name = "James"

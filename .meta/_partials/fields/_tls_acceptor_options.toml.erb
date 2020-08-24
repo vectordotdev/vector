@@ -38,7 +38,7 @@ groups = <%= groups.to_toml %>
 description = """\
 Absolute path to a certificate file used to identify this server, in DER \
 or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. \
-If this is set and is not a PKCS#12 archive, `key_file` must also be set. \
+If this is set, and is not a PKCS#12 archive, `key_file` must also be set. \
 This is required if `enabled` is set to `true`.\
 """
 
@@ -71,8 +71,8 @@ groups = <%= groups.to_toml %>
 <%= relevant %>
 description = """\
 If `true`, Vector will require a TLS certificate from the connecting host \
-and terminate the connection if it is not valid. \
-If `false` (the default), Vector  will not request a certificate from the \
+and terminate the connection if the certicate is not valid. \
+If `false` (the default), Vector will not request a certificate from the \
 client.\
 """
 warnings = [{visibility_level = "option", text = "Setting this to `false` will cause OpenSSL to not request a certificate from the client"}]
