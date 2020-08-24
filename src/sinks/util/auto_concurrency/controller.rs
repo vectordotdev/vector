@@ -142,77 +142,81 @@ impl<L> Controller<L> {
             inner.current_rtt.update(rtt);
         }
         let current_rtt = inner.current_rtt.average();
-        let past_rtt = inner.past_rtt.average();
 
-        // No past measurements, set up initial values.
-        if past_rtt == 0.0 {
-            if let Some(current_rtt) = current_rtt {
-                inner.past_rtt.update(current_rtt);
-                inner.next_update = now + Duration::from_secs_f64(current_rtt);
-            }
-        } else if past_rtt > 0.0 && now >= inner.next_update {
-            #[cfg(test)]
-            {
+        match inner.past_rtt.average() {
+            None => {
+                // No past measurements, set up initial values.
                 if let Some(current_rtt) = current_rtt {
-                    stats.averaged_rtt.add(current_rtt, now);
+                    inner.past_rtt.update(current_rtt);
+                    inner.next_update = now + Duration::from_secs_f64(current_rtt);
                 }
-                stats.concurrency_limit.add(inner.current_limit, now);
-                drop(stats); // Drop the stats lock a little earlier on this path
             }
+            Some(mut past_rtt) => {
+                if now >= inner.next_update {
+                    #[cfg(test)]
+                    {
+                        if let Some(current_rtt) = current_rtt {
+                            stats.averaged_rtt.add(current_rtt, now);
+                        }
+                        stats.concurrency_limit.add(inner.current_limit, now);
+                        drop(stats); // Drop the stats lock a little earlier on this path
+                    }
 
-            if let Some(current_rtt) = current_rtt {
-                emit!(AutoConcurrencyAveragedRtt {
-                    rtt: Duration::from_secs_f64(current_rtt)
-                });
-            }
+                    if let Some(current_rtt) = current_rtt {
+                        emit!(AutoConcurrencyAveragedRtt {
+                            rtt: Duration::from_secs_f64(current_rtt)
+                        });
+                    }
 
-            // Only manage the concurrency if in_flight_limit was set to "auto"
-            if self.in_flight_limit.is_none() {
-                let threshold = past_rtt * THRESHOLD_RATIO;
+                    // Only manage the concurrency if in_flight_limit was set to "auto"
+                    if self.in_flight_limit.is_none() {
+                        let threshold = past_rtt * THRESHOLD_RATIO;
 
-                // Normal quick responses trigger an increase in the
-                // concurrency limit. Note that we only check this if we had
-                // requests to go beyond the current limit to prevent
-                // increasing the limit beyond what we have evidence for.
-                if inner.current_limit < super::MAX_CONCURRENCY
-                    && inner.reached_limit
-                    && !inner.had_back_pressure
-                    && current_rtt.is_some()
-                    && current_rtt.unwrap() <= past_rtt
-                {
-                    // Increase (additive) the current concurrency limit
-                    self.semaphore.add_permits(1);
-                    inner.current_limit += 1;
+                        // Normal quick responses trigger an increase in the
+                        // concurrency limit. Note that we only check this if we had
+                        // requests to go beyond the current limit to prevent
+                        // increasing the limit beyond what we have evidence for.
+                        if inner.current_limit < super::MAX_CONCURRENCY
+                            && inner.reached_limit
+                            && !inner.had_back_pressure
+                            && current_rtt.is_some()
+                            && current_rtt.unwrap() <= past_rtt
+                        {
+                            // Increase (additive) the current concurrency limit
+                            self.semaphore.add_permits(1);
+                            inner.current_limit += 1;
+                        }
+                        // Back pressure responses, either explicit or implicit due
+                        // to increasing response times, trigger a decrease in the
+                        // concurrency limit.
+                        else if inner.current_limit > 1
+                            && (inner.had_back_pressure
+                                || current_rtt.unwrap_or(0.0) >= past_rtt + threshold)
+                        {
+                            // Decrease (multiplicative) the current concurrency limit
+                            let to_forget = inner.current_limit / 2;
+                            self.semaphore.forget_permits(to_forget);
+                            inner.current_limit -= to_forget;
+                        }
+                        emit!(AutoConcurrencyLimit {
+                            concurrency: inner.current_limit as u64,
+                            reached_limit: inner.reached_limit,
+                            had_back_pressure: inner.had_back_pressure,
+                            current_rtt: current_rtt.map(Duration::from_secs_f64),
+                            past_rtt: Duration::from_secs_f64(past_rtt),
+                        });
+                    }
+
+                    // Reset values for next interval
+                    if let Some(current_rtt) = current_rtt {
+                        past_rtt = inner.past_rtt.update(current_rtt);
+                    }
+                    inner.next_update = now + Duration::from_secs_f64(past_rtt);
+                    inner.current_rtt.reset();
+                    inner.had_back_pressure = false;
+                    inner.reached_limit = false;
                 }
-                // Back pressure responses, either explicit or implicit due
-                // to increasing response times, trigger a decrease in the
-                // concurrency limit.
-                else if inner.current_limit > 1
-                    && (inner.had_back_pressure
-                        || current_rtt.unwrap_or(0.0) >= past_rtt + threshold)
-                {
-                    // Decrease (multiplicative) the current concurrency limit
-                    let to_forget = inner.current_limit / 2;
-                    self.semaphore.forget_permits(to_forget);
-                    inner.current_limit -= to_forget;
-                }
-                emit!(AutoConcurrencyLimit {
-                    concurrency: inner.current_limit as u64,
-                    reached_limit: inner.reached_limit,
-                    had_back_pressure: inner.had_back_pressure,
-                    current_rtt: current_rtt.map(Duration::from_secs_f64),
-                    past_rtt: Duration::from_secs_f64(past_rtt),
-                });
             }
-
-            // Reset values for next interval
-            if let Some(current_rtt) = current_rtt {
-                inner.past_rtt.update(current_rtt);
-            }
-            inner.next_update = now + Duration::from_secs_f64(inner.past_rtt.average());
-            inner.current_rtt.reset();
-            inner.had_back_pressure = false;
-            inner.reached_limit = false;
         }
     }
 }
@@ -247,20 +251,22 @@ where
 /// Exponentially Weighted Moving Average
 #[derive(Clone, Copy, Debug, Default)]
 struct EWMA {
-    average: f64,
+    average: Option<f64>,
 }
 
 impl EWMA {
-    fn average(&self) -> f64 {
+    fn average(&self) -> Option<f64> {
         self.average
     }
 
-    /// Update the current average
-    fn update(&mut self, point: f64) {
-        self.average = match self.average {
-            avg if avg == 0.0 => point,
-            avg => point * EWMA_ALPHA + avg * (1.0 - EWMA_ALPHA),
+    /// Update the current average and return it for convenience
+    fn update(&mut self, point: f64) -> f64 {
+        let average = match self.average {
+            None => point,
+            Some(avg) => point * EWMA_ALPHA + avg * (1.0 - EWMA_ALPHA),
         };
+        self.average = Some(average);
+        average
     }
 }
 
@@ -312,15 +318,15 @@ mod tests {
     #[test]
     fn ewma_update_works() {
         let mut mean = EWMA::default();
-        assert_eq!(mean.average(), 0.0);
+        assert_eq!(mean.average(), None);
         mean.update(2.0);
-        assert_eq!(mean.average(), 2.0);
+        assert_eq!(mean.average(), Some(2.0));
         mean.update(2.0);
-        assert_eq!(mean.average(), 2.0);
+        assert_eq!(mean.average(), Some(2.0));
         mean.update(1.0);
-        assert_eq!(mean.average(), 1.5);
+        assert_eq!(mean.average(), Some(1.5));
         mean.update(2.0);
-        assert_eq!(mean.average(), 1.75);
-        assert_eq!(mean.average, 1.75);
+        assert_eq!(mean.average(), Some(1.75));
+        assert_eq!(mean.average, Some(1.75));
     }
 }
