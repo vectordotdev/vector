@@ -439,7 +439,7 @@ impl Config {
         if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
             self.global.data_dir = with.global.data_dir.clone();
         } else if with.global.data_dir != default_data_dir()
-            && self.global.data_dir != with.global.data_dir.clone()
+            && self.global.data_dir != with.global.data_dir
         {
             // If two configs both set 'data_dir' and have conflicting values
             // we consider this an error.

@@ -34,7 +34,7 @@ pub fn update_config(old_config: &mut Config, new_config: &Config) {
         old_config.api.enabled = new_config.api.enabled
     }
 
-    if let Some(bind) = new_config.api.bind.clone() {
+    if let Some(bind) = new_config.api.bind {
         old_config.api.bind = Some(bind)
     }
 }
