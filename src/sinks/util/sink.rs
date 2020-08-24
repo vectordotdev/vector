@@ -40,10 +40,8 @@ use futures::{
     FutureExt, TryFutureExt,
 };
 use futures01::{
-    future::Either,
-    stream::FuturesUnordered,
-    sync::oneshot::{self, Receiver},
-    try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
+    future::Either, stream::FuturesUnordered, sync::oneshot, try_ready, Async, AsyncSink, Future,
+    Poll, Sink, StartSend, Stream,
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -616,7 +614,7 @@ where
 
 struct ServiceSink<S, Request> {
     service: S,
-    in_flight: FuturesUnordered<Receiver<(usize, usize)>>,
+    in_flight: FuturesUnordered<oneshot::Receiver<(usize, usize)>>,
     acker: Acker,
     seq_head: usize,
     seq_tail: usize,
