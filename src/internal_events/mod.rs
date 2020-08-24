@@ -20,6 +20,7 @@ mod lua;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
 mod regex;
+#[cfg(feature = "transforms-rename_fields")]
 mod rename_fields;
 mod sampler;
 mod split;
@@ -61,6 +62,7 @@ pub use self::lua::*;
 #[cfg(feature = "sources-prometheus")]
 pub use self::prometheus::*;
 pub use self::regex::*;
+#[cfg(feature = "transforms-rename_fields")]
 pub use self::rename_fields::*;
 pub use self::sampler::*;
 pub use self::split::*;
