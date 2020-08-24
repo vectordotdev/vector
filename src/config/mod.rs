@@ -11,7 +11,6 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::fs::DirBuilder;
-use std::net::{Ipv4Addr, SocketAddr};
 use std::{collections::HashMap, path::PathBuf};
 
 pub mod component;
@@ -21,17 +20,21 @@ mod validation;
 mod vars;
 pub mod watcher;
 
-pub use diff::{ConfigDiff, ServiceDiff};
+pub use diff::ConfigDiff;
 pub use loading::*;
 pub use validation::check;
+
+#[cfg(feature = "api")]
+pub mod api;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(flatten)]
     pub global: GlobalOptions,
+    #[cfg(feature = "api")]
     #[serde(default)]
-    pub api: ApiOptions,
+    pub api: api::Options,
     #[serde(default)]
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
     #[serde(default)]
@@ -55,22 +58,6 @@ pub struct GlobalOptions {
 
 pub fn default_data_dir() -> Option<PathBuf> {
     Some(PathBuf::from("/var/lib/vector/"))
-}
-
-#[derive(Default, Debug, Deserialize, Serialize, PartialEq)]
-pub struct ApiOptions {
-    #[serde(default = "default_api_enabled")]
-    pub enabled: bool,
-
-    #[serde(default = "default_api_bind")]
-    pub bind: Option<SocketAddr>,
-}
-
-pub fn default_api_enabled() -> bool {
-    false
-}
-pub fn default_api_bind() -> Option<SocketAddr> {
-    Some(SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 8686))
 }
 
 #[derive(Debug, Snafu)]
@@ -344,7 +331,8 @@ impl Config {
                 data_dir: None,
                 log_schema: event::LogSchema::default(),
             },
-            api: ApiOptions {
+            #[cfg(feature = "api")]
+            api: api::Options {
                 enabled: false,
                 bind: None,
             },
@@ -449,9 +437,9 @@ impl Config {
         let mut errors = Vec::new();
 
         if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
-            self.global.data_dir = with.global.data_dir;
+            self.global.data_dir = with.global.data_dir.clone();
         } else if with.global.data_dir != default_data_dir()
-            && self.global.data_dir != with.global.data_dir
+            && self.global.data_dir != with.global.data_dir.clone()
         {
             // If two configs both set 'data_dir' and have conflicting values
             // we consider this an error.
@@ -493,11 +481,9 @@ impl Config {
         }
 
         // api
-        if with.api.enabled != default_api_enabled() {
-            self.api.enabled = with.api.enabled
-        }
-        if let Some(bind) = with.api.bind {
-            self.api.bind = Some(bind)
+        #[cfg(feature = "api")]
+        {
+            api::update_config(self, &with);
         }
 
         with.sources.keys().for_each(|k| {
