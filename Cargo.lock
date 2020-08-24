@@ -102,6 +102,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-compression"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9021768bcce77296b64648cc7a7460e3df99979b97ed5c925c38d1cc83778d98"
+dependencies = [
+ "flate2",
+ "futures-core",
+ "memchr",
+ "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
 name = "async-graphql"
 version = "1.17.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -186,19 +199,6 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "warp",
-]
-
-[[package]]
-name = "async-compression"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9021768bcce77296b64648cc7a7460e3df99979b97ed5c925c38d1cc83778d98"
-dependencies = [
- "flate2",
- "futures-core",
- "memchr",
- "pin-project-lite",
- "tokio 0.2.21",
 ]
 
 [[package]]
@@ -5635,9 +5635,9 @@ dependencies = [
  "anyhow",
  "approx",
  "assert_cmd",
+ "async-compression",
  "async-graphql",
  "async-graphql-warp",
- "async-compression",
  "async-stream",
  "async-trait",
  "atty",
