@@ -1,9 +1,11 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::elasticsearch::{ElasticSearchConfig, Encoding},
+    sinks::sematext::Region,
     sinks::util::{
         encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
     },
+    sinks::{Healthcheck, RouterSink},
     Event,
 };
 use futures01::{Future, Sink};
@@ -36,13 +38,6 @@ inventory::submit! {
 }
 
 impl GenerateConfig for SematextLogsConfig {}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Region {
-    Us,
-    Eu,
-}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "sematext_logs")]

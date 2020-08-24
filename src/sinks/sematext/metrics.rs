@@ -2,12 +2,13 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricValue},
     sinks::influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
-    sinks::sematext_logs::Region,
+    sinks::sematext::Region,
     sinks::util::{
         http::{HttpBatchService, HttpClient, HttpRetryLogic},
         service2::TowerRequestConfig,
         BatchConfig, BatchSettings, MetricBuffer,
     },
+    sinks::{Healthcheck, HealthcheckError, RouterSink},
 };
 use futures::future::{ready, BoxFuture};
 use futures::TryFutureExt;
@@ -40,7 +41,7 @@ inventory::submit! {
     SinkDescription::new_without_default::<SematextMetricsConfig>("sematext_metrics")
 }
 
-fn healthcheck(endpoint: &str, mut client: HttpClient) -> crate::Result<super::Healthcheck> {
+fn healthcheck(endpoint: &str, mut client: HttpClient) -> crate::Result<Healthcheck> {
     let uri = format!("{}{}", endpoint, "/write?db=metrics&v=3.0.0");
 
     let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
@@ -52,7 +53,7 @@ fn healthcheck(endpoint: &str, mut client: HttpClient) -> crate::Result<super::H
         .and_then(|response| match response.status() {
             StatusCode::OK => Ok(()),
             StatusCode::NO_CONTENT => Ok(()),
-            other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
+            other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
         });
 
     Ok(Box::new(healthcheck))
@@ -60,14 +61,13 @@ fn healthcheck(endpoint: &str, mut client: HttpClient) -> crate::Result<super::H
 
 #[typetag::serde(name = "sematext_metrics")]
 impl SinkConfig for SematextMetricsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
         let client = HttpClient::new(cx.resolver(), None)?;
 
         let host = match (&self.host, &self.region) {
             (Some(host), None) => host.clone(),
             (None, Some(Region::Na)) => "https://spm-receiver.sematext.com".to_owned(),
             (None, Some(Region::Eu)) => "https://spm-receiver.eu.sematext.com".to_owned(),
-            //(None, Some(Region::Eu)) => "http://localhost:8086".to_owned(),
             (None, None) => {
                 return Err("Either `region` or `host` must be set.".into());
             }
@@ -119,13 +119,12 @@ impl SematextMetricsSvc {
         host: http::Uri,
         cx: SinkContext,
         client: HttpClient,
-    ) -> crate::Result<super::RouterSink> {
+    ) -> crate::Result<RouterSink> {
         let batch = BatchSettings::default()
             .events(20)
             .timeout(1)
             .parse_config(config.batch)?;
-        let request: super::util::service2::TowerRequestSettings =
-            config.request.unwrap_with(&REQUEST_DEFAULTS);
+        let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let http_service = HttpBatchService::new(client, create_build_request(host));
         let sematext_service = SematextMetricsSvc {
             config,
@@ -156,9 +155,7 @@ impl Service<Vec<Metric>> for SematextMetricsSvc {
     }
 
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
-        let len = items.len();
         let input = encode_events(&self.config.token, items);
-        println!("Service sending {:?} {}", input, len);
         let body: Vec<u8> = input.into_bytes();
 
         self.inner.call(body)
@@ -181,9 +178,12 @@ fn create_build_request(
 
 /// Sematext takes the first part of the name as the namespace for the event.
 /// The rest of the name is the value label.
+/// If the name is not a '.' separated string, it will take the whole name as the
+/// namespace, and set label the value as 'value'.
+/// This probably should not happen if you want meaningful metrics in Sematext.
 fn split_event_name(name: &str) -> (String, String) {
     match name.find('.') {
-        None => (name.into(), name.into()),
+        None => (name.into(), "value".into()),
         Some(pos) => (name[0..pos].into(), name[pos + 1..].into()),
     }
 }
@@ -194,8 +194,11 @@ fn encode_events(token: &str, events: Vec<Metric>) -> String {
         let fullname = event.name;
         let (namespace, label) = split_event_name(&fullname);
         let ts = encode_timestamp(event.timestamp);
+
+        // Authentication in Sematext is by inserting the token as a tag.
         let mut tags = event.tags.clone().unwrap_or_else(BTreeMap::new);
         tags.insert("token".into(), token.into());
+
         match event.value {
             MetricValue::Counter { value } => {
                 let fields = to_fields(label, value);
@@ -208,7 +211,7 @@ fn encode_events(token: &str, events: Vec<Metric>) -> String {
                     Some(fields),
                     ts,
                     &mut output,
-                )
+                );
             }
             MetricValue::Gauge { value } => {
                 let fields = to_fields(label, value);
@@ -221,9 +224,14 @@ fn encode_events(token: &str, events: Vec<Metric>) -> String {
                     Some(fields),
                     ts,
                     &mut output,
-                )
+                );
             }
-            _ => panic!("OHNO"),
+            _ => {
+                warn!(
+                    "invalid metric sent to sematext metrics sink ({:?}) ({:?})",
+                    event.kind, event.value
+                );
+            }
         }
     }
 
@@ -249,7 +257,6 @@ mod tests {
     use chrono::{offset::TimeZone, Utc};
     use futures::compat::Future01CompatExt;
     use futures01::{stream, Stream};
-    //use std::thread;
 
     #[test]
     fn test_encode_counter_event() {
@@ -263,6 +270,22 @@ mod tests {
 
         assert_eq!(
             "jvm,metric_type=counter,token=aaa pool.used=42 1597784400000000000",
+            encode_events("aaa", events)
+        );
+    }
+
+    #[test]
+    fn test_encode_counter_event_no_namespace() {
+        let events = vec![Metric {
+            name: "used".into(),
+            timestamp: Some(Utc.ymd(2020, 08, 18).and_hms_nano(21, 0, 0, 0)),
+            tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Counter { value: 42.0 },
+        }];
+
+        assert_eq!(
+            "used,metric_type=counter,token=aaa value=42 1597784400000000000",
             encode_events("aaa", events)
         );
     }
@@ -299,6 +322,7 @@ mod tests {
             r#"
             region = "eu"
             token = "atoken"
+            batch.max_events = 1
             "#,
         )
         .unwrap();
@@ -318,45 +342,54 @@ mod tests {
         tokio::spawn(server);
 
         // Make our test metrics.
-        let metric = format!("jvm.counter-{}", Utc::now().timestamp_nanos());
+        let metrics = vec![
+            ("os.swap.size", 324292.0),
+            ("os.network.tx", 42000.0),
+            ("os.network.rx", 54293.0),
+            ("process.count", 12.0),
+            ("process.uptime", 32423.0),
+            ("process.rss", 2342333.0),
+            ("jvm.pool.used", 18874368.0),
+            ("jvm.pool.committed", 18868584.0),
+            ("jvm.pool.max", 18874368.0),
+        ];
+
         let mut events = Vec::new();
-        for i in 0..10 {
+        for i in 0..metrics.len() {
+            let (metric, val) = metrics[i];
             let event = Event::from(Metric {
                 name: metric.to_string(),
-                timestamp: Some(Utc.ymd(2020, 08, 18).and_hms_nano(21, 0, 0, i)),
+                timestamp: Some(Utc.ymd(2020, 08, 18).and_hms_nano(21, 0, 0, i as u32)),
                 tags: Some(
-                    // TODO - Find out where we can get these from..
-                    vec![
-                        ("region".to_owned(), "us-west-1".to_owned()),
-                        ("production".to_owned(), "true".to_owned()),
-                    ]
-                    .into_iter()
-                    .collect(),
+                    vec![("os.host".to_owned(), "somehost".to_owned())]
+                        .into_iter()
+                        .collect(),
                 ),
                 kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: i as f64 },
+                value: MetricValue::Counter { value: val as f64 },
             });
             events.push(event);
         }
 
-        println!("{} events", events.len());
         let _ = sink
             .send_all(stream::iter_ok(events.clone()))
             .compat()
             .await
             .unwrap();
 
-        /*
-        thread::spawn(move || {
-            block_on(
-                sink
-                    .send_all(stream::iter_ok(events.clone()))
-                    .compat()
-            ).unwrap()
-        });
-        */
-
-        let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();
-        println!("1 {:?}", output);
+        let output = rx
+            .take(metrics.len() as u64)
+            .wait()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert_eq!("os,metric_type=counter,os.host=somehost,token=atoken swap.size=324292 1597784400000000000", output[0].1);
+        assert_eq!("os,metric_type=counter,os.host=somehost,token=atoken network.tx=42000 1597784400000000001", output[1].1);
+        assert_eq!("os,metric_type=counter,os.host=somehost,token=atoken network.rx=54293 1597784400000000002", output[2].1);
+        assert_eq!("process,metric_type=counter,os.host=somehost,token=atoken count=12 1597784400000000003", output[3].1);
+        assert_eq!("process,metric_type=counter,os.host=somehost,token=atoken uptime=32423 1597784400000000004", output[4].1);
+        assert_eq!("process,metric_type=counter,os.host=somehost,token=atoken rss=2342333 1597784400000000005", output[5].1);
+        assert_eq!("jvm,metric_type=counter,os.host=somehost,token=atoken pool.used=18874368 1597784400000000006", output[6].1);
+        assert_eq!("jvm,metric_type=counter,os.host=somehost,token=atoken pool.committed=18868584 1597784400000000007", output[7].1);
+        assert_eq!("jvm,metric_type=counter,os.host=somehost,token=atoken pool.max=18874368 1597784400000000008", output[8].1);
     }
 }
