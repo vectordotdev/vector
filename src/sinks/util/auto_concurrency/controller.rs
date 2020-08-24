@@ -9,7 +9,7 @@ use crate::sinks::util::retries::RetryLogic;
 #[cfg(test)]
 use crate::test_util::stats::{TimeHistogram, TimeWeightedSum};
 use std::future::Future;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 use tokio::sync::OwnedSemaphorePermit;
 use tower03::timeout::error::Elapsed;
@@ -170,41 +170,7 @@ impl<L> Controller<L> {
 
                     // Only manage the concurrency if in_flight_limit was set to "auto"
                     if self.in_flight_limit.is_none() {
-                        let threshold = past_rtt * THRESHOLD_RATIO;
-
-                        // Normal quick responses trigger an increase in the
-                        // concurrency limit. Note that we only check this if we had
-                        // requests to go beyond the current limit to prevent
-                        // increasing the limit beyond what we have evidence for.
-                        if inner.current_limit < super::MAX_CONCURRENCY
-                            && inner.reached_limit
-                            && !inner.had_back_pressure
-                            && current_rtt.is_some()
-                            && current_rtt.unwrap() <= past_rtt
-                        {
-                            // Increase (additive) the current concurrency limit
-                            self.semaphore.add_permits(1);
-                            inner.current_limit += 1;
-                        }
-                        // Back pressure responses, either explicit or implicit due
-                        // to increasing response times, trigger a decrease in the
-                        // concurrency limit.
-                        else if inner.current_limit > 1
-                            && (inner.had_back_pressure
-                                || current_rtt.unwrap_or(0.0) >= past_rtt + threshold)
-                        {
-                            // Decrease (multiplicative) the current concurrency limit
-                            let to_forget = inner.current_limit / 2;
-                            self.semaphore.forget_permits(to_forget);
-                            inner.current_limit -= to_forget;
-                        }
-                        emit!(AutoConcurrencyLimit {
-                            concurrency: inner.current_limit as u64,
-                            reached_limit: inner.reached_limit,
-                            had_back_pressure: inner.had_back_pressure,
-                            current_rtt: current_rtt.map(Duration::from_secs_f64),
-                            past_rtt: Duration::from_secs_f64(past_rtt),
-                        });
+                        self.manage_limit(&mut inner, past_rtt, current_rtt);
                     }
 
                     // Reset values for next interval
@@ -218,6 +184,43 @@ impl<L> Controller<L> {
                 }
             }
         }
+    }
+
+    fn manage_limit(&self, inner: &mut MutexGuard<Inner>, past_rtt: f64, current_rtt: Option<f64>) {
+        let threshold = past_rtt * THRESHOLD_RATIO;
+
+        // Normal quick responses trigger an increase in the
+        // concurrency limit. Note that we only check this if we had
+        // requests to go beyond the current limit to prevent
+        // increasing the limit beyond what we have evidence for.
+        if inner.current_limit < super::MAX_CONCURRENCY
+            && inner.reached_limit
+            && !inner.had_back_pressure
+            && current_rtt.is_some()
+            && current_rtt.unwrap() <= past_rtt
+        {
+            // Increase (additive) the current concurrency limit
+            self.semaphore.add_permits(1);
+            inner.current_limit += 1;
+        }
+        // Back pressure responses, either explicit or implicit due
+        // to increasing response times, trigger a decrease in the
+        // concurrency limit.
+        else if inner.current_limit > 1
+            && (inner.had_back_pressure || current_rtt.unwrap_or(0.0) >= past_rtt + threshold)
+        {
+            // Decrease (multiplicative) the current concurrency limit
+            let to_forget = inner.current_limit / 2;
+            self.semaphore.forget_permits(to_forget);
+            inner.current_limit -= to_forget;
+        }
+        emit!(AutoConcurrencyLimit {
+            concurrency: inner.current_limit as u64,
+            reached_limit: inner.reached_limit,
+            had_back_pressure: inner.had_back_pressure,
+            current_rtt: current_rtt.map(Duration::from_secs_f64),
+            past_rtt: Duration::from_secs_f64(past_rtt),
+        });
     }
 }
 
