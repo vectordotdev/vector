@@ -23,4 +23,3 @@ impl<'a> InternalEvent for RemoveFieldsFieldMissing<'a> {
         error!(message = "Field did not exist.", %self.field, rate_limit_secs = 30);
     }
 }
-

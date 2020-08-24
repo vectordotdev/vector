@@ -1,8 +1,8 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    internal_events::{RemoveFieldsEventProcessed, RemoveFieldsFieldMissing},
     Event,
-    internal_events::{RemoveFieldsFieldMissing, RemoveFieldsEventProcessed},
 };
 use serde::{Deserialize, Serialize};
 use string_cache::DefaultAtom as Atom;
@@ -59,7 +59,9 @@ impl Transform for RemoveFields {
         for field in &self.fields {
             let old_val = log.remove_prune(field, self.drop_empty);
             if old_val.is_none() {
-                emit!(RemoveFieldsFieldMissing { field: field.as_ref() });
+                emit!(RemoveFieldsFieldMissing {
+                    field: field.as_ref()
+                });
             }
         }
 

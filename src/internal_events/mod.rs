@@ -1,4 +1,3 @@
-mod remove_fields;
 mod add_fields;
 mod ansi_stripper;
 mod auto_concurrency;
@@ -21,6 +20,8 @@ mod lua;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
 mod regex;
+#[cfg(feature = "transforms-remove_fields")]
+mod remove_fields;
 mod sampler;
 mod split;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
@@ -61,6 +62,7 @@ pub use self::lua::*;
 #[cfg(feature = "sources-prometheus")]
 pub use self::prometheus::*;
 pub use self::regex::*;
+#[cfg(feature = "transforms-remove_fields")]
 pub use self::remove_fields::*;
 pub use self::sampler::*;
 pub use self::split::*;
