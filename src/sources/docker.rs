@@ -12,13 +12,13 @@ use crate::{
 };
 use bollard::{
     container::{InspectContainerOptions, ListContainersOptions, LogOutput, LogsOptions},
-    errors::{Error as DockerError, ErrorKind as DockerErrorKind},
+    errors::Error as DockerError,
     service::{ContainerInspectResponse, SystemEventsResponse},
     system::EventsOptions,
     Docker,
 };
 use bytes::{Buf, Bytes};
-use chrono::{DateTime, FixedOffset, Local, NaiveTime, ParseError, Utc, MAX_DATE};
+use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     future,
@@ -213,10 +213,8 @@ impl DockerSourceCore {
         }
 
         self.docker.events(Some(EventsOptions {
-            since: self.now_timestamp,
-            // Handler in Docker API:
-            // https://github.com/moby/moby/blob/c833222d54c00d64a0fc44c561a5973ecd414053/api/server/router/system/system_routes.go#L155
-            until: MAX_DATE.and_time(NaiveTime::from_hms(0, 0, 0)).unwrap(),
+            since: Some(self.now_timestamp),
+            until: None,
             filters,
         }))
     }
@@ -534,7 +532,7 @@ impl EventStreamBuilder {
 
     async fn start_event_stream(&self, mut info: ContainerLogInfo) {
         // Establish connection
-        let options = Some(LogsOptions {
+        let options = Some(LogsOptions::<String> {
             follow: true,
             stdout: true,
             stderr: true,
@@ -562,8 +560,8 @@ impl EventStreamBuilder {
                     )),
                     Err(error) => {
                         // On any error, restart connection
-                        match error.kind() {
-                            DockerErrorKind::DockerResponseServerError { status_code, .. }
+                        match &error {
+                            DockerError::DockerResponseServerError { status_code, .. }
                                 if *status_code == http::StatusCode::NOT_IMPLEMENTED =>
                             {
                                 emit!(DockerLoggingDriverUnsupported {
@@ -919,7 +917,7 @@ fn docker() -> Result<Docker, DockerError> {
 
     match scheme.as_ref().map(|s| s.as_str()) {
         Some("http") => Docker::connect_with_http_defaults(),
-        Some("https") => Docker::connect_with_tls_defaults(),
+        Some("https") => Docker::connect_with_ssl_defaults(),
         _ => Docker::connect_with_local_defaults(),
     }
 }
@@ -935,7 +933,7 @@ mod tests {
             Config as ContainerConfig, CreateContainerOptions, KillContainerOptions,
             RemoveContainerOptions, StartContainerOptions, WaitContainerOptions,
         },
-        image::{CreateImageOptions, CreateImageResults, ListImagesOptions},
+        image::{CreateImageOptions, ListImagesOptions},
     };
     use futures::{compat::Future01CompatExt, stream::TryStreamExt};
     use futures01::{sync::mpsc as mpsc01, Async, Stream as Stream01};
@@ -1062,9 +1060,9 @@ mod tests {
             docker
                 .create_image(options, None, None)
                 .for_each(|item| async move {
-                    match item.unwrap() {
-                        err @ CreateImageResults::CreateImageError { .. } => panic!("{:?}", err),
-                        _ => {}
+                    let info = item.unwrap();
+                    if let Some(error) = info.error {
+                        panic!("{:?}", error);
                     }
                 })
                 .await
