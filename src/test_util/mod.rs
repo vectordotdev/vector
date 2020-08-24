@@ -5,6 +5,7 @@ use crate::{
     topology::{self, RunningTopology},
     trace, Event,
 };
+use flate2::read::GzDecoder;
 use futures::{
     compat::Stream01CompatExt, stream, FutureExt as _, SinkExt, Stream, StreamExt, TryFutureExt,
     TryStreamExt,
@@ -266,6 +267,18 @@ pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     let mut file = File::open(path).unwrap();
     let mut output = String::new();
     file.read_to_string(&mut output).unwrap();
+    output.lines().map(|s| s.to_owned()).collect()
+}
+
+pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
+    trace!(message = "Reading gzip file.", path = %path.as_ref().display());
+    let mut file = File::open(path).unwrap();
+    let mut gzip_bytes = Vec::new();
+    file.read_to_end(&mut gzip_bytes).unwrap();
+    let mut output = String::new();
+    GzDecoder::new(&gzip_bytes[..])
+        .read_to_string(&mut output)
+        .unwrap();
     output.lines().map(|s| s.to_owned()).collect()
 }
 
