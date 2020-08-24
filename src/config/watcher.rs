@@ -121,7 +121,7 @@ fn add_paths(watcher: &mut RecommendedWatcher, config_paths: &[PathBuf]) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::{trace_init, temp_file};
+    use crate::test_util::{temp_file, trace_init};
     use futures::compat::Future01CompatExt;
     use futures01::{Future, Stream};
     use std::time::Duration;
