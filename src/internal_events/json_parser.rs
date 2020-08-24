@@ -8,7 +8,7 @@ pub(crate) struct JsonParserEventProcessed;
 
 impl InternalEvent for JsonParserEventProcessed {
     fn emit_logs(&self) {
-        trace!(message = "received one event.");
+        trace!(message = "Received one event.");
     }
 
     fn emit_metrics(&self) {
@@ -28,7 +28,7 @@ pub(crate) struct JsonParserFailedParse<'a> {
 impl<'a> InternalEvent for JsonParserFailedParse<'a> {
     fn emit_logs(&self) {
         warn!(
-            message = "event failed to parse as JSON",
+            message = "Event failed to parse as JSON.",
             field = %self.field,
             %self.error,
             rate_limit_secs = 30
@@ -52,7 +52,7 @@ pub(crate) struct JsonParserTargetExists<'a> {
 impl<'a> InternalEvent for JsonParserTargetExists<'a> {
     fn emit_logs(&self) {
         warn!(
-            message = "target field already exists",
+            message = "Target field already exists.",
             target_field = %self.target_field,
             rate_limit_secs = 30
         )
