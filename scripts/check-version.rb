@@ -6,10 +6,15 @@
 #
 #   Checks that the version in Cargo.toml is up-to-date
 
-require "git"
-require "semantic"
-require "semantic/core_ext"
-require "toml-rb"
+begin
+  require "git"
+  require "semantic"
+  require "semantic/core_ext"
+  require "toml-rb"
+rescue LoadError => ex
+  puts "Load error: #{ex.message}"
+  exit
+end
 
 class Semantic::Version
   #
