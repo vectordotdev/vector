@@ -98,6 +98,8 @@ jobs:
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
     runs-on: windows-latest
+    if: |
+      !contains(format('{0} {1} {2}', github.event.head_commit.message, github.event.pull_request.title, github.event.pull_request.body), '[skip ci]')
     steps:
       - uses: actions/checkout@v1
       - env:
@@ -108,6 +110,8 @@ jobs:
   test-misc:
     name: Shutdown - Linux
     runs-on: ubuntu-20.04
+    if: |
+      !contains(format('{0} {1} {2}', github.event.head_commit.message, github.event.pull_request.title, github.event.pull_request.body), '[skip ci]')
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -126,6 +130,8 @@ jobs:
   test-integration-aws:
     name: Integration - Linux, AWS
     runs-on: ubuntu-20.04
+    if: |
+      !contains(format('{0} {1} {2}', github.event.head_commit.message, github.event.pull_request.title, github.event.pull_request.body), '[skip ci]')
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -142,6 +148,8 @@ jobs:
   test-integration-clickhouse:
     name: Integration - Linux, Clickhouse
     runs-on: ubuntu-20.04
+    if: |
+      !contains(format('{0} {1} {2}', github.event.head_commit.message, github.event.pull_request.title, github.event.pull_request.body), '[skip ci]')
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -158,6 +166,8 @@ jobs:
   test-integration-docker:
     name: Integration - Linux, Docker
     runs-on: ubuntu-20.04
+    if: |
+      !contains(format('{0} {1} {2}', github.event.head_commit.message, github.event.pull_request.title, github.event.pull_request.body), '[skip ci]')
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -174,6 +184,8 @@ jobs:
   test-integration-elasticsearch:
     name: Integration - Linux, ES
     runs-on: ubuntu-20.04
+    if: |
+      !contains(format('{0} {1} {2}', github.event.head_commit.message, github.event.pull_request.title, github.event.pull_request.body), '[skip ci]')
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -190,6 +202,8 @@ jobs:
   test-integration-gcp:
     name: Integration - Linux, GCP
     runs-on: ubuntu-20.04
+    if: |
+      !contains(format('{0} {1} {2}', github.event.head_commit.message, github.event.pull_request.title, github.event.pull_request.body), '[skip ci]')
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -206,6 +220,8 @@ jobs:
   test-integration-influxdb:
     name: Integration - Linux, Influx
     runs-on: ubuntu-20.04
+    if: |
+      !contains(format('{0} {1} {2}', github.event.head_commit.message, github.event.pull_request.title, github.event.pull_request.body), '[skip ci]')
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -222,6 +238,8 @@ jobs:
   test-integration-kafka:
     name: Integration - Linux, Kafka
     runs-on: ubuntu-20.04
+    if: |
+      !contains(format('{0} {1} {2}', github.event.head_commit.message, github.event.pull_request.title, github.event.pull_request.body), '[skip ci]')
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -238,6 +256,8 @@ jobs:
   test-integration-loki:
     name: Integration - Linux, Loki
     runs-on: ubuntu-20.04
+    if: |
+      !contains(format('{0} {1} {2}', github.event.head_commit.message, github.event.pull_request.title, github.event.pull_request.body), '[skip ci]')
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -254,6 +274,8 @@ jobs:
   test-integration-pulsar:
     name: Integration - Linux, Pulsar
     runs-on: ubuntu-20.04
+    if: |
+      !contains(format('{0} {1} {2}', github.event.head_commit.message, github.event.pull_request.title, github.event.pull_request.body), '[skip ci]')
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -270,6 +292,8 @@ jobs:
   test-integration-splunk:
     name: Integration - Linux, Splunk
     runs-on: ubuntu-20.04
+    if: |
+      !contains(format('{0} {1} {2}', github.event.head_commit.message, github.event.pull_request.title, github.event.pull_request.body), '[skip ci]')
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
