@@ -1433,11 +1433,11 @@ dependencies = [
 
 [[package]]
 name = "getset"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f62a139c59ae846c3964c392f12aac68f1997d1a40e9d3b40a89a4ab553e04a0"
+checksum = "24b328c01a4d71d2d8173daa93562a73ab0fe85616876f02500f53d82948c504"
 dependencies = [
- "proc-macro-error 0.4.9",
+ "proc-macro-error",
  "proc-macro2 1.0.18",
  "quote 1.0.2",
  "syn 1.0.33",
@@ -3119,41 +3119,15 @@ dependencies = [
 
 [[package]]
 name = "proc-macro-error"
-version = "0.4.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "052b3c9af39c7e5e94245f820530487d19eb285faedcb40e0c3275132293f242"
-dependencies = [
- "proc-macro-error-attr 0.4.9",
- "proc-macro2 1.0.18",
- "quote 1.0.2",
- "rustversion",
- "syn 1.0.33",
-]
-
-[[package]]
-name = "proc-macro-error"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98e9e4b82e0ef281812565ea4751049f1bdcdfccda7d3f459f2e138a40c08678"
 dependencies = [
- "proc-macro-error-attr 1.0.2",
+ "proc-macro-error-attr",
  "proc-macro2 1.0.18",
  "quote 1.0.2",
  "syn 1.0.33",
  "version_check 0.9.1",
-]
-
-[[package]]
-name = "proc-macro-error-attr"
-version = "0.4.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d175bef481c7902e63e3165627123fff3502f06ac043d3ef42d08c1246da9253"
-dependencies = [
- "proc-macro2 1.0.18",
- "quote 1.0.2",
- "rustversion",
- "syn 1.0.33",
- "syn-mid",
 ]
 
 [[package]]
@@ -3958,17 +3932,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustversion"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3bba175698996010c4f6dce5e7f173b6eb781fce25d2cfc45e27091ce0b79f6"
-dependencies = [
- "proc-macro2 1.0.18",
- "quote 1.0.2",
- "syn 1.0.33",
-]
-
-[[package]]
 name = "ryu"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4529,7 +4492,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "510413f9de616762a4fbeab62509bf15c729603b72d7cd71280fbca431b1c118"
 dependencies = [
  "heck",
- "proc-macro-error 1.0.2",
+ "proc-macro-error",
  "proc-macro2 1.0.18",
  "quote 1.0.2",
  "syn 1.0.33",
