@@ -42,6 +42,10 @@ env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
 
+defaults:
+   if: |
+      !contains(format('{0} {1} {2}', github.event.head_commit.message, github.event.pull_request.title, github.event.pull_request.body), '[skip ci]')
+
 jobs:
   cancel-previous:
     name: Cancel redundant jobs
