@@ -290,6 +290,8 @@ mod tests {
 
     #[tokio::test(threaded_scheduler)]
     async fn resync() {
+        trace_init();
+
         no_maintenance_test_flow(
             |writer| Box::pin(writer.resync()),
             |event| assert!(matches!(event, mock::ScenarioEvent::Resync)),

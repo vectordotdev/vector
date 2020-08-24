@@ -169,6 +169,7 @@ mod tests {
     async fn test_with_debounce() {
         // Due to https://github.com/tokio-rs/tokio/issues/2090 we're not
         // pausing the time.
+
         let (state_reader, state_writer) = evmap::new();
         let flush_debounce_timeout = Duration::from_millis(100);
         let mut state_writer = Writer::new(state_writer, Some(flush_debounce_timeout));
