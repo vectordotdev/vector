@@ -11,10 +11,12 @@ mod fanout;
 mod task;
 pub mod unit_test;
 
+#[cfg(feature = "api")]
+use crate::{api::Server, config::api};
+
 use crate::{
-    api::Server,
     buffers,
-    config::{self, Config, ConfigDiff, ServiceDiff},
+    config::{self, Config, ConfigDiff},
     shutdown::SourceShutdownCoordinator,
     topology::{builder::Pieces, task::Task},
 };
@@ -32,6 +34,7 @@ type TaskHandle = tokio::task::JoinHandle<Result<(), ()>>;
 
 #[allow(dead_code)]
 pub struct RunningTopology {
+    #[cfg(feature = "api")]
     api: Option<Server>,
     inputs: HashMap<String, buffers::BufferInputCloner>,
     outputs: HashMap<String, fanout::ControlChannel>,
@@ -51,6 +54,7 @@ pub async fn start_validated(
     let (abort_tx, abort_rx) = mpsc::unbounded();
 
     let mut running_topology = RunningTopology {
+        #[cfg(feature = "api")]
         api: None,
         inputs: HashMap::new(),
         outputs: HashMap::new(),
@@ -125,9 +129,10 @@ impl RunningTopology {
     /// RunningTopology instance has been dropped except for the `tasks` map, which gets moved
     /// into the returned future and is used to poll for when the tasks have completed. One the
     /// returned future is dropped then everything from this RunningTopology instance is fully
-    /// dropped.
-    pub fn stop(mut self) -> impl Future<Item = (), Error = ()> {
+    /// dropped. Takes self as `mut`, to stop the running API server if applicable.
+    pub fn stop(#[allow(unused_mut)] mut self) -> impl Future<Item = (), Error = ()> {
         // Shut down the API server
+        #[cfg(feature = "api")]
         self.stop_api();
 
         // Create handy handles collections of all tasks for the subsequent operations.
@@ -393,9 +398,10 @@ impl RunningTopology {
         }
 
         // Shutdown the API server, if applicable
+        #[cfg(feature = "api")]
         if let Some(api_diff) = &diff.api {
             match api_diff {
-                ServiceDiff::Stop | ServiceDiff::Restart => self.stop_api(),
+                api::Diff::Stop | api::Diff::Restart => self.stop_api(),
                 _ => return,
             }
         }
@@ -469,16 +475,18 @@ impl RunningTopology {
         }
 
         // API
+        #[cfg(feature = "api")]
         if let Some(diff) = &diff.api {
             self.spawn_api(diff, &mut new_pieces).await
         }
     }
 
+    #[cfg(feature = "api")]
     /// Starts/restarts the API server, if enabled in configuration
-    async fn spawn_api(&mut self, diff: &ServiceDiff, new_pieces: &mut builder::Pieces) {
+    async fn spawn_api(&mut self, diff: &api::Diff, new_pieces: &mut builder::Pieces) {
         let message = match diff {
-            ServiceDiff::Start => "Starting",
-            ServiceDiff::Restart => "Restarting",
+            api::Diff::Start => "Starting",
+            api::Diff::Restart => "Restarting",
             _ => return, // no effect if the server has stopped
         };
 
@@ -493,6 +501,7 @@ impl RunningTopology {
         self.api = Some(server.run().await);
     }
 
+    #[cfg(feature = "api")]
     /// Stop the API server, if applicable
     fn stop_api(&mut self) {
         if let Some(api) = self.api.take() {

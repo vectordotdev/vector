@@ -3,10 +3,13 @@ use super::{
     task::Task,
     ConfigDiff,
 };
+
+#[cfg(feature = "api")]
+use crate::{api::Server, config::api};
+
 use crate::{
-    api::Server,
     buffers,
-    config::{DataType, ServiceDiff, SinkContext, TransformContext},
+    config::{DataType, SinkContext, TransformContext},
     dns::Resolver,
     event::Event,
     shutdown::SourceShutdownCoordinator,
@@ -18,6 +21,7 @@ use std::collections::HashMap;
 use tokio::time::{timeout, Duration};
 
 pub struct Pieces {
+    #[cfg(feature = "api")]
     pub api: Option<Server>,
     pub inputs: HashMap<String, (buffers::BufferInputCloner, Vec<String>)>,
     pub outputs: HashMap<String, fanout::ControlChannel>,
@@ -38,7 +42,6 @@ pub async fn build_pieces(
     let mut source_tasks = HashMap::new();
     let mut healthchecks = HashMap::new();
     let mut shutdown_coordinator = SourceShutdownCoordinator::default();
-    let mut api = None;
 
     let mut errors = vec![];
 
@@ -197,17 +200,18 @@ pub async fn build_pieces(
     }
 
     // API server
-    if let Some(api_diff) = &diff.api {
-        api = match api_diff {
-            ServiceDiff::Start | ServiceDiff::Restart => {
-                Some(Server::new(config.api.bind.unwrap()))
-            }
+    #[cfg(feature = "api")]
+    let api = match &diff.api {
+        Some(api_diff) => match api_diff {
+            api::Diff::Start | api::Diff::Restart => Some(Server::new(config.api.bind.unwrap())),
             _ => None,
-        }
-    }
+        },
+        _ => None,
+    };
 
     if errors.is_empty() {
         let pieces = Pieces {
+            #[cfg(feature = "api")]
             api,
             inputs,
             outputs,
