@@ -66,15 +66,15 @@ metrics-core = "0.5.2"
 metrics-runtime = "0.13.0"
 
 # Aws
-rusoto_core = { version = "0.44.0", features = ["encoding"], optional = true }
-rusoto_s3 = { version = "0.44.0", optional = true }
-rusoto_logs = { version = "0.44.0", optional = true }
-rusoto_cloudwatch = { version = "0.44.0", optional = true }
-rusoto_kinesis = { version = "0.44.0", optional = true }
-rusoto_credential = { version = "0.44.0", optional = true }
-rusoto_firehose = { version = "0.44.0", optional = true }
-rusoto_sts = { version = "0.44.0", optional = true }
-rusoto_signature = { version = "0.44.0", optional = true }
+rusoto_core = { version = "0.45.0", features = ["encoding"], optional = true }
+rusoto_s3 = { version = "0.45.0", optional = true }
+rusoto_logs = { version = "0.45.0", optional = true }
+rusoto_cloudwatch = { version = "0.45.0", optional = true }
+rusoto_kinesis = { version = "0.45.0", optional = true }
+rusoto_credential = { version = "0.45.0", optional = true }
+rusoto_firehose = { version = "0.45.0", optional = true }
+rusoto_sts = { version = "0.45.0", optional = true }
+rusoto_signature = { version = "0.45.0", optional = true }
 
 # Tower
 tower = { version = "0.3.1", git = "https://github.com/tower-rs/tower", rev = "43168944220ed32dab83cb4f11f7b97abc5818d5", features = ["buffer", "limit", "retry", "timeout", "util"] }
