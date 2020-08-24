@@ -8,7 +8,7 @@ pub(crate) struct RegexParserEventProcessed;
 
 impl InternalEvent for RegexParserEventProcessed {
     fn emit_logs(&self) {
-        trace!(message = "processed one event.");
+        trace!(message = "Processed one event.");
     }
 
     fn emit_metrics(&self) {
@@ -49,7 +49,7 @@ pub(crate) struct RegexParserMissingField<'a> {
 
 impl InternalEvent for RegexParserMissingField<'_> {
     fn emit_logs(&self) {
-        debug!(message = "field does not exist.", field = %self.field);
+        debug!(message = "Field does not exist.", field = %self.field);
     }
 
     fn emit_metrics(&self) {
@@ -69,7 +69,7 @@ pub(crate) struct RegexParserTargetExists<'a> {
 impl<'a> InternalEvent for RegexParserTargetExists<'a> {
     fn emit_logs(&self) {
         warn!(
-            message = "target field already exists",
+            message = "Target field already exists.",
             target_field = %self.target_field,
             rate_limit_secs = 30
         )
@@ -93,7 +93,7 @@ pub(crate) struct RegexParserConversionFailed<'a> {
 impl<'a> InternalEvent for RegexParserConversionFailed<'a> {
     fn emit_logs(&self) {
         debug!(
-            message = "could not convert types.",
+            message = "Could not convert types.",
             name = %self.name,
             error = %self.error,
             rate_limit_secs = 30
