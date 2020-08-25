@@ -497,30 +497,27 @@ enum Ec2MetadataError {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::{event::Event, test_util::runtime};
+    use crate::{event::Event, test_util::trace_init};
 
     lazy_static::lazy_static! {
         static ref HOST: String = "http://localhost:8111".to_string();
     }
 
-    #[test]
-    fn enrich() {
-        crate::test_util::trace_init();
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn enrich() {
+        trace_init();
 
         let config = Ec2Metadata {
             host: Some(HOST.clone()),
             ..Default::default()
         };
-        let mut transform = rt.block_on_std(async move {
-            config
-                .build_async(TransformContext::new_test())
-                .await
-                .unwrap()
-        });
+        let mut transform = config
+            .build_async(TransformContext::new_test())
+            .await
+            .unwrap();
 
         // We need to sleep to let the background task fetch the data.
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        delay_for(Duration::from_secs(1)).await;
 
         let event = Event::new_empty_log();
 
@@ -556,24 +553,20 @@ mod integration_tests {
         assert_eq!(log.get(&"role-name[0]".into()), Some(&"mock-user".into()));
     }
 
-    #[test]
-    fn fields() {
-        let mut rt = runtime();
-
+    #[tokio::test]
+    async fn fields() {
         let config = Ec2Metadata {
             host: Some(HOST.clone()),
             fields: Some(vec!["public-ipv4".into(), "region".into()]),
             ..Default::default()
         };
-        let mut transform = rt.block_on_std(async move {
-            config
-                .build_async(TransformContext::new_test())
-                .await
-                .unwrap()
-        });
+        let mut transform = config
+            .build_async(TransformContext::new_test())
+            .await
+            .unwrap();
 
         // We need to sleep to let the background task fetch the data.
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        delay_for(Duration::from_secs(1)).await;
 
         let event = Event::new_empty_log();
 
@@ -591,24 +584,20 @@ mod integration_tests {
         assert_eq!(log.get(&"region".into()), Some(&"us-east-1".into()));
     }
 
-    #[test]
-    fn namespace() {
-        let mut rt = runtime();
-
+    #[tokio::test]
+    async fn namespace() {
         let config = Ec2Metadata {
             host: Some(HOST.clone()),
             namespace: Some("ec2.metadata".into()),
             ..Default::default()
         };
-        let mut transform = rt.block_on_std(async move {
-            config
-                .build_async(TransformContext::new_test())
-                .await
-                .unwrap()
-        });
+        let mut transform = config
+            .build_async(TransformContext::new_test())
+            .await
+            .unwrap();
 
         // We need to sleep to let the background task fetch the data.
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        delay_for(Duration::from_secs(1)).await;
 
         let event = Event::new_empty_log();
 
@@ -630,15 +619,13 @@ mod integration_tests {
             namespace: Some("".into()),
             ..Default::default()
         };
-        let mut transform = rt.block_on_std(async move {
-            config
-                .build_async(TransformContext::new_test())
-                .await
-                .unwrap()
-        });
+        let mut transform = config
+            .build_async(TransformContext::new_test())
+            .await
+            .unwrap();
 
         // We need to sleep to let the background task fetch the data.
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        delay_for(Duration::from_secs(1)).await;
 
         let event = Event::new_empty_log();
 

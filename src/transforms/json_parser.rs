@@ -2,7 +2,7 @@ use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{self, Event},
-    internal_events::{JsonEventProcessed, JsonFailedParse},
+    internal_events::{JsonParserEventProcessed, JsonParserFailedParse, JsonParserTargetExists},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -75,13 +75,13 @@ impl Transform for JsonParser {
         let log = event.as_mut_log();
         let to_parse = log.get(&self.field).map(|s| s.as_bytes());
 
-        emit!(JsonEventProcessed);
+        emit!(JsonParserEventProcessed);
 
         let parsed = to_parse
             .and_then(|to_parse| {
                 serde_json::from_slice::<Value>(to_parse.as_ref())
                     .map_err(|error| {
-                        emit!(JsonFailedParse {
+                        emit!(JsonParserFailedParse {
                             field: &self.field,
                             error
                         })
@@ -102,7 +102,7 @@ impl Transform for JsonParser {
                     let contains_target = log.contains(&target_field);
 
                     if contains_target && !self.overwrite_target {
-                        error!(message = "Target field already exists", %target_field);
+                        emit!(JsonParserTargetExists { target_field })
                     } else {
                         if self.drop_field {
                             log.remove(&self.field);

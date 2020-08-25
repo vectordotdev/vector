@@ -682,17 +682,16 @@ fn retain<T>(vec: &mut Vec<T>, mut retain_filter: impl FnMut(&mut T) -> bool) {
 
 #[cfg(all(test, feature = "sinks-console", feature = "sources-socket"))]
 mod tests {
-    use crate::config::Config;
-    use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
-    use crate::sources::socket::SocketConfig;
-    use crate::test_util::{next_addr, runtime, start_topology};
+    use crate::{
+        config::Config,
+        sinks::console::{ConsoleSinkConfig, Encoding, Target},
+        sources::socket::SocketConfig,
+        test_util::{next_addr, start_topology},
+    };
+    use std::path::Path;
 
-    #[test]
-    fn topology_doesnt_reload_new_data_dir() {
-        let mut rt = runtime();
-
-        use std::path::Path;
-
+    #[tokio::test]
+    async fn topology_doesnt_reload_new_data_dir() {
         let mut old_config = Config::empty();
         old_config.add_source("in", SocketConfig::make_tcp_config(next_addr()));
         old_config.add_sink(
@@ -706,21 +705,19 @@ mod tests {
         old_config.global.data_dir = Some(Path::new("/asdf").to_path_buf());
         let mut new_config = old_config.clone();
 
-        rt.block_on_std(async move {
-            let (mut topology, _crash) = start_topology(old_config, false).await;
+        let (mut topology, _crash) = start_topology(old_config, false).await;
 
-            new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
+        new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
-            topology
-                .reload_config_and_respawn(new_config, false)
-                .await
-                .unwrap();
+        topology
+            .reload_config_and_respawn(new_config, false)
+            .await
+            .unwrap();
 
-            assert_eq!(
-                topology.config.global.data_dir,
-                Some(Path::new("/asdf").to_path_buf())
-            );
-        });
+        assert_eq!(
+            topology.config.global.data_dir,
+            Some(Path::new("/asdf").to_path_buf())
+        );
     }
 }
 
@@ -729,16 +726,14 @@ mod reload_tests {
     use crate::config::Config;
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sources::splunk_hec::SplunkConfig;
-    use crate::test_util::{next_addr, runtime, start_topology};
+    use crate::test_util::{next_addr, start_topology};
 
     // TODO: Run it only on Linux and Mac since it fails on Windows.
     // TODO: Issue: https://github.com/timberio/vector/issues/3035
     #[cfg(unix)]
-    #[test]
-    fn topology_reuse_old_port() {
+    #[tokio::test]
+    async fn topology_reuse_old_port() {
         let address = next_addr();
-
-        let mut rt = runtime();
 
         let mut old_config = Config::empty();
         old_config.add_source("in1", SplunkConfig::on(address));
@@ -762,21 +757,16 @@ mod reload_tests {
             },
         );
 
-        rt.block_on_std(async move {
-            let (mut topology, _crash) = start_topology(old_config, false).await;
-
-            assert!(topology
-                .reload_config_and_respawn(new_config, false)
-                .await
-                .unwrap());
-        });
+        let (mut topology, _crash) = start_topology(old_config, false).await;
+        assert!(topology
+            .reload_config_and_respawn(new_config, false)
+            .await
+            .unwrap());
     }
 
-    #[test]
-    fn topology_rebuild_old() {
+    #[tokio::test]
+    async fn topology_rebuild_old() {
         let address = next_addr();
-
-        let mut rt = runtime();
 
         let mut old_config = Config::empty();
         old_config.add_source("in1", SplunkConfig::on(address));
@@ -801,21 +791,16 @@ mod reload_tests {
             },
         );
 
-        rt.block_on_std(async move {
-            let (mut topology, _crash) = start_topology(old_config, false).await;
-
-            assert!(!topology
-                .reload_config_and_respawn(new_config, false)
-                .await
-                .unwrap());
-        });
+        let (mut topology, _crash) = start_topology(old_config, false).await;
+        assert!(!topology
+            .reload_config_and_respawn(new_config, false)
+            .await
+            .unwrap());
     }
 
-    #[test]
-    fn topology_old() {
+    #[tokio::test]
+    async fn topology_old() {
         let address = next_addr();
-
-        let mut rt = runtime();
 
         let mut old_config = Config::empty();
         old_config.add_source("in1", SplunkConfig::on(address));
@@ -828,23 +813,22 @@ mod reload_tests {
             },
         );
 
-        rt.block_on_std(async move {
-            let (mut topology, _crash) = start_topology(old_config.clone(), false).await;
-
-            assert!(topology
-                .reload_config_and_respawn(old_config, false)
-                .await
-                .unwrap());
-        })
+        let (mut topology, _crash) = start_topology(old_config.clone(), false).await;
+        assert!(topology
+            .reload_config_and_respawn(old_config, false)
+            .await
+            .unwrap());
     }
 }
 
 #[cfg(all(test, feature = "sinks-console", feature = "sources-generator"))]
 mod source_finished_tests {
-    use crate::config::Config;
-    use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
-    use crate::sources::generator::GeneratorConfig;
-    use crate::test_util::start_topology;
+    use crate::{
+        config::Config,
+        sinks::console::{ConsoleSinkConfig, Encoding, Target},
+        sources::generator::GeneratorConfig,
+        test_util::start_topology,
+    };
     use futures::compat::Future01CompatExt;
     use tokio::time::{timeout, Duration};
 
@@ -878,15 +862,16 @@ mod source_finished_tests {
     feature = "transforms-json_parser"
 ))]
 mod transient_state_tests {
-    use crate::config::{Config, DataType, GlobalOptions, SourceConfig};
-    use crate::shutdown::ShutdownSignal;
-    use crate::sinks::blackhole::BlackholeConfig;
-    use crate::sources::stdin::StdinConfig;
-    use crate::sources::Source;
-    use crate::test_util::{runtime, start_topology};
-    use crate::transforms::json_parser::JsonParserConfig;
-    use crate::Error;
-    use crate::Pipeline;
+    use crate::{
+        config::{Config, DataType, GlobalOptions, SourceConfig},
+        shutdown::ShutdownSignal,
+        sinks::blackhole::BlackholeConfig,
+        sources::stdin::StdinConfig,
+        sources::Source,
+        test_util::{start_topology, trace_init},
+        transforms::json_parser::JsonParserConfig,
+        Error, Pipeline,
+    };
     use futures::compat::Future01CompatExt;
     use futures01::Future;
     use serde::{Deserialize, Serialize};
@@ -936,10 +921,8 @@ mod transient_state_tests {
         }
     }
 
-    #[test]
-    fn closed_source() {
-        let mut rt = runtime();
-
+    #[tokio::test]
+    async fn closed_source() {
         let mut old_config = Config::empty();
         let (trigger_old, source) = MockSourceConfig::new();
         old_config.add_source("in", source);
@@ -967,25 +950,22 @@ mod transient_state_tests {
         );
         new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
 
-        rt.block_on_std(async move {
-            let (mut topology, _crash) = start_topology(old_config, false).await;
+        let (mut topology, _crash) = start_topology(old_config, false).await;
 
-            trigger_old.cancel();
+        trigger_old.cancel();
 
-            let finished = topology.sources_finished();
-            finished.compat().await.unwrap();
+        let finished = topology.sources_finished();
+        finished.compat().await.unwrap();
 
-            assert!(topology
-                .reload_config_and_respawn(new_config, false)
-                .await
-                .unwrap());
-        });
+        assert!(topology
+            .reload_config_and_respawn(new_config, false)
+            .await
+            .unwrap());
     }
 
-    #[test]
-    fn remove_sink() {
-        crate::test_util::trace_init();
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn remove_sink() {
+        trace_init();
 
         let mut old_config = Config::empty();
         old_config.add_source("in", StdinConfig::default());
@@ -1012,20 +992,16 @@ mod transient_state_tests {
         );
         new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
 
-        rt.block_on_std(async move {
-            let (mut topology, _crash) = start_topology(old_config, false).await;
-
-            assert!(topology
-                .reload_config_and_respawn(new_config, false)
-                .await
-                .unwrap());
-        });
+        let (mut topology, _crash) = start_topology(old_config, false).await;
+        assert!(topology
+            .reload_config_and_respawn(new_config, false)
+            .await
+            .unwrap());
     }
 
-    #[test]
-    fn remove_transform() {
-        crate::test_util::trace_init();
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn remove_transform() {
+        trace_init();
 
         let mut old_config = Config::empty();
         old_config.add_source("in", StdinConfig::default());
@@ -1060,13 +1036,10 @@ mod transient_state_tests {
         );
         new_config.add_sink("out1", &["trans1"], BlackholeConfig { print_amount: 1000 });
 
-        rt.block_on_std(async move {
-            let (mut topology, _crash) = start_topology(old_config, false).await;
-
-            assert!(topology
-                .reload_config_and_respawn(new_config, false)
-                .await
-                .unwrap());
-        });
+        let (mut topology, _crash) = start_topology(old_config, false).await;
+        assert!(topology
+            .reload_config_and_respawn(new_config, false)
+            .await
+            .unwrap());
     }
 }

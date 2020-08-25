@@ -79,33 +79,29 @@ pub enum DnsError {
 #[cfg(test)]
 mod tests {
     use super::Resolver;
-    use crate::test_util::runtime;
 
-    fn resolve(name: &str) -> bool {
-        let mut runtime = runtime();
-
+    async fn resolve(name: &str) -> bool {
         let resolver = Resolver;
-        let fut = resolver.lookup_ip(name.to_owned());
-        runtime.block_on_std(fut).is_ok()
+        resolver.lookup_ip(name.to_owned()).await.is_ok()
     }
 
-    #[test]
-    fn resolve_vector() {
-        assert!(resolve("vector.dev"));
+    #[tokio::test]
+    async fn resolve_vector() {
+        assert!(resolve("vector.dev").await);
     }
 
-    #[test]
-    fn resolve_localhost() {
-        assert!(resolve("localhost"));
+    #[tokio::test]
+    async fn resolve_localhost() {
+        assert!(resolve("localhost").await);
     }
 
-    #[test]
-    fn resolve_ipv4() {
-        assert!(resolve("10.0.4.0"));
+    #[tokio::test]
+    async fn resolve_ipv4() {
+        assert!(resolve("10.0.4.0").await);
     }
 
-    #[test]
-    fn resolve_ipv6() {
-        assert!(resolve("::1"));
+    #[tokio::test]
+    async fn resolve_ipv6() {
+        assert!(resolve("::1").await);
     }
 }
