@@ -2,49 +2,9 @@ use super::InternalEvent;
 use metrics::counter;
 use prost::DecodeError;
 
-#[derive(Debug)]
-pub struct VectorEventSent {
-    pub byte_size: usize,
-}
+define_events_processed_bytes!(VectorEventReceived, "sink", "vector");
 
-impl InternalEvent for VectorEventSent {
-    fn emit_metrics(&self) {
-        counter!(
-            "events_processed", 1,
-            "component_kind" => "sink",
-            "component_type" => "vector",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "sink",
-            "component_type" => "vector",
-        );
-    }
-}
-
-#[derive(Debug)]
-pub struct VectorEventReceived {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for VectorEventReceived {
-    fn emit_logs(&self) {
-        trace!(message = "Received one event.",);
-    }
-
-    fn emit_metrics(&self) {
-        counter!(
-            "events_processed", 1,
-            "component_kind" => "source",
-            "component_type" => "vector",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "vector",
-        );
-    }
-}
+define_events_processed_bytes!(VectorEventSent, "sink", "vector", "Events sent.");
 
 #[derive(Debug)]
 pub struct VectorProtoDecodeError {

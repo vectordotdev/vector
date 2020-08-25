@@ -1,10 +1,66 @@
 use std::borrow::Cow;
 
+macro_rules! define_events_processed {
+    ($ty:ident, $kind:expr, $name:expr) => {
+        pub(crate) struct $ty;
+
+        impl $crate::internal_events::InternalEvent for $ty {
+            fn emit_logs(&self) {
+                trace!(message = "Processed one event.");
+            }
+
+            fn emit_metrics(&self) {
+                counter!(
+                    "events_processed", 1,
+                    "component_kind" => $kind,
+                    "component_type" => $name,
+                );
+            }
+        }
+    }
+}
+
+macro_rules! define_events_processed_bytes {
+    ($ty:ident, $kind:expr, $name:expr) => {
+        define_events_processed_bytes!($ty, $kind, $name, "Received one event.");
+    };
+
+    ($ty:ident, $kind:expr, $name:expr, $msg:expr) => {
+        pub(crate) struct $ty {
+            pub byte_size: usize,
+        }
+
+        impl $crate::internal_events::InternalEvent for $ty {
+            fn emit_logs(&self) {
+                trace!(
+                    message = $msg,
+                    byte_size = %self.byte_size,
+                );
+            }
+
+            fn emit_metrics(&self) {
+                counter!(
+                    "events_processed", 1,
+                    "component_kind" => $kind,
+                    "component_type" => $name,
+                );
+                counter!(
+                    "bytes_processed", self.byte_size as u64,
+                    "component_kind" => $kind,
+                    "component_type" => $name,
+                );
+            }
+        }
+    }
+}
+
 mod add_fields;
 mod add_tags;
 mod ansi_stripper;
 mod auto_concurrency;
+#[cfg(feature = "sinks-aws_kinesis_streams")]
 mod aws_kinesis_streams;
+#[cfg(feature = "sinks-blackhole")]
 mod blackhole;
 #[cfg(feature = "sources-docker")]
 mod docker;
@@ -55,8 +111,10 @@ pub use self::add_fields::*;
 pub use self::add_tags::*;
 pub use self::ansi_stripper::*;
 pub use self::auto_concurrency::*;
-pub use self::aws_kinesis_streams::*;
-pub use self::blackhole::*;
+#[cfg(feature = "sinks-aws_kinesis_streams")]
+pub(crate) use self::aws_kinesis_streams::*;
+#[cfg(feature = "sinks-blackhole")]
+pub(crate) use self::blackhole::*;
 #[cfg(feature = "sources-docker")]
 pub use self::docker::*;
 pub use self::elasticsearch::*;

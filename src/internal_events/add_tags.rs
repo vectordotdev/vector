@@ -1,17 +1,7 @@
 use super::InternalEvent;
 use metrics::counter;
 
-#[derive(Debug)]
-pub struct AddTagsEventProcessed;
-
-impl InternalEvent for AddTagsEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "add_tags",
-        );
-    }
-}
+define_events_processed!(AddTagsEventProcessed, "transform", "add_tags");
 
 #[derive(Debug)]
 pub struct AddTagsTagOverwritten<'a> {

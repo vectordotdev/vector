@@ -3,21 +3,7 @@ use metrics::counter;
 use serde_json::Error;
 use string_cache::DefaultAtom as Atom;
 
-#[derive(Debug)]
-pub(crate) struct JsonParserEventProcessed;
-
-impl InternalEvent for JsonParserEventProcessed {
-    fn emit_logs(&self) {
-        trace!(message = "Received one event.");
-    }
-
-    fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "json_parser",
-        );
-    }
-}
+define_events_processed!(JsonParserEventProcessed, "transform", "json_parser");
 
 #[derive(Debug)]
 pub(crate) struct JsonParserFailedParse<'a> {

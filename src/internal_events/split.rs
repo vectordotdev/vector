@@ -2,17 +2,7 @@ use super::InternalEvent;
 use metrics::counter;
 use string_cache::DefaultAtom as Atom;
 
-#[derive(Debug)]
-pub struct SplitEventProcessed;
-
-impl InternalEvent for SplitEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "split",
-        );
-    }
-}
+define_events_processed!(SplitEventProcessed, "transform", "split");
 
 #[derive(Debug)]
 pub struct SplitFieldMissing<'a> {

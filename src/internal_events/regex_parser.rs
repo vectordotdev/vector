@@ -2,21 +2,7 @@ use super::InternalEvent;
 use metrics::counter;
 use string_cache::DefaultAtom as Atom;
 
-#[derive(Debug)]
-pub(crate) struct RegexParserEventProcessed;
-
-impl InternalEvent for RegexParserEventProcessed {
-    fn emit_logs(&self) {
-        trace!(message = "Processed one event.");
-    }
-
-    fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "regex_parser",
-        );
-    }
-}
+define_events_processed!(RegexParserEventProcessed, "transform", "regex_parser");
 
 #[derive(Debug)]
 pub(crate) struct RegexParserFailedMatch<'a> {

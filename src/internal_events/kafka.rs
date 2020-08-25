@@ -1,29 +1,7 @@
 use super::InternalEvent;
 use metrics::counter;
 
-#[derive(Debug)]
-pub struct KafkaEventReceived {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for KafkaEventReceived {
-    fn emit_logs(&self) {
-        trace!(message = "Received one event.", rate_limit_secs = 10);
-    }
-
-    fn emit_metrics(&self) {
-        counter!(
-            "events_processed", 1,
-            "component_kind" => "source",
-            "component_type" => "kafka",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "kafka",
-        );
-    }
-}
+define_events_processed_bytes!(KafkaEventReceived, "source", "kafka");
 
 #[derive(Debug)]
 pub struct KafkaOffsetUpdateFailed {

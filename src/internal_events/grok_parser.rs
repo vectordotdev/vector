@@ -1,21 +1,7 @@
 use super::InternalEvent;
 use metrics::counter;
 
-#[derive(Debug)]
-pub(crate) struct GrokParserEventProcessed;
-
-impl InternalEvent for GrokParserEventProcessed {
-    fn emit_logs(&self) {
-        trace!(message = "Processed one event.");
-    }
-
-    fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "grok_parser",
-        );
-    }
-}
+define_events_processed!(GrokParserEventProcessed, "transform", "grok_parser");
 
 #[derive(Debug)]
 pub(crate) struct GrokParserFailedMatch<'a> {

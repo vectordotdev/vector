@@ -6,25 +6,7 @@ use string_cache::DefaultAtom as Atom;
 #[cfg(feature = "sources-splunk_hec")]
 pub(crate) use self::source::*;
 
-#[derive(Debug)]
-pub(crate) struct SplunkEventSent {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for SplunkEventSent {
-    fn emit_metrics(&self) {
-        counter!(
-            "events_processed", 1,
-            "component_kind" => "sink",
-            "component_type" => "splunk_hec",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "sink",
-            "component_type" => "splunk_hec",
-        );
-    }
-}
+define_events_processed_bytes!(SplunkEventSent, "sink", "splunk_hec", "Sent one event.");
 
 #[derive(Debug)]
 pub(crate) struct SplunkEventEncodeError {
