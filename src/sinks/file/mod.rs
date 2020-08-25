@@ -85,17 +85,32 @@ impl OutFile {
         }
     }
 
+    async fn sync_all(&mut self) -> Result<(), std::io::Error> {
+        match self {
+            OutFile::Regular(file) => file.sync_all().await,
+            OutFile::Gzip(gzip) => gzip.get_mut().sync_all().await,
+        }
+    }
+
     async fn shutdown(&mut self) -> Result<(), std::io::Error> {
         match self {
             OutFile::Regular(file) => file.shutdown().await,
             OutFile::Gzip(gzip) => gzip.shutdown().await,
         }
     }
+
     async fn write_all(&mut self, src: &[u8]) -> Result<(), std::io::Error> {
         match self {
             OutFile::Regular(file) => file.write_all(src).await,
             OutFile::Gzip(gzip) => gzip.write_all(src).await,
         }
+    }
+
+    /// Shutdowns by flushing data, writing headers, and syncing all of that
+    /// data and metadata to the filesystem.
+    async fn close(&mut self) -> Result<(), std::io::Error> {
+        self.shutdown().await?;
+        self.sync_all().await
     }
 }
 
@@ -170,14 +185,13 @@ impl FileSink {
                             // If we got `None` - terminate the processing.
                             debug!(message = "Receiver exhausted, terminating the processing loop.");
 
-                            // Shutdown all the open files. This will flush any
-                            // headers or anything pending.
-                            debug!(message = "Flushing all the open files");
-                            for (path, file) in self.files.iterate_map() {
-                                if let Err(error) = file.shutdown().await {
-                                    error!(message = "Failed to flush file.", ?path, %error);
+                            // Close all the open files.
+                            debug!(message = "Closing all the open files");
+                            for (path, file) in self.files.iter_mut() {
+                                if let Err(error) = file.close().await {
+                                    error!(message = "Failed to close file.", ?path, %error);
                                 } else{
-                                    trace!(message = "Successfully flushed file", ?path);
+                                    trace!(message = "Successfully closed file", ?path);
                                 }
                             }
 
@@ -194,8 +208,8 @@ impl FileSink {
                         Some(Ok((mut expired_file, path))) => {
                             // We got an expired file. All we really want is to
                             // flush and close it.
-                            if let Err(error) = expired_file.shutdown().await {
-                                error!(message = "Failed to flush file.", ?path, %error);
+                            if let Err(error) = expired_file.close().await {
+                                error!(message = "Failed to close file.", ?path, %error);
                             }
                             drop(expired_file); // ignore close error
                         }
