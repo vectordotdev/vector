@@ -50,7 +50,7 @@ impl TcpSinkConfig {
         }
     }
 
-    pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    pub fn prepare(&self, cx: SinkContext) -> crate::Result<(IntoTcpSink, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -58,16 +58,55 @@ impl TcpSinkConfig {
 
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
-        let tcp = TcpSink::new(host, port, cx.resolver(), tls);
+        let tcp = IntoTcpSink::new(host, port, cx.resolver(), tls);
         let healthcheck = tcp.healthcheck();
 
-        let encoding = self.encoding.clone();
-        let sink = Box::new(
-            StreamSink::new(tcp, cx.acker())
-                .with_flat_map(move |event| iter_ok(encode_event(event, &encoding))),
-        );
+        Ok((tcp, healthcheck))
+    }
 
-        Ok((sink, Box::new(healthcheck.compat())))
+    pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+        let (tcp, healthcheck) = self.prepare(cx.clone())?;
+        let encoding = self.encoding.clone();
+        let sink = StreamSink::new(tcp.into_sink(), cx.acker())
+            .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
+
+        Ok((Box::new(sink), healthcheck))
+    }
+}
+
+#[derive(Clone)]
+pub struct IntoTcpSink {
+    host: String,
+    port: u16,
+    resolver: Resolver,
+    tls: MaybeTlsSettings,
+}
+
+impl IntoTcpSink {
+    fn new(host: String, port: u16, resolver: Resolver, tls: MaybeTlsSettings) -> Self {
+        IntoTcpSink {
+            host,
+            port,
+            resolver,
+            tls,
+        }
+    }
+
+    fn into_sink(self) -> TcpSink {
+        TcpSink::new(self.host, self.port, self.resolver, self.tls)
+    }
+
+    fn healthcheck(&self) -> Healthcheck {
+        Box::new(
+            tcp_healthcheck(
+                self.host.clone(),
+                self.port,
+                self.resolver,
+                self.tls.clone(),
+            )
+            .boxed()
+            .compat(),
+        )
     }
 }
 
