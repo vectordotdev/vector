@@ -143,7 +143,7 @@ evmap = { version = "10.0.2", features = ["bytes"], optional = true }
 logfmt = { version = "0.0.2", optional = true }
 notify = "4.0.14"
 once_cell = "1.3"
-getset = "0.1.0"
+getset = "0.1.1"
 lru = "0.4.3"
 bloom = "0.3.2"
 pulsar = { version = "1.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
