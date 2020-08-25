@@ -134,6 +134,7 @@ The following additional source configuration will be added:
   type = "apache" # required
   endpoints = ["http://localhost/server-status?auto"] # required, default
   scrape_interval_secs = 15 # optional, default, seconds
+  namespace = "apache" # optional, default, namespace to put metrics under
 ```
 
 Some possible configuration improvements we could add in the future would be:
