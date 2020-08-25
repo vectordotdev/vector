@@ -176,8 +176,7 @@ mod tests {
     use crate::{
         config::{GlobalOptions, SourceConfig},
         event::{self, Event},
-        runtime::Runtime,
-        test_util::{self, collect_n, runtime, wait_for_tcp},
+        test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
     };
     use chrono::{DateTime, Utc};
@@ -186,11 +185,10 @@ mod tests {
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
 
-    fn source(rt: &mut Runtime) -> (mpsc::Receiver<Event>, SocketAddr) {
-        test_util::trace_init();
+    async fn source() -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
-        let address = test_util::next_addr();
-        rt.spawn_std(async move {
+        let address = next_addr();
+        tokio::spawn(async move {
             LogplexConfig { address, tls: None }
                 .build_async(
                     "default",
@@ -204,7 +202,7 @@ mod tests {
                 .await
                 .unwrap()
         });
-        rt.block_on_std(async move { wait_for_tcp(address).await });
+        wait_for_tcp(address).await;
         (recv, address)
     }
 
@@ -223,34 +221,33 @@ mod tests {
             .as_u16()
     }
 
-    #[test]
-    fn logplex_handles_router_log() {
+    #[tokio::test]
+    async fn logplex_handles_router_log() {
+        trace_init();
+
         let body = r#"267 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#;
 
-        let mut rt = runtime();
-        let (rx, addr) = source(&mut rt);
+        let (rx, addr) = source().await;
 
-        rt.block_on_std(async move {
-            assert_eq!(200, send(addr, body).await);
+        assert_eq!(200, send(addr, body).await);
 
-            let mut events = collect_n(rx, body.lines().count()).compat().await.unwrap();
-            let event = events.remove(0);
-            let log = event.as_log();
+        let mut events = collect_n(rx, body.lines().count()).compat().await.unwrap();
+        let event = events.remove(0);
+        let log = event.as_log();
 
-            assert_eq!(
-                log[&event::log_schema().message_key()],
-                r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
-            );
-            assert_eq!(
-                log[&event::log_schema().timestamp_key()],
-                "2020-01-08T22:33:57.353034+00:00"
-                    .parse::<DateTime<Utc>>()
-                    .unwrap()
-                    .into()
-            );
-            assert_eq!(log[&event::log_schema().host_key()], "host".into());
-            assert_eq!(log[event::log_schema().source_type_key()], "logplex".into());
-        });
+        assert_eq!(
+            log[&event::log_schema().message_key()],
+            r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
+        );
+        assert_eq!(
+            log[&event::log_schema().timestamp_key()],
+            "2020-01-08T22:33:57.353034+00:00"
+                .parse::<DateTime<Utc>>()
+                .unwrap()
+                .into()
+        );
+        assert_eq!(log[&event::log_schema().host_key()], "host".into());
+        assert_eq!(log[event::log_schema().source_type_key()], "logplex".into());
     }
 
     #[test]
