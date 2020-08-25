@@ -3,7 +3,8 @@ use crate::sinks;
 use crate::Event;
 use futures::channel::mpsc;
 use futures::compat::CompatSink;
-use futures01::sink::Sink;
+use futures::future::TryFutureExt;
+use futures01::{future::Future, sink::Sink, Async, AsyncSink, Poll};
 
 /// This function provides the compatibility with our old interfaces.
 ///
@@ -49,12 +50,53 @@ pub type OldSink = Box<dyn Sink<SinkItem = Event, SinkError = ()> + 'static + Se
 pub fn adapt_to_topology(mut streaming_sink: impl StreamingSink + 'static) -> sinks::RouterSink {
     let (stream, sink) = sink_interface_compat();
 
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         streaming_sink
             .run(stream)
             .await
             .expect("streaming sink error")
     });
 
-    sink
+    let synched = SynchedSink {
+        sink,
+        synching: false,
+        sync: Box::new(handle.compat().map_err(|res| {
+            if res.is_panic() {
+                // We are propagating panic as if this spawn indirection isn't here.
+                panic!(res);
+            }
+        })),
+    };
+
+    Box::new(synched)
+}
+
+/// Behaves in all regards like the underlying sink, except that on close
+/// it synchronizes on sync.
+struct SynchedSink {
+    sink: OldSink,
+    sync: Box<dyn Future<Item = (), Error = ()> + 'static + Send>,
+    synching: bool,
+}
+
+impl Sink for SynchedSink {
+    type SinkItem = Event;
+    type SinkError = ();
+    fn start_send(&mut self, item: Self::SinkItem) -> Result<AsyncSink<Event>, ()> {
+        self.sink.start_send(item)
+    }
+
+    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
+        self.sink.poll_complete()
+    }
+
+    fn close(&mut self) -> Poll<(), Self::SinkError> {
+        if !self.synching {
+            if let Async::NotReady = self.sink.close()? {
+                return Ok(Async::NotReady);
+            }
+            self.synching = true;
+        }
+        self.sync.poll()
+    }
 }

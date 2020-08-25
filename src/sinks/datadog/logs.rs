@@ -5,11 +5,12 @@ use crate::{
         self,
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSink,
-        Encoding, UriSerde,
+        Encoding, StreamSink, UriSerde,
     },
     tls::{MaybeTlsSettings, TlsConfig},
 };
 use bytes::Bytes;
+use futures::TryFutureExt;
 use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
 
@@ -56,9 +57,10 @@ impl SinkConfig for DatadogLogsConfig {
         let encoding = self.encoding.clone();
         let api_key = self.api_key.clone();
 
-        let sink = sink.with_flat_map(move |e| iter_ok(encode_event(e, &api_key, &encoding)));
+        let sink = StreamSink::new(sink, cx.acker())
+            .with_flat_map(move |e| iter_ok(encode_event(e, &api_key, &encoding)));
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((Box::new(sink), Box::new(healthcheck.compat())))
     }
 
     fn input_type(&self) -> DataType {
