@@ -34,30 +34,47 @@ impl UdpSinkConfig {
         Self { address, encoding }
     }
 
-    pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    pub fn prepare(&self, cx: SinkContext) -> crate::Result<(IntoUdpSink, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
 
-        let sink = raw_udp(host, port, self.encoding.clone(), cx)?;
+        let udp = IntoUdpSink::new(host, port, cx.resolver());
         let healthcheck = udp_healthcheck();
 
-        Ok((sink, healthcheck))
+        Ok((udp, healthcheck))
+    }
+
+    pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+        let (udp, healthcheck) = self.prepare(cx.clone())?;
+        let encoding = self.encoding.clone();
+        let sink = StreamSink::new(udp.into_sink()?, cx.acker())
+            .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
+
+        Ok((Box::new(sink), healthcheck))
     }
 }
 
-fn raw_udp(
+#[derive(Clone)]
+pub struct IntoUdpSink {
     host: String,
     port: u16,
-    encoding: EncodingConfig<Encoding>,
-    cx: SinkContext,
-) -> Result<RouterSink, UdpBuildError> {
-    let sink = UdpSink::new(host, port, cx.resolver())?;
-    let sink = StreamSink::new(sink, cx.acker());
-    Ok(Box::new(sink.with_flat_map(move |event| {
-        iter_ok(encode_event(event, &encoding))
-    })))
+    resolver: Resolver,
+}
+
+impl IntoUdpSink {
+    fn new(host: String, port: u16, resolver: Resolver) -> Self {
+        IntoUdpSink {
+            host,
+            port,
+            resolver,
+        }
+    }
+
+    fn into_sink(self) -> Result<UdpSink, UdpBuildError> {
+        UdpSink::new(self.host, self.port, self.resolver)
+    }
 }
 
 fn udp_healthcheck() -> Healthcheck {
