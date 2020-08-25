@@ -92,47 +92,16 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Result<Config, Option<Co
         return Err(None);
     };
 
-    // Validate configuration files
-    let to_valdiate = paths.len();
-    let mut validated = 0;
-    let mut full_config = Config::empty();
-    for config_path in paths {
-        let mut sub_failed = |title: String, errors| {
-            fmt.title(title);
+    match config::load_from_paths(&paths, None) {
+        Ok(config) => {
+            fmt.success(format!("Loaded {:?}", &paths));
+            Ok(config)
+        }
+        Err(errors) => {
+            fmt.title(format!("Failed to load {:?}", paths));
             fmt.sub_error(errors);
-        };
-
-        let mut config = match config::load_from_paths(&[config_path.clone()], None) {
-            Ok(config) => config,
-            Err(errors) => {
-                sub_failed(format!("Failed to parse {:?}", config_path), errors);
-                continue;
-            }
-        };
-
-        if let Err(errors) = config.expand_macros() {
-            sub_failed(
-                format!("Failed to expand macros in {:?}", config_path),
-                errors,
-            );
-            continue;
+            Err(None)
         }
-
-        if let Err(errors) = full_config.append(config) {
-            sub_failed(format!("Failed to merge config {:?}", config_path), errors);
-            continue;
-        }
-
-        validated += 1;
-        fmt.success(format!("Loaded {:?}", &config_path));
-    }
-
-    if to_valdiate == validated {
-        Ok(full_config)
-    } else if validated > 0 {
-        Err(Some(full_config))
-    } else {
-        Err(None)
     }
 }
 
