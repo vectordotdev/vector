@@ -1,4 +1,4 @@
-use bytes05::Bytes;
+use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 use futures::{compat::Future01CompatExt, stream, SinkExt, StreamExt};
 use futures01::Future;
@@ -52,6 +52,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                         path: output.try_into().unwrap(),
                         idle_timeout_secs: None,
                         encoding: sinks::file::Encoding::Text.into(),
+                        compression: sinks::file::Compression::None,
                     },
                 );
 

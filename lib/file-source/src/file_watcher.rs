@@ -60,7 +60,7 @@ impl FileWatcher {
                 // the entire thing, so for now we simply refuse to read gzipped files for which we
                 // already have a stored file position from a previous run.
                 debug!(
-                    message = "not re-reading gzipped file with existing stored offset.",
+                    message = "Not re-reading gzipped file with existing stored offset.",
                     ?path,
                     %file_position
                 );

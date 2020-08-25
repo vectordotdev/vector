@@ -7,10 +7,10 @@ use crate::{
     },
     sinks::util::{
         http::{HttpBatchService, HttpClient, HttpRetryLogic},
-        service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, MetricBuffer,
+        BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
     },
 };
+use bytes::Bytes;
 use futures::future::{ready, BoxFuture};
 use futures01::Sink;
 use lazy_static::lazy_static;
@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::task::Poll;
-use tower03::Service;
+use tower::Service;
 
 #[derive(Clone)]
 struct InfluxDBSvc {
@@ -128,7 +128,7 @@ impl InfluxDBSvc {
 }
 
 impl Service<Vec<Metric>> for InfluxDBSvc {
-    type Response = http::Response<bytes05::Bytes>;
+    type Response = http::Response<Bytes>;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 

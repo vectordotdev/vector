@@ -12,13 +12,13 @@ use crate::{
 };
 use bollard::{
     container::{InspectContainerOptions, ListContainersOptions, LogOutput, LogsOptions},
-    errors::{Error as DockerError, ErrorKind as DockerErrorKind},
+    errors::Error as DockerError,
     service::{ContainerInspectResponse, SystemEventsResponse},
     system::EventsOptions,
     Docker,
 };
-use bytes05::{Buf, Bytes};
-use chrono::{DateTime, FixedOffset, Local, NaiveTime, ParseError, Utc, MAX_DATE};
+use bytes::{Buf, Bytes};
+use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     future,
@@ -126,7 +126,7 @@ impl SourceConfig for DockerConfig {
             match source.handle_running_containers().await {
                 Ok(source) => source.run().await,
                 Err(error) => {
-                    error!(message = "listing currently running containers, failed.", %error);
+                    error!(message = "listing currently running containers failed.", %error);
                 }
             }
         };
@@ -169,7 +169,7 @@ impl DockerSourceCore {
         // Only log events created at-or-after this moment are logged.
         let now = Local::now();
         info!(
-            message = "capturing logs from now on.",
+            message = "Capturing logs from now on.",
             now = %now.to_rfc3339()
         );
 
@@ -213,10 +213,8 @@ impl DockerSourceCore {
         }
 
         self.docker.events(Some(EventsOptions {
-            since: self.now_timestamp,
-            // Handler in Docker API:
-            // https://github.com/moby/moby/blob/c833222d54c00d64a0fc44c561a5973ecd414053/api/server/router/system/system_routes.go#L155
-            until: MAX_DATE.and_time(NaiveTime::from_hms(0, 0, 0)).unwrap(),
+            since: Some(self.now_timestamp),
+            until: None,
             filters,
         }))
     }
@@ -271,7 +269,7 @@ impl DockerSource {
 
         // main event stream, with whom only newly started/restarted containers will be loged.
         let events = core.docker_event_stream();
-        info!(message = "listening docker events.");
+        info!(message = "Listening to docker events.");
 
         // Channel of communication between main future and event_stream futures
         let (main_send, main_recv) =
@@ -282,7 +280,7 @@ impl DockerSource {
         // Only somewhat exception to this is case where:
         // t0 -- outside: container running
         // t1 -- now_timestamp
-        // t2 -- outside: container stoped
+        // t2 -- outside: container stopped
         // t3 -- list_containers
         // In that case, logs between [t1,t2] will be pulled to vector only on next start/unpause of that container.
         let esb = EventStreamBuilder {
@@ -392,7 +390,7 @@ impl DockerSource {
                         }
                         None => {
                             error!(message = "docker source main stream has ended unexpectedly.");
-                            info!(message = "shuting down docker source.");
+                            info!(message = "shutting down docker source.");
                             return;
                         }
                     };
@@ -413,7 +411,7 @@ impl DockerSource {
                             match action.as_str() {
                                 "die" | "pause" => {
                                     if let Some(state) = self.containers.get_mut(&id) {
-                                        state.stoped();
+                                        state.stopped();
                                     }
                                 }
                                 "start" | "unpause" => {
@@ -444,7 +442,7 @@ impl DockerSource {
                         None => {
                             // TODO: this could be fixed, but should be tryed with some timeoff and exponential backoff
                             error!(message = "docker event stream has ended unexpectedly.");
-                            info!(message = "shuting down docker source.");
+                            info!(message = "shutting down docker source.");
                             return;
                         }
                     };
@@ -468,7 +466,7 @@ impl DockerSource {
                 .unwrap_or(false);
             if hostname_hint || image_hint {
                 // This container is probably itself.
-                info!(message = "setected self container.", id);
+                info!(message = "detected self container.", id);
                 return false;
             }
         }
@@ -534,7 +532,7 @@ impl EventStreamBuilder {
 
     async fn start_event_stream(&self, mut info: ContainerLogInfo) {
         // Establish connection
-        let options = Some(LogsOptions {
+        let options = Some(LogsOptions::<String> {
             follow: true,
             stdout: true,
             stderr: true,
@@ -562,8 +560,8 @@ impl EventStreamBuilder {
                     )),
                     Err(error) => {
                         // On any error, restart connection
-                        match error.kind() {
-                            DockerErrorKind::DockerResponseServerError { status_code, .. }
+                        match &error {
+                            DockerError::DockerResponseServerError { status_code, .. }
                                 if *status_code == http::StatusCode::NOT_IMPLEMENTED =>
                             {
                                 emit!(DockerLoggingDriverUnsupported {
@@ -639,7 +637,7 @@ impl ContainerState {
         self.generation += 1;
     }
 
-    fn stoped(&mut self) {
+    fn stopped(&mut self) {
         self.running = false;
     }
 
@@ -735,7 +733,7 @@ impl ContainerLogInfo {
                     None if self.created <= timestamp.with_timezone(&Utc) => (),
                     _ => {
                         trace!(
-                            message = "recieved older log.",
+                            message = "received older log.",
                             timestamp = %timestamp_str
                         );
                         return None;
@@ -919,7 +917,7 @@ fn docker() -> Result<Docker, DockerError> {
 
     match scheme.as_ref().map(|s| s.as_str()) {
         Some("http") => Docker::connect_with_http_defaults(),
-        Some("https") => Docker::connect_with_tls_defaults(),
+        Some("https") => Docker::connect_with_ssl_defaults(),
         _ => Docker::connect_with_local_defaults(),
     }
 }
@@ -935,7 +933,7 @@ mod tests {
             Config as ContainerConfig, CreateContainerOptions, KillContainerOptions,
             RemoveContainerOptions, StartContainerOptions, WaitContainerOptions,
         },
-        image::{CreateImageOptions, CreateImageResults, ListImagesOptions},
+        image::{CreateImageOptions, ListImagesOptions},
     };
     use futures::{compat::Future01CompatExt, stream::TryStreamExt};
     use futures01::{sync::mpsc as mpsc01, Async, Stream as Stream01};
@@ -1010,7 +1008,7 @@ mod tests {
         } else {
             // Maybe a before created container is present
             info!(
-                message = "assums that named container remained from previous tests.",
+                message = "assumes that named container remained from previous tests.",
                 name = name
             );
             name.to_owned()
@@ -1026,7 +1024,7 @@ mod tests {
     ) -> Option<String> {
         pull_busybox(docker).await;
 
-        trace!("creating container.");
+        trace!("Creating container.");
 
         let options = Some(CreateContainerOptions { name });
         let config = ContainerConfig {
@@ -1062,9 +1060,9 @@ mod tests {
             docker
                 .create_image(options, None, None)
                 .for_each(|item| async move {
-                    match item.unwrap() {
-                        err @ CreateImageResults::CreateImageError { .. } => panic!("{:?}", err),
-                        _ => {}
+                    let info = item.unwrap();
+                    if let Some(error) = info.error {
+                        panic!("{:?}", error);
                     }
                 })
                 .await
@@ -1073,7 +1071,7 @@ mod tests {
 
     /// Returns once container has started
     async fn container_start(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
-        trace!("starting container.");
+        trace!("Starting container.");
 
         let options = None::<StartContainerOptions<&str>>;
         docker.start_container(id, options).await
@@ -1081,12 +1079,12 @@ mod tests {
 
     /// Returns once container is done running
     async fn container_wait(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
-        trace!("waiting container.");
+        trace!("Waiting container.");
 
         docker
             .wait_container(id, None::<WaitContainerOptions<&str>>)
             .try_for_each(|exit| async move {
-                info!("container exited with status code: {}.", exit.status_code);
+                info!("Container exited with status code: {}.", exit.status_code);
                 Ok(())
             })
             .await
@@ -1094,7 +1092,7 @@ mod tests {
 
     /// Returns once container is killed
     async fn container_kill(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
-        trace!("waiting container.");
+        trace!("Waiting container.");
 
         docker
             .kill_container(id, None::<KillContainerOptions<&str>>)
@@ -1108,7 +1106,7 @@ mod tests {
     }
 
     async fn container_remove(id: &str, docker: &Docker) {
-        trace!("removing container.");
+        trace!("Removing container.");
 
         // Don't panick, as this is unreleated to test, and there possibly other containers that need to be removed
         let _ = docker

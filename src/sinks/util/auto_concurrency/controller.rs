@@ -5,14 +5,14 @@ use crate::internal_events::{
     AutoConcurrencyAveragedRtt, AutoConcurrencyInFlight, AutoConcurrencyLimit,
     AutoConcurrencyObservedRtt,
 };
-use crate::sinks::util::retries2::RetryLogic;
+use crate::sinks::util::retries::RetryLogic;
 #[cfg(test)]
 use crate::test_util::stats::{TimeHistogram, TimeWeightedSum};
 use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::sync::OwnedSemaphorePermit;
-use tower03::timeout::error::Elapsed;
+use tower::timeout::error::Elapsed;
 
 // This value was picked as a reasonable default while we ensure the
 // viability of the system. This value may need adjustment if later

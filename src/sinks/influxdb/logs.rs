@@ -1,7 +1,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::Value,
-    event::{log_schema, Event},
+    event::{log_schema, Event, Value},
     sinks::{
         influxdb::{
             encode_namespace, encode_timestamp, healthcheck, influx_line_protocol,
@@ -10,8 +9,7 @@ use crate::{
         util::{
             encoding::EncodingConfigWithDefault,
             http::{BatchedHttpSink, HttpClient, HttpSink},
-            service2::TowerRequestConfig,
-            BatchConfig, BatchSettings, Buffer, Compression,
+            BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
         },
         Healthcheck,
     },

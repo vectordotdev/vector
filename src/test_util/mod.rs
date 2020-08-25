@@ -5,6 +5,7 @@ use crate::{
     topology::{self, RunningTopology},
     trace, Event,
 };
+use flate2::read::GzDecoder;
 use futures::{
     compat::Stream01CompatExt, stream, FutureExt as _, SinkExt, Stream, StreamExt, TryFutureExt,
     TryStreamExt,
@@ -41,7 +42,7 @@ macro_rules! assert_downcast_matches {
     ($e:expr, $t:ty, $v:pat) => {{
         match $e.downcast_ref::<$t>() {
             Some($v) => (),
-            got => panic!("assertion failed: got wrong error variant {:?}", got),
+            got => panic!("Assertion failed: got wrong error variant {:?}", got),
         }
     }};
 }
@@ -269,6 +270,18 @@ pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     output.lines().map(|s| s.to_owned()).collect()
 }
 
+pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
+    trace!(message = "Reading gzip file.", path = %path.as_ref().display());
+    let mut file = File::open(path).unwrap();
+    let mut gzip_bytes = Vec::new();
+    file.read_to_end(&mut gzip_bytes).unwrap();
+    let mut output = String::new();
+    GzDecoder::new(&gzip_bytes[..])
+        .read_to_string(&mut output)
+        .unwrap();
+    output.lines().map(|s| s.to_owned()).collect()
+}
+
 pub fn block_on<F, R, E>(future: F) -> Result<R, E>
 where
     F: Send + 'static + Future<Item = R, Error = E>,
@@ -319,7 +332,7 @@ where
     while !f().await {
         delay_for(Duration::from_millis(5)).await;
         if started.elapsed().as_secs() > 5 {
-            panic!("timed out while waiting");
+            panic!("Timed out while waiting");
         }
     }
 }
@@ -336,7 +349,7 @@ pub fn wait_for_sync(mut f: impl FnMut() -> bool) {
         std::thread::sleep(wait);
         attempts += 1;
         if attempts * wait > limit {
-            panic!("timed out while waiting");
+            panic!("Timed out while waiting");
         }
     }
 }

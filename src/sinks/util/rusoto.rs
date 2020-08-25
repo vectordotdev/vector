@@ -2,7 +2,7 @@
 
 use crate::{dns::Resolver, sinks::util, tls::MaybeTlsSettings};
 use async_trait::async_trait;
-use bytes05::Bytes;
+use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{
     header::{HeaderMap, HeaderName, HeaderValue},
@@ -28,7 +28,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tower03::{Service, ServiceExt};
+use tower::{Service, ServiceExt};
 
 pub type Client = HttpClient<util::http::HttpClient<RusotoBody>>;
 

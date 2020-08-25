@@ -61,7 +61,7 @@ pub struct KubernetesLogsDockerFormatParseFailed<'a> {
 impl InternalEvent for KubernetesLogsDockerFormatParseFailed<'_> {
     fn emit_logs(&self) {
         warn!(
-            message = "failed to parse message as json object",
+            message = "failed to parse message as JSON object",
             value = %String::from_utf8_lossy(self.message),
         );
     }

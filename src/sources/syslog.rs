@@ -9,7 +9,7 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
-use bytes05::{Buf, Bytes, BytesMut};
+use bytes::{Buf, Bytes, BytesMut};
 use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use futures::{
@@ -250,15 +250,15 @@ pub fn udp(
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
-    let out = out.sink_map_err(|e| error!("error sending line: {:?}.", e));
+    let out = out.sink_map_err(|e| error!("Error sending line: {:?}.", e));
 
     Box::new(
         async move {
             let socket = UdpSocket::bind(&addr)
                 .await
-                .expect("failed to bind to udp listener socket");
+                .expect("Failed to bind to UDP listener socket");
             info!(
-                message = "listening.",
+                message = "Listening.",
                 addr = &field::display(addr),
                 r#type = "udp"
             );
@@ -289,7 +289,7 @@ pub fn udp(
                 .forward(out.sink_compat())
                 .await;
 
-            info!("finished sending.");
+            info!("Finished sending.");
             Ok(())
         }
         .boxed()

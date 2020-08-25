@@ -7,7 +7,8 @@ use crate::{
     tls::TlsConfig,
     Pipeline,
 };
-use bytes05::{buf::BufExt, Bytes};
+use async_trait::async_trait;
+use bytes::{buf::BufExt, Bytes};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -33,8 +34,19 @@ impl HttpSource for LogplexSource {
 }
 
 #[typetag::serde(name = "logplex")]
+#[async_trait]
 impl SourceConfig for LogplexConfig {
     fn build(
+        &self,
+        _name: &str,
+        _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
+        _out: Pipeline,
+    ) -> crate::Result<super::Source> {
+        unimplemented!()
+    }
+
+    async fn build_async(
         &self,
         _: &str,
         _: &GlobalOptions,
@@ -142,7 +154,7 @@ fn line_to_event(line: String) -> Event {
         event
     } else {
         warn!(
-            message = "line didn't match expected logplex format, so raw message is forwarded.",
+            message = "Line didn't match expected logplex format, so raw message is forwarded.",
             fields = parts.len(),
             rate_limit_secs = 10
         );
@@ -165,7 +177,7 @@ mod tests {
         config::{GlobalOptions, SourceConfig},
         event::{self, Event},
         runtime::Runtime,
-        test_util::{self, collect_n, runtime},
+        test_util::{self, collect_n, runtime, wait_for_tcp},
         Pipeline,
     };
     use chrono::{DateTime, Utc};
@@ -178,16 +190,21 @@ mod tests {
         test_util::trace_init();
         let (sender, recv) = Pipeline::new_test();
         let address = test_util::next_addr();
-        rt.spawn(
+        rt.spawn_std(async move {
             LogplexConfig { address, tls: None }
-                .build(
+                .build_async(
                     "default",
                     &GlobalOptions::default(),
                     ShutdownSignal::noop(),
                     sender,
                 )
-                .unwrap(),
-        );
+                .await
+                .unwrap()
+                .compat()
+                .await
+                .unwrap()
+        });
+        rt.block_on_std(async move { wait_for_tcp(address).await });
         (recv, address)
     }
 

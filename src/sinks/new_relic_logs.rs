@@ -3,8 +3,7 @@ use crate::{
     sinks::http::{HttpMethod, HttpSinkConfig},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        service2::{InFlightLimit, TowerRequestConfig},
-        BatchConfig, Compression,
+        BatchConfig, Compression, InFlightLimit, TowerRequestConfig,
     },
 };
 use http::Uri;
@@ -146,10 +145,10 @@ mod tests {
     use crate::{
         config::SinkConfig,
         event::Event,
-        sinks::util::{service2::InFlightLimit, test::build_test_server},
+        sinks::util::{test::build_test_server, InFlightLimit},
         test_util::next_addr,
     };
-    use bytes05::buf::BufExt;
+    use bytes::buf::BufExt;
     use futures::compat::Future01CompatExt;
     use futures01::{stream, Sink, Stream};
     use hyper::Method;

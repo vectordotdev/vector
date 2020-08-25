@@ -7,7 +7,7 @@ use crate::{
     trace::{current_span, Instrument},
     Pipeline,
 };
-use bytes05::Bytes;
+use bytes::Bytes;
 use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
     FileServer, Fingerprinter,
@@ -267,7 +267,7 @@ pub fn file_source(
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
     Box::new(future::lazy(move || {
-        info!(message = "starting file server.", ?include, ?exclude);
+        info!(message = "Starting file server.", ?include, ?exclude);
 
         // sizing here is just a guess
         let (tx, rx) = futures01::sync::mpsc::channel(100);

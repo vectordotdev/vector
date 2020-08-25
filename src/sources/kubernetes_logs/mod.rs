@@ -19,8 +19,7 @@ use crate::{
     transforms::Transform,
     Pipeline,
 };
-use bytes05::Bytes;
-use evmap10::{self as evmap};
+use bytes::Bytes;
 use file_source::{FileServer, FileServerShutdown, Fingerprinter};
 use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
 use k8s_openapi::api::core::v1::Pod;
@@ -89,7 +88,7 @@ impl SourceConfig for Config {
         let fut = source.run(out, shutdown);
         let fut = fut.map(|result| {
             result.map_err(|error| {
-                error!(message = "source future failed", ?error);
+                error!(message = "Source future failed", ?error);
             })
         });
         let fut = Box::pin(fut);

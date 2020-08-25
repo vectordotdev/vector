@@ -1,6 +1,6 @@
 #![cfg(all(feature = "sources-syslog", feature = "sinks-socket"))]
 
-use bytes05::Bytes;
+use bytes::Bytes;
 use futures::compat::Future01CompatExt;
 #[cfg(unix)]
 use futures::{stream, SinkExt, StreamExt};
@@ -119,7 +119,7 @@ fn test_unix_stream_syslog() {
         stream.shutdown(std::net::Shutdown::Both).unwrap();
 
         // Otherwise some lines will be lost
-        tokio::time::delay_for(std::time::Duration::from_millis(100)).await;
+        tokio::time::delay_for(std::time::Duration::from_millis(1000)).await;
 
         // Shut down server
         topology.stop().compat().await.unwrap();

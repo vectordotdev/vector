@@ -1,9 +1,8 @@
 use crate::{
     config::{self, GlobalOptions},
-    hyper::body_to_bytes,
     internal_events::{
-        PrometheusEventReceived, PrometheusHttpError, PrometheusParseError,
-        PrometheusRequestCompleted,
+        PrometheusErrorResponse, PrometheusEventReceived, PrometheusHttpError,
+        PrometheusParseError, PrometheusRequestCompleted,
     },
     shutdown::ShutdownSignal,
     Event, Pipeline,
@@ -64,6 +63,9 @@ fn prometheus(
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
+    let out = out
+        .sink_map_err(|e| error!("error sending metric: {:?}", e))
+        .sink_compat();
     let task = tokio::time::interval(Duration::from_secs(interval))
         .take_until(shutdown.compat())
         .map(move |_| stream::iter(urls.clone()))
@@ -79,35 +81,53 @@ fn prometheus(
             let start = Instant::now();
             client
                 .request(request)
-                .and_then(|response| body_to_bytes(response.into_body()))
+                .and_then(|response| async move {
+                    let (header, body) = response.into_parts();
+                    let body = hyper::body::to_bytes(body).await?;
+                    Ok((header, body))
+                })
                 .into_stream()
                 .filter_map(move |response| {
                     future::ready(match response {
-                        Ok(body) => {
+                        Ok((header, body)) if header.status == hyper::StatusCode::OK => {
                             emit!(PrometheusRequestCompleted {
                                 start,
                                 end: Instant::now()
                             });
 
                             let byte_size = body.len();
-                            let packet = String::from_utf8_lossy(&body);
-                            let metrics = parser::parse(&packet)
-                                .map_err(|error| {
-                                    emit!(PrometheusParseError { error });
-                                })
-                                .unwrap_or_default();
+                            let body = String::from_utf8_lossy(&body);
 
-                            if !metrics.is_empty() {
-                                emit!(PrometheusEventReceived {
-                                    byte_size,
-                                    count: metrics.len()
-                                });
+                            match parser::parse(&body) {
+                                Ok(metrics) => {
+                                    emit!(PrometheusEventReceived {
+                                        byte_size,
+                                        count: metrics.len(),
+                                    });
+                                    Some(stream::iter(metrics).map(Event::Metric).map(Ok))
+                                }
+                                Err(error) => {
+                                    emit!(PrometheusParseError {
+                                        error,
+                                        url: url.clone(),
+                                        body,
+                                    });
+                                    None
+                                }
                             }
-
-                            Some(stream::iter(metrics).map(Event::Metric).map(Ok))
+                        }
+                        Ok((header, _)) => {
+                            emit!(PrometheusErrorResponse {
+                                code: header.status,
+                                url: url.clone(),
+                            });
+                            None
                         }
                         Err(error) => {
-                            emit!(PrometheusHttpError { error });
+                            emit!(PrometheusHttpError {
+                                error,
+                                url: url.clone(),
+                            });
                             None
                         }
                     })
@@ -115,10 +135,7 @@ fn prometheus(
                 .flatten()
         })
         .flatten()
-        .forward(
-            out.sink_map_err(|e| error!("error sending metric: {:?}", e))
-                .sink_compat(),
-        )
+        .forward(out)
         .inspect(|_| info!("finished sending"));
 
     Box::new(task.boxed().compat())
@@ -130,7 +147,6 @@ mod test {
     use super::*;
     use crate::{
         config,
-        hyper::body_to_bytes,
         sinks::prometheus::PrometheusSinkConfig,
         test_util::{next_addr, start_topology},
         Error,
@@ -215,7 +231,7 @@ mod test {
             .unwrap();
         assert!(response.status().is_success());
 
-        let body = body_to_bytes(response.into_body()).await.unwrap();
+        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
         let lines = std::str::from_utf8(&body)
             .unwrap()
             .lines()

@@ -4,12 +4,12 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{Auth, BatchedHttpSink, HttpClient, HttpRetryLogic, HttpSink},
-        retries2::{RetryAction, RetryLogic},
-        service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, Buffer, Compression,
+        retries::{RetryAction, RetryLogic},
+        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
     },
     tls::{TlsOptions, TlsSettings},
 };
+use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
 use http::{Request, StatusCode, Uri};
@@ -177,7 +177,7 @@ struct ClickhouseRetryLogic {
 }
 
 impl RetryLogic for ClickhouseRetryLogic {
-    type Response = http::Response<bytes05::Bytes>;
+    type Response = http::Response<Bytes>;
     type Error = hyper::Error;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

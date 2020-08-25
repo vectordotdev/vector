@@ -202,7 +202,7 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
         if got_marker {
             // We've already seen one marker! This is not good, we only emitted
             // one.
-            panic!("marker seen more than once");
+            panic!("Marker seen more than once");
         }
 
         // If we did, remember it.
@@ -271,7 +271,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
         if got_expected_line {
             // We've already seen our expected line once! This is not good, we
             // only emitted one.
-            panic!("test message seen more than once");
+            panic!("Test message seen more than once");
         }
 
         // If we did, remember it.
@@ -342,7 +342,7 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
         if got_marker {
             // We've already seen one marker! This is not good, we only emitted
             // one.
-            panic!("marker seen more than once");
+            panic!("Marker seen more than once");
         }
 
         // If we did, remember it.
@@ -480,7 +480,7 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         if got_marker {
             // We've already seen one marker! This is not good, we only emitted
             // one.
-            panic!("marker seen more than once");
+            panic!("Marker seen more than once");
         }
 
         // If we did, remember it.
@@ -609,7 +609,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         if got_control_marker {
             // We've already seen one control marker! This is not good, we only
             // emitted one.
-            panic!("control marker seen more than once");
+            panic!("Control marker seen more than once");
         }
 
         // Remember that we've seen a control marker.
