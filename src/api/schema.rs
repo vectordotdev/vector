@@ -1,9 +1,9 @@
-use crate::event::Metric;
-use crate::metrics::capture_metrics;
-use crate::{metrics, Event};
+use crate::event::{Event, Metric, MetricValue};
+use crate::metrics;
 use async_graphql::validators::IntRange;
 use async_graphql::{
-    EmptyMutation, FieldResult, Object, Schema, SchemaBuilder, SimpleObject, Subscription,
+    EmptyMutation, FieldResult, Interface, Object, Schema, SchemaBuilder, SimpleObject,
+    Subscription,
 };
 use async_stream::stream;
 use chrono::{DateTime, Utc};
@@ -21,17 +21,52 @@ impl Heartbeat {
     }
 }
 
-#[Object]
-impl Metric {
-    /// Metric name
-    async fn name(&self) -> String {
-        self.name.clone()
-    }
+struct EventsProcessed(Metric);
 
+#[Object]
+impl EventsProcessed {
     /// Metric timestamp
     async fn timestamp(&self) -> Option<DateTime<Utc>> {
-        self.timestamp
+        self.0.timestamp
     }
+
+    /// Number of events processed
+    async fn events_processed(&self) -> f64 {
+        match self.0.value {
+            MetricValue::Counter { value } => value,
+            _ => 0.00,
+        }
+    }
+}
+
+impl Into<EventsProcessed> for Metric {
+    fn into(self) -> EventsProcessed {
+        EventsProcessed(self)
+    }
+}
+
+struct BytesProcessed(Metric);
+
+#[Object]
+impl BytesProcessed {
+    /// Metric timestamp
+    async fn timestamp(&self) -> Option<DateTime<Utc>> {
+        self.0.timestamp
+    }
+
+    /// Number of bytes processed
+    async fn bytes_processed(&self) -> f64 {
+        match self.0.value {
+            MetricValue::Counter { value } => value,
+            _ => 0.00,
+        }
+    }
+}
+
+#[Interface(field(name = "timestamp", type = "Option<DateTime<Utc>>"))]
+enum MetricType {
+    EventsProcessed(EventsProcessed),
+    BytesProcessed(BytesProcessed),
 }
 
 pub struct Query;
@@ -60,8 +95,11 @@ impl Subscription {
     async fn metrics(
         &self,
         #[arg(validator(IntRange(min = "100", max = "60_000")))] interval: i32,
-    ) -> impl Stream<Item = Metric> {
-        get_metrics(interval)
+    ) -> impl Stream<Item = MetricType> {
+        get_metrics(interval).filter_map(|m| match m.name.as_str() {
+            "events_processed" => Some(MetricType::EventsProcessed(m.into())),
+            _ => None,
+        })
     }
 }
 
@@ -77,7 +115,7 @@ fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
 
     stream! {
         while let _ = interval.tick().await {
-            for ev in capture_metrics(&controller) {
+            for ev in metrics::capture_metrics(&controller) {
                 if let Event::Metric(m) = ev {
                     yield m
                 }

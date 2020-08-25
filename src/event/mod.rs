@@ -3,7 +3,7 @@ use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use getset::{Getters, Setters};
 use lazy_static::lazy_static;
-use metric::{MetricKind, MetricValue};
+use metric::MetricKind;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json::Value as JsonValue;
@@ -16,7 +16,7 @@ pub mod merge_state;
 pub mod metric;
 mod util;
 
-pub use metric::{Metric, StatisticKind};
+pub use metric::{Metric, MetricValue, StatisticKind};
 pub(crate) use util::log::PathComponent;
 pub(crate) use util::log::PathIter;
 
