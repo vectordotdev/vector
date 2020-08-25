@@ -1784,11 +1784,11 @@ data_dir = "/home/user/vector/"
   # * must be: "filter"
   type = "filter"
 
-# Accepts and outputs `log` events, allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
+# Accepts and outputs `log` events, allowing you to enrich events with geolocation data from the MaxMind GeoIP2-City, GeoLite2-City, GeoIP2-ISP and GeoLite2-ASN databases.
 [transforms.geoip]
-  # Path to the MaxMind GeoIP2 or GeoLite2 binary city database file
-  # (`GeoLite2-City.mmdb`). Other databases, such as the the country database are
-  # not supported.
+  # Path to the MaxMind GeoIP2-City, GeoLite2-City, GeoIP2-ISP or GeoLite2-ASN
+  # binary database file (`GeoLite2-City.mmdb` or `GeoLite2-ISP.mmdb`). Other
+  # databases, such as the the country database, are not supported.
   #
   # * required
   # * type: string

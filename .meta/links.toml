@@ -1,2 +1,6 @@
 [links.urls]
-test = "val"
+maxmind_db_file_format = "https://maxmind.github.io/MaxMind-DB/"
+maxmind_geoip2_city = "https://www.maxmind.com/en/geoip2-city"
+maxmind_geoip2_isp = "https://www.maxmind.com/en/geoip2-isp-database"
+maxmind_geolite2_asn = "https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access"
+maxmind_geolite2_city = "https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access"
