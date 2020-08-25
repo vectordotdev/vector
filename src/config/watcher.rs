@@ -121,7 +121,7 @@ fn add_paths(watcher: &mut RecommendedWatcher, config_paths: &[PathBuf]) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::temp_file;
+    use crate::test_util::{temp_file, trace_init};
     use futures::compat::Future01CompatExt;
     use futures01::{Future, Stream};
     use std::time::Duration;
@@ -141,7 +141,8 @@ mod tests {
 
     #[tokio::test]
     async fn file_update() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let delay = Duration::from_secs(3);
         let file_path = temp_file();
         let mut file = File::create(&file_path).unwrap();
@@ -155,7 +156,8 @@ mod tests {
 
     #[tokio::test]
     async fn sym_file_update() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let delay = Duration::from_secs(3);
         let file_path = temp_file();
         let sym_file = temp_file();
