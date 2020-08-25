@@ -1,6 +1,7 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricValue},
+    built_info,
     sinks::influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
     sinks::sematext::Region,
     sinks::util::{
@@ -41,9 +42,20 @@ inventory::submit! {
     SinkDescription::new_without_default::<SematextMetricsConfig>("sematext_metrics")
 }
 
-fn healthcheck(endpoint: &str, mut client: HttpClient) -> crate::Result<Healthcheck> {
-    let uri = format!("{}{}", endpoint, "/write?db=metrics&v=3.0.0");
+/// Return a url safe version of Vector to send to Sematext.
+fn vector_version() -> String {
+    #[cfg(feature = "nightly")]
+    let pkg_version = format!("vector-{}-nightly", built_info::PKG_VERSION);
 
+    #[cfg(not(feature = "nightly"))]
+    let pkg_version = format!("vector-{}", built_info::PKG_VERSION);
+    
+    pkg_version
+}
+
+fn healthcheck(endpoint: &str, mut client: HttpClient) -> crate::Result<Healthcheck> {
+    let uri = format!("{}/write?db=metrics&v={}", endpoint, vector_version());
+    
     let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
     let healthcheck = client
@@ -103,12 +115,9 @@ fn write_uri(endpoint: &str) -> crate::Result<Uri> {
         &endpoint,
         "write",
         &[
-            // TODO Should we make these an option?
-            ("consistency", None),
             ("db", Some("metrics".into())),
-            ("rp", None),
-            ("v", Some("vector".into())), // TODO Can we get the current version of Vector?
-            ("precision", Some("ns".to_owned())),
+            ("v", Some(vector_version())),
+            ("precision", Some("ns".into())),
         ],
     )
 }
