@@ -181,7 +181,7 @@ mod test {
     };
     use tokio::time::Duration;
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn gzip() {
         use flate2::read::GzDecoder;
 
