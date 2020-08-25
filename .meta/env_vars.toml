@@ -12,3 +12,41 @@ description = """\
 Enables backtraces when errors are logged. Use this when debugging only since \
 it can degrade performance.\
 """
+
+[env_vars.VECTOR_CONFIG]
+type = "string"
+examples = ["/etc/vector/vector.toml"]
+description = """\
+Sets the location of Vector's configuration file.
+"""
+
+[env_vars.VECTOR_REQUIRE_HEALTHY]
+type = "bool"
+description = """\
+Exit on startup if any sinks fail healthchecks.
+"""
+
+[env_vars.VECTOR_THREADS]
+type = "uint"
+examples = [4]
+description = """\
+Number of threads to use for processing (default is number of available cores).
+"""
+
+[env_vars.VECTOR_VERBOSE]
+type = "bool"
+description = """\
+Enable more detailed internal logging.
+"""
+
+[env_vars.VECTOR_QUIET]
+type = "bool"
+description = """\
+Reduce detail of internal logging. Overrides VECTOR_VERBOSE.
+"""
+
+[env_vars.VECTOR_WATCH_CONFIG]
+type = "bool"
+description = """\
+Watch for changes in configuration file, and reload accordingly.
+"""

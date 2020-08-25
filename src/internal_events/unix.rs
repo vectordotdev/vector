@@ -81,27 +81,3 @@ impl InternalEvent for UnixSocketEventSent {
         );
     }
 }
-
-#[derive(Debug)]
-pub struct UnixSocketEventReceived {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for UnixSocketEventReceived {
-    fn emit_logs(&self) {
-        trace!(message = "received one event.");
-    }
-
-    fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "source",
-            "component_type" => "socket",
-            "mode" => "unix",
-        );
-        counter!("bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "socket",
-            "mode" => "unix",
-        );
-    }
-}
