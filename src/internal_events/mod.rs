@@ -7,6 +7,7 @@ mod blackhole;
 #[cfg(feature = "sources-docker")]
 mod docker;
 mod elasticsearch;
+mod generator;
 mod heartbeat;
 mod http;
 #[cfg(all(unix, feature = "sources-journald"))]
@@ -50,6 +51,7 @@ pub use self::blackhole::*;
 pub use self::docker::*;
 pub use self::elasticsearch::*;
 pub use self::file::*;
+pub use self::generator::*;
 pub use self::heartbeat::*;
 pub use self::http::*;
 #[cfg(all(unix, feature = "sources-journald"))]
