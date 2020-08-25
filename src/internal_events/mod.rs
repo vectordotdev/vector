@@ -69,6 +69,8 @@ mod sampler;
     feature = "sources-vector"
 ))]
 mod socket;
+#[cfg(feature = "sinks-sematext")]
+mod sematext_metrics;
 mod split;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 mod splunk_hec;
