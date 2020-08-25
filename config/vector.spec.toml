@@ -6857,9 +6857,9 @@ require('custom_module')
     # time window.
     #
     # * optional
-    # * default: 10
+    # * default: 1000
     # * type: uint
-    rate_limit_num = 10
+    rate_limit_num = 1000
 
     # The maximum number of retries to make for failed requests. The default, for
     # all intents and purposes, represents an infinite number of retries.
