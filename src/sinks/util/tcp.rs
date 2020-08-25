@@ -90,7 +90,7 @@ impl IntoTcpSink {
         }
     }
 
-    fn into_sink(self) -> TcpSink {
+    pub fn into_sink(self) -> TcpSink {
         TcpSink::new(self.host, self.port, self.resolver, self.tls)
     }
 

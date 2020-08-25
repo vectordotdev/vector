@@ -74,7 +74,7 @@ impl IntoUdpSink {
         }
     }
 
-    fn into_sink(self) -> Result<UdpSink, UdpBuildError> {
+    pub fn into_sink(self) -> Result<UdpSink, UdpBuildError> {
         UdpSink::new(self.host, self.port, self.resolver)
     }
 }

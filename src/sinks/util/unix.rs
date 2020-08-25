@@ -62,7 +62,7 @@ impl IntoUnixSink {
         IntoUnixSink { path }
     }
 
-    fn into_sink(self) -> UnixSink {
+    pub fn into_sink(self) -> UnixSink {
         UnixSink::new(self.path)
     }
 }
