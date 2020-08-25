@@ -19,9 +19,6 @@ extern crate derivative;
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
-#[cfg(feature = "api")]
-pub mod api;
-
 pub mod buffers;
 pub mod conditions;
 pub mod config;
@@ -33,6 +30,8 @@ pub mod generate;
 pub mod wasm;
 #[macro_use]
 pub mod internal_events;
+#[cfg(feature = "api")]
+pub mod api;
 pub mod async_read;
 pub mod heartbeat;
 #[cfg(feature = "rdkafka")]

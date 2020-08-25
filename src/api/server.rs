@@ -1,4 +1,4 @@
-use super::{handler, schema::build_schema};
+use super::{handler, schema};
 
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig},
@@ -8,7 +8,6 @@ use async_graphql_warp::{graphql_subscription, GQLResponse};
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use tokio::sync::oneshot;
-use tokio::sync::oneshot::{Receiver, Sender};
 use warp::filters::BoxedFilter;
 use warp::{http::Response, Filter, Reply};
 
@@ -17,10 +16,10 @@ pub struct Server {
     address: SocketAddr,
 
     /// Transmission channel to trigger closure of a running API server
-    trigger_cancel: Sender<()>,
+    trigger_cancel: oneshot::Sender<()>,
 
     /// Receiver signal to cancel running API server
-    cancel_signal: Option<Receiver<()>>,
+    cancel_signal: Option<oneshot::Receiver<()>>,
 }
 
 impl Server {
@@ -74,7 +73,9 @@ fn make_routes() -> BoxedFilter<(impl Reply,)> {
     let health_route = warp::path("health").and_then(handler::health);
 
     // Build the GraphQL schema
-    let schema = build_schema().finish();
+    let schema = schema::build_schema()
+        .data(schema::Provider::new())
+        .finish();
 
     // GraphQL POST handler
     let graphql_post = async_graphql_warp::graphql(schema.clone()).and_then(
