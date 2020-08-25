@@ -141,6 +141,8 @@ Some possible configuration improvements we could add in the future would be:
 
 - `response_timeout`; to cap request lengths
 - `tls`: settings to allow setting specific chains of trust and client certs
+- `basic_auth`: to set username/password for use with HTTP basic auth; we'll
+  allow this to be set in the URL too which will work for now
 
 But I chose to leave those out for now given the prometheous source doesn't
 support them either. We could add support to both at the same time (see Future
