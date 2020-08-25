@@ -47,7 +47,7 @@ impl UdpSinkConfig {
     }
 }
 
-pub fn raw_udp(
+fn raw_udp(
     host: String,
     port: u16,
     encoding: EncodingConfig<Encoding>,
