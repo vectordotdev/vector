@@ -33,16 +33,35 @@ impl UnixSinkConfig {
         Self { path, encoding }
     }
 
-    pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let encoding = self.encoding.clone();
-        let unix = UnixSink::new(self.path.clone());
-        let sink = StreamSink::new(unix, cx.acker());
-
-        let sink =
-            Box::new(sink.with_flat_map(move |event| iter_ok(encode_event(event, &encoding))));
+    pub fn prepare(&self) -> crate::Result<(IntoUnixSink, Healthcheck)> {
+        let unix = IntoUnixSink::new(self.path.clone());
         let healthcheck = healthcheck(self.path.clone()).boxed().compat();
 
-        Ok((sink, Box::new(healthcheck)))
+        Ok((unix, Box::new(healthcheck)))
+    }
+
+    pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+        let (unix, healthcheck) = self.prepare()?;
+        let encoding = self.encoding.clone();
+        let sink = StreamSink::new(unix.into_sink(), cx.acker())
+            .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
+
+        Ok((Box::new(sink), healthcheck))
+    }
+}
+
+#[derive(Clone)]
+pub struct IntoUnixSink {
+    path: PathBuf,
+}
+
+impl IntoUnixSink {
+    fn new(path: PathBuf) -> Self {
+        IntoUnixSink { path }
+    }
+
+    fn into_sink(self) -> UnixSink {
+        UnixSink::new(self.path)
     }
 }
 
