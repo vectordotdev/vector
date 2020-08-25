@@ -132,7 +132,7 @@ The following additional source configuration will be added:
 ```toml
 [sources.my_source_id]
   type = "apache" # required
-  endpoint = "http://localhost/server-status?auto" # required, default
+  endpoints = ["http://localhost/server-status?auto"] # required, default
   scrape_interval_secs = 15 # optional, default, seconds
 ```
 
