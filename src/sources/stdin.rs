@@ -199,7 +199,8 @@ fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event, test_util::runtime, Pipeline};
+    use crate::{event, test_util::trace_init, Pipeline};
+    use futures::compat::Future01CompatExt;
     use futures01::{Async::*, Stream};
     use std::io::Cursor;
 
@@ -220,17 +221,19 @@ mod tests {
         assert_eq!(log[event::log_schema().source_type_key()], "stdin".into());
     }
 
-    #[test]
-    fn stdin_decodes_line() {
-        crate::test_util::trace_init();
+    #[tokio::test]
+    async fn stdin_decodes_line() {
+        trace_init();
+
         let (tx, mut rx) = Pipeline::new_test();
         let config = StdinConfig::default();
         let buf = Cursor::new("hello world\nhello world again");
 
-        let mut rt = runtime();
-        let source = stdin_source(buf, config, ShutdownSignal::noop(), tx).unwrap();
-
-        rt.block_on(source).unwrap();
+        stdin_source(buf, config, ShutdownSignal::noop(), tx)
+            .unwrap()
+            .compat()
+            .await
+            .unwrap();
 
         let event = rx.poll().unwrap();
 

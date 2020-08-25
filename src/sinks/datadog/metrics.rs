@@ -381,11 +381,11 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
-    use crate::sinks::util::{http::HttpSink, test::load_sink};
-    use crate::test_util::runtime;
-    use chrono::offset::TimeZone;
-    use chrono::Utc;
+    use crate::{
+        event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
+        sinks::util::{http::HttpSink, test::load_sink},
+    };
+    use chrono::{offset::TimeZone, Utc};
     use http::{Method, Uri};
     use pretty_assertions::assert_eq;
     use std::sync::atomic::AtomicI64;
@@ -404,8 +404,8 @@ mod tests {
         .collect()
     }
 
-    #[test]
-    fn test_request() {
+    #[tokio::test]
+    async fn test_request() {
         let (sink, _cx) = load_sink::<DatadogConfig>(
             r#"
             namespace = "test"
@@ -444,11 +444,7 @@ mod tests {
                 value: MetricValue::Counter { value: 1.0 },
             },
         ];
-
-        let mut rt = runtime();
-        let req = rt
-            .block_on_std(async move { sink.build_request(events).await })
-            .unwrap();
+        let req = sink.build_request(events).await.unwrap();
 
         assert_eq!(req.method(), Method::POST);
         assert_eq!(

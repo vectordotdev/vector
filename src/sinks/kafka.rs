@@ -9,7 +9,8 @@ use crate::{
 };
 use futures::compat::Compat;
 use futures01::{
-    future, stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
+    future as future01, stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend,
+    Stream,
 };
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
@@ -22,7 +23,7 @@ use std::convert::TryFrom;
 use std::time::Duration;
 use string_cache::DefaultAtom as Atom;
 
-type MetadataFuture<F, M> = future::Join<F, future::FutureResult<M, <F as Future>::Error>>;
+type MetadataFuture<F, M> = future01::Join<F, future01::FutureResult<M, <F as Future>::Error>>;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -180,7 +181,7 @@ impl Sink for KafkaSink {
         self.seq_head += 1;
 
         self.in_flight
-            .push(Compat::new(future).join(future::ok(seqno)));
+            .push(Compat::new(future).join(future01::ok(seqno)));
         Ok(AsyncSink::Ready)
     }
 
@@ -237,7 +238,7 @@ fn healthcheck(config: KafkaSinkConfig) -> crate::Result<super::Healthcheck> {
         }
     };
 
-    let check = future::lazy(move || {
+    let check = future01::lazy(move || {
         let consumer: BaseConsumer = client.create().unwrap();
 
         tokio::task::block_in_place(|| {
@@ -325,10 +326,10 @@ mod integration_test {
     use crate::{
         buffers::Acker,
         kafka::{KafkaAuthConfig, KafkaSaslConfig, KafkaTlsConfig},
-        test_util::{block_on, random_lines_with_stream, random_string, wait_for_sync},
+        test_util::{random_lines_with_stream, random_string, wait_for},
         tls::TlsOptions,
     };
-    use futures::compat::Future01CompatExt;
+    use futures::{compat::Future01CompatExt, future};
     use futures01::Sink;
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
@@ -340,8 +341,8 @@ mod integration_test {
     const TEST_CRT: &str = "tests/data/localhost.crt";
     const TEST_KEY: &str = "tests/data/localhost.key";
 
-    #[test]
-    fn healthcheck() {
+    #[tokio::test(threaded_scheduler)]
+    async fn healthcheck() {
         let topic = format!("test-{}", random_string(10));
 
         let config = KafkaSinkConfig {
@@ -355,39 +356,36 @@ mod integration_test {
             ..Default::default()
         };
 
-        let mut rt = crate::test_util::runtime();
-        let jh = rt.spawn_handle_std(super::healthcheck(config).unwrap().compat());
-
-        rt.block_on_std(jh).unwrap().unwrap();
+        super::healthcheck(config).unwrap().compat().await.unwrap();
     }
 
-    #[test]
-    fn kafka_happy_path_plaintext() {
-        kafka_happy_path("localhost:9091", None, None, KafkaCompression::None);
+    #[tokio::test]
+    async fn kafka_happy_path_plaintext() {
+        kafka_happy_path("localhost:9091", None, None, KafkaCompression::None).await;
     }
 
-    #[test]
-    fn kafka_happy_path_gzip() {
-        kafka_happy_path("localhost:9091", None, None, KafkaCompression::Gzip);
+    #[tokio::test]
+    async fn kafka_happy_path_gzip() {
+        kafka_happy_path("localhost:9091", None, None, KafkaCompression::Gzip).await;
     }
 
-    #[test]
-    fn kafka_happy_path_lz4() {
-        kafka_happy_path("localhost:9091", None, None, KafkaCompression::Lz4);
+    #[tokio::test]
+    async fn kafka_happy_path_lz4() {
+        kafka_happy_path("localhost:9091", None, None, KafkaCompression::Lz4).await;
     }
 
-    #[test]
-    fn kafka_happy_path_snappy() {
-        kafka_happy_path("localhost:9091", None, None, KafkaCompression::Snappy);
+    #[tokio::test]
+    async fn kafka_happy_path_snappy() {
+        kafka_happy_path("localhost:9091", None, None, KafkaCompression::Snappy).await;
     }
 
-    #[test]
-    fn kafka_happy_path_zstd() {
-        kafka_happy_path("localhost:9091", None, None, KafkaCompression::Zstd);
+    #[tokio::test]
+    async fn kafka_happy_path_zstd() {
+        kafka_happy_path("localhost:9091", None, None, KafkaCompression::Zstd).await;
     }
 
-    #[test]
-    fn kafka_happy_path_tls() {
+    #[tokio::test]
+    async fn kafka_happy_path_tls() {
         kafka_happy_path(
             "localhost:9092",
             None,
@@ -399,11 +397,12 @@ mod integration_test {
                 },
             }),
             KafkaCompression::None,
-        );
+        )
+        .await;
     }
 
-    #[test]
-    fn kafka_happy_path_tls_with_key() {
+    #[tokio::test]
+    async fn kafka_happy_path_tls_with_key() {
         kafka_happy_path(
             "localhost:9092",
             None,
@@ -418,11 +417,12 @@ mod integration_test {
                 },
             }),
             KafkaCompression::None,
-        );
+        )
+        .await;
     }
 
-    #[test]
-    fn kafka_happy_path_sasl() {
+    #[tokio::test]
+    async fn kafka_happy_path_sasl() {
         kafka_happy_path(
             "localhost:9093",
             Some(KafkaSaslConfig {
@@ -433,10 +433,11 @@ mod integration_test {
             }),
             None,
             KafkaCompression::None,
-        );
+        )
+        .await;
     }
 
-    fn kafka_happy_path(
+    async fn kafka_happy_path(
         server: &str,
         sasl: Option<KafkaSaslConfig>,
         tls: Option<KafkaTlsConfig>,
@@ -463,8 +464,7 @@ mod integration_test {
         let num_events = 1000;
         let (input, events) = random_lines_with_stream(100, num_events);
 
-        let pump = sink.send_all(events);
-        let _ = block_on(pump).unwrap();
+        let _ = sink.send_all(events).compat().await.unwrap();
 
         // read back everything from the beginning
         let mut client_config = rdkafka::ClientConfig::new();
@@ -480,12 +480,13 @@ mod integration_test {
         consumer.assign(&tpl).unwrap();
 
         // wait for messages to show up
-        wait_for_sync(|| {
+        wait_for(|| {
             let (_low, high) = consumer
                 .fetch_watermarks(&topic, 0, Duration::from_secs(3))
                 .unwrap();
-            high > 0
-        });
+            future::ready(high > 0)
+        })
+        .await;
 
         // check we have the expected number of messages in the topic
         let (low, high) = consumer

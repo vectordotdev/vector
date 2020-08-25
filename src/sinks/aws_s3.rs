@@ -529,12 +529,14 @@ mod integration_tests {
         dns::Resolver,
         event::Event,
         region::RegionOrEndpoint,
-        test_util::{random_lines_with_stream, random_string, runtime},
+        test_util::{random_lines_with_stream, random_string},
     };
     use bytes::{buf::BufExt, BytesMut};
     use flate2::read::GzDecoder;
-    use futures::compat::Future01CompatExt;
-    use futures::stream::{self, StreamExt};
+    use futures::{
+        compat::Future01CompatExt,
+        stream::{self, StreamExt},
+    };
     use futures01::Sink;
     use pretty_assertions::assert_eq;
     use rusoto_core::region::Region;
@@ -543,154 +545,139 @@ mod integration_tests {
 
     const BUCKET: &str = "router-tests";
 
-    #[test]
-    fn s3_insert_message_into() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn s3_insert_message_into() {
         let cx = SinkContext::new_test();
 
-        rt.block_on_std(async move {
-            let config = config(1000000).await;
-            let prefix = config.key_prefix.clone();
-            let client = config.create_client(cx.resolver()).unwrap();
-            let sink = config.new(client, cx).unwrap();
+        let config = config(1000000).await;
+        let prefix = config.key_prefix.clone();
+        let client = config.create_client(cx.resolver()).unwrap();
+        let sink = config.new(client, cx).unwrap();
 
-            let (lines, events) = random_lines_with_stream(100, 10);
+        let (lines, events) = random_lines_with_stream(100, 10);
 
-            let _ = sink.send_all(events).compat().await.unwrap();
+        let _ = sink.send_all(events).compat().await.unwrap();
 
-            let keys = get_keys(prefix.unwrap()).await;
-            assert_eq!(keys.len(), 1);
+        let keys = get_keys(prefix.unwrap()).await;
+        assert_eq!(keys.len(), 1);
 
-            let key = keys[0].clone();
-            assert!(key.ends_with(".log"));
+        let key = keys[0].clone();
+        assert!(key.ends_with(".log"));
+
+        let obj = get_object(key).await;
+        assert_eq!(obj.content_encoding, None);
+
+        let response_lines = get_lines(obj).await;
+        assert_eq!(lines, response_lines);
+    }
+
+    #[tokio::test]
+    async fn s3_rotate_files_after_the_buffer_size_is_reached() {
+        let cx = SinkContext::new_test();
+
+        let config = S3SinkConfig {
+            key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
+            filename_time_format: Some("waitsforfullbatch".into()),
+            filename_append_uuid: Some(false),
+            ..config(1010).await
+        };
+        let prefix = config.key_prefix.clone();
+        let client = config.create_client(cx.resolver()).unwrap();
+        let sink = config.new(client, cx).unwrap();
+
+        let (lines, _events) = random_lines_with_stream(100, 30);
+
+        let events = lines.clone().into_iter().enumerate().map(|(i, line)| {
+            let mut e = Event::from(line);
+            let i = if i < 10 {
+                1
+            } else if i < 20 {
+                2
+            } else {
+                3
+            };
+            e.as_mut_log().insert("i", format!("{}", i));
+            e
+        });
+
+        let _ = sink
+            .send_all(futures01::stream::iter_ok(events))
+            .compat()
+            .await
+            .unwrap();
+
+        let keys = get_keys(prefix.unwrap()).await;
+        assert_eq!(keys.len(), 3);
+
+        let response_lines = stream::iter(keys)
+            .fold(Vec::new(), |mut acc, key| async {
+                acc.push(get_lines(get_object(key).await).await);
+                acc
+            })
+            .await;
+
+        assert_eq!(&lines[00..10], response_lines[0].as_slice());
+        assert_eq!(&lines[10..20], response_lines[1].as_slice());
+        assert_eq!(&lines[20..30], response_lines[2].as_slice());
+    }
+
+    #[tokio::test]
+    async fn s3_gzip() {
+        let cx = SinkContext::new_test();
+
+        let config = S3SinkConfig {
+            compression: Compression::Gzip,
+            filename_time_format: Some("%S%f".into()),
+            ..config(10000).await
+        };
+
+        let prefix = config.key_prefix.clone();
+        let client = config.create_client(cx.resolver()).unwrap();
+        let sink = config.new(client, cx).unwrap();
+
+        let (lines, events) = random_lines_with_stream(100, 500);
+
+        let _ = sink.send_all(events).compat().await.unwrap();
+
+        let keys = get_keys(prefix.unwrap()).await;
+        assert_eq!(keys.len(), 6);
+
+        let response_lines = stream::iter(keys).fold(Vec::new(), |mut acc, key| async {
+            assert!(key.ends_with(".log.gz"));
 
             let obj = get_object(key).await;
-            assert_eq!(obj.content_encoding, None);
+            assert_eq!(obj.content_encoding, Some("gzip".to_string()));
 
-            let response_lines = get_lines(obj).await;
-            assert_eq!(lines, response_lines);
-        })
-    }
-
-    #[test]
-    fn s3_rotate_files_after_the_buffer_size_is_reached() {
-        let mut rt = runtime();
-        let cx = SinkContext::new_test();
-
-        rt.block_on_std(async move {
-            let config = S3SinkConfig {
-                key_prefix: Some(format!("{}/{}", random_string(10), "{{i}}")),
-                filename_time_format: Some("waitsforfullbatch".into()),
-                filename_append_uuid: Some(false),
-                ..config(1010).await
-            };
-            let prefix = config.key_prefix.clone();
-            let client = config.create_client(cx.resolver()).unwrap();
-            let sink = config.new(client, cx).unwrap();
-
-            let (lines, _events) = random_lines_with_stream(100, 30);
-
-            let events = lines.clone().into_iter().enumerate().map(|(i, line)| {
-                let mut e = Event::from(line);
-                let i = if i < 10 {
-                    1
-                } else if i < 20 {
-                    2
-                } else {
-                    3
-                };
-                e.as_mut_log().insert("i", format!("{}", i));
-                e
-            });
-
-            let _ = sink
-                .send_all(futures01::stream::iter_ok(events))
-                .compat()
-                .await
-                .unwrap();
-
-            let keys = get_keys(prefix.unwrap()).await;
-            assert_eq!(keys.len(), 3);
-
-            let response_lines = stream::iter(keys)
-                .fold(Vec::new(), |mut acc, key| async {
-                    acc.push(get_lines(get_object(key).await).await);
-                    acc
-                })
-                .await;
-
-            assert_eq!(&lines[00..10], response_lines[0].as_slice());
-            assert_eq!(&lines[10..20], response_lines[1].as_slice());
-            assert_eq!(&lines[20..30], response_lines[2].as_slice());
+            acc.append(&mut get_gzipped_lines(obj).await);
+            acc
         });
+
+        assert_eq!(lines, response_lines.await);
     }
 
-    #[test]
-    fn s3_gzip() {
-        let mut rt = runtime();
-        let cx = SinkContext::new_test();
-
-        rt.block_on_std(async {
-            let config = S3SinkConfig {
-                compression: Compression::Gzip,
-                filename_time_format: Some("%S%f".into()),
-                ..config(10000).await
-            };
-
-            let prefix = config.key_prefix.clone();
-            let client = config.create_client(cx.resolver()).unwrap();
-            let sink = config.new(client, cx).unwrap();
-
-            let (lines, events) = random_lines_with_stream(100, 500);
-
-            let _ = sink.send_all(events).compat().await.unwrap();
-
-            let keys = get_keys(prefix.unwrap()).await;
-            assert_eq!(keys.len(), 6);
-
-            let response_lines = stream::iter(keys).fold(Vec::new(), |mut acc, key| async {
-                assert!(key.ends_with(".log.gz"));
-
-                let obj = get_object(key).await;
-                assert_eq!(obj.content_encoding, Some("gzip".to_string()));
-
-                acc.append(&mut get_gzipped_lines(obj).await);
-                acc
-            });
-
-            assert_eq!(lines, response_lines.await);
-        });
-    }
-
-    #[test]
-    fn s3_healthchecks() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn s3_healthchecks() {
         let resolver = Resolver;
 
-        rt.block_on_std(async move {
-            let config = config(1).await;
-            let client = config.create_client(resolver).unwrap();
-            config.healthcheck(client).await.unwrap();
-        });
+        let config = config(1).await;
+        let client = config.create_client(resolver).unwrap();
+        config.healthcheck(client).await.unwrap();
     }
 
-    #[test]
-    fn s3_healthchecks_invalid_bucket() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn s3_healthchecks_invalid_bucket() {
         let resolver = Resolver;
 
-        rt.block_on_std(async move {
-            let config = S3SinkConfig {
-                bucket: "asdflkjadskdaadsfadf".to_string(),
-                ..config(1).await
-            };
-            let client = config.create_client(resolver).unwrap();
-            assert_downcast_matches!(
-                config.healthcheck(client).await.unwrap_err(),
-                HealthcheckError,
-                HealthcheckError::UnknownBucket{ .. }
-            );
-        });
+        let config = S3SinkConfig {
+            bucket: "asdflkjadskdaadsfadf".to_string(),
+            ..config(1).await
+        };
+        let client = config.create_client(resolver).unwrap();
+        assert_downcast_matches!(
+            config.healthcheck(client).await.unwrap_err(),
+            HealthcheckError,
+            HealthcheckError::UnknownBucket{ .. }
+        );
     }
 
     fn client() -> S3Client {

@@ -67,7 +67,7 @@ where
 mod tests {
     use super::super::{mock, MaintainedWrite, Write};
     use super::*;
-    use crate::test_util;
+    use crate::test_util::trace_init;
     use futures::{channel::mpsc, SinkExt, StreamExt};
     use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
     use once_cell::sync::OnceCell;
@@ -163,193 +163,192 @@ mod tests {
     // resolved.
 
     #[ignore]
-    #[test]
-    fn add() {
+    #[tokio::test(threaded_scheduler)]
+    async fn add() {
+        trace_init();
+
         let _guard = tests_lock();
-        test_util::trace_init();
-        test_util::block_on_std(async {
-            let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
 
-            let pod = make_pod();
+        let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
 
-            let join = {
-                let pod = pod.clone();
-                let before = get_metric_value("item_added");
-                tokio::spawn(async move {
-                    assert_eq!(
-                        events_rx.next().await.unwrap().unwrap_op(),
-                        (pod, mock::OpKind::Add)
-                    );
+        let pod = make_pod();
 
-                    // By now metrics should've updated.
-                    let after = get_metric_value("item_added");
-                    assert_counter_changed(before, after, 1);
+        let join = {
+            let pod = pod.clone();
+            let before = get_metric_value("item_added");
+            tokio::spawn(async move {
+                assert_eq!(
+                    events_rx.next().await.unwrap().unwrap_op(),
+                    (pod, mock::OpKind::Add)
+                );
 
-                    actions_tx.send(()).await.unwrap();
-                })
-            };
+                // By now metrics should've updated.
+                let after = get_metric_value("item_added");
+                assert_counter_changed(before, after, 1);
 
-            writer.add(pod).await;
-            join.await.unwrap();
-        })
+                actions_tx.send(()).await.unwrap();
+            })
+        };
+
+        writer.add(pod).await;
+        join.await.unwrap();
     }
 
     #[ignore]
-    #[test]
-    fn update() {
+    #[tokio::test(threaded_scheduler)]
+    async fn update() {
+        trace_init();
+
         let _guard = tests_lock();
-        test_util::trace_init();
-        test_util::block_on_std(async {
-            let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
 
-            let pod = make_pod();
+        let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
 
-            let join = {
-                let pod = pod.clone();
-                let before = get_metric_value("item_updated");
-                tokio::spawn(async move {
-                    assert_eq!(
-                        events_rx.next().await.unwrap().unwrap_op(),
-                        (pod, mock::OpKind::Update)
-                    );
+        let pod = make_pod();
 
-                    // By now metrics should've updated.
-                    let after = get_metric_value("item_updated");
-                    assert_counter_changed(before, after, 1);
+        let join = {
+            let pod = pod.clone();
+            let before = get_metric_value("item_updated");
+            tokio::spawn(async move {
+                assert_eq!(
+                    events_rx.next().await.unwrap().unwrap_op(),
+                    (pod, mock::OpKind::Update)
+                );
 
-                    actions_tx.send(()).await.unwrap();
-                })
-            };
+                // By now metrics should've updated.
+                let after = get_metric_value("item_updated");
+                assert_counter_changed(before, after, 1);
 
-            writer.update(pod).await;
-            join.await.unwrap();
-        })
+                actions_tx.send(()).await.unwrap();
+            })
+        };
+
+        writer.update(pod).await;
+        join.await.unwrap();
     }
 
     #[ignore]
-    #[test]
-    fn delete() {
+    #[tokio::test(threaded_scheduler)]
+    async fn delete() {
+        trace_init();
+
         let _guard = tests_lock();
-        test_util::trace_init();
-        test_util::block_on_std(async {
-            let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
 
-            let pod = make_pod();
+        let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
 
-            let join = {
-                let pod = pod.clone();
-                let before = get_metric_value("item_deleted");
-                tokio::spawn(async move {
-                    assert_eq!(
-                        events_rx.next().await.unwrap().unwrap_op(),
-                        (pod, mock::OpKind::Delete)
-                    );
+        let pod = make_pod();
 
-                    // By now metrics should've updated.
-                    let after = get_metric_value("item_deleted");
-                    assert_counter_changed(before, after, 1);
+        let join = {
+            let pod = pod.clone();
+            let before = get_metric_value("item_deleted");
+            tokio::spawn(async move {
+                assert_eq!(
+                    events_rx.next().await.unwrap().unwrap_op(),
+                    (pod, mock::OpKind::Delete)
+                );
 
-                    actions_tx.send(()).await.unwrap();
-                })
-            };
+                // By now metrics should've updated.
+                let after = get_metric_value("item_deleted");
+                assert_counter_changed(before, after, 1);
 
-            writer.delete(pod).await;
-            join.await.unwrap();
-        })
+                actions_tx.send(()).await.unwrap();
+            })
+        };
+
+        writer.delete(pod).await;
+        join.await.unwrap();
     }
 
     #[ignore]
-    #[test]
-    fn resync() {
+    #[tokio::test(threaded_scheduler)]
+    async fn resync() {
+        trace_init();
+
         let _guard = tests_lock();
-        test_util::trace_init();
-        test_util::block_on_std(async {
-            let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
 
-            let join = {
-                let before = get_metric_value("resynced");
-                tokio::spawn(async move {
-                    assert!(matches!(
-                        events_rx.next().await.unwrap(),
-                        mock::ScenarioEvent::Resync
-                    ));
+        let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
 
-                    let after = get_metric_value("resynced");
-                    assert_counter_changed(before, after, 1);
+        let join = {
+            let before = get_metric_value("resynced");
+            tokio::spawn(async move {
+                assert!(matches!(
+                    events_rx.next().await.unwrap(),
+                    mock::ScenarioEvent::Resync
+                ));
 
-                    actions_tx.send(()).await.unwrap();
-                })
-            };
+                let after = get_metric_value("resynced");
+                assert_counter_changed(before, after, 1);
 
-            writer.resync().await;
-            join.await.unwrap();
-        })
+                actions_tx.send(()).await.unwrap();
+            })
+        };
+
+        writer.resync().await;
+        join.await.unwrap();
     }
 
     #[ignore]
-    #[test]
-    fn request_maintenance_without_maintenance() {
+    #[tokio::test(threaded_scheduler)]
+    async fn request_maintenance_without_maintenance() {
+        trace_init();
+
         let _guard = tests_lock();
-        test_util::trace_init();
-        test_util::block_on_std(async {
-            let (mut writer, _events_rx, _actions_tx) = prepare_test();
-            let before = get_metric_value("maintenace_requested");
-            let _ = writer.maintenance_request();
-            let after = get_metric_value("maintenace_requested");
-            assert_counter_changed(before, after, 0);
-        })
+
+        let (mut writer, _events_rx, _actions_tx) = prepare_test();
+        let before = get_metric_value("maintenace_requested");
+        let _ = writer.maintenance_request();
+        let after = get_metric_value("maintenace_requested");
+        assert_counter_changed(before, after, 0);
     }
 
     #[ignore]
-    #[test]
-    fn request_maintenance_with_maintenance() {
+    #[tokio::test(threaded_scheduler)]
+    async fn request_maintenance_with_maintenance() {
+        trace_init();
+
         let _guard = tests_lock();
-        test_util::trace_init();
-        test_util::block_on_std(async {
-            let (events_tx, _events_rx) = mpsc::channel(0);
-            let (_actions_tx, actions_rx) = mpsc::channel(0);
-            let (maintenance_request_events_tx, _maintenance_request_events_rx) = mpsc::channel(0);
-            let (_maintenance_request_actions_tx, maintenance_request_actions_rx) =
-                mpsc::channel(0);
-            let writer = mock::Writer::<Pod>::new_with_maintenance(
-                events_tx,
-                actions_rx,
-                maintenance_request_events_tx,
-                maintenance_request_actions_rx,
-            );
-            let mut writer = Writer::new(writer);
-            let before = get_metric_value("maintenace_requested");
-            let _ = writer.maintenance_request();
-            let after = get_metric_value("maintenace_requested");
-            assert_counter_changed(before, after, 1);
-        })
+
+        let (events_tx, _events_rx) = mpsc::channel(0);
+        let (_actions_tx, actions_rx) = mpsc::channel(0);
+        let (maintenance_request_events_tx, _maintenance_request_events_rx) = mpsc::channel(0);
+        let (_maintenance_request_actions_tx, maintenance_request_actions_rx) = mpsc::channel(0);
+        let writer = mock::Writer::<Pod>::new_with_maintenance(
+            events_tx,
+            actions_rx,
+            maintenance_request_events_tx,
+            maintenance_request_actions_rx,
+        );
+        let mut writer = Writer::new(writer);
+        let before = get_metric_value("maintenace_requested");
+        let _ = writer.maintenance_request();
+        let after = get_metric_value("maintenace_requested");
+        assert_counter_changed(before, after, 1);
     }
 
     #[ignore]
-    #[test]
-    fn perform_maintenance() {
+    #[tokio::test(threaded_scheduler)]
+    async fn perform_maintenance() {
+        trace_init();
+
         let _guard = tests_lock();
-        test_util::trace_init();
-        test_util::block_on_std(async {
-            let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
 
-            let join = {
-                let before = get_metric_value("maintenace_performed");
-                tokio::spawn(async move {
-                    assert!(matches!(
-                        events_rx.next().await.unwrap(),
-                        mock::ScenarioEvent::Maintenance
-                    ));
+        let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
 
-                    let after = get_metric_value("maintenace_performed");
-                    assert_counter_changed(before, after, 1);
+        let join = {
+            let before = get_metric_value("maintenace_performed");
+            tokio::spawn(async move {
+                assert!(matches!(
+                    events_rx.next().await.unwrap(),
+                    mock::ScenarioEvent::Maintenance
+                ));
 
-                    actions_tx.send(()).await.unwrap();
-                })
-            };
+                let after = get_metric_value("maintenace_performed");
+                assert_counter_changed(before, after, 1);
 
-            writer.perform_maintenance().await;
-            join.await.unwrap();
-        })
+                actions_tx.send(()).await.unwrap();
+            })
+        };
+
+        writer.perform_maintenance().await;
+        join.await.unwrap();
     }
 }

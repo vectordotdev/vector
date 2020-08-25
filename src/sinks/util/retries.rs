@@ -184,8 +184,9 @@ mod tests {
 
     #[tokio::test]
     async fn service_error_retry() {
-        time::pause();
         trace_init();
+
+        time::pause();
 
         let policy = FixedRetryPolicy::new(
             5,
@@ -234,8 +235,9 @@ mod tests {
 
     #[tokio::test]
     async fn timeout_error() {
-        time::pause();
         trace_init();
+
+        time::pause();
 
         let policy = FixedRetryPolicy::new(
             5,

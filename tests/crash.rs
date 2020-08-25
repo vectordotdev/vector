@@ -7,9 +7,7 @@ use tokio::time::{delay_for, Duration};
 use vector::{
     config::{self, GlobalOptions, SinkContext},
     shutdown::ShutdownSignal,
-    test_util::{
-        next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver,
-    },
+    test_util::{next_addr, random_lines, send_lines, start_topology, wait_for_tcp, CountReceiver},
     Event, Pipeline, {sinks, sources},
 };
 
@@ -50,8 +48,8 @@ impl Sink for PanicSink {
     }
 }
 
-#[test]
-fn test_sink_panic() {
+#[tokio::test]
+async fn test_sink_panic() {
     let num_lines: usize = 10;
 
     let in_addr = next_addr();
@@ -69,32 +67,29 @@ fn test_sink_panic() {
     );
     config.add_sink("panic", &["in"], PanicSink);
 
-    let mut rt = runtime();
-    rt.block_on_std(async move {
-        let mut output_lines = CountReceiver::receive_lines(out_addr);
+    let mut output_lines = CountReceiver::receive_lines(out_addr);
 
-        std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
-        let (topology, crash) = start_topology(config, false).await;
-        // Wait for server to accept traffic
-        wait_for_tcp(in_addr).await;
-        delay_for(Duration::from_millis(100)).await;
+    std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
+    let (topology, crash) = start_topology(config, false).await;
+    // Wait for server to accept traffic
+    wait_for_tcp(in_addr).await;
+    delay_for(Duration::from_millis(100)).await;
 
-        // Wait for output to connect
-        output_lines.connected().await;
+    // Wait for output to connect
+    output_lines.connected().await;
 
-        let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
-        send_lines(in_addr, input_lines.clone()).await.unwrap();
-        delay_for(Duration::from_millis(100)).await;
+    let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+    send_lines(in_addr, input_lines.clone()).await.unwrap();
+    delay_for(Duration::from_millis(100)).await;
 
-        let _ = std::panic::take_hook();
-        assert!(crash.wait().next().is_some());
-        topology.stop().compat().await.unwrap();
-        delay_for(Duration::from_millis(100)).await;
+    let _ = std::panic::take_hook();
+    assert!(crash.wait().next().is_some());
+    topology.stop().compat().await.unwrap();
+    delay_for(Duration::from_millis(100)).await;
 
-        let output_lines = output_lines.wait().await;
-        assert_eq!(num_lines, output_lines.len());
-        assert_eq!(input_lines, output_lines);
-    });
+    let output_lines = output_lines.wait().await;
+    assert_eq!(num_lines, output_lines.len());
+    assert_eq!(input_lines, output_lines);
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -134,8 +129,8 @@ impl Sink for ErrorSink {
     }
 }
 
-#[test]
-fn test_sink_error() {
+#[tokio::test]
+async fn test_sink_error() {
     let num_lines: usize = 10;
 
     let in_addr = next_addr();
@@ -153,30 +148,27 @@ fn test_sink_error() {
     );
     config.add_sink("error", &["in"], ErrorSink);
 
-    let mut rt = runtime();
-    rt.block_on_std(async move {
-        let mut output_lines = CountReceiver::receive_lines(out_addr);
+    let mut output_lines = CountReceiver::receive_lines(out_addr);
 
-        let (topology, crash) = start_topology(config, false).await;
-        // Wait for server to accept traffic
-        wait_for_tcp(in_addr).await;
-        delay_for(Duration::from_millis(100)).await;
+    let (topology, crash) = start_topology(config, false).await;
+    // Wait for server to accept traffic
+    wait_for_tcp(in_addr).await;
+    delay_for(Duration::from_millis(100)).await;
 
-        // Wait for output to connect
-        output_lines.connected().await;
+    // Wait for output to connect
+    output_lines.connected().await;
 
-        let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
-        send_lines(in_addr, input_lines.clone()).await.unwrap();
-        delay_for(Duration::from_millis(100)).await;
+    let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+    send_lines(in_addr, input_lines.clone()).await.unwrap();
+    delay_for(Duration::from_millis(100)).await;
 
-        assert!(crash.wait().next().is_some());
-        topology.stop().compat().await.unwrap();
-        delay_for(Duration::from_millis(100)).await;
+    assert!(crash.wait().next().is_some());
+    topology.stop().compat().await.unwrap();
+    delay_for(Duration::from_millis(100)).await;
 
-        let output_lines = output_lines.wait().await;
-        assert_eq!(num_lines, output_lines.len());
-        assert_eq!(input_lines, output_lines);
-    });
+    let output_lines = output_lines.wait().await;
+    assert_eq!(num_lines, output_lines.len());
+    assert_eq!(input_lines, output_lines);
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -203,8 +195,8 @@ impl config::SourceConfig for ErrorSourceConfig {
     }
 }
 
-#[test]
-fn test_source_error() {
+#[tokio::test]
+async fn test_source_error() {
     let num_lines: usize = 10;
 
     let in_addr = next_addr();
@@ -222,30 +214,27 @@ fn test_source_error() {
         sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
     );
 
-    let mut rt = runtime();
-    rt.block_on_std(async move {
-        let mut output_lines = CountReceiver::receive_lines(out_addr);
+    let mut output_lines = CountReceiver::receive_lines(out_addr);
 
-        let (topology, crash) = start_topology(config, false).await;
-        // Wait for server to accept traffic
-        wait_for_tcp(in_addr).await;
-        delay_for(Duration::from_millis(100)).await;
+    let (topology, crash) = start_topology(config, false).await;
+    // Wait for server to accept traffic
+    wait_for_tcp(in_addr).await;
+    delay_for(Duration::from_millis(100)).await;
 
-        // Wait for output to connect
-        output_lines.connected().await;
+    // Wait for output to connect
+    output_lines.connected().await;
 
-        let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
-        send_lines(in_addr, input_lines.clone()).await.unwrap();
-        delay_for(Duration::from_millis(100)).await;
+    let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+    send_lines(in_addr, input_lines.clone()).await.unwrap();
+    delay_for(Duration::from_millis(100)).await;
 
-        assert!(crash.wait().next().is_some());
-        topology.stop().compat().await.unwrap();
-        delay_for(Duration::from_millis(100)).await;
+    assert!(crash.wait().next().is_some());
+    topology.stop().compat().await.unwrap();
+    delay_for(Duration::from_millis(100)).await;
 
-        let output_lines = output_lines.wait().await;
-        assert_eq!(num_lines, output_lines.len());
-        assert_eq!(input_lines, output_lines);
-    });
+    let output_lines = output_lines.wait().await;
+    assert_eq!(num_lines, output_lines.len());
+    assert_eq!(input_lines, output_lines);
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -274,8 +263,8 @@ impl config::SourceConfig for PanicSourceConfig {
     }
 }
 
-#[test]
-fn test_source_panic() {
+#[tokio::test]
+async fn test_source_panic() {
     let num_lines: usize = 10;
 
     let in_addr = next_addr();
@@ -293,30 +282,27 @@ fn test_source_panic() {
         sinks::socket::SocketSinkConfig::make_basic_tcp_config(out_addr.to_string()),
     );
 
-    let mut rt = runtime();
-    rt.block_on_std(async move {
-        let mut output_lines = CountReceiver::receive_lines(out_addr);
+    let mut output_lines = CountReceiver::receive_lines(out_addr);
 
-        std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
-        let (topology, crash) = start_topology(config, false).await;
-        // Wait for server to accept traffic
-        wait_for_tcp(in_addr).await;
-        delay_for(Duration::from_millis(100)).await;
+    std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
+    let (topology, crash) = start_topology(config, false).await;
+    // Wait for server to accept traffic
+    wait_for_tcp(in_addr).await;
+    delay_for(Duration::from_millis(100)).await;
 
-        // Wait for output to connect
-        output_lines.connected().await;
+    // Wait for output to connect
+    output_lines.connected().await;
 
-        let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
-        send_lines(in_addr, input_lines.clone()).await.unwrap();
-        delay_for(Duration::from_millis(100)).await;
-        let _ = std::panic::take_hook();
+    let input_lines = random_lines(100).take(num_lines).collect::<Vec<_>>();
+    send_lines(in_addr, input_lines.clone()).await.unwrap();
+    delay_for(Duration::from_millis(100)).await;
+    let _ = std::panic::take_hook();
 
-        assert!(crash.wait().next().is_some());
-        topology.stop().compat().await.unwrap();
-        delay_for(Duration::from_millis(100)).await;
+    assert!(crash.wait().next().is_some());
+    topology.stop().compat().await.unwrap();
+    delay_for(Duration::from_millis(100)).await;
 
-        let output_lines = output_lines.wait().await;
-        assert_eq!(num_lines, output_lines.len());
-        assert_eq!(input_lines, output_lines);
-    });
+    let output_lines = output_lines.wait().await;
+    assert_eq!(num_lines, output_lines.len());
+    assert_eq!(input_lines, output_lines);
 }

@@ -7,11 +7,12 @@ use crate::{
 };
 use flate2::read::GzDecoder;
 use futures::{
-    compat::Stream01CompatExt, stream, FutureExt as _, SinkExt, Stream, StreamExt, TryFutureExt,
+    compat::Stream01CompatExt, future, stream, FutureExt, SinkExt, Stream, StreamExt, TryFutureExt,
     TryStreamExt,
 };
 use futures01::{
-    future, stream as stream01, sync::mpsc, try_ready, Async, Future, Poll, Stream as Stream01,
+    future as future01, stream as stream01, sync::mpsc, try_ready, Async, Future, Poll,
+    Stream as Stream01,
 };
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -253,7 +254,7 @@ pub fn random_maps(
 pub fn collect_n<T>(mut rx: mpsc::Receiver<T>, n: usize) -> impl Future<Item = Vec<T>, Error = ()> {
     let mut events = Vec::new();
 
-    future::poll_fn(move || {
+    future01::poll_fn(move || {
         while events.len() < n {
             let e = try_ready!(rx.poll()).unwrap();
             events.push(e);
@@ -280,27 +281,6 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
         .read_to_string(&mut output)
         .unwrap();
     output.lines().map(|s| s.to_owned()).collect()
-}
-
-pub fn block_on<F, R, E>(future: F) -> Result<R, E>
-where
-    F: Send + 'static + Future<Item = R, Error = E>,
-    R: Send + 'static,
-    E: Send + 'static,
-{
-    let mut rt = runtime();
-
-    rt.block_on(future)
-}
-
-pub fn block_on_std<F>(future: F) -> F::Output
-where
-    F: std::future::Future + Send + 'static,
-    F::Output: Send + 'static,
-{
-    let mut rt = runtime();
-
-    rt.block_on_std(future)
 }
 
 pub fn runtime() -> Runtime {
@@ -341,26 +321,17 @@ pub async fn wait_for_tcp(addr: SocketAddr) {
     wait_for(|| async move { TcpStream::connect(addr).await.is_ok() }).await
 }
 
-pub fn wait_for_sync(mut f: impl FnMut() -> bool) {
-    let wait = std::time::Duration::from_millis(5);
-    let limit = std::time::Duration::from_secs(5);
-    let mut attempts = 0;
-    while !f() {
-        std::thread::sleep(wait);
-        attempts += 1;
-        if attempts * wait > limit {
-            panic!("Timed out while waiting");
-        }
-    }
-}
-
-pub fn wait_for_atomic_usize_sync<T, F>(val: T, unblock: F)
+pub async fn wait_for_atomic_usize<T, F>(value: T, unblock: F)
 where
     T: AsRef<AtomicUsize>,
     F: Fn(usize) -> bool,
 {
-    let val = val.as_ref();
-    wait_for_sync(|| unblock(val.load(Ordering::SeqCst)))
+    let value = value.as_ref();
+    wait_for(|| {
+        let result = unblock(value.load(Ordering::SeqCst));
+        future::ready(result)
+    })
+    .await
 }
 
 #[derive(Debug)]

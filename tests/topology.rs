@@ -5,16 +5,20 @@ use futures::compat::Future01CompatExt;
 use futures01::{
     future, future::Future, sink::Sink, stream::iter_ok, stream::Stream, sync::mpsc::SendError,
 };
-use std::iter;
-use std::sync::{
-    atomic::{AtomicBool, AtomicUsize, Ordering},
-    Arc,
+use std::{
+    iter,
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc,
+    },
 };
 use tokio::time::{delay_for, Duration};
-use vector::config::Config;
-use vector::event::{self, Event};
-use vector::test_util::{runtime, start_topology, trace_init};
-use vector::topology;
+use vector::{
+    config::Config,
+    event::{self, Event},
+    test_util::start_topology,
+    topology,
+};
 
 fn basic_config() -> Config {
     let mut config = Config::empty();
@@ -38,7 +42,7 @@ fn into_message(event: Event) -> String {
         .to_string_lossy()
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(threaded_scheduler)]
 async fn topology_shutdown_while_active() {
     let source_event_counter = Arc::new(AtomicUsize::new(0));
     let source_event_total = source_event_counter.clone();
@@ -95,7 +99,7 @@ async fn topology_shutdown_while_active() {
     let _err: SendError<Event> = pump_handle.await.unwrap().unwrap_err();
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(threaded_scheduler)]
 async fn topology_source_and_sink() {
     let (in1, source1) = source();
     let (out1, sink1) = sink(10);
@@ -116,7 +120,7 @@ async fn topology_source_and_sink() {
     assert_eq!(vec![event], res);
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(threaded_scheduler)]
 async fn topology_multiple_sources() {
     let (in1, source1) = source();
     let (in2, source2) = source();
@@ -146,7 +150,7 @@ async fn topology_multiple_sources() {
     assert_eq!(out_event2, Some(event2));
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(threaded_scheduler)]
 async fn topology_multiple_sinks() {
     let (in1, source1) = source();
     let (out1, sink1) = sink(10);
@@ -172,7 +176,7 @@ async fn topology_multiple_sinks() {
     assert_eq!(vec![event], res2);
 }
 
-#[tokio::test(core_threads = 2)]
+#[tokio::test(threaded_scheduler)]
 async fn topology_transform_chain() {
     let (in1, source1) = source();
     let transform1 = transform(" first", 0.0);
@@ -348,7 +352,6 @@ async fn topology_swap_source() {
 
 #[tokio::test]
 async fn topology_swap_sink() {
-    trace_init();
     let (in1, source1) = source();
     let (out1, sink1) = sink(10);
 
@@ -489,83 +492,67 @@ async fn topology_swap_transform_is_atomic() {
     );
 }
 
-#[test]
-fn topology_required_healthcheck_fails_start() {
+#[tokio::test]
+async fn topology_required_healthcheck_fails_start() {
     let config = basic_config_with_sink_failing_healthcheck();
-    let mut rt = runtime();
-    rt.block_on_std(async move {
-        let diff = vector::config::ConfigDiff::initial(&config);
-        let pieces = topology::validate(&config, &diff).await.unwrap();
-        assert!(topology::start_validated(config, diff, pieces, true)
-            .await
-            .is_none());
-    });
+    let diff = vector::config::ConfigDiff::initial(&config);
+    let pieces = topology::validate(&config, &diff).await.unwrap();
+    assert!(topology::start_validated(config, diff, pieces, true)
+        .await
+        .is_none());
 }
 
-#[test]
-fn topology_optional_healthcheck_does_not_fail_start() {
+#[tokio::test]
+async fn topology_optional_healthcheck_does_not_fail_start() {
     let config = basic_config_with_sink_failing_healthcheck();
-    let mut rt = runtime();
-    rt.block_on_std(async move {
-        let diff = vector::config::ConfigDiff::initial(&config);
-        let pieces = topology::validate(&config, &diff).await.unwrap();
-        assert!(topology::start_validated(config, diff, pieces, false)
-            .await
-            .is_some());
-    });
+    let diff = vector::config::ConfigDiff::initial(&config);
+    let pieces = topology::validate(&config, &diff).await.unwrap();
+    assert!(topology::start_validated(config, diff, pieces, false)
+        .await
+        .is_some());
 }
 
-#[test]
-fn topology_optional_healthcheck_does_not_fail_reload() {
-    let mut rt = runtime();
+#[tokio::test]
+async fn topology_optional_healthcheck_does_not_fail_reload() {
     let config = basic_config();
-    rt.block_on_std(async move {
-        let (mut topology, _crash) = start_topology(config, false).await;
-        let config = basic_config_with_sink_failing_healthcheck();
-        assert!(topology
-            .reload_config_and_respawn(config, false)
-            .await
-            .unwrap());
-    });
+    let (mut topology, _crash) = start_topology(config, false).await;
+    let config = basic_config_with_sink_failing_healthcheck();
+    assert!(topology
+        .reload_config_and_respawn(config, false)
+        .await
+        .unwrap());
 }
 
-#[test]
-fn topology_healthcheck_not_run_on_unchanged_reload() {
-    let mut rt = runtime();
+#[tokio::test]
+async fn topology_healthcheck_not_run_on_unchanged_reload() {
     let config = basic_config();
 
-    rt.block_on_std(async move {
-        let (mut topology, _crash) = start_topology(config, false).await;
-        let config = basic_config_with_sink_failing_healthcheck();
-        assert!(topology
-            .reload_config_and_respawn(config, true)
-            .await
-            .unwrap());
-    });
+    let (mut topology, _crash) = start_topology(config, false).await;
+    let config = basic_config_with_sink_failing_healthcheck();
+    assert!(topology
+        .reload_config_and_respawn(config, true)
+        .await
+        .unwrap());
 }
 
-#[test]
-fn topology_healthcheck_run_for_changes_on_reload() {
-    let mut rt = runtime();
-
+#[tokio::test]
+async fn topology_healthcheck_run_for_changes_on_reload() {
     let mut config = Config::empty();
     // We can't just drop the sender side since that will close the source.
     let (_ch0, src) = source();
     config.add_source("in1", src);
     config.add_sink("out1", &["in1"], sink(10).1);
 
-    rt.block_on_std(async move {
-        let (mut topology, _crash) = start_topology(config, false).await;
+    let (mut topology, _crash) = start_topology(config, false).await;
 
-        let mut config = Config::empty();
-        // We can't just drop the sender side since that will close the source.
-        let (_ch1, src) = source();
-        config.add_source("in1", src);
-        config.add_sink("out2", &["in1"], sink_failing_healthcheck(10).1);
+    let mut config = Config::empty();
+    // We can't just drop the sender side since that will close the source.
+    let (_ch1, src) = source();
+    config.add_source("in1", src);
+    config.add_sink("out2", &["in1"], sink_failing_healthcheck(10).1);
 
-        assert!(!topology
-            .reload_config_and_respawn(config, true)
-            .await
-            .unwrap());
-    });
+    assert!(!topology
+        .reload_config_and_respawn(config, true)
+        .await
+        .unwrap());
 }

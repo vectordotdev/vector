@@ -5,12 +5,15 @@ use futures01::{Future, Sink};
 use prost::Message;
 use tempfile::tempdir;
 use tracing::trace;
-use vector::event;
-use vector::test_util::{
-    random_events_with_stream, runtime, trace_init, wait_for_atomic_usize_sync, CountReceiver,
+use vector::{
+    buffers::BufferConfig,
+    config, event, runtime,
+    test_util::{
+        random_events_with_stream, runtime, start_topology, trace_init, wait_for_atomic_usize,
+        CountReceiver,
+    },
+    topology,
 };
-use vector::{buffers::BufferConfig, runtime};
-use vector::{config, test_util::start_topology, topology};
 
 mod support;
 
@@ -55,21 +58,28 @@ fn test_buffering() {
     };
 
     let mut rt = runtime();
+    let (topology, input_events) = rt.block_on_std(async move {
+        let (topology, _crash) = start_topology(config, false).await;
+        let (input_events, input_events_stream) =
+            random_events_with_stream(line_length, num_events);
 
-    let (topology, _crash) = rt.block_on_std(start_topology(config, false));
+        let _ = in_tx
+            .sink_map_err(|err| panic!(err))
+            .send_all(input_events_stream)
+            .compat()
+            .await
+            .unwrap();
 
-    let (input_events, input_events_stream) = random_events_with_stream(line_length, num_events);
-    let send = in_tx
-        .sink_map_err(|err| panic!(err))
-        .send_all(input_events_stream);
-    let _ = rt.block_on(send).unwrap();
+        // We need to wait for at least the source to process events.
+        // This is to avoid a race after we send all events, at that point two things
+        // can happen in any order, we reaching `terminate_abruptly` and source processing
+        // all of the events. We need for the source to process events before `terminate_abruptly`
+        // so we wait for that here.
+        wait_for_atomic_usize(source_event_counter, |x| x == num_events).await;
 
-    // We need to wait for at least the source to process events.
-    // This is to avoid a race after we send all events, at that point two things
-    // can happen in any order, we reaching `terminate_abruptly` and source processing
-    // all of the events. We need for the source to process events before `terminate_abruptly`
-    // so we wait for that here.
-    wait_for_atomic_usize_sync(source_event_counter, |x| x == num_events);
+        (topology, input_events)
+    });
+
     // Now we give it some time for the events to propagate to File.
     // This is to avoid a race after the source processes all events, at that point two things
     // can happen in any order, we reaching `terminate_abruptly` and events being written
@@ -158,20 +168,26 @@ fn test_max_size() {
     };
 
     let mut rt = runtime();
+    let topology = rt.block_on_std(async move {
+        let (topology, _crash) = start_topology(config, false).await;
 
-    let (topology, _crash) = rt.block_on_std(start_topology(config, false));
+        let _ = in_tx
+            .sink_map_err(|err| panic!(err))
+            .send_all(input_events_stream)
+            .compat()
+            .await
+            .unwrap();
 
-    let send = in_tx
-        .sink_map_err(|err| panic!(err))
-        .send_all(input_events_stream);
-    let _ = rt.block_on(send).unwrap();
+        // We need to wait for at least the source to process events.
+        // This is to avoid a race after we send all events, at that point two things
+        // can happen in any order, we reaching `terminate_abruptly` and source processing
+        // all of the events. We need for the source to process events before `terminate_abruptly`
+        // so we wait for that here.
+        wait_for_atomic_usize(source_event_counter, |x| x == num_events).await;
 
-    // We need to wait for at least the source to process events.
-    // This is to avoid a race after we send all events, at that point two things
-    // can happen in any order, we reaching `terminate_abruptly` and source processing
-    // all of the events. We need for the source to process events before `terminate_abruptly`
-    // so we wait for that here.
-    wait_for_atomic_usize_sync(source_event_counter, |x| x == num_events);
+        topology
+    });
+
     // Now we give it some time for the events to propagate to File.
     // This is to avoid a race after the source processes all events, at that point two things
     // can happen in any order, we reaching `terminate_abruptly` and events being written

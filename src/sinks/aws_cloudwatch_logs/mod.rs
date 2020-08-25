@@ -982,6 +982,7 @@ mod integration_tests {
     #[tokio::test]
     async fn cloudwatch_insert_out_of_range_timestamp() {
         trace_init();
+
         ensure_group().await;
 
         let stream_name = gen_name();
@@ -1098,9 +1099,10 @@ mod integration_tests {
         assert_eq!(output_lines, input_lines);
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn cloudwatch_insert_log_event_batched() {
         trace_init();
+
         ensure_group().await;
 
         let stream_name = gen_name();
@@ -1153,6 +1155,7 @@ mod integration_tests {
     #[tokio::test]
     async fn cloudwatch_insert_log_event_partitioned() {
         trace_init();
+
         ensure_group().await;
 
         let stream_name = gen_name();
@@ -1239,6 +1242,7 @@ mod integration_tests {
     #[tokio::test]
     async fn cloudwatch_healthcheck() {
         trace_init();
+
         ensure_group().await;
 
         let config = CloudwatchLogsSinkConfig {

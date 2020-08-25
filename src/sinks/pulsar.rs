@@ -226,57 +226,54 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::test_util::{random_lines_with_stream, random_string, runtime, trace_init};
+    use crate::test_util::{random_lines_with_stream, random_string, trace_init};
     use futures::{compat::Future01CompatExt, StreamExt};
     use pulsar::SubType;
 
-    #[test]
-    fn pulsar_happy() {
+    #[tokio::test]
+    async fn pulsar_happy() {
         trace_init();
 
-        let mut rt = runtime();
-        rt.block_on_std(async move {
-            let num_events = 1_000;
-            let (_input, events) = random_lines_with_stream(100, num_events);
+        let num_events = 1_000;
+        let (_input, events) = random_lines_with_stream(100, num_events);
 
-            let topic = format!("test-{}", random_string(10));
-            let cnf = PulsarSinkConfig {
-                address: "pulsar://127.0.0.1:6650".to_owned(),
-                topic: topic.clone(),
-                encoding: Encoding::Text.into(),
-                auth: None,
+        let topic = format!("test-{}", random_string(10));
+        let cnf = PulsarSinkConfig {
+            address: "pulsar://127.0.0.1:6650".to_owned(),
+            topic: topic.clone(),
+            encoding: Encoding::Text.into(),
+            auth: None,
+        };
+
+        let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.address, TokioExecutor)
+            .build()
+            .await
+            .unwrap();
+        let mut consumer = pulsar
+            .consumer()
+            .with_topic(&topic)
+            .with_consumer_name("VectorTestConsumer")
+            .with_subscription_type(SubType::Shared)
+            .with_subscription("VectorTestSub")
+            .build::<String>()
+            .await
+            .unwrap();
+
+        let (acker, ack_counter) = Acker::new_for_testing();
+        let producer = cnf.create_pulsar_producer().await.unwrap();
+        let sink = cnf.new_sink(producer, acker).unwrap();
+        let _ = sink.send_all(events).compat().await.unwrap();
+        assert_eq!(
+            ack_counter.load(std::sync::atomic::Ordering::Relaxed),
+            num_events
+        );
+
+        for _ in 0..num_events {
+            let msg = match consumer.next().await.unwrap() {
+                Ok(msg) => msg,
+                Err(err) => panic!("{:?}", err),
             };
-
-            let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.address, TokioExecutor)
-                .build()
-                .await
-                .unwrap();
-            let mut consumer = pulsar
-                .consumer()
-                .with_topic(&topic)
-                .with_consumer_name("VectorTestConsumer")
-                .with_subscription_type(SubType::Shared)
-                .with_subscription("VectorTestSub")
-                .build::<String>()
-                .await
-                .unwrap();
-
-            let (acker, ack_counter) = Acker::new_for_testing();
-            let producer = cnf.create_pulsar_producer().await.unwrap();
-            let sink = cnf.new_sink(producer, acker).unwrap();
-            let _ = sink.send_all(events).compat().await.unwrap();
-            assert_eq!(
-                ack_counter.load(std::sync::atomic::Ordering::Relaxed),
-                num_events
-            );
-
-            for _ in 0..num_events {
-                let msg = match consumer.next().await.unwrap() {
-                    Ok(msg) => msg,
-                    Err(err) => panic!("{:?}", err),
-                };
-                consumer.ack(&msg).await.unwrap();
-            }
-        });
+            consumer.ack(&msg).await.unwrap();
+        }
     }
 }

@@ -322,16 +322,16 @@ mod tests {
     use crate::{
         event,
         test_util::{
-            self, lines_from_file, lines_from_gzip_file, random_events_with_stream,
-            random_lines_with_stream, temp_dir, temp_file,
+            lines_from_file, lines_from_gzip_file, random_events_with_stream,
+            random_lines_with_stream, temp_dir, temp_file, trace_init,
         },
     };
     use futures::stream;
     use std::convert::TryInto;
 
-    #[test]
-    fn single_partition() {
-        test_util::trace_init();
+    #[tokio::test]
+    async fn single_partition() {
+        trace_init();
 
         let template = temp_file();
 
@@ -346,11 +346,7 @@ mod tests {
         let (input, _) = random_lines_with_stream(100, 64);
 
         let events = stream::iter(input.clone().into_iter().map(Event::from));
-
-        let mut rt = crate::test_util::runtime();
-        let _ = rt
-            .block_on_std(async move { sink.run(events).await })
-            .unwrap();
+        sink.run(events).await.unwrap();
 
         let output = lines_from_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -358,9 +354,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn single_partition_gzip() {
-        test_util::trace_init();
+    #[tokio::test]
+    async fn single_partition_gzip() {
+        trace_init();
 
         let template = temp_file();
 
@@ -376,10 +372,7 @@ mod tests {
 
         let events = stream::iter(input.clone().into_iter().map(Event::from));
 
-        let mut rt = crate::test_util::runtime();
-        let _ = rt
-            .block_on_std(async move { sink.run(events).await })
-            .unwrap();
+        sink.run(events).await.unwrap();
 
         let output = lines_from_gzip_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -387,9 +380,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn many_partitions() {
-        test_util::trace_init();
+    #[tokio::test]
+    async fn many_partitions() {
+        trace_init();
 
         let directory = temp_dir();
 
@@ -426,10 +419,7 @@ mod tests {
         input[7].as_mut_log().insert("level", "error");
 
         let events = stream::iter(input.clone().into_iter());
-        let mut rt = crate::test_util::runtime();
-        let _ = rt
-            .block_on_std(async move { sink.run(events).await })
-            .unwrap();
+        sink.run(events).await.unwrap();
 
         let output = vec![
             lines_from_file(&directory.join("warnings-2019-26-07.log")),
@@ -478,7 +468,7 @@ mod tests {
     async fn reopening() {
         use pretty_assertions::assert_eq;
 
-        test_util::trace_init();
+        trace_init();
 
         let template = temp_file();
 

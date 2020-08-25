@@ -217,10 +217,12 @@ async fn healthcheck(config: LogdnaConfig, mut client: HttpClient) -> crate::Res
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::SinkConfig;
-    use crate::event::Event;
-    use crate::sinks::util::test::{build_test_server, load_sink};
-    use crate::test_util;
+    use crate::{
+        config::SinkConfig,
+        event::Event,
+        sinks::util::test::{build_test_server, load_sink},
+        test_util::{next_addr, random_lines, trace_init},
+    };
     use futures::compat::Future01CompatExt;
     use futures01::{Sink, Stream};
     use serde_json::json;
@@ -257,7 +259,8 @@ mod tests {
 
     #[tokio::test]
     async fn smoke() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let (mut config, cx) = load_sink::<LogdnaConfig>(
             r#"
             api_key = "mylogtoken"
@@ -272,7 +275,7 @@ mod tests {
         // Make sure we can build the config
         let _ = config.build(cx.clone()).unwrap();
 
-        let addr = test_util::next_addr();
+        let addr = next_addr();
         // Swap out the host so we can force send it
         // to our local server
         let host = format!("http://{}", addr).parse::<http::Uri>().unwrap();
@@ -283,7 +286,7 @@ mod tests {
         let (rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
-        let lines = test_util::random_lines(100).take(10).collect::<Vec<_>>();
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
         let mut events = Vec::new();
 
         // Create 10 events where the first one contains custom
