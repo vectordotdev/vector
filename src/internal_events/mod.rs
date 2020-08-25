@@ -11,7 +11,8 @@ mod heartbeat;
 mod http;
 #[cfg(all(unix, feature = "sources-journald"))]
 mod journald;
-mod json;
+#[cfg(feature = "transforms-json_parser")]
+mod json_parser;
 #[cfg(feature = "sources-kafka")]
 mod kafka;
 #[cfg(feature = "sources-kubernetes-logs")]
@@ -54,7 +55,8 @@ pub use self::heartbeat::*;
 pub use self::http::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
-pub use self::json::*;
+#[cfg(feature = "transforms-json_parser")]
+pub(crate) use self::json_parser::*;
 #[cfg(feature = "sources-kafka")]
 pub use self::kafka::*;
 #[cfg(feature = "sources-kubernetes-logs")]
