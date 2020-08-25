@@ -28,6 +28,8 @@ jobs:
   checks:
     name: Checks
     runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
         with:
@@ -55,6 +57,8 @@ jobs:
   check-component-features:
     name: Component Features - Linux
     runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2

@@ -60,6 +60,8 @@ jobs:
   build-deb-package:
     name: Build .deb package
     runs-on: ubuntu-latest
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - run: make package-deb-x86_64
@@ -77,6 +79,8 @@ jobs:
   compute-k8s-test-plan:
     name: Compute K8s test plan
     runs-on: ubuntu-latest
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -127,6 +131,8 @@ jobs:
   test-e2e-kubernetes:
     name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime }} (${{ matrix.kubernetes_version.role }})
     runs-on: ubuntu-latest
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     needs:
       - build-deb-package
       - compute-k8s-test-plan
