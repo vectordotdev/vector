@@ -172,7 +172,7 @@ Currently Vector uses Github Actions to run tests. The workflows are defined in
 
 Tests are run for all changes except those that have the label:
 
-```
+```text
 ci-condition: skip
 ```
 
