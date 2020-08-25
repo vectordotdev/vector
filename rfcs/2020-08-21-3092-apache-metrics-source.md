@@ -115,6 +115,11 @@ I figure we probably don't want metrics for:
 
 - Load (should be handled by a `cpu` or similar metrics source)
 
+Metrics will be labeled with:
+
+- `endpoint` the full endpoint (sans any basic auth credentials)
+- `host` the hostname and port portions of the endpoint
+
 ## Doc-level Proposal
 
 Users will be instructed to setup
