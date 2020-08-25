@@ -33,18 +33,6 @@ description = """\
 Number of threads to use for processing (default is number of available cores).
 """
 
-[env_vars.VECTOR_VERBOSE]
-type = "bool"
-description = """\
-Enable more detailed internal logging.
-"""
-
-[env_vars.VECTOR_QUIET]
-type = "bool"
-description = """\
-Reduce detail of internal logging. Overrides VECTOR_VERBOSE.
-"""
-
 [env_vars.VECTOR_WATCH_CONFIG]
 type = "bool"
 description = """\
