@@ -1,7 +1,6 @@
 use super::State;
 use crate::{emit, internal_events::InternalEvent};
 use metrics::counter;
-#[cfg(feature = "wasm-timings")]
 use std::time::{Duration, Instant};
 use vector_wasm::Role;
 
@@ -27,31 +26,29 @@ impl WasmCompilationProgress {
         emit!(me.clone());
         me
     }
+
     pub fn complete(self) {
         emit!(Self {
             state: State::Completed,
-            role: self.role,
-            error: self.error,
-            epoch: self.epoch,
-            elapsed: self.epoch.elapsed()
+            elapsed: self.epoch.elapsed(),
+            ..self
         })
     }
+
     pub fn error(self, error: String) {
         emit!(Self {
             state: State::Cached,
-            role: self.role,
             error: Some(error),
-            epoch: self.epoch,
-            elapsed: self.epoch.elapsed()
+            elapsed: self.epoch.elapsed(),
+            ..self
         })
     }
+
     pub fn cached(self) {
         emit!(Self {
             state: State::Cached,
-            role: self.role,
-            error: self.error,
-            epoch: self.epoch,
-            elapsed: self.epoch.elapsed()
+            elapsed: self.epoch.elapsed(),
+            ..self
         })
     }
 }
@@ -59,24 +56,18 @@ impl WasmCompilationProgress {
 impl InternalEvent for WasmCompilationProgress {
     fn emit_logs(&self) {
         match self.state {
-            State::Beginning | State::Cached | State::Completed => event!(
-                tracing::Level::INFO,
-                {
-                    state = self.state.as_const_str(),
-                    role = self.role.as_const_str(),
-                    elapsed_micros = self.elapsed.as_micros() as u64,
-                },
+            State::Beginning | State::Cached | State::Completed => info!(
+                state = self.state.as_const_str(),
+                role = self.role.as_const_str(),
+                elapsed_micros = self.elapsed.as_micros() as u64,
                 "WASM Compilation via `lucet`.",
             ),
-            State::Errored => event!(
-                tracing::Level::ERROR,
-                {
-                    state = self.state.as_const_str(),
-                    role = self.role.as_const_str(),
-                    error = tracing::field::display(self.error.as_ref().unwrap_or(&String::from(""))),
-                    elapsed_micros = self.elapsed.as_micros() as u64,
-                    // We do not rate limit this since it should never spam, it's a oneshot at startup.
-                },
+            State::Errored => error!(
+                state = self.state.as_const_str(),
+                role = self.role.as_const_str(),
+                error = tracing::field::display(self.error.as_ref().unwrap_or(&String::from(""))),
+                elapsed_micros = self.elapsed.as_micros() as u64,
+                // We do not rate limit this since it should never spam, it's a oneshot at startup.
                 "WASM Compilation via `lucet`.",
             ),
         }

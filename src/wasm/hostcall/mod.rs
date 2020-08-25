@@ -95,7 +95,8 @@ mod wrapped_for_ffi {
     #[lucet_hostcall]
     #[no_mangle]
     pub extern "C" fn register(vmctx: &Vmctx, data: u32, length: u32) {
-        let internal_event = internal_events::WasmHostcallProgress::begin(Role::Transform, "emit");
+        let internal_event =
+            internal_events::WasmHostcallProgress::begin(Role::Transform, "register");
         match super::register(vmctx, data, length) {
             Ok(_) => internal_event.complete(),
             Err(e) => {
@@ -107,8 +108,7 @@ mod wrapped_for_ffi {
     #[lucet_hostcall]
     #[no_mangle]
     pub extern "C" fn emit(vmctx: &Vmctx, data: u32, length: u32) -> u32 {
-        let internal_event =
-            internal_events::WasmHostcallProgress::begin(Role::Transform, "register");
+        let internal_event = internal_events::WasmHostcallProgress::begin(Role::Transform, "emit");
         match super::emit(vmctx, data, length) {
             Ok(retval) => {
                 internal_event.complete();
