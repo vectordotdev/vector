@@ -238,10 +238,10 @@ impl Service<Vec<u8>> for StatsdSvc {
     }
 }
 
-/*
 #[cfg(test)]
 mod test {
     use super::*;
+    /*
     use crate::{
         buffers::Acker,
         event::{metric::MetricKind, metric::MetricValue, metric::StatisticKind, Metric},
@@ -254,6 +254,7 @@ mod test {
     use futures01::{sync::mpsc, Sink};
     use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
+    */
     #[cfg(feature = "sources-statsd")]
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
 
@@ -443,4 +444,3 @@ mod test {
     }
     */
 }
-*/
