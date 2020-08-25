@@ -280,7 +280,7 @@ mod integration_tests {
             elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
             util::BatchConfig,
         },
-        test_util::{random_events_with_stream, random_string, runtime},
+        test_util::{random_events_with_stream, random_string},
     };
     use futures::compat::Future01CompatExt;
     use futures01::Sink;
@@ -292,8 +292,8 @@ mod integration_tests {
     use serde_json::{json, Value};
     use std::{thread, time::Duration};
 
-    #[test]
-    fn firehose_put_records() {
+    #[tokio::test]
+    async fn firehose_put_records() {
         let stream = gen_stream();
 
         let region = Region::Custom {
@@ -301,8 +301,7 @@ mod integration_tests {
             endpoint: "http://localhost:4573".into(),
         };
 
-        let mut rt = runtime();
-        rt.block_on_std(ensure_stream(region, stream.clone()));
+        ensure_stream(region, stream.clone()).await;
 
         let config = KinesisFirehoseSinkConfig {
             stream_name: stream.clone(),
@@ -328,45 +327,43 @@ mod integration_tests {
 
         let (input, events) = random_events_with_stream(100, 100);
 
-        rt.block_on_std(async move {
-            let _ = sink.send_all(events).compat().await.unwrap();
+        let _ = sink.send_all(events).compat().await.unwrap();
 
-            thread::sleep(Duration::from_secs(1));
+        thread::sleep(Duration::from_secs(1));
 
-            let config = ElasticSearchConfig {
-                auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
-                host: "http://localhost:4571".into(),
-                index: Some(stream.clone()),
-                ..Default::default()
-            };
-            let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+        let config = ElasticSearchConfig {
+            auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
+            host: "http://localhost:4571".into(),
+            index: Some(stream.clone()),
+            ..Default::default()
+        };
+        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
-            let client = reqwest::Client::builder()
-                .build()
-                .expect("Could not build HTTP client");
+        let client = reqwest::Client::builder()
+            .build()
+            .expect("Could not build HTTP client");
 
-            let response = client
-                .get(&format!("{}/{}/_search", common.base_url, stream))
-                .json(&json!({
-                    "query": { "query_string": { "query": "*" } }
-                }))
-                .send()
-                .await
-                .unwrap()
-                .json::<elastic_responses::search::SearchResponse<Value>>()
-                .await
-                .unwrap();
+        let response = client
+            .get(&format!("{}/{}/_search", common.base_url, stream))
+            .json(&json!({
+                "query": { "query_string": { "query": "*" } }
+            }))
+            .send()
+            .await
+            .unwrap()
+            .json::<elastic_responses::search::SearchResponse<Value>>()
+            .await
+            .unwrap();
 
-            assert_eq!(input.len() as u64, response.total());
-            let input = input
-                .into_iter()
-                .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
-                .collect::<Vec<_>>();
-            for hit in response.into_hits() {
-                let event = hit.into_document().unwrap();
-                assert!(input.contains(&event));
-            }
-        });
+        assert_eq!(input.len() as u64, response.total());
+        let input = input
+            .into_iter()
+            .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
+            .collect::<Vec<_>>();
+        for hit in response.into_hits() {
+            let event = hit.into_document().unwrap();
+            assert!(input.contains(&event));
+        }
     }
 
     async fn ensure_stream(region: Region, delivery_stream_name: String) {

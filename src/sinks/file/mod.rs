@@ -85,17 +85,32 @@ impl OutFile {
         }
     }
 
+    async fn sync_all(&mut self) -> Result<(), std::io::Error> {
+        match self {
+            OutFile::Regular(file) => file.sync_all().await,
+            OutFile::Gzip(gzip) => gzip.get_mut().sync_all().await,
+        }
+    }
+
     async fn shutdown(&mut self) -> Result<(), std::io::Error> {
         match self {
             OutFile::Regular(file) => file.shutdown().await,
             OutFile::Gzip(gzip) => gzip.shutdown().await,
         }
     }
+
     async fn write_all(&mut self, src: &[u8]) -> Result<(), std::io::Error> {
         match self {
             OutFile::Regular(file) => file.write_all(src).await,
             OutFile::Gzip(gzip) => gzip.write_all(src).await,
         }
+    }
+
+    /// Shutdowns by flushing data, writing headers, and syncing all of that
+    /// data and metadata to the filesystem.
+    async fn close(&mut self) -> Result<(), std::io::Error> {
+        self.shutdown().await?;
+        self.sync_all().await
     }
 }
 
@@ -170,14 +185,13 @@ impl FileSink {
                             // If we got `None` - terminate the processing.
                             debug!(message = "Receiver exhausted, terminating the processing loop.");
 
-                            // Shutdown all the open files. This will flush any
-                            // headers or anything pending.
-                            debug!(message = "Flushing all the open files");
-                            for (path, file) in self.files.iterate_map() {
-                                if let Err(error) = file.shutdown().await {
-                                    error!(message = "Failed to flush file.", ?path, %error);
+                            // Close all the open files.
+                            debug!(message = "Closing all the open files");
+                            for (path, file) in self.files.iter_mut() {
+                                if let Err(error) = file.close().await {
+                                    error!(message = "Failed to close file.", ?path, %error);
                                 } else{
-                                    trace!(message = "Successfully flushed file", ?path);
+                                    trace!(message = "Successfully closed file", ?path);
                                 }
                             }
 
@@ -194,8 +208,8 @@ impl FileSink {
                         Some(Ok((mut expired_file, path))) => {
                             // We got an expired file. All we really want is to
                             // flush and close it.
-                            if let Err(error) = expired_file.shutdown().await {
-                                error!(message = "Failed to flush file.", ?path, %error);
+                            if let Err(error) = expired_file.close().await {
+                                error!(message = "Failed to close file.", ?path, %error);
                             }
                             drop(expired_file); // ignore close error
                         }
@@ -308,16 +322,16 @@ mod tests {
     use crate::{
         event,
         test_util::{
-            self, lines_from_file, lines_from_gzip_file, random_events_with_stream,
-            random_lines_with_stream, temp_dir, temp_file,
+            lines_from_file, lines_from_gzip_file, random_events_with_stream,
+            random_lines_with_stream, temp_dir, temp_file, trace_init,
         },
     };
     use futures::stream;
     use std::convert::TryInto;
 
-    #[test]
-    fn single_partition() {
-        test_util::trace_init();
+    #[tokio::test]
+    async fn single_partition() {
+        trace_init();
 
         let template = temp_file();
 
@@ -332,11 +346,7 @@ mod tests {
         let (input, _) = random_lines_with_stream(100, 64);
 
         let events = stream::iter(input.clone().into_iter().map(Event::from));
-
-        let mut rt = crate::test_util::runtime();
-        let _ = rt
-            .block_on_std(async move { sink.run(events).await })
-            .unwrap();
+        sink.run(events).await.unwrap();
 
         let output = lines_from_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -344,9 +354,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn single_partition_gzip() {
-        test_util::trace_init();
+    #[tokio::test]
+    async fn single_partition_gzip() {
+        trace_init();
 
         let template = temp_file();
 
@@ -362,10 +372,7 @@ mod tests {
 
         let events = stream::iter(input.clone().into_iter().map(Event::from));
 
-        let mut rt = crate::test_util::runtime();
-        let _ = rt
-            .block_on_std(async move { sink.run(events).await })
-            .unwrap();
+        sink.run(events).await.unwrap();
 
         let output = lines_from_gzip_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -373,9 +380,9 @@ mod tests {
         }
     }
 
-    #[test]
-    fn many_partitions() {
-        test_util::trace_init();
+    #[tokio::test]
+    async fn many_partitions() {
+        trace_init();
 
         let directory = temp_dir();
 
@@ -412,10 +419,7 @@ mod tests {
         input[7].as_mut_log().insert("level", "error");
 
         let events = stream::iter(input.clone().into_iter());
-        let mut rt = crate::test_util::runtime();
-        let _ = rt
-            .block_on_std(async move { sink.run(events).await })
-            .unwrap();
+        sink.run(events).await.unwrap();
 
         let output = vec![
             lines_from_file(&directory.join("warnings-2019-26-07.log")),
@@ -464,7 +468,7 @@ mod tests {
     async fn reopening() {
         use pretty_assertions::assert_eq;
 
-        test_util::trace_init();
+        trace_init();
 
         let template = temp_file();
 
