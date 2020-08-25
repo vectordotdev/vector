@@ -10,15 +10,6 @@ use chrono::{DateTime, Utc};
 use tokio::stream::{Stream, StreamExt};
 use tokio::time::Duration;
 
-#[derive(Clone)]
-pub struct Provider {}
-
-impl Provider {
-    pub fn new() -> Self {
-        Provider {}
-    }
-}
-
 #[SimpleObject]
 struct Heartbeat {
     utc: DateTime<Utc>,
@@ -37,6 +28,7 @@ impl Metric {
         self.name.clone()
     }
 
+    /// Metric timestamp
     async fn timestamp(&self) -> Option<DateTime<Utc>> {
         self.timestamp
     }
@@ -64,6 +56,7 @@ impl Subscription {
         tokio::time::interval(Duration::from_millis(interval as u64)).map(|_| Heartbeat::new())
     }
 
+    /// Returns all Vector metrics, aggregated at the provided millisecond interval
     async fn metrics(
         &self,
         #[arg(validator(IntRange(min = "100", max = "60_000")))] interval: i32,
@@ -77,6 +70,7 @@ pub fn build_schema() -> SchemaBuilder<Query, EmptyMutation, Subscription> {
     Schema::build(Query, EmptyMutation, Subscription)
 }
 
+/// Returns a stream of `Metric`s, collected at the provided millisecond interval
 fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
     let controller = metrics::get_controller().unwrap();
     let mut interval = tokio::time::interval(Duration::from_millis(interval as u64));

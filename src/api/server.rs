@@ -73,9 +73,7 @@ fn make_routes() -> BoxedFilter<(impl Reply,)> {
     let health_route = warp::path("health").and_then(handler::health);
 
     // Build the GraphQL schema
-    let schema = schema::build_schema()
-        .data(schema::Provider::new())
-        .finish();
+    let schema = schema::build_schema().finish();
 
     // GraphQL POST handler
     let graphql_post = async_graphql_warp::graphql(schema.clone()).and_then(
