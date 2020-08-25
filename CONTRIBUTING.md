@@ -170,8 +170,14 @@ aligns better with our process.
 Currently Vector uses Github Actions to run tests. The workflows are defined in
 `.github/workflows`.
 
-Tests are run for all changes, and Github Actions is responsible for releasing
-updated versions of Vector through various channels.
+Tests are run for all changes except those that have the label:
+
+```
+ci-condition: skip
+```
+
+Github Actions is responsible for releasing updated versions of Vector through
+various channels.
 
 Some long running tests are only run daily, rather than on every pull request.
 If needed, an administrator can kick off these tests manually via:
