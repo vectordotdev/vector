@@ -20,8 +20,10 @@ use crate::{
     test_util::{start_topology, stats::LevelTimeHistogram},
 };
 use core::task::Context;
-use futures::compat::Future01CompatExt;
-use futures::future::{pending, BoxFuture};
+use futures::{
+    compat::Future01CompatExt,
+    future::{pending, BoxFuture},
+};
 use futures01::{future, Sink};
 use rand::{distributions::Exp1, prelude::*};
 use serde::Serialize;

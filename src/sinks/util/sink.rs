@@ -775,7 +775,7 @@ mod tests {
         tokio::time::resume();
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn batch_sink_acking_sequential() {
         let (acker, ack_counter) = Acker::new_for_testing();
 
@@ -865,7 +865,7 @@ mod tests {
         });
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn batch_sink_buffers_messages_until_limit() {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
@@ -897,7 +897,7 @@ mod tests {
         );
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn batch_sink_flushes_below_min_on_close() {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
@@ -952,7 +952,7 @@ mod tests {
         });
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn partition_batch_sink_buffers_messages_until_limit() {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
@@ -983,7 +983,7 @@ mod tests {
         );
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn partition_batch_sink_buffers_by_partition_buffer_size_one() {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
@@ -1009,7 +1009,7 @@ mod tests {
         assert_eq!(&*output, &vec![vec![Partitions::A], vec![Partitions::B]]);
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn partition_batch_sink_buffers_by_partition_buffer_size_two() {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));

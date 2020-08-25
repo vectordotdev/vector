@@ -1,8 +1,7 @@
-use futures01::future::{ExecuteError, Executor, Future};
+use futures01::future::Future;
 use std::io;
-use std::pin::Pin;
 use tokio::task::JoinHandle;
-use tokio_compat::runtime::{Builder, Runtime as TokioRuntime, TaskExecutor as TokioTaskExecutor};
+use tokio_compat::runtime::{Builder, Runtime as TokioRuntime};
 
 pub struct Runtime {
     rt: TokioRuntime,
@@ -33,26 +32,12 @@ impl Runtime {
         self
     }
 
-    pub fn spawn_std<F>(&mut self, future: F) -> &mut Self
-    where
-        F: std::future::Future<Output = ()> + Send + 'static,
-    {
-        self.rt.spawn_std(future);
-        self
-    }
-
     pub fn spawn_handle_std<F>(&mut self, future: F) -> JoinHandle<F::Output>
     where
         F: std::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
         self.rt.spawn_handle_std(future)
-    }
-
-    pub fn executor(&self) -> TaskExecutor {
-        TaskExecutor {
-            inner: self.rt.executor(),
-        }
     }
 
     pub fn block_on<F, R, E>(&mut self, future: F) -> Result<R, E>
@@ -80,42 +65,3 @@ impl Runtime {
         self.rt.shutdown_now()
     }
 }
-
-#[derive(Clone, Debug)]
-pub struct TaskExecutor {
-    inner: TokioTaskExecutor,
-}
-
-impl TaskExecutor {
-    pub fn spawn(&self, f: impl Future<Item = (), Error = ()> + Send + 'static) {
-        self.execute(f).unwrap()
-    }
-
-    pub fn spawn_std(&self, f: impl std::future::Future<Output = ()> + Send + 'static) {
-        use futures::future::{FutureExt, TryFutureExt};
-
-        self.spawn(f.unit_error().boxed().compat());
-    }
-}
-
-impl<F> Executor<F> for TaskExecutor
-where
-    F: Future<Item = (), Error = ()> + Send + 'static,
-{
-    fn execute(&self, future: F) -> Result<(), ExecuteError<F>> {
-        self.inner.execute(future)
-    }
-}
-
-pub trait FutureExt: futures::TryFuture {
-    /// Used to compat a `!Unpin` type from 0.3 futures to 0.1
-    fn boxed_compat(self) -> futures::compat::Compat<Pin<Box<Self>>>
-    where
-        Self: Sized,
-    {
-        let fut = Box::pin(self);
-        futures::compat::Compat::new(fut)
-    }
-}
-
-impl<T: futures::TryFuture> FutureExt for T {}
