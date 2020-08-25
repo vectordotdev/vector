@@ -1,7 +1,4 @@
-use crate::{
-    config::{self, Config},
-    topology::unit_test::UnitTest,
-};
+use crate::{config, topology::unit_test::UnitTest};
 use colored::*;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -15,13 +12,12 @@ pub struct Opts {
 }
 
 fn build_tests(path: PathBuf) -> Result<Vec<UnitTest>, Vec<String>> {
-    // pass an empty config as the previous to avoid trying to reset globals
-    let mut config = match config::load_from_paths(&[path], Config::empty()) {
-        Err(load_errs) => {
-            return Err(load_errs);
-        }
-        Ok(c) => c,
-    };
+    let mut config = config::load_from_paths(&[path])?;
+
+    // Ignore failures on calls other than the first
+    crate::event::LOG_SCHEMA
+        .set(config.global.log_schema.clone())
+        .ok();
 
     crate::topology::unit_test::build_unit_tests(&mut config)
 }

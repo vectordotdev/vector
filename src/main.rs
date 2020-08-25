@@ -105,11 +105,15 @@ fn main() {
             path = ?config_paths
         );
 
-        let config = config::load_from_paths(&config_paths, None)
+        let config = config::load_from_paths(&config_paths)
             .map_err(handle_config_errors)
             .unwrap_or_else(|()| {
                 std::process::exit(exitcode::CONFIG);
             });
+
+        vector::event::LOG_SCHEMA
+            .set(config.global.log_schema.clone())
+            .expect("Couldn't set schema");
 
         let diff = ConfigDiff::initial(&config);
         let pieces = topology::validate(&config, &diff).await.unwrap_or_else(|| {
@@ -134,7 +138,7 @@ fn main() {
                 Some(signal) = signals.next() => {
                     if signal == SignalTo::Reload {
                         // Reload config
-                        let new_config = config::load_from_paths(&config_paths, config.clone()).map_err(handle_config_errors).ok();
+                        let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
 
                         if let Some(new_config) = new_config {
                             match topology

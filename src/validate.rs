@@ -92,7 +92,7 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Result<Config, Option<Co
         return Err(None);
     };
 
-    match config::load_from_paths(&paths, None) {
+    match config::load_from_paths(&paths) {
         Ok(config) => {
             fmt.success(format!("Loaded {:?}", &paths));
             Ok(config)

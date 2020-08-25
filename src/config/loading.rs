@@ -54,11 +54,7 @@ pub fn process_paths(config_paths: &[PathBuf]) -> Option<Vec<PathBuf>> {
     Some(paths)
 }
 
-pub fn load_from_paths(
-    config_paths: &[PathBuf],
-    old: impl Into<Option<Config>>,
-) -> Result<Config, Vec<String>> {
-    let old = old.into();
+pub fn load_from_paths(config_paths: &[PathBuf]) -> Result<Config, Vec<String>> {
     let mut config = Config::empty();
     let mut errors = Vec::new();
 
@@ -79,11 +75,6 @@ pub fn load_from_paths(
     }
 
     if errors.is_empty() {
-        if old.is_none() {
-            crate::event::LOG_SCHEMA
-                .set(config.global.log_schema.clone())
-                .expect("Couldn't set schema");
-        }
         Ok(config)
     } else {
         Err(errors)
