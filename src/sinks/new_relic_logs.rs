@@ -270,7 +270,7 @@ mod tests {
         assert!(http_config.auth.is_none());
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn new_relic_logs_happy_path() {
         let in_addr = next_addr();
 

@@ -425,11 +425,14 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::config::SinkContext;
-    use crate::event::{metric::StatisticKind, Event};
-    use crate::region::RegionOrEndpoint;
-    use crate::test_util::{random_string, runtime};
+    use crate::{
+        config::SinkContext,
+        event::{metric::StatisticKind, Event},
+        region::RegionOrEndpoint,
+        test_util::random_string,
+    };
     use chrono::offset::TimeZone;
+    use futures::compat::Future01CompatExt;
     use futures01::{stream, Sink};
 
     fn config() -> CloudWatchMetricsSinkConfig {
@@ -440,17 +443,15 @@ mod integration_tests {
         }
     }
 
-    #[test]
-    fn cloudwatch_metrics_healthchecks() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn cloudwatch_metrics_healthchecks() {
         let config = config();
         let client = config.create_client(Resolver).unwrap();
-        let _ = rt.block_on_std(config.healthcheck(client));
+        config.healthcheck(client).await.unwrap();
     }
 
-    #[test]
-    fn cloudwatch_metrics_put_data() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn cloudwatch_metrics_put_data() {
         let cx = SinkContext::new_test();
         let config = config();
         let client = config.create_client(cx.resolver()).unwrap();
@@ -507,7 +508,6 @@ mod integration_tests {
 
         let stream = stream::iter_ok(events.clone().into_iter());
 
-        let pump = sink.send_all(stream);
-        let _ = rt.block_on(pump).unwrap();
+        let _ = sink.send_all(stream).compat().await.unwrap();
     }
 }
