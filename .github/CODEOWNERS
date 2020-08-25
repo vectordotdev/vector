@@ -1,6 +1,8 @@
 # https://help.github.com/articles/about-codeowners/
 
 /distribution/ @a-rodin
+/distribution/kubernetes/ @MOZGIII
+/distribution/helm/ @MOZGIII
 
 /proto/ @lukesteensen
 
@@ -13,8 +15,13 @@
 /scripts/release-* @a-rodin
 /scripts/upgrade-* @a-rodin
 /scripts/ci-setup-minikube.sh @MOZGIII
+/scripts/ci-setup-helm.sh @MOZGIII
+/scripts/release-helm.sh @MOZGIII
+/scripts/deploy-kubernetes-test.sh @MOZGIII
+/scripts/test-e2e-kubernetes.sh @MOZGIII
 
 /src/buffers/ @a-rodin
+/src/kubernetes/ @MOZGII
 
 /src/generate.rs @Jeffail
 /src/list.rs @Jeffail
@@ -82,6 +89,13 @@
 /lib/file-source/src/paths_provider/mod.rs @MOZGIII
 /lib/file-source/src/paths_provider/glob.rs @MOZGIII
 
+/lib/k8s-test-framework/ @MOZGIII
+
 /tests/buffering.rs @MOZGIII
+/tests/kubernetes-e2e.rs @MOZGIII
 
 /.github/workflows/e2e.yml @MOZGIII
+
+/skaffold/ @MOZGIII
+/skaffold.yaml @MOZGIII
+/kustomization.yaml @MOZGIII
