@@ -157,6 +157,9 @@ pub use self::remove_fields::*;
 pub use self::remove_tags::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub use self::rename_fields::*;
+pub use self::regex::*;
+#[cfg(feature = "sinks-sematext")]
+pub use self::sematext_metrics::*;
 pub use self::sampler::*;
 #[cfg(any(feature = "sources-socket", feature = "sources-syslog"))]
 pub(crate) use self::socket::*;

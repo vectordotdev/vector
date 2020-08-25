@@ -25,7 +25,7 @@ pub enum Field {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum ProtocolVersion {
+pub(crate) enum ProtocolVersion {
     V1,
     V2,
 }
@@ -168,7 +168,7 @@ fn healthcheck(
 }
 
 // https://v2.docs.influxdata.com/v2.0/reference/syntax/line-protocol/
-pub fn influx_line_protocol(
+pub(crate) fn influx_line_protocol(
     protocol_version: ProtocolVersion,
     measurement: String,
     metric_type: &str,

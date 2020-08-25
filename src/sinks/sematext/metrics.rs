@@ -1,19 +1,20 @@
+use super::Region;
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricValue},
-    built_info,
+    internal_events::SematextMetricsInvalidMetric,
     sinks::influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
-    sinks::sematext::Region,
     sinks::util::{
         http::{HttpBatchService, HttpClient, HttpRetryLogic},
         service2::TowerRequestConfig,
         BatchConfig, BatchSettings, MetricBuffer,
     },
     sinks::{Healthcheck, HealthcheckError, RouterSink},
+    vector_version,
 };
 use futures::future::{ready, BoxFuture};
-use futures::TryFutureExt;
-use futures01::{Future, Sink};
+use futures::{FutureExt, TryFutureExt};
+use futures01::Sink;
 use http::{StatusCode, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -28,7 +29,7 @@ struct SematextMetricsSvc {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
-pub struct SematextMetricsConfig {
+struct SematextMetricsConfig {
     pub region: Option<Region>,
     pub host: Option<String>,
     pub token: String,
@@ -42,33 +43,24 @@ inventory::submit! {
     SinkDescription::new_without_default::<SematextMetricsConfig>("sematext_metrics")
 }
 
-/// Return a url safe version of Vector to send to Sematext.
-fn vector_version() -> String {
-    #[cfg(feature = "nightly")]
-    let pkg_version = format!("vector-{}-nightly", built_info::PKG_VERSION);
+async fn healthcheck(endpoint: String, mut client: HttpClient) -> crate::Result<()> {
+    // Note, this is not the most ideal endpoint for a healthcheck.
+    // Sematext will hopefully be setting up a 'ping' endpoint that we can use in due course.
+    let uri = format!(
+        "{}/write?db=metrics&v=vector-{}",
+        endpoint,
+        vector_version()
+    );
 
-    #[cfg(not(feature = "nightly"))]
-    let pkg_version = format!("vector-{}", built_info::PKG_VERSION);
-    
-    pkg_version
-}
-
-fn healthcheck(endpoint: &str, mut client: HttpClient) -> crate::Result<Healthcheck> {
-    let uri = format!("{}/write?db=metrics&v={}", endpoint, vector_version());
-    
     let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
-    let healthcheck = client
-        .call(request)
-        .compat()
-        .map_err(|err| err.into())
-        .and_then(|response| match response.status() {
-            StatusCode::OK => Ok(()),
-            StatusCode::NO_CONTENT => Ok(()),
-            other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
-        });
+    let response = client.send(request).await?;
 
-    Ok(Box::new(healthcheck))
+    match response.status() {
+        StatusCode::OK => Ok(()),
+        StatusCode::NO_CONTENT => Ok(()),
+        other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
+    }
 }
 
 #[typetag::serde(name = "sematext_metrics")]
@@ -88,10 +80,10 @@ impl SinkConfig for SematextMetricsConfig {
             }
         };
 
-        let healthcheck = healthcheck(&host, client.clone())?;
+        let healthcheck = healthcheck(host.clone(), client.clone()).boxed().compat();
         let sink = SematextMetricsSvc::new(self.clone(), write_uri(&host)?, cx, client)?;
 
-        Ok((sink, healthcheck))
+        Ok((sink, Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {
@@ -116,7 +108,7 @@ fn write_uri(endpoint: &str) -> crate::Result<Uri> {
         "write",
         &[
             ("db", Some("metrics".into())),
-            ("v", Some(vector_version())),
+            ("v", Some(format!("vector-{}", vector_version()))),
             ("precision", Some("ns".into())),
         ],
     )
@@ -236,10 +228,10 @@ fn encode_events(token: &str, events: Vec<Metric>) -> String {
                 );
             }
             _ => {
-                warn!(
-                    "invalid metric sent to sematext metrics sink ({:?}) ({:?})",
-                    event.kind, event.value
-                );
+                emit!(SematextMetricsInvalidMetric {
+                    value: event.value,
+                    kind: event.kind,
+                });
             }
         }
     }
@@ -249,9 +241,9 @@ fn encode_events(token: &str, events: Vec<Metric>) -> String {
 }
 
 pub fn to_fields(label: String, value: f64) -> HashMap<String, Field> {
-    vec![(label, Field::Float(value))]
-        .into_iter()
-        .collect::<HashMap<String, Field>>()
+    let mut result = HashMap::new();
+    result.insert(label, Field::Float(value));
+    result
 }
 
 #[cfg(test)]
