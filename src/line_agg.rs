@@ -2,6 +2,7 @@
 
 #![deny(missing_docs)]
 
+use bytes::{Bytes, BytesMut};
 use futures::{Stream, StreamExt};
 use pin_project::pin_project;
 use regex::bytes::Regex;
@@ -85,26 +86,23 @@ impl Config {
 /// Provides a `Stream` implementation that reads lines from the `inner` stream
 /// and yields aggregated lines.
 #[pin_project(project = LineAggProj)]
-pub struct LineAgg<T, K, A>
-where
-    A: aggregatable::ReadOnly,
-{
+pub struct LineAgg<T, K, C> {
     /// The stream from which we read the lines.
     #[pin]
     inner: T,
 
     /// The core line aggregation logic.
-    logic: Logic<K, A>,
+    logic: Logic<K, C>,
 
     /// Stashed lines. When line aggreation results in more than one line being
     /// emitted, we have to stash lines and return them into the stream after
     /// that before doing any other work.
-    stashed: Option<(A, K)>,
+    stashed: Option<(K, Bytes, C)>,
 
     /// Draining queue. We switch to draining mode when we get `None` from
     /// the inner stream. In this mode we stop polling `inner` for new lines
     /// and just flush all the buffered data.
-    draining: Option<Vec<(A, K)>>,
+    draining: Option<Vec<(K, Bytes, C)>>,
 
     /// A queue of keys with expired timeouts.
     expired: VecDeque<K>,
@@ -114,25 +112,19 @@ where
 ///
 /// Encapsulates the essential state and the core logic for the line
 /// aggregation algorithm.
-pub struct Logic<K, A>
-where
-    A: aggregatable::ReadOnly,
-{
+pub struct Logic<K, C> {
     /// Configuration parameters to use.
     config: Config,
 
     /// Line per key.
     /// Key is usually a filename or other line source identifier.
-    buffers: HashMap<K, <A as aggregatable::ReadOnly>::ReadWrite>,
+    buffers: HashMap<K, Aggregate<C>>,
 
     /// A queue of key timeouts.
     timeouts: DelayQueue<K>,
 }
 
-impl<K, A> Logic<K, A>
-where
-    A: aggregatable::ReadOnly,
-{
+impl<K, C> Logic<K, C> {
     /// Create a new `Logic` using the specified `Config`.
     pub fn new(config: Config) -> Self {
         Self {
@@ -143,15 +135,10 @@ where
     }
 }
 
-impl<T, K, A> LineAgg<T, K, A>
-where
-    T: Stream<Item = (A, K)> + Unpin,
-    K: Hash + Eq + Clone,
-    A: aggregatable::ReadOnly,
-{
+impl<T, K, C> LineAgg<T, K, C> {
     /// Create a new `LineAgg` using the specified `inner` stream and
     /// preconfigured `logic`.
-    pub fn new(inner: T, logic: Logic<K, A>) -> Self {
+    pub fn new(inner: T, logic: Logic<K, C>) -> Self {
         Self {
             inner,
             logic,
@@ -162,25 +149,26 @@ where
     }
 }
 
-impl<T, K, A> Stream for LineAgg<T, K, A>
+impl<T, K, C> Stream for LineAgg<T, K, C>
 where
-    T: Stream<Item = (A, K)> + Unpin,
+    T: Stream<Item = (K, Bytes, C)> + Unpin,
     K: Hash + Eq + Clone,
-    A: aggregatable::ReadOnly,
 {
-    /// `A` - the line data; `K` - file name, or other line source.
-    type Item = (A, K);
+    /// `K` - file name, or other line source,
+    /// `Bytes` - the line data,
+    /// `C` - the context related the the line data.
+    type Item = (K, Bytes, C);
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
         loop {
             // If we have a stashed line, process it before doing anything else.
-            if let Some((line, src)) = this.stashed.take() {
+            if let Some((src, line, context)) = this.stashed.take() {
                 // Handle the stashed line. If the handler gave us something -
                 // return it, otherwise restart the loop iteration to start
                 // anew. Handler could've stashed another value, continuing to
                 // the new loop iteration handles that.
-                if let Some(val) = Self::handle_line_and_stashing(&mut this, line, src) {
+                if let Some(val) = Self::handle_line_and_stashing(&mut this, src, line, context) {
                     return Poll::Ready(Some(val));
                 }
                 continue;
@@ -201,11 +189,12 @@ where
             }
 
             match this.inner.poll_next_unpin(cx) {
-                Poll::Ready(Some((line, src))) => {
+                Poll::Ready(Some((src, line, context))) => {
                     // Handle the incoming line we got from `inner`. If the
                     // handler gave us something - return it, otherwise continue
                     // with the flow.
-                    if let Some(val) = Self::handle_line_and_stashing(&mut this, line, src) {
+                    if let Some(val) = Self::handle_line_and_stashing(&mut this, src, line, context)
+                    {
                         return Poll::Ready(Some(val));
                     }
                 }
@@ -216,7 +205,10 @@ where
                         this.logic
                             .buffers
                             .drain()
-                            .map(|(k, v)| (v.freeze(), k))
+                            .map(|(src, aggregate)| {
+                                let (line, context) = aggregate.merge();
+                                (src, line, context)
+                            })
                             .collect(),
                     );
                 }
@@ -224,8 +216,9 @@ where
                     // We didn't get any lines from `inner`, so we just give
                     // a line from the expired lines queue.
                     if let Some(key) = this.expired.pop_front() {
-                        if let Some(buffered) = this.logic.buffers.remove(&key) {
-                            return Poll::Ready(Some((buffered.freeze(), key)));
+                        if let Some(aggregate) = this.logic.buffers.remove(&key) {
+                            let (line, context) = aggregate.merge();
+                            return Poll::Ready(Some((key, line, context)));
                         }
                     }
 
@@ -236,36 +229,36 @@ where
     }
 }
 
-impl<T, K, A> LineAgg<T, K, A>
+impl<T, K, C> LineAgg<T, K, C>
 where
-    T: Stream<Item = (A, K)> + Unpin,
+    T: Stream<Item = (K, Bytes, C)> + Unpin,
     K: Hash + Eq + Clone,
-    A: aggregatable::ReadOnly,
 {
     /// Handle line and do stashing of extra emitted lines.
     /// Requires that the `stashed` item is empty (i.e. entry is vacant). This
     /// invariant has to be taken care of by the caller.
     fn handle_line_and_stashing(
-        this: &mut LineAggProj<'_, T, K, A>,
-        line: A,
+        this: &mut LineAggProj<'_, T, K, C>,
         src: K,
-    ) -> Option<(A, K)> {
+        line: Bytes,
+        context: C,
+    ) -> Option<(K, Bytes, C)> {
         // Stashed line is always consumed at the start of the `poll`
         // loop before entering this line processing logic. If it's
         // non-empty here - it's a bug.
         debug_assert!(this.stashed.is_none());
-        let val = this.logic.handle_line(line, src)?;
+        let val = this.logic.handle_line(src, line, context)?;
         let val = match val {
             // If we have to emit just one line - that's easy,
             // we just return it.
-            (Emit::One(line), src) => (line, src),
+            (src, Emit::One((line, context))) => (src, line, context),
             // If we have to emit two lines - take the second
             // one and stash it, then return the first one.
             // This way, the stashed line will be returned
             // on the next stream poll.
-            (Emit::Two(line, to_stash), src) => {
-                *this.stashed = Some((to_stash, src.clone()));
-                (line, src)
+            (src, Emit::Two((line, context), (line_to_stash, context_to_stash))) => {
+                *this.stashed = Some((src.clone(), line_to_stash, context_to_stash));
+                (src, line, context)
             }
         };
         Some(val)
@@ -281,31 +274,32 @@ pub enum Emit<T> {
     Two(T, T),
 }
 
-impl<K, A> Logic<K, A>
+impl<K, C> Logic<K, C>
 where
     K: Hash + Eq + Clone,
-    A: aggregatable::ReadOnly,
 {
     /// Handle line, if we have something to output - return it.
-    pub fn handle_line(&mut self, line: A, src: K) -> Option<(Emit<A>, K)> {
+    pub fn handle_line(
+        &mut self,
+        src: K,
+        line: Bytes,
+        context: C,
+    ) -> Option<(K, Emit<(Bytes, C)>)> {
         // Check if we already have the buffered data for the source.
         match self.buffers.entry(src) {
             Entry::Occupied(mut entry) => {
-                let condition_matched = self
-                    .config
-                    .condition_pattern
-                    .is_match(line.bytes().as_ref());
+                let condition_matched = self.config.condition_pattern.is_match(line.as_ref());
                 match self.config.mode {
                     // All consecutive lines matching this pattern are included in
                     // the group.
                     Mode::ContinueThrough => {
                         if condition_matched {
                             let buffered = entry.get_mut();
-                            add_next_line(buffered, line);
+                            buffered.add_next_line(line);
                             None
                         } else {
                             let (src, buffered) = entry.remove_entry();
-                            Some((Emit::Two(buffered.freeze(), line), src))
+                            Some((src, Emit::Two(buffered.merge(), (line, context))))
                         }
                     }
                     // All consecutive lines matching this pattern, plus one
@@ -313,12 +307,12 @@ where
                     Mode::ContinuePast => {
                         if condition_matched {
                             let buffered = entry.get_mut();
-                            add_next_line(buffered, line);
+                            buffered.add_next_line(line);
                             None
                         } else {
                             let (src, mut buffered) = entry.remove_entry();
-                            add_next_line(&mut buffered, line);
-                            Some((Emit::One(buffered.freeze()), src))
+                            buffered.add_next_line(line);
+                            Some((src, Emit::One(buffered.merge())))
                         }
                     }
                     // All consecutive lines not matching this pattern are included
@@ -326,10 +320,10 @@ where
                     Mode::HaltBefore => {
                         if condition_matched {
                             let (src, buffered) = entry.remove_entry();
-                            Some((Emit::Two(buffered.freeze(), line), src))
+                            Some((src, Emit::Two(buffered.merge(), (line, context))))
                         } else {
                             let buffered = entry.get_mut();
-                            add_next_line(buffered, line);
+                            buffered.add_next_line(line);
                             None
                         }
                     }
@@ -338,11 +332,11 @@ where
                     Mode::HaltWith => {
                         if condition_matched {
                             let (src, mut buffered) = entry.remove_entry();
-                            add_next_line(&mut buffered, line);
-                            Some((Emit::One(buffered.freeze()), src))
+                            buffered.add_next_line(line);
+                            Some((src, Emit::One(buffered.merge())))
                         } else {
                             let buffered = entry.get_mut();
-                            add_next_line(buffered, line);
+                            buffered.add_next_line(line);
                             None
                         }
                     }
@@ -350,72 +344,53 @@ where
             }
             Entry::Vacant(entry) => {
                 // This line is a candidate for buffering, or passing through.
-                if self.config.start_pattern.is_match(line.bytes().as_ref()) {
+                if self.config.start_pattern.is_match(line.as_ref()) {
                     // It was indeed a new line we need to filter.
                     // Set the timeout and buffer this line.
                     self.timeouts
                         .insert(entry.key().clone(), self.config.timeout);
-                    entry.insert(line.unfreeze());
+                    entry.insert(Aggregate::new(line, context));
                     None
                 } else {
                     // It's just a regular line we don't really care about.
-                    Some((Emit::One(line), entry.into_key()))
+                    Some((entry.into_key(), Emit::One((line, context))))
                 }
             }
         }
     }
 }
 
-pub mod aggregatable {
-    // This is temporary
-
-    #![allow(missing_docs)]
-
-    use bytes::{Bytes, BytesMut};
-
-    pub trait ReadOnly: Sized {
-        type ReadWrite: ReadWrite<ReadOnly = Self>;
-        fn unfreeze(self) -> Self::ReadWrite;
-        fn bytes(&self) -> &Bytes;
-    }
-
-    pub trait ReadWrite: Sized {
-        type ReadOnly: ReadOnly<ReadWrite = Self>;
-        fn freeze(self) -> Self::ReadOnly;
-        fn bytes_mut(&mut self) -> &mut BytesMut;
-    }
-
-    impl ReadOnly for Bytes {
-        type ReadWrite = BytesMut;
-
-        fn unfreeze(self) -> Self::ReadWrite {
-            self.as_ref().into()
-        }
-
-        fn bytes(&self) -> &Bytes {
-            self
-        }
-    }
-
-    impl ReadWrite for BytesMut {
-        type ReadOnly = Bytes;
-
-        fn freeze(self) -> Self::ReadOnly {
-            BytesMut::freeze(self)
-        }
-
-        fn bytes_mut(&mut self) -> &mut BytesMut {
-            self
-        }
-    }
+struct Aggregate<C> {
+    lines: Vec<Bytes>,
+    context: C,
 }
 
-use aggregatable::*;
+impl<C> Aggregate<C> {
+    fn new(first_line: Bytes, context: C) -> Self {
+        Self {
+            lines: vec![first_line],
+            context,
+        }
+    }
 
-fn add_next_line<A: ReadOnly>(buffered: &mut <A as ReadOnly>::ReadWrite, line: A) {
-    let bytes_mut = buffered.bytes_mut();
-    bytes_mut.extend_from_slice(b"\n");
-    bytes_mut.extend_from_slice(&line.bytes());
+    fn add_next_line(&mut self, line: Bytes) {
+        self.lines.push(line);
+    }
+
+    fn merge(self) -> (Bytes, C) {
+        let capacity = self.lines.iter().map(|line| line.len() + 1).sum::<usize>() - 1;
+        let mut bytes_mut = BytesMut::with_capacity(capacity);
+        let mut first = true;
+        for line in self.lines {
+            if first {
+                first = false;
+            } else {
+                bytes_mut.extend_from_slice(b"\n");
+            }
+            bytes_mut.extend_from_slice(&line);
+        }
+        (bytes_mut.freeze(), self.context)
+    }
 }
 
 #[cfg(test)]
@@ -708,18 +683,26 @@ mod tests {
 
     fn stream_from_lines<'a>(
         lines: &'a [&'static str],
-    ) -> impl Stream<Item = (Bytes, Filename)> + 'a {
-        futures::stream::iter(
-            lines
-                .iter()
-                .map(|line| (Bytes::from_static(line.as_bytes()), "test.log".to_owned())),
-        )
+    ) -> impl Stream<Item = (Filename, Bytes, ())> + 'a {
+        futures::stream::iter(lines.iter().map(|line| {
+            (
+                "test.log".to_owned(),
+                Bytes::from_static(line.as_bytes()),
+                (),
+            )
+        }))
     }
 
-    fn assert_results(actual: Vec<(Bytes, Filename)>, expected: &[&'static str]) {
-        let expected_mapped: Vec<(Bytes, Filename)> = expected
+    fn assert_results(actual: Vec<(Filename, Bytes, ())>, expected: &[&'static str]) {
+        let expected_mapped: Vec<(Filename, Bytes, ())> = expected
             .iter()
-            .map(|line| (Bytes::from_static(line.as_bytes()), "test.log".to_owned()))
+            .map(|line| {
+                (
+                    "test.log".to_owned(),
+                    Bytes::from_static(line.as_bytes()),
+                    (),
+                )
+            })
             .collect();
 
         assert_eq!(
