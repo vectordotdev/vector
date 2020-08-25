@@ -1,7 +1,7 @@
 FROM docker.io/ubuntu:20.04 AS ENVIRONMENT
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ='America/New York' \
-    PATH=/root/.cargo/bin:/root/.local/bin/:$PATH \
+    PATH=/root/.cargo/bin:/root/.local/bin/:/git/timberio/vector/scripts/node_modules/.bin:$PATH \
     LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8
@@ -10,7 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN echo $TZ > /etc/timezone
 
 # Setup the env
-RUN mkdir -p /git/timberio/vector/{scripts,scripts/environment}
+RUN mkdir -p /git/timberio/vector/scripts/environment
 ADD scripts/environment/bootstrap-ubuntu-20.04.sh scripts/environment/prepare.sh \
     /git/timberio/vector/scripts/environment/
 

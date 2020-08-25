@@ -30,6 +30,8 @@ jobs:
     runs-on: ubuntu-20.04
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
+    container:
+      image: timberio/ci_image:latest
     steps:
       - uses: actions/checkout@v2
         with:
@@ -41,8 +43,6 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make check-markdown
       - run: make check-meta
@@ -59,6 +59,8 @@ jobs:
     runs-on: ubuntu-20.04
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
+    container:
+      image: timberio/ci_image:latest
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -67,8 +69,6 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: echo "::add-path::/home/runner/.local/bin"
       - run: make check-component-features

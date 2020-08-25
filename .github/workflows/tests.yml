@@ -166,6 +166,8 @@ jobs:
   test-integration-docker:
     name: Integration - Linux, Docker
     runs-on: ubuntu-20.04
+    container:
+      image: timberio/ci_image:latest
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
@@ -176,8 +178,6 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make test-integration-docker
 
@@ -202,6 +202,15 @@ jobs:
   test-integration-gcp:
     name: Integration - Linux, GCP
     runs-on: ubuntu-20.04
+    container:
+      image: timberio/ci_image:latest
+    services:
+      gcloud-pubsub:
+        image: messagebird/gcloud-pubsub-emulator
+        ports:
+          - 8681-8682:8681-8682
+        env:
+          PUBSUB_PROJECT1: testproject,topic1:subscription1
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
@@ -212,10 +221,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
-      - run: make test-integration-gcp
+      - run: |
+          cargo test --no-default-features --features gcp-integration-tests ::gcp:: -- --nocapture
 
   test-integration-influxdb:
     name: Integration - Linux, Influx
@@ -256,6 +264,15 @@ jobs:
   test-integration-loki:
     name: Integration - Linux, Loki
     runs-on: ubuntu-20.04
+    container:
+      image: timberio/ci_image:latest
+    services:
+      loki:
+        image: grafana/loki:master
+        ports:
+          - "3100:3100"
+        volumes:
+          - /__w/vector/vector/tests/data:/etc/loki
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
@@ -266,10 +283,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
-      - run: make test-integration-loki
+      - run: |
+          cargo test --no-default-features --features loki-integration-tests ::loki:: -- --nocapture
 
   test-integration-pulsar:
     name: Integration - Linux, Pulsar

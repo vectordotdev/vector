@@ -27,8 +27,8 @@ jobs:
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
     runs-on: ubuntu-20.04
+    container:
+      image: timberio/ci_image:latest
     steps:
       - uses: actions/checkout@v2
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
       - run: make bench
