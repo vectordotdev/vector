@@ -25,12 +25,11 @@ use tracing::field;
 #[serde(deny_unknown_fields)]
 pub struct UnixSinkConfig {
     pub path: PathBuf,
-    pub encoding: EncodingConfig<Encoding>,
 }
 
 impl UnixSinkConfig {
-    pub fn new(path: PathBuf, encoding: EncodingConfig<Encoding>) -> Self {
-        Self { path, encoding }
+    pub fn new(path: PathBuf) -> Self {
+        Self { path }
     }
 
     pub fn prepare(&self) -> crate::Result<(IntoUnixSink, Healthcheck)> {
@@ -40,9 +39,12 @@ impl UnixSinkConfig {
         Ok((unix, Box::new(healthcheck)))
     }
 
-    pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    pub fn build(
+        &self,
+        cx: SinkContext,
+        encoding: EncodingConfig<Encoding>,
+    ) -> crate::Result<(RouterSink, Healthcheck)> {
         let (unix, healthcheck) = self.prepare()?;
-        let encoding = self.encoding.clone();
         let sink = StreamSink::new(unix.into_sink(), cx.acker())
             .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
 
@@ -242,9 +244,9 @@ mod tests {
         let mut receiver = CountReceiver::receive_lines_unix(out_path.clone());
 
         // Set up Sink
-        let config = UnixSinkConfig::new(out_path, Encoding::Text.into());
+        let config = UnixSinkConfig::new(out_path);
         let cx = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(cx).unwrap();
+        let (sink, _healthcheck) = config.build(cx, Encoding::Text.into()).unwrap();
 
         // Send the test data
         let (input_lines, events) = random_lines_with_stream(100, num_lines);

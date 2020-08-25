@@ -26,12 +26,11 @@ pub enum UdpBuildError {
 #[serde(deny_unknown_fields)]
 pub struct UdpSinkConfig {
     pub address: String,
-    pub encoding: EncodingConfig<Encoding>,
 }
 
 impl UdpSinkConfig {
-    pub fn new(address: String, encoding: EncodingConfig<Encoding>) -> Self {
-        Self { address, encoding }
+    pub fn new(address: String) -> Self {
+        Self { address }
     }
 
     pub fn prepare(&self, cx: SinkContext) -> crate::Result<(IntoUdpSink, Healthcheck)> {
@@ -46,9 +45,12 @@ impl UdpSinkConfig {
         Ok((udp, healthcheck))
     }
 
-    pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    pub fn build(
+        &self,
+        cx: SinkContext,
+        encoding: EncodingConfig<Encoding>,
+    ) -> crate::Result<(RouterSink, Healthcheck)> {
         let (udp, healthcheck) = self.prepare(cx.clone())?;
-        let encoding = self.encoding.clone();
         let sink = StreamSink::new(udp.into_sink()?, cx.acker())
             .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
 

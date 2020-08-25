@@ -37,17 +37,12 @@ use tokio_util::codec::{BytesCodec, FramedWrite};
 #[serde(deny_unknown_fields)]
 pub struct TcpSinkConfig {
     pub address: String,
-    pub encoding: EncodingConfig<Encoding>,
     pub tls: Option<TlsConfig>,
 }
 
 impl TcpSinkConfig {
-    pub fn new(address: String, encoding: EncodingConfig<Encoding>) -> Self {
-        Self {
-            address,
-            encoding,
-            tls: None,
-        }
+    pub fn new(address: String) -> Self {
+        Self { address, tls: None }
     }
 
     pub fn prepare(&self, cx: SinkContext) -> crate::Result<(IntoTcpSink, Healthcheck)> {
@@ -64,9 +59,12 @@ impl TcpSinkConfig {
         Ok((tcp, healthcheck))
     }
 
-    pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    pub fn build(
+        &self,
+        cx: SinkContext,
+        encoding: EncodingConfig<Encoding>,
+    ) -> crate::Result<(RouterSink, Healthcheck)> {
         let (tcp, healthcheck) = self.prepare(cx.clone())?;
-        let encoding = self.encoding.clone();
         let sink = StreamSink::new(tcp.into_sink(), cx.acker())
             .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
 
