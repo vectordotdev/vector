@@ -23,7 +23,8 @@ mod lua;
 mod process;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
-mod regex;
+#[cfg(feature = "transforms-regex_parser")]
+mod regex_parser;
 mod sampler;
 #[cfg(any(
     feature = "sources-socket",
@@ -72,7 +73,8 @@ pub use self::lua::*;
 pub use self::process::*;
 #[cfg(feature = "sources-prometheus")]
 pub use self::prometheus::*;
-pub use self::regex::*;
+#[cfg(feature = "transforms-regex_parser")]
+pub(crate) use self::regex_parser::*;
 pub use self::sampler::*;
 #[cfg(any(
     feature = "sources-socket",
