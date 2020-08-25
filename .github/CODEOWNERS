@@ -62,6 +62,7 @@
 /src/sources/tcp.rs @bruceg
 /src/sources/udp.rs @bruceg
 /src/sources/vector.rs @lukesteensen
+/src/sources/util/multiline_config.rs @MOZGIII
 
 /src/topology/ @lukesteensen
 
