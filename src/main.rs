@@ -105,7 +105,7 @@ fn main() {
             path = ?config_paths
         );
 
-        let config = config::from_paths(&config_paths, None)
+        let config = config::load_from_paths(&config_paths, None)
             .map_err(handle_config_errors)
             .unwrap_or_else(|()| {
                 std::process::exit(exitcode::CONFIG);
@@ -134,7 +134,7 @@ fn main() {
                 Some(signal) = signals.next() => {
                     if signal == SignalTo::Reload {
                         // Reload config
-                        let new_config = config::from_paths(&config_paths, config.clone()).map_err(handle_config_errors).ok();
+                        let new_config = config::load_from_paths(&config_paths, config.clone()).map_err(handle_config_errors).ok();
 
                         if let Some(new_config) = new_config {
                             match topology

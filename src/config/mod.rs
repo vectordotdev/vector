@@ -11,7 +11,7 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::fs::DirBuilder;
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 pub mod component;
 mod diff;
@@ -21,7 +21,7 @@ mod vars;
 pub mod watcher;
 
 pub use diff::ConfigDiff;
-pub use loading::{from_paths, process_paths, CONFIG_PATHS};
+pub use loading::{load_from_paths, process_paths, CONFIG_PATHS};
 pub use validation::check;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -403,23 +403,6 @@ impl Config {
         } else {
             Ok(expansions)
         }
-    }
-
-    pub fn load(mut input: impl std::io::Read) -> Result<Self, Vec<String>> {
-        let mut source_string = String::new();
-        input
-            .read_to_string(&mut source_string)
-            .map_err(|e| vec![e.to_string()])?;
-
-        let mut vars = std::env::vars().collect::<HashMap<_, _>>();
-        if !vars.contains_key("HOSTNAME") {
-            if let Some(hostname) = hostname::get_hostname() {
-                vars.insert("HOSTNAME".into(), hostname);
-            }
-        }
-        let with_vars = vars::interpolate(&source_string, &vars);
-
-        toml::from_str(&with_vars).map_err(|e| vec![e.to_string()])
     }
 
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {

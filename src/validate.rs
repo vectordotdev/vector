@@ -5,7 +5,7 @@ use crate::{
 };
 use colored::*;
 use exitcode::ExitCode;
-use std::{fmt, fs::File, path::PathBuf};
+use std::{fmt, path::PathBuf};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -97,32 +97,12 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Result<Config, Option<Co
     let mut validated = 0;
     let mut full_config = Config::empty();
     for config_path in paths {
-        let file = match File::open(&config_path) {
-            Ok(file) => file,
-            Err(error) => {
-                if let std::io::ErrorKind::NotFound = error.kind() {
-                    fmt.error(format!("File {:?} not found", config_path));
-                } else {
-                    fmt.error(format!(
-                        "Failed opening file {:?} with error {:?}",
-                        config_path, error
-                    ));
-                }
-                continue;
-            }
-        };
-
-        trace!(
-            message = "Parsing config.",
-            path = ?config_path
-        );
-
         let mut sub_failed = |title: String, errors| {
             fmt.title(title);
             fmt.sub_error(errors);
         };
 
-        let mut config = match Config::load(file) {
+        let mut config = match config::load_from_paths(&[config_path.clone()], None) {
             Ok(config) => config,
             Err(errors) => {
                 sub_failed(format!("Failed to parse {:?}", config_path), errors);
