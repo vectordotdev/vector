@@ -342,7 +342,7 @@ where
 
 pub struct CountReceiver<T> {
     count: Arc<AtomicUsize>,
-    trigger: oneshot::Sender<()>,
+    trigger: Option<oneshot::Sender<()>>,
     connected: Option<oneshot::Receiver<()>>,
     handle: JoinHandle<Vec<T>>,
 }
@@ -359,11 +359,6 @@ impl<T: Send + 'static> CountReceiver<T> {
         }
     }
 
-    pub async fn wait(self) -> Vec<T> {
-        let _ = self.trigger.send(());
-        self.handle.await.unwrap()
-    }
-
     fn new<F, Fut>(make_fut: F) -> CountReceiver<T>
     where
         F: FnOnce(Arc<AtomicUsize>, oneshot::Receiver<()>, oneshot::Sender<()>) -> Fut,
@@ -375,10 +370,24 @@ impl<T: Send + 'static> CountReceiver<T> {
 
         CountReceiver {
             count: Arc::clone(&count),
-            trigger,
+            trigger: Some(trigger),
             connected: Some(connected),
             handle: tokio::spawn(make_fut(count, tripwire, trigger_connected)),
         }
+    }
+}
+
+impl<T> Future for CountReceiver<T> {
+    type Output = Vec<T>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+        if let Some(trigger) = this.trigger.take() {
+            trigger.send(()).unwrap();
+        }
+
+        let result = futures::ready!(Pin::new(&mut this.handle).poll(cx));
+        Poll::Ready(result.unwrap())
     }
 }
 

@@ -155,7 +155,7 @@ mod test {
         // Wait for output to connect
         receiver.connected().await;
 
-        let output = receiver.wait().await;
+        let output = receiver.await;
         assert_eq!(lines.len(), output.len());
         for (source, received) in lines.iter().zip(output) {
             let json = serde_json::from_str::<Value>(&received).expect("Invalid JSON");

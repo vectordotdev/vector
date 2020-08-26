@@ -234,6 +234,6 @@ mod tests {
         receiver.connected().await;
 
         // Receive the data sent by the Sink to the receiver
-        assert_eq!(input_lines, receiver.wait().await);
+        assert_eq!(input_lines, receiver.await);
     }
 }

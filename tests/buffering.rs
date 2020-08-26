@@ -127,7 +127,7 @@ fn test_buffering() {
 
         topology.stop().compat().await.unwrap();
 
-        let output_events = output_events.wait().await;
+        let output_events = output_events.await;
         assert_eq!(expected_events_count, output_events.len());
         assert_eq!(input_events, &output_events[..num_events]);
         assert_eq!(input_events2, &output_events[num_events..]);
@@ -227,7 +227,7 @@ fn test_max_size() {
 
         topology.stop().compat().await.unwrap();
 
-        let output_events = output_events.wait().await;
+        let output_events = output_events.await;
         assert_eq!(num_events / 2, output_events.len());
         assert_eq!(&input_events[..num_events / 2], &output_events[..]);
     });

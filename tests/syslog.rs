@@ -54,7 +54,7 @@ async fn test_tcp_syslog() {
     // Shut down server
     topology.stop().compat().await.unwrap();
 
-    let output_lines = output_lines.wait().await;
+    let output_lines = output_lines.await;
     assert_eq!(output_lines.len(), num_messages);
 
     let output_messages: Vec<SyslogMessageRFC5424> = output_lines
@@ -119,7 +119,7 @@ fn test_unix_stream_syslog() {
         // Shut down server
         topology.stop().compat().await.unwrap();
 
-        let output_lines = output_lines.wait().await;
+        let output_lines = output_lines.await;
         assert_eq!(output_lines.len(), num_messages);
 
         let output_messages: Vec<SyslogMessageRFC5424> = output_lines
@@ -183,7 +183,7 @@ async fn test_octet_counting_syslog() {
     // Shut down server
     topology.stop().compat().await.unwrap();
 
-    let output_lines = output_lines.wait().await;
+    let output_lines = output_lines.await;
     assert_eq!(output_lines.len(), num_messages);
 
     let output_messages: Vec<SyslogMessageRFC5424> = output_lines
