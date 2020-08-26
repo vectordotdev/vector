@@ -55,19 +55,39 @@ pub fn process_paths(config_paths: &[PathBuf]) -> Option<Vec<PathBuf>> {
 }
 
 pub fn load_from_paths(config_paths: &[PathBuf]) -> Result<Config, Vec<String>> {
-    let mut config = Config::empty();
+    let mut inputs = Vec::new();
     let mut errors = Vec::new();
 
     for path in config_paths {
         if let Some(file) = open_config(&path) {
-            trace!(message = "Parsing config.", ?path);
-
-            if let Err(errs) = load(file).and_then(|n| config.append(n)) {
-                errors.extend(errs.iter().map(|e| format!("{:?}: {}", path, e)));
-            }
+            inputs.push(file);
         } else {
             errors.push(format!("Config file not found in path: {:?}.", path));
         };
+    }
+
+    if errors.is_empty() {
+        load_from_inputs(inputs)
+    } else {
+        Err(errors)
+    }
+}
+
+pub fn load_from_str(input: &str) -> Result<Config, Vec<String>> {
+    load_from_inputs(std::iter::once(input.as_bytes()))
+}
+
+fn load_from_inputs(
+    inputs: impl IntoIterator<Item = impl std::io::Read>,
+) -> Result<Config, Vec<String>> {
+    let mut config = Config::empty();
+    let mut errors = Vec::new();
+
+    for input in inputs {
+        if let Err(errs) = load(input).and_then(|n| config.append(n)) {
+            // TODO: add back paths
+            errors.extend(errs.iter().map(|e| format!("{}", e)));
+        }
     }
 
     if let Err(mut errs) = config.expand_macros() {
