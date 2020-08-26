@@ -40,7 +40,7 @@ pub extern "C" fn init() {
 ///
 /// # Returns
 ///
-/// This function should return the number of emitted messages.
+/// This function should return a hint of the number of emitted messages.
 #[no_mangle]
 pub extern "C" fn process(data: u32, length: u32) -> u32 {
     // Vector allocates a chunk of memory through the hostcall interface.
