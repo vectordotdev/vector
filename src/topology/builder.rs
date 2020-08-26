@@ -5,7 +5,7 @@ use super::{
 };
 
 #[cfg(feature = "api")]
-use crate::{api::Server, config::api};
+use crate::api::Server;
 
 use crate::{
     buffers,
@@ -202,10 +202,9 @@ pub async fn build_pieces(
     // API server
     #[cfg(feature = "api")]
     let api = match &diff.api {
-        Some(api_diff) => match api_diff {
-            api::Diff::Start | api::Diff::Restart => Some(Server::new(config.api.bind.unwrap())),
-            _ => None,
-        },
+        Some(api_diff) if api_diff.is_start_or_restart() => {
+            Some(Server::new(config.api.bind.unwrap()))
+        }
         _ => None,
     };
 
