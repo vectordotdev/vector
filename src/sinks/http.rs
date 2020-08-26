@@ -291,14 +291,15 @@ mod tests {
     use crate::{
         assert_downcast_matches,
         config::SinkContext,
-        sinks::http::HttpSinkConfig,
-        sinks::util::http::HttpSink,
-        sinks::util::test::build_test_server,
+        sinks::{
+            http::HttpSinkConfig,
+            util::{http::HttpSink, test::build_test_server},
+        },
         test_util::{next_addr, random_lines_with_stream},
     };
     use bytes::buf::BufExt;
-    use futures::{compat::Sink01CompatExt, SinkExt};
-    use futures01::Stream;
+    use flate2::read::GzDecoder;
+    use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt};
     use headers::{Authorization, HeaderMapExt};
     use hyper::Method;
     use serde::Deserialize;
@@ -388,7 +389,7 @@ mod tests {
         let _ = config.build(cx).unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn http_happy_path_post() {
         let num_lines = 1000;
 
@@ -422,32 +423,28 @@ mod tests {
         drop(trigger);
 
         let output_lines = rx
-            .wait()
-            .map(Result::unwrap)
-            .map(|(parts, body)| {
+            .flat_map(|(parts, body)| {
                 assert_eq!(Method::POST, parts.method);
                 assert_eq!("/frames", parts.uri.path());
                 assert_eq!(
                     Some(Authorization::basic("waldo", "hunter2")),
                     parts.headers.typed_get()
                 );
-                body.reader()
+                stream::iter(BufReader::new(GzDecoder::new(body.reader())).lines())
             })
-            .map(flate2::read::GzDecoder::new)
-            .map(BufReader::new)
-            .flat_map(BufRead::lines)
             .map(Result::unwrap)
-            .map(|s| {
-                let val: serde_json::Value = serde_json::from_str(&s).unwrap();
+            .map(|line| {
+                let val: serde_json::Value = serde_json::from_str(&line).unwrap();
                 val.get("message").unwrap().as_str().unwrap().to_owned()
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+            .await;
 
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn http_happy_path_put() {
         let num_lines = 1000;
 
@@ -482,32 +479,28 @@ mod tests {
         drop(trigger);
 
         let output_lines = rx
-            .wait()
-            .map(Result::unwrap)
-            .map(|(parts, body)| {
+            .flat_map(|(parts, body)| {
                 assert_eq!(Method::PUT, parts.method);
                 assert_eq!("/frames", parts.uri.path());
                 assert_eq!(
                     Some(Authorization::basic("waldo", "hunter2")),
                     parts.headers.typed_get()
                 );
-                body.reader()
+                stream::iter(BufReader::new(GzDecoder::new(body.reader())).lines())
             })
-            .map(flate2::read::GzDecoder::new)
-            .map(BufReader::new)
-            .flat_map(BufRead::lines)
             .map(Result::unwrap)
-            .map(|s| {
-                let val: serde_json::Value = serde_json::from_str(&s).unwrap();
+            .map(|line| {
+                let val: serde_json::Value = serde_json::from_str(&line).unwrap();
                 val.get("message").unwrap().as_str().unwrap().to_owned()
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+            .await;
 
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn http_passes_custom_headers() {
         let num_lines = 1000;
 
@@ -539,9 +532,7 @@ mod tests {
         drop(trigger);
 
         let output_lines = rx
-            .wait()
-            .map(Result::unwrap)
-            .map(|(parts, body)| {
+            .flat_map(|(parts, body)| {
                 assert_eq!(Method::POST, parts.method);
                 assert_eq!("/frames", parts.uri.path());
                 assert_eq!(
@@ -552,17 +543,15 @@ mod tests {
                     Some("quux"),
                     parts.headers.get("baz").map(|v| v.to_str().unwrap())
                 );
-                body.reader()
+                stream::iter(BufReader::new(GzDecoder::new(body.reader())).lines())
             })
-            .map(flate2::read::GzDecoder::new)
-            .map(BufReader::new)
-            .flat_map(BufRead::lines)
             .map(Result::unwrap)
-            .map(|s| {
-                let val: serde_json::Value = serde_json::from_str(&s).unwrap();
+            .map(|line| {
+                let val: serde_json::Value = serde_json::from_str(&line).unwrap();
                 val.get("message").unwrap().as_str().unwrap().to_owned()
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+            .await;
 
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
