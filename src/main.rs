@@ -121,7 +121,7 @@ fn main() {
         });
 
         let result =
-            topology::start_validated(config.clone(), diff, pieces, opts.require_healthy).await;
+            topology::start_validated(config, diff, pieces, opts.require_healthy).await;
         let (mut topology, graceful_crash) = result.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });

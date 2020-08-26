@@ -57,12 +57,8 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
     let mut validated = true;
 
     let config = match validate_config(opts, &mut fmt) {
-        Ok(config) => config,
-        Err(Some(config)) => {
-            validated &= false;
-            config
-        }
-        Err(None) => return exitcode::CONFIG,
+        Some(config) => config,
+        None => return exitcode::CONFIG,
     };
 
     if !(opts.no_topology || opts.no.topology) {
@@ -83,24 +79,24 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
 
 /// Ok if all configs were succesfully validated.
 /// Err Some contains only succesfully validated configs.
-fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Result<Config, Option<Config>> {
+fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     // Prepare paths
     let paths = if let Some(paths) = config::process_paths(&opts.paths) {
         paths
     } else {
         fmt.error("No config file paths");
-        return Err(None);
+        return None;
     };
 
     match config::load_from_paths(&paths) {
         Ok(config) => {
             fmt.success(format!("Loaded {:?}", &paths));
-            Ok(config)
+            Some(config)
         }
         Err(errors) => {
             fmt.title(format!("Failed to load {:?}", paths));
             fmt.sub_error(errors);
-            Err(None)
+            None
         }
     }
 }
