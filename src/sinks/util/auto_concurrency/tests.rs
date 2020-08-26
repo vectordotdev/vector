@@ -359,13 +359,13 @@ async fn constant_link() {
     );
 
     let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
-    assert_within!(observed_rtt.min, 0.099, 0.110, "{:#?}", results);
-    assert_within!(observed_rtt.max, 0.099, 0.115, "{:#?}", results);
-    assert_within!(observed_rtt.mean, 0.099, 0.110, "{:#?}", results);
+    assert_within!(observed_rtt.min, 0.090, 0.120, "{:#?}", results);
+    assert_within!(observed_rtt.max, 0.090, 0.130, "{:#?}", results);
+    assert_within!(observed_rtt.mean, 0.090, 0.120, "{:#?}", results);
     let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
-    assert_within!(averaged_rtt.min, 0.099, 0.110, "{:#?}", results);
-    assert_within!(averaged_rtt.max, 0.099, 0.115, "{:#?}", results);
-    assert_within!(averaged_rtt.mean, 0.099, 0.110, "{:#?}", results);
+    assert_within!(averaged_rtt.min, 0.090, 0.120, "{:#?}", results);
+    assert_within!(averaged_rtt.max, 0.090, 0.130, "{:#?}", results);
+    assert_within!(averaged_rtt.mean, 0.090, 0.120, "{:#?}", results);
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
     assert_within!(concurrency_limit.max, 9, MAX_CONCURRENCY, "{:#?}", results);
     assert_within!(
@@ -412,13 +412,13 @@ async fn defers_at_high_concurrency() {
     assert_within!(in_flight.mean, 2.0, 4.0, "{:#?}", results);
 
     let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
-    assert_within!(observed_rtt.min, 0.099, 0.110, "{:#?}", results);
-    assert_within!(observed_rtt.max, 0.099, 0.115, "{:#?}", results);
-    assert_within!(observed_rtt.mean, 0.099, 0.110, "{:#?}", results);
+    assert_within!(observed_rtt.min, 0.090, 0.120, "{:#?}", results);
+    assert_within!(observed_rtt.max, 0.090, 0.130, "{:#?}", results);
+    assert_within!(observed_rtt.mean, 0.090, 0.120, "{:#?}", results);
     let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
-    assert_within!(averaged_rtt.min, 0.099, 0.110, "{:#?}", results);
-    assert_within!(averaged_rtt.max, 0.099, 0.115, "{:#?}", results);
-    assert_within!(averaged_rtt.mean, 0.099, 0.110, "{:#?}", results);
+    assert_within!(averaged_rtt.min, 0.090, 0.120, "{:#?}", results);
+    assert_within!(averaged_rtt.max, 0.090, 0.130, "{:#?}", results);
+    assert_within!(averaged_rtt.mean, 0.090, 0.120, "{:#?}", results);
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
     assert_within!(concurrency_limit.max, 5, 6, "{:#?}", results);
     assert_within!(concurrency_limit.mode, 2, 5, "{:#?}", results);
@@ -451,13 +451,13 @@ async fn drops_at_high_concurrency() {
     assert_within!(in_flight.mean, 1.5, 3.5, "{:#?}", results);
 
     let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
-    assert_within!(observed_rtt.min, 0.099, 0.110, "{:#?}", results);
-    assert_within!(observed_rtt.max, 1.000, 1.020, "{:#?}", results);
-    assert_within!(observed_rtt.mean, 0.150, 0.350, "{:#?}", results);
+    assert_within!(observed_rtt.min, 0.090, 0.125, "{:#?}", results);
+    assert_within!(observed_rtt.max, 0.090, 0.125, "{:#?}", results);
+    assert_within!(observed_rtt.mean, 0.090, 0.125, "{:#?}", results);
     let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
-    assert_within!(averaged_rtt.min, 0.099, 0.110, "{:#?}", results);
-    assert_within!(averaged_rtt.max, 0.400, 1.010, "{:#?}", results);
-    assert_within!(averaged_rtt.mean, 0.150, 0.350, "{:#?}", results);
+    assert_within!(averaged_rtt.min, 0.090, 0.125, "{:#?}", results);
+    assert_within!(averaged_rtt.max, 0.090, 0.125, "{:#?}", results);
+    assert_within!(averaged_rtt.mean, 0.090, 0.125, "{:#?}", results);
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
     assert_within!(concurrency_limit.mode, 1, 3, "{:#?}", results);
     assert_within!(concurrency_limit.mean, 3.5, 5.0, "{:#?}", results);
@@ -489,11 +489,11 @@ async fn slow_link() {
     assert_within!(in_flight.mean, 1.0, 2.0, "{:#?}", results);
 
     let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
-    assert_within!(observed_rtt.min, 0.099, 0.110, "{:#?}", results);
-    assert_within!(observed_rtt.mean, 0.099, 0.310, "{:#?}", results);
+    assert_within!(observed_rtt.min, 0.090, 0.120, "{:#?}", results);
+    assert_within!(observed_rtt.mean, 0.090, 0.310, "{:#?}", results);
     let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
-    assert_within!(averaged_rtt.min, 0.099, 0.110, "{:#?}", results);
-    assert_within!(averaged_rtt.mean, 0.099, 0.310, "{:#?}", results);
+    assert_within!(averaged_rtt.min, 0.090, 0.120, "{:#?}", results);
+    assert_within!(averaged_rtt.mean, 0.090, 0.310, "{:#?}", results);
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
     assert_within!(concurrency_limit.mode, 1, 3, "{:#?}", results);
     assert_within!(concurrency_limit.mean, 1.0, 2.0, "{:#?}", results);
@@ -591,11 +591,11 @@ async fn medium_send() {
     assert_within!(in_flight.mean, 4.0, 6.0, "{:#?}", results);
 
     let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
-    assert_within!(observed_rtt.min, 0.099, 0.110, "{:#?}", results);
-    assert_within!(observed_rtt.mean, 0.099, 0.110, "{:#?}", results);
+    assert_within!(observed_rtt.min, 0.090, 0.120, "{:#?}", results);
+    assert_within!(observed_rtt.mean, 0.090, 0.120, "{:#?}", results);
     let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
-    assert_within!(averaged_rtt.min, 0.099, 0.110, "{:#?}", results);
-    assert_within!(averaged_rtt.mean, 0.099, 0.500, "{:#?}", results);
+    assert_within!(averaged_rtt.min, 0.090, 0.120, "{:#?}", results);
+    assert_within!(averaged_rtt.mean, 0.090, 0.500, "{:#?}", results);
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
     assert_within!(concurrency_limit.max, 4, MAX_CONCURRENCY, "{:#?}", results);
     let c_in_flight = results.cstats.in_flight.stats().unwrap();
@@ -624,9 +624,9 @@ async fn jittery_link_small() {
     assert_within!(in_flight.mean, 4.0, 20.0, "{:#?}", results);
 
     let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
-    assert_within!(observed_rtt.mean, 0.099, 0.130, "{:#?}", results);
+    assert_within!(observed_rtt.mean, 0.090, 0.130, "{:#?}", results);
     let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
-    assert_within!(averaged_rtt.mean, 0.099, 0.130, "{:#?}", results);
+    assert_within!(averaged_rtt.mean, 0.090, 0.130, "{:#?}", results);
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
     assert_within!(concurrency_limit.max, 6, MAX_CONCURRENCY, "{:#?}", results);
     assert_within!(
