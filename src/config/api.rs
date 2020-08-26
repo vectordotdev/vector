@@ -4,11 +4,14 @@ use std::net::{Ipv4Addr, SocketAddr};
 
 #[derive(Default, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Options {
-    #[serde(default = "default_api_enabled")]
+    #[serde(default = "default_enabled")]
     pub enabled: bool,
 
-    #[serde(default = "default_api_bind")]
+    #[serde(default = "default_bind")]
     pub bind: Option<SocketAddr>,
+
+    #[serde(default = "default_playground")]
+    pub playground: bool,
 }
 
 /// Determines whether the API server should start, stop or restart. Used by configuration
@@ -50,19 +53,30 @@ impl Difference {
 
 /// Updates the configuration to take into account API changes
 pub fn update_config(old_config: &mut Config, new_config: &Config) {
-    if new_config.api.enabled != default_api_enabled() {
+    // API enablement
+    if new_config.api.enabled != default_enabled() {
         old_config.api.enabled = new_config.api.enabled
     }
 
+    // IP/port
     if let Some(bind) = new_config.api.bind {
         old_config.api.bind = Some(bind)
     }
+
+    // Playground
+    if new_config.api.playground != default_playground() {
+        old_config.api.playground = new_config.api.playground;
+    }
 }
 
-fn default_api_enabled() -> bool {
+fn default_enabled() -> bool {
     false
 }
 
-fn default_api_bind() -> Option<SocketAddr> {
+fn default_bind() -> Option<SocketAddr> {
     Some(SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 8686))
+}
+
+fn default_playground() -> bool {
+    true
 }

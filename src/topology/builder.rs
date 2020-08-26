@@ -203,7 +203,7 @@ pub async fn build_pieces(
     #[cfg(feature = "api")]
     let api = match &diff.api {
         Some(api_diff) if api_diff.is_start_or_restart() => {
-            Some(Server::new(config.api.bind.unwrap()))
+            Some(Server::new(config.api.bind.unwrap()).set_playground(config.api.playground))
         }
         _ => None,
     };
