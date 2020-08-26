@@ -333,7 +333,6 @@ mod integration_test {
         compat::{Future01CompatExt, Sink01CompatExt},
         future, SinkExt,
     };
-    use futures01::Sink;
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
         Message, Offset, TopicPartitionList,
