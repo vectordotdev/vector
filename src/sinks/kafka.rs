@@ -329,8 +329,10 @@ mod integration_test {
         test_util::{random_lines_with_stream, random_string, wait_for},
         tls::TlsOptions,
     };
-    use futures::{compat::Future01CompatExt, future};
-    use futures01::Sink;
+    use futures::{
+        compat::{Future01CompatExt, Sink01CompatExt},
+        future, SinkExt,
+    };
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
         Message, Offset, TopicPartitionList,
@@ -462,9 +464,9 @@ mod integration_test {
         let sink = KafkaSink::new(config, acker).unwrap();
 
         let num_events = 1000;
-        let (input, events) = random_lines_with_stream(100, num_events);
+        let (input, mut events) = random_lines_with_stream(100, num_events);
 
-        let _ = sink.send_all(events).compat().await.unwrap();
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 
         // read back everything from the beginning
         let mut client_config = rdkafka::ClientConfig::new();

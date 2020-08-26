@@ -49,7 +49,7 @@ async fn pipe() {
     // Shut down server
     topology.stop().compat().await.unwrap();
 
-    let output_lines = output_lines.wait().await;
+    let output_lines = output_lines.await;
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);
 }
@@ -96,7 +96,7 @@ async fn sample() {
     // Shut down server
     topology.stop().compat().await.unwrap();
 
-    let output_lines = output_lines.wait().await;
+    let output_lines = output_lines.await;
     let num_output_lines = output_lines.len();
 
     let output_lines_ratio = num_output_lines as f32 / num_lines as f32;
@@ -151,8 +151,8 @@ async fn fork() {
     // Shut down server
     topology.stop().compat().await.unwrap();
 
-    let output_lines1 = output_lines1.wait().await;
-    let output_lines2 = output_lines2.wait().await;
+    let output_lines1 = output_lines1.await;
+    let output_lines2 = output_lines2.await;
     assert_eq!(num_lines, output_lines1.len());
     assert_eq!(num_lines, output_lines2.len());
     assert_eq!(input_lines, output_lines1);
@@ -212,8 +212,8 @@ async fn merge_and_fork() {
     // Shut down server
     topology.stop().compat().await.unwrap();
 
-    let output_lines1 = output_lines1.wait().await;
-    let output_lines2 = output_lines2.wait().await;
+    let output_lines1 = output_lines1.await;
+    let output_lines2 = output_lines2.await;
 
     assert_eq!(num_lines, output_lines2.len());
 
@@ -266,7 +266,7 @@ async fn reconnect() {
     // Shut down server and wait for it to fully flush
     topology.stop().compat().await.unwrap();
 
-    let output_lines = output_lines.wait().await;
+    let output_lines = output_lines.await;
     assert!(num_lines >= 2);
     assert!(output_lines.iter().all(|line| input_lines.contains(line)))
 }

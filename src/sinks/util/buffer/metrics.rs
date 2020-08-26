@@ -290,8 +290,8 @@ mod test {
         event::metric::{Metric, MetricValue, StatisticKind},
         Event,
     };
-    use futures::future;
-    use futures01::{Future, Sink};
+    use futures::{compat::Future01CompatExt, future};
+    use futures01::Sink;
     use pretty_assertions::assert_eq;
     use std::{
         collections::BTreeMap,
@@ -335,7 +335,7 @@ mod test {
         (buffered, sent_requests)
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn metric_buffer_counters() {
         let (sink, sent_batches) = sink();
 
@@ -376,7 +376,8 @@ mod test {
         let _ = sink
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
@@ -454,7 +455,7 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn metric_buffer_aggregated_counters() {
         let (sink, sent_batches) = sink();
 
@@ -486,7 +487,8 @@ mod test {
         let _ = sink
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
@@ -529,7 +531,7 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn metric_buffer_gauges() {
         let (sink, sent_batches) = sink();
 
@@ -559,7 +561,8 @@ mod test {
         let _ = sink
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
@@ -602,7 +605,7 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn metric_buffer_aggregated_gauges() {
         let (sink, sent_batches) = sink();
 
@@ -647,7 +650,8 @@ mod test {
         let _ = sink
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
@@ -697,7 +701,7 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn metric_buffer_sets() {
         let (sink, sent_batches) = sink();
 
@@ -731,7 +735,8 @@ mod test {
         let _ = sink
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
@@ -754,7 +759,7 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn metric_buffer_distributions() {
         let (sink, sent_batches) = sink();
 
@@ -792,7 +797,8 @@ mod test {
         let _ = sink
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
@@ -861,7 +867,7 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn metric_buffer_aggregated_histograms_absolute() {
         let (sink, sent_batches) = sink();
 
@@ -901,7 +907,8 @@ mod test {
         let _ = sink
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
@@ -951,7 +958,7 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn metric_buffer_aggregated_histograms_incremental() {
         let (sink, sent_batches) = sink();
 
@@ -991,7 +998,8 @@ mod test {
         let _ = sink
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
@@ -1029,7 +1037,7 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn metric_buffer_aggregated_summaries() {
         let (sink, sent_batches) = sink();
 
@@ -1055,7 +1063,8 @@ mod test {
         let _ = sink
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();

@@ -1152,7 +1152,7 @@ mod tests {
         }
 
         // Wait for before message
-        let events = collect_n(out, 1).compat().await.ok().unwrap();
+        let events = collect_n(out, 1).await.unwrap();
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],
             "before".into()
@@ -1180,7 +1180,7 @@ mod tests {
         let docker = docker().unwrap();
 
         let id = container_log_n(1, name, Some(label), message, &docker).await;
-        let events = collect_n(out, 1).compat().await.ok().unwrap();
+        let events = collect_n(out, 1).await.unwrap();
         container_remove(&id, &docker).await;
 
         let log = events[0].as_log();
@@ -1208,7 +1208,7 @@ mod tests {
         let docker = docker().unwrap();
 
         let id = container_log_n(2, name, None, message, &docker).await;
-        let events = collect_n(out, 2).compat().await.ok().unwrap();
+        let events = collect_n(out, 2).await.unwrap();
         container_remove(&id, &docker).await;
 
         assert_eq!(
@@ -1235,7 +1235,7 @@ mod tests {
 
         let id0 = container_log_n(1, name0, None, "13", &docker).await;
         let id1 = container_log_n(1, name1, None, message, &docker).await;
-        let events = collect_n(out, 1).compat().await.ok().unwrap();
+        let events = collect_n(out, 1).await.unwrap();
         container_remove(&id0, &docker).await;
         container_remove(&id1, &docker).await;
 
@@ -1260,7 +1260,7 @@ mod tests {
 
         let id0 = container_log_n(1, name0, None, "13", &docker).await;
         let id1 = container_log_n(1, name1, Some(label), message, &docker).await;
-        let events = collect_n(out, 1).compat().await.ok().unwrap();
+        let events = collect_n(out, 1).await.unwrap();
         container_remove(&id0, &docker).await;
         container_remove(&id1, &docker).await;
 
@@ -1282,7 +1282,7 @@ mod tests {
         let id = running_container(name, Some(label), message, &docker).await;
         let out = source_with(&[name], None);
 
-        let events = collect_n(out, 1).compat().await.ok().unwrap();
+        let events = collect_n(out, 1).await.unwrap();
         let _ = container_kill(&id, &docker).await;
         container_remove(&id, &docker).await;
 
@@ -1316,7 +1316,7 @@ mod tests {
         let docker = docker().unwrap();
 
         let id = container_log_n(1, name, None, message, &docker).await;
-        let events = collect_n(out, 1).compat().await.ok().unwrap();
+        let events = collect_n(out, 1).await.unwrap();
         container_remove(&id, &docker).await;
 
         assert_eq!(
@@ -1368,7 +1368,7 @@ mod tests {
         let exclude_out = source_with_config(config_ex);
         let include_out = source_with_config(config_in);
 
-        let _ = collect_n(include_out, 1).compat().await.ok().unwrap();
+        let _ = collect_n(include_out, 1).await.unwrap();
         let _ = container_kill(&id, &docker).await;
         container_remove(&id, &docker).await;
 
@@ -1390,7 +1390,7 @@ mod tests {
         let docker = docker().unwrap();
 
         let id = container_log_n(1, name, None, message.as_str(), &docker).await;
-        let events = collect_n(out, 1).compat().await.ok().unwrap();
+        let events = collect_n(out, 1).await.unwrap();
         container_remove(&id, &docker).await;
 
         let log = events[0].as_log();

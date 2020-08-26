@@ -223,8 +223,8 @@ mod tests {
         sinks::util::test::{build_test_server, load_sink},
         test_util::{next_addr, random_lines, trace_init},
     };
-    use futures::compat::Future01CompatExt;
-    use futures01::{Sink, Stream};
+    use futures::{compat::Future01CompatExt, StreamExt};
+    use futures01::Sink;
     use serde_json::json;
 
     #[test]
@@ -283,7 +283,7 @@ mod tests {
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let (rx, _trigger, server) = build_test_server(addr);
+        let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
         let lines = random_lines(100).take(10).collect::<Vec<_>>();
@@ -306,10 +306,10 @@ mod tests {
         let pump = sink.send_all(futures01::stream::iter_ok(events));
         let _ = pump.compat().await.unwrap();
 
-        let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();
+        let output = rx.next().await.unwrap();
 
-        let request = &output[0].0;
-        let body: serde_json::Value = serde_json::from_slice(&output[0].1[..]).unwrap();
+        let request = &output.0;
+        let body: serde_json::Value = serde_json::from_slice(&output.1[..]).unwrap();
 
         let query = request.uri.query().unwrap();
         assert!(query.contains("hostname=vector"));

@@ -343,7 +343,7 @@ mod tests {
         };
 
         let mut sink = FileSink::new(&config);
-        let (input, _) = random_lines_with_stream(100, 64);
+        let (input, _events) = random_lines_with_stream(100, 64);
 
         let events = stream::iter(input.clone().into_iter().map(Event::from));
         sink.run(events).await.unwrap();
@@ -400,7 +400,7 @@ mod tests {
 
         let mut sink = FileSink::new(&config);
 
-        let (mut input, _) = random_events_with_stream(32, 8);
+        let (mut input, _events) = random_events_with_stream(32, 8);
         input[0].as_mut_log().insert("date", "2019-26-07");
         input[0].as_mut_log().insert("level", "warning");
         input[1].as_mut_log().insert("date", "2019-26-07");
@@ -480,7 +480,7 @@ mod tests {
         };
 
         let mut sink = FileSink::new(&config);
-        let (mut input, _) = random_lines_with_stream(10, 64);
+        let (mut input, _events) = random_lines_with_stream(10, 64);
 
         let (mut tx, rx) = tokio::sync::mpsc::channel(1);
 

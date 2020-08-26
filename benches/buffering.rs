@@ -56,7 +56,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                         send_lines(in_addr, lines).await.unwrap();
 
                         topology.stop().compat().await.unwrap();
-                        assert_eq!(num_lines, output_lines.wait().await.len());
+                        assert_eq!(num_lines, output_lines.await.len());
                     });
                 },
             );
@@ -96,7 +96,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                         send_lines(in_addr, lines).await.unwrap();
                         tokio::time::delay_for(std::time::Duration::from_secs(100)).await;
                         topology.stop().compat().await.unwrap();
-                        assert_eq!(num_lines, output_lines.wait().await.len());
+                        assert_eq!(num_lines, output_lines.await.len());
                     });
                 },
             );
@@ -136,7 +136,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                         send_lines(in_addr, lines).await.unwrap();
                         tokio::time::delay_for(std::time::Duration::from_secs(100)).await;
                         topology.stop().compat().await.unwrap();
-                        assert_eq!(num_lines, output_lines.wait().await.len());
+                        assert_eq!(num_lines, output_lines.await.len());
                     });
                 },
             );

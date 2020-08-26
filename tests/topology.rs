@@ -42,7 +42,7 @@ fn into_message(event: Event) -> String {
         .to_string_lossy()
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test]
 async fn topology_shutdown_while_active() {
     let source_event_counter = Arc::new(AtomicUsize::new(0));
     let source_event_total = source_event_counter.clone();
@@ -80,7 +80,7 @@ async fn topology_shutdown_while_active() {
 
     // Now that shutdown has begun we should be able to drain the Sink without blocking forever,
     // as the source should shut down and close its output channel.
-    let processed_events = out1.collect().wait().unwrap();
+    let processed_events = out1.collect().compat().await.unwrap();
     assert_eq!(
         processed_events.len(),
         source_event_total.load(Ordering::Relaxed)
@@ -99,7 +99,7 @@ async fn topology_shutdown_while_active() {
     let _err: SendError<Event> = pump_handle.await.unwrap().unwrap_err();
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test]
 async fn topology_source_and_sink() {
     let (in1, source1) = source();
     let (out1, sink1) = sink(10);
@@ -111,16 +111,16 @@ async fn topology_source_and_sink() {
     let (topology, _crash) = start_topology(config, false).await;
 
     let event = Event::from("this");
-    in1.send(event.clone()).wait().unwrap();
+    in1.send(event.clone()).compat().await.unwrap();
 
     topology.stop().compat().await.unwrap();
 
-    let res = out1.collect().wait().unwrap();
+    let res = out1.collect().compat().await.unwrap();
 
     assert_eq!(vec![event], res);
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test]
 async fn topology_multiple_sources() {
     let (in1, source1) = source();
     let (in2, source2) = source();
@@ -136,13 +136,13 @@ async fn topology_multiple_sources() {
     let event1 = Event::from("this");
     let event2 = Event::from("that");
 
-    in1.send(event1.clone()).wait().unwrap();
+    in1.send(event1.clone()).compat().await.unwrap();
 
-    let (out_event1, out1) = out1.into_future().wait().unwrap();
+    let (out_event1, out1) = out1.into_future().compat().await.unwrap();
 
-    in2.send(event2.clone()).wait().unwrap();
+    in2.send(event2.clone()).compat().await.unwrap();
 
-    let (out_event2, _out1) = out1.into_future().wait().unwrap();
+    let (out_event2, _out1) = out1.into_future().compat().await.unwrap();
 
     topology.stop().compat().await.unwrap();
 
@@ -150,7 +150,7 @@ async fn topology_multiple_sources() {
     assert_eq!(out_event2, Some(event2));
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test]
 async fn topology_multiple_sinks() {
     let (in1, source1) = source();
     let (out1, sink1) = sink(10);
@@ -165,18 +165,18 @@ async fn topology_multiple_sinks() {
 
     let event = Event::from("this");
 
-    in1.send(event.clone()).wait().unwrap();
+    in1.send(event.clone()).compat().await.unwrap();
 
     topology.stop().compat().await.unwrap();
 
-    let res1 = out1.collect().wait().unwrap();
-    let res2 = out2.collect().wait().unwrap();
+    let res1 = out1.collect().compat().await.unwrap();
+    let res2 = out2.collect().compat().await.unwrap();
 
     assert_eq!(vec![event.clone()], res1);
     assert_eq!(vec![event], res2);
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test]
 async fn topology_transform_chain() {
     let (in1, source1) = source();
     let transform1 = transform(" first", 0.0);
@@ -193,11 +193,11 @@ async fn topology_transform_chain() {
 
     let event = Event::from("this");
 
-    in1.send(event).wait().unwrap();
+    in1.send(event).compat().await.unwrap();
 
     topology.stop().compat().await.unwrap();
 
-    let res = out1.map(into_message).collect().wait().unwrap();
+    let res = out1.map(into_message).collect().compat().await.unwrap();
 
     assert_eq!(vec!["this first second"], res);
 }

@@ -571,8 +571,11 @@ mod integration_tests {
         tls::TlsOptions,
         Event,
     };
-    use futures::compat::Future01CompatExt;
-    use futures01::{Sink, Stream};
+    use futures::{
+        compat::{Future01CompatExt, Sink01CompatExt},
+        SinkExt, TryStreamExt,
+    };
+    use futures01::Sink;
     use http::{Request, StatusCode};
     use hyper::Body;
     use serde_json::{json, Value};
@@ -728,27 +731,27 @@ mod integration_tests {
 
         healthcheck.compat().await.expect("Health check failed");
 
-        let (input, events) = random_events_with_stream(100, 100);
+        let (input, mut events) = random_events_with_stream(100, 100);
         match break_events {
             true => {
                 // Break all but the first event to simulate some kind of partial failure
                 let mut doit = false;
                 let _ = sink
-                    .send_all(events.map(move |mut event| {
+                    .sink_compat()
+                    .send_all(&mut events.map_ok(move |mut event| {
                         if doit {
                             event.as_mut_log().insert("_type", 1);
                         }
                         doit = true;
                         event
                     }))
-                    .compat()
                     .await
                     .expect("Sending events failed");
             }
             false => {
                 let _ = sink
-                    .send_all(events)
-                    .compat()
+                    .sink_compat()
+                    .send_all(&mut events)
                     .await
                     .expect("Sending events failed");
             }

@@ -2,8 +2,6 @@
 
 use bytes::Bytes;
 use futures::compat::Future01CompatExt;
-#[cfg(unix)]
-use futures::{stream, SinkExt, StreamExt};
 use rand::{thread_rng, Rng};
 use serde::Deserialize;
 use serde_json::Value;
@@ -12,13 +10,7 @@ use sinks::{
     util::{encoding::EncodingConfig, Encoding},
 };
 use std::{collections::HashMap, fmt, str::FromStr};
-#[cfg(unix)]
-use tokio::net::UnixStream;
 use tokio_util::codec::BytesCodec;
-#[cfg(unix)]
-use tokio_util::codec::{FramedWrite, LinesCodec};
-#[cfg(unix)]
-use vector::test_util::runtime;
 use vector::{
     config, sinks,
     sources::syslog::{Mode, SyslogConfig},
@@ -62,7 +54,7 @@ async fn test_tcp_syslog() {
     // Shut down server
     topology.stop().compat().await.unwrap();
 
-    let output_lines = output_lines.wait().await;
+    let output_lines = output_lines.await;
     assert_eq!(output_lines.len(), num_messages);
 
     let output_messages: Vec<SyslogMessageRFC5424> = output_lines
@@ -80,6 +72,11 @@ async fn test_tcp_syslog() {
 #[cfg(unix)]
 #[test]
 fn test_unix_stream_syslog() {
+    use futures::{stream, SinkExt, StreamExt};
+    use tokio::net::UnixStream;
+    use tokio_util::codec::{FramedWrite, LinesCodec};
+    use vector::test_util::runtime;
+
     let num_messages: usize = 10000;
 
     let in_path = tempfile::tempdir().unwrap().into_path().join("stream_test");
@@ -122,7 +119,7 @@ fn test_unix_stream_syslog() {
         // Shut down server
         topology.stop().compat().await.unwrap();
 
-        let output_lines = output_lines.wait().await;
+        let output_lines = output_lines.await;
         assert_eq!(output_lines.len(), num_messages);
 
         let output_messages: Vec<SyslogMessageRFC5424> = output_lines
@@ -186,7 +183,7 @@ async fn test_octet_counting_syslog() {
     // Shut down server
     topology.stop().compat().await.unwrap();
 
-    let output_lines = output_lines.wait().await;
+    let output_lines = output_lines.await;
     assert_eq!(output_lines.len(), num_messages);
 
     let output_messages: Vec<SyslogMessageRFC5424> = output_lines

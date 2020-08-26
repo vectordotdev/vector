@@ -282,15 +282,14 @@ mod integration_tests {
         },
         test_util::{random_events_with_stream, random_string},
     };
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
+    use futures::{compat::Sink01CompatExt, SinkExt};
     use rusoto_core::Region;
     use rusoto_firehose::{
         CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration, KinesisFirehose,
         KinesisFirehoseClient,
     };
     use serde_json::{json, Value};
-    use std::{thread, time::Duration};
+    use tokio::time::{delay_for, Duration};
 
     #[tokio::test]
     async fn firehose_put_records() {
@@ -325,11 +324,11 @@ mod integration_tests {
         let client = config.create_client(cx.resolver()).unwrap();
         let sink = KinesisFirehoseService::new(config, client, cx).unwrap();
 
-        let (input, events) = random_events_with_stream(100, 100);
+        let (input, mut events) = random_events_with_stream(100, 100);
 
-        let _ = sink.send_all(events).compat().await.unwrap();
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 
-        thread::sleep(Duration::from_secs(1));
+        delay_for(Duration::from_secs(1)).await;
 
         let config = ElasticSearchConfig {
             auth: Some(ElasticSearchAuth::Aws { assume_role: None }),

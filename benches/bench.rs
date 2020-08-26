@@ -83,7 +83,7 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
                         send_lines(in_addr, lines).await.unwrap();
 
                         topology.stop().compat().await.unwrap();
-                        assert_eq!(num_lines, output_lines.wait().await.len());
+                        assert_eq!(num_lines, output_lines.await.len());
                     });
                 },
             );
@@ -134,7 +134,7 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
                         send_lines(in_addr, lines).await.unwrap();
 
                         topology.stop().compat().await.unwrap();
-                        assert_eq!(num_lines, output_lines.wait().await.len());
+                        assert_eq!(num_lines, output_lines.await.len());
                     });
                 },
             );
@@ -185,7 +185,7 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
                         send_lines(in_addr, lines).await.unwrap();
 
                         topology.stop().compat().await.unwrap();
-                        assert_eq!(num_lines, output_lines.wait().await.len());
+                        assert_eq!(num_lines, output_lines.await.len());
                     });
                 },
             );
@@ -244,7 +244,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
                         std::thread::sleep(std::time::Duration::from_millis(100));
 
                         topology.stop().compat().await.unwrap();
-                        assert_eq!(num_lines * num_writers, output_lines.wait().await.len());
+                        assert_eq!(num_lines * num_writers, output_lines.await.len());
                     });
                 },
             );
@@ -314,8 +314,8 @@ fn benchmark_interconnected(c: &mut Criterion) {
                         send_lines(in_addr2, lines2).await.unwrap();
 
                         topology.stop().compat().await.unwrap();
-                        assert_eq!(num_lines * 2, output_lines1.wait().await.len());
-                        assert_eq!(num_lines * 2, output_lines2.wait().await.len());
+                        assert_eq!(num_lines * 2, output_lines1.await.len());
+                        assert_eq!(num_lines * 2, output_lines2.await.len());
                     });
                 },
             );
@@ -385,7 +385,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                         send_lines(in_addr, lines).await.unwrap();
 
                         topology.stop().compat().await.unwrap();
-                        assert_eq!(num_lines, output_lines.wait().await.len());
+                        assert_eq!(num_lines, output_lines.await.len());
                     });
                 },
             );
@@ -596,10 +596,10 @@ fn benchmark_complex(c: &mut Criterion) {
 
                         topology.stop().compat().await.unwrap();
 
-                        let output_lines_all = output_lines_all.wait().await.len();
-                        let output_lines_sampled = output_lines_sampled.wait().await.len();
-                        let output_lines_200 = output_lines_200.wait().await.len();
-                        let output_lines_404 = output_lines_404.wait().await.len();
+                        let output_lines_all = output_lines_all.await.len();
+                        let output_lines_sampled = output_lines_sampled.await.len();
+                        let output_lines_200 = output_lines_200.await.len();
+                        let output_lines_404 = output_lines_404.await.len();
 
                         assert_eq!(output_lines_all, num_lines * 2);
                         assert_relative_eq!(

@@ -144,13 +144,13 @@ impl Sink for Fanout {
 #[cfg(test)]
 mod tests {
     use super::{ControlMessage, Fanout};
-    use crate::{test_util::CollectCurrent, Event};
+    use crate::{test_util::collect_ready, Event};
     use futures::compat::Future01CompatExt;
     use futures01::{stream, sync::mpsc, Future, Sink, Stream};
     use tokio::time::{delay_for, Duration};
 
-    #[test]
-    fn fanout_writes_to_all() {
+    #[tokio::test]
+    async fn fanout_writes_to_all() {
         let (tx_a, rx_a) = mpsc::unbounded();
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::unbounded();
@@ -164,17 +164,14 @@ mod tests {
         let rec1 = Event::from("line 1".to_string());
         let rec2 = Event::from("line 2".to_string());
 
-        let fanout = fanout.send(rec1.clone()).wait().unwrap();
-        let _fanout = fanout.send(rec2.clone()).wait().unwrap();
+        let fanout = fanout.send(rec1.clone()).compat().await.unwrap();
+        let _fanout = fanout.send(rec2.clone()).compat().await.unwrap();
 
         assert_eq!(
-            CollectCurrent::new(rx_a).wait().unwrap().1,
+            collect_ready(rx_a).await.unwrap(),
             vec![rec1.clone(), rec2.clone()]
         );
-        assert_eq!(
-            CollectCurrent::new(rx_b).wait().unwrap().1,
-            vec![rec1, rec2]
-        );
+        assert_eq!(collect_ready(rx_b).await.unwrap(), vec![rec1, rec2]);
     }
 
     #[tokio::test]
@@ -212,8 +209,8 @@ mod tests {
         assert_eq!(collect_c.await.unwrap().unwrap(), recs);
     }
 
-    #[test]
-    fn fanout_grow() {
+    #[tokio::test]
+    async fn fanout_grow() {
         let (tx_a, rx_a) = mpsc::unbounded();
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::unbounded();
@@ -227,25 +224,25 @@ mod tests {
         let rec1 = Event::from("line 1".to_string());
         let rec2 = Event::from("line 2".to_string());
 
-        let fanout = fanout.send(rec1.clone()).wait().unwrap();
-        let mut fanout = fanout.send(rec2.clone()).wait().unwrap();
+        let fanout = fanout.send(rec1.clone()).compat().await.unwrap();
+        let mut fanout = fanout.send(rec2.clone()).compat().await.unwrap();
 
         let (tx_c, rx_c) = mpsc::unbounded();
         let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
         fanout.add("c".to_string(), tx_c);
 
         let rec3 = Event::from("line 3".to_string());
-        let _fanout = fanout.send(rec3.clone()).wait().unwrap();
+        let _fanout = fanout.send(rec3.clone()).compat().await.unwrap();
 
         assert_eq!(
-            CollectCurrent::new(rx_a).wait().unwrap().1,
+            collect_ready(rx_a).await.unwrap(),
             vec![rec1.clone(), rec2.clone(), rec3.clone()]
         );
         assert_eq!(
-            CollectCurrent::new(rx_b).wait().unwrap().1,
+            collect_ready(rx_b).await.unwrap(),
             vec![rec1, rec2, rec3.clone()]
         );
-        assert_eq!(CollectCurrent::new(rx_c).wait().unwrap().1, vec![rec3]);
+        assert_eq!(collect_ready(rx_c).await.unwrap(), vec![rec3]);
     }
 
     #[tokio::test]
@@ -263,8 +260,8 @@ mod tests {
         let rec1 = Event::from("line 1".to_string());
         let rec2 = Event::from("line 2".to_string());
 
-        let fanout = fanout.send(rec1.clone()).wait().unwrap();
-        let fanout = fanout.send(rec2.clone()).wait().unwrap();
+        let fanout = fanout.send(rec1.clone()).compat().await.unwrap();
+        let fanout = fanout.send(rec2.clone()).compat().await.unwrap();
 
         fanout_control
             .unbounded_send(ControlMessage::Remove("b".to_string()))
@@ -275,13 +272,10 @@ mod tests {
         let _fanout = fanout.send(rec3.clone()).compat().await.unwrap();
 
         assert_eq!(
-            CollectCurrent::new(rx_a).wait().unwrap().1,
+            collect_ready(rx_a).await.unwrap(),
             vec![rec1.clone(), rec2.clone(), rec3]
         );
-        assert_eq!(
-            CollectCurrent::new(rx_b).wait().unwrap().1,
-            vec![rec1, rec2]
-        );
+        assert_eq!(collect_ready(rx_b).await.unwrap(), vec![rec1, rec2]);
     }
 
     #[tokio::test]
@@ -399,19 +393,19 @@ mod tests {
         assert_eq!(collect_c.await.unwrap().unwrap(), recs);
     }
 
-    #[test]
-    fn fanout_no_sinks() {
+    #[tokio::test]
+    async fn fanout_no_sinks() {
         let fanout = Fanout::new().0;
 
         let rec1 = Event::from("line 1".to_string());
         let rec2 = Event::from("line 2".to_string());
 
-        let fanout = fanout.send(rec1).wait().unwrap();
-        let _fanout = fanout.send(rec2).wait().unwrap();
+        let fanout = fanout.send(rec1).compat().await.unwrap();
+        let _fanout = fanout.send(rec2).compat().await.unwrap();
     }
 
-    #[test]
-    fn fanout_replace() {
+    #[tokio::test]
+    async fn fanout_replace() {
         let (tx_a1, rx_a1) = mpsc::unbounded();
         let tx_a1 = Box::new(tx_a1.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::unbounded();
@@ -425,24 +419,24 @@ mod tests {
         let rec1 = Event::from("line 1".to_string());
         let rec2 = Event::from("line 2".to_string());
 
-        let fanout = fanout.send(rec1.clone()).wait().unwrap();
-        let mut fanout = fanout.send(rec2.clone()).wait().unwrap();
+        let fanout = fanout.send(rec1.clone()).compat().await.unwrap();
+        let mut fanout = fanout.send(rec2.clone()).compat().await.unwrap();
 
         let (tx_a2, rx_a2) = mpsc::unbounded();
         let tx_a2 = Box::new(tx_a2.sink_map_err(|_| unreachable!()));
         fanout.replace("a".to_string(), tx_a2);
 
         let rec3 = Event::from("line 3".to_string());
-        let _fanout = fanout.send(rec3.clone()).wait().unwrap();
+        let _fanout = fanout.send(rec3.clone()).compat().await.unwrap();
 
         assert_eq!(
-            CollectCurrent::new(rx_a1).wait().unwrap().1,
+            collect_ready(rx_a1).await.unwrap(),
             vec![rec1.clone(), rec2.clone()]
         );
         assert_eq!(
-            CollectCurrent::new(rx_b).wait().unwrap().1,
+            collect_ready(rx_b).await.unwrap(),
             vec![rec1, rec2, rec3.clone()]
         );
-        assert_eq!(CollectCurrent::new(rx_a2).wait().unwrap().1, vec![rec3]);
+        assert_eq!(collect_ready(rx_a2).await.unwrap(), vec![rec3]);
     }
 }

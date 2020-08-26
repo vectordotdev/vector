@@ -534,8 +534,8 @@ mod integration_tests {
     use bytes::{buf::BufExt, BytesMut};
     use flate2::read::GzDecoder;
     use futures::{
-        compat::Future01CompatExt,
-        stream::{self, StreamExt},
+        compat::{Future01CompatExt, Sink01CompatExt},
+        stream, SinkExt, StreamExt,
     };
     use futures01::Sink;
     use pretty_assertions::assert_eq;
@@ -554,9 +554,9 @@ mod integration_tests {
         let client = config.create_client(cx.resolver()).unwrap();
         let sink = config.new(client, cx).unwrap();
 
-        let (lines, events) = random_lines_with_stream(100, 10);
+        let (lines, mut events) = random_lines_with_stream(100, 10);
 
-        let _ = sink.send_all(events).compat().await.unwrap();
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 
         let keys = get_keys(prefix.unwrap()).await;
         assert_eq!(keys.len(), 1);
@@ -635,9 +635,9 @@ mod integration_tests {
         let client = config.create_client(cx.resolver()).unwrap();
         let sink = config.new(client, cx).unwrap();
 
-        let (lines, events) = random_lines_with_stream(100, 500);
+        let (lines, mut events) = random_lines_with_stream(100, 500);
 
-        let _ = sink.send_all(events).compat().await.unwrap();
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 
         let keys = get_keys(prefix.unwrap()).await;
         assert_eq!(keys.len(), 6);

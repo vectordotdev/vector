@@ -87,7 +87,7 @@ async fn test_sink_panic() {
     topology.stop().compat().await.unwrap();
     delay_for(Duration::from_millis(100)).await;
 
-    let output_lines = output_lines.wait().await;
+    let output_lines = output_lines.await;
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);
 }
@@ -166,7 +166,7 @@ async fn test_sink_error() {
     topology.stop().compat().await.unwrap();
     delay_for(Duration::from_millis(100)).await;
 
-    let output_lines = output_lines.wait().await;
+    let output_lines = output_lines.await;
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);
 }
@@ -232,7 +232,7 @@ async fn test_source_error() {
     topology.stop().compat().await.unwrap();
     delay_for(Duration::from_millis(100)).await;
 
-    let output_lines = output_lines.wait().await;
+    let output_lines = output_lines.await;
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);
 }
@@ -302,7 +302,7 @@ async fn test_source_panic() {
     topology.stop().compat().await.unwrap();
     delay_for(Duration::from_millis(100)).await;
 
-    let output_lines = output_lines.wait().await;
+    let output_lines = output_lines.await;
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);
 }
