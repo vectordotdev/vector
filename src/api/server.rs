@@ -88,7 +88,9 @@ impl Server {
                 .body(playground_source(
                     GraphQLPlaygroundConfig::new("/graphql").subscription_endpoint("/graphql"),
                 )),
-            false => Response::builder().status(404).body(String::new()),
+            false => Response::builder()
+                .header("content-type", "text/plain")
+                .body(String::from("GraphQL playground has been disabled")),
         });
 
         let routes = balanced_or_tree!(
