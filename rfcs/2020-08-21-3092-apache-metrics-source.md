@@ -1,8 +1,8 @@
 # RFC 3092 - 2020-08-21 - Apache HTTP Server metrics source
 
 This RFC is to introduce a new metrics source to consume metrics from the
-[Apache HTTP Server] (httpd). The high level plan is to implement a scrapper
-similar to the existing [prometheus
+[Apache HTTP Server](https://httpd.apache.org/) (httpd). The high level plan is
+to implement a scrapper similar to the existing [prometheus
 source](https://vector.dev/docs/reference/sources/prometheus/) that will scrape
 the Apache HTTP Server stats endpoint (provided by
 [`mod_status`](https://httpd.apache.org/docs/2.4/mod/mod_status.html)) on an
