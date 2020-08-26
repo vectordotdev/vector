@@ -78,16 +78,16 @@ impl SinkConfig for StatsdSinkConfig {
         let namespace = self.namespace.clone();
 
         let (client, healthcheck) = match &self.mode {
-            Mode::Tcp(ref config) => {
+            Mode::Tcp(config) => {
                 let (inner, healthcheck) = config.prepare(cx.clone())?;
                 (Client::Tcp(inner), healthcheck)
             }
-            Mode::Udp(ref config) => {
+            Mode::Udp(config) => {
                 let (inner, healthcheck) = config.prepare(cx.clone())?;
                 (Client::Udp(inner), healthcheck)
             }
             #[cfg(unix)]
-            Mode::Unix(ref config) => {
+            Mode::Unix(config) => {
                 let (inner, healthcheck) = config.prepare()?;
                 (Client::Unix(inner), healthcheck)
             }
