@@ -17,7 +17,7 @@ should be used for all pull requests:
 
 ## Expectations
 
-We endeavour to review all PRs within 48 business hours (Monday to Friday - broadly Eastern Time) of submission.
+We endeavour to review all PRs within 2 working days (Monday to Friday - broadly Eastern Time) of submission.
 
 ## Backward Compatibility
 
