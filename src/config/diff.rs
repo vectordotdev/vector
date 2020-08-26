@@ -7,7 +7,7 @@ use super::api;
 
 pub struct ConfigDiff {
     #[cfg(feature = "api")]
-    pub api: Option<api::Diff>,
+    pub api: Option<api::Difference>,
     pub sources: Difference,
     pub transforms: Difference,
     pub sinks: Difference,
@@ -21,7 +21,7 @@ impl ConfigDiff {
     pub fn new(old: &Config, new: &Config) -> Self {
         ConfigDiff {
             #[cfg(feature = "api")]
-            api: api::Diff::from_api(&old.api, &new.api),
+            api: api::Difference::new(&old.api, &new.api),
             sources: Difference::new(&old.sources, &new.sources),
             transforms: Difference::new(&old.transforms, &new.transforms),
             sinks: Difference::new(&old.sinks, &new.sinks),

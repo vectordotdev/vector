@@ -6,7 +6,7 @@ use async_graphql::{
 };
 use async_graphql_warp::{graphql_subscription, GQLResponse};
 use std::convert::Infallible;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use tokio::sync::oneshot;
 use warp::filters::BoxedFilter;
 use warp::{http::Response, Filter, Reply};
@@ -35,13 +35,13 @@ impl Server {
     }
 
     /// String representation of the bound IP address
-    pub fn ip(&self) -> String {
-        self.address.ip().to_string()
+    pub fn ip(&self) -> IpAddr {
+        self.address.ip()
     }
 
     /// String representation of the bound port
-    pub fn port(&self) -> String {
-        self.address.port().to_string()
+    pub fn port(&self) -> u16 {
+        self.address.port()
     }
 
     /// Stops the running API server

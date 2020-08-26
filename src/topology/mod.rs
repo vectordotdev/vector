@@ -399,11 +399,9 @@ impl RunningTopology {
 
         // Shutdown the API server, if applicable
         #[cfg(feature = "api")]
-        if let Some(api_diff) = &diff.api {
-            match api_diff {
-                api::Diff::Stop | api::Diff::Restart => self.stop_api(),
-                _ => return,
-            }
+        match &diff.api {
+            Some(api_diff) if api_diff.is_stop_or_restart() => self.stop_api(),
+            _ => {}
         }
     }
 
@@ -483,10 +481,10 @@ impl RunningTopology {
 
     #[cfg(feature = "api")]
     /// Starts/restarts the API server, if enabled in configuration
-    async fn spawn_api(&mut self, diff: &api::Diff, new_pieces: &mut builder::Pieces) {
+    async fn spawn_api(&mut self, diff: &api::Difference, new_pieces: &mut builder::Pieces) {
         let message = match diff {
-            api::Diff::Start => "Starting",
-            api::Diff::Restart => "Restarting",
+            api::Difference::Start => "Starting",
+            api::Difference::Restart => "Restarting",
             _ => return, // no effect if the server has stopped
         };
 
@@ -494,8 +492,8 @@ impl RunningTopology {
 
         info!(
             message = format!("{} API server", message).as_str(),
-            ip = server.ip().as_str(),
-            port = server.port().as_str()
+            ip = server.ip().to_string().as_str(),
+            port = server.port().to_string().as_str()
         );
 
         self.api = Some(server.run().await);

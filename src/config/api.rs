@@ -11,19 +11,39 @@ pub struct Options {
     pub bind: Option<SocketAddr>,
 }
 
-pub enum Diff {
+/// Determines whether the API server should start, stop or restart. Used by configuration
+/// and topology to spawn/stop the API server if needed, typically on config changes.
+pub enum Difference {
     Start,
     Stop,
     Restart,
 }
 
-impl Diff {
-    pub fn from_api(old: &Options, new: &Options) -> Option<Self> {
+impl Difference {
+    /// Determines whether the API server should start, stop or restart, based on the
+    /// previous configuration options, and the new ones
+    pub fn new(old: &Options, new: &Options) -> Option<Self> {
         match (old.enabled, new.enabled) {
-            (false, true) => Some(Diff::Start),
-            (true, false) => Some(Diff::Stop),
-            (true, true) if *old != *new => Some(Diff::Restart),
+            (false, true) => Some(Self::Start),
+            (true, false) => Some(Self::Stop),
+            (true, true) if *old != *new => Some(Self::Restart),
             _ => None,
+        }
+    }
+
+    /// Returns `true` if the API server should stop|restart
+    pub fn is_stop_or_restart(&self) -> bool {
+        match &self {
+            Self::Stop | Self::Restart => true,
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if the API server should start|restart
+    pub fn is_start_or_restart(&self) -> bool {
+        match &self {
+            Self::Start | Self::Restart => true,
+            _ => false,
         }
     }
 }
