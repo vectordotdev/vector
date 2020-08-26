@@ -1,31 +1,32 @@
 use crate::{
     config::{Config, ConfigDiff},
-    event::LogEvent,
     runtime::Runtime,
     topology::{self, RunningTopology},
     trace, Event,
 };
 use flate2::read::GzDecoder;
 use futures::{
-    compat::Stream01CompatExt, future, stream, FutureExt, SinkExt, Stream, StreamExt, TryFutureExt,
-    TryStreamExt,
+    compat::Stream01CompatExt, future, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream,
+    StreamExt, TryFutureExt, TryStreamExt,
 };
-use futures01::{
-    future as future01, stream as stream01, sync::mpsc, try_ready, Async, Future, Poll,
-    Stream as Stream01,
-};
+use futures01::{sync::mpsc, Stream as Stream01};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::{
     collections::HashMap,
     convert::Infallible,
     fs::File,
+    future::Future,
     io::Read,
-    iter, mem,
+    iter,
     net::{Shutdown, SocketAddr},
     path::{Path, PathBuf},
-    sync::atomic::{AtomicUsize, Ordering},
-    sync::Arc,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    task::{Context, Poll},
 };
 use tokio::{
     io::{AsyncRead, AsyncWrite, Result as IoResult},
@@ -194,35 +195,29 @@ pub fn temp_dir() -> PathBuf {
 pub fn random_lines_with_stream(
     len: usize,
     count: usize,
-) -> (Vec<String>, impl Stream01<Item = Event, Error = ()>) {
+) -> (Vec<String>, impl Stream<Item = Result<Event, ()>>) {
     let lines = (0..count).map(|_| random_string(len)).collect::<Vec<_>>();
-    let stream = stream01::iter_ok(lines.clone().into_iter().map(Event::from));
+    let stream = stream::iter(lines.clone()).map(Event::from).map(Ok);
     (lines, stream)
+}
+
+fn random_events_with_stream_generic<F>(
+    count: usize,
+    generator: F,
+) -> (Vec<Event>, impl Stream<Item = Result<Event, ()>>)
+where
+    F: Fn() -> Event,
+{
+    let events = (0..count).map(|_| generator()).collect::<Vec<_>>();
+    let stream = stream::iter(events.clone()).map(Ok);
+    (events, stream)
 }
 
 pub fn random_events_with_stream(
     len: usize,
     count: usize,
-) -> (Vec<Event>, impl Stream01<Item = Event, Error = ()>) {
+) -> (Vec<Event>, impl Stream<Item = Result<Event, ()>>) {
     random_events_with_stream_generic(count, move || Event::from(random_string(len)))
-}
-
-pub fn random_nested_events_with_stream(
-    len: usize,
-    breadth: usize,
-    depth: usize,
-    count: usize,
-) -> (Vec<Event>, impl Stream01<Item = Event, Error = ()>) {
-    random_events_with_stream_generic(count, move || {
-        let mut log = LogEvent::default();
-
-        let tree = random_pseudonested_map(len, breadth, depth);
-        for (k, v) in tree.into_iter() {
-            log.insert(k, v);
-        }
-
-        Event::Log(log)
-    })
 }
 
 pub fn random_string(len: usize) -> String {
@@ -251,16 +246,27 @@ pub fn random_maps(
     iter::repeat(()).map(move |_| random_map(max_size, field_len))
 }
 
-pub fn collect_n<T>(mut rx: mpsc::Receiver<T>, n: usize) -> impl Future<Item = Vec<T>, Error = ()> {
-    let mut events = Vec::new();
+pub async fn collect_n<T>(rx: mpsc::Receiver<T>, n: usize) -> Result<Vec<T>, ()> {
+    rx.compat().take(n).try_collect().await
+}
 
-    future01::poll_fn(move || {
-        while events.len() < n {
-            let e = try_ready!(rx.poll()).unwrap();
-            events.push(e);
+pub async fn collect_ready<S>(rx: S) -> Result<Vec<S::Item>, ()>
+where
+    S: Stream01<Item = Event, Error = ()>,
+{
+    let mut rx = rx.compat();
+
+    let waker = noop_waker_ref();
+    let mut cx = Context::from_waker(waker);
+
+    let mut vec = Vec::new();
+    loop {
+        match Pin::new(&mut rx).poll_next(&mut cx) {
+            Poll::Ready(Some(Ok(item))) => vec.push(item),
+            Poll::Ready(Some(Err(()))) => return Err(()),
+            Poll::Ready(None) | Poll::Pending => return Ok(vec),
         }
-        Ok(Async::Ready(mem::replace(&mut events, Vec::new())))
-    })
+    }
 }
 
 pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
@@ -289,7 +295,7 @@ pub fn runtime() -> Runtime {
 
 pub fn basic_scheduler_block_on_std<F>(future: F) -> F::Output
 where
-    F: std::future::Future + Send + 'static,
+    F: Future + Send + 'static,
     F::Output: Send + 'static,
 {
     // `tokio::time::advance` is not work on threaded scheduler
@@ -306,7 +312,7 @@ where
 pub async fn wait_for<F, Fut>(mut f: F)
 where
     F: FnMut() -> Fut,
-    Fut: std::future::Future<Output = bool> + Send + 'static,
+    Fut: Future<Output = bool> + Send + 'static,
 {
     let started = Instant::now();
     while !f().await {
@@ -334,109 +340,9 @@ where
     .await
 }
 
-#[derive(Debug)]
-pub struct CollectN<S>
-where
-    S: Stream01,
-{
-    stream: Option<S>,
-    remaining: usize,
-    items: Option<Vec<S::Item>>,
-}
-
-impl<S: Stream01> CollectN<S> {
-    pub fn new(s: S, n: usize) -> Self {
-        Self {
-            stream: Some(s),
-            remaining: n,
-            items: Some(Vec::new()),
-        }
-    }
-}
-
-impl<S> Future for CollectN<S>
-where
-    S: Stream01,
-{
-    type Item = (S, Vec<S::Item>);
-    type Error = S::Error;
-
-    fn poll(&mut self) -> Poll<(S, Vec<S::Item>), S::Error> {
-        let stream = self.stream.take();
-        if stream.is_none() {
-            panic!("Stream is missing");
-        }
-        let mut stream = stream.unwrap();
-
-        loop {
-            if self.remaining == 0 {
-                return Ok(Async::Ready((stream, self.items.take().unwrap())));
-            }
-            match stream.poll() {
-                Ok(Async::Ready(Some(e))) => {
-                    self.items.as_mut().unwrap().push(e);
-                    self.remaining -= 1;
-                }
-                Ok(Async::Ready(None)) => {
-                    return Ok(Async::Ready((stream, self.items.take().unwrap())));
-                }
-                Ok(Async::NotReady) => {
-                    self.stream.replace(stream);
-                    return Ok(Async::NotReady);
-                }
-                Err(e) => {
-                    return Err(e);
-                }
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct CollectCurrent<S>
-where
-    S: Stream01,
-{
-    stream: Option<S>,
-}
-
-impl<S: Stream01> CollectCurrent<S> {
-    pub fn new(s: S) -> Self {
-        Self { stream: Some(s) }
-    }
-}
-
-impl<S> Future for CollectCurrent<S>
-where
-    S: Stream01,
-{
-    type Item = (S, Vec<S::Item>);
-    type Error = S::Error;
-
-    fn poll(&mut self) -> Poll<(S, Vec<S::Item>), S::Error> {
-        if let Some(mut stream) = self.stream.take() {
-            let mut items = vec![];
-
-            loop {
-                match stream.poll() {
-                    Ok(Async::Ready(Some(e))) => items.push(e),
-                    Ok(Async::Ready(None)) | Ok(Async::NotReady) => {
-                        return Ok(Async::Ready((stream, items)));
-                    }
-                    Err(e) => {
-                        return Err(e);
-                    }
-                }
-            }
-        } else {
-            panic!("Future already completed");
-        }
-    }
-}
-
 pub struct CountReceiver<T> {
     count: Arc<AtomicUsize>,
-    trigger: oneshot::Sender<()>,
+    trigger: Option<oneshot::Sender<()>>,
     connected: Option<oneshot::Receiver<()>>,
     handle: JoinHandle<Vec<T>>,
 }
@@ -453,15 +359,10 @@ impl<T: Send + 'static> CountReceiver<T> {
         }
     }
 
-    pub async fn wait(self) -> Vec<T> {
-        let _ = self.trigger.send(());
-        self.handle.await.unwrap()
-    }
-
     fn new<F, Fut>(make_fut: F) -> CountReceiver<T>
     where
         F: FnOnce(Arc<AtomicUsize>, oneshot::Receiver<()>, oneshot::Sender<()>) -> Fut,
-        Fut: std::future::Future<Output = Vec<T>> + Send + 'static,
+        Fut: Future<Output = Vec<T>> + Send + 'static,
     {
         let count = Arc::new(AtomicUsize::new(0));
         let (trigger, tripwire) = oneshot::channel();
@@ -469,10 +370,24 @@ impl<T: Send + 'static> CountReceiver<T> {
 
         CountReceiver {
             count: Arc::clone(&count),
-            trigger,
+            trigger: Some(trigger),
             connected: Some(connected),
             handle: tokio::spawn(make_fut(count, tripwire, trigger_connected)),
         }
+    }
+}
+
+impl<T> Future for CountReceiver<T> {
+    type Output = Vec<T>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+        if let Some(trigger) = this.trigger.take() {
+            let _ = trigger.send(());
+        }
+
+        let result = futures::ready!(Pin::new(&mut this.handle).poll(cx));
+        Poll::Ready(result.unwrap())
     }
 }
 
@@ -553,50 +468,6 @@ impl CountReceiver<Event> {
                 .await
         })
     }
-}
-
-fn random_events_with_stream_generic<F>(
-    count: usize,
-    generator: F,
-) -> (Vec<Event>, impl Stream01<Item = Event, Error = ()>)
-where
-    F: Fn() -> Event,
-{
-    let events = (0..count).map(|_| generator()).collect::<Vec<_>>();
-    let stream = stream01::iter_ok(events.clone().into_iter());
-    (events, stream)
-}
-
-fn random_pseudonested_map(len: usize, breadth: usize, depth: usize) -> HashMap<String, String> {
-    if breadth == 0 || depth == 0 {
-        return HashMap::new();
-    }
-
-    if depth == 1 {
-        let mut leaf = HashMap::new();
-        leaf.insert(random_string(len), random_string(len));
-        return leaf;
-    }
-
-    let mut tree = HashMap::new();
-    for _ in 0..breadth {
-        let prefix = random_string(len);
-        let subtree = random_pseudonested_map(len, breadth, depth - 1);
-
-        let subtree: HashMap<String, String> = subtree
-            .into_iter()
-            .map(|(mut key, value)| {
-                key.insert(0, '.');
-                key.insert_str(0, &prefix[..]);
-                (key, value)
-            })
-            .collect();
-
-        for (key, value) in subtree.into_iter() {
-            tree.insert(key, value);
-        }
-    }
-    tree
 }
 
 pub async fn start_topology(
