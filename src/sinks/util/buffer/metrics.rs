@@ -335,7 +335,7 @@ mod test {
         (buffered, sent_requests)
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn metric_buffer_counters() {
         let (sink, sent_batches) = sink();
 
@@ -454,7 +454,7 @@ mod test {
         );
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn metric_buffer_aggregated_counters() {
         let (sink, sent_batches) = sink();
 
@@ -529,7 +529,7 @@ mod test {
         );
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn metric_buffer_gauges() {
         let (sink, sent_batches) = sink();
 
@@ -602,7 +602,7 @@ mod test {
         );
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn metric_buffer_aggregated_gauges() {
         let (sink, sent_batches) = sink();
 
@@ -697,7 +697,7 @@ mod test {
         );
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn metric_buffer_sets() {
         let (sink, sent_batches) = sink();
 
@@ -754,7 +754,7 @@ mod test {
         );
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn metric_buffer_distributions() {
         let (sink, sent_batches) = sink();
 
@@ -861,7 +861,7 @@ mod test {
         );
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn metric_buffer_aggregated_histograms_absolute() {
         let (sink, sent_batches) = sink();
 
@@ -951,7 +951,7 @@ mod test {
         );
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn metric_buffer_aggregated_histograms_incremental() {
         let (sink, sent_batches) = sink();
 
@@ -1029,7 +1029,7 @@ mod test {
         );
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn metric_buffer_aggregated_summaries() {
         let (sink, sent_batches) = sink();
 

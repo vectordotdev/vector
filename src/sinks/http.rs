@@ -388,7 +388,7 @@ mod tests {
         let _ = config.build(cx).unwrap();
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn http_happy_path_post() {
         let num_lines = 1000;
 
@@ -446,7 +446,7 @@ mod tests {
         assert_eq!(input_lines, output_lines);
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn http_happy_path_put() {
         let num_lines = 1000;
 
@@ -505,7 +505,7 @@ mod tests {
         assert_eq!(input_lines, output_lines);
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn http_passes_custom_headers() {
         let num_lines = 1000;
 
