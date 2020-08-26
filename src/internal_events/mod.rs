@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 mod add_fields;
 mod add_tags;
 mod ansi_stripper;
@@ -8,6 +10,8 @@ mod blackhole;
 mod docker;
 mod elasticsearch;
 mod generator;
+#[cfg(feature = "transforms-grok_parser")]
+mod grok_parser;
 mod heartbeat;
 mod http;
 #[cfg(all(unix, feature = "sources-journald"))]
@@ -24,7 +28,8 @@ mod lua;
 mod process;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
-mod regex;
+#[cfg(feature = "transforms-regex_parser")]
+mod regex_parser;
 mod sampler;
 #[cfg(any(
     feature = "sources-socket",
@@ -58,6 +63,8 @@ pub use self::docker::*;
 pub use self::elasticsearch::*;
 pub use self::file::*;
 pub use self::generator::*;
+#[cfg(feature = "transforms-grok_parser")]
+pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;
 pub use self::http::*;
 #[cfg(all(unix, feature = "sources-journald"))]
@@ -74,7 +81,8 @@ pub use self::lua::*;
 pub use self::process::*;
 #[cfg(feature = "sources-prometheus")]
 pub use self::prometheus::*;
-pub use self::regex::*;
+#[cfg(feature = "transforms-regex_parser")]
+pub(crate) use self::regex_parser::*;
 pub use self::sampler::*;
 #[cfg(any(
     feature = "sources-socket",
@@ -114,3 +122,26 @@ macro_rules! emit {
 
 // Modules that require emit! macro so they need to be defined after the macro.
 mod file;
+
+const ELLIPSIS: &str = "[...]";
+
+pub(self) fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
+    if s.len() >= maxlen {
+        let mut len = maxlen - ELLIPSIS.len();
+        while !s.is_char_boundary(len) {
+            len -= 1;
+        }
+        format!("{}{}", &s[..len], ELLIPSIS).into()
+    } else {
+        s.into()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn truncate_utf8() {
+        let message = "hello 😁 this is test";
+        assert_eq!("hello [...]", super::truncate_string_at(&message, 13));
+    }
+}

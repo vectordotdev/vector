@@ -67,11 +67,11 @@ pub struct RootOpts {
     pub threads: Option<usize>,
 
     /// Enable more detailed internal logging. Repeat to increase level. Overridden by `--quiet`.
-    #[structopt(short, long, env = "VECTOR_VERBOSE", parse(from_occurrences))]
+    #[structopt(short, long, parse(from_occurrences))]
     pub verbose: u8,
 
     /// Reduce detail of internal logging. Repeat to reduce further. Overrides `--verbose`.
-    #[structopt(short, long, env = "VECTOR_QUIET", parse(from_occurrences))]
+    #[structopt(short, long, parse(from_occurrences))]
     pub quiet: u8,
 
     /// Set the logging format
