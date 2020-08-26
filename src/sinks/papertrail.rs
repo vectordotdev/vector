@@ -16,7 +16,9 @@ use syslog::{Facility, Formatter3164, LogFormat, Severity};
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct PapertrailConfig {
-    endpoint: UriSerde,
+    // Deprecated name
+    #[serde(alias = "endpoint")]
+    address: UriSerde,
     encoding: EncodingConfig<Encoding>,
 }
 
@@ -28,14 +30,14 @@ inventory::submit! {
 impl SinkConfig for PapertrailConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
         let host = self
-            .endpoint
+            .address
             .host()
             .map(str::to_string)
-            .ok_or_else(|| "A host is required for endpoints".to_string())?;
+            .ok_or_else(|| "A host is required for address".to_string())?;
         let port = self
-            .endpoint
+            .address
             .port_u16()
-            .ok_or_else(|| "A port is required for endpoints".to_string())?;
+            .ok_or_else(|| "A port is required for address".to_string())?;
 
         let sink = TcpSink::new(
             host,

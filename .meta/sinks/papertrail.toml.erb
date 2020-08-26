@@ -31,9 +31,9 @@ write_to_description = "[Papertrail][urls.papertrail] via [Syslog][urls.papertra
   encodings: ["json", "text"],
 ) %>
 
-[sinks.papertrail.options.endpoint]
+[sinks.papertrail.options.address]
 type = "string"
 common = true
 required = true
 examples = ["logs.papertrailapp.com:12345"]
-description = "The endpoint to stream logs to."
+description = "The address to stream logs to."

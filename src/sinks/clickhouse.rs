@@ -21,7 +21,9 @@ use snafu::ResultExt;
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ClickhouseConfig {
-    pub host: String,
+    // Deprecated name
+    #[serde(alias = "host")]
+    pub endpoint: String,
     pub table: String,
     pub database: Option<String>,
     #[serde(default = "Compression::default_gzip")]
@@ -114,7 +116,7 @@ impl HttpSink for ClickhouseConfig {
             "default"
         };
 
-        let uri = encode_uri(&self.host, database, &self.table).expect("Unable to encode uri");
+        let uri = encode_uri(&self.endpoint, database, &self.table).expect("Unable to encode uri");
 
         let mut builder = Request::post(&uri).header("Content-Type", "application/x-ndjson");
 
@@ -134,7 +136,7 @@ impl HttpSink for ClickhouseConfig {
 
 async fn healthcheck(mut client: HttpClient, config: ClickhouseConfig) -> crate::Result<()> {
     // TODO: check if table exists?
-    let uri = format!("{}/?query=SELECT%201", config.host);
+    let uri = format!("{}/?query=SELECT%201", config.endpoint);
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
 
     if let Some(auth) = &config.auth {

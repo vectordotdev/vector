@@ -26,7 +26,9 @@ enum BuildError {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PulsarSinkConfig {
-    address: String,
+    // Deprecated name
+    #[serde(alias = "address")]
+    endpoint: String,
     topic: String,
     encoding: EncodingConfigWithDefault<Encoding>,
     auth: Option<AuthConfig>,
@@ -100,7 +102,7 @@ impl SinkConfig for PulsarSinkConfig {
 
 impl PulsarSinkConfig {
     async fn create_pulsar_producer(&self) -> Result<Producer<TokioExecutor>, PulsarError> {
-        let mut builder = Pulsar::builder(&self.address, TokioExecutor);
+        let mut builder = Pulsar::builder(&self.endpoint, TokioExecutor);
         if let Some(auth) = &self.auth {
             builder = builder.with_auth(Authentication {
                 name: auth.name.clone(),

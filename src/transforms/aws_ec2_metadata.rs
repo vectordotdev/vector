@@ -79,7 +79,9 @@ lazy_static::lazy_static! {
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Ec2Metadata {
-    host: Option<String>,
+    // Deprecated name
+    #[serde(alias = "host")]
+    endpoint: Option<String>,
     namespace: Option<String>,
     refresh_interval_secs: Option<u64>,
     fields: Option<Vec<String>>,
@@ -132,7 +134,7 @@ impl TransformConfig for Ec2Metadata {
         let keys = Keys::new(&namespace);
 
         let host = self
-            .host
+            .endpoint
             .clone()
             .map(|s| Uri::from_maybe_shared(s).unwrap())
             .unwrap_or_else(|| HOST.clone());

@@ -78,11 +78,11 @@ to use to ingest the data.
 If unset, Humio will default it to none.
 """
 
-[sinks.humio_logs.options.host]
+[sinks.humio_logs.options.endpoint]
 type = "string"
 default = "https://cloud.humio.com"
 examples = ["http://myhumiohost.com"]
-description = "The optional host to send Humio logs to."
+description = "The optional endpoint to send Humio logs to."
 
 <%= render("_partials/fields/_compression_options.toml",
   namespace: "sinks.humio_logs.options",

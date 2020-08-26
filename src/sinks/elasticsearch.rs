@@ -35,7 +35,9 @@ use std::convert::TryFrom;
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ElasticSearchConfig {
-    pub host: String,
+    // Deprecated name
+    #[serde(alias = "host")]
+    pub endpoint: String,
     pub index: Option<String>,
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
@@ -358,14 +360,14 @@ impl ElasticSearchCommon {
             _ => None,
         };
 
-        let base_url = config.host.clone();
+        let base_url = config.endpoint.clone();
         let region = match &config.aws {
             Some(region) => Region::try_from(region)?,
-            None => region_from_endpoint(&config.host)?,
+            None => region_from_endpoint(&config.endpoint)?,
         };
 
         // Test the configured host, but ignore the result
-        let uri = format!("{}/_test", &config.host);
+        let uri = format!("{}/_test", &config.endpoint);
         let uri = uri
             .parse::<Uri>()
             .with_context(|| InvalidHost { host: &base_url })?;

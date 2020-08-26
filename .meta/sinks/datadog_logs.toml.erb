@@ -37,12 +37,12 @@ examples = ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
 required = true
 description = "Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)"
 
-[sinks.datadog_logs.options.endpoint]
+[sinks.datadog_logs.options.address]
 type = "string"
 required = false
 default = "intake.logs.datadoghq.com:10516"
 examples = ["127.0.0.1:8080", "example.com:12345"]
-description = "The endpoint to stream logs to."
+description = "The address to stream logs to."
 
 <%= render(
   "_partials/fields/_tls_connector_options.toml",
