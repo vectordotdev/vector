@@ -86,7 +86,7 @@ fn load_from_inputs(
     for input in inputs {
         if let Err(errs) = load(input).and_then(|n| config.append(n)) {
             // TODO: add back paths
-            errors.extend(errs.iter().map(|e| format!("{}", e)));
+            errors.extend(errs.iter().map(|e| e.to_string()));
         }
     }
 
