@@ -74,7 +74,7 @@ impl SinkConfig for StatsdSinkConfig {
             .bytes(1300)
             .events(1000)
             .timeout(1)
-            .parse_config(self.batch.clone())?;
+            .parse_config(self.batch)?;
         let namespace = self.namespace.clone();
 
         let (client, healthcheck) = match &self.mode {
@@ -226,12 +226,10 @@ impl Service<Vec<u8>> for StatsdSvc {
         let client = self.client.clone();
         async move {
             let mut sink: ByteSink = match client {
-                Client::Udp(inner) => {
-                    Box::pin(inner.clone().into_sink().context(UdpError)?.sink_compat())
-                }
-                Client::Tcp(inner) => Box::pin(inner.clone().into_sink().sink_compat()),
+                Client::Udp(inner) => Box::pin(inner.into_sink().context(UdpError)?.sink_compat()),
+                Client::Tcp(inner) => Box::pin(inner.into_sink().sink_compat()),
                 #[cfg(unix)]
-                Client::Unix(inner) => Box::pin(inner.clone().into_sink().sink_compat()),
+                Client::Unix(inner) => Box::pin(inner.into_sink().sink_compat()),
             };
             sink.send(frame.into())
                 .await
@@ -245,11 +243,9 @@ impl Service<Vec<u8>> for StatsdSvc {
 #[cfg(test)]
 mod test {
     use super::*;
-    /*
     use crate::{
-        buffers::Acker,
         event::{metric::MetricKind, metric::MetricValue, metric::StatisticKind, Metric},
-        test_util::{collect_n, trace_init},
+        test_util::*,
         Event,
     };
     use bytes::Bytes;
@@ -260,7 +256,7 @@ mod test {
     use futures01::{sync::mpsc, Sink};
     use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
-    */
+
     #[cfg(feature = "sources-statsd")]
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
 
@@ -385,21 +381,26 @@ mod test {
         assert_eq!(metric1, metric2);
     }
 
-    /*
     #[tokio::test]
     async fn test_send_to_statsd() {
         trace_init();
 
+        let addr = next_addr();
+
         let config = StatsdSinkConfig {
             namespace: "vector".into(),
-            address: default_address(),
             batch: BatchConfig {
                 max_bytes: Some(512),
                 timeout_secs: Some(1),
                 ..Default::default()
             },
+            mode: Mode::Udp(UdpSinkConfig {
+                address: addr.to_string(),
+            }),
         };
-        let sink = StatsdSvc::new(config, Acker::Null).unwrap();
+
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).unwrap();
 
         let events = vec![
             Event::Metric(Metric {
@@ -423,7 +424,7 @@ mod test {
         ];
         let (tx, rx) = mpsc::channel(1);
 
-        let socket = UdpSocket::bind(default_address()).await.unwrap();
+        let socket = UdpSocket::bind(addr).await.unwrap();
         tokio::spawn(async move {
             UdpFramed::new(socket, BytesCodec::new())
                 .map_err(|e| error!("Error reading line: {:?}", e))
@@ -445,5 +446,4 @@ mod test {
             Bytes::from("vector.counter:1.5|c|#empty_tag:,normal_tag:value,true_tag\nvector.histogram:2|h|@0.01"),
         );
     }
-    */
 }
