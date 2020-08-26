@@ -212,16 +212,20 @@ impl Service<Vec<u8>> for StatsdSvc {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, frame: Vec<u8>) -> Self::Future {
-        use bytes::Bytes;
+    fn call(&mut self, mut frame: Vec<u8>) -> Self::Future {
         use futures::compat::Sink01CompatExt;
         use futures::Sink;
         use futures::SinkExt;
         use std::pin::Pin;
 
+        type ByteSink = Pin<Box<dyn Sink<bytes::Bytes, Error = ()> + 'static + Send>>;
+
+        if let Some(b'\n') = frame.last() {
+            frame.pop();
+        }
         let client = self.client.clone();
         async move {
-            let mut sink: Pin<Box<dyn Sink<Bytes, Error = ()> + 'static + Send>> = match client {
+            let mut sink: ByteSink = match client {
                 Client::Udp(inner) => {
                     Box::pin(inner.clone().into_sink().context(UdpError)?.sink_compat())
                 }
