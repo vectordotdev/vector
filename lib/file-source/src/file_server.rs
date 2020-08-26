@@ -199,6 +199,9 @@ where
             let mut global_bytes_read: usize = 0;
             let mut maxed_out_reading_single_file = false;
             for (&file_id, watcher) in &mut fp_map {
+                self.emitter
+                    .emit_file_open(&watcher.path, watcher.open_since);
+
                 if !watcher.should_read() {
                     continue;
                 }

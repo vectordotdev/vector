@@ -27,6 +27,7 @@ pub struct FileWatcher {
     is_dead: bool,
     last_read_attempt: Instant,
     last_read_success: Instant,
+    pub open_since: Instant,
 }
 
 impl FileWatcher {
@@ -93,6 +94,7 @@ impl FileWatcher {
             is_dead: false,
             last_read_attempt: ts,
             last_read_success: ts,
+            open_since: Instant::now(),
         })
     }
 

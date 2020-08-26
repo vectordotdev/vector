@@ -1,8 +1,9 @@
 use super::InternalEvent;
 use file_source::FileSourceInternalEvents;
-use metrics::counter;
+use metrics::{counter, gauge};
 use std::io::Error;
 use std::path::Path;
+use std::time::Instant;
 
 #[derive(Debug)]
 pub struct FileEventReceived<'a> {
@@ -256,6 +257,23 @@ impl InternalEvent for FileCheckpointWriteFailed {
     }
 }
 
+#[derive(Debug)]
+pub struct FileOpen<'a> {
+    pub path: &'a Path,
+    pub since: Instant,
+}
+
+impl<'a> InternalEvent for FileOpen<'a> {
+    fn emit_metrics(&self) {
+        gauge!(
+            "file_open_time_ms", self.since.elapsed().as_millis() as i64,
+            "component_kind" => "source",
+            "component_type" => "file",
+            "file" =>  self.path.to_string_lossy().to_string(),
+        );
+    }
+}
+
 pub struct FileSourceInternalEventsEmitter;
 
 impl FileSourceInternalEvents for FileSourceInternalEventsEmitter {
@@ -268,6 +286,10 @@ impl FileSourceInternalEvents for FileSourceInternalEventsEmitter {
             path,
             file_position
         });
+    }
+
+    fn emit_file_open(&self, path: &Path, since: Instant) {
+        emit!(FileOpen { path, since });
     }
 
     fn emit_file_watch_failed(&self, path: &Path, error: Error) {
