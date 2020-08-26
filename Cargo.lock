@@ -2048,20 +2048,18 @@ version = "0.8.4"
 source = "git+https://github.com/timberio/leveldb#64265815bcf1b69f30e6cb35bf687fbd6dd64afb"
 dependencies = [
  "db-key",
- "leveldb-sys 2.0.6",
+ "leveldb-sys 2.0.5",
  "leveldb-sys 3.0.0",
  "libc",
 ]
 
 [[package]]
 name = "leveldb-sys"
-version = "2.0.6"
+version = "2.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f4abc211bb716f076618bca48aaae128f6feb326195608f40f41a9cdbedc502"
+checksum = "71f46429bb70612c3e939aaeed27ffd31a24a773d21728a1a426e4089d6778d2"
 dependencies = [
- "cmake",
  "libc",
- "num_cpus",
 ]
 
 [[package]]
@@ -3609,9 +3607,9 @@ dependencies = [
 
 [[package]]
 name = "rdkafka-sys"
-version = "2.1.0+1.5.0"
+version = "2.0.0+1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d3f17044cba41c7309facedc72ca9bf25f177bf1e06756318e010f043713017"
+checksum = "d2c31c649704b732bb27e47748ff8a288b4f72eccc08b777b1a442b52152b11c"
 dependencies = [
  "cmake",
  "libc",
