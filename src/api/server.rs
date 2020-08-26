@@ -24,7 +24,7 @@ pub struct Server {
 
 impl Server {
     /// Returns a new API Server
-    pub fn new(address: SocketAddr) -> Server {
+    pub fn new(address: SocketAddr) -> Self {
         let (trigger_cancel, cancel_signal) = oneshot::channel::<()>();
 
         Server {
