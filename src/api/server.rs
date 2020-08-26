@@ -8,8 +8,7 @@ use async_graphql_warp::{graphql_subscription, GQLResponse};
 use std::convert::Infallible;
 use std::net::{IpAddr, SocketAddr};
 use tokio::sync::oneshot;
-use warp::filters::BoxedFilter;
-use warp::{http::Response, Filter, Reply};
+use warp::{http::Response, Filter};
 
 pub struct Server {
     /// Address for the API server to bind on
@@ -20,6 +19,9 @@ pub struct Server {
 
     /// Receiver signal to cancel running API server
     cancel_signal: Option<oneshot::Receiver<()>>,
+
+    /// Enables the playground
+    playground: bool,
 }
 
 impl Server {
@@ -31,7 +33,13 @@ impl Server {
             address,
             trigger_cancel,
             cancel_signal: Some(cancel_signal),
+            playground: true,
         }
+    }
+
+    pub fn set_playground(mut self, enable: bool) -> Self {
+        self.playground = enable;
+        self
     }
 
     /// String representation of the bound IP address
@@ -56,47 +64,39 @@ impl Server {
             .take()
             .expect("Run can only be called once");
 
-        let (_, server) =
-            warp::serve(make_routes()).bind_with_graceful_shutdown(self.address, async move {
-                let _ = rx.await;
-            });
+        // Build the GraphQL schema
+        let schema = schema::build_schema().finish();
 
-        tokio::spawn(server);
+        // Routes...
 
-        self
-    }
-}
+        // Health route
+        let health_route = warp::path("health").and_then(handler::health);
 
-/// Builds Warp routes, to be served
-fn make_routes() -> BoxedFilter<(impl Reply,)> {
-    // Health route
-    let health_route = warp::path("health").and_then(handler::health);
+        // GraphQL POST handler
+        let graphql_post = async_graphql_warp::graphql(schema.clone()).and_then(
+            |(schema, builder): (_, QueryBuilder)| async move {
+                let resp = builder.execute(&schema).await;
+                Ok::<_, Infallible>(GQLResponse::from(resp))
+            },
+        );
 
-    // Build the GraphQL schema
-    let schema = schema::build_schema().finish();
+        // GraphQL playground
+        let enable_playground = self.playground;
+        let graphql_playground = warp::path("playground").map(move || match enable_playground {
+            true => Response::builder()
+                .header("content-type", "text/html")
+                .body(playground_source(
+                    GraphQLPlaygroundConfig::new("/graphql").subscription_endpoint("/graphql"),
+                )),
+            false => Response::builder().status(404).body(String::new()),
+        });
 
-    // GraphQL POST handler
-    let graphql_post = async_graphql_warp::graphql(schema.clone()).and_then(
-        |(schema, builder): (_, QueryBuilder)| async move {
-            let resp = builder.execute(&schema).await;
-            Ok::<_, Infallible>(GQLResponse::from(resp))
-        },
-    );
-
-    // GraphQL playground. Also sets up /graphql as an endpoint for both queries + subscriptions
-    let graphql_playground = warp::path("playground").map(|| {
-        Response::builder()
-            .header("content-type", "text/html")
-            .body(playground_source(
-                GraphQLPlaygroundConfig::new("/graphql").subscription_endpoint("/graphql"),
-            ))
-    });
-
-    // All routes - allow any origin
-    let routes = graphql_subscription(schema)
-        .or(graphql_post)
-        .or(graphql_playground)
-        .or(health_route)
+        let routes = balanced_or_tree!(
+            graphql_subscription(schema),
+            health_route,
+            graphql_post,
+            graphql_playground
+        )
         .with(
             warp::cors()
                 .allow_any_origin()
@@ -118,5 +118,13 @@ fn make_routes() -> BoxedFilter<(impl Reply,)> {
                 .allow_methods(vec!["POST", "GET"]),
         );
 
-    routes.boxed()
+        let (_, server) =
+            warp::serve(routes).bind_with_graceful_shutdown(self.address, async move {
+                let _ = rx.await;
+            });
+
+        tokio::spawn(server);
+
+        self
+    }
 }

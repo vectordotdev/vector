@@ -335,6 +335,7 @@ impl Config {
             api: api::Options {
                 enabled: false,
                 bind: None,
+                playground: true,
             },
             sources: IndexMap::new(),
             sinks: IndexMap::new(),
