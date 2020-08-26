@@ -329,7 +329,7 @@ mod integration_test {
                 .unwrap()
                 .compat(),
         );
-        let events = collect_n(rx, 1).compat().await.ok().unwrap();
+        let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],

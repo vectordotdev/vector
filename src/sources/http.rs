@@ -287,7 +287,7 @@ mod tests {
 
         assert_eq!(200, send(addr, body).await);
 
-        let mut events = collect_n(rx, 2).compat().await.unwrap();
+        let mut events = collect_n(rx, 2).await.unwrap();
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -318,7 +318,7 @@ mod tests {
 
         assert_eq!(200, send(addr, body).await);
 
-        let mut events = collect_n(rx, 2).compat().await.unwrap();
+        let mut events = collect_n(rx, 2).await.unwrap();
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -350,7 +350,7 @@ mod tests {
         assert_eq!(200, send(addr, "{}").await); //can be one object or array of objects
         assert_eq!(200, send(addr, "[{},{},{}]").await);
 
-        let mut events = collect_n(rx, 2).compat().await.unwrap();
+        let mut events = collect_n(rx, 2).await.unwrap();
         assert!(events
             .remove(1)
             .as_log()
@@ -372,7 +372,7 @@ mod tests {
         assert_eq!(200, send(addr, r#"[{"key":"value"}]"#).await);
         assert_eq!(200, send(addr, r#"{"key2":"value2"}"#).await);
 
-        let mut events = collect_n(rx, 2).compat().await.unwrap();
+        let mut events = collect_n(rx, 2).await.unwrap();
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -402,7 +402,7 @@ mod tests {
             send(addr, "{\"key1\":\"value1\"}\n\n{\"key2\":\"value2\"}").await
         );
 
-        let mut events = collect_n(rx, 2).compat().await.unwrap();
+        let mut events = collect_n(rx, 2).await.unwrap();
         {
             let event = events.remove(0);
             let log = event.as_log();
@@ -442,7 +442,7 @@ mod tests {
             send_with_headers(addr, "{\"key1\":\"value1\"}", headers).await
         );
 
-        let mut events = collect_n(rx, 1).compat().await.unwrap();
+        let mut events = collect_n(rx, 1).await.unwrap();
         {
             let event = events.remove(0);
             let log = event.as_log();

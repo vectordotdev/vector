@@ -1,9 +1,11 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    sinks::http::{HttpMethod, HttpSinkConfig},
-    sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        BatchConfig, Compression, InFlightLimit, TowerRequestConfig,
+    sinks::{
+        http::{HttpMethod, HttpSinkConfig},
+        util::{
+            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+            BatchConfig, Compression, InFlightLimit, TowerRequestConfig,
+        },
     },
 };
 use http::Uri;
@@ -149,8 +151,8 @@ mod tests {
         test_util::next_addr,
     };
     use bytes::buf::BufExt;
-    use futures::compat::Future01CompatExt;
-    use futures01::{stream, Sink, Stream};
+    use futures::{compat::Future01CompatExt, stream, StreamExt};
+    use futures01::{stream as stream01, Sink};
     use hyper::Method;
     use serde_json::Value;
     use std::io::BufRead;
@@ -270,7 +272,7 @@ mod tests {
         assert!(http_config.auth.is_none());
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn new_relic_logs_happy_path() {
         let in_addr = next_addr();
 
@@ -286,7 +288,7 @@ mod tests {
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
-        let events = stream::iter_ok(input_lines.clone().into_iter().map(Event::from));
+        let events = stream01::iter_ok(input_lines.clone().into_iter().map(Event::from));
 
         let pump = sink.send_all(events);
 
@@ -296,9 +298,7 @@ mod tests {
         drop(trigger);
 
         let output_lines = rx
-            .wait()
-            .map(Result::unwrap)
-            .map(|(parts, body)| {
+            .flat_map(|(parts, body)| {
                 assert_eq!(Method::POST, parts.method);
                 assert_eq!("/fake_nr", parts.uri.path());
                 assert_eq!(
@@ -308,17 +308,18 @@ mod tests {
                         .and_then(|v| v.to_str().ok()),
                     Some("foo")
                 );
-                body.reader()
+                stream::iter(body.reader().lines())
             })
-            .flat_map(BufRead::lines)
             .map(Result::unwrap)
-            .flat_map(|s| -> Vec<String> {
-                let vals: Vec<Value> = serde_json::from_str(&s).unwrap();
-                vals.iter()
-                    .map(|v| v.get("message").unwrap().as_str().unwrap().to_owned())
-                    .collect()
+            .flat_map(|line| {
+                let vals: Vec<Value> = serde_json::from_str(&line).unwrap();
+                stream::iter(
+                    vals.into_iter()
+                        .map(|v| v.get("message").unwrap().as_str().unwrap().to_owned()),
+                )
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+            .await;
 
         assert_eq!(input_lines, output_lines);
     }

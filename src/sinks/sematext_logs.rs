@@ -101,12 +101,10 @@ mod tests {
     use super::*;
     use crate::{
         config::SinkConfig,
-        event::Event,
         sinks::util::test::{build_test_server, load_sink},
         test_util::{next_addr, random_lines_with_stream},
     };
-    use futures::compat::Future01CompatExt;
-    use futures01::{Sink, Stream};
+    use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
 
     #[tokio::test]
     async fn smoke() {
@@ -129,17 +127,16 @@ mod tests {
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let (rx, _trigger, server) = build_test_server(addr);
+        let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
-        let (expected, lines) = random_lines_with_stream(100, 10);
-        let pump = sink.send_all(lines.map(Event::from));
-        let _ = pump.compat().await.unwrap();
+        let (expected, mut events) = random_lines_with_stream(100, 10);
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 
-        let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();
+        let output = rx.next().await.unwrap();
 
         // A stream of `serde_json::Value`
-        let json = serde_json::Deserializer::from_slice(&output[0].1[..])
+        let json = serde_json::Deserializer::from_slice(&output.1[..])
             .into_iter::<serde_json::Value>()
             .map(|v| v.expect("decoding json"));
 
