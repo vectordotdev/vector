@@ -44,7 +44,7 @@ pub enum Region {
 #[typetag::serde(name = "sematext")]
 impl SinkConfig for SematextLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let host = match (&self.endpoint, &self.region) {
+        let endpoint = match (&self.endpoint, &self.region) {
             (Some(host), None) => host.clone(),
             (None, Some(Region::Na)) => "https://logsene-receiver.sematext.com".to_owned(),
             (None, Some(Region::Eu)) => "https://logsene-receiver.eu.sematext.com".to_owned(),
@@ -57,7 +57,7 @@ impl SinkConfig for SematextLogsConfig {
         };
 
         let (sink, healthcheck) = ElasticSearchConfig {
-            host,
+            endpoint,
             compression: Compression::None,
             doc_type: Some("logs".to_string()),
             index: Some(self.token.clone()),

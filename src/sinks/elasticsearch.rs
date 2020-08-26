@@ -373,7 +373,7 @@ impl ElasticSearchCommon {
             .with_context(|| InvalidHost { host: &base_url })?;
         if uri.host().is_none() {
             return Err(ParseError::HostMustIncludeHostname {
-                host: config.host.clone(),
+                host: config.endpoint.clone(),
             }
             .into());
         }

@@ -115,7 +115,7 @@ impl SinkConfig for DatadogConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        let uri = build_uri(&self.endpoint);
+        let uri = build_uri(&self.endpoint)?;
         let timestamp = Utc::now().timestamp();
 
         let sink = DatadogSink {
@@ -418,7 +418,7 @@ mod tests {
         let timestamp = Utc::now().timestamp();
         let sink = DatadogSink {
             config: sink,
-            uri: build_uri(&default_endpoint()),
+            uri: build_uri(&default_endpoint()).unwrap(),
             last_sent_timestamp: AtomicI64::new(timestamp),
         };
 

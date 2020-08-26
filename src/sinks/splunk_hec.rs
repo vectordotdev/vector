@@ -86,7 +86,7 @@ inventory::submit! {
 #[typetag::serde(name = "splunk_hec")]
 impl SinkConfig for HecSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        validate_host(&self.host)?;
+        validate_host(&self.endpoint)?;
 
         let batch = BatchSettings::default()
             .bytes(bytesize::mib(1u64))
