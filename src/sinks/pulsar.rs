@@ -227,10 +227,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
-    use futures::{
-        compat::{Future01CompatExt, Sink01CompatExt},
-        SinkExt, StreamExt,
-    };
+    use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
     use pulsar::SubType;
 
     #[tokio::test]
@@ -265,7 +262,7 @@ mod integration_tests {
         let (acker, ack_counter) = Acker::new_for_testing();
         let producer = cnf.create_pulsar_producer().await.unwrap();
         let sink = cnf.new_sink(producer, acker).unwrap();
-        let _ = sink.sink_compat().send_all(events).await.unwrap();
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
         assert_eq!(
             ack_counter.load(std::sync::atomic::Ordering::Relaxed),
             num_events

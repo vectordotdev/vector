@@ -359,11 +359,7 @@ mod integration_tests {
         region::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string},
     };
-    use futures::{
-        compat::{Future01CompatExt, Sink01CompatExt},
-        SinkExt,
-    };
-    use futures01::Sink;
+    use futures::{compat::Sink01CompatExt, SinkExt};
     use rusoto_core::Region;
     use rusoto_kinesis::{Kinesis, KinesisClient};
     use std::sync::Arc;

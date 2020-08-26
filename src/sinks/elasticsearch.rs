@@ -573,9 +573,9 @@ mod integration_tests {
     };
     use futures::{
         compat::{Future01CompatExt, Sink01CompatExt},
-        SinkExt,
+        SinkExt, TryStreamExt,
     };
-    use futures01::{Sink, Stream};
+    use futures01::Sink;
     use http::{Request, StatusCode};
     use hyper::Body;
     use serde_json::{json, Value};
@@ -738,7 +738,7 @@ mod integration_tests {
                 let mut doit = false;
                 let _ = sink
                     .sink_compat()
-                    .send_all(&mut events.map(move |mut event| {
+                    .send_all(&mut events.map_ok(move |mut event| {
                         if doit {
                             event.as_mut_log().insert("_type", 1);
                         }
