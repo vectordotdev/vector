@@ -63,7 +63,8 @@ tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "65547d8809
 # Metrics
 metrics = "0.12.1"
 metrics-core = "0.5.2"
-metrics-runtime = "0.13.0"
+metrics-runtime = "0.13.1"
+quanta = "0.3.2"
 
 # Aws
 rusoto_core = { version = "0.45.0", features = ["encoding"], optional = true }
@@ -92,6 +93,7 @@ goauth = { version = "0.7.1", optional = true }
 smpl_jwt = { version = "0.5.0", optional = true }
 
 # External libs
+atomic-shim = "0.1.0"
 derivative = "1.0"
 chrono = { version = "0.4.6", features = ["serde"] }
 rand = "0.5.5"

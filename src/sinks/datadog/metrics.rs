@@ -9,6 +9,7 @@ use crate::{
         BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
     },
 };
+use atomic_shim::AtomicI64;
 use chrono::{DateTime, Utc};
 use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
@@ -18,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicI64, Ordering::SeqCst};
+use std::sync::atomic::Ordering::SeqCst;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
