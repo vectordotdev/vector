@@ -8,7 +8,7 @@ impl InternalEvent for RemoveTagsEventProcessed {
     fn emit_metrics(&self) {
         counter!("events_processed", 1,
             "component_kind" => "transform",
-            "component_type" => "add_tags",
+            "component_type" => "remove_tags",
         );
     }
 }
