@@ -332,3 +332,5 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: make slim-builds
       - run: make test-integration-splunk
+        env:
+          AUTOSPAWN: false
