@@ -223,7 +223,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: make slim-builds
       - run: make test-integration-gcp
-      - env:
+        env:
           AUTOSPAWN: false
 
   test-integration-influxdb:
@@ -286,7 +286,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: make slim-builds
       - run: make test-integration-loki
-      - env:
+        env:
           AUTOSPAWN: false
 
   test-integration-pulsar:
