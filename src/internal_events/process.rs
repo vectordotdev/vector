@@ -58,18 +58,18 @@ impl InternalEvent for VectorStopped {
 }
 
 #[derive(Debug)]
-pub struct VectorQuited;
+pub struct VectorQuit;
 
-impl InternalEvent for VectorQuited {
+impl InternalEvent for VectorQuit {
     fn emit_logs(&self) {
         info!(
             target: "vector",
-            message = "Vector has quited."
+            message = "Vector has quit."
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("vector_quited_total", 1);
+        counter!("vector_quit_total", 1);
     }
 }
 
