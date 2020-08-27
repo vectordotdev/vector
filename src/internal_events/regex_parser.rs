@@ -1,6 +1,5 @@
 use super::InternalEvent;
 use metrics::counter;
-use std::borrow::Cow;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug)]
@@ -28,7 +27,7 @@ impl InternalEvent for RegexParserFailedMatch<'_> {
     fn emit_logs(&self) {
         warn!(
             message = "regex pattern failed to match.",
-            field = &truncate_string_at(&String::from_utf8_lossy(&self.value), 60)[..],
+            field = &super::truncate_string_at(&String::from_utf8_lossy(&self.value), 60)[..],
             rate_limit_secs = 30
         );
     }
@@ -106,28 +105,5 @@ impl<'a> InternalEvent for RegexParserConversionFailed<'a> {
             "component_type" => "regex_parser",
             "error_type" => "type_conversion_failed",
         );
-    }
-}
-
-const ELLIPSIS: &str = "[...]";
-
-fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
-    if s.len() >= maxlen {
-        let mut len = maxlen - ELLIPSIS.len();
-        while !s.is_char_boundary(len) {
-            len -= 1;
-        }
-        format!("{}{}", &s[..len], ELLIPSIS).into()
-    } else {
-        s.into()
-    }
-}
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn truncate_utf8() {
-        let message = "hello 😁 this is test";
-        assert_eq!("hello [...]", super::truncate_string_at(&message, 13));
     }
 }

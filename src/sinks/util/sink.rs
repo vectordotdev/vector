@@ -40,10 +40,8 @@ use futures::{
     FutureExt, TryFutureExt,
 };
 use futures01::{
-    future::Either,
-    stream::FuturesUnordered,
-    sync::oneshot::{self, Receiver},
-    try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
+    future::Either, stream::FuturesUnordered, sync::oneshot, try_ready, Async, AsyncSink, Future,
+    Poll, Sink, StartSend, Stream,
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -616,7 +614,7 @@ where
 
 struct ServiceSink<S, Request> {
     service: S,
-    in_flight: FuturesUnordered<Receiver<(usize, usize)>>,
+    in_flight: FuturesUnordered<oneshot::Receiver<(usize, usize)>>,
     acker: Acker,
     seq_head: usize,
     seq_tail: usize,
@@ -756,7 +754,7 @@ mod tests {
         test_util::{basic_scheduler_block_on_std, runtime},
     };
     use bytes::Bytes;
-    use futures::future;
+    use futures::{compat::Future01CompatExt, future};
     use futures01::Sink;
     use std::sync::{atomic::Ordering::Relaxed, Arc, Mutex};
     use tokio::task::yield_now;
@@ -775,7 +773,7 @@ mod tests {
         tokio::time::resume();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn batch_sink_acking_sequential() {
         let (acker, ack_counter) = Acker::new_for_testing();
 
@@ -786,7 +784,8 @@ mod tests {
         let _ = buffered
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(0..22))
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         assert_eq!(ack_counter.load(Relaxed), 22);
@@ -865,7 +864,7 @@ mod tests {
         });
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn batch_sink_buffers_messages_until_limit() {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
@@ -883,7 +882,8 @@ mod tests {
         let _ = buffered
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(0..22))
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         let output = sent_requests.lock().unwrap();
@@ -897,7 +897,7 @@ mod tests {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn batch_sink_flushes_below_min_on_close() {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
@@ -915,7 +915,8 @@ mod tests {
         assert!(buffered.start_send(1).unwrap().is_ready());
 
         futures01::future::poll_fn(|| buffered.close())
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         let output = sent_requests.lock().unwrap();
@@ -952,7 +953,7 @@ mod tests {
         });
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn partition_batch_sink_buffers_messages_until_limit() {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
@@ -969,7 +970,8 @@ mod tests {
         let (_buffered, _) = buffered
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(0..22))
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         let output = sent_requests.lock().unwrap();
@@ -983,7 +985,7 @@ mod tests {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn partition_batch_sink_buffers_by_partition_buffer_size_one() {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
@@ -1001,7 +1003,8 @@ mod tests {
         let (_buffered, _) = buffered
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(input))
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         let mut output = sent_requests.lock().unwrap();
@@ -1009,7 +1012,7 @@ mod tests {
         assert_eq!(&*output, &vec![vec![Partitions::A], vec![Partitions::B]]);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn partition_batch_sink_buffers_by_partition_buffer_size_two() {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
@@ -1027,7 +1030,8 @@ mod tests {
         let (_buffered, _) = buffered
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(input))
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         let mut output = sent_requests.lock().unwrap();
