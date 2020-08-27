@@ -372,7 +372,7 @@ impl Config {
     pub fn get_inputs(&self, identifier: &str) -> Vec<String> {
         self.expansions
             .get(identifier)
-            .map(|v| v.clone())
+            .cloned()
             .unwrap_or_else(|| vec![String::from(identifier)])
     }
 
