@@ -3,7 +3,7 @@ mod support;
 use crate::support::{sink, source};
 use reqwest;
 use vector::config::Config;
-use vector::test_util::{next_addr, start_topology, wait_for_tcp};
+use vector::test_util::{next_addr, start_topology, wait_for_tcp_in_secs};
 
 fn api_enabled_config() -> Config {
     let mut config = Config::empty();
@@ -21,8 +21,8 @@ async fn api_config() {
     let config = api_enabled_config();
     let addr = config.api.bind.unwrap();
 
-    let _ = start_topology(config, false).await;
-    wait_for_tcp(addr.clone()).await;
+    let (mut _top, _) = start_topology(config, false).await;
+    wait_for_tcp_in_secs(addr.clone(), 30).await;
 
     let url = format!("http://{}:{}/health", addr.ip(), addr.port());
     let res = reqwest::get(url.as_str())
