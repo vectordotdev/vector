@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use vector::{
     config::{self, Config, ConfigDiff},
     topology,
@@ -41,7 +42,7 @@ async fn api_enabled() {
           encoding.codec = "json" # required
         "#;
 
-    let configs = vec![
+    let valid_configs = vec![
         // Enabled
         r#"
         [api]
@@ -60,8 +61,46 @@ async fn api_enabled() {
         "#,
     ];
 
-    for c in configs {
+    for c in valid_configs {
         load([c, stub].join("\n").as_str()).await.unwrap();
+    }
+
+    let mut invalid_configs = HashMap::new();
+
+    // Requires an IP address; localhost should fail
+    invalid_configs.insert(
+        r#"
+            [api]
+              enabled = true
+              bind = "localhost:8686"
+        "#,
+        "invalid IP address syntax",
+    );
+
+    // `api.enabled` should be a bool
+    invalid_configs.insert(
+        r#"
+            [api]
+              enabled = 1
+              bind = true
+        "#,
+        "expected a boolean for key `api.enabled`",
+    );
+
+    // Bind should be a socket address
+    invalid_configs.insert(
+        r#"
+            [api]
+              enabled = true
+              bind = true
+        "#,
+        "expected socket address for key `api.bind`",
+    );
+
+    for (c, expected_err) in invalid_configs {
+        for err in load([c, stub].join("\n").as_str()).await.unwrap_err() {
+            assert!(err.contains(expected_err));
+        }
     }
 }
 
