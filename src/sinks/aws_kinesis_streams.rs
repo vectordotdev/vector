@@ -357,15 +357,16 @@ mod integration_tests {
     use crate::{
         config::SinkContext,
         region::RegionOrEndpoint,
-        test_util::{random_lines_with_stream, random_string, runtime},
+        test_util::{random_lines_with_stream, random_string},
     };
-    use futures01::Sink;
+    use futures::{compat::Sink01CompatExt, SinkExt};
     use rusoto_core::Region;
     use rusoto_kinesis::{Kinesis, KinesisClient};
     use std::sync::Arc;
+    use tokio::time::{delay_for, Duration};
 
-    #[test]
-    fn kinesis_put_records() {
+    #[tokio::test]
+    async fn kinesis_put_records() {
         let stream = gen_stream();
 
         let region = Region::Custom {
@@ -373,8 +374,7 @@ mod integration_tests {
             endpoint: "http://localhost:4568".into(),
         };
 
-        let mut rt = runtime();
-        rt.block_on_std(ensure_stream(region.clone(), stream.clone()));
+        ensure_stream(region.clone(), stream.clone()).await;
 
         let config = KinesisSinkConfig {
             stream_name: stream.clone(),
@@ -397,17 +397,14 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 
-        let (mut input_lines, events) = random_lines_with_stream(100, 11);
+        let (mut input_lines, mut events) = random_lines_with_stream(100, 11);
 
-        let pump = sink.send_all(events);
-        let _ = rt.block_on(pump).unwrap();
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        delay_for(Duration::from_secs(1)).await;
 
         let timestamp = timestamp as f64 / 1000.0;
-        let records = rt
-            .block_on_std(fetch_records(stream, timestamp, region))
-            .unwrap();
+        let records = fetch_records(stream, timestamp, region).await.unwrap();
 
         let mut output_lines = records
             .into_iter()

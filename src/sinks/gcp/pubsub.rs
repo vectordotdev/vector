@@ -213,9 +213,11 @@ mod tests {
 #[cfg(feature = "gcp-pubsub-integration-tests")]
 mod integration_tests {
     use super::*;
-    use crate::test_util::{random_events_with_stream, random_string, runtime, trace_init};
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
+    use crate::test_util::{random_events_with_stream, random_string, trace_init};
+    use futures::{
+        compat::{Future01CompatExt, Sink01CompatExt},
+        SinkExt,
+    };
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
 
@@ -239,53 +241,47 @@ mod integration_tests {
             .expect("Building sink failed")
     }
 
-    #[test]
-    fn publish_events() {
+    #[tokio::test]
+    async fn publish_events() {
         trace_init();
 
-        let mut rt = runtime();
-        rt.block_on_std(async {
-            let (topic, subscription) = create_topic_subscription().await;
-            let (sink, healthcheck) = config_build(&topic).await;
+        let (topic, subscription) = create_topic_subscription().await;
+        let (sink, healthcheck) = config_build(&topic).await;
 
-            healthcheck.compat().await.expect("Health check failed");
+        healthcheck.compat().await.expect("Health check failed");
 
-            let (input, events) = random_events_with_stream(100, 100);
-            let _ = sink
-                .send_all(events)
-                .compat()
-                .await
-                .expect("Sending events failed");
+        let (input, mut events) = random_events_with_stream(100, 100);
+        let _ = sink
+            .sink_compat()
+            .send_all(&mut events)
+            .await
+            .expect("Sending events failed");
 
-            let response = pull_messages(&subscription, 1000).await;
-            let messages = response
-                .receivedMessages
-                .as_ref()
-                .expect("Response is missing messages");
-            assert_eq!(input.len(), messages.len());
-            for i in 0..input.len() {
-                let data = messages[i].message.decode_data();
-                let data = serde_json::to_value(data).unwrap();
-                let expected = serde_json::to_value(input[i].as_log().all_fields()).unwrap();
-                assert_eq!(data, expected);
-            }
-        });
+        let response = pull_messages(&subscription, 1000).await;
+        let messages = response
+            .receivedMessages
+            .as_ref()
+            .expect("Response is missing messages");
+        assert_eq!(input.len(), messages.len());
+        for i in 0..input.len() {
+            let data = messages[i].message.decode_data();
+            let data = serde_json::to_value(data).unwrap();
+            let expected = serde_json::to_value(input[i].as_log().all_fields()).unwrap();
+            assert_eq!(data, expected);
+        }
     }
 
-    #[test]
-    fn checks_for_valid_topic() {
+    #[tokio::test]
+    async fn checks_for_valid_topic() {
         trace_init();
 
-        let mut rt = runtime();
-        rt.block_on_std(async {
-            let (topic, _subscription) = create_topic_subscription().await;
-            let topic = format!("BAD{}", topic);
-            let (_sink, healthcheck) = config_build(&topic).await;
-            healthcheck
-                .compat()
-                .await
-                .expect_err("Health check did not fail");
-        });
+        let (topic, _subscription) = create_topic_subscription().await;
+        let topic = format!("BAD{}", topic);
+        let (_sink, healthcheck) = config_build(&topic).await;
+        healthcheck
+            .compat()
+            .await
+            .expect_err("Health check did not fail");
     }
 
     async fn create_topic_subscription() -> (String, String) {

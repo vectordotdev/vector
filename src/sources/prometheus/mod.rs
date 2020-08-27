@@ -152,8 +152,10 @@ mod test {
         Error,
     };
     use futures::compat::Future01CompatExt;
-    use hyper::service::{make_service_fn, service_fn};
-    use hyper::{Body, Client, Response, Server};
+    use hyper::{
+        service::{make_service_fn, service_fn},
+        {Body, Client, Response, Server},
+    };
     use pretty_assertions::assert_eq;
     use tokio::time::{delay_for, Duration};
 

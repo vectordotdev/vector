@@ -8,6 +8,7 @@ use crate::{
     },
     template::Template,
 };
+use async_compression::tokio_02::write::GzipEncoder;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::pin_mut;
@@ -34,6 +35,11 @@ pub struct FileSinkConfig {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub compression: Compression,
 }
 
 inventory::submit! {
@@ -50,6 +56,61 @@ pub enum Encoding {
 impl Default for Encoding {
     fn default() -> Self {
         Encoding::Text
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum Compression {
+    Gzip,
+    None,
+}
+
+impl Default for Compression {
+    fn default() -> Self {
+        Compression::None
+    }
+}
+
+enum OutFile {
+    Regular(File),
+    Gzip(GzipEncoder<File>),
+}
+
+impl OutFile {
+    fn new(file: File, compression: Compression) -> Self {
+        match compression {
+            Compression::None => OutFile::Regular(file),
+            Compression::Gzip => OutFile::Gzip(GzipEncoder::new(file)),
+        }
+    }
+
+    async fn sync_all(&mut self) -> Result<(), std::io::Error> {
+        match self {
+            OutFile::Regular(file) => file.sync_all().await,
+            OutFile::Gzip(gzip) => gzip.get_mut().sync_all().await,
+        }
+    }
+
+    async fn shutdown(&mut self) -> Result<(), std::io::Error> {
+        match self {
+            OutFile::Regular(file) => file.shutdown().await,
+            OutFile::Gzip(gzip) => gzip.shutdown().await,
+        }
+    }
+
+    async fn write_all(&mut self, src: &[u8]) -> Result<(), std::io::Error> {
+        match self {
+            OutFile::Regular(file) => file.write_all(src).await,
+            OutFile::Gzip(gzip) => gzip.write_all(src).await,
+        }
+    }
+
+    /// Shutdowns by flushing data, writing headers, and syncing all of that
+    /// data and metadata to the filesystem.
+    async fn close(&mut self) -> Result<(), std::io::Error> {
+        self.shutdown().await?;
+        self.sync_all().await
     }
 }
 
@@ -76,7 +137,8 @@ pub struct FileSink {
     path: Template,
     encoding: EncodingConfigWithDefault<Encoding>,
     idle_timeout: Duration,
-    files: ExpiringHashMap<Bytes, File>,
+    files: ExpiringHashMap<Bytes, OutFile>,
+    compression: Compression,
 }
 
 impl FileSink {
@@ -86,6 +148,7 @@ impl FileSink {
             encoding: config.encoding.clone(),
             idle_timeout: Duration::from_secs(config.idle_timeout_secs.unwrap_or(30)),
             files: ExpiringHashMap::default(),
+            compression: config.compression,
         }
     }
 
@@ -121,6 +184,17 @@ impl FileSink {
                         None => {
                             // If we got `None` - terminate the processing.
                             debug!(message = "Receiver exhausted, terminating the processing loop.");
+
+                            // Close all the open files.
+                            debug!(message = "Closing all the open files");
+                            for (path, file) in self.files.iter_mut() {
+                                if let Err(error) = file.close().await {
+                                    error!(message = "Failed to close file.", ?path, %error);
+                                } else{
+                                    trace!(message = "Successfully closed file", ?path);
+                                }
+                            }
+
                             break;
                         }
                         Some(event) => self.process_event(event).await,
@@ -134,8 +208,8 @@ impl FileSink {
                         Some(Ok((mut expired_file, path))) => {
                             // We got an expired file. All we really want is to
                             // flush and close it.
-                            if let Err(error) = expired_file.flush().await {
-                                error!(message = "Failed to flush file.", ?path, %error);
+                            if let Err(error) = expired_file.close().await {
+                                error!(message = "Failed to close file.", ?path, %error);
                             }
                             drop(expired_file); // ignore close error
                         }
@@ -180,7 +254,10 @@ impl FileSink {
                     return;
                 }
             };
-            self.files.insert_at(path.clone(), file, next_deadline);
+
+            let outfile = OutFile::new(file, self.compression);
+
+            self.files.insert_at(path.clone(), outfile, next_deadline);
             self.files.get_mut(&path).unwrap()
         };
 
@@ -220,7 +297,7 @@ pub fn encode_event(encoding: &EncodingConfigWithDefault<Encoding>, mut event: E
 }
 
 async fn write_event_to_file(
-    file: &mut File,
+    file: &mut OutFile,
     event: Event,
     encoding: &EncodingConfigWithDefault<Encoding>,
 ) -> Result<(), std::io::Error> {
@@ -245,16 +322,16 @@ mod tests {
     use crate::{
         event,
         test_util::{
-            self, lines_from_file, random_events_with_stream, random_lines_with_stream, temp_dir,
-            temp_file,
+            lines_from_file, lines_from_gzip_file, random_events_with_stream,
+            random_lines_with_stream, temp_dir, temp_file, trace_init,
         },
     };
     use futures::stream;
     use std::convert::TryInto;
 
-    #[test]
-    fn single_partition() {
-        test_util::trace_init();
+    #[tokio::test]
+    async fn single_partition() {
+        trace_init();
 
         let template = temp_file();
 
@@ -262,17 +339,14 @@ mod tests {
             path: template.clone().try_into().unwrap(),
             idle_timeout_secs: None,
             encoding: Encoding::Text.into(),
+            compression: Compression::None,
         };
 
         let mut sink = FileSink::new(&config);
-        let (input, _) = random_lines_with_stream(100, 64);
+        let (input, _events) = random_lines_with_stream(100, 64);
 
         let events = stream::iter(input.clone().into_iter().map(Event::from));
-
-        let mut rt = crate::test_util::runtime();
-        let _ = rt
-            .block_on_std(async move { sink.run(events).await })
-            .unwrap();
+        sink.run(events).await.unwrap();
 
         let output = lines_from_file(template);
         for (input, output) in input.into_iter().zip(output) {
@@ -280,9 +354,35 @@ mod tests {
         }
     }
 
-    #[test]
-    fn many_partitions() {
-        test_util::trace_init();
+    #[tokio::test]
+    async fn single_partition_gzip() {
+        trace_init();
+
+        let template = temp_file();
+
+        let config = FileSinkConfig {
+            path: template.clone().try_into().unwrap(),
+            idle_timeout_secs: None,
+            encoding: Encoding::Text.into(),
+            compression: Compression::Gzip,
+        };
+
+        let mut sink = FileSink::new(&config);
+        let (input, _) = random_lines_with_stream(100, 64);
+
+        let events = stream::iter(input.clone().into_iter().map(Event::from));
+
+        sink.run(events).await.unwrap();
+
+        let output = lines_from_gzip_file(template);
+        for (input, output) in input.into_iter().zip(output) {
+            assert_eq!(input, output);
+        }
+    }
+
+    #[tokio::test]
+    async fn many_partitions() {
+        trace_init();
 
         let directory = temp_dir();
 
@@ -295,11 +395,12 @@ mod tests {
             path: template.try_into().unwrap(),
             idle_timeout_secs: None,
             encoding: Encoding::Text.into(),
+            compression: Compression::None,
         };
 
         let mut sink = FileSink::new(&config);
 
-        let (mut input, _) = random_events_with_stream(32, 8);
+        let (mut input, _events) = random_events_with_stream(32, 8);
         input[0].as_mut_log().insert("date", "2019-26-07");
         input[0].as_mut_log().insert("level", "warning");
         input[1].as_mut_log().insert("date", "2019-26-07");
@@ -318,10 +419,7 @@ mod tests {
         input[7].as_mut_log().insert("level", "error");
 
         let events = stream::iter(input.clone().into_iter());
-        let mut rt = crate::test_util::runtime();
-        let _ = rt
-            .block_on_std(async move { sink.run(events).await })
-            .unwrap();
+        sink.run(events).await.unwrap();
 
         let output = vec![
             lines_from_file(&directory.join("warnings-2019-26-07.log")),
@@ -370,7 +468,7 @@ mod tests {
     async fn reopening() {
         use pretty_assertions::assert_eq;
 
-        test_util::trace_init();
+        trace_init();
 
         let template = temp_file();
 
@@ -378,10 +476,11 @@ mod tests {
             path: template.clone().try_into().unwrap(),
             idle_timeout_secs: Some(1),
             encoding: Encoding::Text.into(),
+            compression: Compression::None,
         };
 
         let mut sink = FileSink::new(&config);
-        let (mut input, _) = random_lines_with_stream(10, 64);
+        let (mut input, _events) = random_lines_with_stream(10, 64);
 
         let (mut tx, rx) = tokio::sync::mpsc::channel(1);
 
