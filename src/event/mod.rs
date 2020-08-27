@@ -307,12 +307,6 @@ impl From<String> for Value {
     }
 }
 
-impl From<&String> for Value {
-    fn from(string: &String) -> Self {
-        string.as_str().into()
-    }
-}
-
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
         Value::Bytes(Vec::from(s.as_bytes()).into())

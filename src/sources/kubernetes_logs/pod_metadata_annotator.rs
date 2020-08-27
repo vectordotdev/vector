@@ -71,13 +71,13 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
     .iter()
     {
         if let Some(val) = val {
-            log.insert(key, val);
+            log.insert(key, val.clone());
         }
     }
 
     if let Some(labels) = &metadata.labels {
         for (key, val) in labels.iter() {
-            log.insert(format!("{}.{}", fields_spec.pod_labels, key), val);
+            log.insert(format!("{}.{}", fields_spec.pod_labels, key), val.clone());
         }
     }
 }
