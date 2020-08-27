@@ -5,7 +5,7 @@ use crate::{
     sources::Source,
     Pipeline,
 };
-use bytes::{BytesMut, Bytes};
+use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::Sink;

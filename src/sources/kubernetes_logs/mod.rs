@@ -288,9 +288,10 @@ fn create_event(line: Bytes, file: &str) -> Event {
     let mut event = Event::from(line);
 
     // Add source type.
-    event
-        .as_mut_log()
-        .insert(event::log_schema().source_type_key(), COMPONENT_NAME.to_owned());
+    event.as_mut_log().insert(
+        event::log_schema().source_type_key(),
+        COMPONENT_NAME.to_owned(),
+    );
 
     // Add file.
     event.as_mut_log().insert(FILE_KEY, file.to_owned());

@@ -108,7 +108,9 @@ fn add_headers(
             .map(HeaderValue::as_bytes)
             .unwrap_or_default();
         for event in events.iter_mut() {
-            event.as_mut_log().insert(header_name as &str, value.to_vec());
+            event
+                .as_mut_log()
+                .insert(header_name as &str, value.to_vec());
         }
     }
 

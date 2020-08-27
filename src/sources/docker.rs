@@ -895,7 +895,12 @@ impl ContainerMetadata {
             .as_ref()
             .map(|map| {
                 map.iter()
-                    .map(|(key, value)| (("label.".to_owned() + key).into(), value.as_bytes().to_owned().into()))
+                    .map(|(key, value)| {
+                        (
+                            ("label.".to_owned() + key).into(),
+                            value.as_bytes().to_owned().into(),
+                        )
+                    })
                     .collect()
             })
             .unwrap_or_default();
