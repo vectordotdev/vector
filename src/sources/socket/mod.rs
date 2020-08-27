@@ -358,7 +358,7 @@ mod test {
         let _ = source_handle.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn tcp_shutdown_infinite_stream() {
         // It's important that the buffer be large enough that the TCP source doesn't have
         // to block trying to forward its input into the Sender because the channel is full,
