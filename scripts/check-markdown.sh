@@ -9,6 +9,11 @@ set -euo pipefail
 #   This ensures that markdown is consistent and easy to read across the
 #   entire Vector repo.
 
+if ! [ -x "$(command -v markdownlint)" ]; then
+  echo 'Error: markdownlint is not installed.' >&2
+  exit 1
+fi
+
 markdownlint \
   --config scripts/.markdownlintrc \
   --ignore scripts/node_modules \
