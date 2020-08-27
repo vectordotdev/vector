@@ -17,7 +17,7 @@ use vector::{
     config::{self, Config, ConfigDiff},
     event, generate, heartbeat,
     internal_events::{
-        VectorConfigLoadFailed, VectorQuited, VectorRecoveryFailed, VectorReloadFailed,
+        VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed,
         VectorReloaded, VectorStarted, VectorStopped,
     },
     list, metrics, runtime,
@@ -178,14 +178,14 @@ fn main() {
                     _ = topology.stop().compat() => (), // Graceful shutdown finished
                     _ = signals.next() => {
                         // It is highly unlikely that this event will exit from topology.
-                        emit!(VectorQuited);
+                        emit!(VectorQuit);
                         // Dropping the shutdown future will immediately shut the server down
                     }
                 }
             }
             SignalTo::Quit => {
                 // It is highly unlikely that this event will exit from topology.
-                emit!(VectorQuited);
+                emit!(VectorQuit);
                 drop(topology);
             }
             SignalTo::Reload => unreachable!(),
