@@ -1,6 +1,6 @@
-mod handler;
 #[macro_use]
 mod macros;
+mod handler;
 mod schema;
 mod server;
 
