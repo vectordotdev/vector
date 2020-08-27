@@ -131,7 +131,7 @@ The following additional source configuration will be added:
 
 ```toml
 [sources.my_source_id]
-  type = "apache" # required
+  type = "apache_metrics" # required
   endpoints = ["http://localhost/server-status?auto"] # required, default
   scrape_interval_secs = 15 # optional, default, seconds
   namespace = "apache" # optional, default, namespace to put metrics under
@@ -216,8 +216,9 @@ first-class source for each type of endpoint we support scraping.
 - Do we want to apply any metric labels based on the other information
   available via the status page? I could see labeling the `url` at least.
   Ansnswer: label with `host` and `endpoint` as described above.
-- Do we want to have one apache source able to scrape multiple endpoints?
-  Answer: yes, the config has been updated to allow multiple endpoints.
+- Do we want to have one apache_metrics source able to scrape multiple
+  endpoints?  Answer: yes, the config has been updated to allow multiple
+  endpoints.
 - Are there preferences between `apache` or `httpd` for the nomenclature? I
   feel like `apache` is more well-known though `httpd` is more accurate. Answer:
   standardize on `apache`.
