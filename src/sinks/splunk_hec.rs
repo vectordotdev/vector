@@ -647,7 +647,7 @@ mod integration_tests {
             // Server not listening at address
             {
                 let config = HecSinkConfig {
-                    host: "http://localhost:1111".to_string(),
+                    endpoint: "http://localhost:1111".to_string(),
                     ..config(Encoding::Text, vec![]).await
                 };
                 let healthcheck = config_to_healthcheck(config);
@@ -670,7 +670,7 @@ mod integration_tests {
             // Unhealthy server
             {
                 let config = HecSinkConfig {
-                    host: "http://localhost:5503".to_string(),
+                    endpoint: "http://localhost:5503".to_string(),
                     ..config(Encoding::Text, vec![]).await
                 };
 
@@ -724,7 +724,7 @@ mod integration_tests {
         indexed_fields: Vec<Atom>,
     ) -> super::HecSinkConfig {
         super::HecSinkConfig {
-            host: "http://localhost:8088/".into(),
+            endpoint: "http://localhost:8088/".into(),
             token: get_token().await,
             host_key: "host".into(),
             compression: Compression::None,

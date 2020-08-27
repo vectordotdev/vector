@@ -511,7 +511,7 @@ mod integration_tests {
         let mut rt = runtime();
 
         let config = Ec2Metadata {
-            host: Some(HOST.clone()),
+            endpoint: Some(HOST.clone()),
             ..Default::default()
         };
         let mut transform = rt.block_on_std(async move {
@@ -563,7 +563,7 @@ mod integration_tests {
         let mut rt = runtime();
 
         let config = Ec2Metadata {
-            host: Some(HOST.clone()),
+            endpoint: Some(HOST.clone()),
             fields: Some(vec!["public-ipv4".into(), "region".into()]),
             ..Default::default()
         };
@@ -598,7 +598,7 @@ mod integration_tests {
         let mut rt = runtime();
 
         let config = Ec2Metadata {
-            host: Some(HOST.clone()),
+            endpoint: Some(HOST.clone()),
             namespace: Some("ec2.metadata".into()),
             ..Default::default()
         };
@@ -628,7 +628,7 @@ mod integration_tests {
 
         // Set an empty namespace to ensure we don't prepend one.
         let config = Ec2Metadata {
-            host: Some(HOST.clone()),
+            endpoint: Some(HOST.clone()),
             namespace: Some("".into()),
             ..Default::default()
         };

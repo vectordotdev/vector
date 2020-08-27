@@ -587,7 +587,7 @@ mod integration_tests {
         let pipeline = String::from("test-pipeline");
 
         let config = ElasticSearchConfig {
-            host: "http://localhost:9200".into(),
+            endpoint: "http://localhost:9200".into(),
             index: Some(index.clone()),
             pipeline: Some(pipeline.clone()),
             ..config()
@@ -603,7 +603,7 @@ mod integration_tests {
 
         let index = gen_index();
         let config = ElasticSearchConfig {
-            host: "http://localhost:9200".into(),
+            endpoint: "http://localhost:9200".into(),
             index: Some(index.clone()),
             doc_type: Some("log_lines".into()),
             id_key: Some("my_id".into()),
@@ -660,7 +660,7 @@ mod integration_tests {
     fn insert_events_over_http() {
         run_insert_tests(
             ElasticSearchConfig {
-                host: "http://localhost:9200".into(),
+                endpoint: "http://localhost:9200".into(),
                 doc_type: Some("log_lines".into()),
                 compression: Compression::None,
                 ..config()
@@ -673,7 +673,7 @@ mod integration_tests {
     fn insert_events_over_https() {
         run_insert_tests(
             ElasticSearchConfig {
-                host: "https://localhost:9201".into(),
+                endpoint: "https://localhost:9201".into(),
                 doc_type: Some("log_lines".into()),
                 compression: Compression::None,
                 tls: Some(TlsOptions {
@@ -691,7 +691,7 @@ mod integration_tests {
         run_insert_tests(
             ElasticSearchConfig {
                 auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
-                host: "http://localhost:4571".into(),
+                endpoint: "http://localhost:4571".into(),
                 ..config()
             },
             false,
@@ -702,7 +702,7 @@ mod integration_tests {
     fn insert_events_with_failure() {
         run_insert_tests(
             ElasticSearchConfig {
-                host: "http://localhost:9200".into(),
+                endpoint: "http://localhost:9200".into(),
                 doc_type: Some("log_lines".into()),
                 compression: Compression::None,
                 ..config()

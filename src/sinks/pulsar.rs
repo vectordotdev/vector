@@ -243,13 +243,13 @@ mod integration_tests {
 
             let topic = format!("test-{}", random_string(10));
             let cnf = PulsarSinkConfig {
-                address: "pulsar://127.0.0.1:6650".to_owned(),
+                endpoint: "pulsar://127.0.0.1:6650".to_owned(),
                 topic: topic.clone(),
                 encoding: Encoding::Text.into(),
                 auth: None,
             };
 
-            let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.address, TokioExecutor)
+            let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.endpoint, TokioExecutor)
                 .build()
                 .await
                 .unwrap();
