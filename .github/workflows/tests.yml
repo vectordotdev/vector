@@ -315,6 +315,11 @@ jobs:
     services:
       splunk:
         image: timberio/splunk-hec-test:latest
+        ports:
+          - "8088:8088"
+          - "8000:8000"
+          - "8089:8089"
+        options: --health-cmd "nc -z localhost 8000" --health-interval 10s --health-timeout 5s --health-retries 5
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
