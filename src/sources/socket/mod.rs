@@ -446,21 +446,21 @@ mod test {
         bind
     }
 
-    fn init_udp_with_shutdown(
+    async fn init_udp_with_shutdown(
         sender: Pipeline,
         source_name: &str,
         shutdown: &mut SourceShutdownCoordinator,
     ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let (shutdown_signal, _) = shutdown.register_source(source_name);
-        init_udp_inner(sender, source_name, shutdown_signal)
+        init_udp_inner(sender, source_name, shutdown_signal).await
     }
 
-    fn init_udp(sender: Pipeline) -> SocketAddr {
-        let (addr, _handle) = init_udp_inner(sender, "default", ShutdownSignal::noop());
+    async fn init_udp(sender: Pipeline) -> SocketAddr {
+        let (addr, _handle) = init_udp_inner(sender, "default", ShutdownSignal::noop()).await;
         addr
     }
 
-    fn init_udp_inner(
+    async fn init_udp_inner(
         sender: Pipeline,
         source_name: &str,
         shutdown_signal: ShutdownSignal,
@@ -479,15 +479,16 @@ mod test {
         let source_handle = tokio::spawn(server);
 
         // Wait for UDP to start listening
-        thread::sleep(Duration::from_millis(100));
+        // thread::sleep(Duration::from_millis(100));
+        tokio::time::delay_for(tokio::time::Duration::from_millis(100)).await;
 
         (addr, source_handle)
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn udp_message() {
         let (tx, rx) = Pipeline::new_test();
-        let address = init_udp(tx);
+        let address = init_udp(tx).await;
 
         send_lines_udp(address, vec!["test".to_string()]);
         let events = collect_n(rx, 1).await.unwrap();
@@ -498,10 +499,10 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn udp_multiple_messages() {
         let (tx, rx) = Pipeline::new_test();
-        let address = init_udp(tx);
+        let address = init_udp(tx).await;
 
         send_lines_udp(address, vec!["test\ntest2".to_string()]);
         let events = collect_n(rx, 2).await.unwrap();
@@ -516,10 +517,10 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn udp_multiple_packets() {
         let (tx, rx) = Pipeline::new_test();
-        let address = init_udp(tx);
+        let address = init_udp(tx).await;
 
         send_lines_udp(address, vec!["test".to_string(), "test2".to_string()]);
         let events = collect_n(rx, 2).await.unwrap();
@@ -534,10 +535,10 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn udp_it_includes_host() {
         let (tx, rx) = Pipeline::new_test();
-        let address = init_udp(tx);
+        let address = init_udp(tx).await;
 
         let from = send_lines_udp(address, vec!["test".to_string()]);
         let events = collect_n(rx, 1).await.unwrap();
@@ -548,10 +549,10 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn udp_it_includes_source_type() {
         let (tx, rx) = Pipeline::new_test();
-        let address = init_udp(tx);
+        let address = init_udp(tx).await;
 
         let _ = send_lines_udp(address, vec!["test".to_string()]);
         let events = collect_n(rx, 1).await.unwrap();
@@ -562,13 +563,13 @@ mod test {
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn udp_shutdown_simple() {
         let (tx, rx) = Pipeline::new_test();
         let source_name = "udp_shutdown_simple";
 
         let mut shutdown = SourceShutdownCoordinator::default();
-        let (address, source_handle) = init_udp_with_shutdown(tx, source_name, &mut shutdown);
+        let (address, source_handle) = init_udp_with_shutdown(tx, source_name, &mut shutdown).await;
 
         send_lines_udp(address, vec!["test".to_string()]);
         let events = collect_n(rx, 1).await.unwrap();
@@ -588,13 +589,13 @@ mod test {
         let _ = source_handle.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn udp_shutdown_infinite_stream() {
         let (tx, rx) = Pipeline::new_test();
         let source_name = "udp_shutdown_infinite_stream";
 
         let mut shutdown = SourceShutdownCoordinator::default();
-        let (address, source_handle) = init_udp_with_shutdown(tx, source_name, &mut shutdown);
+        let (address, source_handle) = init_udp_with_shutdown(tx, source_name, &mut shutdown).await;
 
         // Stream that keeps sending lines to the UDP source forever.
         let run_pump_atomic_sender = Arc::new(AtomicBool::new(true));
