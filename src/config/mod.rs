@@ -37,6 +37,8 @@ pub struct Config {
     pub transforms: IndexMap<String, TransformOuter>,
     #[serde(default)]
     pub tests: Vec<TestDefinition>,
+    #[serde(skip)]
+    expansions: IndexMap<String, Vec<String>>,
 }
 
 #[derive(Default, Debug, Deserialize, Serialize)]
@@ -329,6 +331,7 @@ impl Config {
             sinks: IndexMap::new(),
             transforms: IndexMap::new(),
             tests: Vec::new(),
+            expansions: IndexMap::new(),
         }
     }
 
@@ -363,10 +366,20 @@ impl Config {
         self.transforms.insert(name.to_string(), transform);
     }
 
+    /// Expand a logical component name (i.e. from the config file) into the names of the
+    /// components it was expanded to as part of the macro process. Does not check that the
+    /// identifier is otherwise valid.
+    pub fn get_inputs(&self, identifier: &str) -> Vec<String> {
+        self.expansions
+            .get(identifier)
+            .map(|v| v.clone())
+            .unwrap_or_else(|| vec![String::from(identifier)])
+    }
+
     /// Some component configs can act like macros and expand themselves into
     /// multiple replacement configs. Returns a map of components to their
     /// expanded child names.
-    pub fn expand_macros(&mut self) -> Result<IndexMap<String, Vec<String>>, Vec<String>> {
+    pub fn expand_macros(&mut self) -> Result<(), Vec<String>> {
         let mut expanded_transforms = IndexMap::new();
         let mut expansions = IndexMap::new();
         let mut errors = Vec::new();
@@ -401,7 +414,8 @@ impl Config {
         if !errors.is_empty() {
             Err(errors)
         } else {
-            Ok(expansions)
+            self.expansions = expansions;
+            Ok(())
         }
     }
 
