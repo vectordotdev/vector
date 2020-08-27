@@ -123,7 +123,7 @@ mod file;
 
 const ELLIPSIS: &str = "[...]";
 
-pub(self) fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
+pub fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
     if s.len() >= maxlen {
         let mut len = maxlen - ELLIPSIS.len();
         while !s.is_char_boundary(len) {
