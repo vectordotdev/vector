@@ -4,12 +4,12 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
-use futures01::{sync::mpsc, Sink};
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server,
 };
 use serde::Deserialize;
+use tokio::sync::mpsc;
 
 pub fn load_sink<T>(config: &str) -> crate::Result<(T, SinkContext)>
 where
@@ -33,12 +33,12 @@ pub fn build_test_server(
         let tx = tx.clone();
         async {
             Ok::<_, Error>(service_fn(move |req: Request<Body>| {
-                let tx = tx.clone();
+                let mut tx = tx.clone();
                 async {
                     let (parts, body) = req.into_parts();
                     tokio::spawn(async move {
                         let bytes = hyper::body::to_bytes(body).await.unwrap();
-                        tx.send((parts, bytes)).compat().await.unwrap();
+                        tx.send((parts, bytes)).await.unwrap();
                     });
 
                     Ok::<_, Error>(Response::new(Body::empty()))

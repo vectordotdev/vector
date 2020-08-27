@@ -417,7 +417,7 @@ mod test {
         let stream = stream::iter_ok(events);
         let _ = sink.send_all(stream).compat().await.unwrap();
 
-        let messages = collect_n(rx, 1).compat().await.ok().unwrap();
+        let messages = collect_n(rx, 1).await.unwrap();
         assert_eq!(
             messages[0],
             Bytes::from("vector.counter:1.5|c|#empty_tag:,normal_tag:value,true_tag\nvector.histogram:2|h|@0.01"),
