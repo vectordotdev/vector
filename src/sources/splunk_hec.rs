@@ -842,7 +842,7 @@ mod tests {
         let n = messages.len();
         let pump = sink.send_all(stream::iter_ok(messages.into_iter().map(Into::into)));
         tokio::spawn(pump.map(|_| ()).map_err(|()| panic!()).compat());
-        let events = collect_n(source, n).compat().await.unwrap();
+        let events = collect_n(source, n).await.unwrap();
 
         assert_eq!(n, events.len());
 
@@ -1002,7 +1002,7 @@ mod tests {
         event.as_mut_log().insert("name", "bob");
 
         let _ = sink.send(event).compat().await.unwrap();
-        let event = collect_n(source, 1).compat().await.unwrap().remove(0);
+        let event = collect_n(source, 1).await.unwrap().remove(0);
 
         assert_eq!(event.as_log()[&"greeting".into()], "hello".into());
         assert_eq!(event.as_log()[&"name".into()], "bob".into());
@@ -1026,7 +1026,7 @@ mod tests {
         event.as_mut_log().insert("line", "hello");
 
         let _ = sink.send(event).compat().await.unwrap();
-        let event = collect_n(source, 1).compat().await.unwrap().remove(0);
+        let event = collect_n(source, 1).await.unwrap().remove(0);
 
         assert_eq!(
             event.as_log()[&event::log_schema().message_key()],
@@ -1043,7 +1043,7 @@ mod tests {
 
         assert_eq!(200, post(address, "services/collector/raw", message).await);
 
-        let event = collect_n(source, 1).compat().await.unwrap().remove(0);
+        let event = collect_n(source, 1).await.unwrap().remove(0);
         assert_eq!(
             event.as_log()[&event::log_schema().message_key()],
             message.into()
@@ -1109,7 +1109,7 @@ mod tests {
             post(address, "services/collector/event", message).await
         );
 
-        let event = collect_n(source, 1).compat().await.unwrap().remove(0);
+        let event = collect_n(source, 1).await.unwrap().remove(0);
         assert_eq!(
             event.as_log()[&event::log_schema().message_key()],
             "first".into()
@@ -1136,7 +1136,7 @@ mod tests {
             post(address, "services/collector/event", message).await
         );
 
-        let events = collect_n(source, 3).compat().await.unwrap();
+        let events = collect_n(source, 3).await.unwrap();
 
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],

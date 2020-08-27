@@ -397,10 +397,14 @@ mod integration_tests {
         test_util::{random_lines_with_stream, random_string},
         Event,
     };
-    use futures::compat::Future01CompatExt;
+    use futures::{
+        compat::{Future01CompatExt, Sink01CompatExt},
+        SinkExt,
+    };
     use futures01::Sink;
     use serde_json::Value as JsonValue;
     use std::net::SocketAddr;
+    use tokio::time::{delay_for, Duration};
     use warp::Filter;
 
     const USERNAME: &str = "admin";
@@ -481,8 +485,8 @@ mod integration_tests {
         let config = config(Encoding::Text, vec![]).await;
         let (sink, _) = config.build(cx).unwrap();
 
-        let (messages, events) = random_lines_with_stream(100, 10);
-        let _ = sink.send_all(events).compat().await.unwrap();
+        let (messages, mut events) = random_lines_with_stream(100, 10);
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 
         let mut found_all = false;
         for _ in 0..20 {
@@ -498,7 +502,7 @@ mod integration_tests {
                 break;
             }
 
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            delay_for(Duration::from_millis(100)).await;
         }
 
         assert!(found_all);
