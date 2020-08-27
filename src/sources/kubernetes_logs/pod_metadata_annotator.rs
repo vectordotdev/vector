@@ -133,7 +133,6 @@ mod tests {
                     pod_namespace: "ns".to_owned(),
                     pod_uid: "uid".to_owned(),
                     pod_labels: "labels".to_owned(),
-                    ..FieldsSpec::default()
                 },
                 ObjectMeta {
                     name: Some("sandbox0-name".to_owned()),
