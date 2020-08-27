@@ -1,5 +1,4 @@
 use super::{handler, schema};
-
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig},
     QueryBuilder,

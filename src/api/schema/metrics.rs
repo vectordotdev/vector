@@ -1,6 +1,6 @@
 use crate::event::{Event, Metric, MetricValue};
 use crate::metrics::{capture_metrics, get_controller};
-use async_graphql::{Interface, Object};
+use async_graphql::{validators::IntRange, Interface, Object, Subscription};
 use async_stream::stream;
 use chrono::{DateTime, Utc};
 use tokio::stream::{Stream, StreamExt};
@@ -54,12 +54,21 @@ pub enum MetricType {
     BytesProcessed(BytesProcessed),
 }
 
-/// Returns a new metrics stream, at `interval` milliseconds
-pub fn metrics_stream(interval: i32) -> impl Stream<Item = MetricType> {
-    get_metrics(interval).filter_map(|m| match m.name.as_str() {
-        "events_processed" => Some(MetricType::EventsProcessed(m.into())),
-        _ => None,
-    })
+#[derive(Default)]
+pub struct MetricsSubscription;
+
+#[Subscription]
+impl MetricsSubscription {
+    /// Returns all Vector metrics, aggregated at the provided millisecond interval
+    async fn metrics(
+        &self,
+        #[arg(validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = MetricType> {
+        get_metrics(interval).filter_map(|m| match m.name.as_str() {
+            "events_processed" => Some(MetricType::EventsProcessed(m.into())),
+            _ => None,
+        })
+    }
 }
 
 /// Returns a stream of `Metric`s, collected at the provided millisecond interval
