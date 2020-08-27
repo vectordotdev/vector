@@ -165,7 +165,7 @@ mod test {
         super::unix::UnixConfig,
         futures::SinkExt,
         std::path::PathBuf,
-        tokio::net::UnixStream,
+        tokio::{net::UnixStream, task::yield_now},
         tokio_util::codec::{FramedWrite, LinesCodec},
     };
 
@@ -632,7 +632,7 @@ mod test {
 
     ////////////// UNIX TESTS //////////////
     #[cfg(unix)]
-    fn init_unix(sender: Pipeline) -> PathBuf {
+    async fn init_unix(sender: Pipeline) -> PathBuf {
         let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
 
         let server = SocketConfig::from(UnixConfig::new(in_path.clone()))
@@ -647,7 +647,9 @@ mod test {
         tokio::spawn(server);
 
         // Wait for server to accept traffic
-        while std::os::unix::net::UnixStream::connect(&in_path).is_err() {}
+        while std::os::unix::net::UnixStream::connect(&in_path).is_err() {
+            yield_now().await;
+        }
 
         in_path
     }
@@ -666,10 +668,10 @@ mod test {
     }
 
     #[cfg(unix)]
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn unix_message() {
         let (tx, rx) = Pipeline::new_test();
-        let path = init_unix(tx);
+        let path = init_unix(tx).await;
 
         send_lines_unix(path, vec!["test"]).await;
 
@@ -687,10 +689,10 @@ mod test {
     }
 
     #[cfg(unix)]
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn unix_multiple_messages() {
         let (tx, rx) = Pipeline::new_test();
-        let path = init_unix(tx);
+        let path = init_unix(tx).await;
 
         send_lines_unix(path, vec!["test\ntest2"]).await;
         let events = collect_n(rx, 2).await.unwrap();
@@ -707,10 +709,10 @@ mod test {
     }
 
     #[cfg(unix)]
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn unix_multiple_packets() {
         let (tx, rx) = Pipeline::new_test();
-        let path = init_unix(tx);
+        let path = init_unix(tx).await;
 
         send_lines_unix(path, vec!["test", "test2"]).await;
         let events = collect_n(rx, 2).await.unwrap();
