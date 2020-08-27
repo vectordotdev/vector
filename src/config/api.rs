@@ -73,7 +73,7 @@ fn default_enabled() -> bool {
     false
 }
 
-fn default_bind() -> Option<SocketAddr> {
+pub fn default_bind() -> Option<SocketAddr> {
     Some(SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 8686))
 }
 
