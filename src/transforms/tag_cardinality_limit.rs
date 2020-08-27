@@ -2,8 +2,8 @@ use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     internal_events::{
-        TagCardinalityLimitEventProcessed, TagCardinalityLimitReachedLimit,
-        TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
+        TagCardinalityLimitEventProcessed, TagCardinalityLimitRejectingEvent,
+        TagCardinalityLimitRejectingTag, TagCardinalityValueLimitReached,
     },
     Event,
 };
@@ -178,7 +178,7 @@ impl TagCardinalityLimit {
             tag_value_set.insert(value);
 
             if tag_value_set.len() == self.config.value_limit as usize {
-                emit!(TagCardinalityLimitReachedLimit { key });
+                emit!(TagCardinalityValueLimitReached { key });
             }
 
             true

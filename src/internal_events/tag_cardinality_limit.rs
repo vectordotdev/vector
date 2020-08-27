@@ -11,7 +11,7 @@ impl InternalEvent for TagCardinalityLimitEventProcessed {
     fn emit_metrics(&self) {
         counter!("events_processed", 1,
             "component_kind" => "transform",
-            "component_type" => "regex_parser",
+            "component_type" => "tag_cardinality_limit",
         );
     }
 }
@@ -31,7 +31,12 @@ impl<'a> InternalEvent for TagCardinalityLimitRejectingEvent<'a> {
         );
     }
 
-    fn emit_metrics(&self) {}
+    fn emit_metrics(&self) {
+        counter!("tag_value_limit_exceeded", 1,
+            "component_kind" => "transform",
+            "component_type" => "tag_cardinality_limit",
+        );
+    }
 }
 
 pub(crate) struct TagCardinalityLimitRejectingTag<'a> {
@@ -49,18 +54,30 @@ impl<'a> InternalEvent for TagCardinalityLimitRejectingTag<'a> {
         );
     }
 
-    fn emit_metrics(&self) {}
+    fn emit_metrics(&self) {
+        counter!("tag_value_limit_exceeded", 1,
+            "component_kind" => "transform",
+            "component_type" => "tag_cardinality_limit",
+        );
+    }
 }
 
-pub(crate) struct TagCardinalityLimitReachedLimit<'a> {
+pub(crate) struct TagCardinalityValueLimitReached<'a> {
     pub key: &'a str,
 }
 
-impl<'a> InternalEvent for TagCardinalityLimitReachedLimit<'a> {
+impl<'a> InternalEvent for TagCardinalityValueLimitReached<'a> {
     fn emit_logs(&self) {
         warn!(
             "value_limit reached for key {}. New values for this key will be rejected",
             key = self.key,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("value_limit_reached", 1,
+            "component_kind" => "transform",
+            "component_type" => "tag_cardinality_limit",
         );
     }
 }
