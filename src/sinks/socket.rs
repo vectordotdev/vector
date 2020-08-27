@@ -285,6 +285,8 @@ mod test {
             .for_each(|_| future::ready(()))
             .await;
         close_tx.send(()).unwrap();
+
+        // Close connection in spawned future
         yield_now().await;
 
         assert_eq!(msg_counter.load(Ordering::SeqCst), 10);
