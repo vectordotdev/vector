@@ -18,6 +18,19 @@ pub struct FieldsSpec {
     pub pod_namespace: String,
     pub pod_uid: String,
     pub pod_labels: String,
+    /// Store labels with `.`s as flat fields with `.` literals instead of
+    /// nesting the fields at each `.`.
+    ///
+    /// For example:
+    ///
+    ///   - with `flat_labels = false` (the default),
+    ///     `"foo.bar": "baz"` will be interpreted as
+    ///     (root) -> "foo" -> "bar" = "baz"
+    ///
+    ///   - with `flat_labels = true`,
+    ///     `"foo.bar": "baz"` will be interpreted as
+    ///     (root) -> "foo.bar" = "baz"
+    ///
     pub flat_labels: bool,
 }
 
