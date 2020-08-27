@@ -130,8 +130,6 @@ impl SourceConfig for SocketConfig {
 
 #[cfg(test)]
 mod test {
-    #[cfg(unix)]
-    use super::unix::UnixConfig;
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
         config::{GlobalOptions, SourceConfig},
@@ -140,21 +138,16 @@ mod test {
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSink,
         test_util::{
-            collect_n, next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp, CollectN,
+            collect_n, next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
         tls::{MaybeTlsSettings, TlsConfig, TlsOptions},
         Pipeline,
     };
     use bytes::Bytes;
-    #[cfg(unix)]
-    use futures::SinkExt;
     use futures::{
-        compat::{Future01CompatExt, Sink01CompatExt},
+        compat::{Future01CompatExt, Sink01CompatExt, Stream01CompatExt},
         stream, StreamExt,
     };
-    use futures01::Stream;
-    #[cfg(unix)]
-    use std::path::PathBuf;
     use std::{
         net::{SocketAddr, UdpSocket},
         sync::{
@@ -163,17 +156,21 @@ mod test {
         },
         thread,
     };
-    #[cfg(unix)]
-    use tokio::net::UnixStream;
     use tokio::{
         task::JoinHandle,
         time::{Duration, Instant},
     };
     #[cfg(unix)]
-    use tokio_util::codec::{FramedWrite, LinesCodec};
+    use {
+        super::unix::UnixConfig,
+        futures::SinkExt,
+        std::path::PathBuf,
+        tokio::net::UnixStream,
+        tokio_util::codec::{FramedWrite, LinesCodec},
+    };
 
     //////// TCP TESTS ////////
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn tcp_it_includes_host() {
         let (tx, rx) = Pipeline::new_test();
         let addr = next_addr();
@@ -194,14 +191,14 @@ mod test {
             .await
             .unwrap();
 
-        let event = rx.wait().next().unwrap().unwrap();
+        let event = rx.compat().next().await.unwrap().unwrap();
         assert_eq!(
             event.as_log()[&event::log_schema().host_key()],
             "127.0.0.1".into()
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn tcp_it_includes_source_type() {
         let (tx, rx) = Pipeline::new_test();
         let addr = next_addr();
@@ -222,16 +219,17 @@ mod test {
             .await
             .unwrap();
 
-        let event = rx.wait().next().unwrap().unwrap();
+        let event = rx.compat().next().await.unwrap().unwrap();
         assert_eq!(
             event.as_log()[event::log_schema().source_type_key()],
             "socket".into()
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn tcp_continue_after_long_line() {
         let (tx, rx) = Pipeline::new_test();
+        let mut rx = rx.compat();
         let addr = next_addr();
 
         let mut config = TcpConfig::new(addr.into());
@@ -257,22 +255,23 @@ mod test {
         wait_for_tcp(addr).await;
         send_lines(addr, lines.into_iter()).await.unwrap();
 
-        let (event, rx) = rx.into_future().compat().await.unwrap();
+        let event = rx.next().await.unwrap().unwrap();
         assert_eq!(
-            event.unwrap().as_log()[&event::log_schema().message_key()],
+            event.as_log()[&event::log_schema().message_key()],
             "short".into()
         );
 
-        let (event, _rx) = rx.into_future().compat().await.unwrap();
+        let event = rx.next().await.unwrap().unwrap();
         assert_eq!(
-            event.unwrap().as_log()[&event::log_schema().message_key()],
+            event.as_log()[&event::log_schema().message_key()],
             "more short".into()
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn tcp_with_tls() {
         let (tx, rx) = Pipeline::new_test();
+        let mut rx = rx.compat();
         let addr = next_addr();
 
         let mut config = TcpConfig::new(addr.into());
@@ -308,20 +307,20 @@ mod test {
             .await
             .unwrap();
 
-        let (event, rx) = rx.into_future().compat().await.unwrap();
+        let event = rx.next().await.unwrap().unwrap();
         assert_eq!(
-            event.unwrap().as_log()[&event::log_schema().message_key()],
+            event.as_log()[&event::log_schema().message_key()],
             "short".into()
         );
 
-        let (event, _rx) = rx.into_future().compat().await.unwrap();
+        let event = rx.next().await.unwrap().unwrap();
         assert_eq!(
-            event.unwrap().as_log()[&event::log_schema().message_key()],
+            event.as_log()[&event::log_schema().message_key()],
             "more short".into()
         );
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn tcp_shutdown_simple() {
         let source_name = "tcp_shutdown_simple";
         let (tx, rx) = Pipeline::new_test();
@@ -343,7 +342,7 @@ mod test {
             .await
             .unwrap();
 
-        let event = rx.wait().next().unwrap().unwrap();
+        let event = rx.compat().next().await.unwrap().unwrap();
         assert_eq!(
             event.as_log()[&event::log_schema().message_key()],
             "test".into()
@@ -359,7 +358,7 @@ mod test {
         let _ = source_handle.await.unwrap();
     }
 
-    #[tokio::test(threaded_scheduler, core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn tcp_shutdown_infinite_stream() {
         // It's important that the buffer be large enough that the TCP source doesn't have
         // to block trying to forward its input into the Sender because the channel is full,
@@ -401,7 +400,7 @@ mod test {
         });
 
         // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
-        let (_rx, events) = CollectN::new(rx, 100).compat().await.ok().unwrap();
+        let events = collect_n(rx, 100).await.unwrap();
         assert_eq!(100, events.len());
         for event in events {
             assert_eq!(
@@ -491,7 +490,7 @@ mod test {
         let address = init_udp(tx);
 
         send_lines_udp(address, vec!["test".to_string()]);
-        let events = collect_n(rx, 1).compat().await.ok().unwrap();
+        let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],
@@ -505,7 +504,7 @@ mod test {
         let address = init_udp(tx);
 
         send_lines_udp(address, vec!["test\ntest2".to_string()]);
-        let events = collect_n(rx, 2).compat().await.ok().unwrap();
+        let events = collect_n(rx, 2).await.unwrap();
 
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],
@@ -523,7 +522,7 @@ mod test {
         let address = init_udp(tx);
 
         send_lines_udp(address, vec!["test".to_string(), "test2".to_string()]);
-        let events = collect_n(rx, 2).compat().await.ok().unwrap();
+        let events = collect_n(rx, 2).await.unwrap();
 
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],
@@ -541,7 +540,7 @@ mod test {
         let address = init_udp(tx);
 
         let from = send_lines_udp(address, vec!["test".to_string()]);
-        let events = collect_n(rx, 1).compat().await.ok().unwrap();
+        let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
             events[0].as_log()[&event::log_schema().host_key()],
@@ -555,7 +554,7 @@ mod test {
         let address = init_udp(tx);
 
         let _ = send_lines_udp(address, vec!["test".to_string()]);
-        let events = collect_n(rx, 1).compat().await.ok().unwrap();
+        let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
             events[0].as_log()[event::log_schema().source_type_key()],
@@ -572,7 +571,7 @@ mod test {
         let (address, source_handle) = init_udp_with_shutdown(tx, source_name, &mut shutdown);
 
         send_lines_udp(address, vec!["test".to_string()]);
-        let events = collect_n(rx, 1).compat().await.ok().unwrap();
+        let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],
@@ -609,7 +608,7 @@ mod test {
         });
 
         // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
-        let (_rx, events) = CollectN::new(rx, 100).compat().await.ok().unwrap();
+        let events = collect_n(rx, 100).await.unwrap();
         assert_eq!(100, events.len());
         for event in events {
             assert_eq!(
@@ -674,7 +673,7 @@ mod test {
 
         send_lines_unix(path, vec!["test"]).await;
 
-        let events = collect_n(rx, 1).compat().await.ok().unwrap();
+        let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(1, events.len());
         assert_eq!(
@@ -694,7 +693,7 @@ mod test {
         let path = init_unix(tx);
 
         send_lines_unix(path, vec!["test\ntest2"]).await;
-        let events = collect_n(rx, 2).compat().await.ok().unwrap();
+        let events = collect_n(rx, 2).await.unwrap();
 
         assert_eq!(2, events.len());
         assert_eq!(
@@ -714,7 +713,7 @@ mod test {
         let path = init_unix(tx);
 
         send_lines_unix(path, vec!["test", "test2"]).await;
-        let events = collect_n(rx, 2).compat().await.ok().unwrap();
+        let events = collect_n(rx, 2).await.unwrap();
 
         assert_eq!(2, events.len());
         assert_eq!(
