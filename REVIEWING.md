@@ -15,6 +15,10 @@ should be used for all pull requests:
 - [ ] Is there a risk of performance regressions? If so, have run the [Vector test harness](https://github.com/timberio/vector-test-harness)? (see [Performance Testing](#performance-testing))
 - [ ] Should documentation be adjusted to reflect any of these changes? (see [Documentation](#documentation))
 
+## Expectations
+
+We endeavour to review all PRs within 2 working days (Monday to Friday - broadly Eastern Time) of submission.
+
 ## Backward Compatibility
 
 All changes should strive to retain backward compatibility. If a change breaks
