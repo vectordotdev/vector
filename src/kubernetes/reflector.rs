@@ -535,7 +535,7 @@ mod tests {
     }
 
     /// Test that the delayed delete works accordingly.
-    #[tokio::test(threaded_scheduler, core_threads = 2)]
+    #[tokio::test(threaded_scheduler)]
     async fn test_delayed_deletes() {
         trace_init();
 
