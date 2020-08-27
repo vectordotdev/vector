@@ -1,6 +1,6 @@
 use crate::{
     conditions::{Condition, ConditionConfig},
-    config::{TestCondition, TestDefinition, TestInput, TestInputValue, TransformContext},
+    config::{Config, TestCondition, TestDefinition, TestInput, TestInputValue, TransformContext},
     event::{Event, Value},
     transforms::Transform,
 };
@@ -233,15 +233,9 @@ fn reduce_transforms(
     });
 }
 
-fn build_input(
-    input: &TestInput,
-    expansions: &IndexMap<String, Vec<String>>,
-) -> Result<(Vec<String>, Event), String> {
-    let target = if let Some(children) = expansions.get(&input.insert_at) {
-        children.clone()
-    } else {
-        vec![input.insert_at.clone()]
-    };
+fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<String>, Event), String> {
+    let target = config.get_inputs(&input.insert_at);
+
     match input.type_str.as_ref() {
         "raw" => match input.value.as_ref() {
             Some(v) => Ok((target, Event::from(v.clone()))),
@@ -279,14 +273,14 @@ fn build_input(
 }
 
 fn build_inputs(
+    config: &Config,
     definition: &TestDefinition,
-    expansions: &IndexMap<String, Vec<String>>,
 ) -> Result<Vec<(Vec<String>, Event)>, Vec<String>> {
     let mut inputs = Vec::new();
     let mut errors = vec![];
 
     if let Some(input_def) = &definition.input {
-        match build_input(input_def, &expansions) {
+        match build_input(config, input_def) {
             Ok(input_event) => inputs.push(input_event),
             Err(err) => errors.push(err),
         }
@@ -294,7 +288,7 @@ fn build_inputs(
         errors.push("must specify at least one input.".to_owned());
     }
     for input_def in &definition.inputs {
-        match build_input(input_def, &expansions) {
+        match build_input(config, input_def) {
             Ok(input_event) => inputs.push(input_event),
             Err(err) => errors.push(err),
         }
@@ -309,12 +303,11 @@ fn build_inputs(
 
 fn build_unit_test(
     definition: &TestDefinition,
-    expansions: &IndexMap<String, Vec<String>>,
     config: &super::Config,
 ) -> Result<UnitTest, Vec<String>> {
     let mut errors = vec![];
 
-    let inputs = match build_inputs(&definition, &expansions) {
+    let inputs = match build_inputs(config, definition) {
         Ok(inputs) => inputs,
         Err(mut errs) => {
             errors.append(&mut errs);
@@ -489,11 +482,10 @@ pub fn build_unit_tests(config: &mut super::Config) -> Result<Vec<UnitTest>, Vec
     let mut tests = vec![];
     let mut errors = vec![];
 
-    let expansions = config.expand_macros()?;
     config
         .tests
         .iter()
-        .for_each(|test| match build_unit_test(test, &expansions, config) {
+        .for_each(|test| match build_unit_test(test, config) {
             Ok(t) => tests.push(t),
             Err(errs) => {
                 let mut test_err = errs.join("\n");
@@ -518,11 +510,11 @@ pub fn build_unit_tests(config: &mut super::Config) -> Result<Vec<UnitTest>, Vec
 ))]
 mod tests {
     use super::*;
-    use crate::config::Config;
+    use crate::config;
 
     #[test]
     fn parse_no_input() {
-        let mut config: Config = toml::from_str(
+        let mut config = config::load_from_str(
             r#"
 [transforms.bar]
   inputs = ["foo"]
@@ -553,7 +545,7 @@ mod tests {
                 .to_owned(),]
         );
 
-        let mut config: Config = toml::from_str(
+        let mut config = config::load_from_str(
             r#"
 [transforms.bar]
   inputs = ["foo"]
@@ -591,7 +583,7 @@ mod tests {
 
     #[test]
     fn parse_no_test_input() {
-        let mut config: Config = toml::from_str(
+        let mut config = config::load_from_str(
             r#"
 [transforms.bar]
   inputs = ["foo"]
@@ -621,7 +613,7 @@ mod tests {
 
     #[test]
     fn parse_no_outputs() {
-        let mut config: Config = toml::from_str(
+        let mut config = config::load_from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
@@ -650,7 +642,7 @@ mod tests {
 
     #[test]
     fn parse_broken_topology() {
-        let mut config: Config = toml::from_str(
+        let mut config = config::load_from_str(
             r#"
 [transforms.foo]
   inputs = ["something"]
@@ -755,7 +747,7 @@ mod tests {
 
     #[test]
     fn parse_bad_input_event() {
-        let mut config: Config = toml::from_str(
+        let mut config = config::load_from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
@@ -790,7 +782,7 @@ mod tests {
 
     #[test]
     fn test_success_multi_inputs() {
-        let mut config: Config = toml::from_str(
+        let mut config = config::load_from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
@@ -878,7 +870,7 @@ mod tests {
 
     #[test]
     fn test_success() {
-        let mut config: Config = toml::from_str(
+        let mut config = config::load_from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
@@ -938,7 +930,7 @@ mod tests {
 
     #[test]
     fn test_swimlanes() {
-        let mut config: Config = toml::from_str(
+        let mut config = config::load_from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
@@ -998,7 +990,7 @@ mod tests {
 
     #[test]
     fn test_fail_no_outputs() {
-        let mut config: Config = toml::from_str(
+        let mut config = config::load_from_str(
             r#"
 [transforms.foo]
   inputs = [ "TODO" ]
@@ -1028,7 +1020,7 @@ mod tests {
 
     #[test]
     fn test_fail_two_output_events() {
-        let mut config: Config = toml::from_str(
+        let mut config = config::load_from_str(
             r#"
 [transforms.foo]
   inputs = [ "TODO" ]
@@ -1099,7 +1091,7 @@ mod tests {
 
     #[test]
     fn test_no_outputs_from() {
-        let mut config: Config = toml::from_str(
+        let mut config = config::load_from_str(
             r#"
 [transforms.foo]
   inputs = [ "ignored" ]
@@ -1135,7 +1127,7 @@ mod tests {
 
     #[test]
     fn test_no_outputs_from_chained() {
-        let mut config: Config = toml::from_str(
+        let mut config = config::load_from_str(
             r#"
 [transforms.foo]
   inputs = [ "ignored" ]
@@ -1177,7 +1169,7 @@ mod tests {
 
     #[test]
     fn test_log_input() {
-        let mut config: Config = toml::from_str(
+        let mut config = config::load_from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
@@ -1214,7 +1206,7 @@ mod tests {
 
     #[test]
     fn test_metric_input() {
-        let mut config: Config = toml::from_str(
+        let mut config = config::load_from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
@@ -1252,7 +1244,7 @@ mod tests {
 
     #[test]
     fn test_success_over_gap() {
-        let mut config: Config = toml::from_str(
+        let mut config = config::load_from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]
@@ -1297,7 +1289,7 @@ mod tests {
 
     #[test]
     fn test_success_tree() {
-        let mut config: Config = toml::from_str(
+        let mut config = config::load_from_str(
             r#"
 [transforms.ignored]
   inputs = ["also_ignored"]
@@ -1355,7 +1347,7 @@ mod tests {
 
     #[test]
     fn test_fails() {
-        let mut config: Config = toml::from_str(
+        let mut config = config::load_from_str(
             r#"
 [transforms.foo]
   inputs = ["ignored"]

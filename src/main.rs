@@ -14,8 +14,8 @@ use futures01::Future;
 use std::cmp::max;
 use tokio::select;
 use vector::{
-    config::{self, Config, ConfigDiff},
-    event, generate, heartbeat,
+    config::{self, ConfigDiff},
+    generate, heartbeat,
     internal_events::{VectorReloaded, VectorStarted, VectorStopped},
     list, metrics, runtime,
     signal::{self, SignalTo},
@@ -105,12 +105,13 @@ fn main() {
             path = ?config_paths
         );
 
-        let read_config = config::read_configs(&config_paths);
-        let maybe_config = handle_config_errors(read_config);
-        let config = maybe_config.unwrap_or_else(|| {
-            std::process::exit(exitcode::CONFIG);
-        });
-        event::LOG_SCHEMA
+        let config = config::load_from_paths(&config_paths)
+            .map_err(handle_config_errors)
+            .unwrap_or_else(|()| {
+                std::process::exit(exitcode::CONFIG);
+            });
+
+        vector::event::LOG_SCHEMA
             .set(config.global.log_schema.clone())
             .expect("Couldn't set schema");
 
@@ -119,7 +120,8 @@ fn main() {
             std::process::exit(exitcode::CONFIG);
         });
 
-        let result = topology::start_validated(config, diff, pieces, opts.require_healthy).await;
+        let result =
+            topology::start_validated(config, diff, pieces, opts.require_healthy).await;
         let (mut topology, graceful_crash) = result.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });
@@ -136,10 +138,8 @@ fn main() {
                 Some(signal) = signals.next() => {
                     if signal == SignalTo::Reload {
                         // Reload config
-                        let new_config = config::read_configs(&config_paths);
+                        let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
 
-                        trace!("Parsing config");
-                        let new_config = handle_config_errors(new_config);
                         if let Some(new_config) = new_config {
                             match topology
                                 .reload_config_and_respawn(new_config, opts.require_healthy)
@@ -186,14 +186,8 @@ fn main() {
     rt.shutdown_now().wait().unwrap();
 }
 
-fn handle_config_errors(config: Result<Config, Vec<String>>) -> Option<Config> {
-    match config {
-        Err(errors) => {
-            for error in errors {
-                error!("Configuration error: {}", error);
-            }
-            None
-        }
-        Ok(config) => Some(config),
+fn handle_config_errors(errors: Vec<String>) {
+    for error in errors {
+        error!("Configuration error: {}", error);
     }
 }

@@ -1,8 +1,9 @@
-use super::Config;
+use super::{vars, Config};
 use glob::glob;
 use lazy_static::lazy_static;
 use once_cell::sync::OnceCell;
 use std::{
+    collections::HashMap,
     fs::File,
     path::{Path, PathBuf},
 };
@@ -53,40 +54,54 @@ pub fn process_paths(config_paths: &[PathBuf]) -> Option<Vec<PathBuf>> {
     Some(paths)
 }
 
-pub fn read_configs(config_paths: &[PathBuf]) -> Result<Config, Vec<String>> {
+pub fn load_from_paths(config_paths: &[PathBuf]) -> Result<Config, Vec<String>> {
+    let mut inputs = Vec::new();
+    let mut errors = Vec::new();
+
+    for path in config_paths {
+        if let Some(file) = open_config(&path) {
+            inputs.push(file);
+        } else {
+            errors.push(format!("Config file not found in path: {:?}.", path));
+        };
+    }
+
+    if errors.is_empty() {
+        load_from_inputs(inputs)
+    } else {
+        Err(errors)
+    }
+}
+
+pub fn load_from_str(input: &str) -> Result<Config, Vec<String>> {
+    load_from_inputs(std::iter::once(input.as_bytes()))
+}
+
+fn load_from_inputs(
+    inputs: impl IntoIterator<Item = impl std::io::Read>,
+) -> Result<Config, Vec<String>> {
     let mut config = Config::empty();
     let mut errors = Vec::new();
 
-    config_paths.iter().for_each(|p| {
-        let file = if let Some(file) = open_config(&p) {
-            file
-        } else {
-            errors.push(format!("Config file not found in path: {:?}.", p));
-            return;
-        };
-
-        trace!(
-            message = "Parsing config.",
-            path = ?p
-        );
-
-        if let Err(errs) = Config::load(file).and_then(|n| config.append(n)) {
-            errors.extend(errs.iter().map(|e| format!("{:?}: {}", p, e)));
+    for input in inputs {
+        if let Err(errs) = load(input).and_then(|n| config.append(n)) {
+            // TODO: add back paths
+            errors.extend(errs.iter().map(|e| e.to_string()));
         }
-    });
+    }
 
     if let Err(mut errs) = config.expand_macros() {
         errors.append(&mut errs);
     }
 
-    if !errors.is_empty() {
-        Err(errors)
-    } else {
+    if errors.is_empty() {
         Ok(config)
+    } else {
+        Err(errors)
     }
 }
 
-pub fn open_config(path: &Path) -> Option<File> {
+fn open_config(path: &Path) -> Option<File> {
     match File::open(path) {
         Ok(f) => Some(f),
         Err(error) => {
@@ -99,4 +114,21 @@ pub fn open_config(path: &Path) -> Option<File> {
             }
         }
     }
+}
+
+fn load(mut input: impl std::io::Read) -> Result<Config, Vec<String>> {
+    let mut source_string = String::new();
+    input
+        .read_to_string(&mut source_string)
+        .map_err(|e| vec![e.to_string()])?;
+
+    let mut vars = std::env::vars().collect::<HashMap<_, _>>();
+    if !vars.contains_key("HOSTNAME") {
+        if let Some(hostname) = hostname::get_hostname() {
+            vars.insert("HOSTNAME".into(), hostname);
+        }
+    }
+    let with_vars = vars::interpolate(&source_string, &vars);
+
+    toml::from_str(&with_vars).map_err(|e| vec![e.to_string()])
 }

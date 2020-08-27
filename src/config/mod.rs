@@ -11,7 +11,7 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::fs::DirBuilder;
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 pub mod component;
 mod diff;
@@ -21,7 +21,7 @@ mod vars;
 pub mod watcher;
 
 pub use diff::ConfigDiff;
-pub use loading::*;
+pub use loading::{load_from_paths, load_from_str, process_paths, CONFIG_PATHS};
 pub use validation::check;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -37,6 +37,8 @@ pub struct Config {
     pub transforms: IndexMap<String, TransformOuter>,
     #[serde(default)]
     pub tests: Vec<TestDefinition>,
+    #[serde(skip)]
+    expansions: IndexMap<String, Vec<String>>,
 }
 
 #[derive(Default, Debug, Deserialize, Serialize)]
@@ -329,6 +331,7 @@ impl Config {
             sinks: IndexMap::new(),
             transforms: IndexMap::new(),
             tests: Vec::new(),
+            expansions: IndexMap::new(),
         }
     }
 
@@ -363,10 +366,20 @@ impl Config {
         self.transforms.insert(name.to_string(), transform);
     }
 
+    /// Expand a logical component name (i.e. from the config file) into the names of the
+    /// components it was expanded to as part of the macro process. Does not check that the
+    /// identifier is otherwise valid.
+    pub fn get_inputs(&self, identifier: &str) -> Vec<String> {
+        self.expansions
+            .get(identifier)
+            .cloned()
+            .unwrap_or_else(|| vec![String::from(identifier)])
+    }
+
     /// Some component configs can act like macros and expand themselves into
     /// multiple replacement configs. Returns a map of components to their
     /// expanded child names.
-    pub fn expand_macros(&mut self) -> Result<IndexMap<String, Vec<String>>, Vec<String>> {
+    pub fn expand_macros(&mut self) -> Result<(), Vec<String>> {
         let mut expanded_transforms = IndexMap::new();
         let mut expansions = IndexMap::new();
         let mut errors = Vec::new();
@@ -401,25 +414,9 @@ impl Config {
         if !errors.is_empty() {
             Err(errors)
         } else {
-            Ok(expansions)
+            self.expansions = expansions;
+            Ok(())
         }
-    }
-
-    pub fn load(mut input: impl std::io::Read) -> Result<Self, Vec<String>> {
-        let mut source_string = String::new();
-        input
-            .read_to_string(&mut source_string)
-            .map_err(|e| vec![e.to_string()])?;
-
-        let mut vars = std::env::vars().collect::<HashMap<_, _>>();
-        if !vars.contains_key("HOSTNAME") {
-            if let Some(hostname) = hostname::get_hostname() {
-                vars.insert("HOSTNAME".into(), hostname);
-            }
-        }
-        let with_vars = vars::interpolate(&source_string, &vars);
-
-        toml::from_str(&with_vars).map_err(|e| vec![e.to_string()])
     }
 
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {
