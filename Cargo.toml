@@ -153,6 +153,7 @@ task-compat = "0.1"
 cidr-utils = "0.4.2"
 pin-project = "0.4.22"
 k8s-openapi = { version = "0.9", features = ["v1_15"], optional = true }
+nats = { version = "0.7.3", optional = true }
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -350,6 +351,7 @@ sinks = [
   "sinks-kafka",
   "sinks-logdna",
   "sinks-loki",
+  "sinks-nats",
   "sinks-new_relic_logs",
   "sinks-papertrail",
   "sinks-prometheus",
@@ -379,6 +381,7 @@ sinks-influxdb = ["bytesize"]
 sinks-kafka = []
 sinks-logdna = ["bytesize"]
 sinks-loki = ["bytesize"]
+sinks-nats = ["nats"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-prometheus = []
 sinks-sematext_logs = ["sinks-elasticsearch"]
@@ -405,6 +408,7 @@ docker = [
   "influxdb-integration-tests",
   "kafka-integration-tests",
   "loki-integration-tests",
+  "nats-integration-tests",
   "pulsar-integration-tests",
   "splunk-integration-tests",
 ]
@@ -433,6 +437,7 @@ humio-integration-tests = ["sinks-humio_logs"]
 influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sources-kafka", "sinks-kafka"]
 loki-integration-tests = ["sinks-loki"]
+nats-integration-tests = ["sinks-nats"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 
