@@ -130,28 +130,24 @@ impl SourceConfig for SocketConfig {
 
 #[cfg(test)]
 mod test {
-    use super::tcp::TcpConfig;
-    use super::udp::UdpConfig;
-    #[cfg(unix)]
-    use super::unix::UnixConfig;
-    use super::SocketConfig;
-    use crate::config::{GlobalOptions, SourceConfig};
-    use crate::dns::Resolver;
-    use crate::event;
-    use crate::runtime::Runtime;
-    use crate::shutdown::{ShutdownSignal, SourceShutdownCoordinator};
-    use crate::sinks::util::tcp::TcpSink;
-    use crate::test_util::{
-        block_on, collect_n, next_addr, runtime, send_lines, send_lines_tls, wait_for_tcp, CollectN,
+    use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
+    use crate::{
+        config::{GlobalOptions, SourceConfig},
+        dns::Resolver,
+        event,
+        shutdown::{ShutdownSignal, SourceShutdownCoordinator},
+        sinks::util::tcp::TcpSink,
+        test_util::{
+            collect_n, next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
+        },
+        tls::{MaybeTlsSettings, TlsConfig, TlsOptions},
+        Pipeline,
     };
-    use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions};
-    use crate::Pipeline;
     use bytes::Bytes;
-    #[cfg(unix)]
-    use futures::{compat::Future01CompatExt, stream, SinkExt};
-    use futures01::{sync::oneshot, Future, Stream};
-    #[cfg(unix)]
-    use std::path::PathBuf;
+    use futures::{
+        compat::{Future01CompatExt, Sink01CompatExt, Stream01CompatExt},
+        stream, StreamExt,
+    };
     use std::{
         net::{SocketAddr, UdpSocket},
         sync::{
@@ -160,17 +156,23 @@ mod test {
         },
         thread,
     };
+    use tokio::{
+        task::JoinHandle,
+        time::{Duration, Instant},
+    };
     #[cfg(unix)]
-    use tokio::net::UnixStream;
-    use tokio::time::{Duration, Instant};
-    #[cfg(unix)]
-    use tokio_util::codec::{FramedWrite, LinesCodec};
+    use {
+        super::unix::UnixConfig,
+        futures::SinkExt,
+        std::path::PathBuf,
+        tokio::net::UnixStream,
+        tokio_util::codec::{FramedWrite, LinesCodec},
+    };
 
     //////// TCP TESTS ////////
-    #[test]
-    fn tcp_it_includes_host() {
+    #[tokio::test]
+    async fn tcp_it_includes_host() {
         let (tx, rx) = Pipeline::new_test();
-
         let addr = next_addr();
 
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
@@ -180,25 +182,25 @@ mod test {
                 ShutdownSignal::noop(),
                 tx,
             )
-            .unwrap();
-        let mut rt = runtime();
-        rt.spawn(server);
-        rt.block_on_std(async move { wait_for_tcp(addr).await });
+            .unwrap()
+            .compat();
+        tokio::spawn(server);
 
-        rt.block_on_std(send_lines(addr, vec!["test".to_owned()].into_iter()))
+        wait_for_tcp(addr).await;
+        send_lines(addr, vec!["test".to_owned()].into_iter())
+            .await
             .unwrap();
 
-        let event = rx.wait().next().unwrap().unwrap();
+        let event = rx.compat().next().await.unwrap().unwrap();
         assert_eq!(
             event.as_log()[&event::log_schema().host_key()],
             "127.0.0.1".into()
         );
     }
 
-    #[test]
-    fn tcp_it_includes_source_type() {
+    #[tokio::test]
+    async fn tcp_it_includes_source_type() {
         let (tx, rx) = Pipeline::new_test();
-
         let addr = next_addr();
 
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
@@ -208,25 +210,26 @@ mod test {
                 ShutdownSignal::noop(),
                 tx,
             )
-            .unwrap();
-        let mut rt = runtime();
-        rt.spawn(server);
-        rt.block_on_std(async move { wait_for_tcp(addr).await });
+            .unwrap()
+            .compat();
+        tokio::spawn(server);
 
-        rt.block_on_std(send_lines(addr, vec!["test".to_owned()].into_iter()))
+        wait_for_tcp(addr).await;
+        send_lines(addr, vec!["test".to_owned()].into_iter())
+            .await
             .unwrap();
 
-        let event = rx.wait().next().unwrap().unwrap();
+        let event = rx.compat().next().await.unwrap().unwrap();
         assert_eq!(
             event.as_log()[event::log_schema().source_type_key()],
             "socket".into()
         );
     }
 
-    #[test]
-    fn tcp_continue_after_long_line() {
+    #[tokio::test]
+    async fn tcp_continue_after_long_line() {
         let (tx, rx) = Pipeline::new_test();
-
+        let mut rx = rx.compat();
         let addr = next_addr();
 
         let mut config = TcpConfig::new(addr.into());
@@ -239,10 +242,9 @@ mod test {
                 ShutdownSignal::noop(),
                 tx,
             )
-            .unwrap();
-        let mut rt = runtime();
-        rt.spawn(server);
-        rt.block_on_std(async move { wait_for_tcp(addr).await });
+            .unwrap()
+            .compat();
+        tokio::spawn(server);
 
         let lines = vec![
             "short".to_owned(),
@@ -250,26 +252,26 @@ mod test {
             "more short".to_owned(),
         ];
 
-        rt.block_on_std(send_lines(addr, lines.into_iter()))
-            .unwrap();
+        wait_for_tcp(addr).await;
+        send_lines(addr, lines.into_iter()).await.unwrap();
 
-        let (event, rx) = block_on(rx.into_future()).unwrap();
+        let event = rx.next().await.unwrap().unwrap();
         assert_eq!(
-            event.unwrap().as_log()[&event::log_schema().message_key()],
+            event.as_log()[&event::log_schema().message_key()],
             "short".into()
         );
 
-        let (event, _rx) = block_on(rx.into_future()).unwrap();
+        let event = rx.next().await.unwrap().unwrap();
         assert_eq!(
-            event.unwrap().as_log()[&event::log_schema().message_key()],
+            event.as_log()[&event::log_schema().message_key()],
             "more short".into()
         );
     }
 
-    #[test]
-    fn tcp_with_tls() {
+    #[tokio::test]
+    async fn tcp_with_tls() {
         let (tx, rx) = Pipeline::new_test();
-
+        let mut rx = rx.compat();
         let addr = next_addr();
 
         let mut config = TcpConfig::new(addr.into());
@@ -290,10 +292,9 @@ mod test {
                 ShutdownSignal::noop(),
                 tx,
             )
-            .unwrap();
-        let mut rt = runtime();
-        rt.spawn(server);
-        rt.block_on_std(async move { wait_for_tcp(addr).await });
+            .unwrap()
+            .compat();
+        tokio::spawn(server);
 
         let lines = vec![
             "short".to_owned(),
@@ -301,24 +302,26 @@ mod test {
             "more short".to_owned(),
         ];
 
-        rt.block_on_std(send_lines_tls(addr, "localhost".into(), lines.into_iter()))
+        wait_for_tcp(addr).await;
+        send_lines_tls(addr, "localhost".into(), lines.into_iter())
+            .await
             .unwrap();
 
-        let (event, rx) = block_on(rx.into_future()).unwrap();
+        let event = rx.next().await.unwrap().unwrap();
         assert_eq!(
-            event.unwrap().as_log()[&event::log_schema().message_key()],
+            event.as_log()[&event::log_schema().message_key()],
             "short".into()
         );
 
-        let (event, _rx) = block_on(rx.into_future()).unwrap();
+        let event = rx.next().await.unwrap().unwrap();
         assert_eq!(
-            event.unwrap().as_log()[&event::log_schema().message_key()],
+            event.as_log()[&event::log_schema().message_key()],
             "more short".into()
         );
     }
 
-    #[test]
-    fn tcp_shutdown_simple() {
+    #[tokio::test]
+    async fn tcp_shutdown_simple() {
         let source_name = "tcp_shutdown_simple";
         let (tx, rx) = Pipeline::new_test();
         let addr = next_addr();
@@ -329,16 +332,17 @@ mod test {
         // Start TCP Source
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
             .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
-            .unwrap();
-        let mut rt = runtime();
-        let source_handle = oneshot::spawn(server, &rt.executor());
-        rt.block_on_std(async move { wait_for_tcp(addr).await });
+            .unwrap()
+            .compat();
+        let source_handle = tokio::spawn(server);
 
         // Send data to Source.
-        rt.block_on_std(send_lines(addr, vec!["test".to_owned()].into_iter()))
+        wait_for_tcp(addr).await;
+        send_lines(addr, vec!["test".to_owned()].into_iter())
+            .await
             .unwrap();
 
-        let event = rx.wait().next().unwrap().unwrap();
+        let event = rx.compat().next().await.unwrap().unwrap();
         assert_eq!(
             event.as_log()[&event::log_schema().message_key()],
             "test".into()
@@ -347,15 +351,15 @@ mod test {
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
-        let shutdown_success = rt.block_on(shutdown_complete).unwrap();
+        let shutdown_success = shutdown_complete.compat().await.unwrap();
         assert_eq!(true, shutdown_success);
 
         // Ensure source actually shut down successfully.
-        rt.block_on(source_handle).unwrap();
+        let _ = source_handle.await.unwrap();
     }
 
-    #[test]
-    fn tcp_shutdown_infinite_stream() {
+    #[tokio::test(threaded_scheduler)]
+    async fn tcp_shutdown_infinite_stream() {
         // It's important that the buffer be large enough that the TCP source doesn't have
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
@@ -363,7 +367,6 @@ mod test {
         let source_name = "tcp_shutdown_infinite_stream";
 
         let addr = next_addr();
-
         let mut shutdown = SourceShutdownCoordinator::default();
         let (shutdown_signal, _) = shutdown.register_source(source_name);
 
@@ -373,10 +376,11 @@ mod test {
             ..TcpConfig::new(addr.into())
         })
         .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
-        .unwrap();
-        let mut rt = Runtime::with_thread_count(2).unwrap();
-        let source_handle = oneshot::spawn(server, &rt.executor());
-        rt.block_on_std(async move { wait_for_tcp(addr).await });
+        .unwrap()
+        .compat();
+        let source_handle = tokio::spawn(server);
+
+        wait_for_tcp(addr).await;
 
         // Spawn future that keeps sending lines to the TCP source forever.
         let sink = TcpSink::new(
@@ -385,37 +389,38 @@ mod test {
             Resolver,
             MaybeTlsSettings::Raw(()),
         );
-        rt.spawn(
-            futures01::stream::iter_ok::<_, ()>(std::iter::repeat(()))
-                .map(|_| Bytes::from("test\n"))
-                .map_err(|_| ())
-                .forward(sink)
-                .map(|_| ()),
-        );
+        let message = random_string(512);
+        let message_event = Bytes::from(message.clone() + "\n");
+        tokio::spawn(async move {
+            let _ = stream::repeat(())
+                .map(move |_| Ok(message_event.clone()))
+                .forward(sink.sink_compat())
+                .await
+                .unwrap();
+        });
 
         // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
-        let (_rx, events) = rt.block_on(CollectN::new(rx, 100)).ok().unwrap();
+        let events = collect_n(rx, 100).await.unwrap();
         assert_eq!(100, events.len());
         for event in events {
             assert_eq!(
                 event.as_log()[&event::log_schema().message_key()],
-                "test".into()
+                message.clone().into()
             );
         }
 
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
-        let shutdown_success = rt.block_on(shutdown_complete).unwrap();
+        let shutdown_success = shutdown_complete.compat().await.unwrap();
         assert_eq!(true, shutdown_success);
 
         // Ensure that the source has actually shut down.
-        rt.block_on(source_handle).unwrap();
+        let _ = source_handle.await.unwrap();
     }
 
     //////// UDP TESTS ////////
     fn send_lines_udp(addr: SocketAddr, lines: impl IntoIterator<Item = String>) -> SocketAddr {
         let bind = next_addr();
-
         let socket = UdpSocket::bind(bind)
             .map_err(|e| panic!("{:}", e))
             .ok()
@@ -445,22 +450,21 @@ mod test {
         sender: Pipeline,
         source_name: &str,
         shutdown: &mut SourceShutdownCoordinator,
-    ) -> (SocketAddr, Runtime, oneshot::SpawnHandle<(), ()>) {
+    ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let (shutdown_signal, _) = shutdown.register_source(source_name);
         init_udp_inner(sender, source_name, shutdown_signal)
     }
 
-    fn init_udp(sender: Pipeline) -> (SocketAddr, Runtime) {
-        let (addr, rt, handle) = init_udp_inner(sender, "default", ShutdownSignal::noop());
-        handle.forget();
-        (addr, rt)
+    fn init_udp(sender: Pipeline) -> SocketAddr {
+        let (addr, _handle) = init_udp_inner(sender, "default", ShutdownSignal::noop());
+        addr
     }
 
     fn init_udp_inner(
         sender: Pipeline,
         source_name: &str,
         shutdown_signal: ShutdownSignal,
-    ) -> (SocketAddr, Runtime, oneshot::SpawnHandle<(), ()>) {
+    ) -> (SocketAddr, JoinHandle<Result<(), ()>>) {
         let addr = next_addr();
 
         let server = SocketConfig::from(UdpConfig::new(addr))
@@ -470,24 +474,23 @@ mod test {
                 shutdown_signal,
                 sender,
             )
-            .unwrap();
-        let rt = runtime();
-        let source_handle = oneshot::spawn(server, &rt.executor());
+            .unwrap()
+            .compat();
+        let source_handle = tokio::spawn(server);
 
         // Wait for UDP to start listening
         thread::sleep(Duration::from_millis(100));
 
-        (addr, rt, source_handle)
+        (addr, source_handle)
     }
 
-    #[test]
-    fn udp_message() {
+    #[tokio::test(threaded_scheduler)]
+    async fn udp_message() {
         let (tx, rx) = Pipeline::new_test();
-
-        let (address, mut rt) = init_udp(tx);
+        let address = init_udp(tx);
 
         send_lines_udp(address, vec!["test".to_string()]);
-        let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
+        let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],
@@ -495,14 +498,13 @@ mod test {
         );
     }
 
-    #[test]
-    fn udp_multiple_messages() {
+    #[tokio::test(threaded_scheduler)]
+    async fn udp_multiple_messages() {
         let (tx, rx) = Pipeline::new_test();
-
-        let (address, mut rt) = init_udp(tx);
+        let address = init_udp(tx);
 
         send_lines_udp(address, vec!["test\ntest2".to_string()]);
-        let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
+        let events = collect_n(rx, 2).await.unwrap();
 
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],
@@ -514,14 +516,13 @@ mod test {
         );
     }
 
-    #[test]
-    fn udp_multiple_packets() {
+    #[tokio::test(threaded_scheduler)]
+    async fn udp_multiple_packets() {
         let (tx, rx) = Pipeline::new_test();
-
-        let (address, mut rt) = init_udp(tx);
+        let address = init_udp(tx);
 
         send_lines_udp(address, vec!["test".to_string(), "test2".to_string()]);
-        let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
+        let events = collect_n(rx, 2).await.unwrap();
 
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],
@@ -533,14 +534,13 @@ mod test {
         );
     }
 
-    #[test]
-    fn udp_it_includes_host() {
+    #[tokio::test(threaded_scheduler)]
+    async fn udp_it_includes_host() {
         let (tx, rx) = Pipeline::new_test();
-
-        let (address, mut rt) = init_udp(tx);
+        let address = init_udp(tx);
 
         let from = send_lines_udp(address, vec!["test".to_string()]);
-        let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
+        let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
             events[0].as_log()[&event::log_schema().host_key()],
@@ -548,14 +548,13 @@ mod test {
         );
     }
 
-    #[test]
-    fn udp_it_includes_source_type() {
+    #[tokio::test(threaded_scheduler)]
+    async fn udp_it_includes_source_type() {
         let (tx, rx) = Pipeline::new_test();
-
-        let (address, mut rt) = init_udp(tx);
+        let address = init_udp(tx);
 
         let _ = send_lines_udp(address, vec!["test".to_string()]);
-        let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
+        let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
             events[0].as_log()[event::log_schema().source_type_key()],
@@ -563,17 +562,16 @@ mod test {
         );
     }
 
-    #[test]
-    fn udp_shutdown_simple() {
+    #[tokio::test(threaded_scheduler)]
+    async fn udp_shutdown_simple() {
         let (tx, rx) = Pipeline::new_test();
         let source_name = "udp_shutdown_simple";
 
         let mut shutdown = SourceShutdownCoordinator::default();
-        let (address, mut rt, source_handle) =
-            init_udp_with_shutdown(tx, source_name, &mut shutdown);
+        let (address, source_handle) = init_udp_with_shutdown(tx, source_name, &mut shutdown);
 
         send_lines_udp(address, vec!["test".to_string()]);
-        let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
+        let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],
@@ -583,21 +581,20 @@ mod test {
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
-        let shutdown_success = rt.block_on(shutdown_complete).unwrap();
+        let shutdown_success = shutdown_complete.compat().await.unwrap();
         assert_eq!(true, shutdown_success);
 
         // Ensure source actually shut down successfully.
-        rt.block_on(source_handle).unwrap();
+        let _ = source_handle.await.unwrap();
     }
 
-    #[test]
-    fn udp_shutdown_infinite_stream() {
+    #[tokio::test(threaded_scheduler)]
+    async fn udp_shutdown_infinite_stream() {
         let (tx, rx) = Pipeline::new_test();
         let source_name = "udp_shutdown_infinite_stream";
 
         let mut shutdown = SourceShutdownCoordinator::default();
-        let (address, mut rt, source_handle) =
-            init_udp_with_shutdown(tx, source_name, &mut shutdown);
+        let (address, source_handle) = init_udp_with_shutdown(tx, source_name, &mut shutdown);
 
         // Stream that keeps sending lines to the UDP source forever.
         let run_pump_atomic_sender = Arc::new(AtomicBool::new(true));
@@ -611,7 +608,7 @@ mod test {
         });
 
         // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
-        let (_rx, events) = rt.block_on(CollectN::new(rx, 100)).ok().unwrap();
+        let events = collect_n(rx, 100).await.unwrap();
         assert_eq!(100, events.len());
         for event in events {
             assert_eq!(
@@ -622,11 +619,11 @@ mod test {
 
         let deadline = Instant::now() + Duration::from_secs(10);
         let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
-        let shutdown_success = rt.block_on(shutdown_complete).unwrap();
+        let shutdown_success = shutdown_complete.compat().await.unwrap();
         assert_eq!(true, shutdown_success);
 
         // Ensure that the source has actually shut down.
-        rt.block_on(source_handle).unwrap();
+        let _ = source_handle.await.unwrap();
 
         // Stop the pump from sending lines forever.
         run_pump_atomic_sender.store(false, Ordering::Relaxed);
@@ -635,7 +632,7 @@ mod test {
 
     ////////////// UNIX TESTS //////////////
     #[cfg(unix)]
-    fn init_unix(sender: Pipeline) -> (PathBuf, Runtime) {
+    fn init_unix(sender: Pipeline) -> PathBuf {
         let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
 
         let server = SocketConfig::from(UnixConfig::new(in_path.clone()))
@@ -645,15 +642,14 @@ mod test {
                 ShutdownSignal::noop(),
                 sender,
             )
-            .unwrap();
-
-        let mut rt = runtime();
-        rt.spawn(server);
+            .unwrap()
+            .compat();
+        tokio::spawn(server);
 
         // Wait for server to accept traffic
         while std::os::unix::net::UnixStream::connect(&in_path).is_err() {}
 
-        (in_path, rt)
+        in_path
     }
 
     #[cfg(unix)]
@@ -670,66 +666,63 @@ mod test {
     }
 
     #[cfg(unix)]
-    #[test]
-    fn unix_message() {
+    #[tokio::test(threaded_scheduler)]
+    async fn unix_message() {
         let (tx, rx) = Pipeline::new_test();
-        let (path, mut rt) = init_unix(tx);
-        rt.block_on_std(async move {
-            send_lines_unix(path, vec!["test"]).await;
+        let path = init_unix(tx);
 
-            let events = collect_n(rx, 1).compat().await.ok().unwrap();
+        send_lines_unix(path, vec!["test"]).await;
 
-            assert_eq!(1, events.len());
-            assert_eq!(
-                events[0].as_log()[&event::log_schema().message_key()],
-                "test".into()
-            );
-            assert_eq!(
-                events[0].as_log()[event::log_schema().source_type_key()],
-                "socket".into()
-            );
-        });
+        let events = collect_n(rx, 1).await.unwrap();
+
+        assert_eq!(1, events.len());
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            "test".into()
+        );
+        assert_eq!(
+            events[0].as_log()[event::log_schema().source_type_key()],
+            "socket".into()
+        );
     }
 
     #[cfg(unix)]
-    #[test]
-    fn unix_multiple_messages() {
+    #[tokio::test(threaded_scheduler)]
+    async fn unix_multiple_messages() {
         let (tx, rx) = Pipeline::new_test();
-        let (path, mut rt) = init_unix(tx);
-        rt.block_on_std(async move {
-            send_lines_unix(path, vec!["test\ntest2"]).await;
-            let events = collect_n(rx, 2).compat().await.ok().unwrap();
+        let path = init_unix(tx);
 
-            assert_eq!(2, events.len());
-            assert_eq!(
-                events[0].as_log()[&event::log_schema().message_key()],
-                "test".into()
-            );
-            assert_eq!(
-                events[1].as_log()[&event::log_schema().message_key()],
-                "test2".into()
-            );
-        });
+        send_lines_unix(path, vec!["test\ntest2"]).await;
+        let events = collect_n(rx, 2).await.unwrap();
+
+        assert_eq!(2, events.len());
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            "test".into()
+        );
+        assert_eq!(
+            events[1].as_log()[&event::log_schema().message_key()],
+            "test2".into()
+        );
     }
 
     #[cfg(unix)]
-    #[test]
-    fn unix_multiple_packets() {
+    #[tokio::test(threaded_scheduler)]
+    async fn unix_multiple_packets() {
         let (tx, rx) = Pipeline::new_test();
-        let (path, mut rt) = init_unix(tx);
-        rt.block_on_std(async move {
-            send_lines_unix(path, vec!["test", "test2"]).await;
-            let events = collect_n(rx, 2).compat().await.ok().unwrap();
+        let path = init_unix(tx);
 
-            assert_eq!(2, events.len());
-            assert_eq!(
-                events[0].as_log()[&event::log_schema().message_key()],
-                "test".into()
-            );
-            assert_eq!(
-                events[1].as_log()[&event::log_schema().message_key()],
-                "test2".into()
-            );
-        });
+        send_lines_unix(path, vec!["test", "test2"]).await;
+        let events = collect_n(rx, 2).await.unwrap();
+
+        assert_eq!(2, events.len());
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            "test".into()
+        );
+        assert_eq!(
+            events[1].as_log()[&event::log_schema().message_key()],
+            "test2".into()
+        );
     }
 }

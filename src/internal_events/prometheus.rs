@@ -1,6 +1,7 @@
 use super::InternalEvent;
 use crate::sources::prometheus::parser::ParserError;
 use metrics::{counter, timing};
+use std::borrow::Cow;
 use std::time::Instant;
 
 #[derive(Debug)]
@@ -44,7 +45,7 @@ impl InternalEvent for PrometheusRequestCompleted {
             "component_kind" => "source",
             "component_type" => "prometheus",
         );
-        timing!("request_duration_nanoseconds", self.start,self.end,
+        timing!("request_duration_nanoseconds", self.start, self.end,
             "component_kind" => "source",
             "component_type" => "prometheus",
         );
@@ -52,13 +53,20 @@ impl InternalEvent for PrometheusRequestCompleted {
 }
 
 #[derive(Debug)]
-pub struct PrometheusParseError {
+pub struct PrometheusParseError<'a> {
     pub error: ParserError,
+    pub url: String,
+    pub body: Cow<'a, str>,
 }
 
-impl InternalEvent for PrometheusParseError {
+impl<'a> InternalEvent for PrometheusParseError<'a> {
     fn emit_logs(&self) {
-        error!(message = "parsing error.", error = ?self.error);
+        error!(message = "parsing error.", url = %self.url, error = %self.error);
+        debug!(
+            message = %format!("failed to parse response:\n\n{}\n\n", self.body),
+            url = %self.url,
+            rate_limit_secs = 10
+        );
     }
 
     fn emit_metrics(&self) {
@@ -70,13 +78,33 @@ impl InternalEvent for PrometheusParseError {
 }
 
 #[derive(Debug)]
+pub struct PrometheusErrorResponse {
+    pub code: hyper::StatusCode,
+    pub url: String,
+}
+
+impl InternalEvent for PrometheusErrorResponse {
+    fn emit_logs(&self) {
+        error!(message = "HTTP error response.", url = %self.url, code = %self.code);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("http_error_response", 1,
+            "component_kind" => "source",
+            "component_type" => "prometheus",
+        );
+    }
+}
+
+#[derive(Debug)]
 pub struct PrometheusHttpError {
     pub error: hyper::Error,
+    pub url: String,
 }
 
 impl InternalEvent for PrometheusHttpError {
     fn emit_logs(&self) {
-        error!(message = "http request processing error.", error = %self.error);
+        error!(message = "HTTP request processing error.", url = %self.url, error = %self.error);
     }
 
     fn emit_metrics(&self) {

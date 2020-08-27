@@ -89,16 +89,20 @@ mod test {
     use crate::{
         config::SinkContext,
         event::Event,
-        test_util::{next_addr, random_lines_with_stream, runtime, CountReceiver},
+        test_util::{next_addr, random_lines_with_stream, trace_init, CountReceiver},
     };
-    use futures::compat::Future01CompatExt;
+    use futures::{
+        compat::{Future01CompatExt, Sink01CompatExt},
+        SinkExt,
+    };
     use futures01::Sink;
     use serde_json::Value;
     use std::net::UdpSocket;
 
-    #[test]
-    fn udp_message() {
-        crate::test_util::trace_init();
+    #[tokio::test]
+    async fn udp_message() {
+        trace_init();
+
         let addr = next_addr();
         let receiver = UdpSocket::bind(addr).unwrap();
 
@@ -108,13 +112,11 @@ mod test {
                 encoding: Encoding::Json.into(),
             }),
         };
-        let mut rt = runtime();
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).unwrap();
 
         let event = Event::from("raw log line");
-        let pump = sink.send(event);
-        rt.block_on(pump).unwrap();
+        let _ = sink.send(event).compat().await.unwrap();
 
         let mut buf = [0; 256];
         let (size, _src_addr) = receiver
@@ -129,9 +131,10 @@ mod test {
         assert_eq!(message, &Value::String("raw log line".into()));
     }
 
-    #[test]
-    fn tcp_stream() {
-        crate::test_util::trace_init();
+    #[tokio::test]
+    async fn tcp_stream() {
+        trace_init();
+
         let addr = next_addr();
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
@@ -140,27 +143,25 @@ mod test {
                 tls: None,
             }),
         };
-        let mut rt = runtime();
-        rt.block_on_std(async move {
-            let context = SinkContext::new_test();
-            let (sink, _healthcheck) = config.build(context).unwrap();
 
-            let mut receiver = CountReceiver::receive_lines(addr);
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).unwrap();
 
-            let (lines, events) = random_lines_with_stream(10, 100);
-            let _ = sink.send_all(events).compat().await.unwrap();
+        let mut receiver = CountReceiver::receive_lines(addr);
 
-            // Wait for output to connect
-            receiver.connected().await;
+        let (lines, mut events) = random_lines_with_stream(10, 100);
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 
-            let output = receiver.wait().await;
-            assert_eq!(lines.len(), output.len());
-            for (source, received) in lines.iter().zip(output) {
-                let json = serde_json::from_str::<Value>(&received).expect("Invalid JSON");
-                let received = json.get("message").unwrap().as_str().unwrap();
-                assert_eq!(source, received);
-            }
-        });
+        // Wait for output to connect
+        receiver.connected().await;
+
+        let output = receiver.await;
+        assert_eq!(lines.len(), output.len());
+        for (source, received) in lines.iter().zip(output) {
+            let json = serde_json::from_str::<Value>(&received).expect("Invalid JSON");
+            let received = json.get("message").unwrap().as_str().unwrap();
+            assert_eq!(source, received);
+        }
     }
 
     // This is a test that checks that we properly receieve all events in the
@@ -172,19 +173,28 @@ mod test {
     //
     // If this test hangs that means somewhere we are not collecting the correct
     // events.
-    #[cfg(feature = "sources-tls")]
-    #[test]
-    fn tcp_stream_detects_disconnect() {
-        use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions};
-        use futures01::{Async, Stream};
-        use std::io::{ErrorKind, Read};
-        use std::net::Shutdown;
-        use std::sync::{
-            atomic::{AtomicUsize, Ordering},
-            Arc,
+    #[cfg(all(feature = "sources-tls", feature = "listenfd"))]
+    #[tokio::test(threaded_scheduler)]
+    async fn tcp_stream_detects_disconnect() {
+        use crate::tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
+        use futures::{future, FutureExt, StreamExt};
+        use std::{
+            future::Future,
+            net::Shutdown,
+            pin::Pin,
+            sync::{
+                atomic::{AtomicUsize, Ordering},
+                Arc,
+            },
+            task::Poll,
+        };
+        use tokio::{
+            io::AsyncRead,
+            net::TcpStream,
+            time::{delay_for, Duration},
         };
 
-        crate::test_util::trace_init();
+        trace_init();
 
         let addr = next_addr();
         let config = SocketSinkConfig {
@@ -202,16 +212,17 @@ mod test {
                 }),
             }),
         };
-        let mut rt = runtime();
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).unwrap();
+        let mut sink = sink.sink_compat();
 
         let msg_counter = Arc::new(AtomicUsize::new(0));
         let msg_counter1 = Arc::clone(&msg_counter);
         let conn_counter = Arc::new(AtomicUsize::new(0));
         let conn_counter1 = Arc::clone(&conn_counter);
 
-        let (mut close_tx, mut close_rx) = tokio01::sync::mpsc::unbounded_channel::<()>();
+        let (close_tx, close_rx) = tokio::sync::oneshot::channel::<()>();
+        let mut close_rx = Some(close_rx.map(|x| x.unwrap()));
 
         let config = Some(TlsConfig {
             enabled: Some(true),
@@ -221,41 +232,48 @@ mod test {
                 ..Default::default()
             },
         });
-        let stream = MaybeTlsSettings::from_config(&config, true).unwrap();
 
         // Only accept two connections.
-        let fut = stream
-            .bind(&addr)
-            .unwrap()
-            .incoming()
-            .take(2)
-            .for_each(move |mut socket| {
-                conn_counter1.fetch_add(1, Ordering::SeqCst);
-                loop {
-                    if let Ok(Async::Ready(_)) = close_rx.poll() {
-                        socket.get_ref().unwrap().shutdown(Shutdown::Write).unwrap();
-                    }
+        let jh = tokio::spawn(async move {
+            let tls = MaybeTlsSettings::from_config(&config, true).unwrap();
+            let mut listener = tls.bind(&addr).await.unwrap();
+            listener
+                .incoming()
+                .take(2)
+                .for_each(|connection| {
+                    let mut close_rx = close_rx.take();
 
-                    let mut buf = vec![0u8; 11];
-                    match socket.read(&mut buf) {
-                        Err(error) if error.kind() == ErrorKind::WouldBlock => {}
-                        Err(error) => panic!("{}", error),
-                        Ok(n) => {
-                            if n == 0 {
-                                break;
-                            } else {
-                                msg_counter1.fetch_add(1, Ordering::SeqCst);
+                    conn_counter1.fetch_add(1, Ordering::SeqCst);
+                    let msg_counter1 = Arc::clone(&msg_counter1);
+
+                    let mut stream: MaybeTlsIncomingStream<TcpStream> = connection.unwrap();
+                    future::poll_fn(move |cx| loop {
+                        if let Some(fut) = close_rx.as_mut() {
+                            if let Poll::Ready(()) = Pin::new(fut).poll(cx) {
+                                stream.get_ref().unwrap().shutdown(Shutdown::Write).unwrap();
+                                close_rx = None;
                             }
                         }
-                    };
-                }
-                Ok(())
-            });
-        let jh = rt.spawn_handle_std(fut.compat());
 
-        let (_, events) = random_lines_with_stream(10, 10);
-        let pump = sink.send_all(events);
-        let (sink, _) = rt.block_on(pump).unwrap();
+                        return match Pin::new(&mut stream).poll_read(cx, &mut [0u8; 11]) {
+                            Poll::Ready(Ok(n)) => {
+                                if n == 0 {
+                                    Poll::Ready(())
+                                } else {
+                                    msg_counter1.fetch_add(1, Ordering::SeqCst);
+                                    continue;
+                                }
+                            }
+                            Poll::Ready(Err(error)) => panic!("{}", error),
+                            Poll::Pending => Poll::Pending,
+                        };
+                    })
+                })
+                .await;
+        });
+
+        let (_, mut events) = random_lines_with_stream(10, 10);
+        let _ = sink.send_all(&mut events).await.unwrap();
 
         // Loop and check for 10 events, we should always get 10 events. Once,
         // we have 10 events we can tell the server to shutdown to simulate the
@@ -264,30 +282,29 @@ mod test {
             let amnt = msg_counter.load(Ordering::SeqCst);
 
             if amnt == 10 {
-                close_tx.try_send(()).unwrap();
+                close_tx.send(()).unwrap();
                 break;
             }
 
             // Some CI machines are very slow, be generous.
-            std::thread::sleep(std::time::Duration::from_millis(500));
+            delay_for(Duration::from_millis(500)).await;
         }
         assert_eq!(msg_counter.load(Ordering::SeqCst), 10);
         assert_eq!(conn_counter.load(Ordering::SeqCst), 1);
 
         // Send another 10 events
-        let (_, events) = random_lines_with_stream(10, 10);
-        let pump = sink.send_all(events);
-        let pump = rt.block_on(pump).unwrap();
+        let (_, mut events) = random_lines_with_stream(10, 10);
+        let _ = sink.send_all(&mut events).await.unwrap();
 
         // Some CI machines are very slow, be generous.
-        std::thread::sleep(std::time::Duration::from_secs(2));
+        delay_for(Duration::from_secs(2)).await;
 
         // Drop the connection to allow the server to fully read from the buffer
         // and exit.
-        drop(pump);
+        drop(sink);
 
         // Wait for server task to be complete.
-        let _ = rt.block_on_std(jh).unwrap();
+        let _ = jh.await.unwrap();
 
         // Check that there are exacty 20 events.
         assert_eq!(msg_counter.load(Ordering::SeqCst), 20);

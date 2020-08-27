@@ -26,6 +26,7 @@ impl Sink for Pipeline {
 }
 
 impl Pipeline {
+    #[cfg(test)]
     pub fn new_test() -> (Self, Receiver<Event>) {
         Self::new_with_buffer(100)
     }
