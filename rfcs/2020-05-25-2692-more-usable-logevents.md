@@ -108,8 +108,10 @@ pub enum Value {
 
 Differences are:
 
-* A `Bytes` type in our `Value` type exists because `serde_json::value::Value` and most JSON implementations support this type through the `String` type, which isn't ideal for applying `Bytes` related functions to. We hold this special `Bytes` variant to support better in-pipeline processing for Vector.
-* Our `Value` type lacks a `String` variant, using the `Bytes` variant instead, preventing us from having optimized `String` operations.
+* A `Bytes` type in our `Value` type exists because `serde_json::value::Value` and most JSON implementations support
+  this type through the `String` type, which isn't ideal for applying `Bytes` related functions to. We hold this special
+  `Bytes` variant to support better in-pipeline processing for Vector.
+* Our `Value` type lacks a `String` variant, using the `Bytes` variant instead.
 * A `Timestamp` type in our `Value` type exists for largely the same reason the `Bytes` variant exists: Optimize in-pipeline processing.
 * Separate `Float` and `Integer` type exist whereas `serde_json::value::Value::Number`, also for optimizing in-pipeline processing.
 
@@ -180,17 +182,15 @@ In the [WASM transform](https://github.com/timberio/vector/pull/2006/files) our 
 
 This RFC ultimately proposes the following steps:
 
-1. Rename `Value::Bytes` to `Value::String`.
-2. Add `Value::Bytes`. (Unused for now -- to be used later in raw codecs and WASM)
-3. Add UX improvements on `LogEvent`, particularly turning JSON into or from `LogEvent`.
-4. Refactor the `PathIter` to make `vector::Event::Path` type.
-5. Add UX improvements on `Path` , particularly an internal `String` ↔ `Path` with an `Into`/`From` that does not do path parsing, as well as a `Path::parse(s: String)` that does.
-6. Refactor all `LogEvent` to accept `Into<Path>` values.
+1. Add UX improvements on `LogEvent`, particularly turning JSON into or from `LogEvent`.
+1. Refactor the `PathIter` to make `vector::Event::Path` type.
+1. Add UX improvements on `Path` , particularly an internal `String` ↔ `Path` with an `Into`/`From` that does not do path parsing, as well as a `Path::parse(s: String)` that does.
+1. Refactor all `LogEvent` to accept `Into<Path>` values.
     1. Remove obsolete functionality like `insert_path` since the new `Path` type covers this.
     2. Refactor the `keys` function to return an `Iterator<Path>`
-7. Add an `Entry` style API to `LogEvent`.
+1. Add an `Entry` style API to `LogEvent`.
     1. Remove functionality rendered obsolete by the Entry API like `try_insert`, moving them to use the new Entry API
-8. Provide `iter` and `iter_mut` functions that yield `(Path, Value)`.
+1. Provide `iter` and `iter_mut` functions that yield `(Path, Value)`.
     1. Remove the `all_fields` function, moving them to the new iterator.
 
 We believe these steps will provide a more ergonomic and consistent API.
