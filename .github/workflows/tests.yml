@@ -221,9 +221,10 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - env:
+          AUTOSPAWN: false
       - run: make slim-builds
-      - run: |
-          cargo test --no-default-features --features gcp-integration-tests ::gcp:: -- --nocapture
+      - run: make test-integration-gcp
 
   test-integration-influxdb:
     name: Integration - Linux, Influx
@@ -283,9 +284,10 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - env:
+          AUTOSPAWN: false
       - run: make slim-builds
-      - run: |
-          cargo test --no-default-features --features loki-integration-tests ::loki:: -- --nocapture
+      - run: make test-integration-loki
 
   test-integration-pulsar:
     name: Integration - Linux, Pulsar
