@@ -324,7 +324,7 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
     // Add source type
     event
         .as_mut_log()
-        .insert(event::log_schema().source_type_key(), "syslog");
+        .insert(event::log_schema().source_type_key(), Bytes::from("syslog"));
 
     if let Some(default_host) = default_host.clone() {
         event.as_mut_log().insert("source_ip", default_host);
@@ -361,35 +361,35 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
     let log = event.as_mut_log();
 
     if let Some(host) = parsed.hostname {
-        log.insert("hostname", host);
+        log.insert("hostname", host.to_string());
     }
     if let Some(severity) = parsed.severity {
-        log.insert("severity", severity.as_str());
+        log.insert("severity", severity.as_str().to_owned());
     }
     if let Some(facility) = parsed.facility {
-        log.insert("facility", facility.as_str());
+        log.insert("facility", facility.as_str().to_owned());
     }
     if let Protocol::RFC5424(version) = parsed.protocol {
         log.insert("version", version as i64);
     }
     if let Some(app_name) = parsed.appname {
-        log.insert("appname", app_name);
+        log.insert("appname", app_name.to_owned());
     }
     if let Some(msg_id) = parsed.msgid {
-        log.insert("msgid", msg_id);
+        log.insert("msgid", msg_id.to_owned());
     }
     if let Some(procid) = parsed.procid {
         let value: Value = match procid {
             ProcId::PID(pid) => pid.into(),
-            ProcId::Name(name) => name.into(),
+            ProcId::Name(name) => name.to_string().into(),
         };
         log.insert("procid", value);
     }
 
-    for element in parsed.structured_data.iter() {
-        for (name, value) in element.params.iter() {
+    for element in parsed.structured_data.into_iter() {
+        for (name, value) in element.params.into_iter() {
             let key = format!("{}.{}", element.id, name);
-            log.insert(key, *value);
+            log.insert(key, value.to_string());
         }
     }
 }

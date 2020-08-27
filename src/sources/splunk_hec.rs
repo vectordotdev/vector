@@ -400,7 +400,7 @@ impl<R: Read> Stream for EventStream<R> {
         let log = event.as_mut_log();
 
         // Add source type
-        log.insert(event::log_schema().source_type_key(), "splunk_hec");
+        log.insert(event::log_schema().source_type_key(), Bytes::from("splunk_hec"));
 
         // Process event field
         match json.get_mut("event") {
@@ -621,7 +621,7 @@ fn raw_event(
     // Add source type
     event
         .as_mut_log()
-        .try_insert(event::log_schema().source_type_key(), "splunk_hec");
+        .try_insert(event::log_schema().source_type_key(), Bytes::from("splunk_hec"));
 
     emit!(SplunkHECEventReceived);
 

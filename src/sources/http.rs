@@ -54,7 +54,7 @@ impl HttpSource for SimpleHttpSource {
                 // Add source type
                 let key = event::log_schema().source_type_key();
                 for event in events.iter_mut() {
-                    event.as_mut_log().try_insert(key, "http");
+                    event.as_mut_log().try_insert(key, Bytes::from("http"));
                 }
                 events
             })

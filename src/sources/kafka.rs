@@ -6,6 +6,7 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
+use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{
     compat::{Compat, Future01CompatExt},
@@ -141,7 +142,7 @@ fn kafka_source(
                             log.insert(event::log_schema().timestamp_key().clone(), timestamp);
 
                             // Add source type
-                            log.insert(event::log_schema().source_type_key(), "kafka");
+                            log.insert(event::log_schema().source_type_key(), Bytes::from("kafka"));
 
                             if let Some(key_field) = &key_field {
                                 match msg.key() {

@@ -290,10 +290,10 @@ fn create_event(line: Bytes, file: &str) -> Event {
     // Add source type.
     event
         .as_mut_log()
-        .insert(event::log_schema().source_type_key(), COMPONENT_NAME);
+        .insert(event::log_schema().source_type_key(), COMPONENT_NAME.to_owned());
 
     // Add file.
-    event.as_mut_log().insert(FILE_KEY, file);
+    event.as_mut_log().insert(FILE_KEY, file.to_owned());
 
     event
 }
@@ -301,5 +301,5 @@ fn create_event(line: Bytes, file: &str) -> Event {
 /// This function returns the default value for `self_node_name` variable
 /// as it should be at the generated config file.
 fn default_self_node_name_env_template() -> String {
-    format!("${{{}}}", SELF_NODE_NAME_ENV_KEY)
+    format!("${{{}}}", SELF_NODE_NAME_ENV_KEY.to_owned())
 }
