@@ -309,7 +309,7 @@ where
         .unwrap()
 }
 
-pub async fn wait_for<F, Fut>(mut f: F)
+pub async fn wait_for<F, Fut>(mut f: F, wait_for_secs: u64)
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = bool> + Send + 'static,
@@ -317,14 +317,24 @@ where
     let started = Instant::now();
     while !f().await {
         delay_for(Duration::from_millis(5)).await;
-        if started.elapsed().as_secs() > 5 {
+        if started.elapsed().as_secs() > wait_for_secs {
             panic!("Timed out while waiting");
         }
     }
 }
 
+// Wait for TCP socket to accept traffic-- defaults to 5 seconds
 pub async fn wait_for_tcp(addr: SocketAddr) {
-    wait_for(|| async move { TcpStream::connect(addr).await.is_ok() }).await
+    wait_for(|| async move { TcpStream::connect(addr).await.is_ok() }, 5).await
+}
+
+// Wait for TCP socket to accept traffic-- user definable seconds
+pub async fn wait_for_tcp_in_secs(addr: SocketAddr, secs: u64) {
+    wait_for(
+        || async move { TcpStream::connect(addr).await.is_ok() },
+        secs,
+    )
+    .await
 }
 
 pub async fn wait_for_atomic_usize<T, F>(value: T, unblock: F)
@@ -333,10 +343,13 @@ where
     F: Fn(usize) -> bool,
 {
     let value = value.as_ref();
-    wait_for(|| {
-        let result = unblock(value.load(Ordering::SeqCst));
-        future::ready(result)
-    })
+    wait_for(
+        || {
+            let result = unblock(value.load(Ordering::SeqCst));
+            future::ready(result)
+        },
+        5,
+    )
     .await
 }
 
