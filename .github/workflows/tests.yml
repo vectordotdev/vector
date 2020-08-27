@@ -315,10 +315,6 @@ jobs:
     services:
       splunk:
         image: timberio/splunk-hec-test:latest
-        ports:
-          - "8088:8088"
-          - "8000:8000"
-          - "8089:8089"
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
