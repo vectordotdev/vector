@@ -908,7 +908,7 @@ impl ContainerMetadata {
         Ok(ContainerMetadata {
             labels,
             name: name.as_str().trim_start_matches('/').to_owned().into(),
-            image: config.image.unwrap().to_owned().into(),
+            image: config.image.unwrap().into(),
             created_at: DateTime::parse_from_rfc3339(created.as_str())?.with_timezone(&Utc),
         })
     }
