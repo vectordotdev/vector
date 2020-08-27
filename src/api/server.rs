@@ -81,15 +81,18 @@ impl Server {
 
         // GraphQL playground
         let enable_playground = self.playground;
-        let graphql_playground = warp::path("playground").map(move || match enable_playground {
-            true => Response::builder()
-                .header("content-type", "text/html")
-                .body(playground_source(
-                    GraphQLPlaygroundConfig::new("/graphql").subscription_endpoint("/graphql"),
-                )),
-            false => Response::builder()
-                .header("content-type", "text/plain")
-                .body(String::from("GraphQL playground has been disabled")),
+        let graphql_playground = warp::path("playground").map(move || {
+            if enable_playground {
+                Response::builder()
+                    .header("content-type", "text/html")
+                    .body(playground_source(
+                        GraphQLPlaygroundConfig::new("/graphql").subscription_endpoint("/graphql"),
+                    ))
+            } else {
+                Response::builder()
+                    .header("content-type", "text/plain")
+                    .body(String::from("GraphQL playground has been disabled"))
+            }
         });
 
         let routes = balanced_or_tree!(
