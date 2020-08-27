@@ -16,9 +16,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogLogsConfig {
-    // Deprecated name
-    #[serde(alias = "endpoint")]
-    address: Option<UriSerde>,
+    endpoint: Option<UriSerde>,
     api_key: String,
     encoding: EncodingConfig<Encoding>,
     tls: Option<TlsConfig>,
@@ -31,13 +29,13 @@ inventory::submit! {
 #[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let (host, port, tls) = if let Some(uri) = &self.address {
+        let (host, port, tls) = if let Some(uri) = &self.endpoint {
             let host = uri
                 .host()
-                .ok_or_else(|| "A host is required for address".to_string())?;
+                .ok_or_else(|| "A host is required for endpoint".to_string())?;
             let port = uri
                 .port_u16()
-                .ok_or_else(|| "A port is required for address".to_string())?;
+                .ok_or_else(|| "A port is required for endpoint".to_string())?;
 
             (host.to_string(), port, self.tls.clone())
         } else {
