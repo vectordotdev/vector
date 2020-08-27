@@ -190,7 +190,7 @@ ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-aws
 	sleep 5 # Many services are very lazy... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features aws-integration-tests ::aws_ -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features aws-integration-tests --lib ::aws_ -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
@@ -200,20 +200,20 @@ ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-clickhouse
 	sleep 5 # Many services are very lazy... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features clickhouse-integration-tests ::clickhouse:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features clickhouse-integration-tests --lib ::clickhouse:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
 
 test-integration-docker: ## Runs Docker integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features docker-integration-tests ::docker:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features docker-integration-tests --lib ::docker:: -- --nocapture
 
 test-integration-elasticsearch: ## Runs Elasticsearch integration tests
 ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-elasticsearch
 	sleep 20 # Elasticsearch is incredibly slow to start up, be very generous...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features es-integration-tests ::elasticsearch:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features es-integration-tests --lib ::elasticsearch:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
@@ -223,7 +223,7 @@ ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-gcp
 	sleep 5 # Many services are very lazy... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features gcp-integration-tests ::gcp:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features gcp-integration-tests --lib ::gcp:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
@@ -232,7 +232,7 @@ test-integration-humio: ## Runs Humio integration tests
 ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-humio
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features humio-integration-tests ::humio:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features humio-integration-tests --lib ::humio:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
@@ -243,7 +243,7 @@ ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-influxdb
 	sleep 5 # Many services are very lazy... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features influxdb-integration-tests ::influxdb::integration_tests:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features influxdb-integration-tests --lib ::influxdb::integration_tests:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
@@ -253,7 +253,7 @@ ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-kafka
 	sleep 5 # Many services are very lazy... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features "kafka-integration-tests rdkafka-plain" ::kafka:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features "kafka-integration-tests rdkafka-plain" --lib ::kafka:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
@@ -263,7 +263,7 @@ ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-loki
 	sleep 5 # Many services are very lazy... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features loki-integration-tests ::loki:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features loki-integration-tests --lib ::loki:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
@@ -273,7 +273,7 @@ ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-pulsar
 	sleep 5 # Many services are very lazy... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features pulsar-integration-tests ::pulsar:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features pulsar-integration-tests --lib ::pulsar:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
@@ -283,7 +283,7 @@ ifeq ($(AUTOSPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-splunk
 	sleep 5 # Many services are very lazy... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features splunk-integration-tests ::splunk_hec:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features splunk-integration-tests --lib ::splunk_hec:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
 endif
@@ -303,7 +303,7 @@ ifeq ($(AUTODESPAWN), true)
 endif
 
 test-cli: ## Runs cli tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --test cli -- --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --test cli -- --test-threads 4
 
 .PHONY: build-wasm-tests
 test-wasm-build-modules: $(WASM_MODULE_OUTPUTS) ### Build all WASM test modules
@@ -322,7 +322,7 @@ $(WASM_MODULE_OUTPUTS): ### Build a specific WASM module
 test-wasm: export TEST_THREADS=1
 test-wasm: export TEST_LOG=vector=trace
 test-wasm: $(WASM_MODULE_OUTPUTS)  ### Run engine tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test wasm --no-default-features --features "wasm wasm-timings" -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test wasm --no-default-features --features "wasm wasm-timings" --lib -- --nocapture
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
