@@ -343,13 +343,13 @@ impl<R: Read> EventStream<R> {
         EventStream {
             data,
             events: 0,
-            channel: channel.map(|value| value.as_bytes().into()),
+            channel: channel.map(|value| value.into_bytes().into()),
             time: Time::Now(Utc::now()),
             extractors: [
                 DefaultExtractor::new_with(
                     "host",
                     &event::log_schema().host_key(),
-                    host.map(|value| value.as_bytes().into()),
+                    host.map(|value| value.into_bytes().into()),
                 ),
                 DefaultExtractor::new("index", &INDEX),
                 DefaultExtractor::new("source", &SOURCE),
@@ -608,11 +608,11 @@ fn raw_event(
     log.insert(event::log_schema().message_key().clone(), message);
 
     // Add channel
-    log.insert(CHANNEL.clone(), channel.as_bytes());
+    log.insert(CHANNEL.clone(), channel.into_bytes());
 
     // Add host
     if let Some(host) = host {
-        log.insert(event::log_schema().host_key().clone(), host.as_bytes());
+        log.insert(event::log_schema().host_key().clone(), host.into_bytes());
     }
 
     // Add timestamp
