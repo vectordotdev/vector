@@ -3,7 +3,7 @@ use vector::{
     topology,
 };
 
-async fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
+pub async fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
     match Config::load(config.as_bytes()) {
         Ok(c) => {
             let diff = ConfigDiff::initial(&c);
@@ -19,6 +19,49 @@ async fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
             }
         }
         Err(error) => Err(error),
+    }
+}
+
+#[cfg(feature = "api")]
+#[tokio::test]
+async fn api_enabled() {
+    let stub = r#"
+        [sources.generator]
+          type = "generator" # required
+          lines = ["Random line", "And another"] # required
+          batch_interval = 0.05 # optional, no default
+
+        [sinks.my_sink_id]
+          # General
+          type = "console" # required
+          inputs = ["generator"] # required
+          target = "stdout" # optional, default
+
+          # Encoding
+          encoding.codec = "json" # required
+        "#;
+
+    let configs = vec![
+        // Enabled
+        r#"
+        [api]
+          enabled = true
+        "#,
+        // Disabled
+        r#"
+        [api]
+          enabled = true
+        "#,
+        // Custom bind
+        r#"
+        [api]
+          enabled = true
+          bind = "127.0.0.1:4444"
+        "#,
+    ];
+
+    for c in configs {
+        load([c, stub].join("\n").as_str()).await.unwrap();
     }
 }
 
