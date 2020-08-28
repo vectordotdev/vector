@@ -38,7 +38,7 @@ pub(crate) struct LogToMetricParseError<'a> {
 
 impl<'a> InternalEvent for LogToMetricParseError<'a> {
     fn emit_logs(&self) {
-        debug!(message = "failed to parse.", error = %self.error, rate_limit_secs = 30);
+        debug!(message = "Failed to parse.", error = %self.error, rate_limit_secs = 30);
     }
 
     fn emit_metrics(&self) {
@@ -74,7 +74,7 @@ pub(crate) struct LogToMetricTemplateError {
 
 impl InternalEvent for LogToMetricTemplateError {
     fn emit_logs(&self) {
-        debug!(message = "failed to parse.", error = %self.error, rate_limit_secs = 30);
+        debug!(message = "Failed to parse.", error = %self.error, rate_limit_secs = 30);
     }
 
     fn emit_metrics(&self) {
