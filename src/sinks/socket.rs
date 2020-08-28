@@ -91,7 +91,10 @@ mod test {
         event::Event,
         test_util::{next_addr, random_lines_with_stream, trace_init, CountReceiver},
     };
-    use futures::compat::Future01CompatExt;
+    use futures::{
+        compat::{Future01CompatExt, Sink01CompatExt},
+        SinkExt,
+    };
     use futures01::Sink;
     use serde_json::Value;
     use std::net::UdpSocket;
@@ -146,13 +149,13 @@ mod test {
 
         let mut receiver = CountReceiver::receive_lines(addr);
 
-        let (lines, events) = random_lines_with_stream(10, 100);
-        let _ = sink.send_all(events).compat().await.unwrap();
+        let (lines, mut events) = random_lines_with_stream(10, 100);
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 
         // Wait for output to connect
         receiver.connected().await;
 
-        let output = receiver.wait().await;
+        let output = receiver.await;
         assert_eq!(lines.len(), output.len());
         for (source, received) in lines.iter().zip(output) {
             let json = serde_json::from_str::<Value>(&received).expect("Invalid JSON");
@@ -171,7 +174,7 @@ mod test {
     // If this test hangs that means somewhere we are not collecting the correct
     // events.
     #[cfg(all(feature = "sources-tls", feature = "listenfd"))]
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn tcp_stream_detects_disconnect() {
         use crate::tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
         use futures::{future, FutureExt, StreamExt};
@@ -188,7 +191,8 @@ mod test {
         use tokio::{
             io::AsyncRead,
             net::TcpStream,
-            time::{delay_for, Duration},
+            task::yield_now,
+            time::{interval, Duration},
         };
 
         trace_init();
@@ -211,6 +215,7 @@ mod test {
         };
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).unwrap();
+        let mut sink = sink.sink_compat();
 
         let msg_counter = Arc::new(AtomicUsize::new(0));
         let msg_counter1 = Arc::clone(&msg_counter);
@@ -268,36 +273,28 @@ mod test {
                 .await;
         });
 
-        let (_, events) = random_lines_with_stream(10, 10);
-        let (sink, _) = sink.send_all(events).compat().await.unwrap();
+        let (_, mut events) = random_lines_with_stream(10, 10);
+        let _ = sink.send_all(&mut events).await.unwrap();
 
         // Loop and check for 10 events, we should always get 10 events. Once,
         // we have 10 events we can tell the server to shutdown to simulate the
         // remote shutting down on an idle connection.
-        for _ in 0..100 {
-            let amnt = msg_counter.load(Ordering::SeqCst);
+        interval(Duration::from_millis(100))
+            .take(500)
+            .take_while(|_| future::ready(msg_counter.load(Ordering::SeqCst) != 10))
+            .for_each(|_| future::ready(()))
+            .await;
+        close_tx.send(()).unwrap();
 
-            if amnt == 10 {
-                close_tx.send(()).unwrap();
-                break;
-            }
+        // Close connection in spawned future
+        yield_now().await;
 
-            // Some CI machines are very slow, be generous.
-            delay_for(Duration::from_millis(500)).await;
-        }
         assert_eq!(msg_counter.load(Ordering::SeqCst), 10);
         assert_eq!(conn_counter.load(Ordering::SeqCst), 1);
 
         // Send another 10 events
         let (_, events) = random_lines_with_stream(10, 10);
-        let pump = sink.send_all(events).compat().await.unwrap();
-
-        // Some CI machines are very slow, be generous.
-        delay_for(Duration::from_secs(2)).await;
-
-        // Drop the connection to allow the server to fully read from the buffer
-        // and exit.
-        drop(pump);
+        events.forward(sink).await.unwrap();
 
         // Wait for server task to be complete.
         let _ = jh.await.unwrap();

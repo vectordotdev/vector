@@ -81,7 +81,7 @@ mod tests {
         hyper::body::Body::wrap_stream(in_stream)
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn test_body() {
         trace_init();
 
@@ -105,7 +105,7 @@ mod tests {
         assert!(out_stream.next().await.is_none());
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn test_body_passes_reading_error() {
         trace_init();
 
@@ -124,7 +124,7 @@ mod tests {
         assert!(out_stream.next().await.is_none());
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn test_body_passes_parsing_error() {
         trace_init();
 
@@ -142,7 +142,7 @@ mod tests {
         assert!(out_stream.next().await.is_none());
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn test_body_uses_finish() {
         trace_init();
 
