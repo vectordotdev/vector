@@ -4,11 +4,12 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSink,
-        Encoding, UriSerde,
+        Encoding, StreamSink, UriSerde,
     },
     tls::{MaybeTlsSettings, TlsSettings},
 };
 use bytes::Bytes;
+use futures::TryFutureExt;
 use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
@@ -49,9 +50,10 @@ impl SinkConfig for PapertrailConfig {
 
         let encoding = self.encoding.clone();
 
-        let sink = sink.with_flat_map(move |e| iter_ok(encode_event(e, pid, &encoding)));
+        let sink = StreamSink::new(sink, cx.acker())
+            .with_flat_map(move |e| iter_ok(encode_event(e, pid, &encoding)));
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((Box::new(sink), Box::new(healthcheck.compat())))
     }
 
     fn input_type(&self) -> DataType {

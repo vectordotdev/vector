@@ -50,5 +50,5 @@ examples = [
 required = false
 description = """\
 In addition to the defined fields, a log event can have any number of \
-additional fields. This includes nested fields.
+additional fields, including nested fields.
 """

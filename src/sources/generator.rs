@@ -109,26 +109,30 @@ impl GeneratorConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event, shutdown::ShutdownSignal, test_util::runtime, Pipeline};
+    use crate::{event, shutdown::ShutdownSignal, Pipeline};
+    use futures::compat::Future01CompatExt;
     use futures01::{stream::Stream, sync::mpsc, Async::*};
     use std::time::{Duration, Instant};
 
-    fn runit(config: &str) -> mpsc::Receiver<Event> {
+    async fn runit(config: &str) -> mpsc::Receiver<Event> {
         let (tx, rx) = Pipeline::new_test();
-        let mut rt = runtime();
         let config: GeneratorConfig = toml::from_str(config).unwrap();
-        let source = config.generator(ShutdownSignal::noop(), tx);
-        rt.block_on(source).unwrap();
+        config
+            .generator(ShutdownSignal::noop(), tx)
+            .compat()
+            .await
+            .unwrap();
         rx
     }
 
-    #[test]
-    fn copies_lines() {
+    #[tokio::test]
+    async fn copies_lines() {
         let message_key = event::log_schema().message_key();
         let mut rx = runit(
             r#"lines = ["one", "two"]
                count = 1"#,
-        );
+        )
+        .await;
 
         for line in &["one", "two"] {
             let event = rx.poll().unwrap();
@@ -146,12 +150,13 @@ mod tests {
         assert_eq!(rx.poll().unwrap(), Ready(None));
     }
 
-    #[test]
-    fn limits_count() {
+    #[tokio::test]
+    async fn limits_count() {
         let mut rx = runit(
             r#"lines = ["one", "two"]
                count = 5"#,
-        );
+        )
+        .await;
 
         for _ in 0..10 {
             assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
@@ -159,14 +164,15 @@ mod tests {
         assert_eq!(rx.poll().unwrap(), Ready(None));
     }
 
-    #[test]
-    fn adds_sequence() {
+    #[tokio::test]
+    async fn adds_sequence() {
         let message_key = event::log_schema().message_key();
         let mut rx = runit(
             r#"lines = ["one", "two"]
                count = 2
                sequence = true"#,
-        );
+        )
+        .await;
 
         for line in &["1 one", "2 two", "3 one", "4 two"] {
             let event = rx.poll().unwrap();
@@ -184,14 +190,15 @@ mod tests {
         assert_eq!(rx.poll().unwrap(), Ready(None));
     }
 
-    #[test]
-    fn obeys_batch_interval() {
+    #[tokio::test]
+    async fn obeys_batch_interval() {
         let start = Instant::now();
         let mut rx = runit(
             r#"lines = ["one", "two"]
                count = 3
                batch_interval = 1.0"#,
-        );
+        )
+        .await;
 
         for _ in 0..6 {
             assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));

@@ -173,14 +173,15 @@ mod test {
     use super::{Buffer, Compression};
     use crate::buffers::Acker;
     use crate::sinks::util::{BatchSettings, BatchSink};
-    use futures01::{future, Future, Sink};
+    use futures::{compat::Future01CompatExt, future};
+    use futures01::Sink;
     use std::{
         io::Read,
         sync::{Arc, Mutex},
     };
     use tokio::time::Duration;
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test]
     async fn gzip() {
         use flate2::read::GzDecoder;
 
@@ -210,7 +211,8 @@ mod test {
         let _ = buffered
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(input))
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         let output = Arc::try_unwrap(sent_requests)

@@ -219,12 +219,14 @@ async fn healthcheck(config: LogdnaConfig, mut client: HttpClient) -> crate::Res
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::SinkConfig;
-    use crate::event::Event;
-    use crate::sinks::util::test::{build_test_server, load_sink};
-    use crate::test_util;
-    use futures::compat::Future01CompatExt;
-    use futures01::{Sink, Stream};
+    use crate::{
+        config::SinkConfig,
+        event::Event,
+        sinks::util::test::{build_test_server, load_sink},
+        test_util::{next_addr, random_lines, trace_init},
+    };
+    use futures::{compat::Future01CompatExt, StreamExt};
+    use futures01::Sink;
     use serde_json::json;
 
     #[test]
@@ -259,7 +261,8 @@ mod tests {
 
     #[tokio::test]
     async fn smoke() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let (mut config, cx) = load_sink::<LogdnaConfig>(
             r#"
             api_key = "mylogtoken"
@@ -274,7 +277,7 @@ mod tests {
         // Make sure we can build the config
         let _ = config.build(cx.clone()).unwrap();
 
-        let addr = test_util::next_addr();
+        let addr = next_addr();
         // Swap out the host so we can force send it
         // to our local server
         let endpoint = format!("http://{}", addr).parse::<http::Uri>().unwrap();
@@ -282,10 +285,10 @@ mod tests {
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let (rx, _trigger, server) = build_test_server(addr);
+        let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
-        let lines = test_util::random_lines(100).take(10).collect::<Vec<_>>();
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
         let mut events = Vec::new();
 
         // Create 10 events where the first one contains custom
@@ -305,10 +308,10 @@ mod tests {
         let pump = sink.send_all(futures01::stream::iter_ok(events));
         let _ = pump.compat().await.unwrap();
 
-        let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();
+        let output = rx.next().await.unwrap();
 
-        let request = &output[0].0;
-        let body: serde_json::Value = serde_json::from_slice(&output[0].1[..]).unwrap();
+        let request = &output.0;
+        let body: serde_json::Value = serde_json::from_slice(&output.1[..]).unwrap();
 
         let query = request.uri.query().unwrap();
         assert!(query.contains("hostname=vector"));

@@ -108,6 +108,7 @@ scopes:
   - http source
   - journald source
   - kafka source
+  - kubernetes_logs source
   - logplex source
   - prometheus source
   - socket source

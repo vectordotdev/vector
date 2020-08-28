@@ -2,7 +2,7 @@ use super::controller::Controller;
 use super::future::ResponseFuture;
 use crate::sinks::util::retries::RetryLogic;
 
-use tower03::Service;
+use tower::Service;
 
 use futures::{future::BoxFuture, ready};
 use std::{
@@ -112,16 +112,20 @@ impl fmt::Debug for State {
 
 #[cfg(test)]
 mod tests {
-    use super::super::controller::{ControllerStatistics, Inner};
-    use super::super::AutoConcurrencyLimitLayer;
+    use super::super::{
+        controller::{ControllerStatistics, Inner},
+        AutoConcurrencyLimitLayer,
+    };
     use super::*;
     use crate::assert_downcast_matches;
     use snafu::Snafu;
-    use std::sync::{Mutex, MutexGuard};
-    use std::time::Duration;
+    use std::{
+        sync::{Mutex, MutexGuard},
+        time::Duration,
+    };
     use tokio::time::{advance, pause};
     use tokio_test::{assert_pending, assert_ready_ok};
-    use tower_test03::{
+    use tower_test::{
         assert_request_eq,
         mock::{
             self, future::ResponseFuture as MockResponseFuture, Handle, Mock, SendResponse, Spawn,
