@@ -7,7 +7,7 @@ use metric::{MetricKind, MetricValue};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json::Value as JsonValue;
-use std::{collections::BTreeMap, iter::FromIterator};
+use std::collections::BTreeMap;
 use string_cache::DefaultAtom as Atom;
 
 pub mod discriminant;
@@ -15,10 +15,12 @@ pub mod merge;
 pub mod merge_state;
 pub mod metric;
 mod util;
+mod log_event;
 
 pub use metric::{Metric, StatisticKind};
 pub(crate) use util::log::PathComponent;
 pub(crate) use util::log::PathIter;
+pub use log_event::LogEvent;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
@@ -42,11 +44,6 @@ lazy_static! {
 pub enum Event {
     Log(LogEvent),
     Metric(Metric),
-}
-
-#[derive(PartialEq, Debug, Clone, Default)]
-pub struct LogEvent {
-    fields: BTreeMap<String, Value>,
 }
 
 impl Event {
@@ -94,120 +91,6 @@ impl Event {
             Event::Metric(metric) => metric,
             _ => panic!("Failed type coercion, {:?} is not a metric", self),
         }
-    }
-}
-
-impl LogEvent {
-    pub fn get(&self, key: &Atom) -> Option<&Value> {
-        util::log::get(&self.fields, key)
-    }
-
-    pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.fields.get(key.as_ref())
-    }
-
-    pub fn get_mut(&mut self, key: &Atom) -> Option<&mut Value> {
-        util::log::get_mut(&mut self.fields, key)
-    }
-
-    pub fn contains(&self, key: &Atom) -> bool {
-        util::log::contains(&self.fields, key)
-    }
-
-    pub fn insert<K, V>(&mut self, key: K, value: V) -> Option<Value>
-    where
-        K: AsRef<str>,
-        V: Into<Value>,
-    {
-        util::log::insert(&mut self.fields, key.as_ref(), value.into())
-    }
-
-    pub fn insert_path<V>(&mut self, key: Vec<PathComponent>, value: V) -> Option<Value>
-    where
-        V: Into<Value>,
-    {
-        util::log::insert_path(&mut self.fields, key, value.into())
-    }
-
-    pub fn insert_flat<K, V>(&mut self, key: K, value: V)
-    where
-        K: Into<String>,
-        V: Into<Value>,
-    {
-        self.fields.insert(key.into(), value.into());
-    }
-
-    pub fn try_insert<V>(&mut self, key: &Atom, value: V)
-    where
-        V: Into<Value>,
-    {
-        if !self.contains(key) {
-            self.insert(key.clone(), value);
-        }
-    }
-
-    pub fn remove(&mut self, key: &Atom) -> Option<Value> {
-        util::log::remove(&mut self.fields, &key, false)
-    }
-
-    pub fn remove_prune(&mut self, key: &Atom, prune: bool) -> Option<Value> {
-        util::log::remove(&mut self.fields, &key, prune)
-    }
-
-    pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
-        util::log::keys(&self.fields)
-    }
-
-    pub fn all_fields(&self) -> impl Iterator<Item = (String, &Value)> + Serialize {
-        util::log::all_fields(&self.fields)
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.fields.is_empty()
-    }
-}
-
-impl std::ops::Index<&Atom> for LogEvent {
-    type Output = Value;
-
-    fn index(&self, key: &Atom) -> &Value {
-        self.get(key).expect("Key is not found")
-    }
-}
-
-impl<K: Into<Atom>, V: Into<Value>> Extend<(K, V)> for LogEvent {
-    fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
-        for (k, v) in iter {
-            self.insert(k.into(), v.into());
-        }
-    }
-}
-
-// Allow converting any kind of appropriate key/value iterator directly into a LogEvent.
-impl<K: Into<Atom>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
-    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let mut log_event = LogEvent::default();
-        log_event.extend(iter);
-        log_event
-    }
-}
-
-/// Converts event into an iterator over top-level key/value pairs.
-impl IntoIterator for LogEvent {
-    type Item = (String, Value);
-    type IntoIter = std::collections::btree_map::IntoIter<String, Value>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.fields.into_iter()
-    }
-}
-
-impl Serialize for LogEvent {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.collect_map(self.fields.iter())
     }
 }
 
@@ -503,7 +386,7 @@ impl From<proto::EventWrapper> for Event {
                     .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
                     .collect::<BTreeMap<_, _>>();
 
-                Event::Log(LogEvent { fields })
+                Event::Log(LogEvent::from(fields))
             }
             EventProto::Metric(proto) => {
                 let kind = match proto.kind() {
@@ -603,7 +486,8 @@ fn encode_array(items: Vec<Value>) -> proto::ValueArray {
 impl From<Event> for proto::EventWrapper {
     fn from(event: Event) -> Self {
         match event {
-            Event::Log(LogEvent { fields }) => {
+            Event::Log(log_event) => {
+                let fields: BTreeMap::<_, _> = log_event.into();
                 let fields = fields
                     .into_iter()
                     .map(|(k, v)| (k, encode_value(v)))
@@ -708,9 +592,7 @@ impl From<Event> for Vec<u8> {
 
 impl From<Bytes> for Event {
     fn from(message: Bytes) -> Self {
-        let mut event = Event::Log(LogEvent {
-            fields: BTreeMap::new(),
-        });
+        let mut event = Event::Log(LogEvent::from(BTreeMap::new()));
 
         event
             .as_mut_log()
