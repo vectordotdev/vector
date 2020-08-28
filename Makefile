@@ -24,7 +24,6 @@ export VERBOSE ?= false
 # Override to set a different Rust toolchain
 export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
 # Override the container tool.
-# TODO: We're working on first class `podman` support for integration tests! We need to move away from compose though: https://github.com/containers/podman-compose/issues/125
 export CONTAINER_TOOL ?= docker
 # Override this to automatically enter a container containing the correct, full, official build environment for Vector, ready for development
 export ENVIRONMENT ?= false
@@ -645,9 +644,6 @@ signoff: ## Signsoff all previous commits since branch creation
 
 slim-builds: ## Updates the Cargo config to product disk optimized builds (for CI, not for users)
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/slim-builds.sh
-
-target-graph: ## Display dependencies between targets in this Makefile
-	@cd $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))) && docker-compose run --rm target-graph $(TARGET)
 
 version: ## Get the current Vector version
 	@scripts/version.sh
