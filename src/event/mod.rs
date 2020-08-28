@@ -3,7 +3,7 @@ use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
 use metric::{MetricKind, MetricValue};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use string_cache::DefaultAtom as Atom;
 
 pub mod discriminant;
@@ -16,6 +16,7 @@ mod value;
 
 pub use log_event::LogEvent;
 pub use metric::{Metric, StatisticKind};
+use std::convert::{TryFrom, TryInto};
 pub(crate) use util::log::PathComponent;
 pub(crate) use util::log::PathIter;
 pub use value::Value;
@@ -127,6 +128,47 @@ fn decode_value(input: proto::Value) -> Option<Value> {
         None => {
             error!("encoded event contains unknown value kind");
             None
+        }
+    }
+}
+
+impl From<BTreeMap<String, Value>> for Event {
+    fn from(map: BTreeMap<String, Value>) -> Self {
+        Self::Log(LogEvent::from(map))
+    }
+}
+
+impl From<HashMap<String, Value>> for Event {
+    fn from(map: HashMap<String, Value>) -> Self {
+        Self::Log(LogEvent::from(map))
+    }
+}
+
+impl TryFrom<serde_json::Value> for Event {
+    type Error = crate::Error;
+
+    fn try_from(map: serde_json::Value) -> Result<Self, Self::Error> {
+        match map {
+            serde_json::Value::Object(fields) => Ok(Event::from(
+                fields
+                    .into_iter()
+                    .map(|(k, v)| (k, v.into()))
+                    .collect::<BTreeMap<_, _>>(),
+            )),
+            _ => Err(crate::Error::from(
+                "Attempted to convert non-Object JSON into an Event.",
+            )),
+        }
+    }
+}
+
+impl TryInto<serde_json::Value> for Event {
+    type Error = serde_json::Error;
+
+    fn try_into(self) -> Result<serde_json::Value, Self::Error> {
+        match self {
+            Event::Log(fields) => serde_json::to_value(fields),
+            Event::Metric(metric) => serde_json::to_value(metric),
         }
     }
 }
