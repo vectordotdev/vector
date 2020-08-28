@@ -186,15 +186,15 @@ test-integration: test-integration-gcp test-integration-influxdb test-integratio
 test-integration: test-integration-pulsar test-integration-splunk
 
 start-integration-aws:
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL) network create test-integration-aws
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL) run -d --network=test-integration-aws -p 8111:8111 --name ec2_metadata timberiodev/mock-ec2-metadata:latest
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL) run -d --network=test-integration-aws -p 4568:4568 -p 4572:4572 -p 4582:4582 -p 4571:4571 -p 4573:4573 --name localstack -e SERVICES=kinesis:4568,s3:4572,cloudwatch:4582,elasticsearch:4571,firehose:4573 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL) run -d --network=test-integration-aws -p 6000:6000 --name mockwatchlogs -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
+	$(CONTAINER_TOOL) network create test-integration-aws
+	$(CONTAINER_TOOL) run -d --network=test-integration-aws -p 8111:8111 --name ec2_metadata timberiodev/mock-ec2-metadata:latest
+	$(CONTAINER_TOOL) run -d --network=test-integration-aws -p 4566-4584:4566-4584 --name localstack -e SERVICES=kinesis:4568,s3:4572,cloudwatch:4582,elasticsearch:4571,firehose:4573 localstack/localstack
+	$(CONTAINER_TOOL) run -d --network=test-integration-aws -p 6000:6000 --name mockwatchlogs -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
 	sleep 30 # Many services are very slow... Give them a sec...
 
 stop-integration-aws:
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL) rm --force ec2_metadata mockwatchlogs localstack
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL) network rm test-integration-aws
+	$(CONTAINER_TOOL) rm --force ec2_metadata mockwatchlogs localstack 2>/dev/null; true
+	$(CONTAINER_TOOL) network rm test-integration-aws 2>/dev/null; true
 
 test-integration-aws: ## Runs AWS integration tests
 ifeq ($(AUTOSPAWN), true)
@@ -207,97 +207,200 @@ ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-aws
 endif
 
+start-integration-clickhouse:
+	$(CONTAINER_TOOL) network create test-integration-clickhouse
+	$(CONTAINER_TOOL) run -d --network=test-integration-clickhouse -p 8123:8123 --name clickhouse yandex/clickhouse-server:19
+
+stop-integration-clickhouse:
+	$(CONTAINER_TOOL) rm --force clickhouse 2>/dev/null; true
+	$(CONTAINER_TOOL) network rm test-integration-clickhouse 2>/dev/null; true
+
 test-integration-clickhouse: ## Runs Clickhouse integration tests
 ifeq ($(AUTOSPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-clickhouse
-	sleep 5 # Many services are very lazy... Give them a sec...
+	$(MAKE) -k stop-integration-clickhouse \
+    ; rc=$$? \
+	$(MAKE) start-integration-clickhouse
+	sleep 30 # Many services are very slow... Give them a sec...
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features clickhouse-integration-tests --lib ::clickhouse:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
+	$(MAKE) -k stop-integration-clickhouse
 endif
 
 test-integration-docker: ## Runs Docker integration tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features docker-integration-tests --lib ::docker:: -- --nocapture
 
+start-integration-elasticsearch:
+	$(CONTAINER_TOOL) network create test-integration-elasticsearch
+	$(CONTAINER_TOOL) run -d --network=test-integration-elasticsearch -p 4566-4584:4566-4584 --name localstack -e SERVICES=kinesis:4568,s3:4572,cloudwatch:4582,elasticsearch:4571,firehose:4573 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
+	$(CONTAINER_TOOL) run -d --network=test-integration-elasticsearch -p 9200:9200 -p 9300:9300 --name elasticsearch -e discovery.type=single-node elasticsearch:6.6.2
+	$(CONTAINER_TOOL) run -d --network=test-integration-elasticsearch -p 9201:9200 -p 9301:9300 --name elasticsearch-tls -e discovery.type=single-node -e xpack.security.enabled=true -e xpack.security.http.ssl.enabled=true -e xpack.security.transport.ssl.enabled=true -e xpack.ssl.certificate=certs/localhost.crt -e xpack.ssl.key=certs/localhost.key -v $(PWD)/tests/data:/usr/share/elasticsearch/config/certs:ro elasticsearch:6.6.2
+
+stop-integration-elasticsearch:
+	$(CONTAINER_TOOL) rm --force localstack elasticsearch elasticsearch-tls 2>/dev/null; true
+	$(CONTAINER_TOOL) network rm test-integration-elasticsearch 2>/dev/null; true
+
 test-integration-elasticsearch: ## Runs Elasticsearch integration tests
 ifeq ($(AUTOSPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-elasticsearch
-	sleep 20 # Elasticsearch is incredibly slow to start up, be very generous...
+	$(MAKE) -k stop-integration-elasticsearch \
+    ; rc=$$? \
+	$(MAKE) start-integration-elasticsearch
+	sleep 30 # Many services are very slow... Give them a sec...
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features es-integration-tests --lib ::elasticsearch:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
+	$(MAKE) -k stop-integration-elasticsearch
 endif
+
+start-integration-gcp:
+	$(CONTAINER_TOOL) network create test-integration-gcp
+	$(CONTAINER_TOOL) run -d --network=test-integration-gcp -p 8681-8682:8681-8682 --name cloud-pubsub -e PUBSUB_PROJECT1=testproject,topic1:subscription1 messagebird/gcloud-pubsub-emulator
+
+stop-integration-gcp:
+	$(CONTAINER_TOOL) rm --force cloud-pubsub 2>/dev/null; true
+	$(CONTAINER_TOOL) network rm test-integration-gcp 2>/dev/null; true
 
 test-integration-gcp: ## Runs GCP integration tests
 ifeq ($(AUTOSPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-gcp
-	sleep 5 # Many services are very lazy... Give them a sec...
+	$(MAKE) -k stop-integration-gcp \
+    ; rc=$$? \
+	$(MAKE) start-integration-gcp
+	sleep 30 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features gcp-integration-tests --lib ::gcp:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
+	$(MAKE) -k stop-integration-gcp
 endif
+
+start-integration-humio:
+	$(CONTAINER_TOOL) network create test-integration-humio
+	$(CONTAINER_TOOL) run -d --network=test-integration-humio -p 8080:8080 --name humio humio/humio:1.13.1
+
+stop-integration-humio:
+	$(CONTAINER_TOOL) rm --force humio 2>/dev/null; true
+	$(CONTAINER_TOOL) network rm test-integration-humio 2>/dev/null; true
 
 test-integration-humio: ## Runs Humio integration tests
 ifeq ($(AUTOSPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-humio
+	$(MAKE) -k stop-integration-humio \
+    ; rc=$$? \
+	$(MAKE) start-integration-humio
+	sleep 30 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features humio-integration-tests --lib ::humio:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
+	$(MAKE) -k stop-integration-humio
 endif
 
+start-integration-influxdb:
+	$(CONTAINER_TOOL) network create test-integration-influxdb
+	$(CONTAINER_TOOL) run -d --network=test-integration-influxdb -p 8086:8086 --name influxdb_v1 -e INFLUXDB_REPORTING_DISABLED=true influxdb:1.7
+	$(CONTAINER_TOOL) run -d --network=test-integration-influxdb -p 9999:9999 --name influxdb_v2 -e INFLUXDB_REPORTING_DISABLED=true  quay.io/influxdb/influxdb:2.0.0-beta influxd --reporting-disabled
+
+stop-integration-influxdb:
+	$(CONTAINER_TOOL) rm --force influxdb_v1 influxdb_v2 2>/dev/null; true
+	$(CONTAINER_TOOL) network rm test-integration-influxdb 2>/dev/null; true
 
 test-integration-influxdb: ## Runs InfluxDB integration tests
 ifeq ($(AUTOSPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-influxdb
-	sleep 5 # Many services are very lazy... Give them a sec...
+	$(MAKE) -k stop-integration-influxdb \
+    ; rc=$$? \
+	$(MAKE) start-integration-influxdb
+	sleep 30 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features influxdb-integration-tests --lib ::influxdb::integration_tests:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
+	$(MAKE) -k stop-integration-influxdb
 endif
+
+start-integration-kafka:
+	$(CONTAINER_TOOL) network create test-integration-kafka
+	$(CONTAINER_TOOL) run -d --network=test-integration-kafka -p 2181:2181 --name zookeeper wurstmeister/zookeeper
+	$(CONTAINER_TOOL) run -d --network=test-integration-kafka -p 9091-9093:9091-9093 -e KAFKA_BROKER_ID=1 \
+	 -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 -e KAFKA_LISTENERS=PLAINTEXT://:9091,SSL://:9092,SASL_PLAINTEXT://:9093 \
+	 -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9091,SSL://localhost:9092,SASL_PLAINTEXT://localhost:9093 \
+	 -e KAFKA_SSL_KEYSTORE_LOCATION=/certs/localhost.p12 -e KAFKA_SSL_KEYSTORE_PASSWORD=NOPASS \
+	 -e KAFKA_SSL_TRUSTSTORE_LOCATION=/certs/localhost.p12 -e KAFKA_SSL_TRUSTSTORE_PASSWORD=NOPASS \
+	 -e KAFKA_SSL_KEY_PASSWORD=NOPASS -e KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=none \
+	 -e KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf" \
+	 -e KAFKA_INTER_BROKER_LISTENER_NAME=SASL_PLAINTEXT -e KAFKA_SASL_ENABLED_MECHANISMS=PLAIN \
+	 -e KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL=PLAIN -v $(PWD)/tests/data/localhost.p12:/certs/localhost.p12:ro \
+	 -v $(PWD)/tests/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf --name kafka wurstmeister/kafka
+
+stop-integration-kafka:
+	$(CONTAINER_TOOL) rm --force kafka zookeeper 2>/dev/null; true
+	$(CONTAINER_TOOL) network rm test-integration-kafka 2>/dev/null; true
 
 test-integration-kafka: ## Runs Kafka integration tests
 ifeq ($(AUTOSPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-kafka
-	sleep 5 # Many services are very lazy... Give them a sec...
+	$(MAKE) -k stop-integration-kafka \
+    ; rc=$$? \
+	$(MAKE) start-integration-kafka
+	sleep 30 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features "kafka-integration-tests rdkafka-plain" --lib ::kafka:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
+	$(MAKE) -k stop-integration-kafka
 endif
+
+start-integration-loki:
+	$(CONTAINER_TOOL) network create test-integration-loki
+	$(CONTAINER_TOOL) run -d --network=test-integration-loki -p 3100:3100 -v $(PWD)/tests/data:/etc/loki --name loki grafana/loki:master -config.file=/etc/loki/loki-config.yaml
+
+stop-integration-loki:
+	$(CONTAINER_TOOL) rm --force loki 2>/dev/null; true
+	$(CONTAINER_TOOL) network rm test-integration-loki 2>/dev/null; true
 
 test-integration-loki: ## Runs Loki integration tests
 ifeq ($(AUTOSPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-loki
-	sleep 5 # Many services are very lazy... Give them a sec...
+	$(MAKE) -k stop-integration-loki \
+    ; rc=$$? \
+	$(MAKE) start-integration-loki
+	sleep 30 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features loki-integration-tests --lib ::loki:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
+	$(MAKE) -k stop-integration-loki
 endif
+
+start-integration-pulsar:
+	$(CONTAINER_TOOL) network create test-integration-pulsar
+	$(CONTAINER_TOOL) run -d --network=test-integration-pulsar -p 6650:6650 --name pulsar apachepulsar/pulsar bin/pulsar standalone
+
+stop-integration-pulsar:
+	$(CONTAINER_TOOL) rm --force pulsar 2>/dev/null; true
+	$(CONTAINER_TOOL) network rm test-integration-pulsar 2>/dev/null; true
 
 test-integration-pulsar: ## Runs Pulsar integration tests
 ifeq ($(AUTOSPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-pulsar
-	sleep 5 # Many services are very lazy... Give them a sec...
+	$(MAKE) -k stop-integration-pulsar \
+    ; rc=$$? \
+	$(MAKE) start-integration-pulsar
+	sleep 30 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features pulsar-integration-tests --lib ::pulsar:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
+	$(MAKE) -k stop-integration-pulsar
 endif
+
+start-integration-splunk:
+	$(CONTAINER_TOOL) network create test-integration-splunk
+	$(CONTAINER_TOOL) run -d --network=test-integration-splunk -p 8088:8088 -p 8000:8000 -p 8089:8089 --name splunk timberio/splunk-hec-test:latest
+
+stop-integration-splunk:
+	$(CONTAINER_TOOL) rm --force splunk 2>/dev/null; true
+	$(CONTAINER_TOOL) network rm test-integration-splunk 2>/dev/null; true
 
 test-integration-splunk: ## Runs Splunk integration tests
 ifeq ($(AUTOSPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-splunk
-	sleep 5 # Many services are very lazy... Give them a sec...
+	$(MAKE) -k stop-integration-splunk \
+    ; rc=$$? \
+	$(MAKE) start-integration-splunk
+	sleep 30 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features splunk-integration-tests --lib ::splunk_hec:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
+	$(MAKE) -k stop-integration-splunk
 endif
 
 PACKAGE_DEB_USE_CONTAINER ?= $(USE_CONTAINER)
@@ -306,12 +409,14 @@ test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` 
 
 test-shutdown: ## Runs shutdown tests
 ifeq ($(AUTOSPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-kafka
-	sleep 5 # Many services are very lazy... Give them a sec...
+	$(MAKE) -k stop-integration-kafka \
+    ; rc=$$? \
+	$(MAKE) start-integration-kafka
+	sleep 30 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features shutdown-tests --test shutdown -- --test-threads 4
 ifeq ($(AUTODESPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
+	$(MAKE) -k stop-integration-kafka
 endif
 
 test-cli: ## Runs cli tests
