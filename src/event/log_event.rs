@@ -1,8 +1,8 @@
-use crate::event::{Value, PathComponent, util};
-use string_cache::{DefaultAtom};
-use std::collections::BTreeMap;
+use crate::event::{util, PathComponent, Value};
 use serde::{Serialize, Serializer};
+use std::collections::BTreeMap;
 use std::iter::FromIterator;
+use string_cache::DefaultAtom;
 
 #[derive(PartialEq, Debug, Clone, Default)]
 pub struct LogEvent {
@@ -27,31 +27,31 @@ impl LogEvent {
     }
 
     pub fn insert<K, V>(&mut self, key: K, value: V) -> Option<Value>
-        where
-            K: AsRef<str>,
-            V: Into<Value>,
+    where
+        K: AsRef<str>,
+        V: Into<Value>,
     {
         util::log::insert(&mut self.fields, key.as_ref(), value.into())
     }
 
     pub fn insert_path<V>(&mut self, key: Vec<PathComponent>, value: V) -> Option<Value>
-        where
-            V: Into<Value>,
+    where
+        V: Into<Value>,
     {
         util::log::insert_path(&mut self.fields, key, value.into())
     }
 
     pub fn insert_flat<K, V>(&mut self, key: K, value: V)
-        where
-            K: Into<String>,
-            V: Into<Value>,
+    where
+        K: Into<String>,
+        V: Into<Value>,
     {
         self.fields.insert(key.into(), value.into());
     }
 
     pub fn try_insert<V>(&mut self, key: &DefaultAtom, value: V)
-        where
-            V: Into<Value>,
+    where
+        V: Into<Value>,
     {
         if !self.contains(key) {
             self.insert(key.clone(), value);
@@ -129,8 +129,8 @@ impl IntoIterator for LogEvent {
 
 impl Serialize for LogEvent {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         serializer.collect_map(self.fields.iter())
     }
