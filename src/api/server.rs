@@ -71,17 +71,22 @@ impl Server {
         // Health route
         let health_route = warp::path("health").and_then(handler::health);
 
+        // 404
+        let not_found_route = warp::any()
+            .and_then(|| async { Err(warp::reject::not_found()) })
+            .boxed();
+
         // GraphQL POST handler
-        let graphql_post = async_graphql_warp::graphql(schema.clone()).and_then(
-            |(schema, builder): (_, QueryBuilder)| async move {
-                let resp = builder.execute(&schema).await;
-                Ok::<_, Infallible>(GQLResponse::from(resp))
-            },
+        let graphql_post_route = warp::path("graphql").and(
+            graphql_subscription(schema.clone()).or(async_graphql_warp::graphql(schema.clone())
+                .and_then(|(schema, builder): (_, QueryBuilder)| async move {
+                    let resp = builder.execute(&schema).await;
+                    Ok::<_, Infallible>(GQLResponse::from(resp))
+                })),
         );
 
         // GraphQL playground
-        let enable_playground = self.playground;
-        let graphql_playground = if enable_playground {
+        let graphql_playground_route = if self.playground {
             warp::path("playground")
                 .map(move || {
                     Response::builder()
@@ -93,16 +98,14 @@ impl Server {
                 })
                 .boxed()
         } else {
-            warp::any()
-                .and_then(|| async move { Err(warp::reject::not_found()) })
-                .boxed()
+            not_found_route.clone()
         };
 
         let routes = balanced_or_tree!(
-            graphql_subscription(schema),
             health_route,
-            graphql_post,
-            graphql_playground
+            graphql_post_route,
+            graphql_playground_route,
+            not_found_route
         )
         .with(
             warp::cors()
