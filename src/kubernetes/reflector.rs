@@ -307,7 +307,7 @@ mod tests {
     }
 
     // A simple test, to serve as a bare-bones example for adding further tests.
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn simple_test() {
         trace_init();
 
@@ -359,7 +359,7 @@ mod tests {
     }
 
     // Test the properties of the normal  execution flow.
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn flow_test() {
         trace_init();
 
@@ -411,7 +411,7 @@ mod tests {
     }
 
     // Test the properies of the flow with desync.
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn desync_test() {
         trace_init();
 
@@ -450,7 +450,7 @@ mod tests {
     }
 
     /// Test that the state is properly initialized even if no events arrived.
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn no_updates_state_test() {
         trace_init();
 
@@ -462,7 +462,7 @@ mod tests {
     }
 
     // Test that [`k8s_openapi::WatchOptional`] is populated properly.
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn arguments_test() {
         trace_init();
 
@@ -535,7 +535,7 @@ mod tests {
     }
 
     /// Test that the delayed delete works accordingly.
-    #[tokio::test(threaded_scheduler, core_threads = 2)]
+    #[tokio::test]
     async fn test_delayed_deletes() {
         trace_init();
 
@@ -694,7 +694,7 @@ mod tests {
     }
 
     /// Test that stream error terminates the reflector.
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn test_stream_error() {
         trace_init();
 
@@ -762,7 +762,7 @@ mod tests {
     }
 
     /// Test that maintenance works accordingly.
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn test_maintenance() {
         trace_init();
 
