@@ -1,6 +1,5 @@
 use crate::{
     config::{Config, ConfigDiff},
-    runtime::Runtime,
     topology::{self, RunningTopology},
     trace, Event,
 };
@@ -31,6 +30,7 @@ use std::{
 use tokio::{
     io::{AsyncRead, AsyncWrite, Result as IoResult},
     net::{TcpListener, TcpStream},
+    runtime,
     sync::oneshot,
     task::JoinHandle,
     time::{delay_for, Duration, Instant},
@@ -289,8 +289,12 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     output.lines().map(|s| s.to_owned()).collect()
 }
 
-pub fn runtime() -> Runtime {
-    Runtime::single_threaded().unwrap()
+pub fn runtime() -> runtime::Runtime {
+    runtime::Builder::new()
+        .threaded_scheduler()
+        .enable_all()
+        .build()
+        .unwrap()
 }
 
 pub async fn wait_for<F, Fut>(mut f: F)
