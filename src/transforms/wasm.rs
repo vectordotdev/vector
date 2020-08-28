@@ -2,12 +2,19 @@ use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
-    wasm::{WasmModule, WasmModuleConfig},
+    wasm::WasmModule,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use vector_wasm::Role;
+use vector_wasm::{Role, WasmModuleConfig};
+
+pub mod defaults {
+    pub(super) const HEAP_MEMORY_SIZE: usize = 16 * 64 * 1024 * 10; // 10MB
+    pub const fn heap_memory_size() -> usize {
+        HEAP_MEMORY_SIZE
+    }
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -16,6 +23,8 @@ pub struct WasmConfig {
     pub module: PathBuf,
     /// The location of the WASM artifact cache.
     pub artifact_cache: PathBuf,
+    #[serde(default = "defaults::heap_memory_size")]
+    pub heap_memory_size: usize,
     /// Options to be passed to the WASM module.
     #[serde(default)]
     pub options: HashMap<String, serde_json::Value>,
@@ -28,6 +37,7 @@ impl Into<WasmModuleConfig> for WasmConfig {
             self.module,
             self.artifact_cache,
             self.options,
+            defaults::HEAP_MEMORY_SIZE,
         )
     }
 }
@@ -163,6 +173,8 @@ mod tests {
             r#"
             module = "target/wasm32-wasi/release/add_fields.wasm"
             artifact_cache = "target/artifacts"
+            options.new_field = "new_value"
+            options.new_field_2 = "new_value_2"
             "#,
         )?;
 

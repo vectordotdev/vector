@@ -1,6 +1,5 @@
-use crate::Registration;
+use crate::{Registration, WasmModuleConfig};
 use anyhow::{Context, Result};
-use std::collections::HashMap;
 use std::fmt::Display;
 
 /// Emit the data back to the host.
@@ -38,14 +37,14 @@ pub fn raise(error: impl Display) -> Result<u32> {
 }
 
 /// Retrieve the options from the instance context.
-pub fn config() -> Result<HashMap<String, serde_json::Value>> {
+pub fn config() -> Result<WasmModuleConfig> {
     let size = unsafe { ffi::config_size() };
     let ptr = crate::interop::allocate_buffer(size);
 
     unsafe { ffi::config(ptr as u32, size) };
 
     let buffer = unsafe { Vec::from_raw_parts(ptr as *mut u8, size as usize, size as usize) };
-    let config: HashMap<String, serde_json::Value> = serde_json::from_slice(&buffer)?;
+    let config = serde_json::from_slice(&buffer)?;
     Ok(config)
 }
 
