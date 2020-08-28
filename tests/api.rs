@@ -3,7 +3,6 @@ mod support;
 #[cfg(feature = "api")]
 mod tests {
     use crate::support::{sink, source};
-    use reqwest;
     use vector::config::Config;
     use vector::test_util::{next_addr, start_topology, wait_for_tcp_in_secs};
 
@@ -23,7 +22,7 @@ mod tests {
         let addr = config.api.bind.unwrap();
 
         let (mut _top, _) = start_topology(config, false).await;
-        wait_for_tcp_in_secs(addr.clone(), 30).await;
+        wait_for_tcp_in_secs(addr, 30).await;
 
         let url = format!("http://{}:{}/health", addr.ip(), addr.port());
         let res = reqwest::get(url.as_str())
