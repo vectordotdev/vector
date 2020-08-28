@@ -72,9 +72,7 @@ impl Server {
         let health = warp::path("health").and_then(handler::health);
 
         // 404
-        let not_found = warp::any()
-            .and_then(|| async { Err(warp::reject::not_found()) })
-            .boxed();
+        let not_found = warp::any().and_then(|| async { Err(warp::reject::not_found()) });
 
         // GraphQL POST handler
         let graphql_handler = warp::path("graphql").and(graphql_subscription(schema.clone()).or(
@@ -99,7 +97,7 @@ impl Server {
                 })
                 .boxed()
         } else {
-            not_found.clone()
+            not_found.boxed().clone()
         };
 
         let routes = balanced_or_tree!(health, graphql_handler, graphql_playground, not_found)
