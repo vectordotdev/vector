@@ -1,5 +1,5 @@
 use crate::{
-    event::{self, Event},
+    event::{Event},
     internal_events::{SocketEventReceived, SocketMode},
     sources::util::{SocketListenAddr, TcpSource},
     tls::TlsConfig,
@@ -60,9 +60,9 @@ impl TcpSource for RawTcpSource {
 
         event
             .as_mut_log()
-            .insert(event::log_schema().source_type_key(), "socket");
+            .insert(crate::config::log_schema().source_type_key(), "socket");
 
-        let host_key = (self.config.host_key.as_ref()).unwrap_or(&event::log_schema().host_key());
+        let host_key = (self.config.host_key.as_ref()).unwrap_or(&crate::config::log_schema().host_key());
 
         event.as_mut_log().insert(host_key.clone(), host);
 

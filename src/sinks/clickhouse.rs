@@ -331,11 +331,11 @@ mod integration_tests {
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            event::log_schema().timestamp_key().clone(),
+            crate::config::log_schema().timestamp_key().clone(),
             format!(
                 "{}",
                 exp_event
-                    .get(&event::log_schema().timestamp_key())
+                    .get(&crate::config::log_schema().timestamp_key())
                     .unwrap()
                     .as_timestamp()
                     .unwrap()
@@ -389,11 +389,11 @@ timestamp_format = "unix""#,
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            event::log_schema().timestamp_key().clone(),
+            crate::config::log_schema().timestamp_key().clone(),
             format!(
                 "{}",
                 exp_event
-                    .get(&event::log_schema().timestamp_key())
+                    .get(&crate::config::log_schema().timestamp_key())
                     .unwrap()
                     .as_timestamp()
                     .unwrap()

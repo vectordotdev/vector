@@ -34,7 +34,7 @@ impl Transform for Docker {
 
 /// Parses `message` as json object and removes it.
 fn parse_json(log: &mut LogEvent) -> Option<()> {
-    let to_parse = log.remove(&event::log_schema().message_key())?.as_bytes();
+    let to_parse = log.remove(&crate::config::log_schema().message_key())?.as_bytes();
 
     match serde_json::from_slice(to_parse.as_ref()) {
         Ok(JsonValue::Object(object)) => {
@@ -62,7 +62,7 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     let time = DateTime::parse_from_rfc3339(String::from_utf8_lossy(time.as_ref()).as_ref())
         .context(TimeParsing)?;
     log.insert(
-        event::log_schema().timestamp_key(),
+        crate::config::log_schema().timestamp_key(),
         time.with_timezone(&Utc),
     );
 
@@ -88,7 +88,7 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
         message.truncate(message.len() - 1);
         is_partial = false;
     };
-    log.insert(event::log_schema().message_key(), message);
+    log.insert(crate::config::log_schema().message_key(), message);
 
     // For partial messages add a partial event indicator.
     if is_partial {

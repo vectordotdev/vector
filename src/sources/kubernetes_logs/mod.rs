@@ -5,7 +5,7 @@
 
 #![deny(missing_docs)]
 
-use crate::event::{self, Event};
+use crate::event::{Event};
 use crate::internal_events::{
     FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
     KubernetesLogsEventReceived,
@@ -290,7 +290,7 @@ fn create_event(line: Bytes, file: &str) -> Event {
     // Add source type.
     event
         .as_mut_log()
-        .insert(event::log_schema().source_type_key(), COMPONENT_NAME);
+        .insert(crate::config::log_schema().source_type_key(), COMPONENT_NAME);
 
     // Add file.
     event.as_mut_log().insert(FILE_KEY, file);

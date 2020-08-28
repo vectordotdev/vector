@@ -1,5 +1,5 @@
 use crate::{
-    event::{self, Event},
+    event::{Event},
     internal_events::{SocketEventReceived, SocketMode},
     shutdown::ShutdownSignal,
     sources::{util::build_unix_source, Source},
@@ -42,7 +42,7 @@ fn build_event(host_key: &str, received_from: Option<Bytes>, line: &str) -> Opti
     let mut event = Event::from(line);
     event
         .as_mut_log()
-        .insert(event::log_schema().source_type_key(), "socket");
+        .insert(crate::config::log_schema().source_type_key(), "socket");
     if let Some(host) = received_from {
         event.as_mut_log().insert(host_key, host);
     }

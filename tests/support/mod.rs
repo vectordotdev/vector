@@ -15,7 +15,7 @@ use vector::config::{
     DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
     TransformContext,
 };
-use vector::event::{self, metric::MetricValue, Event, Value};
+use vector::event::{metric::MetricValue, Event, Value};
 use vector::shutdown::ShutdownSignal;
 use vector::sinks::{util::StreamSink, Healthcheck, RouterSink};
 use vector::sources::Source;
@@ -155,11 +155,14 @@ impl Transform for MockTransform {
         match &mut event {
             Event::Log(log) => {
                 let mut v = log
-                    .get(&event::log_schema().message_key())
+                    .get(&vector::config::log_schema().message_key())
                     .unwrap()
                     .to_string_lossy();
                 v.push_str(&self.suffix);
-                log.insert(event::log_schema().message_key().clone(), Value::from(v));
+                log.insert(
+                    vector::config::log_schema().message_key().clone(),
+                    Value::from(v),
+                );
             }
             Event::Metric(metric) => match metric.value {
                 MetricValue::Counter { ref mut value } => {

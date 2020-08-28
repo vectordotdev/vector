@@ -132,7 +132,7 @@ impl HttpSink for LokiConfig {
             }
         }
 
-        let timestamp = match event.as_log().get(&event::log_schema().timestamp_key()) {
+        let timestamp = match event.as_log().get(&crate::config::log_schema().timestamp_key()) {
             Some(event::Value::Timestamp(ts)) => ts.timestamp_nanos(),
             _ => chrono::Utc::now().timestamp_nanos(),
         };
@@ -140,7 +140,7 @@ impl HttpSink for LokiConfig {
         if self.remove_timestamp {
             event
                 .as_mut_log()
-                .remove(&event::log_schema().timestamp_key());
+                .remove(&crate::config::log_schema().timestamp_key());
         }
 
         let event = match &self.encoding.codec() {
@@ -149,7 +149,7 @@ impl HttpSink for LokiConfig {
 
             Encoding::Text => event
                 .as_log()
-                .get(&event::log_schema().message_key())
+                .get(&crate::config::log_schema().message_key())
                 .map(Value::to_string_lossy)
                 .unwrap_or_default(),
         };

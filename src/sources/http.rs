@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::{self, Event},
+    event::Event,
     shutdown::ShutdownSignal,
     sources::util::{ErrorMessage, HttpSource},
     tls::TlsConfig,
@@ -52,7 +52,7 @@ impl HttpSource for SimpleHttpSource {
             .map(|events| add_headers(events, &self.headers, header_map))
             .map(|mut events| {
                 // Add source type
-                let key = event::log_schema().source_type_key();
+                let key = crate::config::log_schema().source_type_key();
                 for event in events.iter_mut() {
                     event.as_mut_log().try_insert(key, "http");
                 }
@@ -160,7 +160,10 @@ fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
 fn json_parse_object(value: JsonValue) -> Result<Event, ErrorMessage> {
     let mut event = Event::new_empty_log();
     let log = event.as_mut_log();
-    log.insert(event::log_schema().timestamp_key().clone(), Utc::now()); // Add timestamp
+    log.insert(
+        crate::config::log_schema().timestamp_key().clone(),
+        Utc::now(),
+    ); // Add timestamp
     match value {
         JsonValue::Object(map) => {
             for (k, v) in map {
@@ -214,7 +217,7 @@ mod tests {
     use crate::shutdown::ShutdownSignal;
     use crate::{
         config::{GlobalOptions, SourceConfig},
-        event::{self, Event},
+        event::Event,
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
     };
@@ -291,19 +294,32 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[&event::log_schema().message_key()], "test body".into());
-            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
+            assert_eq!(
+                log[&crate::config::log_schema().message_key()],
+                "test body".into()
+            );
+            assert!(log
+                .get(&crate::config::log_schema().timestamp_key())
+                .is_some());
+            assert_eq!(
+                log[crate::config::log_schema().source_type_key()],
+                "http".into()
+            );
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(
-                log[&event::log_schema().message_key()],
+                log[&crate::config::log_schema().message_key()],
                 "test body 2".into()
             );
-            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
+            assert!(log
+                .get(&crate::config::log_schema().timestamp_key())
+                .is_some());
+            assert_eq!(
+                log[crate::config::log_schema().source_type_key()],
+                "http".into()
+            );
         }
     }
 
@@ -322,19 +338,32 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[&event::log_schema().message_key()], "test body".into());
-            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
+            assert_eq!(
+                log[&crate::config::log_schema().message_key()],
+                "test body".into()
+            );
+            assert!(log
+                .get(&crate::config::log_schema().timestamp_key())
+                .is_some());
+            assert_eq!(
+                log[crate::config::log_schema().source_type_key()],
+                "http".into()
+            );
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(
-                log[&event::log_schema().message_key()],
+                log[&crate::config::log_schema().message_key()],
                 "test body 2".into()
             );
-            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
+            assert!(log
+                .get(&crate::config::log_schema().timestamp_key())
+                .is_some());
+            assert_eq!(
+                log[crate::config::log_schema().source_type_key()],
+                "http".into()
+            );
         }
     }
 
@@ -354,12 +383,12 @@ mod tests {
         assert!(events
             .remove(1)
             .as_log()
-            .get(&event::log_schema().timestamp_key())
+            .get(&crate::config::log_schema().timestamp_key())
             .is_some());
         assert!(events
             .remove(0)
             .as_log()
-            .get(&event::log_schema().timestamp_key())
+            .get(&crate::config::log_schema().timestamp_key())
             .is_some());
     }
 
@@ -377,15 +406,25 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key")], "value".into());
-            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
+            assert!(log
+                .get(&crate::config::log_schema().timestamp_key())
+                .is_some());
+            assert_eq!(
+                log[crate::config::log_schema().source_type_key()],
+                "http".into()
+            );
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key2")], "value2".into());
-            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
+            assert!(log
+                .get(&crate::config::log_schema().timestamp_key())
+                .is_some());
+            assert_eq!(
+                log[crate::config::log_schema().source_type_key()],
+                "http".into()
+            );
         }
     }
 
@@ -407,15 +446,25 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key1")], "value1".into());
-            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
+            assert!(log
+                .get(&crate::config::log_schema().timestamp_key())
+                .is_some());
+            assert_eq!(
+                log[crate::config::log_schema().source_type_key()],
+                "http".into()
+            );
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key2")], "value2".into());
-            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
+            assert!(log
+                .get(&crate::config::log_schema().timestamp_key())
+                .is_some());
+            assert_eq!(
+                log[crate::config::log_schema().source_type_key()],
+                "http".into()
+            );
         }
     }
 
@@ -453,8 +502,13 @@ mod tests {
                 "false".into()
             );
             assert_eq!(log[&Atom::from("AbsentHeader")], "".into());
-            assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-            assert_eq!(log[event::log_schema().source_type_key()], "http".into());
+            assert!(log
+                .get(&crate::config::log_schema().timestamp_key())
+                .is_some());
+            assert_eq!(
+                log[crate::config::log_schema().source_type_key()],
+                "http".into()
+            );
         }
     }
 }

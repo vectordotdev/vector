@@ -781,17 +781,17 @@ impl ContainerLogInfo {
             let mut log_event = LogEvent::default();
 
             // Source type
-            log_event.insert(event::log_schema().source_type_key(), "docker");
+            log_event.insert(crate::config::log_schema().source_type_key(), "docker");
 
             // The log message.
-            log_event.insert(event::log_schema().message_key().clone(), bytes_message);
+            log_event.insert(crate::config::log_schema().message_key(), bytes_message);
 
             // Stream we got the message from.
             log_event.insert(STREAM.clone(), stream);
 
             // Timestamp of the event.
             if let Some(timestamp) = timestamp {
-                log_event.insert(event::log_schema().timestamp_key().clone(), timestamp);
+                log_event.insert(crate::config::log_schema().timestamp_key(), timestamp);
             }
 
             // Container ID.
@@ -831,7 +831,7 @@ impl ContainerLogInfo {
                 if let Some(partial_event_merge_state) = partial_event_merge_state {
                     partial_event_merge_state.merge_in_next_event(
                         log_event,
-                        &[event::log_schema().message_key().clone()],
+                        &[crate::config::log_schema().message_key().clone()],
                     );
                 } else {
                     *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
@@ -844,8 +844,10 @@ impl ContainerLogInfo {
             // would give us a merged event we can return.
             // Otherwise it's just a regular event that we return as-is.
             match partial_event_merge_state.take() {
-                Some(partial_event_merge_state) => partial_event_merge_state
-                    .merge_in_final_event(log_event, &[event::log_schema().message_key().clone()]),
+                Some(partial_event_merge_state) => partial_event_merge_state.merge_in_final_event(
+                    log_event,
+                    &[crate::config::log_schema().message_key().clone()],
+                ),
                 None => log_event,
             }
         } else {
@@ -1154,7 +1156,7 @@ mod tests {
         // Wait for before message
         let events = collect_n(out, 1).await.unwrap();
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&crate::config::log_schema().message_key()],
             "before".into()
         );
 
@@ -1184,14 +1186,17 @@ mod tests {
         container_remove(&id, &docker).await;
 
         let log = events[0].as_log();
-        assert_eq!(log[&event::log_schema().message_key()], message.into());
+        assert_eq!(
+            log[&crate::config::log_schema().message_key()],
+            message.into()
+        );
         assert_eq!(log[&super::CONTAINER], id.into());
         assert!(log.get(&super::CREATED_AT).is_some());
         assert_eq!(log[&super::IMAGE], "busybox".into());
         assert!(log.get(&format!("label.{}", label).into()).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
         assert_eq!(
-            events[0].as_log()[event::log_schema().source_type_key()],
+            events[0].as_log()[crate::config::log_schema().source_type_key()],
             "docker".into()
         );
     }
@@ -1212,11 +1217,11 @@ mod tests {
         container_remove(&id, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&crate::config::log_schema().message_key()],
             message.into()
         );
         assert_eq!(
-            events[1].as_log()[&event::log_schema().message_key()],
+            events[1].as_log()[&crate::config::log_schema().message_key()],
             message.into()
         );
     }
@@ -1240,7 +1245,7 @@ mod tests {
         container_remove(&id1, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&crate::config::log_schema().message_key()],
             message.into()
         );
     }
@@ -1265,7 +1270,7 @@ mod tests {
         container_remove(&id1, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&crate::config::log_schema().message_key()],
             message.into()
         );
     }
@@ -1287,14 +1292,17 @@ mod tests {
         container_remove(&id, &docker).await;
 
         let log = events[0].as_log();
-        assert_eq!(log[&event::log_schema().message_key()], message.into());
+        assert_eq!(
+            log[&crate::config::log_schema().message_key()],
+            message.into()
+        );
         assert_eq!(log[&super::CONTAINER], id.into());
         assert!(log.get(&super::CREATED_AT).is_some());
         assert_eq!(log[&super::IMAGE], "busybox".into());
         assert!(log.get(&format!("label.{}", label).into()).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
         assert_eq!(
-            events[0].as_log()[event::log_schema().source_type_key()],
+            events[0].as_log()[crate::config::log_schema().source_type_key()],
             "docker".into()
         );
     }
@@ -1320,7 +1328,7 @@ mod tests {
         container_remove(&id, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&crate::config::log_schema().message_key()],
             message.into()
         );
     }
@@ -1394,6 +1402,9 @@ mod tests {
         container_remove(&id, &docker).await;
 
         let log = events[0].as_log();
-        assert_eq!(log[&event::log_schema().message_key()], message.into());
+        assert_eq!(
+            log[&crate::config::log_schema().message_key()],
+            message.into()
+        );
     }
 }

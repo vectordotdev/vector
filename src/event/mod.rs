@@ -1,11 +1,8 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
-use getset::{Getters, Setters};
 use lazy_static::lazy_static;
 use metric::{MetricKind, MetricValue};
-use once_cell::sync::OnceCell;
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use string_cache::DefaultAtom as Atom;
 
@@ -27,18 +24,10 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
 }
 
-pub static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
-
 pub const PARTIAL_STR: &str = "_partial"; // TODO: clean up the _STR suffix after we get rid of atoms
 
 lazy_static! {
     pub static ref PARTIAL: Atom = Atom::from(PARTIAL_STR);
-    static ref LOG_SCHEMA_DEFAULT: LogSchema = LogSchema {
-        message_key: Atom::from("message"),
-        timestamp_key: Atom::from("timestamp"),
-        host_key: Atom::from("host"),
-        source_type_key: Atom::from("source_type"),
-    };
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -92,53 +81,6 @@ impl Event {
             Event::Metric(metric) => metric,
             _ => panic!("Failed type coercion, {:?} is not a metric", self),
         }
-    }
-}
-
-pub fn log_schema() -> &'static LogSchema {
-    LOG_SCHEMA.get().unwrap_or(&LOG_SCHEMA_DEFAULT)
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Getters, Setters)]
-#[serde(default)]
-pub struct LogSchema {
-    #[serde(default = "LogSchema::default_message_key")]
-    #[getset(get = "pub", set = "pub(crate)")]
-    message_key: Atom,
-    #[serde(default = "LogSchema::default_timestamp_key")]
-    #[getset(get = "pub", set = "pub(crate)")]
-    timestamp_key: Atom,
-    #[serde(default = "LogSchema::default_host_key")]
-    #[getset(get = "pub", set = "pub(crate)")]
-    host_key: Atom,
-    #[serde(default = "LogSchema::default_source_type_key")]
-    #[getset(get = "pub", set = "pub(crate)")]
-    source_type_key: Atom,
-}
-
-impl Default for LogSchema {
-    fn default() -> Self {
-        LogSchema {
-            message_key: Atom::from("message"),
-            timestamp_key: Atom::from("timestamp"),
-            host_key: Atom::from("host"),
-            source_type_key: Atom::from("source_type"),
-        }
-    }
-}
-
-impl LogSchema {
-    fn default_message_key() -> Atom {
-        Atom::from("message")
-    }
-    fn default_timestamp_key() -> Atom {
-        Atom::from("timestamp")
-    }
-    fn default_host_key() -> Atom {
-        Atom::from("host")
-    }
-    fn default_source_type_key() -> Atom {
-        Atom::from("source_type")
     }
 }
 
@@ -398,7 +340,7 @@ impl From<Event> for Vec<u8> {
     fn from(event: Event) -> Vec<u8> {
         event
             .into_log()
-            .remove(&log_schema().message_key())
+            .remove(&crate::config::log_schema().message_key())
             .unwrap()
             .as_bytes()
             .to_vec()
@@ -411,10 +353,10 @@ impl From<Bytes> for Event {
 
         event
             .as_mut_log()
-            .insert(log_schema().message_key().clone(), message);
+            .insert(crate::config::log_schema().message_key(), message);
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), Utc::now());
+            .insert(crate::config::log_schema().timestamp_key(), Utc::now());
 
         event
     }
@@ -446,7 +388,7 @@ impl From<Metric> for Event {
 
 #[cfg(test)]
 mod test {
-    use super::{Atom, Event, LogSchema, Value};
+    use super::{Atom, Event, Value};
     use regex::Regex;
     use std::collections::HashSet;
 
@@ -460,7 +402,7 @@ mod test {
             "message": "raw log line",
             "foo": "bar",
             "bar": "baz",
-            "timestamp": event.as_log().get(&super::log_schema().timestamp_key()),
+            "timestamp": event.as_log().get(&crate::config::log_schema().timestamp_key()),
         });
 
         let actual_all = serde_json::to_value(event.as_log().all_fields()).unwrap();
@@ -537,14 +479,5 @@ mod test {
                 (String::from("o9amkaRY"), &Value::from("pGsfG7Nr")),
             ]
         );
-    }
-
-    #[test]
-    fn partial_log_schema() {
-        let toml = r#"
-message_key = "message"
-timestamp_key = "timestamp"
-"#;
-        let _ = toml::from_str::<LogSchema>(toml).unwrap();
     }
 }

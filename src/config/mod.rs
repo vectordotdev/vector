@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     conditions,
     dns::Resolver,
-    event::{self, Metric},
+    event::Metric,
     shutdown::ShutdownSignal,
     sinks, sources, transforms, Pipeline,
 };
@@ -19,10 +19,12 @@ mod loading;
 mod validation;
 mod vars;
 pub mod watcher;
+pub mod log_schema;
 
 pub use diff::ConfigDiff;
 pub use loading::{load_from_paths, load_from_str, process_paths, CONFIG_PATHS};
 pub use validation::check;
+pub use log_schema::{log_schema, LogSchema};
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -49,7 +51,7 @@ pub struct GlobalOptions {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub log_schema: event::LogSchema,
+    pub log_schema: LogSchema,
 }
 
 pub fn default_data_dir() -> Option<PathBuf> {
@@ -325,7 +327,7 @@ impl Config {
         Self {
             global: GlobalOptions {
                 data_dir: None,
-                log_schema: event::LogSchema::default(),
+                log_schema: LogSchema::default(),
             },
             sources: IndexMap::new(),
             sinks: IndexMap::new(),
@@ -434,7 +436,7 @@ impl Config {
 
         // If the user has multiple config files, we must *merge* log schemas until we meet a
         // conflict, then we are allowed to error.
-        let default_schema = event::LogSchema::default();
+        let default_schema = crate::config::LogSchema::default();
         if with.global.log_schema != default_schema {
             // If the set value is the default, override it. If it's already overridden, error.
             if self.global.log_schema.host_key() != default_schema.host_key()

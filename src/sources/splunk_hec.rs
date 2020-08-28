@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig},
-    event::{self, Event, LogEvent, Value},
+    event::{Event, LogEvent, Value},
     internal_events::{
         SplunkHECEventReceived, SplunkHECRequestBodyInvalid, SplunkHECRequestError,
         SplunkHECRequestReceived,
@@ -348,7 +348,7 @@ impl<R: Read> EventStream<R> {
             extractors: [
                 DefaultExtractor::new_with(
                     "host",
-                    &event::log_schema().host_key(),
+                    &crate::config::log_schema().host_key(),
                     host.map(|value| value.as_bytes().into()),
                 ),
                 DefaultExtractor::new("index", &INDEX),
@@ -400,7 +400,7 @@ impl<R: Read> Stream for EventStream<R> {
         let log = event.as_mut_log();
 
         // Add source type
-        log.insert(event::log_schema().source_type_key(), "splunk_hec");
+        log.insert(crate::config::log_schema().source_type_key(), "splunk_hec");
 
         // Process event field
         match json.get_mut("event") {
@@ -409,7 +409,7 @@ impl<R: Read> Stream for EventStream<R> {
                     if string.is_empty() {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
-                    log.insert(event::log_schema().message_key().clone(), string);
+                    log.insert(crate::config::log_schema().message_key().clone(), string);
                 }
                 JsonValue::Object(mut object) => {
                     if object.is_empty() {
@@ -424,7 +424,7 @@ impl<R: Read> Stream for EventStream<R> {
                                 log.insert("line", line);
                             }
                             _ => {
-                                log.insert(event::log_schema().message_key(), line);
+                                log.insert(crate::config::log_schema().message_key(), line);
                             }
                         }
                     }
@@ -480,8 +480,12 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Add time field
         match self.time.clone() {
-            Time::Provided(time) => log.insert(event::log_schema().timestamp_key().clone(), time),
-            Time::Now(time) => log.insert(event::log_schema().timestamp_key().clone(), time),
+            Time::Provided(time) => {
+                log.insert(crate::config::log_schema().timestamp_key().clone(), time)
+            }
+            Time::Now(time) => {
+                log.insert(crate::config::log_schema().timestamp_key().clone(), time)
+            }
         };
 
         // Extract default extracted fields
@@ -605,23 +609,29 @@ fn raw_event(
     let log = event.as_mut_log();
 
     // Add message
-    log.insert(event::log_schema().message_key().clone(), message);
+    log.insert(crate::config::log_schema().message_key().clone(), message);
 
     // Add channel
     log.insert(CHANNEL.clone(), channel.as_bytes());
 
     // Add host
     if let Some(host) = host {
-        log.insert(event::log_schema().host_key().clone(), host.as_bytes());
+        log.insert(
+            crate::config::log_schema().host_key().clone(),
+            host.as_bytes(),
+        );
     }
 
     // Add timestamp
-    log.insert(event::log_schema().timestamp_key().clone(), Utc::now());
+    log.insert(
+        crate::config::log_schema().timestamp_key().clone(),
+        Utc::now(),
+    );
 
     // Add source type
     event
         .as_mut_log()
-        .try_insert(event::log_schema().source_type_key(), "splunk_hec");
+        .try_insert(crate::config::log_schema().source_type_key(), "splunk_hec");
 
     emit!(SplunkHECEventReceived);
 
@@ -761,7 +771,7 @@ mod tests {
     use super::{parse_timestamp, SplunkConfig};
     use crate::{
         config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
-        event::{self, Event},
+        event::Event,
         shutdown::ShutdownSignal,
         sinks::{
             splunk_hec::{Encoding, HecSinkConfig},
@@ -876,15 +886,15 @@ mod tests {
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
         assert_eq!(
-            event.as_log()[&event::log_schema().message_key()],
+            event.as_log()[&crate::config::log_schema().message_key()],
             message.into()
         );
         assert!(event
             .as_log()
-            .get(&event::log_schema().timestamp_key())
+            .get(&crate::config::log_schema().timestamp_key())
             .is_some());
         assert_eq!(
-            event.as_log()[event::log_schema().source_type_key()],
+            event.as_log()[crate::config::log_schema().source_type_key()],
             "splunk_hec".into()
         );
     }
@@ -899,15 +909,15 @@ mod tests {
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
         assert_eq!(
-            event.as_log()[&event::log_schema().message_key()],
+            event.as_log()[&crate::config::log_schema().message_key()],
             message.into()
         );
         assert!(event
             .as_log()
-            .get(&event::log_schema().timestamp_key())
+            .get(&crate::config::log_schema().timestamp_key())
             .is_some());
         assert_eq!(
-            event.as_log()[event::log_schema().source_type_key()],
+            event.as_log()[crate::config::log_schema().source_type_key()],
             "splunk_hec".into()
         );
     }
@@ -926,15 +936,15 @@ mod tests {
 
         for (msg, event) in messages.into_iter().zip(events.into_iter()) {
             assert_eq!(
-                event.as_log()[&event::log_schema().message_key()],
+                event.as_log()[&crate::config::log_schema().message_key()],
                 msg.into()
             );
             assert!(event
                 .as_log()
-                .get(&event::log_schema().timestamp_key())
+                .get(&crate::config::log_schema().timestamp_key())
                 .is_some());
             assert_eq!(
-                event.as_log()[event::log_schema().source_type_key()],
+                event.as_log()[crate::config::log_schema().source_type_key()],
                 "splunk_hec".into()
             );
         }
@@ -950,15 +960,15 @@ mod tests {
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
         assert_eq!(
-            event.as_log()[&event::log_schema().message_key()],
+            event.as_log()[&crate::config::log_schema().message_key()],
             message.into()
         );
         assert!(event
             .as_log()
-            .get(&event::log_schema().timestamp_key())
+            .get(&crate::config::log_schema().timestamp_key())
             .is_some());
         assert_eq!(
-            event.as_log()[event::log_schema().source_type_key()],
+            event.as_log()[crate::config::log_schema().source_type_key()],
             "splunk_hec".into()
         );
     }
@@ -977,15 +987,15 @@ mod tests {
 
         for (msg, event) in messages.into_iter().zip(events.into_iter()) {
             assert_eq!(
-                event.as_log()[&event::log_schema().message_key()],
+                event.as_log()[&crate::config::log_schema().message_key()],
                 msg.into()
             );
             assert!(event
                 .as_log()
-                .get(&event::log_schema().timestamp_key())
+                .get(&crate::config::log_schema().timestamp_key())
                 .is_some());
             assert_eq!(
-                event.as_log()[event::log_schema().source_type_key()],
+                event.as_log()[crate::config::log_schema().source_type_key()],
                 "splunk_hec".into()
             );
         }
@@ -1008,10 +1018,10 @@ mod tests {
         assert_eq!(event.as_log()[&"name".into()], "bob".into());
         assert!(event
             .as_log()
-            .get(&event::log_schema().timestamp_key())
+            .get(&crate::config::log_schema().timestamp_key())
             .is_some());
         assert_eq!(
-            event.as_log()[event::log_schema().source_type_key()],
+            event.as_log()[crate::config::log_schema().source_type_key()],
             "splunk_hec".into()
         );
     }
@@ -1029,7 +1039,7 @@ mod tests {
         let event = collect_n(source, 1).await.unwrap().remove(0);
 
         assert_eq!(
-            event.as_log()[&event::log_schema().message_key()],
+            event.as_log()[&crate::config::log_schema().message_key()],
             "hello".into()
         );
     }
@@ -1045,16 +1055,16 @@ mod tests {
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
         assert_eq!(
-            event.as_log()[&event::log_schema().message_key()],
+            event.as_log()[&crate::config::log_schema().message_key()],
             message.into()
         );
         assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
         assert!(event
             .as_log()
-            .get(&event::log_schema().timestamp_key())
+            .get(&crate::config::log_schema().timestamp_key())
             .is_some());
         assert_eq!(
-            event.as_log()[event::log_schema().source_type_key()],
+            event.as_log()[crate::config::log_schema().source_type_key()],
             "splunk_hec".into()
         );
     }
@@ -1092,7 +1102,7 @@ mod tests {
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
         assert_eq!(
-            event.as_log()[&event::log_schema().message_key()],
+            event.as_log()[&crate::config::log_schema().message_key()],
             message.into()
         );
     }
@@ -1111,15 +1121,15 @@ mod tests {
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
         assert_eq!(
-            event.as_log()[&event::log_schema().message_key()],
+            event.as_log()[&crate::config::log_schema().message_key()],
             "first".into()
         );
         assert!(event
             .as_log()
-            .get(&event::log_schema().timestamp_key())
+            .get(&crate::config::log_schema().timestamp_key())
             .is_some());
         assert_eq!(
-            event.as_log()[event::log_schema().source_type_key()],
+            event.as_log()[crate::config::log_schema().source_type_key()],
             "splunk_hec".into()
         );
     }
@@ -1139,19 +1149,19 @@ mod tests {
         let events = collect_n(source, 3).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&crate::config::log_schema().message_key()],
             "first".into()
         );
         assert_eq!(events[0].as_log()[&super::SOURCE], "main".into());
 
         assert_eq!(
-            events[1].as_log()[&event::log_schema().message_key()],
+            events[1].as_log()[&crate::config::log_schema().message_key()],
             "second".into()
         );
         assert_eq!(events[1].as_log()[&super::SOURCE], "main".into());
 
         assert_eq!(
-            events[2].as_log()[&event::log_schema().message_key()],
+            events[2].as_log()[&crate::config::log_schema().message_key()],
             "third".into()
         );
         assert_eq!(events[2].as_log()[&super::SOURCE], "secondary".into());

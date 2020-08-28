@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{self, Event, PathComponent, PathIter},
+    event::{Event, PathComponent, PathIter},
     internal_events::{
         GrokParserConversionFailed, GrokParserEventProcessed, GrokParserFailedMatch,
         GrokParserMissingField,
@@ -42,7 +42,7 @@ impl TransformConfig for GrokParserConfig {
         let field = self
             .field
             .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+            .unwrap_or(&crate::config::log_schema().message_key());
 
         let mut grok = grok::Grok::with_patterns();
 
@@ -195,9 +195,9 @@ mod tests {
         assert_eq!(2, event.keys().count());
         assert_eq!(
             event::Value::from("Help I'm stuck in an HTTP server"),
-            event[&event::log_schema().message_key()]
+            event[&crate::config::log_schema().message_key()]
         );
-        assert!(!event[&event::log_schema().timestamp_key()]
+        assert!(!event[&crate::config::log_schema().timestamp_key()]
             .to_string_lossy()
             .is_empty());
     }
@@ -242,9 +242,9 @@ mod tests {
         assert_eq!(2, event.keys().count());
         assert_eq!(
             event::Value::from("i am the only field"),
-            event[&event::log_schema().message_key()]
+            event[&crate::config::log_schema().message_key()]
         );
-        assert!(!event[&event::log_schema().timestamp_key()]
+        assert!(!event[&crate::config::log_schema().timestamp_key()]
             .to_string_lossy()
             .is_empty());
     }

@@ -650,7 +650,7 @@ mod integration_tests {
         let expected = json!({
             "message": "raw log line",
             "foo": "bar",
-            "timestamp": input_event.as_log()[&event::log_schema().timestamp_key()],
+            "timestamp": input_event.as_log()[&crate::config::log_schema().timestamp_key()],
         });
         assert_eq!(expected, value);
     }
