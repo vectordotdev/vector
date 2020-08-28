@@ -6,8 +6,8 @@ use crate::{
 };
 use flate2::read::GzDecoder;
 use futures::{
-    compat::Stream01CompatExt, future, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream,
-    StreamExt, TryFutureExt, TryStreamExt,
+    compat::Stream01CompatExt, future, stream, task::noop_waker_ref, SinkExt, Stream, StreamExt,
+    TryStreamExt,
 };
 use futures01::{sync::mpsc, Stream as Stream01};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
@@ -291,22 +291,6 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
 
 pub fn runtime() -> Runtime {
     Runtime::single_threaded().unwrap()
-}
-
-pub fn basic_scheduler_block_on_std<F>(future: F) -> F::Output
-where
-    F: Future + Send + 'static,
-    F::Output: Send + 'static,
-{
-    // `tokio::time::advance` is not work on threaded scheduler
-    // `tokio_compat::runtime::current_thread` use `basic_scheduler`
-    // Example: https://pastebin.com/7fK4nxEW
-    tokio_compat::runtime::current_thread::Builder::new()
-        .build()
-        .unwrap()
-        // This is limit of `compat`, otherwise we get error: `no Task is currently running`
-        .block_on(future.never_error().boxed().compat())
-        .unwrap()
 }
 
 pub async fn wait_for<F, Fut>(mut f: F)
