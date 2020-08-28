@@ -5,7 +5,7 @@ use crate::{
 };
 use colored::*;
 use exitcode::ExitCode;
-use std::{fmt, fs::File, path::PathBuf};
+use std::{fmt, path::PathBuf};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -57,12 +57,8 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
     let mut validated = true;
 
     let config = match validate_config(opts, &mut fmt) {
-        Ok(config) => config,
-        Err(Some(config)) => {
-            validated &= false;
-            config
-        }
-        Err(None) => return exitcode::CONFIG,
+        Some(config) => config,
+        None => return exitcode::CONFIG,
     };
 
     if !(opts.no_topology || opts.no.topology) {
@@ -83,76 +79,25 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
 
 /// Ok if all configs were succesfully validated.
 /// Err Some contains only succesfully validated configs.
-fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Result<Config, Option<Config>> {
+fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     // Prepare paths
     let paths = if let Some(paths) = config::process_paths(&opts.paths) {
         paths
     } else {
         fmt.error("No config file paths");
-        return Err(None);
+        return None;
     };
 
-    // Validate configuration files
-    let to_valdiate = paths.len();
-    let mut validated = 0;
-    let mut full_config = Config::empty();
-    for config_path in paths {
-        let file = match File::open(&config_path) {
-            Ok(file) => file,
-            Err(error) => {
-                if let std::io::ErrorKind::NotFound = error.kind() {
-                    fmt.error(format!("File {:?} not found", config_path));
-                } else {
-                    fmt.error(format!(
-                        "Failed opening file {:?} with error {:?}",
-                        config_path, error
-                    ));
-                }
-                continue;
-            }
-        };
-
-        trace!(
-            message = "Parsing config.",
-            path = ?config_path
-        );
-
-        let mut sub_failed = |title: String, errors| {
-            fmt.title(title);
+    match config::load_from_paths(&paths) {
+        Ok(config) => {
+            fmt.success(format!("Loaded {:?}", &paths));
+            Some(config)
+        }
+        Err(errors) => {
+            fmt.title(format!("Failed to load {:?}", paths));
             fmt.sub_error(errors);
-        };
-
-        let mut config = match Config::load(file) {
-            Ok(config) => config,
-            Err(errors) => {
-                sub_failed(format!("Failed to parse {:?}", config_path), errors);
-                continue;
-            }
-        };
-
-        if let Err(errors) = config.expand_macros() {
-            sub_failed(
-                format!("Failed to expand macros in {:?}", config_path),
-                errors,
-            );
-            continue;
+            None
         }
-
-        if let Err(errors) = full_config.append(config) {
-            sub_failed(format!("Failed to merge config {:?}", config_path), errors);
-            continue;
-        }
-
-        validated += 1;
-        fmt.success(format!("Loaded {:?}", &config_path));
-    }
-
-    if to_valdiate == validated {
-        Ok(full_config)
-    } else if validated > 0 {
-        Err(Some(full_config))
-    } else {
-        Err(None)
     }
 }
 
