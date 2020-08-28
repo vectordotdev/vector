@@ -20,7 +20,7 @@ pub(crate) struct LogToMetricFieldNotFound;
 
 impl InternalEvent for LogToMetricFieldNotFound {
     fn emit_logs(&self) {
-        debug!(message = "Field not found.", rate_limit_sec = 30);
+        warn!(message = "Field not found.", rate_limit_sec = 30);
     }
 
     fn emit_metrics(&self) {
@@ -38,7 +38,7 @@ pub(crate) struct LogToMetricParseError<'a> {
 
 impl<'a> InternalEvent for LogToMetricParseError<'a> {
     fn emit_logs(&self) {
-        debug!(message = "Failed to parse.", error = %self.error, rate_limit_secs = 30);
+        warn!(message = "Failed to parse.", error = %self.error, rate_limit_secs = 30);
     }
 
     fn emit_metrics(&self) {
@@ -56,7 +56,7 @@ pub(crate) struct LogToMetricRenderError {
 
 impl InternalEvent for LogToMetricRenderError {
     fn emit_logs(&self) {
-        debug!(message = "Unable to render.", error = %self.error, rate_limit_secs = 30);
+        warn!(message = "Unable to render.", error = %self.error, rate_limit_secs = 30);
     }
 
     fn emit_metrics(&self) {
@@ -74,7 +74,7 @@ pub(crate) struct LogToMetricTemplateError {
 
 impl InternalEvent for LogToMetricTemplateError {
     fn emit_logs(&self) {
-        debug!(message = "Failed to parse.", error = %self.error, rate_limit_secs = 30);
+        warn!(message = "Failed to parse.", error = %self.error, rate_limit_secs = 30);
     }
 
     fn emit_metrics(&self) {
