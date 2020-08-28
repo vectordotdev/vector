@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    internal_events::{RemoveFieldsEventProcessed, RemoveFieldsFieldMissing},
     Event,
 };
 use serde::{Deserialize, Serialize};
@@ -52,15 +53,15 @@ impl RemoveFields {
 
 impl Transform for RemoveFields {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
+        emit!(RemoveFieldsEventProcessed);
+
         let log = event.as_mut_log();
         for field in &self.fields {
             let old_val = log.remove_prune(field, self.drop_empty);
             if old_val.is_none() {
-                debug!(
-                    message = "Field did not exist",
-                    field = field.as_ref(),
-                    rate_limit_secs = 30,
-                )
+                emit!(RemoveFieldsFieldMissing {
+                    field: field.as_ref()
+                });
             }
         }
 
