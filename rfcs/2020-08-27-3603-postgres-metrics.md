@@ -34,7 +34,7 @@ The source would then run the following queries:
 - `SELECT * FROM pg_stat_database_conflicts`
 - `SELECT * FROM pg_stat_bgwriter`
 
-And return these metrics:
+And return these metrics by parsing the query results and converting them into metrics using the database name and column names.
 
 - `postgresql_up` -> Used as an uptime metric (0/1) ? - merits a broader discussion.
 - `pg_stat_database_blk_read_time` tagged with db, host, server, user (counter)
