@@ -185,12 +185,17 @@ test-integration: test-integration-aws test-integration-clickhouse test-integrat
 test-integration: test-integration-gcp test-integration-influxdb test-integration-kafka test-integration-loki
 test-integration: test-integration-pulsar test-integration-splunk
 
+stop-test-integration: ## Stops all integration test infrastructure
+stop-test-integration: stop-integration-aws stop-integration-clickhouse stop-integration-elasticsearch
+stop-test-integration: stop-integration-gcp stop-integration-influxdb stop-integration-kafka stop-integration-loki
+stop-test-integration: stop-integration-pulsar stop-integration-splunk
+
 start-integration-aws:
 	$(CONTAINER_TOOL) network create test-integration-aws
 	$(CONTAINER_TOOL) run -d --network=test-integration-aws -p 8111:8111 --name ec2_metadata timberiodev/mock-ec2-metadata:latest
-	$(CONTAINER_TOOL) run -d --network=test-integration-aws -p 4566-4584:4566-4584 --name localstack -e SERVICES=kinesis:4568,s3:4572,cloudwatch:4582,elasticsearch:4571,firehose:4573 localstack/localstack
+	$(CONTAINER_TOOL) run -d --network=test-integration-aws -p 4566-4584:4566-4584 --name localstack -e SERVICES=kinesis:4568,s3:4572,cloudwatch:4582,elasticsearch:4571,firehose:4573 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
 	$(CONTAINER_TOOL) run -d --network=test-integration-aws -p 6000:6000 --name mockwatchlogs -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
-	sleep 30 # Many services are very slow... Give them a sec...
+	sleep 60 # Many services are very slow... Give them a sec...
 
 stop-integration-aws:
 	$(CONTAINER_TOOL) rm --force ec2_metadata mockwatchlogs localstack 2>/dev/null; true
@@ -245,7 +250,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) -k stop-integration-elasticsearch \
     ; rc=$$? \
 	$(MAKE) start-integration-elasticsearch
-	sleep 30 # Many services are very slow... Give them a sec...
+	sleep 60 # Many services are very slow... Give them a sec...
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features es-integration-tests --lib ::elasticsearch:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
