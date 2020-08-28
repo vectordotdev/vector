@@ -138,6 +138,7 @@ If users are already running Telegraf or PostgreSQL Exporter though, they could 
 
 - SSL. Configure? Default to disable?
 - Supported PG versions? There are some differences in functionality between the versions.
+- Grab pg_settings?
 
 ## Plan Of Attack
 
@@ -147,4 +148,7 @@ Incremental steps that execute this change. Generally this is in the form of:
 
 ## Future Work
 
-- Extend source to collect additional database metrics
+- Extend source to collect additional database metrics:
+  - Replication
+  - Locks?
+  - pg_stat_user_tables?
