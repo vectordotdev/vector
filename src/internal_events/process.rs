@@ -57,6 +57,70 @@ impl InternalEvent for VectorStopped {
     }
 }
 
+#[derive(Debug)]
+pub struct VectorQuit;
+
+impl InternalEvent for VectorQuit {
+    fn emit_logs(&self) {
+        info!(
+            target: "vector",
+            message = "Vector has quit."
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("vector_quit_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct VectorReloadFailed;
+
+impl InternalEvent for VectorReloadFailed {
+    fn emit_logs(&self) {
+        error!(
+            target: "vector",
+            message = "Reload was not successful."
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("vector_reload_errors", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct VectorConfigLoadFailed;
+
+impl InternalEvent for VectorConfigLoadFailed {
+    fn emit_logs(&self) {
+        error!(
+            target: "vector",
+            message = "Failed to load config files, reload aborted."
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("config_load_errors", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct VectorRecoveryFailed;
+
+impl InternalEvent for VectorRecoveryFailed {
+    fn emit_logs(&self) {
+        error!(
+            target: "vector",
+            message = "Vector has failed to recover from a failed reload."
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("vector_recover_errors", 1);
+    }
+}
+
 #[allow(unused)]
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
