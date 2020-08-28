@@ -68,25 +68,26 @@ impl Server {
 
         // Routes...
 
-        // Health route
-        let health_route = warp::path("health").and_then(handler::health);
+        // Health
+        let health = warp::path("health").and_then(handler::health);
 
         // 404
-        let not_found_route = warp::any()
+        let not_found = warp::any()
             .and_then(|| async { Err(warp::reject::not_found()) })
             .boxed();
 
         // GraphQL POST handler
-        let graphql_post_route = warp::path("graphql").and(
-            graphql_subscription(schema.clone()).or(async_graphql_warp::graphql(schema.clone())
-                .and_then(|(schema, builder): (_, QueryBuilder)| async move {
+        let graphql_handler = warp::path("graphql").and(graphql_subscription(schema.clone()).or(
+            async_graphql_warp::graphql(schema).and_then(
+                |(schema, builder): (_, QueryBuilder)| async move {
                     let resp = builder.execute(&schema).await;
                     Ok::<_, Infallible>(GQLResponse::from(resp))
-                })),
-        );
+                },
+            ),
+        ));
 
         // GraphQL playground
-        let graphql_playground_route = if self.playground {
+        let graphql_playground = if self.playground {
             warp::path("playground")
                 .map(move || {
                     Response::builder()
@@ -98,35 +99,30 @@ impl Server {
                 })
                 .boxed()
         } else {
-            not_found_route.clone()
+            not_found.clone()
         };
 
-        let routes = balanced_or_tree!(
-            health_route,
-            graphql_post_route,
-            graphql_playground_route,
-            not_found_route
-        )
-        .with(
-            warp::cors()
-                .allow_any_origin()
-                .allow_headers(vec![
-                    "User-Agent",
-                    "Sec-Fetch-Mode",
-                    "Referer",
-                    "Origin",
-                    "Access-Control-Request-Method",
-                    "Access-Control-Allow-Origin",
-                    "Access-Control-Request-Headers",
-                    "Content-Type",
-                    "X-Apollo-Tracing", // for Apollo GraphQL clients
-                    "Pragma",
-                    "Host",
-                    "Connection",
-                    "Cache-Control",
-                ])
-                .allow_methods(vec!["POST", "GET"]),
-        );
+        let routes = balanced_or_tree!(health, graphql_handler, graphql_playground, not_found)
+            .with(
+                warp::cors()
+                    .allow_any_origin()
+                    .allow_headers(vec![
+                        "User-Agent",
+                        "Sec-Fetch-Mode",
+                        "Referer",
+                        "Origin",
+                        "Access-Control-Request-Method",
+                        "Access-Control-Allow-Origin",
+                        "Access-Control-Request-Headers",
+                        "Content-Type",
+                        "X-Apollo-Tracing", // for Apollo GraphQL clients
+                        "Pragma",
+                        "Host",
+                        "Connection",
+                        "Cache-Control",
+                    ])
+                    .allow_methods(vec!["POST", "GET"]),
+            );
 
         let (_, server) =
             warp::serve(routes).bind_with_graceful_shutdown(self.address, async move {
