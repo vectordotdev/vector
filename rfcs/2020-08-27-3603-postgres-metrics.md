@@ -76,7 +76,13 @@ And return these metrics by parsing the query results and converting them into m
 
 Naming of metrics is determined via:
 
-- `pg _ db_name _ column_name + Prometheus endings (_total for counters, etc)`
+- `table_name _ column_name + Prometheus endings (_total for counters, etc)`
+
+For example:
+
+- `pg_database_conflicts_confl_tablespace_total`
+
+Here `pg_database_conflicts` is the name of the table, `confl_tablespace` is the column name, and `_total` is suffixed because counters end in `total` in the [Prometheus naming convention](https://prometheus.io/docs/practices/naming/).
 
 This is in line with the Prometheus naming convention for their exporter.
 
