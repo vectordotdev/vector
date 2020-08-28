@@ -2,7 +2,6 @@ use std::borrow::Cow;
 
 mod add_fields;
 mod add_tags;
-mod remove_tags;
 mod ansi_stripper;
 mod auto_concurrency;
 mod aws_kinesis_streams;
@@ -30,6 +29,7 @@ mod process;
 mod prometheus;
 #[cfg(feature = "transforms-regex_parser")]
 mod regex_parser;
+mod remove_tags;
 mod sampler;
 #[cfg(any(
     feature = "sources-socket",
@@ -54,7 +54,6 @@ pub mod kubernetes;
 
 pub use self::add_fields::*;
 pub use self::add_tags::*;
-pub use self::remove_tags::*;
 pub use self::ansi_stripper::*;
 pub use self::auto_concurrency::*;
 pub use self::aws_kinesis_streams::*;
@@ -83,6 +82,7 @@ pub use self::process::*;
 pub use self::prometheus::*;
 #[cfg(feature = "transforms-regex_parser")]
 pub(crate) use self::regex_parser::*;
+pub use self::remove_tags::*;
 pub use self::sampler::*;
 #[cfg(any(
     feature = "sources-socket",
