@@ -256,7 +256,7 @@ mod integration_tests {
     /// create a new test config with the given ingest token
     fn config(token: &str) -> super::HumioLogsConfig {
         super::HumioLogsConfig {
-            host: Some(HOST.to_string()),
+            endpoint: Some(HOST.to_string()),
             token: token.to_string(),
             compression: Compression::None,
             encoding: Encoding::Json.into(),
