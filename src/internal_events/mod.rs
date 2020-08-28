@@ -33,6 +33,8 @@ mod process;
 mod prometheus;
 #[cfg(feature = "transforms-regex_parser")]
 mod regex_parser;
+#[cfg(feature = "transforms-remove_fields")]
+mod remove_fields;
 #[cfg(feature = "transforms-remove_tags")]
 mod remove_tags;
 #[cfg(feature = "transforms-rename_fields")]
@@ -93,6 +95,8 @@ pub use self::process::*;
 pub use self::prometheus::*;
 #[cfg(feature = "transforms-regex_parser")]
 pub(crate) use self::regex_parser::*;
+#[cfg(feature = "transforms-remove_fields")]
+pub use self::remove_fields::*;
 #[cfg(feature = "transforms-remove_tags")]
 pub use self::remove_tags::*;
 #[cfg(feature = "transforms-rename_fields")]
