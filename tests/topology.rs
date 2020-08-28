@@ -88,7 +88,7 @@ async fn topology_shutdown_while_active() {
     for event in processed_events {
         assert_eq!(
             event.as_log()[&event::log_schema().message_key()],
-            "test transformed".into()
+            "test transformed".to_owned().into()
         );
     }
 

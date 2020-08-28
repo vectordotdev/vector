@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use criterion::{criterion_group, Criterion};
 use serde_json::{json, Value};
 use vector::{
@@ -12,9 +13,9 @@ fn benchmark_event(c: &mut Criterion) {
     c.bench_function("create and insert single-level", |b| {
         b.iter(|| {
             let mut log = Event::new_empty_log().into_log();
-            log.insert("key1", "value1");
-            log.insert("key2", "value2");
-            log.insert("key3", "value3");
+            log.insert("key1", Bytes::from("value1"));
+            log.insert("key2", Bytes::from("value2"));
+            log.insert("key3", Bytes::from("value3"));
         })
     });
 
@@ -34,9 +35,9 @@ fn benchmark_event(c: &mut Criterion) {
     c.bench_function("create and insert nested-keys", |b| {
         b.iter(|| {
             let mut log = Event::new_empty_log().into_log();
-            log.insert("key1.nested1.nested2", "value1");
-            log.insert("key1.nested1.nested3", "value4");
-            log.insert("key3", "value3");
+            log.insert("key1.nested1.nested2", Bytes::from("value1"));
+            log.insert("key1.nested1.nested3", Bytes::from("value4"));
+            log.insert("key3", Bytes::from("value3"));
         })
     });
 
@@ -60,8 +61,8 @@ fn benchmark_event(c: &mut Criterion) {
     c.bench_function("create and insert array", |b| {
         b.iter(|| {
             let mut log = Event::new_empty_log().into_log();
-            log.insert("key1.nested1[0]", "value1");
-            log.insert("key1.nested1[1]", "value2");
+            log.insert("key1.nested1[0]", Bytes::from("value1"));
+            log.insert("key1.nested1[1]", Bytes::from("value2"));
         })
     });
 

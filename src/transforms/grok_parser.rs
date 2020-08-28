@@ -94,10 +94,10 @@ impl Transform for GrokParser {
                 let drop_field = self.drop_field && matches.get(&self.field).is_none();
                 for (name, value) in matches.iter() {
                     let conv = self.types.get(name).unwrap_or(&Conversion::Bytes);
-                    match conv.convert(value.into()) {
+                    match conv.convert(value.to_string().into()) {
                         Ok(value) => {
                             if let Some(path) = self.paths.get(name) {
-                                event.insert_path(path.to_vec(), value);
+                                event.insert_path(path.to_vec(), value.clone());
                             } else {
                                 let path = PathIter::new(name).collect::<Vec<_>>();
                                 self.paths.insert(name.to_string(), path.clone());

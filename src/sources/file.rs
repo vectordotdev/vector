@@ -297,7 +297,7 @@ fn create_event(
     // Add source type
     event
         .as_mut_log()
-        .insert(event::log_schema().source_type_key(), "file");
+        .insert(event::log_schema().source_type_key(), Bytes::from("file"));
 
     if let Some(file_key) = &file_key {
         event.as_mut_log().insert(file_key.clone(), file);

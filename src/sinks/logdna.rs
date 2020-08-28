@@ -103,7 +103,7 @@ impl HttpSink for LogdnaConfig {
 
         let line = log
             .remove(&event::log_schema().message_key())
-            .unwrap_or_else(|| "".into());
+            .unwrap_or_else(|| String::from("").into());
         let timestamp = log
             .remove(&event::log_schema().timestamp_key())
             .unwrap_or_else(|| chrono::Utc::now().into());

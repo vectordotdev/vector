@@ -110,7 +110,7 @@ impl CompiledRegex {
                         .iter()
                         .filter_map(move |(idx, name, conversion)| {
                             capture_locs.get(*idx).and_then(|(start, end)| {
-                                let capture: Value = value[start..end].into();
+                                let capture: Value = value[start..end].to_vec().into();
 
                                 match conversion.convert(capture) {
                                     Ok(value) => Some((name.clone(), value)),

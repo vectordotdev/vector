@@ -102,7 +102,7 @@ impl Transform for Tokenizer {
             for ((name, path, conversion), value) in
                 self.field_names.iter().zip(parse(value).into_iter())
             {
-                match conversion.convert(value.as_bytes().into()) {
+                match conversion.convert(value.as_bytes().to_vec().into()) {
                     Ok(value) => {
                         event.as_mut_log().insert_path(path.clone(), value);
                     }
