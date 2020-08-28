@@ -1,11 +1,11 @@
 use crate::{
-    event::{Event},
+    event::Event,
     internal_events::{SocketEventReceived, SocketMode, SocketReceiveError},
     shutdown::ShutdownSignal,
     sources::Source,
     Pipeline,
 };
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::Sink;
@@ -78,7 +78,7 @@ pub fn udp(
 
                             event
                                 .as_mut_log()
-                                .insert(crate::config::log_schema().source_type_key(), "socket");
+                                .insert(crate::config::log_schema().source_type_key(), Bytes::from("socket"));
                             event
                                 .as_mut_log()
                                 .insert(host_key.clone(), address.to_string());

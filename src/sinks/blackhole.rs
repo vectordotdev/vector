@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
-    event::{Event},
+    event::Event,
     internal_events::BlackholeEventReceived,
 };
 use futures01::{future, AsyncSink, Future, Poll, Sink, StartSend};

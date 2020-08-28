@@ -1,10 +1,6 @@
 use crate::{
-    buffers::Acker,
-    conditions,
-    dns::Resolver,
-    event::Metric,
-    shutdown::ShutdownSignal,
-    sinks, sources, transforms, Pipeline,
+    buffers::Acker, conditions, dns::Resolver, event::Metric, shutdown::ShutdownSignal, sinks,
+    sources, transforms, Pipeline,
 };
 use component::ComponentDescription;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
@@ -16,15 +12,15 @@ use std::path::PathBuf;
 pub mod component;
 mod diff;
 mod loading;
+pub mod log_schema;
 mod validation;
 mod vars;
 pub mod watcher;
-pub mod log_schema;
 
 pub use diff::ConfigDiff;
 pub use loading::{load_from_paths, load_from_str, process_paths, CONFIG_PATHS};
-pub use validation::check;
 pub use log_schema::{log_schema, LogSchema};
+pub use validation::check;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]

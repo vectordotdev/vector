@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{Event},
+    event::Event,
     sinks::util::{
         encoding::EncodingConfigWithDefault,
         http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
@@ -103,7 +103,7 @@ impl HttpSink for LogdnaConfig {
 
         let line = log
             .remove(&crate::config::log_schema().message_key())
-            .unwrap_or_else(|| "".into());
+            .unwrap_or_else(|| String::from("").into());
         let timestamp = log
             .remove(&crate::config::log_schema().timestamp_key())
             .unwrap_or_else(|| chrono::Utc::now().into());

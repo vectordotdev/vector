@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{Event},
+    event::Event,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{Auth, BatchedHttpSink, HttpClient, HttpSink},

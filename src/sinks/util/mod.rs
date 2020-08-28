@@ -16,7 +16,7 @@ pub mod udp;
 pub mod unix;
 pub mod uri;
 
-use crate::event::{Event};
+use crate::event::Event;
 use bytes::Bytes;
 use encoding::{EncodingConfig, EncodingConfiguration};
 use serde::{Deserialize, Serialize};

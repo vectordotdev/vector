@@ -5,6 +5,7 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
+use bytes::Bytes;
 use chrono::TimeZone;
 use futures::{
     compat::Future01CompatExt,
@@ -222,7 +223,10 @@ fn create_event(record: Record) -> Event {
         }
     }
     // Add source type
-    log.try_insert(crate::config::log_schema().source_type_key(), "journald");
+    log.try_insert(
+        crate::config::log_schema().source_type_key(),
+        Bytes::from("journald"),
+    );
 
     log.into()
 }

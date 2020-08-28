@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    internal_events::RemoveTagsEventProcessed,
     Event,
 };
 use serde::{Deserialize, Serialize};
@@ -47,6 +48,8 @@ impl RemoveTags {
 
 impl Transform for RemoveTags {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
+        emit!(RemoveTagsEventProcessed);
+
         let tags = &mut event.as_mut_metric().tags;
 
         if let Some(map) = tags {

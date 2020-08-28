@@ -111,9 +111,10 @@ fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event
     let mut event = Event::from(line);
 
     // Add source type
-    event
-        .as_mut_log()
-        .insert(crate::config::log_schema().source_type_key(), "stdin");
+    event.as_mut_log().insert(
+        crate::config::log_schema().source_type_key(),
+        Bytes::from("stdin"),
+    );
 
     if let Some(hostname) = &hostname {
         event.as_mut_log().insert(host_key, hostname.clone());

@@ -1,11 +1,12 @@
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::{Event},
+    event::Event,
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::KafkaAuthConfig,
     shutdown::ShutdownSignal,
     Pipeline,
 };
+use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{
     compat::{Compat, Future01CompatExt},
@@ -130,7 +131,10 @@ fn kafka_source(
                             let mut event = Event::new_empty_log();
                             let log = event.as_mut_log();
 
-                            log.insert(crate::config::log_schema().message_key().clone(), payload);
+                            log.insert(
+                                crate::config::log_schema().message_key().clone(),
+                                payload.to_vec(),
+                            );
 
                             // Extract timestamp from kafka message
                             let timestamp = msg
@@ -138,16 +142,22 @@ fn kafka_source(
                                 .to_millis()
                                 .and_then(|millis| Utc.timestamp_millis_opt(millis).latest())
                                 .unwrap_or_else(Utc::now);
-                            log.insert(crate::config::log_schema().timestamp_key().clone(), timestamp);
+                            log.insert(
+                                crate::config::log_schema().timestamp_key().clone(),
+                                timestamp,
+                            );
 
                             // Add source type
-                            log.insert(crate::config::log_schema().source_type_key(), "kafka");
+                            log.insert(
+                                crate::config::log_schema().source_type_key(),
+                                Bytes::from("kafka"),
+                            );
 
                             if let Some(key_field) = &key_field {
                                 match msg.key() {
                                     None => (),
                                     Some(key) => {
-                                        log.insert(key_field.clone(), key);
+                                        log.insert(key_field.clone(), key.to_vec());
                                     }
                                 }
                             }

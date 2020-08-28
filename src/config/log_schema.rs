@@ -1,7 +1,7 @@
-use once_cell::sync::OnceCell;
-use string_cache::DefaultAtom;
-use serde::{Serialize, Deserialize};
 use getset::{Getters, Setters};
+use once_cell::sync::OnceCell;
+use serde::{Deserialize, Serialize};
+use string_cache::DefaultAtom;
 
 pub static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
 
@@ -13,7 +13,6 @@ lazy_static::lazy_static! {
         source_type_key: DefaultAtom::from("source_type"),
     };
 }
-
 pub fn log_schema() -> &'static LogSchema {
     LOG_SCHEMA.get().unwrap_or(&LOG_SCHEMA_DEFAULT)
 }

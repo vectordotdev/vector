@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{Event},
+    event::Event,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
 };
 use futures::{lock::Mutex, FutureExt, TryFutureExt};
@@ -211,7 +211,10 @@ mod tests {
         evt.as_mut_log().insert("key", "value");
         let result = encode_event(evt, &EncodingConfig::from(Encoding::Json)).unwrap();
         let map: HashMap<String, String> = serde_json::from_slice(&result[..]).unwrap();
-        assert_eq!(msg, map[&crate::config::log_schema().message_key().to_string()]);
+        assert_eq!(
+            msg,
+            map[&crate::config::log_schema().message_key().to_string()]
+        );
     }
 
     #[test]
