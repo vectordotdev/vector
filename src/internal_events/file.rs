@@ -24,11 +24,13 @@ impl InternalEvent for FileEventReceived<'_> {
             "events_processed", 1,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.file.to_owned(),
         );
         counter!(
             "bytes_processed", self.byte_size as u64,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.file.to_owned(),
         );
     }
 }
@@ -51,6 +53,7 @@ impl<'a> InternalEvent for FileChecksumFailed<'a> {
             "checksum_errors", 1,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.path.to_string_lossy().into_owned(),
         );
     }
 }
@@ -75,6 +78,7 @@ impl<'a> InternalEvent for FileFingerprintReadFailed<'a> {
             "fingerprint_read_errors", 1,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.path.to_string_lossy().into_owned(),
         );
     }
 }
@@ -100,6 +104,7 @@ impl<'a> InternalEvent for FileDeleteFailed<'a> {
             "file_delete_errors", 1,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.path.to_string_lossy().into_owned(),
         );
     }
 }
@@ -122,6 +127,7 @@ impl<'a> InternalEvent for FileDeleted<'a> {
             "files_deleted", 1,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.path.to_string_lossy().into_owned(),
         );
     }
 }
@@ -144,6 +150,7 @@ impl<'a> InternalEvent for FileUnwatched<'a> {
             "files_unwatched", 1,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.path.to_string_lossy().into_owned(),
         );
     }
 }
@@ -168,6 +175,7 @@ impl<'a> InternalEvent for FileWatchFailed<'a> {
             "file_watch_errors", 1,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.path.to_string_lossy().into_owned(),
         );
     }
 }
@@ -192,6 +200,7 @@ impl<'a> InternalEvent for FileResumed<'a> {
             "files_resumed", 1,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.path.to_string_lossy().into_owned(),
         );
     }
 }
@@ -214,6 +223,7 @@ impl<'a> InternalEvent for FileAdded<'a> {
             "files_added", 1,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.path.to_string_lossy().into_owned(),
         );
     }
 }
