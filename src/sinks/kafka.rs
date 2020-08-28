@@ -487,7 +487,7 @@ mod integration_test {
                 .fetch_watermarks(&topic, 0, Duration::from_secs(3))
                 .unwrap();
             future::ready(high > 0)
-        })
+        }, 5)
         .await;
 
         // check we have the expected number of messages in the topic
