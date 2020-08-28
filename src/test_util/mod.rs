@@ -6,8 +6,8 @@ use crate::{
 };
 use flate2::read::GzDecoder;
 use futures::{
-    compat::Stream01CompatExt, future, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream,
-    StreamExt, TryFutureExt, TryStreamExt,
+    compat::Stream01CompatExt, future, ready, stream, task::noop_waker_ref, FutureExt, SinkExt,
+    Stream, StreamExt, TryFutureExt, TryStreamExt,
 };
 use futures01::{sync::mpsc, Stream as Stream01};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
@@ -261,7 +261,7 @@ where
 
     let mut vec = Vec::new();
     loop {
-        match Pin::new(&mut rx).poll_next(&mut cx) {
+        match rx.poll_next_unpin(&mut cx) {
             Poll::Ready(Some(Ok(item))) => vec.push(item),
             Poll::Ready(Some(Err(()))) => return Err(()),
             Poll::Ready(None) | Poll::Pending => return Ok(vec),
@@ -386,7 +386,7 @@ impl<T> Future for CountReceiver<T> {
             let _ = trigger.send(());
         }
 
-        let result = futures::ready!(Pin::new(&mut this.handle).poll(cx));
+        let result = ready!(this.handle.poll_unpin(cx));
         Poll::Ready(result.unwrap())
     }
 }
