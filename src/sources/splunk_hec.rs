@@ -343,13 +343,13 @@ impl<R: Read> EventStream<R> {
         EventStream {
             data,
             events: 0,
-            channel: channel.map(|value| value.as_bytes().into()),
+            channel: channel.map(|value| value.into_bytes().into()),
             time: Time::Now(Utc::now()),
             extractors: [
                 DefaultExtractor::new_with(
                     "host",
                     &event::log_schema().host_key(),
-                    host.map(|value| value.as_bytes().into()),
+                    host.map(|value| value.into_bytes().into()),
                 ),
                 DefaultExtractor::new("index", &INDEX),
                 DefaultExtractor::new("source", &SOURCE),
@@ -400,7 +400,10 @@ impl<R: Read> Stream for EventStream<R> {
         let log = event.as_mut_log();
 
         // Add source type
-        log.insert(event::log_schema().source_type_key(), "splunk_hec");
+        log.insert(
+            event::log_schema().source_type_key(),
+            Bytes::from("splunk_hec"),
+        );
 
         // Process event field
         match json.get_mut("event") {
@@ -608,20 +611,21 @@ fn raw_event(
     log.insert(event::log_schema().message_key().clone(), message);
 
     // Add channel
-    log.insert(CHANNEL.clone(), channel.as_bytes());
+    log.insert(CHANNEL.clone(), channel.into_bytes());
 
     // Add host
     if let Some(host) = host {
-        log.insert(event::log_schema().host_key().clone(), host.as_bytes());
+        log.insert(event::log_schema().host_key().clone(), host.into_bytes());
     }
 
     // Add timestamp
     log.insert(event::log_schema().timestamp_key().clone(), Utc::now());
 
     // Add source type
-    event
-        .as_mut_log()
-        .try_insert(event::log_schema().source_type_key(), "splunk_hec");
+    event.as_mut_log().try_insert(
+        event::log_schema().source_type_key(),
+        Bytes::from("splunk_hec"),
+    );
 
     emit!(SplunkHECEventReceived);
 
