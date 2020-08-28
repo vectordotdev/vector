@@ -16,7 +16,10 @@ use tokio::select;
 use vector::{
     config::{self, ConfigDiff},
     generate, heartbeat,
-    internal_events::{VectorReloaded, VectorStarted, VectorStopped},
+    internal_events::{
+        VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed,
+        VectorReloaded, VectorStarted, VectorStopped,
+    },
     list, metrics, runtime,
     signal::{self, SignalTo},
     topology, trace, unit_test, validate,
@@ -146,12 +149,16 @@ fn main() {
                                 .await
                             {
                                 Ok(true) =>  emit!(VectorReloaded { config_paths: &config_paths }),
-                                Ok(false) => error!("Reload was not successful."),
+                                Ok(false) => emit!(VectorReloadFailed),
                                 // Trigger graceful shutdown for what remains of the topology
-                                Err(()) => break SignalTo::Shutdown,
+                                Err(()) => {
+                                    emit!(VectorReloadFailed);
+                                    emit!(VectorRecoveryFailed);
+                                    break SignalTo::Shutdown;
+                                }
                             }
                         } else {
-                            error!("Reload aborted.");
+                            emit!(VectorConfigLoadFailed);
                         }
                     } else {
                         break signal;
@@ -170,13 +177,15 @@ fn main() {
                 select! {
                     _ = topology.stop().compat() => (), // Graceful shutdown finished
                     _ = signals.next() => {
-                        info!("Shutting down immediately.");
+                        // It is highly unlikely that this event will exit from topology.
+                        emit!(VectorQuit);
                         // Dropping the shutdown future will immediately shut the server down
                     }
                 }
             }
             SignalTo::Quit => {
-                info!("Shutting down immediately");
+                // It is highly unlikely that this event will exit from topology.
+                emit!(VectorQuit);
                 drop(topology);
             }
             SignalTo::Reload => unreachable!(),
