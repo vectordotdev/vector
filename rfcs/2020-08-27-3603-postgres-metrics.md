@@ -22,11 +22,12 @@ Users want to collect, transform, and forward metrics to better observe how thei
 
 ## Internal Proposal
 
-Build a single source called `postgresql_metrics` (name to be confirmed) to collect PostgreSQL metrics.
+Build a single source called `postgresql_metrics` (name to be confirmed) to collect PostgreSQL metrics. We support all non-EOL'ed PostgreSQL versions.
 
 The recommended implementation is to use the Rust PostgreSQL client to connect the target database server by address specified in configuration.
 
 - https://docs.rs/postgres/0.17.5/postgres/index.html
+
 
 The source would then run the following queries:
 
@@ -36,48 +37,50 @@ The source would then run the following queries:
 
 And return these metrics by parsing the query results and converting them into metrics using the database name and column names.
 
-- `postgresql_up` -> Used as an uptime metric (0/1) ? - merits a broader discussion.
-- `pg_stat_database_blk_read_time` tagged with db, host, server, user (counter)
-- `pg_stat_database_blk_write_time` tagged with db, host, server, user (counter)
-- `pg_stat_database_blks_hit` tagged with db, host, server, user (counter)
-- `pg_stat_database_blks_read` tagged with db, host, server, user (counter)
+- `pg_up` -> Used as an uptime metric with 0 for successful collection and 1 for failed collection (gauge)
+- `pg_stat_database_blk_read_time_seconds_total` tagged with db, host, server, user (counter)
+- `pg_stat_database_blk_write_time_seconds_total` tagged with db, host, server, user (counter)
+- `pg_stat_database_blks_hit_total` tagged with db, host, server, user (counter)
+- `pg_stat_database_blks_read_total` tagged with db, host, server, user (counter)
 - `pg_stat_database_stats_reset` tagged with db, host, server, user(counter)
-- `pg_stat_bgwriter_buffers_alloc` tagged with db, host, server, user (counter)
-- `pg_stat_bgwriter_buffers_backend` tagged with db, host, server, user (counter)
-- `pg_stat_bgwriter_buffers_backend_fsync` tagged with db, host, server, user (counter)
-- `pg_stat_bgwriter_buffers_checkpoint` tagged with db, host, server, user (counter)
-- `pg_stat_bgwriter_buffers_clean` tagged with db, host, server, user (counter)
-- `pg_stat_bgwriter_checkpoint_sync_time` tagged with db, host, server, user (counter)
-- `pg_stat_bgwriter_checkpoint_write_time` tagged with db, host, server, user (counter)
-- `pg_stat_bgwriter_checkpoints_req` tagged with db, host, server, user (counter)
-- `pg_stat_bgwriter_checkpoints_time` tagged with db, host, server, user (counter)
-- `pg_stat_bgwriter_maxwritten_clean` tagged with db, host, server, user (counter)
+- `pg_stat_bgwriter_buffers_alloc_total` tagged with db, host, server, user (counter)
+- `pg_stat_bgwriter_buffers_backend_total` tagged with db, host, server, user (counter)
+- `pg_stat_bgwriter_buffers_backend_fsync_total` tagged with db, host, server, user (counter)
+- `pg_stat_bgwriter_buffers_checkpoint_total` tagged with db, host, server, user (counter)
+- `pg_stat_bgwriter_buffers_clean_total` tagged with db, host, server, user (counter)
+- `pg_stat_bgwriter_checkpoint_sync_time_seconds_total` tagged with db, host, server, user (counter)
+- `pg_stat_bgwriter_checkpoint_write_time_seconds_total` tagged with db, host, server, user (counter)
+- `pg_stat_bgwriter_checkpoints_req_total` tagged with db, host, server, user (counter)
+- `pg_stat_bgwriter_checkpoints_timed_total` tagged with db, host, server, user (counter)
+- `pg_stat_bgwriter_maxwritten_clean_total` tagged with db, host, server, user (counter)
 - `pg_stat_bgwriter_stats_reset` (counter)
-- `pg_stat_database_conflicts` tagged with db, host, server, user (counter)
+- `pg_stat_database_conflicts_total` tagged with db, host, server, user (counter)
 - `pg_stat_database_datid` tagged with db, host, server, user (counter)
-- `pg_stat_database_deadlocks` tagged with db, host, server, user (counter)
-- `pg_stat_database_numbackends` tagged with db, host, server, user (gauge)
-- `pg_stat_database_temp_bytes` tagged with db, host, server, user (counter)
-- `pg_stat_database_temp_files` tagged with db, host, server, user (counter)
-- `pg_stat_database_tup_deleted` tagged with db, host, server, user (counter)
-- `pg_stat_database_tup_fetched` tagged with db, host, server, user (counter)
-- `pg_stat_database_tup_inserted` tagged with db, host, server, user (counter)
-- `pg_stat_database_tup_returned` tagged with db, host, server, user (counter)
-- `pg_stat_database_tup_updated` tagged with db, host, server, user (counter)
-- `pg_stat_database_xact_commit` tagged with db, host, server, user (counter)
-- `pg_stat_database_xact_rollback` tagged with db, host, server, user (counter)
-- `postgresql_database_conflicts` tagged by db name and server (counter)
-- `postgresql_database_conflicts_confl_bufferpin` tagged by db name and server (counter)
-- `postgresql_database_conflicts_confl_deadlock` tagged by db name and server (counter)
-- `postgresql_database_conflicts_confl_lock tagged` by db name and server (counter)
-- `postgresql_database_conflicts_confl_snapshot` tagged by db name and server (counter)
-- `postgresql_database_conflicts_confl_tablespace` tagged by db name and server (counter)
+- `pg_stat_database_deadlocks_total` tagged with db, host, server, user (counter)
+- `pg_stat_database_numbackends_total` tagged with db, host, server, user (gauge)
+- `pg_stat_database_temp_bytes_total` tagged with db, host, server, user (counter)
+- `pg_stat_database_temp_files_total` tagged with db, host, server, user (counter)
+- `pg_stat_database_tup_deleted_total` tagged with db, host, server, user (counter)
+- `pg_stat_database_tup_fetched_total` tagged with db, host, server, user (counter)
+- `pg_stat_database_tup_inserted_total` tagged with db, host, server, user (counter)
+- `pg_stat_database_tup_returned_total` tagged with db, host, server, user (counter)
+- `pg_stat_database_tup_updated_total` tagged with db, host, server, user (counter)
+- `pg_stat_database_xact_commit_total` tagged with db, host, server, user (counter)
+- `pg_stat_database_xact_rollback_total` tagged with db, host, server, user (counter)
+- `pg_database_conflicts_total` tagged by db name and server (counter)
+- `pg_database_conflicts_confl_bufferpin_total` tagged by db name and server (counter)
+- `pg_database_conflicts_confl_deadlock_total` tagged by db name and server (counter)
+- `pg_database_conflicts_confl_lock_total tagged` by db name and server (counter)
+- `pg_database_conflicts_confl_snapshot_total` tagged by db name and server (counter)
+- `pg_database_conflicts_confl_tablespace_total` tagged by db name and server (counter)
 
 Naming of metrics is determined via:
 
-- `pg _ db_name _ column_name`
+- `pg _ db_name _ column_name + Prometheus endings (_total for counters, etc)`
 
 This is in line with the Prometheus naming convention for their exporter.
+
+All metrics will also be tagged with the `endpoint` (stripped of username/password).
 
 ## Doc-level Proposal
 
@@ -86,11 +89,13 @@ The following additional source configuration will be added:
 ```toml
 [sources.my_source_id]
   type = "postgresql_metrics" # required
-  address = "postgres://postgres@localhost" # required - address of the PG server.
+  endpoints = [ "postgres://postgres@localhost" ] # required - address of the PG server.
   databases = ["production", "testing"] # optional, list of databases to query. Defaults to all if not specified.
   scrape_interval_secs = 15 # optional, default, seconds
   namespace = "postgresql" # optional, default is "postgresql", namespace to put metrics under
 ```
+
+We will also expose the HTTP SSL settings and support `ssl` in the `endpoint` URL.
 
 - We'd also add a guide for doing this without root permissions.
 
@@ -136,8 +141,6 @@ If users are already running Telegraf or PostgreSQL Exporter though, they could 
 
 ## Outstanding Questions
 
-- SSL. Configure? Default to disable?
-- Supported PG versions? There are some differences in functionality between the versions.
 - Grab pg_settings?
 
 ## Plan Of Attack
