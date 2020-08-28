@@ -75,7 +75,7 @@ type = "string"
 default = "kubernetes.pod_name"
 sort = 1
 description = """\
-The field name to annotate Pod name as.\
+Event field for Pod name.\
 """
 
 [sources.kubernetes_logs.options.annotation_fields.children.pod_namespace]
@@ -83,7 +83,7 @@ type = "string"
 default = "kubernetes.pod_namespace"
 sort = 2
 description = """\
-The field name to annotate Pod namespace as.\
+Event field for Pod namespace.\
 """
 
 [sources.kubernetes_logs.options.annotation_fields.children.pod_uid]
@@ -91,7 +91,7 @@ type = "string"
 default = "kubernetes.pod_uid"
 sort = 3
 description = """\
-The field name to annotate Pod uid as.\
+Event field for Pod uid.\
 """
 
 [sources.kubernetes_logs.options.annotation_fields.children.pod_labels]
@@ -99,5 +99,5 @@ type = "string"
 default = "kubernetes.pod_labels"
 sort = 4
 description = """\
-The field name to annotate Pod labels as.\
+Event field for Pod labels.\
 """
