@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use vector::{
-    config::{self, Config, ConfigDiff},
+    config::{self, ConfigDiff},
     topology,
 };
 
-pub async fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
-    match Config::load(config.as_bytes()) {
+async fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
+    match config::load_from_str(config) {
         Ok(c) => {
             let diff = ConfigDiff::initial(&c);
             match (
