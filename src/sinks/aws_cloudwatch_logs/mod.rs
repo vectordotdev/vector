@@ -1094,7 +1094,7 @@ mod integration_tests {
         assert_eq!(output_lines, input_lines);
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn cloudwatch_insert_log_event_batched() {
         trace_init();
 

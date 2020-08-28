@@ -163,7 +163,7 @@ mod tests {
     // resolved.
 
     #[ignore]
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn add() {
         trace_init();
 
@@ -195,7 +195,7 @@ mod tests {
     }
 
     #[ignore]
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn update() {
         trace_init();
 
@@ -227,7 +227,7 @@ mod tests {
     }
 
     #[ignore]
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn delete() {
         trace_init();
 
@@ -259,7 +259,7 @@ mod tests {
     }
 
     #[ignore]
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn resync() {
         trace_init();
 
@@ -287,7 +287,7 @@ mod tests {
     }
 
     #[ignore]
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn request_maintenance_without_maintenance() {
         trace_init();
 
@@ -301,7 +301,7 @@ mod tests {
     }
 
     #[ignore]
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn request_maintenance_with_maintenance() {
         trace_init();
 
@@ -325,7 +325,7 @@ mod tests {
     }
 
     #[ignore]
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn perform_maintenance() {
         trace_init();
 
