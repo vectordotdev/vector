@@ -2,6 +2,10 @@
 
 This RFC is to introduce a new metrics source to consume metrics from PostgreSQL database servers. The high level plan is to implement one source that collects metrics from PostgreSQL server instances.
 
+Background reading on PostgreSQL monitoring:
+
+- https://www.datadoghq.com/blog/postgresql-monitoring/
+
 ## Scope
 
 This RFC will cover:
