@@ -74,7 +74,7 @@ impl Server {
         // 404
         let not_found = warp::any().and_then(|| async { Err(warp::reject::not_found()) });
 
-        // GraphQL POST handler
+        // GraphQL query and subscription handler
         let graphql_handler = warp::path("graphql").and(graphql_subscription(schema.clone()).or(
             async_graphql_warp::graphql(schema).and_then(
                 |(schema, builder): (_, QueryBuilder)| async move {
