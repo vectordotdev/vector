@@ -185,14 +185,26 @@ test-integration: test-integration-aws test-integration-clickhouse test-integrat
 test-integration: test-integration-gcp test-integration-influxdb test-integration-kafka test-integration-loki
 test-integration: test-integration-pulsar test-integration-splunk
 
+start-integration-aws:
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL) network create test-integration-aws
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL) run -d --network=test-integration-aws -p 8111:8111 --name ec2_metadata timberiodev/mock-ec2-metadata:latest
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL) run -d --network=test-integration-aws -p 4568:4568 -p 4572:4572 -p 4582:4582 -p 4571:4571 -p 4573:4573 --name localstack -e SERVICES=kinesis:4568,s3:4572,cloudwatch:4582,elasticsearch:4571,firehose:4573 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL) run -d --network=test-integration-aws -p 6000:6000 --name mockwatchlogs -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
+	sleep 30 # Many services are very slow... Give them a sec...
+
+stop-integration-aws:
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL) rm --force ec2_metadata mockwatchlogs localstack
+	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL) network rm test-integration-aws
+
 test-integration-aws: ## Runs AWS integration tests
 ifeq ($(AUTOSPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose up -d dependencies-aws
-	sleep 5 # Many services are very lazy... Give them a sec...
+	$(MAKE) -k stop-integration-aws \
+    ; rc=$$? \
+	$(MAKE) start-integration-aws
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features aws-integration-tests --lib ::aws_ -- --nocapture
 ifeq ($(AUTODESPAWN), true)
-	${MAYBE_ENVIRONMENT_EXEC} $(CONTAINER_TOOL)-compose stop
+	$(MAKE) -k stop-integration-aws
 endif
 
 test-integration-clickhouse: ## Runs Clickhouse integration tests
@@ -541,4 +553,3 @@ target/wasm32-wasi/.obtained:
 	${MAYBE_ENVIRONMENT_EXEC} rustup target add wasm32-wasi
 	@mkdir -p target/wasm32-wasi
 	@touch target/wasm32-wasi/.obtained
-
