@@ -91,7 +91,7 @@ metrics published.
 
 I figure we probably don't want metrics for:
 
-- Load (should be handled by a `cpu` or similar metrics source)
+- System Load (should be handled by a `cpu` or similar metrics source)
 
 Metrics will be labeled with:
 
