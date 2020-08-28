@@ -1,36 +1,38 @@
 mod support;
 
-use crate::support::{sink, source};
-use reqwest;
-use vector::config::Config;
-use vector::test_util::{next_addr, start_topology, wait_for_tcp_in_secs};
-
-fn api_enabled_config() -> Config {
-    let mut config = Config::empty();
-    config.add_source("in1", source().1);
-    config.add_sink("out1", &["in1"], sink(10).1);
-    config.api.enabled = true;
-    config.api.bind = Some(next_addr());
-
-    config
-}
-
 #[cfg(feature = "api")]
-#[tokio::test]
-async fn api_config() {
-    let config = api_enabled_config();
-    let addr = config.api.bind.unwrap();
+mod tests {
+    use crate::support::{sink, source};
+    use reqwest;
+    use vector::config::Config;
+    use vector::test_util::{next_addr, start_topology, wait_for_tcp_in_secs};
 
-    let (mut _top, _) = start_topology(config, false).await;
-    wait_for_tcp_in_secs(addr.clone(), 30).await;
+    fn api_enabled_config() -> Config {
+        let mut config = Config::empty();
+        config.add_source("in1", source().1);
+        config.add_sink("out1", &["in1"], sink(10).1);
+        config.api.enabled = true;
+        config.api.bind = Some(next_addr());
 
-    let url = format!("http://{}:{}/health", addr.ip(), addr.port());
-    let res = reqwest::get(url.as_str())
-        .await
-        .unwrap()
-        .text()
-        .await
-        .unwrap();
+        config
+    }
 
-    assert!(res.contains("ok"));
+    #[tokio::test]
+    async fn api_config() {
+        let config = api_enabled_config();
+        let addr = config.api.bind.unwrap();
+
+        let (mut _top, _) = start_topology(config, false).await;
+        wait_for_tcp_in_secs(addr.clone(), 30).await;
+
+        let url = format!("http://{}:{}/health", addr.ip(), addr.port());
+        let res = reqwest::get(url.as_str())
+            .await
+            .unwrap()
+            .text()
+            .await
+            .unwrap();
+
+        assert!(res.contains("ok"));
+    }
 }
