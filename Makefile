@@ -519,7 +519,7 @@ load-qemu-binfmt: ## Load `binfmt-misc` kernel module which required to use `qem
 	$(RUN) load-qemu-binfmt
 
 signoff: ## Signsoff all previous commits since branch creation
-	$(RUN) signoff
+	scripts/signoff.sh
 
 slim-builds: ## Updates the Cargo config to product disk optimized builds (for CI, not for users)
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/slim-builds.sh
