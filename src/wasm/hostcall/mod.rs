@@ -95,50 +95,78 @@ mod wrapped_for_ffi {
     #[lucet_hostcall]
     #[no_mangle]
     pub extern "C" fn register(vmctx: &Vmctx, data: u32, length: u32) {
-        let internal_event = internal_events::Hostcall::begin(Role::Transform, "emit");
-        // TODO: Handle error.
-        let ret = super::register(vmctx, data, length).unwrap();
-        internal_event.complete();
-        ret
+        let internal_event =
+            internal_events::WasmHostcallProgress::begin(Role::Transform, "register");
+        match super::register(vmctx, data, length) {
+            Ok(_) => internal_event.complete(),
+            Err(e) => {
+                internal_event.error(format!("{}", e));
+            }
+        }
     }
 
     #[lucet_hostcall]
     #[no_mangle]
     pub extern "C" fn emit(vmctx: &Vmctx, data: u32, length: u32) -> u32 {
-        let internal_event = internal_events::Hostcall::begin(Role::Transform, "register");
-        // TODO: Handle error.
-        let ret = super::emit(vmctx, data, length).unwrap();
-        internal_event.complete();
-        ret
+        let internal_event = internal_events::WasmHostcallProgress::begin(Role::Transform, "emit");
+        match super::emit(vmctx, data, length) {
+            Ok(retval) => {
+                internal_event.complete();
+                retval
+            }
+            Err(e) => {
+                internal_event.error(format!("{}", e));
+                0
+            }
+        }
     }
 
     #[lucet_hostcall]
     #[no_mangle]
     pub extern "C" fn raise(vmctx: &Vmctx, data: u32, length: u32) -> u32 {
-        let internal_event = internal_events::Hostcall::begin(Role::Transform, "raise");
-        // TODO: Handle error.
-        let ret = super::raise(vmctx, data, length).unwrap();
-        internal_event.complete();
-        ret
+        let internal_event = internal_events::WasmHostcallProgress::begin(Role::Transform, "raise");
+        match super::raise(vmctx, data, length) {
+            Ok(retval) => {
+                internal_event.complete();
+                retval
+            }
+            Err(e) => {
+                internal_event.error(format!("{}", e));
+                0
+            }
+        }
     }
 
     #[lucet_hostcall]
     #[no_mangle]
     pub extern "C" fn config_size(vmctx: &Vmctx) -> u32 {
-        let internal_event = internal_events::Hostcall::begin(Role::Transform, "config_size");
-        // TODO: Handle error.
-        let ret = super::config_size(vmctx).unwrap();
-        internal_event.complete();
-        ret
+        let internal_event =
+            internal_events::WasmHostcallProgress::begin(Role::Transform, "config_size");
+        match super::config_size(vmctx) {
+            Ok(retval) => {
+                internal_event.complete();
+                retval
+            }
+            Err(e) => {
+                internal_event.error(format!("{}", e));
+                0
+            }
+        }
     }
 
     #[lucet_hostcall]
     #[no_mangle]
     pub extern "C" fn config(vmctx: &Vmctx, buffer: u32, length: u32) {
-        let internal_event = internal_events::Hostcall::begin(Role::Transform, "config");
-        // TODO: Handle error.
-        let ret = super::config(vmctx, buffer, length).unwrap();
-        internal_event.complete();
-        ret
+        let internal_event =
+            internal_events::WasmHostcallProgress::begin(Role::Transform, "config");
+        match super::config(vmctx, buffer, length) {
+            Ok(retval) => {
+                internal_event.complete();
+                retval
+            }
+            Err(e) => {
+                internal_event.error(format!("{}", e));
+            }
+        }
     }
 }

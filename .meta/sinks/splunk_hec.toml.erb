@@ -48,12 +48,12 @@ write_to_description = "a [Splunk's HTTP Event Collector][urls.splunk_hec]"
   default: "text"
 ) %>
 
-[sinks.splunk_hec.options.host]
+[sinks.splunk_hec.options.endpoint]
 type = "string"
 common = true
 examples = ["http://my-splunk-host.com"]
 required = true
-description = "Your Splunk HEC host."
+description = "Your Splunk HEC endpoint."
 
 [sinks.splunk_hec.options.host_key]
 type = "string"

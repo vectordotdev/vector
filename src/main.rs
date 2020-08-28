@@ -14,9 +14,12 @@ use futures01::Future;
 use std::cmp::max;
 use tokio::select;
 use vector::{
-    config::{self, Config, ConfigDiff},
-    event, generate, heartbeat,
-    internal_events::{VectorReloaded, VectorStarted, VectorStopped},
+    config::{self, ConfigDiff},
+    generate, heartbeat,
+    internal_events::{
+        VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed,
+        VectorReloaded, VectorStarted, VectorStopped,
+    },
     list, metrics, runtime,
     signal::{self, SignalTo},
     topology, trace, unit_test, validate,
@@ -105,12 +108,13 @@ fn main() {
             path = ?config_paths
         );
 
-        let read_config = config::read_configs(&config_paths);
-        let maybe_config = handle_config_errors(read_config);
-        let config = maybe_config.unwrap_or_else(|| {
-            std::process::exit(exitcode::CONFIG);
-        });
-        event::LOG_SCHEMA
+        let config = config::load_from_paths(&config_paths)
+            .map_err(handle_config_errors)
+            .unwrap_or_else(|()| {
+                std::process::exit(exitcode::CONFIG);
+            });
+
+        vector::event::LOG_SCHEMA
             .set(config.global.log_schema.clone())
             .expect("Couldn't set schema");
 
@@ -119,7 +123,8 @@ fn main() {
             std::process::exit(exitcode::CONFIG);
         });
 
-        let result = topology::start_validated(config, diff, pieces, opts.require_healthy).await;
+        let result =
+            topology::start_validated(config, diff, pieces, opts.require_healthy).await;
         let (mut topology, graceful_crash) = result.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });
@@ -136,22 +141,24 @@ fn main() {
                 Some(signal) = signals.next() => {
                     if signal == SignalTo::Reload {
                         // Reload config
-                        let new_config = config::read_configs(&config_paths);
+                        let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
 
-                        trace!("Parsing config");
-                        let new_config = handle_config_errors(new_config);
                         if let Some(new_config) = new_config {
                             match topology
                                 .reload_config_and_respawn(new_config, opts.require_healthy)
                                 .await
                             {
                                 Ok(true) =>  emit!(VectorReloaded { config_paths: &config_paths }),
-                                Ok(false) => error!("Reload was not successful."),
+                                Ok(false) => emit!(VectorReloadFailed),
                                 // Trigger graceful shutdown for what remains of the topology
-                                Err(()) => break SignalTo::Shutdown,
+                                Err(()) => {
+                                    emit!(VectorReloadFailed);
+                                    emit!(VectorRecoveryFailed);
+                                    break SignalTo::Shutdown;
+                                }
                             }
                         } else {
-                            error!("Reload aborted.");
+                            emit!(VectorConfigLoadFailed);
                         }
                     } else {
                         break signal;
@@ -170,13 +177,15 @@ fn main() {
                 select! {
                     _ = topology.stop().compat() => (), // Graceful shutdown finished
                     _ = signals.next() => {
-                        info!("Shutting down immediately.");
+                        // It is highly unlikely that this event will exit from topology.
+                        emit!(VectorQuit);
                         // Dropping the shutdown future will immediately shut the server down
                     }
                 }
             }
             SignalTo::Quit => {
-                info!("Shutting down immediately");
+                // It is highly unlikely that this event will exit from topology.
+                emit!(VectorQuit);
                 drop(topology);
             }
             SignalTo::Reload => unreachable!(),
@@ -186,14 +195,8 @@ fn main() {
     rt.shutdown_now().wait().unwrap();
 }
 
-fn handle_config_errors(config: Result<Config, Vec<String>>) -> Option<Config> {
-    match config {
-        Err(errors) => {
-            for error in errors {
-                error!("Configuration error: {}", error);
-            }
-            None
-        }
-        Ok(config) => Some(config),
+fn handle_config_errors(errors: Vec<String>) {
+    for error in errors {
+        error!("Configuration error: {}", error);
     }
 }

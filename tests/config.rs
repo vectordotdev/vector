@@ -1,10 +1,10 @@
 use vector::{
-    config::{self, Config, ConfigDiff},
+    config::{self, ConfigDiff},
     topology,
 };
 
 async fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
-    match Config::load(config.as_bytes()) {
+    match config::load_from_str(config) {
         Ok(c) => {
             let diff = ConfigDiff::initial(&c);
             match (
