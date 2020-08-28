@@ -482,12 +482,15 @@ mod integration_test {
         consumer.assign(&tpl).unwrap();
 
         // wait for messages to show up
-        wait_for(|| {
-            let (_low, high) = consumer
-                .fetch_watermarks(&topic, 0, Duration::from_secs(3))
-                .unwrap();
-            future::ready(high > 0)
-        }, 5)
+        wait_for(
+            || {
+                let (_low, high) = consumer
+                    .fetch_watermarks(&topic, 0, Duration::from_secs(3))
+                    .unwrap();
+                future::ready(high > 0)
+            },
+            5,
+        )
         .await;
 
         // check we have the expected number of messages in the topic
