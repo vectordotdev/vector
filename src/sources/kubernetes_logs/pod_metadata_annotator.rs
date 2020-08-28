@@ -18,20 +18,6 @@ pub struct FieldsSpec {
     pub pod_namespace: String,
     pub pod_uid: String,
     pub pod_labels: String,
-    /// Store labels with `.`s as flat fields with `.` literals instead of
-    /// nesting the fields at each `.`.
-    ///
-    /// For example:
-    ///
-    ///   - with `flat_labels = false` (the default),
-    ///     `"foo.bar": "baz"` will be interpreted as
-    ///     (root) -> "foo" -> "bar" = "baz"
-    ///
-    ///   - with `flat_labels = true`,
-    ///     `"foo.bar": "baz"` will be interpreted as
-    ///     (root) -> "foo.bar" = "baz"
-    ///
-    pub flat_labels: bool,
 }
 
 impl Default for FieldsSpec {
@@ -41,7 +27,6 @@ impl Default for FieldsSpec {
             pod_namespace: "kubernetes.pod_namespace".to_owned(),
             pod_uid: "kubernetes.pod_uid".to_owned(),
             pod_labels: "kubernetes.pod_labels".to_owned(),
-            flat_labels: false,
         }
     }
 }
@@ -98,11 +83,7 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
         let prefix_path = PathIter::new(fields_spec.pod_labels.as_ref()).collect::<Vec<_>>();
         for (key, val) in labels.iter() {
             let mut path = prefix_path.clone();
-            if fields_spec.flat_labels {
-                path.push(PathComponent::Key(key.clone()));
-            } else {
-                path.extend(PathIter::new(key));
-            }
+            path.push(PathComponent::Key(key.clone()));
             log.insert_path(path, val);
         }
     }
@@ -152,7 +133,6 @@ mod tests {
                     pod_namespace: "ns".to_owned(),
                     pod_uid: "uid".to_owned(),
                     pod_labels: "labels".to_owned(),
-                    ..FieldsSpec::default()
                 },
                 ObjectMeta {
                     name: Some("sandbox0-name".to_owned()),
@@ -178,46 +158,9 @@ mod tests {
                     log
                 },
             ),
-            // Ensure we properly handle labels with `.` as nested fields.
-            (
-                FieldsSpec {
-                    flat_labels: false,
-                    ..FieldsSpec::default()
-                },
-                ObjectMeta {
-                    name: Some("sandbox0-name".to_owned()),
-                    namespace: Some("sandbox0-ns".to_owned()),
-                    uid: Some("sandbox0-uid".to_owned()),
-                    labels: Some(
-                        vec![
-                            ("nested0.label0".to_owned(), "val0".to_owned()),
-                            ("nested0.label1".to_owned(), "val1".to_owned()),
-                            ("nested1.label0".to_owned(), "val2".to_owned()),
-                            ("nested2.label0.deep0".to_owned(), "val3".to_owned()),
-                        ]
-                        .into_iter()
-                        .collect(),
-                    ),
-                    ..ObjectMeta::default()
-                },
-                {
-                    let mut log = LogEvent::default();
-                    log.insert("kubernetes.pod_name", "sandbox0-name");
-                    log.insert("kubernetes.pod_namespace", "sandbox0-ns");
-                    log.insert("kubernetes.pod_uid", "sandbox0-uid");
-                    log.insert("kubernetes.pod_labels.nested0.label0", "val0");
-                    log.insert("kubernetes.pod_labels.nested0.label1", "val1");
-                    log.insert("kubernetes.pod_labels.nested1.label0", "val2");
-                    log.insert("kubernetes.pod_labels.nested2.label0.deep0", "val3");
-                    log
-                },
-            ),
             // Ensure we properly handle labels with `.` as flat fields.
             (
-                FieldsSpec {
-                    flat_labels: true,
-                    ..FieldsSpec::default()
-                },
+                FieldsSpec::default(),
                 ObjectMeta {
                     name: Some("sandbox0-name".to_owned()),
                     namespace: Some("sandbox0-ns".to_owned()),
