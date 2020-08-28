@@ -73,7 +73,8 @@ impl WasmModule {
 
         let artifact_cache = ArtifactCache::new(config.artifact_cache.clone())?;
 
-        let internal_event_compilation = internal_events::WasmCompilation::begin(config.role);
+        let internal_event_compilation =
+            internal_events::WasmCompilationProgress::begin(config.role);
         if artifact_cache.has_fresh(&config.path)? {
             // We can be lazy and do nothing! How wonderful.
             internal_event_compilation.cached();
@@ -127,7 +128,7 @@ impl WasmModule {
     }
 
     pub fn process(&mut self, mut data: Event) -> Result<LinkedList<Event>> {
-        let internal_event_processing = internal_events::EventProcessing::begin(self.role);
+        let internal_event_processing = internal_events::EventProcessingProgress::begin(self.role);
 
         self.instance.insert_embed_ctx(context::EventBuffer::new());
         self.instance
@@ -154,29 +155,35 @@ impl WasmModule {
                 (guest_data_size as u32).into(),
             ],
         ) {
-            Ok(_num_events) => (),
-            Err(lucet_runtime::Error::RuntimeFault(fault)) => {
-                error!(
-                    "WASM instance faulted, resetting: {:?}",
-                    fault.clone().rip_addr_details.and_then(|v| v.file_name),
-                );
-                self.instance.reset()?;
+            Ok(_num_events) => {
+                let context::EventBuffer { events: out } = self
+                    .instance
+                    .remove_embed_ctx()
+                    .ok_or("Could not retrieve context after processing.")?;
+
+                if let Some(context::RaisedError { error: Some(error) }) =
+                    self.instance.remove_embed_ctx()
+                {
+                    internal_event_processing.error(error);
+                } else {
+                    internal_event_processing.complete()
+                }
+                Ok(out)
             }
-            Err(e) => error!("WASM processing errored: {:?}", e,),
+            Err(lucet_runtime::Error::RuntimeFault(fault)) => {
+                let error = format!(
+                    "WASM instance faulted, resetting: {:?}",
+                    fault.clone().rip_addr_details.and_then(|v| v.file_name)
+                );
+                internal_event_processing.error(error);
+                self.instance.reset()?;
+                Ok(Default::default())
+            }
+            Err(e) => {
+                internal_event_processing.error(format!("{:?}", e));
+                Ok(Default::default())
+            }
         }
-
-        let context::EventBuffer { events: out } = self
-            .instance
-            .remove_embed_ctx()
-            .ok_or("Could not retrieve context after processing.")?;
-
-        if let Some(context::RaisedError { error: Some(error) }) = self.instance.remove_embed_ctx()
-        {
-            error!("WASM plugin errored: {}", error);
-        };
-
-        internal_event_processing.complete();
-        Ok(out)
     }
 
     pub fn shutdown(&mut self) -> Result<()> {
