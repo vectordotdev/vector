@@ -21,6 +21,8 @@ mod json_parser;
 mod kafka;
 #[cfg(feature = "sources-kubernetes-logs")]
 mod kubernetes_logs;
+#[cfg(feature = "transforms-log_to_metric")]
+mod log_to_metric;
 mod logplex;
 #[cfg(feature = "transforms-lua")]
 mod lua;
@@ -73,6 +75,8 @@ pub(crate) use self::json_parser::*;
 pub use self::kafka::*;
 #[cfg(feature = "sources-kubernetes-logs")]
 pub use self::kubernetes_logs::*;
+#[cfg(feature = "transforms-log_to_metric")]
+pub(crate) use self::log_to_metric::*;
 pub use self::logplex::*;
 #[cfg(feature = "transforms-lua")]
 pub use self::lua::*;

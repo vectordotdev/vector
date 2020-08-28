@@ -3,6 +3,10 @@ use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::{self, Value},
+    internal_events::{
+        LogToMetricEventProcessed, LogToMetricFieldNotFound, LogToMetricParseError,
+        LogToMetricRenderError, LogToMetricTemplateError,
+    },
     template::{Template, TemplateError},
     Event,
 };
@@ -242,6 +246,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 impl Transform for LogToMetric {
     // Only used in tests
     fn transform(&mut self, event: Event) -> Option<Event> {
+        emit!(LogToMetricEventProcessed);
         let mut output = Vec::new();
         self.transform_into(&mut output, event);
         output.pop()
@@ -253,15 +258,11 @@ impl Transform for LogToMetric {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }
-                Err(TransformError::FieldNotFound) => {}
-                Err(TransformError::ParseError(error)) => {
-                    debug!(message = "failed to parse.", %error, rate_limit_secs = 30);
-                }
-                Err(TransformError::RenderError(error)) => {
-                    debug!(message = "Unable to render.", %error, rate_limit_secs = 30);
-                }
+                Err(TransformError::FieldNotFound) => emit!(LogToMetricFieldNotFound),
+                Err(TransformError::ParseError(error)) => emit!(LogToMetricParseError { error }),
+                Err(TransformError::RenderError(error)) => emit!(LogToMetricRenderError { error }),
                 Err(TransformError::TemplateError(error)) => {
-                    debug!(message = "failed to parse.", %error, rate_limit_secs = 30);
+                    emit!(LogToMetricTemplateError { error })
                 }
             }
         }
