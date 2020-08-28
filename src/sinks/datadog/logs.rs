@@ -33,10 +33,10 @@ impl SinkConfig for DatadogLogsConfig {
         let (host, port, tls) = if let Some(uri) = &self.endpoint {
             let host = uri
                 .host()
-                .ok_or_else(|| "A host is required for endpoints".to_string())?;
+                .ok_or_else(|| "A host is required for endpoint".to_string())?;
             let port = uri
                 .port_u16()
-                .ok_or_else(|| "A port is required for endpoints".to_string())?;
+                .ok_or_else(|| "A port is required for endpoint".to_string())?;
 
             (host.to_string(), port, self.tls.clone())
         } else {

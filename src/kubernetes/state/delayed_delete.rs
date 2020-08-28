@@ -206,7 +206,7 @@ mod tests {
         assert!(writer.maintenance_request().is_none());
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn add() {
         trace_init();
 
@@ -219,7 +219,7 @@ mod tests {
         .await
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn update() {
         trace_init();
 
@@ -232,7 +232,7 @@ mod tests {
         .await
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn delete() {
         trace_init();
 
@@ -288,7 +288,7 @@ mod tests {
         tokio::time::resume();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn resync() {
         trace_init();
 

@@ -23,7 +23,9 @@ const PATH: &str = "/logs/ingest";
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LogdnaConfig {
     api_key: String,
-    host: Option<UriSerde>,
+    // Deprecated name
+    #[serde(alias = "host")]
+    endpoint: Option<UriSerde>,
 
     hostname: String,
     mac: Option<String>,
@@ -187,7 +189,7 @@ impl HttpSink for LogdnaConfig {
 
 impl LogdnaConfig {
     fn build_uri(&self, query: &str) -> Uri {
-        let host: Uri = self.host.clone().unwrap_or_else(|| HOST.clone()).into();
+        let host: Uri = self.endpoint.clone().unwrap_or_else(|| HOST.clone()).into();
 
         let uri = format!("{}{}?{}", host, PATH, query);
 
@@ -278,8 +280,8 @@ mod tests {
         let addr = next_addr();
         // Swap out the host so we can force send it
         // to our local server
-        let host = format!("http://{}", addr).parse::<http::Uri>().unwrap();
-        config.host = Some(host.into());
+        let endpoint = format!("http://{}", addr).parse::<http::Uri>().unwrap();
+        config.endpoint = Some(endpoint.into());
 
         let (sink, _) = config.build(cx).unwrap();
 

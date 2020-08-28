@@ -8,24 +8,12 @@ use crate::{
 use bytes::Bytes;
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
-    FutureExt, StreamExt, TryFutureExt, TryStreamExt,
+    executor, FutureExt, StreamExt, TryFutureExt, TryStreamExt,
 };
 use futures01::Sink;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
-use std::{io, sync::Mutex, thread};
-use tokio::sync::broadcast::{channel, Sender};
-
-#[derive(Debug, Snafu)]
-enum BuildError {
-    #[snafu(display("CRITICAL_SECTION poisoned"))]
-    CriticalSectionPoisoned,
-}
-
-lazy_static! {
-    static ref CRITICAL_SECTION: Mutex<Option<Sender<Bytes>>> = Mutex::default();
-}
+use std::{io, thread};
+use tokio::sync::mpsc::channel;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -82,102 +70,40 @@ pub fn stdin_source<R>(
 where
     R: Send + io::BufRead + 'static,
 {
-    // The idea is to have one dedicated future for reading stdin running in the background,
-    // and the sources would recieve the lines thorugh a multi consumer channel.
-    //
-    // Implemented solution relies on having a copy of optional sender behind a global mutex,
-    // and have stdin sources and background thread synchronize on it.
-    //
-    // When source is built it must:
-    // 1. enter critical section by locking mutex.
-    // 2. if sender isn't present start background thread and set sender.
-    // 3. gain receiver by calling subscribe on the sender.
-    // 4. release lock.
-    //
-    // When source has finished it should just drop it's receiver.
-    //
-    // Background thread should be started with copy of the sender.
-    //
-    // Once background thread wants to stop it must:
-    // 1. enter critical section by locking mutex.
-    // 2. if there are receivers it must abort the stop.
-    // 3. remove sender.
-    // 4. release lock.
-    //
-    // Although it's possible to implement this in a lock free, maybe even wait free manner,
-    // this should be easier to reason about and performance shouldn't suffer since this procedure
-    // is cold compared to the rest of the source.
-
     let host_key = config
         .host_key
         .unwrap_or_else(|| event::log_schema().host_key().to_string());
     let hostname = hostname::get_hostname();
 
-    let mut guard = CRITICAL_SECTION
-        .lock()
-        .map_err(|_| BuildError::CriticalSectionPoisoned)?;
-    let receiver = match guard.as_ref() {
-        Some(sender) => sender.subscribe(),
-        None => {
-            let (sender, receiver) = channel(1024);
-            *guard = Some(sender.clone());
+    let (mut sender, receiver) = channel(1024);
 
-            // Start the background thread
-            thread::spawn(move || {
-                info!("Capturing STDIN.");
+    // Start the background thread
+    thread::spawn(move || {
+        info!("Capturing STDIN.");
 
-                for line in stdin.lines() {
-                    match line {
-                        Err(error) => {
-                            emit!(StdinReadFailed { error });
-                            break;
-                        }
-                        Ok(line) => {
-                            if sender.send(Bytes::from(line)).is_err() {
-                                // There are no active receivers.
-                                // Try to stop.
-                                let mut guard =
-                                    CRITICAL_SECTION.lock().expect("CRITICAL_SECTION poisoned");
-
-                                if sender.receiver_count() == 0 {
-                                    guard.take();
-                                    return;
-                                }
-
-                                // A new receiver has shown up.
-
-                                // It's fine not to resend the line since it came from
-                                // before this new receiver has shown up.
-                            }
-                        }
-                    }
-                }
-
-                CRITICAL_SECTION
-                    .lock()
-                    .expect("CRITICAL_SECTION poisoned")
-                    .take();
-            });
-
-            receiver
+        for line in stdin.lines() {
+            if executor::block_on(sender.send(line)).is_err() {
+                // receiver has closed so we should shutdown
+                return;
+            }
         }
-    };
-    std::mem::drop(guard);
+    });
 
     let fut = receiver
         .take_until(shutdown.compat())
-        .map_err(|error| error!("Error reading line: {:?}", error))
+        .map_err(|error| emit!(StdinReadFailed { error }))
         .map_ok(move |line| {
             emit!(StdinEventReceived {
                 byte_size: line.len()
             });
-            create_event(line, &host_key, &hostname)
+            create_event(Bytes::from(line), &host_key, &hostname)
         })
         .forward(
             out.sink_map_err(|error| error!(message = "Unable to send event to out.", %error))
                 .sink_compat(),
         )
         .inspect(|_| info!("Finished sending"));
+
     Ok(Box::new(fut.boxed().compat()))
 }
 
