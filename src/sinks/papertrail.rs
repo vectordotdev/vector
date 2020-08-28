@@ -32,11 +32,11 @@ impl SinkConfig for PapertrailConfig {
             .endpoint
             .host()
             .map(str::to_string)
-            .ok_or_else(|| "A host is required for endpoints".to_string())?;
+            .ok_or_else(|| "A host is required for endpoint".to_string())?;
         let port = self
             .endpoint
             .port_u16()
-            .ok_or_else(|| "A port is required for endpoints".to_string())?;
+            .ok_or_else(|| "A port is required for endpoint".to_string())?;
 
         let sink = TcpSink::new(
             host,

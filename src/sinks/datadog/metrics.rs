@@ -35,8 +35,9 @@ struct DatadogState {
 #[serde(deny_unknown_fields)]
 pub struct DatadogConfig {
     pub namespace: String,
-    #[serde(default = "default_host")]
-    pub host: String,
+    // Deprecated name
+    #[serde(alias = "host", default = "default_endpoint")]
+    pub endpoint: String,
     pub api_key: String,
     #[serde(default)]
     pub batch: BatchConfig,
@@ -63,7 +64,7 @@ struct DatadogRequest {
     series: Vec<DatadogMetric>,
 }
 
-pub fn default_host() -> String {
+pub fn default_endpoint() -> String {
     String::from("https://api.datadoghq.com")
 }
 
@@ -114,7 +115,7 @@ impl SinkConfig for DatadogConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        let uri = build_uri(&self.host)?;
+        let uri = build_uri(&self.endpoint)?;
         let timestamp = Utc::now().timestamp();
 
         let sink = DatadogSink {
@@ -179,7 +180,7 @@ fn build_uri(host: &str) -> crate::Result<Uri> {
 }
 
 async fn healthcheck(config: DatadogConfig, mut client: HttpClient) -> crate::Result<()> {
-    let uri = format!("{}/api/v1/validate", config.host)
+    let uri = format!("{}/api/v1/validate", config.endpoint)
         .parse::<Uri>()
         .context(super::UriParseError)?;
 
@@ -417,7 +418,7 @@ mod tests {
         let timestamp = Utc::now().timestamp();
         let sink = DatadogSink {
             config: sink,
-            uri: build_uri(&default_host()).unwrap(),
+            uri: build_uri(&default_endpoint()).unwrap(),
             last_sent_timestamp: AtomicI64::new(timestamp),
         };
 

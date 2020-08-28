@@ -92,12 +92,12 @@ description = "The token to use for bearer authentication"
   }
 ) %>
 
-[sinks.clickhouse.options.host]
+[sinks.clickhouse.options.endpoint]
 type = "string"
 common = true
 examples = ["http://localhost:8123"]
 required = true
-description = "The host url of the [Clickhouse][urls.clickhouse] server."
+description = "The endpoint of the [Clickhouse][urls.clickhouse] server."
 
 [sinks.clickhouse.options.table]
 type = "string"

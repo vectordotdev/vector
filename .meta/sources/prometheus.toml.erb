@@ -18,12 +18,12 @@ through_description = "the [Prometheus text exposition format][urls.prometheus_t
 
 <%= render("_partials/fields/_component_options.toml", type: "source", name: "prometheus") %>
 
-[sources.prometheus.options.hosts]
+[sources.prometheus.options.endpoints]
 type = "[string]"
 common = true
 required = true
 examples = [["http://localhost:9090"]]
-description = "Host addresses to scrape metrics from."
+description = "Endpoints to scrape metrics from."
 
 [sources.prometheus.options.scrape_interval_secs]
 type = "uint"

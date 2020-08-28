@@ -34,7 +34,9 @@ pub enum BuildError {
 #[serde(deny_unknown_fields)]
 pub struct HecSinkConfig {
     pub token: String,
-    pub host: String,
+    // Deprecated name
+    #[serde(alias = "host")]
+    pub endpoint: String,
     #[serde(default = "default_host_key")]
     pub host_key: Atom,
     #[serde(default)]
@@ -84,7 +86,7 @@ inventory::submit! {
 #[typetag::serde(name = "splunk_hec")]
 impl SinkConfig for HecSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        validate_host(&self.host)?;
+        validate_host(&self.endpoint)?;
 
         let batch = BatchSettings::default()
             .bytes(bytesize::mib(1u64))
@@ -206,7 +208,8 @@ impl HttpSink for HecSinkConfig {
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
-        let uri = build_uri(&self.host, "/services/collector/event").expect("Unable to parse URI");
+        let uri =
+            build_uri(&self.endpoint, "/services/collector/event").expect("Unable to parse URI");
 
         let mut builder = Request::post(uri)
             .header("Content-Type", "application/json")
@@ -229,8 +232,8 @@ enum HealthcheckError {
 }
 
 pub async fn healthcheck(config: HecSinkConfig, mut client: HttpClient) -> crate::Result<()> {
-    let uri =
-        build_uri(&config.host, "/services/collector/health/1.0").context(super::UriParseError)?;
+    let uri = build_uri(&config.endpoint, "/services/collector/health/1.0")
+        .context(super::UriParseError)?;
 
     let request = Request::get(uri)
         .header("Authorization", format!("Splunk {}", config.token))
@@ -622,7 +625,7 @@ mod integration_tests {
         // Server not listening at address
         {
             let config = HecSinkConfig {
-                host: "http://localhost:1111".to_string(),
+                endpoint: "http://localhost:1111".to_string(),
                 ..config(Encoding::Text, vec![]).await
             };
             let healthcheck = config_to_healthcheck(config);
@@ -645,7 +648,7 @@ mod integration_tests {
         // Unhealthy server
         {
             let config = HecSinkConfig {
-                host: "http://localhost:5503".to_string(),
+                endpoint: "http://localhost:5503".to_string(),
                 ..config(Encoding::Text, vec![]).await
             };
 
@@ -697,7 +700,7 @@ mod integration_tests {
         indexed_fields: Vec<Atom>,
     ) -> super::HecSinkConfig {
         super::HecSinkConfig {
-            host: "http://localhost:8088/".into(),
+            endpoint: "http://localhost:8088/".into(),
             token: get_token().await,
             host_key: "host".into(),
             compression: Compression::None,

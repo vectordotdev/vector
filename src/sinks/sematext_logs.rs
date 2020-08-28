@@ -12,8 +12,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SematextLogsConfig {
     region: Option<Region>,
-    // TODO: replace this with `UriEncode` once that is on master.
-    host: Option<String>,
+    // Deprecated name
+    #[serde(alias = "host")]
+    endpoint: Option<String>,
     token: String,
 
     #[serde(
@@ -43,7 +44,7 @@ pub enum Region {
 #[typetag::serde(name = "sematext")]
 impl SinkConfig for SematextLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let host = match (&self.host, &self.region) {
+        let endpoint = match (&self.endpoint, &self.region) {
             (Some(host), None) => host.clone(),
             (None, Some(Region::Na)) => "https://logsene-receiver.sematext.com".to_owned(),
             (None, Some(Region::Eu)) => "https://logsene-receiver.eu.sematext.com".to_owned(),
@@ -56,7 +57,7 @@ impl SinkConfig for SematextLogsConfig {
         };
 
         let (sink, healthcheck) = ElasticSearchConfig {
-            host,
+            endpoint,
             compression: Compression::None,
             doc_type: Some("logs".to_string()),
             index: Some(self.token.clone()),
@@ -122,7 +123,7 @@ mod tests {
         let addr = next_addr();
         // Swap out the host so we can force send it
         // to our local server
-        config.host = Some(format!("http://{}", addr));
+        config.endpoint = Some(format!("http://{}", addr));
         config.region = None;
 
         let (sink, _) = config.build(cx).unwrap();

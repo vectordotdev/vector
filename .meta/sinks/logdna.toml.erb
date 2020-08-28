@@ -51,11 +51,11 @@ required = true
 examples = ["${LOGDNA_API_KEY}", "ef8d5de700e7989468166c40fc8a0ccd"]
 description = "The Ingestion API key."
 
-[sinks.logdna.options.host]
+[sinks.logdna.options.endpoint]
 type = "string"
 required = false
 examples = ["http://127.0.0.1", "http://example.com"]
-description = "An optional host that will override the default one."
+description = "An optional endpoint that will override the default one."
 
 [sinks.logdna.options.hostname]
 type = "string"

@@ -814,7 +814,7 @@ mod tests {
         compression: Compression,
     ) -> (RouterSink, Healthcheck) {
         HecSinkConfig {
-            host: format!("http://{}", address),
+            endpoint: format!("http://{}", address),
             token: TOKEN.to_owned(),
             encoding: encoding.into(),
             compression,

@@ -40,11 +40,11 @@ common = true
 default = 10
 description = "The interval in seconds at which the EC2 Metadata api will be called."
 
-[transforms.aws_ec2_metadata.options.host]
+[transforms.aws_ec2_metadata.options.endpoint]
 type = "string"
 common = true
 default = "http://169.254.169.254"
-description = "Override the default EC2 Metadata host."
+description = "Override the default EC2 Metadata endpoint."
 
 [transforms.aws_ec2_metadata.fields.log.fields.ami-id]
 type = "string"

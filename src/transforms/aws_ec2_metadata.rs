@@ -79,7 +79,9 @@ lazy_static::lazy_static! {
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Ec2Metadata {
-    host: Option<String>,
+    // Deprecated name
+    #[serde(alias = "host")]
+    endpoint: Option<String>,
     namespace: Option<String>,
     refresh_interval_secs: Option<u64>,
     fields: Option<Vec<String>>,
@@ -132,7 +134,7 @@ impl TransformConfig for Ec2Metadata {
         let keys = Keys::new(&namespace);
 
         let host = self
-            .host
+            .endpoint
             .clone()
             .map(|s| Uri::from_maybe_shared(s).unwrap())
             .unwrap_or_else(|| HOST.clone());
@@ -508,7 +510,7 @@ mod integration_tests {
         trace_init();
 
         let config = Ec2Metadata {
-            host: Some(HOST.clone()),
+            endpoint: Some(HOST.clone()),
             ..Default::default()
         };
         let mut transform = config
@@ -556,7 +558,7 @@ mod integration_tests {
     #[tokio::test]
     async fn fields() {
         let config = Ec2Metadata {
-            host: Some(HOST.clone()),
+            endpoint: Some(HOST.clone()),
             fields: Some(vec!["public-ipv4".into(), "region".into()]),
             ..Default::default()
         };
@@ -587,7 +589,7 @@ mod integration_tests {
     #[tokio::test]
     async fn namespace() {
         let config = Ec2Metadata {
-            host: Some(HOST.clone()),
+            endpoint: Some(HOST.clone()),
             namespace: Some("ec2.metadata".into()),
             ..Default::default()
         };
@@ -615,7 +617,7 @@ mod integration_tests {
 
         // Set an empty namespace to ensure we don't prepend one.
         let config = Ec2Metadata {
-            host: Some(HOST.clone()),
+            endpoint: Some(HOST.clone()),
             namespace: Some("".into()),
             ..Default::default()
         };
