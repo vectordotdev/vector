@@ -33,7 +33,7 @@ The source would then run the following queries:
 And return these metrics:
 
 - `postgresql_up` -> Used as an uptime metric (0/1) ? - merits a broader discussion.
-- `pg_stat_database_blk_read`_time` tagged with db, host, server, user (counter)
+- `pg_stat_database_blk_read_time` tagged with db, host, server, user (counter)
 - `pg_stat_database_blk_write_time` tagged with db, host, server, user (counter)
 - `pg_stat_database_blks_hit` tagged with db, host, server, user (counter)
 - `pg_stat_database_blks_read` tagged with db, host, server, user (counter)
