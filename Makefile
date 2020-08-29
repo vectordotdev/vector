@@ -196,10 +196,6 @@ start-integration-aws:
 	$(CONTAINER_TOOL) run -d --network=test-integration-aws -p 6000:6000 --name mockwatchlogs -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
 	sleep 60 # Many services are very slow... Give them a sec...
 
-
-  -p 4568:4568 -p 4572:4572 -p 4582:4582 -p 4571:4571 -p 4573:4573
-
-
 stop-integration-aws:
 	$(CONTAINER_TOOL) rm --force ec2_metadata mockwatchlogs localstack 2>/dev/null; true
 	$(CONTAINER_TOOL) network rm test-integration-aws 2>/dev/null; true
