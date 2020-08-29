@@ -55,7 +55,7 @@ And return these metrics by parsing the query results and converting them into m
 - `pg_stat_bgwriter_maxwritten_clean_total` tagged with host, server (counter)
 - `pg_stat_bgwriter_stats_reset` host, server (gauge)
 - `pg_stat_database_conflicts_total` tagged with db, host, server, user (counter)
-- `pg_stat_database_datid` tagged with db, host, server, user (counter)
+- `pg_stat_database_datid` (database ID) tagged with db, host, server, user (gauge)
 - `pg_stat_database_deadlocks_total` tagged with db, host, server, user (counter)
 - `pg_stat_database_numbackends_total` tagged with db, host, server, user (gauge)
 - `pg_stat_database_temp_bytes_total` tagged with db, host, server, user (counter)
