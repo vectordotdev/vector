@@ -170,7 +170,7 @@ impl Transform for KeyValue {
                 }
 
                 if let Some(conv) = self.conversions.get(&key) {
-                    match conv.convert(val.as_bytes().into()) {
+                    match conv.convert(val.as_bytes().to_vec().into()) {
                         Ok(value) => {
                             log.insert(key, value);
                         }
