@@ -352,7 +352,7 @@ async fn constant_link() {
     assert_within!(in_flight.max, 10, MAX_CONCURRENCY, "{:#?}", results);
     assert_within!(
         in_flight.mean,
-        6.0,
+        5.5,
         MAX_CONCURRENCY as f64,
         "{:#?}",
         results
@@ -379,7 +379,7 @@ async fn constant_link() {
     assert_within!(c_in_flight.max, 9, MAX_CONCURRENCY, "{:#?}", results);
     assert_within!(
         c_in_flight.mean,
-        6.5,
+        5.5,
         MAX_CONCURRENCY as f64,
         "{:#?}",
         results
@@ -447,7 +447,7 @@ async fn drops_at_high_concurrency() {
     // of requests in flight (tracked below in the internal stats).
     let in_flight = results.stats.in_flight.stats().unwrap();
     assert_within!(in_flight.max, 4, 5, "{:#?}", results);
-    assert_within!(in_flight.mode, 3, 4, "{:#?}", results);
+    assert_within!(in_flight.mode, 3, 5, "{:#?}", results);
     assert_within!(in_flight.mean, 1.5, 3.5, "{:#?}", results);
 
     let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
@@ -459,10 +459,10 @@ async fn drops_at_high_concurrency() {
     assert_within!(averaged_rtt.max, 0.090, 0.125, "{:#?}", results);
     assert_within!(averaged_rtt.mean, 0.090, 0.125, "{:#?}", results);
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
-    assert_within!(concurrency_limit.mode, 1, 3, "{:#?}", results);
+    assert_within!(concurrency_limit.mode, 1, 4, "{:#?}", results);
     assert_within!(concurrency_limit.mean, 3.5, 5.0, "{:#?}", results);
     let c_in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(c_in_flight.mode, 1, 3, "{:#?}", results);
+    assert_within!(c_in_flight.mode, 1, 4, "{:#?}", results);
     assert_within!(c_in_flight.mean, 3.0, 5.0, "{:#?}", results);
 }
 
@@ -480,27 +480,24 @@ async fn slow_link() {
     .await;
 
     // With a link that slows down heavily as concurrency increases, the
-    // limiter will keep the concurrency low (timing skews occasionally
-    // has it reaching 3, but usually just 2),
+    // limiter will continue to increase the limit, but slower than for
+    // a constant link.
     let in_flight = results.stats.in_flight.stats().unwrap();
-    assert_within!(in_flight.max, 1, 3, "{:#?}", results);
-    // and it will spend most of its time between 1 and 2.
-    assert_within!(in_flight.mode, 1, 2, "{:#?}", results);
-    assert_within!(in_flight.mean, 1.0, 2.0, "{:#?}", results);
+    assert_within!(in_flight.max, 4, 7, "{:#?}", results);
+    assert_within!(in_flight.mean, 2.5, 6.0, "{:#?}", results);
 
     let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
-    assert_within!(observed_rtt.min, 0.090, 0.120, "{:#?}", results);
-    assert_within!(observed_rtt.mean, 0.090, 0.310, "{:#?}", results);
+    assert_within!(observed_rtt.min, 0.090, 0.125, "{:#?}", results);
+    assert_within!(observed_rtt.mean, 0.090, 0.510, "{:#?}", results);
     let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
-    assert_within!(averaged_rtt.min, 0.090, 0.120, "{:#?}", results);
-    assert_within!(averaged_rtt.mean, 0.090, 0.310, "{:#?}", results);
+    assert_within!(averaged_rtt.min, 0.090, 0.125, "{:#?}", results);
+    assert_within!(averaged_rtt.mean, 0.090, 0.510, "{:#?}", results);
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
-    assert_within!(concurrency_limit.mode, 1, 3, "{:#?}", results);
-    assert_within!(concurrency_limit.mean, 1.0, 2.0, "{:#?}", results);
+    assert_within!(concurrency_limit.mode, 2, 6, "{:#?}", results);
+    assert_within!(concurrency_limit.mean, 2.5, 6.0, "{:#?}", results);
     let c_in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(c_in_flight.max, 1, 3, "{:#?}", results);
-    assert_within!(c_in_flight.mode, 1, 2, "{:#?}", results);
-    assert_within!(c_in_flight.mean, 1.0, 2.0, "{:#?}", results);
+    assert_within!(c_in_flight.max, 4, 7, "{:#?}", results);
+    assert_within!(c_in_flight.mean, 2.5, 6.0, "{:#?}", results);
 }
 
 #[tokio::test]

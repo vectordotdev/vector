@@ -20,11 +20,6 @@ use tower::timeout::error::Elapsed;
 // weighting.
 const EWMA_ALPHA: f64 = 0.5;
 
-// This was picked as a reasonable default threshold ratio to avoid
-// dropping concurrency too aggressively when there is fluctuation in
-// the RTT measurements.
-const THRESHOLD_RATIO: f64 = 0.05;
-
 /// Shared class for `tokio::sync::Semaphore` that manages adjusting the
 /// semaphore size and other associated data.
 #[derive(Clone, Debug)]
@@ -151,7 +146,7 @@ impl<L> Controller<L> {
                     inner.next_update = now + Duration::from_secs_f64(current_rtt);
                 }
             }
-            Some(mut past_rtt) => {
+            Some(mut past_rtt_mean) => {
                 if now >= inner.next_update {
                     #[cfg(test)]
                     {
@@ -170,14 +165,15 @@ impl<L> Controller<L> {
 
                     // Only manage the concurrency if in_flight_limit was set to "auto"
                     if self.in_flight_limit.is_none() {
-                        self.manage_limit(&mut inner, past_rtt, current_rtt);
+                        let threshold = inner.past_rtt.stddev().unwrap_or(0.0) * 3.0;
+                        self.manage_limit(&mut inner, past_rtt_mean, threshold, current_rtt);
                     }
 
                     // Reset values for next interval
                     if let Some(current_rtt) = current_rtt {
-                        past_rtt = inner.past_rtt.update(current_rtt);
+                        past_rtt_mean = inner.past_rtt.update(current_rtt);
                     }
-                    inner.next_update = now + Duration::from_secs_f64(past_rtt);
+                    inner.next_update = now + Duration::from_secs_f64(past_rtt_mean);
                     inner.current_rtt.reset();
                     inner.had_back_pressure = false;
                     inner.reached_limit = false;
@@ -186,9 +182,13 @@ impl<L> Controller<L> {
         }
     }
 
-    fn manage_limit(&self, inner: &mut MutexGuard<Inner>, past_rtt: f64, current_rtt: Option<f64>) {
-        let threshold = past_rtt * THRESHOLD_RATIO;
-
+    fn manage_limit(
+        &self,
+        inner: &mut MutexGuard<Inner>,
+        past_rtt: f64,
+        threshold: f64,
+        current_rtt: Option<f64>,
+    ) {
         // Normal quick responses trigger an increase in the
         // concurrency limit. Note that we only check this if we had
         // requests to go beyond the current limit to prevent
@@ -219,7 +219,8 @@ impl<L> Controller<L> {
             reached_limit: inner.reached_limit,
             had_back_pressure: inner.had_back_pressure,
             current_rtt: current_rtt.map(Duration::from_secs_f64),
-            past_rtt: Duration::from_secs_f64(past_rtt),
+            past_rtt_mean: Duration::from_secs_f64(past_rtt),
+            past_rtt_stddev: Duration::from_secs_f64(inner.past_rtt.stddev().unwrap_or(0.0)),
         });
     }
 }
@@ -255,6 +256,7 @@ where
 #[derive(Clone, Copy, Debug, Default)]
 struct EWMA {
     average: Option<f64>,
+    variance: Option<f64>,
 }
 
 impl EWMA {
@@ -262,13 +264,25 @@ impl EWMA {
         self.average
     }
 
+    fn stddev(&self) -> Option<f64> {
+        self.variance.map(|v| v.sqrt())
+    }
+
     /// Update the current average and return it for convenience
     fn update(&mut self, point: f64) -> f64 {
-        let average = match self.average {
-            None => point,
-            Some(avg) => point * EWMA_ALPHA + avg * (1.0 - EWMA_ALPHA),
+        let (average, variance) = match self.average {
+            None => (point, None),
+            Some(avg) => {
+                let delta = point - avg;
+                let variance = self.variance.unwrap_or(0.0);
+                (
+                    point * EWMA_ALPHA + avg * (1.0 - EWMA_ALPHA),
+                    Some((1.0 - EWMA_ALPHA) * (variance + EWMA_ALPHA * delta * delta)),
+                )
+            }
         };
         self.average = Some(average);
+        self.variance = variance;
         average
     }
 }

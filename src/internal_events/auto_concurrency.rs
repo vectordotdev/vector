@@ -8,7 +8,8 @@ pub struct AutoConcurrencyLimit {
     pub reached_limit: bool,
     pub had_back_pressure: bool,
     pub current_rtt: Option<Duration>,
-    pub past_rtt: Duration,
+    pub past_rtt_mean: Duration,
+    pub past_rtt_stddev: Duration,
 }
 
 impl InternalEvent for AutoConcurrencyLimit {
@@ -19,7 +20,8 @@ impl InternalEvent for AutoConcurrencyLimit {
             reached_limit = %self.reached_limit,
             had_back_pressure = %self.had_back_pressure,
             current_rtt = ?self.current_rtt,
-            past_rtt = ?self.past_rtt,
+            past_rtt_mean = ?self.past_rtt_mean,
+            past_rtt_stddev = ?self.past_rtt_stddev,
         );
     }
 
