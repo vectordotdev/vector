@@ -96,7 +96,7 @@ To merge a new source, sink, or transform, you need to:
 - [ ] Add instrumentation so folks using your integration can get insight into how it's working and performing. You can see some [example of instrumentation in existing integrations](https://github.com/timberio/vector/tree/master/src/internal_events).
 - [ ] Add internal documentation of options and fields. You can see [examples in the `.meta` directory](https://github.com/timberio/vector/blob/master/.meta/sources/kafka.toml.erb).
 - [ ] Add external documentation explaining the use of the integration. You can see [some examples in our existing documentation](https://github.com/timberio/vector-website/blob/master/docs/reference/sources/kafka.md.erb).
-- [ ] Update the `.github/CODEOWNERS` or talk to us about identifying someone on the team to help look after the new integration.
+- [ ] Update [`.github/CODEOWNERS`](https://github.com/timberio/vector/blob/master/.github/CODEOWNERS) or talk to us about identifying someone on the team to help look after the new integration.
 
 ## Change Control
 
