@@ -192,9 +192,13 @@ stop-test-integration: stop-integration-pulsar stop-integration-splunk
 start-integration-aws:
 	$(CONTAINER_TOOL) network create test-integration-aws
 	$(CONTAINER_TOOL) run -d --network=test-integration-aws -p 8111:8111 --name ec2_metadata timberiodev/mock-ec2-metadata:latest
-	$(CONTAINER_TOOL) run -d --network=test-integration-aws -p 4566-4584:4566-4584 --name localstack -e SERVICES=kinesis:4568,s3:4572,cloudwatch:4582,elasticsearch:4571,firehose:4573 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
+	$(CONTAINER_TOOL) run -d --network=test-integration-aws -p 4568:4568 -p 4572:4572 -p 4582:4582 -p 4571:4571 -p 4573:4573 --name localstack -e SERVICES=kinesis:4568,s3:4572,cloudwatch:4582,elasticsearch:4571,firehose:4573 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
 	$(CONTAINER_TOOL) run -d --network=test-integration-aws -p 6000:6000 --name mockwatchlogs -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
 	sleep 60 # Many services are very slow... Give them a sec...
+
+
+  -p 4568:4568 -p 4572:4572 -p 4582:4582 -p 4571:4571 -p 4573:4573
+
 
 stop-integration-aws:
 	$(CONTAINER_TOOL) rm --force ec2_metadata mockwatchlogs localstack 2>/dev/null; true
@@ -236,7 +240,7 @@ test-integration-docker: ## Runs Docker integration tests
 
 start-integration-elasticsearch:
 	$(CONTAINER_TOOL) network create test-integration-elasticsearch
-	$(CONTAINER_TOOL) run -d --network=test-integration-elasticsearch -p 4566-4584:4566-4584 --name localstack -e SERVICES=kinesis:4568,s3:4572,cloudwatch:4582,elasticsearch:4571,firehose:4573 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
+	$(CONTAINER_TOOL) run -d --network=test-integration-elasticsearch -p 4568:4568 -p 4572:4572 -p 4582:4582 -p 4571:4571 -p 4573:4573 --name localstack -e SERVICES=kinesis:4568,s3:4572,cloudwatch:4582,elasticsearch:4571,firehose:4573 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
 	$(CONTAINER_TOOL) run -d --network=test-integration-elasticsearch -p 9200:9200 -p 9300:9300 --name elasticsearch -e discovery.type=single-node elasticsearch:6.6.2
 	$(CONTAINER_TOOL) run -d --network=test-integration-elasticsearch -p 9201:9200 -p 9301:9300 --name elasticsearch-tls -e discovery.type=single-node -e xpack.security.enabled=true -e xpack.security.http.ssl.enabled=true -e xpack.security.transport.ssl.enabled=true -e xpack.ssl.certificate=certs/localhost.crt -e xpack.ssl.key=certs/localhost.key -v $(PWD)/tests/data:/usr/share/elasticsearch/config/certs:ro elasticsearch:6.6.2
 
