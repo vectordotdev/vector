@@ -3,7 +3,7 @@ use metrics::counter;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug)]
-pub struct KeyValueEventProcessed;
+pub(crate) struct KeyValueEventProcessed;
 
 impl InternalEvent for KeyValueEventProcessed {
     fn emit_metrics(&self) {
@@ -15,12 +15,37 @@ impl InternalEvent for KeyValueEventProcessed {
 }
 
 #[derive(Debug)]
-pub struct KeyValueFailedParse {
-    pub field: Atom,
+pub(crate) struct KeyFailedParse {
+    pub key: Atom,
     pub error: crate::types::Error,
 }
 
-impl InternalEvent for KeyValueFailedParse {
+impl InternalEvent for KeyFailedParse {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Event failed to parse as KeyValue",
+            key = %self.key,
+            error = %self.error,
+            rate_limit_secs = 30
+        )
+    }
+
+    fn emit_metrics(&self) {
+        counter!("processing_error", 1,
+            "component_kind" => "transform",
+            "component_type" => "key_value_parser",
+            "error_type" => "failed_parse",
+        );
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct KeyValueEventFailed {
+    pub field: Atom,
+    pub error: Atom,
+}
+
+impl InternalEvent for KeyValueEventFailed {
     fn emit_logs(&self) {
         warn!(
             message = "Event failed to parse as KeyValue",

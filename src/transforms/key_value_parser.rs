@@ -2,7 +2,7 @@ use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{self, Event},
-    internal_events::{KeyValueEventProcessed, KeyValueFailedParse},
+    internal_events::{KeyValueEventProcessed, KeyFailedParse, KeyValueEventFailed},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -152,6 +152,8 @@ impl Transform for KeyValue {
                 }
             }
 
+            emit!(KeyValueEventProcessed);
+
             for (mut key, val) in pairs {
                 if let Some(target_field) = self.target_field.to_owned() {
                     key = Atom::from(format!("{}.{}", target_field, key));
@@ -163,12 +165,10 @@ impl Transform for KeyValue {
                             log.insert(key, value);
                         }
                         Err(error) => {
-                            debug!(
-                                message = "Could not convert types.",
-                                key = &key[..],
-                                %error,
-                                rate_limit_secs = 30
-                            );
+                            emit!(KeyFailedParse {
+                                key,
+                                error
+                            });
                         }
                     }
                 } else {
@@ -180,10 +180,10 @@ impl Transform for KeyValue {
                 log.remove(&self.field);
             }
         } else {
-            debug!(
-                message = "Field does not exist.",
-                field = self.field.as_ref(),
-            );
+            emit!(KeyValueEventFailed {
+                error: "Field does not exist.".into(),
+                field: self.field.as_ref().into(),
+            });
         };
 
         Some(event)
