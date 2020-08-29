@@ -121,10 +121,9 @@ impl KeyValue {
             None => fields.0,
         };
 
-        let val = if let Some(trim_value) = &self.trim_value {
-            fields.1.trim_matches(trim_value as &[_])
-        } else {
-            fields.1
+        let val = match &self.trim_value {
+            Some(trim_value) => fields.1.trim_matches(trim_value as &[_]),
+            None => fields.1,
         };
 
         Some((Atom::from(key), val.to_string()))
@@ -333,7 +332,7 @@ mod tests {
     #[test]
     fn it_fails_graceful_on_empty_values() {
         let log = parse_log(
-            "foo::0, ::beep, score:: ",
+            "foo::0, ::beep, score::",
             ",".to_string(),
             "::".to_string(),
             false,
