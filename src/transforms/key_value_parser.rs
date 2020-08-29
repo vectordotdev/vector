@@ -40,14 +40,8 @@ impl TransformConfig for KeyValueConfig {
             .unwrap_or(&event::log_schema().message_key());
 
         let conversions = parse_conversion_map(&self.types)?;
-
         let trim_key = self.trim_key.as_ref().map(|key| key.chars().collect());
-
-        let trim_value = if let Some(val) = &self.trim_value {
-            Some(val.chars().collect())
-        } else {
-            None
-        };
+        let trim_value = self.trim_value.as_ref().map(|key| key.chars().collect());
 
         Ok(Box::new(KeyValue {
             conversions,
@@ -102,7 +96,7 @@ impl KeyValue {
             let val = kv_pair.next()?;
             if kv_pair.next().is_some() {
                 error!(
-                    message = "KV parser saw more than one separator",
+                    message = "KeyValue parser saw more than one separator",
                     rate_limit_secs = 30
                 );
                 return None;
