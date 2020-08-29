@@ -116,10 +116,9 @@ impl KeyValue {
             (key, val)
         };
 
-        let key = if let Some(trim_key) = &self.trim_key {
-            fields.0.trim_matches(trim_key as &[_])
-        } else {
-            fields.0
+        let key = match &self.trim_key {
+            Some(trim_key) => fields.0.trim_matches(trim_key as &[_]),
+            None => fields.0,
         };
 
         let val = if let Some(trim_value) = &self.trim_value {
