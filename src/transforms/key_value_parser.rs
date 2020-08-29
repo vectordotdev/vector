@@ -2,6 +2,7 @@ use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{self, Event},
+    internal_events::{KeyValueEventProcessed, KeyValueFailedParse},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -140,7 +141,6 @@ impl Transform for KeyValue {
                 .split(&self.separator)
                 .filter_map(|pair| self.parse_pair(pair));
 
-            // Handle optional overwriting of the target field
             if let Some(target_field) = &self.target_field {
                 if log.contains(target_field) {
                     if self.overwrite_target {
