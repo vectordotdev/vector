@@ -41,11 +41,7 @@ impl TransformConfig for KeyValueConfig {
 
         let conversions = parse_conversion_map(&self.types)?;
 
-        let trim_key = if let Some(key) = &self.trim_key {
-            Some(key.chars().collect())
-        } else {
-            None
-        };
+        let trim_key = self.trim_key.as_ref().map(|key| key.chars().collect());
 
         let trim_value = if let Some(val) = &self.trim_value {
             Some(val.chars().collect())
