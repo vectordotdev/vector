@@ -11,7 +11,7 @@ pub struct SematextMetricsInvalidMetric {
 impl InternalEvent for SematextMetricsInvalidMetric {
     fn emit_logs(&self) {
         warn!(
-            message = "invalid metric sent; dropping event.",
+            message = "Invalid metric sent; dropping event.",
             value = ?self.value,
             kind = ?self.kind,
             rate_limit_secs = 30,
@@ -20,9 +20,10 @@ impl InternalEvent for SematextMetricsInvalidMetric {
 
     fn emit_metrics(&self) {
         counter!(
-            "invalid_metrics", 1,
+            "processing_errors", 1,
             "component_kind" => "sink",
             "component_type" => "sematext_metrics",
+            "error_type" => "invalid_metric",
         );
     }
 }
