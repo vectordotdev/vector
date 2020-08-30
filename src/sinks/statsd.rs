@@ -4,6 +4,8 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::Event,
     sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
+    internal_events::StatsdInvalidMetric,
+    sinks::util::{BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
 };
 use futures::{future, FutureExt};
 use futures01::{stream, Sink};
@@ -181,10 +183,10 @@ fn encode_event(event: Event, namespace: Option<&str>) -> Option<Vec<u8>> {
             }
         }
         _ => {
-            warn!(
-                "invalid metric sent to statsd sink ({:?}) ({:?})",
-                metric.kind, metric.value
-            );
+            emit!(StatsdInvalidMetric {
+                value: metric.value.clone(),
+                kind: metric.kind.clone(),
+            });
         }
     };
 

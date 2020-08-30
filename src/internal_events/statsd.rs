@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use crate::event::metric::{MetricKind, MetricValue};
 use metrics::counter;
 
 #[derive(Debug)]
@@ -90,6 +91,32 @@ impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for StatsdSocketError
             "socket_errors", 1,
             "component_kind" => "source",
             "component_type" => "statsd",
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct StatsdInvalidMetric {
+    pub value: MetricValue,
+    pub kind: MetricKind,
+}
+
+impl InternalEvent for StatsdInvalidMetric {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Invalid metric sent; dropping event.",
+            value = ?self.value,
+            kind = ?self.kind,
+            rate_limit_secs = 30,
+        )
+    }
+
+    fn emit_metrics(&self) {
+        counter!(
+            "processing_errors", 1,
+            "component_kind" => "sink",
+            "component_type" => "statsd_metrics",
+            "error_type" => "invalid_metric",
         );
     }
 }
