@@ -342,7 +342,7 @@ check: ## Run prerequisite code checks
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-style check-markdown check-meta
 check-all: check-version check-examples check-component-features
-check-all: check-scripts
+check-all: check-scripts check-kubernetes-yaml
 
 check-component-features: ## Check that all component features are setup properly
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-features.sh
@@ -373,6 +373,9 @@ check-scripts: ## Check that scipts do not have common mistakes
 
 check-helm: ## Check that the Helm Chart passes helm lint
 	${MAYBE_ENVIRONMENT_EXEC} helm lint distribution/helm/vector
+
+check-kubernetes-yaml: ## Check that the generated Kubernetes YAML config is up to date
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh check
 
 ##@ Packaging
 
@@ -538,6 +541,9 @@ version: ## Get the current Vector version
 
 git-hooks: ## Add Vector-local git hooks for commit sign-off
 	@scripts/install-git-hooks.sh
+
+update-kubernetes-yaml: ## Regenerate the Kubernetes YAML config
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh update
 
 .PHONY: ensure-has-wasm-toolchain ### Configures a wasm toolchain for test artifact building, if required
 ensure-has-wasm-toolchain: target/wasm32-wasi/.obtained
