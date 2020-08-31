@@ -1,4 +1,4 @@
-.PHONY: $(MAKECMDGOALS) all
+# .PHONY: $(MAKECMDGOALS) all
 .DEFAULT_GOAL := help
 RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/scripts/run.sh)
 
@@ -171,78 +171,43 @@ build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in rel
 	$(RUN) build-aarch64-unknown-linux-musl
 
 ##@ Cross Compiling
+.PHONY: cross-enable
 cross-enable: cargo-install-cross
-
-ci-cross-x86_64-unknown-linux-gnu: cross-enable cross-test-x86_64-unknown-linux-gnu
-
-cross-build-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/release/vector
-cross-build-dev-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/debug/vector
-cross-test-x86_64-unknown-linux-gnu:
-	cross test --target x86_64-unknown-linux-gnu
-
-.PHONY: target/x86_64-unknown-linux-gnu/debug/vector
-target/x86_64-unknown-linux-gnu/debug/vector: export RUSTFLAGS += -C link-arg=-s
-target/x86_64-unknown-linux-gnu/debug/vector:
-	cross build \
-		--release \
-		--target x86_64-unknown-linux-gnu \
-		--no-default-features \
-		--features target-x86_64-unknown-linux-gnu
-
-.PHONY: target/x86_64-unknown-linux-gnu/release/vector
-target/x86_64-unknown-linux-gnu/release/vector: export RUSTFLAGS += -C link-arg=-s
-target/x86_64-unknown-linux-gnu/release/vector:
-	cross build \
-		--release \
-		--target x86_64-unknown-linux-gnu \
-		--no-default-features \
-		--features target-x86_64-unknown-linux-gnu
-
-target/x86_64-unknown-linux-gnu/release/vector.tar.gz: target/x86_64-unknown-linux-gnu/release/vector
-target/x86_64-unknown-linux-gnu/release/vector.tar.gz:
-	tar --create \
-		--gzip \
-		--file target/x86_64-unknown-linux-gnu/release/vector.tar.gz \
-		--transform='s|target/x86_64-unknown-linux-gnu/release/|/bin/|' \
-		--transform='s|distribution/|etc/|' \
-		target/x86_64-unknown-linux-gnu/release/vector \
-		README.md \
-		config \
-		distribution/init.d \
-		distribution/systemd
-
-ci-cross-aarch64-unknown-linux-gnu: cross-enable cross-test-aarch64-unknown-linux-gnu
 
 cross-build-aarch64-unknown-linux-gnu: target/aarch64-unknown-linux-gnu/release/vector
 cross-build-dev-aarch64-unknown-linux-gnu: target/aarch64-unknown-linux-gnu/debug/vector
 cross-test-aarch64-unknown-linux-gnu:
 	cross test --target aarch64-unknown-linux-gnu
 
-.PHONY: target/aarch64-unknown-linux-gnu/debug/vector
-target/aarch64-unknown-linux-gnu/debug/vector: export RUSTFLAGS += -C link-arg=-s
-target/aarch64-unknown-linux-gnu/debug/vector:
-	cross build \
-		--target aarch64-unknown-linux-gnu \
-		--no-default-features \
-		--features target-aarch64-unknown-linux-gnu
+cross-build-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/release/vector
+cross-build-dev-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/debug/vector
+cross-test-x86_64-unknown-linux-gnu:
+	cross test --target x86_64-unknown-linux-gnu
 
-.PHONY: target/aarch64-unknown-linux-gnu/release/vector
-target/aarch64-unknown-linux-gnu/release/vector: export RUSTFLAGS += -C link-arg=-s
-target/aarch64-unknown-linux-gnu/release/vector:
+.PHONY: target/%/vector
+target/%/vector: export PAIR =$(subst /, ,$(@:target/%/vector=%))
+target/%/vector: export TARGET ?=$(word 1,${PAIR})
+target/%/vector: export PROFILE ?=$(word 2,${PAIR})
+target/%/vector: export RUSTFLAGS += -C link-arg=-s
+target/%/vector:
 	cross build \
-		--release \
-		--target aarch64-unknown-linux-gnu \
+		$(if $(findstring release,$(PROFILE)),--release,) \
+		--target ${TARGET} \
 		--no-default-features \
-		--features target-aarch64-unknown-linux-gnu
+		--features target-${TARGET}
 
-target/aarch64-unknown-linux-gnu/release/vector.tar.gz: target/aarch64-unknown-linux-gnu/release/vector
-target/aarch64-unknown-linux-gnu/release/vector.tar.gz:
+.PHONY: target/%/vector.tar.gz
+target/%/vector.tar.gz: export PAIR =$(subst /, ,$(@:target/%/vector.tar.gz=%))
+target/%/vector.tar.gz: export TARGET ?=$(word 1,${PAIR})
+target/%/vector.tar.gz: export PROFILE ?=$(word 2,${PAIR})
+target/%/vector.tar.gz: target/%/vector
+	echo ${PAIR} $@
 	tar --create \
 		--gzip \
-		--file target/aarch64-unknown-linux-gnu/release/vector.tar.gz \
-		--transform='s|target/aarch64-unknown-linux-gnu/release/|/bin/|' \
+		--file target/${TARGET}/${PROFILE}/vector.tar.gz \
+		--transform='s|target/${TARGET}/${PROFILE}/|/bin/|' \
 		--transform='s|distribution/|etc/|' \
-		target/aarch64-unknown-linux-gnu/release/vector \
+		target/${TARGET}/${PROFILE}/vector \
 		README.md \
 		config \
 		distribution/init.d \
