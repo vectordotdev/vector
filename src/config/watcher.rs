@@ -22,8 +22,8 @@ const CONFIG_WATCH_DELAY: std::time::Duration = std::time::Duration::from_secs(1
 const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// Triggers SIGHUP when file on config_path changes.
-/// Accumulates file changes until no change for given duration has occured.
-/// Has best effort guarante of detecting all file changes from the end of
+/// Accumulates file changes until no change for given duration has occurred.
+/// Has best effort guarantee of detecting all file changes from the end of
 /// this function until the main thread stops.
 #[cfg(unix)]
 pub fn spawn_thread(
@@ -121,7 +121,7 @@ fn add_paths(watcher: &mut RecommendedWatcher, config_paths: &[PathBuf]) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::temp_file;
+    use crate::test_util::{temp_file, trace_init};
     use futures::compat::Future01CompatExt;
     use futures01::{Future, Stream};
     use std::time::Duration;
@@ -141,7 +141,8 @@ mod tests {
 
     #[tokio::test]
     async fn file_update() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let delay = Duration::from_secs(3);
         let file_path = temp_file();
         let mut file = File::create(&file_path).unwrap();
@@ -155,7 +156,8 @@ mod tests {
 
     #[tokio::test]
     async fn sym_file_update() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let delay = Duration::from_secs(3);
         let file_path = temp_file();
         let sym_file = temp_file();

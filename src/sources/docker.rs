@@ -1,3 +1,4 @@
+use super::util::MultilineConfig;
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::merge_state::LogEventMergeState,
@@ -7,6 +8,7 @@ use crate::{
         DockerContainerUnwatch, DockerContainerWatch, DockerEventReceived,
         DockerLoggingDriverUnsupported, DockerTimestampParseFailed,
     },
+    line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
     Pipeline,
 };
@@ -29,12 +31,12 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::pin::Pin;
 use std::sync::Arc;
-use std::{collections::HashMap, env};
+use std::{collections::HashMap, convert::TryFrom, env};
 use string_cache::DefaultAtom as Atom;
 use tokio::sync::mpsc;
 use tracing::field;
 
-/// The begining of image names of vector docker images packaged by vector.
+/// The beginning of image names of vector docker images packaged by vector.
 const VECTOR_IMAGE_NAME: &str = "timberio/vector";
 
 lazy_static! {
@@ -55,6 +57,7 @@ pub struct DockerConfig {
     include_images: Option<Vec<String>>,
     partial_event_marker_field: Option<Atom>,
     auto_partial_merge: bool,
+    multiline: Option<MultilineConfig>,
 }
 
 impl Default for DockerConfig {
@@ -65,6 +68,7 @@ impl Default for DockerConfig {
             include_images: None,
             partial_event_marker_field: Some(event::PARTIAL.clone()),
             auto_partial_merge: true,
+            multiline: None,
         }
     }
 }
@@ -155,6 +159,7 @@ impl SourceConfig for DockerConfig {
 
 struct DockerSourceCore {
     config: DockerConfig,
+    line_agg_config: Option<line_agg::Config>,
     docker: Docker,
     /// Only logs created at, or after this moment are logged.
     now_timestamp: DateTime<Utc>,
@@ -173,8 +178,15 @@ impl DockerSourceCore {
             now = %now.to_rfc3339()
         );
 
+        let line_agg_config = if let Some(ref multiline_config) = config.multiline {
+            Some(line_agg::Config::try_from(multiline_config)?)
+        } else {
+            None
+        };
+
         Ok(DockerSourceCore {
             config,
+            line_agg_config,
             docker,
             now_timestamp: now.into(),
         })
@@ -186,7 +198,7 @@ impl DockerSourceCore {
     ) -> impl Stream<Item = Result<SystemEventsResponse, DockerError>> + Send {
         let mut filters = HashMap::new();
 
-        // event  | emmited on commands
+        // event  | emitted on commands
         // -------+-------------------
         // start  | docker start, docker run, restart policy, docker restart
         // unpause | docker unpause
@@ -222,7 +234,7 @@ impl DockerSourceCore {
 
 /// Main future which listens for events coming from docker, and maintains
 /// a fan of event_stream futures.
-/// Where each event_stream corresponds to a runing container marked with ContainerLogInfo.
+/// Where each event_stream corresponds to a running container marked with ContainerLogInfo.
 /// While running, event_stream streams Events to out channel.
 /// Once a log stream has ended, it sends ContainerLogInfo back to main.
 ///
@@ -237,7 +249,7 @@ struct DockerSource {
     events: Pin<Box<dyn Stream<Item = Result<SystemEventsResponse, DockerError>> + Send>>,
     ///  mappings of seen container_id to their data
     containers: HashMap<ContainerId, ContainerState>,
-    ///receives ContainerLogInfo comming from event stream futures
+    ///receives ContainerLogInfo coming from event stream futures
     main_recv: mpsc::UnboundedReceiver<Result<ContainerLogInfo, ContainerId>>,
     /// It may contain shortened container id.
     hostname: Option<String>,
@@ -253,7 +265,7 @@ impl DockerSource {
     ) -> crate::Result<DockerSource> {
         // Find out it's own container id, if it's inside a docker container.
         // Since docker doesn't readily provide such information,
-        // various approches need to be made. As such the solution is not
+        // various approaches need to be made. As such the solution is not
         // exact, but probable.
         // This is to be used only if source is in state of catching everything.
         // Or in other words, if includes are used then this is not necessary.
@@ -267,7 +279,7 @@ impl DockerSource {
         // Only logs created at, or after this moment are logged.
         let core = DockerSourceCore::new(config)?;
 
-        // main event stream, with whom only newly started/restarted containers will be loged.
+        // main event stream, with whom only newly started/restarted containers will be logged.
         let events = core.docker_event_stream();
         info!(message = "Listening to docker events.");
 
@@ -440,7 +452,7 @@ impl DockerSource {
                         }
                         Some(Err(error)) => emit!(DockerCommunicationError{error,container_id:None}),
                         None => {
-                            // TODO: this could be fixed, but should be tryed with some timeoff and exponential backoff
+                            // TODO: this could be fixed, but should be tried with some timeoff and exponential backoff
                             error!(message = "docker event stream has ended unexpectedly.");
                             info!(message = "shutting down docker source.");
                             return;
@@ -549,7 +561,7 @@ impl EventStreamBuilder {
         // Create event streamer
         let mut partial_event_merge_state = None;
 
-        stream
+        let events_stream = stream
             .map(|value| {
                 match value {
                     Ok(message) => Ok(info.new_event(
@@ -580,8 +592,21 @@ impl EventStreamBuilder {
                 }
             })
             .take_while(|v| future::ready(v.is_ok()))
-            .filter_map(|v| future::ready(v.transpose()))
-            .take_until(self.shutdown.clone().compat())
+            .filter_map(|v| future::ready(v.unwrap()))
+            .take_until(self.shutdown.clone().compat());
+
+        let events_stream: Box<dyn Stream<Item = Event> + Unpin + Send> =
+            if let Some(ref line_agg_config) = self.core.line_agg_config {
+                Box::new(line_agg_adapter(
+                    events_stream,
+                    line_agg::Logic::new(line_agg_config.clone()),
+                ))
+            } else {
+                Box::new(events_stream)
+            };
+
+        events_stream
+            .map(Ok)
             .forward(self.out.clone().sink_compat().sink_map_err(|_| ()))
             .map(|_| {})
             .await;
@@ -650,7 +675,7 @@ impl ContainerState {
     fn return_info(&mut self, info: ContainerLogInfo) -> bool {
         debug_assert!(self.info.is_none());
         // Generation is the only one strictly necessary,
-        // but with v.running, restarting event_stream is automtically done.
+        // but with v.running, restarting event_stream is automatically done.
         let restart = self.running || info.generation < self.generation;
         self.info = Some(info);
         restart
@@ -700,7 +725,7 @@ impl ContainerLogInfo {
             - 1
     }
 
-    /// Expects timestamp at the begining of message.
+    /// Expects timestamp at the beggining of message.
     /// Expects messages to be ordered by timestamps.
     fn new_event(
         &mut self,
@@ -723,13 +748,13 @@ impl ContainerLogInfo {
             Ok(timestamp) => {
                 // Timestamp check
                 match self.last_log.as_ref() {
-                    // Recieved log has not already been processed
+                    // Received log has not already been processed
                     Some(&(ref last, gen))
                         if *last < timestamp || (*last == timestamp && gen == self.generation) =>
                     {
                         // noop
                     }
-                    // Recieved log is not from before of creation
+                    // Received log is not from before of creation
                     None if self.created <= timestamp.with_timezone(&Utc) => (),
                     _ => {
                         trace!(
@@ -750,7 +775,7 @@ impl ContainerLogInfo {
                 Some(timestamp.with_timezone(&Utc))
             }
             Err(error) => {
-                // Recieved bad timestamp, if any at all.
+                // Received bad timestamp, if any at all.
                 emit!(DockerTimestampParseFailed {
                     error,
                     container_id: self.id.as_str()
@@ -781,7 +806,7 @@ impl ContainerLogInfo {
             let mut log_event = LogEvent::default();
 
             // Source type
-            log_event.insert(event::log_schema().source_type_key(), "docker");
+            log_event.insert(event::log_schema().source_type_key(), Bytes::from("docker"));
 
             // The log message.
             log_event.insert(event::log_schema().message_key().clone(), bytes_message);
@@ -839,7 +864,7 @@ impl ContainerLogInfo {
                 return None;
             };
 
-            // This is not a parial event. If we have a partial event merge
+            // This is not a partial event. If we have a partial event merge
             // state from before, the current event must be a final event, that
             // would give us a merged event we can return.
             // Otherwise it's just a regular event that we return as-is.
@@ -861,7 +886,7 @@ impl ContainerLogInfo {
         };
 
         // Partial or not partial - we return the event we got here, because all
-        // other cases were handeled earlier.
+        // other cases were handled earlier.
         let event = Event::Log(log_event);
 
         emit!(DockerEventReceived {
@@ -895,15 +920,20 @@ impl ContainerMetadata {
             .as_ref()
             .map(|map| {
                 map.iter()
-                    .map(|(key, value)| (("label.".to_owned() + key).into(), value.as_str().into()))
+                    .map(|(key, value)| {
+                        (
+                            ("label.".to_owned() + key).into(),
+                            value.as_bytes().to_owned().into(),
+                        )
+                    })
                     .collect()
             })
             .unwrap_or_default();
 
         Ok(ContainerMetadata {
             labels,
-            name: name.as_str().trim_start_matches('/').into(),
-            image: config.image.unwrap().as_str().into(),
+            name: name.as_str().trim_start_matches('/').to_owned().into(),
+            image: config.image.unwrap().into(),
             created_at: DateTime::parse_from_rfc3339(created.as_str())?.with_timezone(&Utc),
         })
     }
@@ -922,12 +952,38 @@ fn docker() -> Result<Docker, DockerError> {
     }
 }
 
+fn line_agg_adapter(
+    inner: impl Stream<Item = Event> + Unpin,
+    logic: line_agg::Logic<Bytes, LogEvent>,
+) -> impl Stream<Item = Event> {
+    let line_agg_in = inner.map(|event| {
+        let mut log_event = event.into_log();
+
+        let message_value = log_event
+            .remove(event::log_schema().message_key())
+            .expect("message must exist in the event");
+        let stream_value = log_event
+            .get(&STREAM)
+            .expect("stream must exist in the event");
+
+        let stream = stream_value.as_bytes();
+        let message = message_value.into_bytes();
+        (stream, message, log_event)
+    });
+    let line_agg_out = LineAgg::<_, Bytes, LogEvent>::new(line_agg_in, logic);
+    line_agg_out.map(|(_, message, mut log_event)| {
+        log_event.insert(event::log_schema().message_key(), message);
+        Event::Log(log_event)
+    })
+}
+
 #[cfg(all(test, feature = "docker-integration-tests"))]
 mod tests {
     use super::*;
-    use crate::runtime::Runtime;
-    use crate::test_util::{collect_n, runtime, trace_init};
-    use crate::Pipeline;
+    use crate::{
+        test_util::{collect_n, trace_init},
+        Pipeline,
+    };
     use bollard::{
         container::{
             Config as ContainerConfig, CreateContainerOptions, KillContainerOptions,
@@ -942,23 +998,19 @@ mod tests {
     fn source_with<'a, L: Into<Option<&'a str>>>(
         names: &[&str],
         label: L,
-        rt: &mut Runtime,
     ) -> mpsc01::Receiver<Event> {
-        source_with_config(
-            DockerConfig {
-                include_containers: Some(names.iter().map(|&s| s.to_owned()).collect()),
-                include_labels: Some(label.into().map(|l| vec![l.to_owned()]).unwrap_or_default()),
-                ..DockerConfig::default()
-            },
-            rt,
-        )
+        source_with_config(DockerConfig {
+            include_containers: Some(names.iter().map(|&s| s.to_owned()).collect()),
+            include_labels: Some(label.into().map(|l| vec![l.to_owned()]).unwrap_or_default()),
+            ..DockerConfig::default()
+        })
     }
 
     /// None if docker is not present on the system
-    fn source_with_config(config: DockerConfig, rt: &mut Runtime) -> mpsc01::Receiver<Event> {
+    fn source_with_config(config: DockerConfig) -> mpsc01::Receiver<Event> {
         // trace_init();
         let (sender, recv) = Pipeline::new_test();
-        rt.spawn(
+        tokio::spawn(async move {
             config
                 .build(
                     "default",
@@ -966,8 +1018,11 @@ mod tests {
                     ShutdownSignal::noop(),
                     sender,
                 )
-                .unwrap(),
-        );
+                .unwrap()
+                .compat()
+                .await
+                .unwrap();
+        });
         recv
     }
 
@@ -1108,7 +1163,7 @@ mod tests {
     async fn container_remove(id: &str, docker: &Docker) {
         trace!("Removing container.");
 
-        // Don't panick, as this is unreleated to test, and there possibly other containers that need to be removed
+        // Don't panic, as this is unrelated to the test, and there are possibly other containers that need to be removed
         let _ = docker
             .remove_container(id, None::<RemoveContainerOptions>)
             .await
@@ -1136,32 +1191,29 @@ mod tests {
 
     /// Once function returns, the container has entered into running state.
     /// Container must be killed before removed.
-    fn running_container(
+    async fn running_container(
         name: &'static str,
         label: Option<&'static str>,
         log: &'static str,
         docker: &Docker,
-        rt: &mut Runtime,
     ) -> String {
-        let out = source_with(&[name], None, rt);
+        let out = source_with(&[name], None);
         let docker = docker.clone();
 
-        rt.block_on_std(async move {
-            let id = eternal_container(name, label, log, &docker).await;
-            if let Err(error) = container_start(&id, &docker).await {
-                container_remove(&id, &docker).await;
-                panic!("Container start failed with error: {:?}", error);
-            }
+        let id = eternal_container(name, label, log, &docker).await;
+        if let Err(error) = container_start(&id, &docker).await {
+            container_remove(&id, &docker).await;
+            panic!("Container start failed with error: {:?}", error);
+        }
 
-            // Wait for before message
-            let events = collect_n(out, 1).compat().await.ok().unwrap();
-            assert_eq!(
-                events[0].as_log()[&event::log_schema().message_key()],
-                "before".into()
-            );
+        // Wait for before message
+        let events = collect_n(out, 1).await.unwrap();
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            "before".into()
+        );
 
-            id
-        })
+        id
     }
 
     async fn is_empty<T>(mut rx: mpsc01::Receiver<T>) -> Result<bool, ()> {
@@ -1170,95 +1222,86 @@ mod tests {
             .await
     }
 
-    #[test]
-    fn newly_started() {
+    #[tokio::test]
+    async fn newly_started() {
         trace_init();
 
         let message = "9";
         let name = "vector_test_newly_started";
         let label = "vector_test_label_newly_started";
 
-        let mut rt = runtime();
-        let out = source_with(&[name], None, &mut rt);
+        let out = source_with(&[name], None);
 
-        rt.block_on_std(async move {
-            let docker = docker().unwrap();
+        let docker = docker().unwrap();
 
-            let id = container_log_n(1, name, Some(label), message, &docker).await;
-            let events = collect_n(out, 1).compat().await.ok().unwrap();
-            container_remove(&id, &docker).await;
+        let id = container_log_n(1, name, Some(label), message, &docker).await;
+        let events = collect_n(out, 1).await.unwrap();
+        container_remove(&id, &docker).await;
 
-            let log = events[0].as_log();
-            assert_eq!(log[&event::log_schema().message_key()], message.into());
-            assert_eq!(log[&super::CONTAINER], id.into());
-            assert!(log.get(&super::CREATED_AT).is_some());
-            assert_eq!(log[&super::IMAGE], "busybox".into());
-            assert!(log.get(&format!("label.{}", label).into()).is_some());
-            assert_eq!(events[0].as_log()[&super::NAME], name.into());
-            assert_eq!(
-                events[0].as_log()[event::log_schema().source_type_key()],
-                "docker".into()
-            );
-        });
+        let log = events[0].as_log();
+        assert_eq!(log[&event::log_schema().message_key()], message.into());
+        assert_eq!(log[&super::CONTAINER], id.into());
+        assert!(log.get(&super::CREATED_AT).is_some());
+        assert_eq!(log[&super::IMAGE], "busybox".into());
+        assert!(log.get(&format!("label.{}", label).into()).is_some());
+        assert_eq!(events[0].as_log()[&super::NAME], name.into());
+        assert_eq!(
+            events[0].as_log()[event::log_schema().source_type_key()],
+            "docker".into()
+        );
     }
 
-    #[test]
-    fn restart() {
+    #[tokio::test]
+    async fn restart() {
         trace_init();
 
         let message = "10";
         let name = "vector_test_restart";
 
-        let mut rt = runtime();
-        let out = source_with(&[name], None, &mut rt);
+        let out = source_with(&[name], None);
 
-        rt.block_on_std(async move {
-            let docker = docker().unwrap();
+        let docker = docker().unwrap();
 
-            let id = container_log_n(2, name, None, message, &docker).await;
-            let events = collect_n(out, 2).compat().await.ok().unwrap();
-            container_remove(&id, &docker).await;
+        let id = container_log_n(2, name, None, message, &docker).await;
+        let events = collect_n(out, 2).await.unwrap();
+        container_remove(&id, &docker).await;
 
-            assert_eq!(
-                events[0].as_log()[&event::log_schema().message_key()],
-                message.into()
-            );
-            assert_eq!(
-                events[1].as_log()[&event::log_schema().message_key()],
-                message.into()
-            );
-        });
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            message.into()
+        );
+        assert_eq!(
+            events[1].as_log()[&event::log_schema().message_key()],
+            message.into()
+        );
     }
 
-    #[test]
-    fn include_containers() {
+    #[tokio::test]
+    async fn include_containers() {
         trace_init();
 
         let message = "11";
         let name0 = "vector_test_include_container_0";
         let name1 = "vector_test_include_container_1";
 
-        let mut rt = runtime();
-        let out = source_with(&[name1], None, &mut rt);
+        let out = source_with(&[name1], None);
 
-        rt.block_on_std(async move {
-            let docker = docker().unwrap();
+        let docker = docker().unwrap();
 
-            let id0 = container_log_n(1, name0, None, "13", &docker).await;
-            let id1 = container_log_n(1, name1, None, message, &docker).await;
-            let events = collect_n(out, 1).compat().await.ok().unwrap();
-            container_remove(&id0, &docker).await;
-            container_remove(&id1, &docker).await;
+        let id0 = container_log_n(1, name0, None, "13", &docker).await;
+        let id1 = container_log_n(1, name1, None, message, &docker).await;
+        let events = collect_n(out, 1).await.unwrap();
+        container_remove(&id0, &docker).await;
+        container_remove(&id1, &docker).await;
 
-            assert_eq!(
-                events[0].as_log()[&event::log_schema().message_key()],
-                message.into()
-            );
-        });
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            message.into()
+        );
     }
 
-    #[test]
-    fn include_labels() {
+    #[tokio::test]
+    async fn include_labels() {
         trace_init();
 
         let message = "12";
@@ -1266,59 +1309,53 @@ mod tests {
         let name1 = "vector_test_include_labels_1";
         let label = "vector_test_include_label";
 
-        let mut rt = runtime();
-        let out = source_with(&[name0, name1], label, &mut rt);
+        let out = source_with(&[name0, name1], label);
 
-        rt.block_on_std(async move {
-            let docker = docker().unwrap();
+        let docker = docker().unwrap();
 
-            let id0 = container_log_n(1, name0, None, "13", &docker).await;
-            let id1 = container_log_n(1, name1, Some(label), message, &docker).await;
-            let events = collect_n(out, 1).compat().await.ok().unwrap();
-            container_remove(&id0, &docker).await;
-            container_remove(&id1, &docker).await;
+        let id0 = container_log_n(1, name0, None, "13", &docker).await;
+        let id1 = container_log_n(1, name1, Some(label), message, &docker).await;
+        let events = collect_n(out, 1).await.unwrap();
+        container_remove(&id0, &docker).await;
+        container_remove(&id1, &docker).await;
 
-            assert_eq!(
-                events[0].as_log()[&event::log_schema().message_key()],
-                message.into()
-            );
-        });
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            message.into()
+        );
     }
 
-    #[test]
-    fn currently_running() {
+    #[tokio::test]
+    async fn currently_running() {
         trace_init();
 
         let message = "14";
         let name = "vector_test_currently_running";
         let label = "vector_test_label_currently_running";
 
-        let mut rt = runtime();
         let docker = docker().unwrap();
-        let id = running_container(name, Some(label), message, &docker, &mut rt);
-        let out = source_with(&[name], None, &mut rt);
+        let id = running_container(name, Some(label), message, &docker).await;
+        let out = source_with(&[name], None);
 
-        rt.block_on_std(async move {
-            let events = collect_n(out, 1).compat().await.ok().unwrap();
-            let _ = container_kill(&id, &docker).await;
-            container_remove(&id, &docker).await;
+        let events = collect_n(out, 1).await.unwrap();
+        let _ = container_kill(&id, &docker).await;
+        container_remove(&id, &docker).await;
 
-            let log = events[0].as_log();
-            assert_eq!(log[&event::log_schema().message_key()], message.into());
-            assert_eq!(log[&super::CONTAINER], id.into());
-            assert!(log.get(&super::CREATED_AT).is_some());
-            assert_eq!(log[&super::IMAGE], "busybox".into());
-            assert!(log.get(&format!("label.{}", label).into()).is_some());
-            assert_eq!(events[0].as_log()[&super::NAME], name.into());
-            assert_eq!(
-                events[0].as_log()[event::log_schema().source_type_key()],
-                "docker".into()
-            );
-        });
+        let log = events[0].as_log();
+        assert_eq!(log[&event::log_schema().message_key()], message.into());
+        assert_eq!(log[&super::CONTAINER], id.into());
+        assert!(log.get(&super::CREATED_AT).is_some());
+        assert_eq!(log[&super::IMAGE], "busybox".into());
+        assert!(log.get(&format!("label.{}", label).into()).is_some());
+        assert_eq!(events[0].as_log()[&super::NAME], name.into());
+        assert_eq!(
+            events[0].as_log()[event::log_schema().source_type_key()],
+            "docker".into()
+        );
     }
 
-    #[test]
-    fn include_image() {
+    #[tokio::test]
+    async fn include_image() {
         trace_init();
 
         let message = "15";
@@ -1329,25 +1366,22 @@ mod tests {
             ..DockerConfig::default()
         };
 
-        let mut rt = runtime();
-        let out = source_with_config(config, &mut rt);
+        let out = source_with_config(config);
 
-        rt.block_on_std(async move {
-            let docker = docker().unwrap();
+        let docker = docker().unwrap();
 
-            let id = container_log_n(1, name, None, message, &docker).await;
-            let events = collect_n(out, 1).compat().await.ok().unwrap();
-            container_remove(&id, &docker).await;
+        let id = container_log_n(1, name, None, message, &docker).await;
+        let events = collect_n(out, 1).await.unwrap();
+        container_remove(&id, &docker).await;
 
-            assert_eq!(
-                events[0].as_log()[&event::log_schema().message_key()],
-                message.into()
-            );
-        });
+        assert_eq!(
+            events[0].as_log()[&event::log_schema().message_key()],
+            message.into()
+        );
     }
 
-    #[test]
-    fn not_include_image() {
+    #[tokio::test]
+    async fn not_include_image() {
         trace_init();
 
         let message = "16";
@@ -1357,21 +1391,18 @@ mod tests {
             ..DockerConfig::default()
         };
 
-        let mut rt = runtime();
-        let exclude_out = source_with_config(config_ex, &mut rt);
+        let exclude_out = source_with_config(config_ex);
 
-        rt.block_on_std(async move {
-            let docker = docker().unwrap();
+        let docker = docker().unwrap();
 
-            let id = container_log_n(1, name, None, message, &docker).await;
-            container_remove(&id, &docker).await;
+        let id = container_log_n(1, name, None, message, &docker).await;
+        container_remove(&id, &docker).await;
 
-            assert!(is_empty(exclude_out).await.unwrap());
-        });
+        assert!(is_empty(exclude_out).await.unwrap());
     }
 
-    #[test]
-    fn not_include_running_image() {
+    #[tokio::test]
+    async fn not_include_running_image() {
         trace_init();
 
         let message = "17";
@@ -1386,24 +1417,21 @@ mod tests {
             ..DockerConfig::default()
         };
 
-        let mut rt = runtime();
         let docker = docker().unwrap();
 
-        let id = running_container(name, None, message, &docker, &mut rt);
-        let exclude_out = source_with_config(config_ex, &mut rt);
-        let include_out = source_with_config(config_in, &mut rt);
+        let id = running_container(name, None, message, &docker).await;
+        let exclude_out = source_with_config(config_ex);
+        let include_out = source_with_config(config_in);
 
-        rt.block_on_std(async move {
-            let _ = collect_n(include_out, 1).compat().await.ok().unwrap();
-            let _ = container_kill(&id, &docker).await;
-            container_remove(&id, &docker).await;
+        let _ = collect_n(include_out, 1).await.unwrap();
+        let _ = container_kill(&id, &docker).await;
+        container_remove(&id, &docker).await;
 
-            assert!(is_empty(exclude_out).await.unwrap());
-        });
+        assert!(is_empty(exclude_out).await.unwrap());
     }
 
-    #[test]
-    fn log_longer_than_16kb() {
+    #[tokio::test]
+    async fn log_longer_than_16kb() {
         trace_init();
 
         let mut message = String::with_capacity(20 * 1024);
@@ -1412,18 +1440,73 @@ mod tests {
         }
         let name = "vector_test_log_longer_than_16kb";
 
-        let mut rt = runtime();
-        let out = source_with(&[name], None, &mut rt);
+        let out = source_with(&[name], None);
 
-        rt.block_on_std(async move {
-            let docker = docker().unwrap();
+        let docker = docker().unwrap();
 
-            let id = container_log_n(1, name, None, message.as_str(), &docker).await;
-            let events = collect_n(out, 1).compat().await.ok().unwrap();
+        let id = container_log_n(1, name, None, message.as_str(), &docker).await;
+        let events = collect_n(out, 1).await.unwrap();
+        container_remove(&id, &docker).await;
+
+        let log = events[0].as_log();
+        assert_eq!(log[&event::log_schema().message_key()], message.into());
+    }
+
+    #[tokio::test]
+    async fn merge_multiline() {
+        trace_init();
+
+        let emitted_messages = vec![
+            "java.lang.Exception",
+            "    at com.foo.bar(bar.java:123)",
+            "    at com.foo.baz(baz.java:456)",
+        ];
+        let expected_messages = vec![concat!(
+            "java.lang.Exception\n",
+            "    at com.foo.bar(bar.java:123)\n",
+            "    at com.foo.baz(baz.java:456)",
+        )];
+        let name = "vector_test_merge_multiline";
+        let config = DockerConfig {
+            include_containers: Some(vec![name.to_owned()]),
+            include_images: Some(vec!["busybox".to_owned()]),
+            multiline: Some(MultilineConfig {
+                start_pattern: "^[^\\s]".to_owned(),
+                condition_pattern: "^[\\s]+at".to_owned(),
+                mode: line_agg::Mode::ContinueThrough,
+                timeout_ms: 10,
+            }),
+            ..DockerConfig::default()
+        };
+
+        let out = source_with_config(config);
+
+        let docker = docker().unwrap();
+
+        let command = emitted_messages
+            .into_iter()
+            .map(|message| format!("echo {:?}", message))
+            .collect::<Box<_>>()
+            .join(" && ");
+
+        let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker).await;
+        if let Err(error) = container_run(&id, &docker).await {
             container_remove(&id, &docker).await;
+            panic!("Container failed to start with error: {:?}", error);
+        }
+        let events = collect_n(out, expected_messages.len()).await.unwrap();
+        container_remove(&id, &docker).await;
 
-            let log = events[0].as_log();
-            assert_eq!(log[&event::log_schema().message_key()], message.into());
-        });
+        let actual_messages = events
+            .into_iter()
+            .map(|event| {
+                event
+                    .into_log()
+                    .remove(event::log_schema().message_key())
+                    .unwrap()
+                    .to_string_lossy()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(actual_messages, expected_messages);
     }
 }

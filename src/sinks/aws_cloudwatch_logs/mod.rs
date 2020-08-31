@@ -853,11 +853,11 @@ mod integration_tests {
         region::RegionOrEndpoint,
         test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
     };
-    use futures::compat::Future01CompatExt;
-    use futures01::{
-        stream::{self, Stream},
-        Sink,
+    use futures::{
+        compat::{Future01CompatExt, Sink01CompatExt},
+        SinkExt, TryStreamExt,
     };
+    use futures01::{stream, Sink};
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_logs::{CloudWatchLogs, CreateLogGroupRequest, GetLogEventsRequest};
@@ -889,12 +889,9 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, events) = random_lines_with_stream(100, 11);
+        let (input_lines, mut events) = random_lines_with_stream(100, 11);
 
-        let pump = sink.send_all(events);
-        let (sink, _) = pump.compat().await.unwrap();
-        // drop the sink so it closes all its connections
-        drop(sink);
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -942,22 +939,23 @@ mod integration_tests {
         // add a historical timestamp to all but the first event, to simulate
         // out-of-order timestamps.
         let mut doit = false;
-        let pump = sink.send_all(events.map(move |mut event| {
-            if doit {
-                let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
+        let _ = sink
+            .sink_compat()
+            .send_all(&mut events.map_ok(move |mut event| {
+                if doit {
+                    let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
 
-                event.as_mut_log().insert(
-                    event::log_schema().timestamp_key(),
-                    Value::Timestamp(timestamp),
-                );
-            }
-            doit = true;
+                    event.as_mut_log().insert(
+                        event::log_schema().timestamp_key(),
+                        Value::Timestamp(timestamp),
+                    );
+                }
+                doit = true;
 
-            event
-        }));
-        let (sink, _) = pump.compat().await.unwrap();
-        // drop the sink so it closes all its connections
-        drop(sink);
+                event
+            }))
+            .await
+            .unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -982,6 +980,7 @@ mod integration_tests {
     #[tokio::test]
     async fn cloudwatch_insert_out_of_range_timestamp() {
         trace_init();
+
         ensure_group().await;
 
         let stream_name = gen_name();
@@ -1074,12 +1073,9 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, events) = random_lines_with_stream(100, 11);
+        let (input_lines, mut events) = random_lines_with_stream(100, 11);
 
-        let pump = sink.send_all(events);
-        let (sink, _) = pump.compat().await.unwrap();
-        // drop the sink so it closes all its connections
-        drop(sink);
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -1098,9 +1094,10 @@ mod integration_tests {
         assert_eq!(output_lines, input_lines);
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test]
     async fn cloudwatch_insert_log_event_batched() {
         trace_init();
+
         ensure_group().await;
 
         let stream_name = gen_name();
@@ -1126,12 +1123,9 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, events) = random_lines_with_stream(100, 11);
+        let (input_lines, mut events) = random_lines_with_stream(100, 11);
 
-        let pump = sink.send_all(events);
-        let (sink, _) = pump.compat().await.unwrap();
-        // drop the sink so it closes all its connections
-        drop(sink);
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -1153,6 +1147,7 @@ mod integration_tests {
     #[tokio::test]
     async fn cloudwatch_insert_log_event_partitioned() {
         trace_init();
+
         ensure_group().await;
 
         let stream_name = gen_name();
@@ -1173,7 +1168,7 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, _) = random_lines_with_stream(100, 10);
+        let (input_lines, _events) = random_lines_with_stream(100, 10);
 
         let events = input_lines
             .clone()
@@ -1239,6 +1234,7 @@ mod integration_tests {
     #[tokio::test]
     async fn cloudwatch_healthcheck() {
         trace_init();
+
         ensure_group().await;
 
         let config = CloudwatchLogsSinkConfig {

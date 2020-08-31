@@ -22,7 +22,9 @@ pub mod parser;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 struct PrometheusConfig {
-    hosts: Vec<String>,
+    // Deprecated name
+    #[serde(alias = "hosts")]
+    endpoints: Vec<String>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
 }
@@ -41,7 +43,7 @@ impl crate::config::SourceConfig for PrometheusConfig {
         out: Pipeline,
     ) -> crate::Result<super::Source> {
         let mut urls = Vec::new();
-        for host in self.hosts.iter() {
+        for host in self.endpoints.iter() {
             let base_uri = host.parse::<http::Uri>().context(super::UriParseError)?;
             urls.push(format!("{}metrics", base_uri));
         }
@@ -152,8 +154,10 @@ mod test {
         Error,
     };
     use futures::compat::Future01CompatExt;
-    use hyper::service::{make_service_fn, service_fn};
-    use hyper::{Body, Client, Response, Server};
+    use hyper::{
+        service::{make_service_fn, service_fn},
+        {Body, Client, Response, Server},
+    };
     use pretty_assertions::assert_eq;
     use tokio::time::{delay_for, Duration};
 
@@ -207,7 +211,7 @@ mod test {
         config.add_source(
             "in",
             PrometheusConfig {
-                hosts: vec![format!("http://{}", in_addr)],
+                endpoints: vec![format!("http://{}", in_addr)],
                 scrape_interval_secs: 1,
             },
         );

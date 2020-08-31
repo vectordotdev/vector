@@ -18,6 +18,9 @@ spec:
         {{- toYaml . | nindent 8 }}
     {{- end }}
       labels:
+        {{- with .Values.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
         {{- include "vector.selectorLabels" . | nindent 8 }}
         vector.dev/exclude: "true"
     spec:

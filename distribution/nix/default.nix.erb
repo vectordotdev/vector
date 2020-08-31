@@ -27,7 +27,7 @@ rustPlatform.buildRustPackage rec {
 
   legacyCargoFetcher = true;
   cargoSha256 = "<%=
-    # The only offical way to calculate `cargoSha256` is to set it arbitrarily,
+    # The only official way to calculate `cargoSha256` is to set it arbitrarily,
     # run the build, and then extract the correct checksum from the error
     # message. See
     # https://nixos.org/nixpkgs/manual/#compiling-rust-applications-with-cargo

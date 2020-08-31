@@ -170,8 +170,14 @@ aligns better with our process.
 Currently Vector uses Github Actions to run tests. The workflows are defined in
 `.github/workflows`.
 
-Tests are run for all changes, and Github Actions is responsible for releasing
-updated versions of Vector through various channels.
+Tests are run for all changes except those that have the label:
+
+```text
+ci-condition: skip
+```
+
+Github Actions is responsible for releasing updated versions of Vector through
+various channels.
 
 Some long running tests are only run daily, rather than on every pull request.
 If needed, an administrator can kick off these tests manually via:
@@ -749,7 +755,7 @@ by the use of [conventional commit](#title) titles.
 
 It should offer meaningful value to users. This is inherently subjective and
 it is impossible to define exact rules for this distinction. But we should be
-cautious not to dillute the meaning of a highlight by producing low values
+cautious not to dilute the meaning of a highlight by producing low values
 highlights.
 
 #### How is a highlight different from a blog post?
@@ -762,7 +768,7 @@ For example, [this performance increase announcement][urls.performance_highlight
 is noteworthy, but also deserves an in-depth blog post covering the work that
 resulted in the performance benefit. Notice that the highlight alludes to an
 upcoming blog post. This allows us to communicate a high-value performance
-improvment without being blocked by an in-depth blog post.
+improvement without being blocked by an in-depth blog post.
 
 ## Security
 

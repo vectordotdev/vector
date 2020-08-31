@@ -35,8 +35,9 @@ struct DatadogState {
 #[serde(deny_unknown_fields)]
 pub struct DatadogConfig {
     pub namespace: String,
-    #[serde(default = "default_host")]
-    pub host: String,
+    // Deprecated name
+    #[serde(alias = "host", default = "default_endpoint")]
+    pub endpoint: String,
     pub api_key: String,
     #[serde(default)]
     pub batch: BatchConfig,
@@ -63,7 +64,7 @@ struct DatadogRequest {
     series: Vec<DatadogMetric>,
 }
 
-pub fn default_host() -> String {
+pub fn default_endpoint() -> String {
     String::from("https://api.datadoghq.com")
 }
 
@@ -114,7 +115,7 @@ impl SinkConfig for DatadogConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        let uri = build_uri(&self.host)?;
+        let uri = build_uri(&self.endpoint)?;
         let timestamp = Utc::now().timestamp();
 
         let sink = DatadogSink {
@@ -179,7 +180,7 @@ fn build_uri(host: &str) -> crate::Result<Uri> {
 }
 
 async fn healthcheck(config: DatadogConfig, mut client: HttpClient) -> crate::Result<()> {
-    let uri = format!("{}/api/v1/validate", config.host)
+    let uri = format!("{}/api/v1/validate", config.endpoint)
         .parse::<Uri>()
         .context(super::UriParseError)?;
 
@@ -381,11 +382,11 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
-    use crate::sinks::util::{http::HttpSink, test::load_sink};
-    use crate::test_util::runtime;
-    use chrono::offset::TimeZone;
-    use chrono::Utc;
+    use crate::{
+        event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
+        sinks::util::{http::HttpSink, test::load_sink},
+    };
+    use chrono::{offset::TimeZone, Utc};
     use http::{Method, Uri};
     use pretty_assertions::assert_eq;
     use std::sync::atomic::AtomicI64;
@@ -404,8 +405,8 @@ mod tests {
         .collect()
     }
 
-    #[test]
-    fn test_request() {
+    #[tokio::test]
+    async fn test_request() {
         let (sink, _cx) = load_sink::<DatadogConfig>(
             r#"
             namespace = "test"
@@ -417,7 +418,7 @@ mod tests {
         let timestamp = Utc::now().timestamp();
         let sink = DatadogSink {
             config: sink,
-            uri: build_uri(&default_host()).unwrap(),
+            uri: build_uri(&default_endpoint()).unwrap(),
             last_sent_timestamp: AtomicI64::new(timestamp),
         };
 
@@ -444,11 +445,7 @@ mod tests {
                 value: MetricValue::Counter { value: 1.0 },
             },
         ];
-
-        let mut rt = runtime();
-        let req = rt
-            .block_on_std(async move { sink.build_request(events).await })
-            .unwrap();
+        let req = sink.build_request(events).await.unwrap();
 
         assert_eq!(req.method(), Method::POST);
         assert_eq!(
