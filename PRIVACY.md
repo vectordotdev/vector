@@ -15,7 +15,7 @@ privacy now and in the future.
 1. [Vector Community](#vector-community)
    1. [Vector Repository](#vector-repository)
    1. [Vector Chat](#vector-chat)
-   1. [Vector Mailing_List](#vector-mailing-list)
+   1. [Vector Mailing List](#vector-mailing-list)
 
 <!-- /MarkdownTOC -->
 
