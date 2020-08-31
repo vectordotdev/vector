@@ -1,7 +1,6 @@
 use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 use futures::{compat::Future01CompatExt, stream, SinkExt, StreamExt};
-use futures01::Future;
 use std::convert::TryInto;
 use std::path::PathBuf;
 use tempfile::tempdir;
@@ -57,7 +56,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                 );
 
                 let mut rt = runtime();
-                let (topology, input) = rt.block_on_std(async move {
+                let (topology, input) = rt.block_on(async move {
                     let (topology, _crash) = start_topology(config, false).await;
 
                     let mut options = OpenOptions::new();
@@ -72,7 +71,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                 (rt, topology, input)
             },
             |(mut rt, topology, input)| {
-                rt.block_on_std(async move {
+                rt.block_on(async move {
                     let lines = random_lines(line_size).take(num_lines).map(|mut line| {
                         line.push('\n');
                         Ok(Bytes::from(line))
@@ -81,7 +80,6 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
 
                     topology.stop().compat().await.unwrap();
                 });
-                rt.shutdown_now().wait().unwrap();
             },
         )
     })
