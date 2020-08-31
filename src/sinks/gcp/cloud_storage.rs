@@ -123,7 +123,7 @@ enum GcsStorageClass {
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
         in_flight_limit: InFlightLimit::Fixed(25),
-        rate_limit_num: Some(25),
+        rate_limit_num: Some(1000),
         ..Default::default()
     };
 }
