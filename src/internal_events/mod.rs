@@ -53,6 +53,8 @@ mod splunk_hec;
 mod statsd;
 mod stdin;
 mod syslog;
+#[cfg(feature = "transforms-tag_cardinality_limit")]
+mod tag_cardinality_limit;
 mod tcp;
 mod unix;
 mod vector;
@@ -115,6 +117,8 @@ pub(crate) use self::splunk_hec::*;
 pub use self::statsd::*;
 pub use self::stdin::*;
 pub use self::syslog::*;
+#[cfg(feature = "transforms-tag_cardinality_limit")]
+pub(crate) use self::tag_cardinality_limit::*;
 pub use self::tcp::*;
 pub use self::unix::*;
 pub use self::vector::*;
