@@ -1,4 +1,4 @@
-use super::{vars, Config};
+use super::{builder::ConfigBuilder, vars, Config};
 use glob::glob;
 use lazy_static::lazy_static;
 use once_cell::sync::OnceCell;
@@ -80,7 +80,7 @@ pub fn load_from_str(input: &str) -> Result<Config, Vec<String>> {
 fn load_from_inputs(
     inputs: impl IntoIterator<Item = impl std::io::Read>,
 ) -> Result<Config, Vec<String>> {
-    let mut config = Config::empty();
+    let mut config = Config::builder();
     let mut errors = Vec::new();
 
     for input in inputs {
@@ -89,6 +89,9 @@ fn load_from_inputs(
             errors.extend(errs.iter().map(|e| e.to_string()));
         }
     }
+
+    // TODO: this should be the last step
+    let mut config = config.build();
 
     if let Err(mut errs) = config.expand_macros() {
         errors.append(&mut errs);
@@ -116,7 +119,7 @@ fn open_config(path: &Path) -> Option<File> {
     }
 }
 
-fn load(mut input: impl std::io::Read) -> Result<Config, Vec<String>> {
+fn load(mut input: impl std::io::Read) -> Result<ConfigBuilder, Vec<String>> {
     let mut source_string = String::new();
     input
         .read_to_string(&mut source_string)
