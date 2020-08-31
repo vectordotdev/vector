@@ -164,10 +164,10 @@ mod test {
         }
     }
 
-    // This is a test that checks that we properly receieve all events in the
+    // This is a test that checks that we properly receive all events in the
     // case of a proper server side write side shutdown.
     //
-    // This test basically sends 10 events, shutsdown the server and forces a
+    // This test basically sends 10 events, shuts down the server and forces a
     // reconnect. It then forces another 10 events through and we should get a
     // total of 20 events.
     //
@@ -298,7 +298,7 @@ mod test {
         // Wait for server task to be complete.
         let _ = jh.await.unwrap();
 
-        // Check that there are exacty 20 events.
+        // Check that there are exactly 20 events.
         assert_eq!(msg_counter.load(Ordering::SeqCst), 20);
         assert_eq!(conn_counter.load(Ordering::SeqCst), 2);
     }

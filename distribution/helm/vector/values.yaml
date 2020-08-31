@@ -55,16 +55,16 @@ securityContext: {}
 # Extra env vars to pass to the `vector` container.
 env: []
 
-# Various tweakables for the `Pod`s managed by `DaemonSet`.
+# Various tweaks for the `Pod`s managed by `DaemonSet`.
 resources: {}
 nodeSelector: {}
 tolerations: []
 affinity: {}
 
-# Additional volmes to pass to the `Pod`s managed by `DaemonSet`.
+# Additional volumes to pass to the `Pod`s managed by `DaemonSet`.
 extraVolumes: []
 
-# Additional volme mounts to pass to the `vector` container of the `Pod`s
+# Additional volume mounts to pass to the `vector` container of the `Pod`s
 # managed by `DaemonSet`.
 extraVolumeMounts: []
 

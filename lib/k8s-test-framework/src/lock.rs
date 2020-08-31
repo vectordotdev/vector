@@ -2,7 +2,7 @@ use once_cell::sync::OnceCell;
 use std::sync::{Mutex, MutexGuard};
 
 /// A shared lock to use commonly among the tests.
-/// The goal is to guranatee that only one test is executing concurrently, since
+/// The goal is to guarantee that only one test is executing concurrently, since
 /// tests use a shared resource - a k8s cluster - and will conflict with each
 /// other unless they're executing sequentially.
 pub fn lock() -> MutexGuard<'static, ()> {

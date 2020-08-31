@@ -252,9 +252,9 @@ mod tests {
     }
 
     // TODO: rewrite this test with tokio::time::clock when it's available.
-    // For now we just wait for an actal second. We should just scroll time instead.
+    // For now we just wait for an actual second. We should just scroll time instead.
     // In theory, this is only possible when the runtime timer used in the
-    // underlying delay queue and the means by which we fresse/adjust time are
+    // underlying delay queue and the means by which we freeze/adjust time are
     // working together.
     #[tokio::test]
     async fn next_expired_wakes_and_becomes_ready_when_value_ttl_expires() {

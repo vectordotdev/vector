@@ -137,7 +137,7 @@ mod test {
                 start_idx = self.read_idx;
                 end_idx = self.read_idx;
             }
-            // Seek end_idx foward until we hit the newline character.
+            // Seek end_idx forward until we hit the newline character.
             while self.contents[end_idx] != b'\n' {
                 end_idx += 1;
                 if end_idx == max {
