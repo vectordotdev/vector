@@ -170,6 +170,58 @@ build-x86_64-unknown-linux-musl: ## Build static binary in release mode for the 
 build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in release mode for the aarch64 architecture
 	$(RUN) build-aarch64-unknown-linux-musl
 
+##@ Cross Compiling
+cross-enable: cargo-install-cross
+
+ci-cross-x86_64-unknown-linux-gnu: cross-enable cross-test-x86_64-unknown-linux-gnu
+
+cross-build-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/release/vector
+
+cross-build-dev-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/debug/vector
+
+cross-test-x86_64-unknown-linux-gnu: ## Linux X86 GNU
+	cross test --target x86_64-unknown-linux-gnu
+
+.PHONY: target/x86_64-unknown-linux-gnu/debug/vector
+target/x86_64-unknown-linux-gnu/debug/vector:
+	cross build \
+		--release \
+		--target x86_64-unknown-linux-gnu \
+		--no-default-features \
+		--features target-x86_64-unknown-linux-gnu
+
+.PHONY: target/x86_64-unknown-linux-gnu/release/vector
+target/x86_64-unknown-linux-gnu/release/vector:
+	cross build \
+		--release \
+		--target x86_64-unknown-linux-gnu \
+		--no-default-features \
+		--features target-x86_64-unknown-linux-gnu
+
+ci-cross-aarch64-unknown-linux-gnu: cross-enable cross-test-aarch64-unknown-linux-gnu
+
+cross-build-aarch64-unknown-linux-gnu: target/aarch64-unknown-linux-gnu/release/vector
+
+cross-build-dev-aarch64-unknown-linux-gnu: target/aarch64-unknown-linux-gnu/debug/vector
+
+cross-test-aarch64-unknown-linux-gnu: ## Linux X86 GNU
+	cross test --target aarch64-unknown-linux-gnu
+
+.PHONY: target/aarch64-unknown-linux-gnu/debug/vector
+target/aarch64-unknown-linux-gnu/debug/vector:
+	cross build \
+		--target aarch64-unknown-linux-gnu \
+		--no-default-features \
+		--features target-aarch64-unknown-linux-gnu
+
+.PHONY: target/aarch64-unknown-linux-gnu/release/vector
+target/aarch64-unknown-linux-gnu/release/vector:
+	cross build \
+		--release \
+		--target aarch64-unknown-linux-gnu \
+		--no-default-features \
+		--features target-aarch64-unknown-linux-gnu
+
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
 test: ## Run the test suite
@@ -532,6 +584,10 @@ version: ## Get the current Vector version
 
 git-hooks: ## Add Vector-local git hooks for commit sign-off
 	@scripts/install-git-hooks.sh
+
+cargo-install-%: override TOOL = $(@:cargo-install-%=%)
+cargo-install-%:
+	${MAYBE_ENVIRONMENT_EXEC} cargo install ${TOOL} --quiet
 
 .PHONY: ensure-has-wasm-toolchain ### Configures a wasm toolchain for test artifact building, if required
 ensure-has-wasm-toolchain: target/wasm32-wasi/.obtained
