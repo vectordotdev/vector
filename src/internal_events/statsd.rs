@@ -96,12 +96,12 @@ impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for StatsdSocketError
 }
 
 #[derive(Debug)]
-pub struct StatsdInvalidMetric {
-    pub value: MetricValue,
-    pub kind: MetricKind,
+pub struct StatsdInvalidMetric<'a> {
+    pub value: &'a MetricValue,
+    pub kind: &'a MetricKind,
 }
 
-impl InternalEvent for StatsdInvalidMetric {
+impl<'a> InternalEvent for StatsdInvalidMetric<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "Invalid metric sent; dropping event.",

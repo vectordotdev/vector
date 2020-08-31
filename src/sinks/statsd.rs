@@ -184,8 +184,8 @@ fn encode_event(event: Event, namespace: Option<&str>) -> Option<Vec<u8>> {
         }
         _ => {
             emit!(StatsdInvalidMetric {
-                value: metric.value.clone(),
-                kind: metric.kind.clone(),
+                value: &metric.value,
+                kind: &metric.kind,
             });
         }
     };
