@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-# Inital vector build to ensure we start at a valid state.
+# Initial vector build to ensure we start at a valid state.
 cargo build
 
 # Prepare .dockerignore so we don't send the whole dir to the docker as the

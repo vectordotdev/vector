@@ -77,8 +77,8 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
     }
 }
 
-/// Ok if all configs were succesfully validated.
-/// Err Some contains only succesfully validated configs.
+/// Ok if all configs were successfully validated.
+/// Err Some contains only successfully validated configs.
 fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     // Prepare paths
     let paths = if let Some(paths) = config::process_paths(&opts.paths) {
@@ -237,7 +237,7 @@ impl Formatter {
         }
     }
 
-    /// Final confirmation that validation process was succesfull.
+    /// Final confirmation that validation process was successful.
     fn validated(&self) {
         println!("{:-^width$}", "", width = self.max_line_width);
         if self.color {

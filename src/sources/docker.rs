@@ -36,7 +36,7 @@ use string_cache::DefaultAtom as Atom;
 use tokio::sync::mpsc;
 use tracing::field;
 
-/// The begining of image names of vector docker images packaged by vector.
+/// The beginning of image names of vector docker images packaged by vector.
 const VECTOR_IMAGE_NAME: &str = "timberio/vector";
 
 lazy_static! {
@@ -198,7 +198,7 @@ impl DockerSourceCore {
     ) -> impl Stream<Item = Result<SystemEventsResponse, DockerError>> + Send {
         let mut filters = HashMap::new();
 
-        // event  | emmited on commands
+        // event  | emitted on commands
         // -------+-------------------
         // start  | docker start, docker run, restart policy, docker restart
         // unpause | docker unpause
@@ -234,7 +234,7 @@ impl DockerSourceCore {
 
 /// Main future which listens for events coming from docker, and maintains
 /// a fan of event_stream futures.
-/// Where each event_stream corresponds to a runing container marked with ContainerLogInfo.
+/// Where each event_stream corresponds to a running container marked with ContainerLogInfo.
 /// While running, event_stream streams Events to out channel.
 /// Once a log stream has ended, it sends ContainerLogInfo back to main.
 ///
@@ -249,7 +249,7 @@ struct DockerSource {
     events: Pin<Box<dyn Stream<Item = Result<SystemEventsResponse, DockerError>> + Send>>,
     ///  mappings of seen container_id to their data
     containers: HashMap<ContainerId, ContainerState>,
-    ///receives ContainerLogInfo comming from event stream futures
+    ///receives ContainerLogInfo coming from event stream futures
     main_recv: mpsc::UnboundedReceiver<Result<ContainerLogInfo, ContainerId>>,
     /// It may contain shortened container id.
     hostname: Option<String>,
@@ -265,7 +265,7 @@ impl DockerSource {
     ) -> crate::Result<DockerSource> {
         // Find out it's own container id, if it's inside a docker container.
         // Since docker doesn't readily provide such information,
-        // various approches need to be made. As such the solution is not
+        // various approaches need to be made. As such the solution is not
         // exact, but probable.
         // This is to be used only if source is in state of catching everything.
         // Or in other words, if includes are used then this is not necessary.
@@ -279,7 +279,7 @@ impl DockerSource {
         // Only logs created at, or after this moment are logged.
         let core = DockerSourceCore::new(config)?;
 
-        // main event stream, with whom only newly started/restarted containers will be loged.
+        // main event stream, with whom only newly started/restarted containers will be logged.
         let events = core.docker_event_stream();
         info!(message = "Listening to docker events.");
 
@@ -452,7 +452,7 @@ impl DockerSource {
                         }
                         Some(Err(error)) => emit!(DockerCommunicationError{error,container_id:None}),
                         None => {
-                            // TODO: this could be fixed, but should be tryed with some timeoff and exponential backoff
+                            // TODO: this could be fixed, but should be tried with some timeoff and exponential backoff
                             error!(message = "docker event stream has ended unexpectedly.");
                             info!(message = "shutting down docker source.");
                             return;
@@ -675,7 +675,7 @@ impl ContainerState {
     fn return_info(&mut self, info: ContainerLogInfo) -> bool {
         debug_assert!(self.info.is_none());
         // Generation is the only one strictly necessary,
-        // but with v.running, restarting event_stream is automtically done.
+        // but with v.running, restarting event_stream is automatically done.
         let restart = self.running || info.generation < self.generation;
         self.info = Some(info);
         restart
@@ -725,7 +725,7 @@ impl ContainerLogInfo {
             - 1
     }
 
-    /// Expects timestamp at the begining of message.
+    /// Expects timestamp at the beggining of message.
     /// Expects messages to be ordered by timestamps.
     fn new_event(
         &mut self,
@@ -748,13 +748,13 @@ impl ContainerLogInfo {
             Ok(timestamp) => {
                 // Timestamp check
                 match self.last_log.as_ref() {
-                    // Recieved log has not already been processed
+                    // Received log has not already been processed
                     Some(&(ref last, gen))
                         if *last < timestamp || (*last == timestamp && gen == self.generation) =>
                     {
                         // noop
                     }
-                    // Recieved log is not from before of creation
+                    // Received log is not from before of creation
                     None if self.created <= timestamp.with_timezone(&Utc) => (),
                     _ => {
                         trace!(
@@ -775,7 +775,7 @@ impl ContainerLogInfo {
                 Some(timestamp.with_timezone(&Utc))
             }
             Err(error) => {
-                // Recieved bad timestamp, if any at all.
+                // Received bad timestamp, if any at all.
                 emit!(DockerTimestampParseFailed {
                     error,
                     container_id: self.id.as_str()
@@ -864,7 +864,7 @@ impl ContainerLogInfo {
                 return None;
             };
 
-            // This is not a parial event. If we have a partial event merge
+            // This is not a partial event. If we have a partial event merge
             // state from before, the current event must be a final event, that
             // would give us a merged event we can return.
             // Otherwise it's just a regular event that we return as-is.
@@ -886,7 +886,7 @@ impl ContainerLogInfo {
         };
 
         // Partial or not partial - we return the event we got here, because all
-        // other cases were handeled earlier.
+        // other cases were handled earlier.
         let event = Event::Log(log_event);
 
         emit!(DockerEventReceived {
@@ -1163,7 +1163,7 @@ mod tests {
     async fn container_remove(id: &str, docker: &Docker) {
         trace!("Removing container.");
 
-        // Don't panick, as this is unreleated to test, and there possibly other containers that need to be removed
+        // Don't panic, as this is unrelated to the test, and there are possibly other containers that need to be removed
         let _ = docker
             .remove_container(id, None::<RemoveContainerOptions>)
             .await

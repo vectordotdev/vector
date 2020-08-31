@@ -82,7 +82,7 @@ impl SourceConfig for Config {
         let source = Source::new(self, Resolver, globals, name)?;
 
         // TODO: this is a workaround for the legacy futures 0.1.
-        // When the core is updated to futures 0.3 this should be simplied
+        // When the core is updated to futures 0.3 this should be simplified
         // significantly.
         let out = futures::compat::Compat01As03Sink::new(out);
         let fut = source.run(out, shutdown);

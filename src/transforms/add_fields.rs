@@ -234,7 +234,7 @@ mod tests {
     }
 
     #[test]
-    fn add_fields_preseves_types() {
+    fn add_fields_preserves_types() {
         let event = Event::from("hello world");
 
         let mut fields = IndexMap::new();
