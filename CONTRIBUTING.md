@@ -427,6 +427,31 @@ that fall into a false negative circumstance. Our goal should be to minimize the
 likelihood of users needing to pull that lever while still making a good effort
 to detect common problems.
 
+#### Metric naming convention
+
+For metrics naming, Vector broadly follows the [Prometheus metric naming standards](https://prometheus.io/docs/practices/naming/). Hence, a metric name:
+
+- Must only contain valid characters, which are ASCII letters and digits, as well as underscores. It should match the regular expression: `[a-z_][a-z0-9_]*`.
+- Metrics have a broad template:
+
+  `<namespace>_<name>_<unit>_[total]`
+
+  - The `namespace` is a single word prefix that groups metrics from a specific source, for example host-based metrics like CPU, disk, and memory are prefixed with `host`, Apache metrics are prefixed with `apache`, etc.
+  - The `name` describes what the metric measures.
+  - The `unit` is a [single base unit](https://en.wikipedia.org/wiki/SI_base_unit), for example seconds, bytes, metrics.
+  - The suffix should describe the unit in plural form: seconds, bytes. Accumulating counts, both with units or without, should end in `total`, for example `disk_written_bytes_total` and `http_requests_total`.
+
+- Where required, use tags to differentiate the characteristic of the measurement. For example, whilst `host_cpu_seconds_total` is name of the metric, we also record the `mode` that is being used for each CPU. The `mode` and the specific CPU then become tags on the metric:
+
+```text
+host_cpu_seconds_total{cpu="0",mode="idle"}
+host_cpu_seconds_total{cpu="0",mode="idle"}
+host_cpu_seconds_total{cpu="0",mode="nice"}
+host_cpu_seconds_total{cpu="0",mode="system"}
+host_cpu_seconds_total{cpu="0",mode="user"}
+host_cpu_seconds_total
+```
+
 ### Testing
 
 You can run Vector's tests via the `make test` command. Our tests use Docker
