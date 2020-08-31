@@ -95,10 +95,11 @@ The following additional source configuration will be added:
 ```toml
 [sources.my_source_id]
   type = "postgresql_metrics" # required
-  endpoints = [ "postgres://postgres@localhost" ] # required - address of the PG server.
-  databases = ["production", "testing"] # optional, list of databases to query. Defaults to all if not specified.
+  endpoint = "postgres://postgres@localhost" # required - address of the PG server.
+  included_databases = ["production", "testing"] # optional, list of databases to query. Defaults to all if not specified.
+  excluded_databases = [ "development" ] # optional, excludes specific databases. If a DB is exclude explictity but included in `included_databases` then it is excluded.
   scrape_interval_secs = 15 # optional, default, seconds
-  namespace = "postgresql" # optional, default is "postgresql", namespace to put metrics under
+  namespace = "postgresql" # optional, default is "postgresql", namespace to attach to metrics.
 ```
 
 We will also expose the HTTP SSL settings and support `ssl` in the `endpoint` URL.
@@ -147,7 +148,7 @@ If users are already running Telegraf or PostgreSQL Exporter though, they could 
 
 ## Outstanding Questions
 
-- Grab pg_settings?
+- Grab pg_settings - should look at this during implementation.
 
 ## Plan Of Attack
 
@@ -159,5 +160,5 @@ Incremental steps that execute this change. Generally this is in the form of:
 
 - Extend source to collect additional database metrics:
   - Replication
-  - Locks?
-  - pg_stat_user_tables?
+  - Locks
+  - pg_stat_user_tables
