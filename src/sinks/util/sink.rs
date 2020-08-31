@@ -751,11 +751,10 @@ mod tests {
     use crate::{
         buffers::Acker,
         sinks::util::{buffer::partition::Partition, BatchSettings, EncodedLength, VecBuffer},
-        test_util::{basic_scheduler_block_on_std, runtime},
     };
     use bytes::Bytes;
     use futures::{compat::Future01CompatExt, future};
-    use futures01::Sink;
+    use futures01::{future as future01, Sink};
     use std::sync::{atomic::Ordering::Relaxed, Arc, Mutex};
     use tokio::task::yield_now;
 
@@ -765,6 +764,16 @@ mod tests {
         fn encoded_length(&self) -> usize {
             22
         }
+    }
+
+    // If we try poll future in tokio:0.2 Runtime directly we get `no Task is currently running`.
+    async fn run_as_future01<F: std::future::Future + std::marker::Send>(
+        f: F,
+    ) -> <F as std::future::Future>::Output {
+        future01::lazy(|| f.never_error().boxed().compat())
+            .compat()
+            .await
+            .unwrap()
     }
 
     async fn advance_time(duration: Duration) {
@@ -791,9 +800,9 @@ mod tests {
         assert_eq!(ack_counter.load(Relaxed), 22);
     }
 
-    #[test]
-    fn batch_sink_acking_unordered() {
-        basic_scheduler_block_on_std(async {
+    #[tokio::test]
+    async fn batch_sink_acking_unordered() {
+        run_as_future01(async {
             // Services future will be spawned and work between `yield_now` calls.
             let (acker, ack_counter) = Acker::new_for_testing();
 
@@ -861,7 +870,8 @@ mod tests {
             sink.flush().compat().await.unwrap();
 
             assert_eq!(ack_counter.load(Relaxed), 6);
-        });
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -923,9 +933,9 @@ mod tests {
         assert_eq!(&*output, &vec![vec![0, 1]]);
     }
 
-    #[test]
-    fn batch_sink_expired_linger() {
-        basic_scheduler_block_on_std(async {
+    #[tokio::test]
+    async fn batch_sink_expired_linger() {
+        run_as_future01(async {
             let (acker, _) = Acker::new_for_testing();
             let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
@@ -950,7 +960,8 @@ mod tests {
 
             let output = sent_requests.lock().unwrap();
             assert_eq!(&*output, &vec![vec![0, 1]]);
-        });
+        })
+        .await;
     }
 
     #[tokio::test]
@@ -1045,9 +1056,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn partition_batch_sink_submits_after_linger() {
-        basic_scheduler_block_on_std(async {
+    #[tokio::test]
+    async fn partition_batch_sink_submits_after_linger() {
+        run_as_future01(async {
             let (acker, _) = Acker::new_for_testing();
             let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
@@ -1072,12 +1083,13 @@ mod tests {
 
             let output = sent_requests.lock().unwrap();
             assert_eq!(&*output, &vec![vec![1]]);
-        });
+        })
+        .await;
     }
 
-    #[test]
-    fn service_sink_doesnt_propagate_error() {
-        runtime().block_on_std(async {
+    #[tokio::test]
+    async fn service_sink_doesnt_propagate_error() {
+        run_as_future01(async {
             // We need a mock executor here because we need to ensure
             // that we poll the service futures within the mock clock
             // context. This allows us to manually advance the time on the
@@ -1114,7 +1126,8 @@ mod tests {
             assert!(fut4.poll().unwrap().is_ready());
             assert!(sink.poll_complete().unwrap().is_ready());
             assert_eq!(ack_counter.load(Relaxed), 10);
-        });
+        })
+        .await;
     }
 
     #[derive(Debug, PartialEq, Eq, Ord, PartialOrd)]

@@ -1,13 +1,12 @@
 use crate::{
     config::{Config, ConfigDiff},
-    runtime::Runtime,
     topology::{self, RunningTopology},
     trace, Event,
 };
 use flate2::read::GzDecoder;
 use futures::{
     compat::Stream01CompatExt, future, ready, stream, task::noop_waker_ref, FutureExt, SinkExt,
-    Stream, StreamExt, TryFutureExt, TryStreamExt,
+    Stream, StreamExt, TryStreamExt,
 };
 use futures01::{sync::mpsc, Stream as Stream01};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
@@ -31,6 +30,7 @@ use std::{
 use tokio::{
     io::{AsyncRead, AsyncWrite, Result as IoResult},
     net::{TcpListener, TcpStream},
+    runtime,
     sync::oneshot,
     task::JoinHandle,
     time::{delay_for, Duration, Instant},
@@ -289,23 +289,11 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     output.lines().map(|s| s.to_owned()).collect()
 }
 
-pub fn runtime() -> Runtime {
-    Runtime::single_threaded().unwrap()
-}
-
-pub fn basic_scheduler_block_on_std<F>(future: F) -> F::Output
-where
-    F: Future + Send + 'static,
-    F::Output: Send + 'static,
-{
-    // `tokio::time::advance` is not work on threaded scheduler
-    // `tokio_compat::runtime::current_thread` use `basic_scheduler`
-    // Example: https://pastebin.com/7fK4nxEW
-    tokio_compat::runtime::current_thread::Builder::new()
+pub fn runtime() -> runtime::Runtime {
+    runtime::Builder::new()
+        .threaded_scheduler()
+        .enable_all()
         .build()
-        .unwrap()
-        // This is limit of `compat`, otherwise we get error: `no Task is currently running`
-        .block_on(future.never_error().boxed().compat())
         .unwrap()
 }
 
