@@ -55,7 +55,7 @@ securityContext: {}
 # Extra env vars to pass to the `vector` container.
 env: []
 
-# Various tweaks for the `Pod`s managed by `DaemonSet`.
+# Various tweakables for the `Pod`s managed by `DaemonSet`.
 resources: {}
 nodeSelector: {}
 tolerations: []
