@@ -88,14 +88,13 @@ expanding into more specifics.
 
 ### New sources, sinks, and transforms
 
-If you're contributing a new source, sink, or transform to Vector, thank you that's way cool! There's a couple of things you need think about if you want to make sure we can merge your contribution.
+If you're contributing a new source, sink, or transform to Vector, thank you that's way cool! There's a few steps you need think about if you want to make sure we can merge your contribution. We're here to help you along with these steps but they are a blocker to getting a new integration released.
 
 To merge a new source, sink, or transform, you need to:
 
 - [ ] Add tests, especially integration tests if your contribution connects to an external service.
 - [ ] Add instrumentation so folks using your integration can get insight into how it's working and performing. You can see some [example of instrumentation in existing integrations](https://github.com/timberio/vector/tree/master/src/internal_events).
 - [ ] Add internal documentation of options and fields. You can see [examples in the `.meta` directory](https://github.com/timberio/vector/blob/master/.meta/sources/kafka.toml.erb).
-- [ ] Add external documentation explaining the use of the integration. You can see [some examples in our existing documentation](https://github.com/timberio/vector-website/blob/master/docs/reference/sources/kafka.md.erb).
 - [ ] Update [`.github/CODEOWNERS`](https://github.com/timberio/vector/blob/master/.github/CODEOWNERS) or talk to us about identifying someone on the team to help look after the new integration.
 
 ## Change Control
