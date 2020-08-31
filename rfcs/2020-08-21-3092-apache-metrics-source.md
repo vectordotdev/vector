@@ -122,7 +122,7 @@ Some possible configuration improvements we could add in the future would be:
 - `basic_auth`: to set username/password for use with HTTP basic auth; we'll
   allow this to be set in the URL too which will work for now
 
-But I chose to leave those out for now given the prometheous source doesn't
+But I chose to leave those out for now given the Prometheus source doesn't
 support them either. We could add support to both at the same time (see Future
 Work section below).
 
@@ -193,7 +193,7 @@ first-class source for each type of endpoint we support scraping.
 
 - Do we want to apply any metric labels based on the other information
   available via the status page? I could see labeling the `url` at least.
-  Ansnswer: label with `host` and `endpoint` as described above.
+  Answer: label with `host` and `endpoint` as described above.
 - Do we want to have one apache_metrics source able to scrape multiple
   endpoints?  Answer: yes, the config has been updated to allow multiple
   endpoints.
@@ -207,7 +207,7 @@ first-class source for each type of endpoint we support scraping.
 
 Incremental steps that execute this change. Generally this is in the form of:
 
-- [ ] Sumbit a PR with the initial sink implementation
+- [ ] Submit a PR with the initial sink implementation
 
 ## Future Work
 

@@ -16,7 +16,7 @@ use tower::timeout::error::Elapsed;
 
 // This value was picked as a reasonable default while we ensure the
 // viability of the system. This value may need adjustment if later
-// analysis descovers we need higher or lower weighting on past RTT
+// analysis discovers we need higher or lower weighting on past RTT
 // weighting.
 const EWMA_ALPHA: f64 = 0.5;
 

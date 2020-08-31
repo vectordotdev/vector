@@ -97,7 +97,7 @@ impl<S> MaybeTlsIncomingStream<S> {
         self.peer_addr
     }
 
-    /// None if connection still hasen't been established.
+    /// None if connection still hasn't been established.
     pub fn get_ref(&self) -> Option<&S> {
         match &self.state {
             StreamState::Accepted(stream) => Some(match stream {

@@ -179,7 +179,7 @@ fn encode_metric_datum(namespace: &str, buckets: &[f64], expired: bool, metric: 
                 sample_rates,
                 statistic: _,
             } => {
-                // convert ditributions into aggregated histograms
+                // convert distributions into aggregated histograms
                 let mut counts = Vec::new();
                 for _ in buckets {
                     counts.push(0);

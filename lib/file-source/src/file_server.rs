@@ -53,7 +53,7 @@ where
 /// your system aggressively rolls log files. `FileServer` will keep a file
 /// handler open but should your system move so quickly that a file disappears
 /// before `FileServer` is able to open it the contents will be lost. This should be a
-/// rare occurence.
+/// rare occurrence.
 ///
 /// Specific operating systems support evented interfaces that correct this
 /// problem but your intrepid authors know of no generic solution.

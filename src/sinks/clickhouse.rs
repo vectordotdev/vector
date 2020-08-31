@@ -424,7 +424,7 @@ timestamp_format = "unix""#,
         };
 
         let client = ClickhouseClient::new(host);
-        // the event contains a message field, but its being omited to
+        // the event contains a message field, but its being omitted to
         // fail the request.
         client
             .create_table(&table, "host String, timestamp String")

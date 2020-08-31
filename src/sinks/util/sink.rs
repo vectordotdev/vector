@@ -13,7 +13,7 @@
 //! type should be used when you do not want to batch events but you want
 //! to _stream_ them to the downstream service. `BatchSink` and `PartitonBatchSink`
 //! are similar in the sense that they both take some `tower::Service`, `Batch` and
-//! `Acker` and will provide full batching, request dipstaching and acking based on
+//! `Acker` and will provide full batching, request dispatching and acking based on
 //! the settings passed.
 //!
 //! For more advanced use cases like HTTP based sinks, one should use the
@@ -23,7 +23,7 @@
 //!
 //! Each sink utility provided here strictly follows the patterns described in
 //! the `futures01::Sink` docs. Each sink utility must be polled from a valid
-//! tokio context wether that may be an actual runtime or using any of the
+//! tokio context whether that may be an actual runtime or using any of the
 //! `tokio01-test` utilities.
 //!
 //! For service based sinks like `BatchSink` and `PartitionBatchSink` they also
@@ -559,7 +559,7 @@ where
         for partition in ready {
             if let Some(batch) = self.partitions.remove(&partition) {
                 if let Some(linger_cancel) = self.linger_handles.remove(&partition) {
-                    // XXX: had to remove the expect here, a cancaellation should
+                    // XXX: had to remove the expect here, a cancellation should
                     // always be a best effort.
                     let _ = linger_cancel.send(partition.clone());
                 }

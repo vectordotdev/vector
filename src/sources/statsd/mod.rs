@@ -207,7 +207,7 @@ mod test {
         assert_eq!(milliglork_count * 3, milliglork_sum);
 
         // Set test
-        // Flush could have occured
+        // Flush could have occurred
         assert!(parse_count(&lines, "vector_set") <= 2);
 
         // Flush test
@@ -237,7 +237,7 @@ mod test {
             // Check rested
             assert_eq!(parse_count(&lines, "vector_set"), 0);
 
-            // Recheck that set is also reseted------------
+            // Re-check that set is also reset------------
 
             socket.send_to(b"set:0|s\nset:1|s\n", &in_addr).unwrap();
             // Space things out slightly to try to avoid dropped packets

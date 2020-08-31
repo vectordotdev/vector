@@ -28,11 +28,11 @@ COMMAND="${1:?"Specify the command (up/down) as the first argument"}"
 # A Kubernetes namespace to deploy to.
 NAMESPACE="${2:?"Specify the namespace as the second argument"}"
 
-# Allow overriding kubectl with somethingl like `minikube kubectl --`.
+# Allow overriding kubectl with something like `minikube kubectl --`.
 VECTOR_TEST_KUBECTL="${VECTOR_TEST_KUBECTL:-"kubectl"}"
 
 # Allow optionally installing custom resource configs.
-CUSTOM_RESOURCE_CONIFGS_FILE="${CUSTOM_RESOURCE_CONIFGS_FILE:-""}"
+CUSTOM_RESOURCE_CONFIGS_FILE="${CUSTOM_RESOURCE_CONFIGS_FILE:-""}"
 
 
 # TODO: replace with `helm template | kubectl apply -f -` when Helm Chart is
@@ -45,14 +45,14 @@ templated-config-global() {
 
 up() {
   # A Vector container image to use.
-  CONTAINER_IMAGE="${CONTAINER_IMAGE:?"You must assing CONTAINER_IMAGE variable with the Vector container image name"}"
+  CONTAINER_IMAGE="${CONTAINER_IMAGE:?"You must assign CONTAINER_IMAGE variable with the Vector container image name"}"
 
   templated-config-global | $VECTOR_TEST_KUBECTL create -f -
 
   $VECTOR_TEST_KUBECTL create namespace "$NAMESPACE"
 
-  if [[ -n "$CUSTOM_RESOURCE_CONIFGS_FILE" ]]; then
-    $VECTOR_TEST_KUBECTL create --namespace "$NAMESPACE" -f "$CUSTOM_RESOURCE_CONIFGS_FILE"
+  if [[ -n "$CUSTOM_RESOURCE_CONFIGS_FILE" ]]; then
+    $VECTOR_TEST_KUBECTL create --namespace "$NAMESPACE" -f "$CUSTOM_RESOURCE_CONFIGS_FILE"
   fi
 
   sed 's|image: timberio/vector:[^$]*$'"|image: $CONTAINER_IMAGE|" < "distribution/kubernetes/vector-namespaced.yaml" \
@@ -63,8 +63,8 @@ down() {
   # A workaround for `kubectl` from a `snap` package.
   cat < "distribution/kubernetes/vector-namespaced.yaml" | $VECTOR_TEST_KUBECTL delete --namespace "$NAMESPACE" -f -
 
-  if [[ -n "$CUSTOM_RESOURCE_CONIFGS_FILE" ]]; then
-    $VECTOR_TEST_KUBECTL delete --namespace "$NAMESPACE" -f "$CUSTOM_RESOURCE_CONIFGS_FILE"
+  if [[ -n "$CUSTOM_RESOURCE_CONFIGS_FILE" ]]; then
+    $VECTOR_TEST_KUBECTL delete --namespace "$NAMESPACE" -f "$CUSTOM_RESOURCE_CONFIGS_FILE"
   fi
 
   templated-config-global | $VECTOR_TEST_KUBECTL delete -f -

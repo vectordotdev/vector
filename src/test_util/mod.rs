@@ -340,7 +340,7 @@ impl<T: Send + 'static> CountReceiver<T> {
         self.count.load(Ordering::Relaxed)
     }
 
-    /// Succeds once first connection has been made.
+    /// Succeeds once first connection has been made.
     pub async fn connected(&mut self) {
         if let Some(tripwire) = self.connected.take() {
             tripwire.await.unwrap();

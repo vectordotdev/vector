@@ -66,7 +66,7 @@ pub struct MetricBuffer {
 
 impl MetricBuffer {
     // Metric buffer is a data structure for creating normalised
-    // batched metrics data from the flow of datapoints.
+    // batched metrics data from the flow of data points.
     //
     // Batching mostly means that we will aggregate away timestamp information, and
     // apply metric-specific compression to improve the performance of the pipeline.
@@ -78,9 +78,9 @@ impl MetricBuffer {
     // produce absolute values gauges that are well supported by Datadog.
     //
     // Another example of normalisation is disaggregation of counters. Most sinks would expect we send
-    // them delta counters (e.g. how many events occured during the flush period). And most sources are
-    // producting exactly this kind of counters, with Prometheus being a notable exception. If the counter
-    // comes allready aggregated inside the source, the buffer will compare it's values with the previous
+    // them delta counters (e.g. how many events occurred during the flush period). And most sources are
+    // producing exactly these kind of counters, with Prometheus being a notable exception. If the counter
+    // comes already aggregated inside the source, the buffer will compare it's values with the previous
     // known and calculate the delta.
     //
     // This table will summarise how metrics are transforming inside the buffer:
@@ -140,7 +140,7 @@ impl Batch for MetricBuffer {
                         ..
                     })) = self.state.get(&new)
                     {
-                        // Counters are disaggregated. We take the previoud value from the state
+                        // Counters are disaggregated. We take the previous value from the state
                         // and emit the difference between previous and current as a Counter
                         let delta = MetricEntry(Metric {
                             name: item.name.to_string(),

@@ -134,7 +134,7 @@ pub mod invocation {
         /// Returned when the HTTP client fails to perform an HTTP request.
         #[snafu(display("error during the HTTP request"))]
         Request {
-            /// The error that API client retunred.
+            /// The error that API client returned.
             source: crate::Error,
         },
 

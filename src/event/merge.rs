@@ -99,8 +99,8 @@ mod test {
             log.insert("merge_b", 456); // will be merged in as `456`.
             log.insert("merge_c", false); // will be merged in as `false`.
 
-            // `a` will remain as is, since it's not marked for merge and
-            // niether it is specified in the `incoming` event.
+            // `a` will remain as-is, since it's not marked for merge and
+            // neither is it specified in the `incoming` event.
             log.insert("b", 456); // `b` not marked for merge, will not change.
             log.insert("c", true); // `c` not marked for merge, will be ignored.
 

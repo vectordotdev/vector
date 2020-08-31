@@ -31,7 +31,7 @@ pub mod invocation {
     use super::*;
 
     /// Error wrapper providing a semantic wrapper around invocation errors to
-    /// bind meaningful and actionably common error semantics to the arbitrary
+    /// bind meaningful and actionable common error semantics to the arbitrary
     /// underlying errors.
     #[derive(Debug, Snafu)]
     #[snafu(visibility(pub))]
@@ -46,7 +46,7 @@ pub mod invocation {
             source: T,
         },
 
-        /// Any other error that may have maening for downstream but doesn't have
+        /// Any other error that may have meaning for downstream but doesn't have
         /// a semantics attached to it at the [`Watcher`] trait level.
         Other {
             /// The underlying error.

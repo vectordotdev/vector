@@ -5,7 +5,7 @@
 //! developer as executable commands, rather than using a rust interface to talk
 //! to k8s cluster directly.
 //! This enables very trivial troubleshooting and allows us to use the same
-//! deployment mechanisms that we use for prodcution - effectively giving us
+//! deployment mechanisms that we use for production - effectively giving us
 //! the opportunity to test e2e: not just the code layer, but also the
 //! deployment configuration.
 

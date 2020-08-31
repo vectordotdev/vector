@@ -22,8 +22,8 @@ const CONFIG_WATCH_DELAY: std::time::Duration = std::time::Duration::from_secs(1
 const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// Triggers SIGHUP when file on config_path changes.
-/// Accumulates file changes until no change for given duration has occured.
-/// Has best effort guarante of detecting all file changes from the end of
+/// Accumulates file changes until no change for given duration has occurred.
+/// Has best effort guarantee of detecting all file changes from the end of
 /// this function until the main thread stops.
 #[cfg(unix)]
 pub fn spawn_thread(

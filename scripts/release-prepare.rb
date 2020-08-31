@@ -29,7 +29,7 @@ TYPES_THAT_REQUIRE_SCOPES = ["feat", "enhancement", "fix"]
 #
 
 # Determines if a commit message is a breaking change as defined by the
-# Convetional Commits specification:
+# Conventional Commits specification:
 #
 # https://www.conventionalcommits.org
 def breaking_change?(commit)
@@ -116,7 +116,7 @@ end
 
 # Gets the commit log from the last version. This is used to determine
 # the outstanding commits that should be included in this release.
-# Notice the specificed format, this allow us to parse the lines into
+# Notice the specified format, this allow us to parse the lines into
 # structured data.
 def get_commit_log(last_version)
   range = "v#{last_version}..."
@@ -278,7 +278,7 @@ def parse_commit_line!(commit_line)
 end
 
 # Parses the commit message. This is used to extra other information that is
-# helpful in deduping commits across releases.
+# helpful in de-duping commits across releases.
 def parse_commit_message!(message)
   match = message.match(/ \(#(?<pr_number>[0-9]*)\)?$/)
   {

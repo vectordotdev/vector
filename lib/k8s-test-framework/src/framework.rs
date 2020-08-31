@@ -66,7 +66,7 @@ impl Framework {
         exec_tail(&self.interface.kubectl_command, namespace, resource, file)
     }
 
-    /// Wait for a set of `resources` in a specified `namespace` to acheive
+    /// Wait for a set of `resources` in a specified `namespace` to achieve
     /// `wait_for` state.
     /// Use `extra` to pass additional arguments to `kubectl`.
     pub async fn wait<'a>(
@@ -86,7 +86,7 @@ impl Framework {
         .await
     }
 
-    /// Wait for a set of `resources` in any namespace to acheive `wait_for`
+    /// Wait for a set of `resources` in any namespace to achieve `wait_for`
     /// state.
     /// Use `extra` to pass additional arguments to `kubectl`.
     pub async fn wait_all_namespaces<'a>(

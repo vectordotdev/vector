@@ -65,7 +65,7 @@ cat LICENSE NOTICE > "$PROJECT_ROOT/target/debian-license.txt"
 # Build the deb
 #
 #   --target
-#     tells the builder everything it needs to know aboout where
+#     tells the builder everything it needs to know about where
 #     the deb can run, including the architecture
 #
 #   --no-build

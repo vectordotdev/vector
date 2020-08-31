@@ -7,7 +7,7 @@ types:
   - enhancement         # Any user observable enhancement to an existing feature.
   - feat                # Any user observable new feature, such as a new platform, source, transform, or sink.
   - fix                 # Any user observable bug fix.
-  - perf                # Any user observable performance improvment.
+  - perf                # Any user observable performance improvement.
   - status              # A status change to a Vector component.
 
 scopes:

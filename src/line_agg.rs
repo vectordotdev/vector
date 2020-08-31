@@ -25,7 +25,7 @@ pub enum Mode {
     /// to match the `ContinueThrough` pattern.
     /// This is useful in cases such as a Java stack trace, where some indicator
     /// in the line (such as leading whitespace) indicates that it is an
-    /// extension of the preceeding line.
+    /// extension of the proceeding line.
     ContinueThrough,
 
     /// All consecutive lines matching this pattern, plus one additional line,
@@ -58,7 +58,7 @@ pub struct Config {
     /// Mode of operation, specifies how the condition pattern is interpreted.
     pub mode: Mode,
     /// The maximum time to wait for the continuation. Once this timeout is
-    /// reached, the buffered message is guaraneed to be flushed, even if
+    /// reached, the buffered message is guaranteed to be flushed, even if
     /// incomplete.
     pub timeout: Duration,
 }
@@ -94,7 +94,7 @@ pub struct LineAgg<T, K, C> {
     /// The core line aggregation logic.
     logic: Logic<K, C>,
 
-    /// Stashed lines. When line aggreation results in more than one line being
+    /// Stashed lines. When line aggregation results in more than one line being
     /// emitted, we have to stash lines and return them into the stream after
     /// that before doing any other work.
     stashed: Option<(K, Bytes, C)>,
@@ -174,7 +174,7 @@ where
                 continue;
             }
 
-            // If we're in draining mode, short circut here.
+            // If we're in draining mode, short circuit here.
             if let Some(to_drain) = &mut this.draining {
                 if let Some(val) = to_drain.pop() {
                     return Poll::Ready(Some(val));
@@ -571,14 +571,14 @@ mod tests {
     #[tokio::test]
     async fn two_lines_emit_with_continue_through() {
         let lines = vec![
-            "not merged 1", // will NOT be stashed, but passthroughed
+            "not merged 1", // will NOT be stashed, but passed-through
             " merged 1",
             " merged 2",
             "not merged 2", // will be stashed
             " merged 3",
             " merged 4",
             "not merged 3", // will be stashed
-            "not merged 4", // will NOT be stashed, but passthroughed
+            "not merged 4", // will NOT be stashed, but passed-through
             " merged 5",
             "not merged 5", // will be stashed
             " merged 6",

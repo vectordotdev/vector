@@ -100,7 +100,7 @@ impl Transform for Merge {
         // If current event has the partial marker, consider it partial.
         // Remove the partial marker from the event and stash it.
         if event.remove(&self.partial_event_marker_field).is_some() {
-            // We got a perial event. Initialize a partial event merging state
+            // We got a partial event. Initialize a partial event merging state
             // if there's none available yet, or extend the existing one by
             // merging the incoming partial event in.
             match self.log_event_merge_states.entry(discriminant) {
@@ -119,8 +119,8 @@ impl Transform for Merge {
         }
 
         // We got non-partial event. Attempt to get a partial event merge
-        // state. If it's empty then we don't have a backlog of partail events
-        // so we just return the event as is. Otherwise we proceed to merge in
+        // state. If it's empty then we don't have a backlog of partial events
+        // so we just return the event as-is. Otherwise we proceed to merge in
         // the final non-partial event to the partial event merge state - and
         // then return the merged event.
         let log_event_merge_state = match self.log_event_merge_states.remove(&discriminant) {
@@ -150,7 +150,7 @@ mod test {
     }
 
     #[test]
-    fn merge_passthorughs_non_partial_events() {
+    fn merge_passthroughs_non_partial_events() {
         let mut merge = Merge::from(MergeConfig::default());
 
         // A non-partial event.

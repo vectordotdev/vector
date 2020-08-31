@@ -248,7 +248,7 @@ callsite. That work is also effectively decoupled from event implementations.
 
 The example above uses an `emit!` macro, but doesn't currently do anything that
 requires it to be a macro. This may provide some flexibility for the future, or
-could be considered an overcomplication.
+could be considered an over-complication.
 
 The example also splits the `InternalEvent` trait into two method, `emit_logs`
 and `emit_metrics`. There's no strong need for this split, since both are simply

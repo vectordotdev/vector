@@ -124,7 +124,7 @@ mod tests {
     }
 
     #[test]
-    fn consistely_samples_the_same_events() {
+    fn consistently_samples_the_same_events() {
         let events = random_events(1000);
         let mut sampler = Sampler::new(2, None, RegexSet::new(&["na"]).unwrap());
 

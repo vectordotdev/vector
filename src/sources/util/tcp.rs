@@ -179,7 +179,7 @@ async fn handle_stream(
         if let Some(fut) = shutdown.as_mut() {
             match fut.poll_unpin(cx) {
                 Poll::Ready(Ok(token)) => {
-                    debug!("Start gracefull shutdown");
+                    debug!("Start graceful shutdown");
                     // Close our write part of TCP socket to signal the other side
                     // that it should stop writing and close the channel.
                     let socket: Option<&TcpStream> = reader.get_ref().get_ref();
