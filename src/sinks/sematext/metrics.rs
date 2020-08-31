@@ -6,8 +6,7 @@ use crate::{
     sinks::influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
     sinks::util::{
         http::{HttpBatchService, HttpClient, HttpRetryLogic},
-        service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, MetricBuffer,
+        BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
     },
     sinks::{Healthcheck, HealthcheckError, RouterSink},
     vector_version,
@@ -20,7 +19,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::task::Poll;
-use tower03::Service;
+use tower::Service;
 
 #[derive(Clone)]
 struct SematextMetricsSvc {
@@ -256,8 +255,7 @@ mod tests {
     use crate::sinks::util::test::{build_test_server, load_sink};
     use crate::test_util;
     use chrono::{offset::TimeZone, Utc};
-    use futures::compat::Future01CompatExt;
-    use futures01::{stream, Stream};
+    use futures::{compat::Future01CompatExt, StreamExt};
 
     #[test]
     fn test_encode_counter_event() {
@@ -373,16 +371,12 @@ mod tests {
         }
 
         let _ = sink
-            .send_all(stream::iter_ok(events.clone()))
+            .send_all(futures01::stream::iter_ok(events.clone()))
             .compat()
             .await
             .unwrap();
 
-        let output = rx
-            .take(metrics.len() as u64)
-            .wait()
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+        let output = rx.take(metrics.len()).collect::<Vec<_>>().await;
         assert_eq!("os,metric_type=counter,os.host=somehost,token=atoken swap.size=324292 1597784400000000000", output[0].1);
         assert_eq!("os,metric_type=counter,os.host=somehost,token=atoken network.tx=42000 1597784400000000001", output[1].1);
         assert_eq!("os,metric_type=counter,os.host=somehost,token=atoken network.rx=54293 1597784400000000002", output[2].1);
