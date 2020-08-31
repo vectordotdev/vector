@@ -1,3 +1,18 @@
 image:
+  # Use the latest release image.
   version: latest
+  # Use the alpine flavor of vector image.
   base: alpine
+
+env:
+  # Set a reasonable log level to avoid issues with internal logs
+  # overwriting console output at E2E tests. Feel free to change at
+  # a real deployment.
+  - name: LOG
+    value: info
+
+tolerations:
+  # This toleration is to have the daemonset runnable on master nodes.
+  # Remove it if your masters can't run pods.
+  - key: node-role.kubernetes.io/master
+    effect: NoSchedule
