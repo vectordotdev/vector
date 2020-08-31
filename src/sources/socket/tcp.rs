@@ -60,7 +60,7 @@ impl TcpSource for RawTcpSource {
 
         event
             .as_mut_log()
-            .insert(event::log_schema().source_type_key(), "socket");
+            .insert(event::log_schema().source_type_key(), Bytes::from("socket"));
 
         let host_key = (self.config.host_key.as_ref()).unwrap_or(&event::log_schema().host_key());
 

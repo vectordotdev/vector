@@ -74,7 +74,7 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
     .iter()
     {
         if let Some(val) = val {
-            log.insert(key, val);
+            log.insert(key, val.to_owned());
         }
     }
 
@@ -84,7 +84,7 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
         for (key, val) in labels.iter() {
             let mut path = prefix_path.clone();
             path.push(PathComponent::Key(key.clone()));
-            log.insert_path(path, val);
+            log.insert_path(path, val.to_owned());
         }
     }
 }

@@ -301,24 +301,16 @@ impl From<Vec<u8>> for Value {
     }
 }
 
-impl From<&[u8]> for Value {
-    fn from(bytes: &[u8]) -> Self {
-        Value::Bytes(Vec::from(bytes).into())
-    }
-}
-
 impl From<String> for Value {
     fn from(string: String) -> Self {
         Value::Bytes(string.into())
     }
 }
 
-impl From<&String> for Value {
-    fn from(string: &String) -> Self {
-        string.as_str().into()
-    }
-}
-
+// We only enable this in testing for convenience, since `"foo"` is a `&str`.
+// In normal operation, it's better to let the caller decide where to clone and when, rather than
+// hiding this from them.
+#[cfg(test)]
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
         Value::Bytes(Vec::from(s.as_bytes()).into())

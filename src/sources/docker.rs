@@ -781,7 +781,7 @@ impl ContainerLogInfo {
             let mut log_event = LogEvent::default();
 
             // Source type
-            log_event.insert(event::log_schema().source_type_key(), "docker");
+            log_event.insert(event::log_schema().source_type_key(), Bytes::from("docker"));
 
             // The log message.
             log_event.insert(event::log_schema().message_key().clone(), bytes_message);
@@ -895,15 +895,20 @@ impl ContainerMetadata {
             .as_ref()
             .map(|map| {
                 map.iter()
-                    .map(|(key, value)| (("label.".to_owned() + key).into(), value.as_str().into()))
+                    .map(|(key, value)| {
+                        (
+                            ("label.".to_owned() + key).into(),
+                            value.as_bytes().to_owned().into(),
+                        )
+                    })
                     .collect()
             })
             .unwrap_or_default();
 
         Ok(ContainerMetadata {
             labels,
-            name: name.as_str().trim_start_matches('/').into(),
-            image: config.image.unwrap().as_str().into(),
+            name: name.as_str().trim_start_matches('/').to_owned().into(),
+            image: config.image.unwrap().into(),
             created_at: DateTime::parse_from_rfc3339(created.as_str())?.with_timezone(&Utc),
         })
     }
