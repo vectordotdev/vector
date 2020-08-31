@@ -1446,4 +1446,62 @@ mod tests {
         let log = events[0].as_log();
         assert_eq!(log[&event::log_schema().message_key()], message.into());
     }
+
+    #[tokio::test]
+    async fn merge_multiline() {
+        trace_init();
+
+        let emitted_messages = vec![
+            "java.lang.Exception",
+            "    at com.foo.bar(bar.java:123)",
+            "    at com.foo.baz(baz.java:456)",
+        ];
+        let expected_messages = vec![concat!(
+            "java.lang.Exception\n",
+            "    at com.foo.bar(bar.java:123)\n",
+            "    at com.foo.baz(baz.java:456)",
+        )];
+        let name = "vector_test_merge_multiline";
+        let config = DockerConfig {
+            include_containers: Some(vec![name.to_owned()]),
+            include_images: Some(vec!["busybox".to_owned()]),
+            multiline: Some(MultilineConfig {
+                start_pattern: "^[^\\s]".to_owned(),
+                condition_pattern: "^[\\s]+at".to_owned(),
+                mode: line_agg::Mode::ContinueThrough,
+                timeout_ms: 10,
+            }),
+            ..DockerConfig::default()
+        };
+
+        let out = source_with_config(config);
+
+        let docker = docker().unwrap();
+
+        let command = emitted_messages
+            .into_iter()
+            .map(|message| format!("echo {:?}", message))
+            .collect::<Box<_>>()
+            .join(" && ");
+
+        let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker).await;
+        if let Err(error) = container_run(&id, &docker).await {
+            container_remove(&id, &docker).await;
+            panic!("Container failed to start with error: {:?}", error);
+        }
+        let events = collect_n(out, expected_messages.len()).await.unwrap();
+        container_remove(&id, &docker).await;
+
+        let actual_messages = events
+            .into_iter()
+            .map(|event| {
+                event
+                    .into_log()
+                    .remove(event::log_schema().message_key())
+                    .unwrap()
+                    .to_string_lossy()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(actual_messages, expected_messages);
+    }
 }
