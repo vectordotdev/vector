@@ -3,7 +3,7 @@
 use crate::{dns::Resolver, sinks::util, tls::MaybeTlsSettings};
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::{Stream, StreamExt};
+use futures::StreamExt;
 use http::{
     header::{HeaderMap, HeaderName, HeaderValue},
     Method, Request, Response, StatusCode,
@@ -260,17 +260,14 @@ impl HttpBody for RusotoBody {
                     Poll::Ready(None)
                 }
             }
-            Some(SignedRequestPayload::Stream(stream)) => {
-                let stream = Pin::new(stream);
-                match stream.poll_next(cx) {
-                    Poll::Ready(Some(result)) => match result {
-                        Ok(buf) => Poll::Ready(Some(Ok(buf))),
-                        Err(error) => Poll::Ready(Some(Err(error))),
-                    },
-                    Poll::Ready(None) => Poll::Ready(None),
-                    Poll::Pending => Poll::Pending,
-                }
-            }
+            Some(SignedRequestPayload::Stream(stream)) => match stream.poll_next_unpin(cx) {
+                Poll::Ready(Some(result)) => match result {
+                    Ok(buf) => Poll::Ready(Some(Ok(buf))),
+                    Err(error) => Poll::Ready(Some(Err(error))),
+                },
+                Poll::Ready(None) => Poll::Ready(None),
+                Poll::Pending => Poll::Pending,
+            },
             None => Poll::Ready(None),
         }
     }

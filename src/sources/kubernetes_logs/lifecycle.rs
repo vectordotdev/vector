@@ -1,8 +1,12 @@
 use crate::shutdown::{ShutdownSignal, ShutdownSignalToken};
-use futures::channel::oneshot;
-use futures::future::{select, BoxFuture, Either};
-use futures::StreamExt;
-use futures::{compat::Compat01As03, pin_mut, ready, stream::FuturesUnordered};
+use futures::{
+    channel::oneshot,
+    compat::Compat01As03,
+    future::{select, BoxFuture, Either},
+    pin_mut, ready,
+    stream::FuturesUnordered,
+    FutureExt, StreamExt,
+};
 use std::{
     future::Future,
     pin::Pin,
@@ -128,7 +132,7 @@ impl Future for ShutdownHandle {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let _ = ready!(Pin::new(&mut self.0).poll(cx));
+        let _ = ready!(self.0.poll_unpin(cx));
         Poll::Ready(())
     }
 }
