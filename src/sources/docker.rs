@@ -1,3 +1,4 @@
+use super::util::MultilineConfig;
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::merge_state::LogEventMergeState,
@@ -7,6 +8,7 @@ use crate::{
         DockerContainerUnwatch, DockerContainerWatch, DockerEventReceived,
         DockerLoggingDriverUnsupported, DockerTimestampParseFailed,
     },
+    line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
     Pipeline,
 };
@@ -29,7 +31,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::pin::Pin;
 use std::sync::Arc;
-use std::{collections::HashMap, env};
+use std::{collections::HashMap, convert::TryFrom, env};
 use string_cache::DefaultAtom as Atom;
 use tokio::sync::mpsc;
 use tracing::field;
@@ -55,6 +57,7 @@ pub struct DockerConfig {
     include_images: Option<Vec<String>>,
     partial_event_marker_field: Option<Atom>,
     auto_partial_merge: bool,
+    multiline: Option<MultilineConfig>,
 }
 
 impl Default for DockerConfig {
@@ -65,6 +68,7 @@ impl Default for DockerConfig {
             include_images: None,
             partial_event_marker_field: Some(event::PARTIAL.clone()),
             auto_partial_merge: true,
+            multiline: None,
         }
     }
 }
@@ -155,6 +159,7 @@ impl SourceConfig for DockerConfig {
 
 struct DockerSourceCore {
     config: DockerConfig,
+    line_agg_config: Option<line_agg::Config>,
     docker: Docker,
     /// Only logs created at, or after this moment are logged.
     now_timestamp: DateTime<Utc>,
@@ -173,8 +178,15 @@ impl DockerSourceCore {
             now = %now.to_rfc3339()
         );
 
+        let line_agg_config = if let Some(ref multiline_config) = config.multiline {
+            Some(line_agg::Config::try_from(multiline_config)?)
+        } else {
+            None
+        };
+
         Ok(DockerSourceCore {
             config,
+            line_agg_config,
             docker,
             now_timestamp: now.into(),
         })
@@ -549,7 +561,7 @@ impl EventStreamBuilder {
         // Create event streamer
         let mut partial_event_merge_state = None;
 
-        stream
+        let events_stream = stream
             .map(|value| {
                 match value {
                     Ok(message) => Ok(info.new_event(
@@ -580,8 +592,21 @@ impl EventStreamBuilder {
                 }
             })
             .take_while(|v| future::ready(v.is_ok()))
-            .filter_map(|v| future::ready(v.transpose()))
-            .take_until(self.shutdown.clone().compat())
+            .filter_map(|v| future::ready(v.unwrap()))
+            .take_until(self.shutdown.clone().compat());
+
+        let events_stream: Box<dyn Stream<Item = Event> + Unpin + Send> =
+            if let Some(ref line_agg_config) = self.core.line_agg_config {
+                Box::new(line_agg_adapter(
+                    events_stream,
+                    line_agg::Logic::new(line_agg_config.clone()),
+                ))
+            } else {
+                Box::new(events_stream)
+            };
+
+        events_stream
+            .map(Ok)
             .forward(self.out.clone().sink_compat().sink_map_err(|_| ()))
             .map(|_| {})
             .await;
@@ -925,6 +950,31 @@ fn docker() -> Result<Docker, DockerError> {
         Some("https") => Docker::connect_with_ssl_defaults(),
         _ => Docker::connect_with_local_defaults(),
     }
+}
+
+fn line_agg_adapter(
+    inner: impl Stream<Item = Event> + Unpin,
+    logic: line_agg::Logic<Bytes, LogEvent>,
+) -> impl Stream<Item = Event> {
+    let line_agg_in = inner.map(|event| {
+        let mut log_event = event.into_log();
+
+        let message_value = log_event
+            .remove(event::log_schema().message_key())
+            .expect("message must exist in the event");
+        let stream_value = log_event
+            .get(&STREAM)
+            .expect("stream must exist in the event");
+
+        let stream = stream_value.as_bytes();
+        let message = message_value.into_bytes();
+        (stream, message, log_event)
+    });
+    let line_agg_out = LineAgg::<_, Bytes, LogEvent>::new(line_agg_in, logic);
+    line_agg_out.map(|(_, message, mut log_event)| {
+        log_event.insert(event::log_schema().message_key(), message);
+        Event::Log(log_event)
+    })
 }
 
 #[cfg(all(test, feature = "docker-integration-tests"))]
@@ -1400,5 +1450,63 @@ mod tests {
 
         let log = events[0].as_log();
         assert_eq!(log[&event::log_schema().message_key()], message.into());
+    }
+
+    #[tokio::test]
+    async fn merge_multiline() {
+        trace_init();
+
+        let emitted_messages = vec![
+            "java.lang.Exception",
+            "    at com.foo.bar(bar.java:123)",
+            "    at com.foo.baz(baz.java:456)",
+        ];
+        let expected_messages = vec![concat!(
+            "java.lang.Exception\n",
+            "    at com.foo.bar(bar.java:123)\n",
+            "    at com.foo.baz(baz.java:456)",
+        )];
+        let name = "vector_test_merge_multiline";
+        let config = DockerConfig {
+            include_containers: Some(vec![name.to_owned()]),
+            include_images: Some(vec!["busybox".to_owned()]),
+            multiline: Some(MultilineConfig {
+                start_pattern: "^[^\\s]".to_owned(),
+                condition_pattern: "^[\\s]+at".to_owned(),
+                mode: line_agg::Mode::ContinueThrough,
+                timeout_ms: 10,
+            }),
+            ..DockerConfig::default()
+        };
+
+        let out = source_with_config(config);
+
+        let docker = docker().unwrap();
+
+        let command = emitted_messages
+            .into_iter()
+            .map(|message| format!("echo {:?}", message))
+            .collect::<Box<_>>()
+            .join(" && ");
+
+        let id = cmd_container(name, None, vec!["sh", "-c", &command], &docker).await;
+        if let Err(error) = container_run(&id, &docker).await {
+            container_remove(&id, &docker).await;
+            panic!("Container failed to start with error: {:?}", error);
+        }
+        let events = collect_n(out, expected_messages.len()).await.unwrap();
+        container_remove(&id, &docker).await;
+
+        let actual_messages = events
+            .into_iter()
+            .map(|event| {
+                event
+                    .into_log()
+                    .remove(event::log_schema().message_key())
+                    .unwrap()
+                    .to_string_lossy()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(actual_messages, expected_messages);
     }
 }
