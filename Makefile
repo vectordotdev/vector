@@ -243,13 +243,13 @@ start-integration-elasticsearch:
 	$(CONTAINER_TOOL) run -d --network=test-integration-elasticsearch -p 4571:4571 --name localstack \
 	 -e SERVICES=elasticsearch:4571 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
 	$(CONTAINER_TOOL) run -d --network=test-integration-elasticsearch -p 9200:9200 -p 9300:9300 \
-	 --name elasticsearch -e discovery.type=single-node -e ES_JAVA_OPTS="-Xms400m -Xmx400m" elasticsearch:6.8.10
+	 --name elasticsearch -e discovery.type=single-node -e ES_JAVA_OPTS="-Xms400m -Xmx400m" elasticsearch:6.6.2
 	$(CONTAINER_TOOL) run -d --network=test-integration-elasticsearch -p 9201:9200 -p 9301:9300 \
 	 --name elasticsearch-tls -e discovery.type=single-node -e xpack.security.enabled=true \
 	 -e xpack.security.http.ssl.enabled=true -e xpack.security.transport.ssl.enabled=true \
 	 -e xpack.ssl.certificate=certs/localhost.crt -e xpack.ssl.key=certs/localhost.key \
 	 -e ES_JAVA_OPTS="-Xms400m -Xmx400m" \
-	 -v $(PWD)/tests/data:/usr/share/elasticsearch/config/certs:ro elasticsearch:6.8.10
+	 -v $(PWD)/tests/data:/usr/share/elasticsearch/config/certs:ro elasticsearch:6.6.2
 
 stop-integration-elasticsearch:
 	$(CONTAINER_TOOL) rm --force localstack elasticsearch elasticsearch-tls 2>/dev/null; true
