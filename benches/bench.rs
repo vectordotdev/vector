@@ -7,7 +7,7 @@ use rand::{
     prelude::*,
 };
 use std::convert::TryFrom;
-use vector::config::{self, TransformConfig, TransformContext};
+use vector::config::{self, log_schema, TransformConfig, TransformContext};
 use vector::event::Event;
 use vector::test_util::{
     next_addr, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver,
@@ -628,10 +628,9 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut event = Event::from("hello world");
-                    event.as_mut_log().insert(
-                        crate::config::log_schema().timestamp_key().clone(),
-                        Utc::now(),
-                    );
+                    event
+                        .as_mut_log()
+                        .insert(log_schema().timestamp_key().clone(), Utc::now());
 
                     (Template::try_from("index-%Y.%m.%d").unwrap(), event)
                 },
@@ -646,10 +645,9 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut event = Event::from("hello world");
-                    event.as_mut_log().insert(
-                        crate::config::log_schema().timestamp_key().clone(),
-                        Utc::now(),
-                    );
+                    event
+                        .as_mut_log()
+                        .insert(log_schema().timestamp_key().clone(), Utc::now());
 
                     (Template::try_from("index").unwrap(), event)
                 },

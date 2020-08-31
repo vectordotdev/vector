@@ -2,7 +2,7 @@ use super::util::{SocketListenAddr, TcpSource};
 #[cfg(unix)]
 use crate::sources::util::build_unix_source;
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::{Event, Value},
     internal_events::{SyslogEventReceived, SyslogUdpReadError, SyslogUdpUtf8Error},
     shutdown::ShutdownSignal,
@@ -88,7 +88,7 @@ impl SourceConfig for SyslogConfig {
         let host_key = self
             .host_key
             .clone()
-            .unwrap_or_else(|| crate::config::log_schema().host_key().to_string());
+            .unwrap_or_else(|| log_schema().host_key().to_string());
 
         match self.mode.clone() {
             Mode::Tcp { address, tls } => {
@@ -322,10 +322,9 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
     let mut event = Event::from(&parsed.msg[..]);
 
     // Add source type
-    event.as_mut_log().insert(
-        crate::config::log_schema().source_type_key(),
-        Bytes::from("syslog"),
-    );
+    event
+        .as_mut_log()
+        .insert(log_schema().source_type_key(), Bytes::from("syslog"));
 
     if let Some(default_host) = default_host.clone() {
         event.as_mut_log().insert("source_ip", default_host);
@@ -340,10 +339,9 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
         .timestamp
         .map(|ts| ts.into())
         .unwrap_or_else(Utc::now);
-    event.as_mut_log().insert(
-        crate::config::log_schema().timestamp_key().clone(),
-        timestamp,
-    );
+    event
+        .as_mut_log()
+        .insert(log_schema().timestamp_key().clone(), timestamp);
 
     insert_fields_from_syslog(&mut event, parsed);
 
@@ -399,7 +397,7 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
 #[cfg(test)]
 mod test {
     use super::{event_from_str, SyslogConfig};
-    use crate::event::Event;
+    use crate::{config::log_schema, event::Event};
     use chrono::TimeZone;
 
     #[test]
@@ -456,13 +454,10 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                crate::config::log_schema().timestamp_key().clone(),
+                log_schema().timestamp_key().clone(),
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
-            expected.insert(
-                crate::config::log_schema().source_type_key().clone(),
-                "syslog",
-            );
+            expected.insert(log_schema().source_type_key().clone(), "syslog");
             expected.insert("host", "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
 
@@ -497,18 +492,12 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                crate::config::log_schema().timestamp_key().clone(),
+                log_schema().timestamp_key().clone(),
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
-            expected.insert(
-                crate::config::log_schema().host_key().clone(),
-                "74794bfb6795",
-            );
+            expected.insert(log_schema().host_key().clone(), "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
-            expected.insert(
-                crate::config::log_schema().source_type_key().clone(),
-                "syslog",
-            );
+            expected.insert(log_schema().source_type_key().clone(), "syslog");
             expected.insert("severity", "notice");
             expected.insert("facility", "user");
             expected.insert("version", 1);
@@ -594,17 +583,11 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                crate::config::log_schema().timestamp_key().clone(),
+                log_schema().timestamp_key().clone(),
                 chrono::Utc.ymd(2020, 2, 13).and_hms(20, 7, 26),
             );
-            expected.insert(
-                crate::config::log_schema().host_key().clone(),
-                "74794bfb6795",
-            );
-            expected.insert(
-                crate::config::log_schema().source_type_key().clone(),
-                "syslog",
-            );
+            expected.insert(log_schema().host_key().clone(), "74794bfb6795");
+            expected.insert(log_schema().source_type_key().clone(), "syslog");
             expected.insert("hostname", "74794bfb6795");
             expected.insert("severity", "notice");
             expected.insert("facility", "user");
@@ -630,13 +613,10 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                crate::config::log_schema().timestamp_key().clone(),
+                log_schema().timestamp_key().clone(),
                 chrono::Utc.ymd(2020, 2, 13).and_hms(21, 31, 56),
             );
-            expected.insert(
-                crate::config::log_schema().source_type_key().clone(),
-                "syslog",
-            );
+            expected.insert(log_schema().source_type_key().clone(), "syslog");
             expected.insert("host", "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
             expected.insert("severity", "info");
@@ -666,15 +646,12 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                crate::config::log_schema().timestamp_key().clone(),
+                log_schema().timestamp_key().clone(),
                 chrono::Utc
                     .ymd(2019, 2, 13)
                     .and_hms_micro(21, 53, 30, 605_850),
             );
-            expected.insert(
-                crate::config::log_schema().source_type_key().clone(),
-                "syslog",
-            );
+            expected.insert(log_schema().source_type_key().clone(), "syslog");
             expected.insert("host", "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
             expected.insert("severity", "info");
