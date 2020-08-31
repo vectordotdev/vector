@@ -6,6 +6,8 @@ mod ansi_stripper;
 mod auto_concurrency;
 mod aws_kinesis_streams;
 mod blackhole;
+#[cfg(feature = "transforms-coercer")]
+mod coercer;
 #[cfg(feature = "transforms-concat")]
 mod concat;
 #[cfg(feature = "sources-docker")]
@@ -69,6 +71,8 @@ pub use self::ansi_stripper::*;
 pub use self::auto_concurrency::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
+#[cfg(feature = "transforms-coercer")]
+pub(crate) use self::coercer::*;
 #[cfg(feature = "transforms-concat")]
 pub use self::concat::*;
 #[cfg(feature = "sources-docker")]

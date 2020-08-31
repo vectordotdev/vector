@@ -1,7 +1,10 @@
 use super::Transform;
-use crate::config::{DataType, TransformConfig, TransformContext, TransformDescription};
-use crate::event::Event;
-use crate::types::{parse_conversion_map, Conversion};
+use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::Event,
+    internal_events::{CoercerConversionFailed, CoercerEventProcessed},
+    types::{parse_conversion_map, Conversion},
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
@@ -50,6 +53,7 @@ pub struct Coercer {
 impl Transform for Coercer {
     fn transform(&mut self, event: Event) -> Option<Event> {
         let mut log = event.into_log();
+        emit!(CoercerEventProcessed);
         if self.drop_unspecified {
             // This uses a different algorithm from the default path
             // below, as it will be fewer steps to fully recreate the
@@ -63,14 +67,7 @@ impl Transform for Coercer {
                         Ok(converted) => {
                             new_log.insert(field, converted);
                         }
-                        Err(error) => {
-                            warn!(
-                                message = "Could not convert types.",
-                                field = &field[..],
-                                %error,
-                                rate_limit_secs = 10,
-                            );
-                        }
+                        Err(error) => emit!(CoercerConversionFailed { field, error }),
                     }
                 }
             }
@@ -82,14 +79,7 @@ impl Transform for Coercer {
                         Ok(converted) => {
                             log.insert(field, converted);
                         }
-                        Err(error) => {
-                            warn!(
-                                message = "Could not convert types.",
-                                field = &field[..],
-                                %error,
-                                rate_limit_secs = 10,
-                            );
-                        }
+                        Err(error) => emit!(CoercerConversionFailed { field, error }),
                     }
                 }
             }
