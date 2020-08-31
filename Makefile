@@ -191,10 +191,14 @@ stop-test-integration: stop-integration-pulsar stop-integration-splunk
 
 start-integration-aws:
 	$(CONTAINER_TOOL) network create test-integration-aws
-	$(CONTAINER_TOOL) run -d --network=test-integration-aws -p 8111:8111 --name ec2_metadata timberiodev/mock-ec2-metadata:latest
-	$(CONTAINER_TOOL) run -d --network=test-integration-aws -p 4568:4568 -p 4572:4572 -p 4582:4582 -p 4571:4571 -p 4573:4573 --name localstack -e SERVICES=kinesis:4568,s3:4572,cloudwatch:4582,elasticsearch:4571,firehose:4573 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
-	$(CONTAINER_TOOL) run -d --network=test-integration-aws -p 6000:6000 --name mockwatchlogs -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
-	sleep 60 # Many services are very slow... Give them a sec...
+	$(CONTAINER_TOOL) run -d --network=test-integration-aws -p 8111:8111 --name ec2_metadata \
+	 timberiodev/mock-ec2-metadata:latest
+	$(CONTAINER_TOOL) run -d --network=test-integration-aws -p 4568:4568 -p 4572:4572 -p 4582:4582 -p 4571:4571 -p 4573:4573 \
+	 --name localstack -e SERVICES=kinesis:4568,s3:4572,cloudwatch:4582,elasticsearch:4571,firehose:4573 \
+	 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
+	$(CONTAINER_TOOL) run -d --network=test-integration-aws -p 6000:6000 --name mockwatchlogs \
+	 -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
+	sleep 5
 
 stop-integration-aws:
 	$(CONTAINER_TOOL) rm --force ec2_metadata mockwatchlogs localstack 2>/dev/null; true
@@ -224,7 +228,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) -k stop-integration-clickhouse \
     ; rc=$$? \
 	$(MAKE) start-integration-clickhouse
-	sleep 30 # Many services are very slow... Give them a sec...
+	sleep 5 # Many services are very slow... Give them a sec...
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features clickhouse-integration-tests --lib ::clickhouse:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
@@ -236,9 +240,16 @@ test-integration-docker: ## Runs Docker integration tests
 
 start-integration-elasticsearch:
 	$(CONTAINER_TOOL) network create test-integration-elasticsearch
-	$(CONTAINER_TOOL) run -d --network=test-integration-elasticsearch -p 4568:4568 -p 4572:4572 -p 4582:4582 -p 4571:4571 -p 4573:4573 --name localstack -e SERVICES=kinesis:4568,s3:4572,cloudwatch:4582,elasticsearch:4571,firehose:4573 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
-	$(CONTAINER_TOOL) run -d --network=test-integration-elasticsearch -p 9200:9200 -p 9300:9300 --name elasticsearch -e discovery.type=single-node elasticsearch:6.6.2
-	$(CONTAINER_TOOL) run -d --network=test-integration-elasticsearch -p 9201:9200 -p 9301:9300 --name elasticsearch-tls -e discovery.type=single-node -e xpack.security.enabled=true -e xpack.security.http.ssl.enabled=true -e xpack.security.transport.ssl.enabled=true -e xpack.ssl.certificate=certs/localhost.crt -e xpack.ssl.key=certs/localhost.key -v $(PWD)/tests/data:/usr/share/elasticsearch/config/certs:ro elasticsearch:6.6.2
+	$(CONTAINER_TOOL) run -d --network=test-integration-elasticsearch -p 4571:4571 --name localstack \
+	 -e SERVICES=elasticsearch:4571 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
+	$(CONTAINER_TOOL) run -d --network=test-integration-elasticsearch -p 9200:9200 -p 9300:9300 \
+	 --name elasticsearch -e discovery.type=single-node -e ES_JAVA_OPTS="-Xms400m -Xmx400m" elasticsearch:6.8.10
+	$(CONTAINER_TOOL) run -d --network=test-integration-elasticsearch -p 9201:9200 -p 9301:9300 \
+	 --name elasticsearch-tls -e discovery.type=single-node -e xpack.security.enabled=true \
+	 -e xpack.security.http.ssl.enabled=true -e xpack.security.transport.ssl.enabled=true \
+	 -e xpack.ssl.certificate=certs/localhost.crt -e xpack.ssl.key=certs/localhost.key \
+	 -e ES_JAVA_OPTS="-Xms400m -Xmx400m" \
+	 -v $(PWD)/tests/data:/usr/share/elasticsearch/config/certs:ro elasticsearch:6.8.10
 
 stop-integration-elasticsearch:
 	$(CONTAINER_TOOL) rm --force localstack elasticsearch elasticsearch-tls 2>/dev/null; true
@@ -249,7 +260,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) -k stop-integration-elasticsearch \
     ; rc=$$? \
 	$(MAKE) start-integration-elasticsearch
-	sleep 60 # Many services are very slow... Give them a sec...
+	sleep 0 # Many services are very slow... Give them a sec...
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features es-integration-tests --lib ::elasticsearch:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
@@ -258,7 +269,8 @@ endif
 
 start-integration-gcp:
 	$(CONTAINER_TOOL) network create test-integration-gcp
-	$(CONTAINER_TOOL) run -d --network=test-integration-gcp -p 8681-8682:8681-8682 --name cloud-pubsub -e PUBSUB_PROJECT1=testproject,topic1:subscription1 messagebird/gcloud-pubsub-emulator
+	$(CONTAINER_TOOL) run -d --network=test-integration-gcp -p 8681-8682:8681-8682 --name cloud-pubsub \
+	 -e PUBSUB_PROJECT1=testproject,topic1:subscription1 messagebird/gcloud-pubsub-emulator
 
 stop-integration-gcp:
 	$(CONTAINER_TOOL) rm --force cloud-pubsub 2>/dev/null; true
@@ -269,7 +281,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) -k stop-integration-gcp \
     ; rc=$$? \
 	$(MAKE) start-integration-gcp
-	sleep 30 # Many services are very slow... Give them a sec..
+	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features gcp-integration-tests --lib ::gcp:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
@@ -289,7 +301,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) -k stop-integration-humio \
     ; rc=$$? \
 	$(MAKE) start-integration-humio
-	sleep 30 # Many services are very slow... Give them a sec..
+	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features humio-integration-tests --lib ::humio:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
@@ -298,8 +310,10 @@ endif
 
 start-integration-influxdb:
 	$(CONTAINER_TOOL) network create test-integration-influxdb
-	$(CONTAINER_TOOL) run -d --network=test-integration-influxdb -p 8086:8086 --name influxdb_v1 -e INFLUXDB_REPORTING_DISABLED=true influxdb:1.7
-	$(CONTAINER_TOOL) run -d --network=test-integration-influxdb -p 9999:9999 --name influxdb_v2 -e INFLUXDB_REPORTING_DISABLED=true  quay.io/influxdb/influxdb:2.0.0-beta influxd --reporting-disabled
+	$(CONTAINER_TOOL) run -d --network=test-integration-influxdb -p 8086:8086 --name influxdb_v1 \
+	 -e INFLUXDB_REPORTING_DISABLED=true influxdb:1.7
+	$(CONTAINER_TOOL) run -d --network=test-integration-influxdb -p 9999:9999 --name influxdb_v2 \
+	 -e INFLUXDB_REPORTING_DISABLED=true  quay.io/influxdb/influxdb:2.0.0-beta influxd --reporting-disabled
 
 stop-integration-influxdb:
 	$(CONTAINER_TOOL) rm --force influxdb_v1 influxdb_v2 2>/dev/null; true
@@ -310,7 +324,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) -k stop-integration-influxdb \
     ; rc=$$? \
 	$(MAKE) start-integration-influxdb
-	sleep 30 # Many services are very slow... Give them a sec..
+	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features influxdb-integration-tests --lib ::influxdb::integration_tests:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
@@ -340,7 +354,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) -k stop-integration-kafka \
     ; rc=$$? \
 	$(MAKE) start-integration-kafka
-	sleep 30 # Many services are very slow... Give them a sec..
+	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features "kafka-integration-tests rdkafka-plain" --lib ::kafka:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
@@ -349,7 +363,8 @@ endif
 
 start-integration-loki:
 	$(CONTAINER_TOOL) network create test-integration-loki
-	$(CONTAINER_TOOL) run -d --network=test-integration-loki -p 3100:3100 -v $(PWD)/tests/data:/etc/loki --name loki grafana/loki:master -config.file=/etc/loki/loki-config.yaml
+	$(CONTAINER_TOOL) run -d --network=test-integration-loki -p 3100:3100 -v $(PWD)/tests/data:/etc/loki \
+	 --name loki grafana/loki:master -config.file=/etc/loki/loki-config.yaml
 
 stop-integration-loki:
 	$(CONTAINER_TOOL) rm --force loki 2>/dev/null; true
@@ -360,7 +375,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) -k stop-integration-loki \
     ; rc=$$? \
 	$(MAKE) start-integration-loki
-	sleep 30 # Many services are very slow... Give them a sec..
+	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features loki-integration-tests --lib ::loki:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
@@ -369,7 +384,8 @@ endif
 
 start-integration-pulsar:
 	$(CONTAINER_TOOL) network create test-integration-pulsar
-	$(CONTAINER_TOOL) run -d --network=test-integration-pulsar -p 6650:6650 --name pulsar apachepulsar/pulsar bin/pulsar standalone
+	$(CONTAINER_TOOL) run -d --network=test-integration-pulsar -p 6650:6650 --name pulsar \
+	 apachepulsar/pulsar bin/pulsar standalone
 
 stop-integration-pulsar:
 	$(CONTAINER_TOOL) rm --force pulsar 2>/dev/null; true
@@ -380,7 +396,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) -k stop-integration-pulsar \
     ; rc=$$? \
 	$(MAKE) start-integration-pulsar
-	sleep 30 # Many services are very slow... Give them a sec..
+	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features pulsar-integration-tests --lib ::pulsar:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
@@ -389,7 +405,8 @@ endif
 
 start-integration-splunk:
 	$(CONTAINER_TOOL) network create test-integration-splunk
-	$(CONTAINER_TOOL) run -d --network=test-integration-splunk -p 8088:8088 -p 8000:8000 -p 8089:8089 --name splunk timberio/splunk-hec-test:latest
+	$(CONTAINER_TOOL) run -d --network=test-integration-splunk -p 8088:8088 -p 8000:8000 -p 8089:8089 \
+	 --name splunk timberio/splunk-hec-test:latest
 
 stop-integration-splunk:
 	$(CONTAINER_TOOL) rm --force splunk 2>/dev/null; true
@@ -400,7 +417,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) -k stop-integration-splunk \
     ; rc=$$? \
 	$(MAKE) start-integration-splunk
-	sleep 30 # Many services are very slow... Give them a sec..
+	sleep 10 # Many services are very slow... Give them a sec..
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features splunk-integration-tests --lib ::splunk_hec:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
