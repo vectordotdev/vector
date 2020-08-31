@@ -50,6 +50,7 @@ jobs:
       - run: make check-clippy
       - run: make check-version
       - run: make check-scripts
+      - run: make check-helm
       - uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check advisories
