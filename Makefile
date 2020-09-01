@@ -47,6 +47,10 @@ FORMATTING_BEGIN_YELLOW = \033[0;33m
 FORMATTING_BEGIN_BLUE = \033[36m
 FORMATTING_END = \033[0m
 
+# "One weird trick!" https://www.gnu.org/software/make/manual/make.html#Syntax-of-Functions
+EMPTY:=
+SPACE:= ${EMPTY} ${EMPTY}
+
 help:
 	@printf -- "${FORMATTING_BEGIN_BLUE}                                      __   __  __${FORMATTING_END}\n"
 	@printf -- "${FORMATTING_BEGIN_BLUE}                                      \ \ / / / /${FORMATTING_END}\n"
@@ -174,34 +178,40 @@ build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in rel
 .PHONY: cross-enable
 cross-enable: cargo-install-cross
 
-cross-build-aarch64-unknown-linux-gnu: target/aarch64-unknown-linux-gnu/release/vector
-cross-build-dev-aarch64-unknown-linux-gnu: target/aarch64-unknown-linux-gnu/debug/vector
-cross-test-aarch64-unknown-linux-gnu:
-	cross test --target aarch64-unknown-linux-gnu
+.PHONY: CARGO_HANDLES_FRESHNESS
+CARGO_HANDLES_FRESHNESS:
+	${EMPTY}
 
-cross-build-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/release/vector
-cross-build-dev-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/debug/vector
-cross-test-x86_64-unknown-linux-gnu:
-	cross test --target x86_64-unknown-linux-gnu
+# This is basically a shorthand for folks.
+# `cross-anything-triple` will call `cross anything --target triple` with the right features.
+.PHONY: cross-%
+cross-%: export PAIR =$(subst -, ,$($(strip @):cross-%=%))
+cross-%: export COMMAND ?=$(word 1,${PAIR})
+cross-%: export TARGET ?=$(subst ${SPACE},-,$(wordlist 2,99,${PAIR}))
+cross-%: export PROFILE ?= release
+cross-%: export RUSTFLAGS += -C link-arg=-s
+cross-%:
+	cross ${COMMAND} \
+		$(if $(findstring release,$(PROFILE)),--release,) \
+		--target ${TARGET} \
+		--no-default-features \
+		--features target-${TARGET}
 
-.PHONY: target/%/vector
 target/%/vector: export PAIR =$(subst /, ,$(@:target/%/vector=%))
 target/%/vector: export TARGET ?=$(word 1,${PAIR})
 target/%/vector: export PROFILE ?=$(word 2,${PAIR})
 target/%/vector: export RUSTFLAGS += -C link-arg=-s
-target/%/vector:
+target/%/vector: CARGO_HANDLES_FRESHNESS
 	cross build \
 		$(if $(findstring release,$(PROFILE)),--release,) \
 		--target ${TARGET} \
 		--no-default-features \
 		--features target-${TARGET}
 
-.PHONY: target/%/vector.tar.gz
 target/%/vector.tar.gz: export PAIR =$(subst /, ,$(@:target/%/vector.tar.gz=%))
 target/%/vector.tar.gz: export TARGET ?=$(word 1,${PAIR})
 target/%/vector.tar.gz: export PROFILE ?=$(word 2,${PAIR})
 target/%/vector.tar.gz: target/%/vector
-	echo ${PAIR} $@
 	tar --create \
 		--gzip \
 		--file target/${TARGET}/${PROFILE}/vector.tar.gz \
@@ -426,19 +436,38 @@ package-aarch64-unknown-linux-musl-all: package-archive-aarch64-unknown-linux-mu
 
 # archives
 
+.PHONY: package-archive
 package-archive: build ## Build the Vector archive
 	$(RUN) package-archive
 
+.PHONY: package-archive-all
 package-archive-all: package-archive-x86_64-unknown-linux-musl package-archive-x86_64-unknown-linux-gnu package-archive-aarch64-unknown-linux-musl ## Build all archives
 
+.PHONY: package-archive-x86_64-unknown-linux-musl
 package-archive-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## Build the x86_64 archive
 	$(RUN) package-archive-x86_64-unknown-linux-musl
 
-package-archive-x86_64-unknown-linux-gnu: build-x86_64-unknown-linux-gnu ## Build the x86_64 archive
-	$(RUN) package-archive-x86_64-unknown-linux-gnu
+.PHONY: package-archive-x86_64-unknown-linux-gnu
+package-archive-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz
+	@echo "Output to ${<}."
 
+target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz: target/x86_64-unknown-linux-gnu/release/vector.tar.gz ## Build the x86_64 archive
+	@echo "Built to ${<}, relocating to ${@}"
+	@mkdir -p target/artifacts/
+	@cp -v \
+		${<} \
+		${@}
+
+.PHONY: package-archive-aarch64-unknown-linux-musl
 package-archive-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## Build the aarch64 archive
 	$(RUN) package-archive-aarch64-unknown-linux-musl
+
+.PHONY: package-archive-aarch64-unknown-linux-gnu
+package-archive-aarch64-unknown-linux-gnu: target/aarch64-unknown-linux-gnu/release/vector.tar.gz ## Build the aarch64 archive
+	@echo "Built to ${<}, relocating..."
+	@cp -v \
+		target/x86_64-unknown-linux-gnu/release/vector.tar.gz \
+		target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz
 
 # debs
 
