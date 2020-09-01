@@ -19,6 +19,8 @@ export SCOPE ?= ""
 export AUTOSPAWN ?= true
 # Override to control if services are turned off after integration tests.
 export AUTODESPAWN ?= ${AUTOSPAWN}
+# Override autoinstalling of tools. (Eg `cargo install`)
+export AUTOINSTALL ?= false
 # Override to true for a bit more log output in your environment building (more coming!)
 export VERBOSE ?= false
 # Override to set a different Rust toolchain
@@ -165,8 +167,11 @@ build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`
 
 build-all: build-x86_64-unknown-linux-musl build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
 
-build-x86_64-unknown-linux-gnu: ## Build dynamically linked binary in release mode for the x86_64 architecture
-	$(RUN) build-x86_64-unknown-linux-gnu
+build-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/release/vector ## Build a release binary for the x86_64-unknown-linux-gnu triple.
+	@echo "Output to ${<}"
+
+build-aarch64-unknown-linux-gnu: target/aarch64-unknown-linux-gnu/release/vector ## Build a release binary for the aarch64-unknown-linux-gnu triple.
+	@echo "Output to ${<}"
 
 build-x86_64-unknown-linux-musl: ## Build static binary in release mode for the x86_64 architecture
 	$(RUN) build-x86_64-unknown-linux-musl
@@ -190,7 +195,7 @@ cross-%: export COMMAND ?=$(word 1,${PAIR})
 cross-%: export TRIPLE ?=$(subst ${SPACE},-,$(wordlist 2,99,${PAIR}))
 cross-%: export PROFILE ?= release
 cross-%: export RUSTFLAGS += -C link-arg=-s
-cross-%:
+cross-%: cargo-install-cross
 	cross ${COMMAND} \
 		$(if $(findstring release,$(PROFILE)),--release,) \
 		--target ${TRIPLE} \
@@ -201,7 +206,7 @@ target/%/vector: export PAIR =$(subst /, ,$(@:target/%/vector=%))
 target/%/vector: export TRIPLE ?=$(word 1,${PAIR})
 target/%/vector: export PROFILE ?=$(word 2,${PAIR})
 target/%/vector: export RUSTFLAGS += -C link-arg=-s
-target/%/vector: CARGO_HANDLES_FRESHNESS
+target/%/vector: cargo-install-cross CARGO_HANDLES_FRESHNESS
 	cross build \
 		$(if $(findstring release,$(PROFILE)),--release,) \
 		--target ${TRIPLE} \
@@ -211,14 +216,17 @@ target/%/vector: CARGO_HANDLES_FRESHNESS
 target/%/vector.tar.gz: export PAIR =$(subst /, ,$(@:target/%/vector.tar.gz=%))
 target/%/vector.tar.gz: export TRIPLE ?=$(word 1,${PAIR})
 target/%/vector.tar.gz: export PROFILE ?=$(word 2,${PAIR})
-target/%/vector.tar.gz: target/%/vector
+target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 	tar --create \
 		--gzip \
+		--verbose \
 		--file target/${TRIPLE}/${PROFILE}/vector.tar.gz \
-		--transform='s|target/${TRIPLE}/${PROFILE}/|/bin/|' \
+		--transform='s|target/${TRIPLE}/${PROFILE}/|bin/|' \
 		--transform='s|distribution/|etc/|' \
+		--transform 's|^|vector-${TRIPLE}/|' \
 		target/${TRIPLE}/${PROFILE}/vector \
 		README.md \
+		LICENSE \
 		config \
 		distribution/init.d \
 		distribution/systemd
@@ -229,6 +237,12 @@ test: ## Run the test suite
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
 
 test-all: test-behavior test-integration test-unit ## Runs all tests, unit, behaviorial, and integration.
+
+test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit tests on the x86_64-unknown-linux-gnu triple
+	${EMPTY}
+
+test-aarch64-unknown-linux-gnu: cross-test-aarch64-unknown-linux-gnu ## Runs unit tests on the aarch64-unknown-linux-gnu triple
+	${EMPTY}
 
 test-behavior: ## Runs behaviorial test
 	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/**/*.toml
@@ -456,11 +470,11 @@ package-archive-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## Bu
 	$(RUN) package-archive-x86_64-unknown-linux-musl
 
 .PHONY: package-archive-x86_64-unknown-linux-gnu
-package-archive-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build the x86_64 archive
+package-archive-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build an archive of the x86_64-unknown-linux-gnu triple.
 	@echo "Output to ${<}."
 
 .PHONY: package-archive-aarch64-unknown-linux-musl
-package-archive-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## Build the aarch64 archive
+package-archive-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## Build an archive of the aarch64-unknown-linux-gnu triple.
 	$(RUN) package-archive-aarch64-unknown-linux-musl
 
 .PHONY: package-archive-aarch64-unknown-linux-gnu
@@ -606,7 +620,7 @@ git-hooks: ## Add Vector-local git hooks for commit sign-off
 
 cargo-install-%: override TOOL = $(@:cargo-install-%=%)
 cargo-install-%:
-	${MAYBE_ENVIRONMENT_EXEC} cargo install ${TOOL} --quiet
+	$(if $(findstring true,$(AUTOINSTALL)),${MAYBE_ENVIRONMENT_EXEC} cargo install ${TOOL} --quiet,)
 
 .PHONY: ensure-has-wasm-toolchain ### Configures a wasm toolchain for test artifact building, if required
 ensure-has-wasm-toolchain: target/wasm32-wasi/.obtained

@@ -53,8 +53,8 @@ jobs:
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
-  test-linux:
-    name: Unit - Linux
+  test-x86_64-unknown-linux-gnu:
+    name: Unit - x86_64-unknown-linux-gnu
     runs-on: ubuntu-20.04
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
@@ -69,7 +69,25 @@ jobs:
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
-      - run: make test
+      - run: make test-x86_64-unknown-linux-gnu
+  
+  test-aarch64-unknown-linux-gnu:
+    name: Unit - aarch64-unknown-linux-gnu
+    runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make test-x86_64-unknown-linux-gnu
 
   test-mac:
     name: Unit - Mac
