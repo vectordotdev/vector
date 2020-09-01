@@ -42,7 +42,6 @@ SECURITY.md @binarylogic @jamtur01
 /src/metrics.rs @lukesteensen
 /src/main.rs @lukesteensen
 /src/region.rs 
-/src/runtime.rs 
 /src/template.rs @lukesteensen
 /src/tls.rs @bruceg
 /src/trace.rs 
