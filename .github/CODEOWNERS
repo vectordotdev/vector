@@ -1,17 +1,11 @@
 # https://help.github.com/articles/about-codeowners/
 
-PRIVACY.md @binarylogic @jamtur01
-LICENSE @binarylogic @jamtur01
-CONTRIBUTING.md @binarylogic @jamtur01
-CODE_OF_CONDUCT.md @binarylogic @jamtur01
-NOTICE @binarylogic @jamtur01
-SECURITY.md @binarylogic @jamtur01
-
-.github/workflows./* @jamtur01
-.github/semantic* @binarylogic @jamtur01
-.github/SUPPORT.md @binarylogic @jamtur01
-.github/PULL_REQUEST_TEMPLATE.md @binarylogic @jamtur01
-.github/ISSUE_TEMPLATE/* @binarylogic @jamtur01
+/PRIVACY.md @binarylogic @jamtur01
+/LICENSE @binarylogic @jamtur01
+/CONTRIBUTING.md @binarylogic @jamtur01
+/CODE_OF_CONDUCT.md @binarylogic @jamtur01
+/NOTICE @binarylogic @jamtur01
+/SECURITY.md @binarylogic @jamtur01
 
 /distribution/ @hoverbear @jamtur01
 /distribution/kubernetes/ @MOZGIII
@@ -104,21 +98,26 @@ SECURITY.md @binarylogic @jamtur01
 /src/event/merge_state.rs @MOZGIII
 /src/event/discriminant.rs @MOZGIII
 
-/src/wasm/* @hoverbear
+/src/wasm/ @hoverbear
 
 /lib/file-source/src/paths_provider/mod.rs @MOZGIII
 /lib/file-source/src/paths_provider/glob.rs @MOZGIII
 
 /lib/k8s-test-framework/ @MOZGIII
 
-/lib/vector-wasm/* @hoverbear
+/lib/vector-wasm/ @hoverbear
 /tests/buffering.rs @MOZGIII
-tests/data/wasm/* @hoverbear
+/tests/data/wasm/ @hoverbear
 /tests/kubernetes-e2e.rs @MOZGIII
 
 
+/.github/semantic* @binarylogic @jamtur01
+/.github/SUPPORT.md @binarylogic @jamtur01
+/.github/PULL_REQUEST_TEMPLATE.md @binarylogic @jamtur01
+/.github/ISSUE_TEMPLATE/ @binarylogic @jamtur01
 /.github/workflows/e2e.yml @MOZGIII
+/.github/workflows/ @jamtur01
 
-/skaffold/* @MOZGIII
+/skaffold/ @MOZGIII
 /skaffold.yaml @MOZGIII
 /kustomization.yaml @MOZGIII
