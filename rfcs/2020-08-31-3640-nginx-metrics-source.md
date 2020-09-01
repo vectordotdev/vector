@@ -159,7 +159,7 @@ Incremental steps that execute this change. Generally this is in the form of:
 - Support for:
   - nginx_sts
   - nginx_upstream_check
-  - nginx_vts 
+  - nginx_vts
 
 ### Refactor HTTP-scraping-based sources
 
