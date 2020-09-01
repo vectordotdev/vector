@@ -3,3 +3,6 @@ rustflags = ["-C", "link-args=-rdynamic"]
 
 [target.x86_64-unknown-linux-gnu]
 rustflags = ["-C", "link-args=-rdynamic"]
+# focus on fast, lean builds
+[build]
+incremental = false

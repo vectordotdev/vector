@@ -297,7 +297,8 @@ pub fn runtime() -> runtime::Runtime {
         .unwrap()
 }
 
-pub async fn wait_for<F, Fut>(mut f: F)
+// Wait for a Future to resolve, or the duration to elapse (will panic)
+pub async fn wait_for_duration<F, Fut>(mut f: F, duration: Duration)
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = bool> + Send + 'static,
@@ -305,14 +306,33 @@ where
     let started = Instant::now();
     while !f().await {
         delay_for(Duration::from_millis(5)).await;
-        if started.elapsed().as_secs() > 5 {
+        if started.elapsed() > duration {
             panic!("Timed out while waiting");
         }
     }
 }
 
+// Wait for 5 seconds
+pub async fn wait_for<F, Fut>(f: F)
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = bool> + Send + 'static,
+{
+    wait_for_duration(f, Duration::from_secs(5)).await
+}
+
+// Wait (for 5 secs) for a TCP socket to be reachable
 pub async fn wait_for_tcp(addr: SocketAddr) {
     wait_for(|| async move { TcpStream::connect(addr).await.is_ok() }).await
+}
+
+// Allows specifying a custom duration to wait for a TCP socket to be reachable
+pub async fn wait_for_tcp_duration(addr: SocketAddr, duration: Duration) {
+    wait_for_duration(
+        || async move { TcpStream::connect(addr).await.is_ok() },
+        duration,
+    )
+    .await
 }
 
 pub async fn wait_for_atomic_usize<T, F>(value: T, unblock: F)
