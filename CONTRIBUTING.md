@@ -152,8 +152,17 @@ docs: fix typos
 
 #### Reviews & Approvals
 
-All pull requests must be reviewed and approved by at least one Vector team
-member. The review process is outlined in the [Review guide](REVIEWING.md).
+All pull requests should be reviewed by:
+
+* No review required for cosmetic changes like whitespace, types, and spelling
+* One Vector team member for minor changes
+* Two Vector team members for major changes
+* Three Vector team members for RFCs
+
+If there are any CODEOWNERs automatically assigned, you should also wait for
+their review.
+
+The review process is outlined in the [Review guide](REVIEWING.md).
 
 #### Merge Style
 
