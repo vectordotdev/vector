@@ -21,7 +21,7 @@
 /scripts/test-e2e-kubernetes.sh @MOZGIII
 
 /src/buffers/ @a-rodin
-/src/kubernetes/ @MOZGII
+/src/kubernetes/ @MOZGIII
 
 /src/generate.rs @Jeffail
 /src/list.rs @Jeffail

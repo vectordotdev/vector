@@ -6,7 +6,7 @@ use string_cache::DefaultAtom as Atom;
 ///
 /// In the future, this might be extended by various counters (the number of
 /// events that contributed to the current merge event for instance, or the
-/// event size) to support curcut breaker logic.
+/// event size) to support circuit breaker logic.
 #[derive(Debug)]
 pub struct LogEventMergeState {
     /// Intermediate event we merge into.

@@ -4,7 +4,7 @@ use crate::internal_events::kubernetes::instrumenting_state as internal_events;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
 
-/// A [`super::Write`] implementatiom that wraps another [`super::Write`] and
+/// A [`super::Write`] implementation that wraps another [`super::Write`] and
 /// adds instrumentation.
 pub struct Writer<T> {
     inner: T,
@@ -159,7 +159,7 @@ mod tests {
     // - testing metrics introduces unintended coupling between subsystems,
     //   ideally we only need to assert that we emit, but avoid assumptions on
     //   what the results of that emit are.
-    // Unignore them and/or properly reimplemenmt once the issues above are
+    // Un-ignore them and/or properly reimplement once the issues above are
     // resolved.
 
     #[ignore]
@@ -294,9 +294,9 @@ mod tests {
         let _guard = tests_lock();
 
         let (mut writer, _events_rx, _actions_tx) = prepare_test();
-        let before = get_metric_value("maintenace_requested");
+        let before = get_metric_value("maintenance_requested");
         let _ = writer.maintenance_request();
-        let after = get_metric_value("maintenace_requested");
+        let after = get_metric_value("maintenance_requested");
         assert_counter_changed(before, after, 0);
     }
 
@@ -318,9 +318,9 @@ mod tests {
             maintenance_request_actions_rx,
         );
         let mut writer = Writer::new(writer);
-        let before = get_metric_value("maintenace_requested");
+        let before = get_metric_value("maintenance_requested");
         let _ = writer.maintenance_request();
-        let after = get_metric_value("maintenace_requested");
+        let after = get_metric_value("maintenance_requested");
         assert_counter_changed(before, after, 1);
     }
 
@@ -334,14 +334,14 @@ mod tests {
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
 
         let join = {
-            let before = get_metric_value("maintenace_performed");
+            let before = get_metric_value("maintenance_performed");
             tokio::spawn(async move {
                 assert!(matches!(
                     events_rx.next().await.unwrap(),
                     mock::ScenarioEvent::Maintenance
                 ));
 
-                let after = get_metric_value("maintenace_performed");
+                let after = get_metric_value("maintenance_performed");
                 assert_counter_changed(before, after, 1);
 
                 actions_tx.send(()).await.unwrap();
