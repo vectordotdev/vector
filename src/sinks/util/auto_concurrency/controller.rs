@@ -253,13 +253,24 @@ where
 }
 
 /// Exponentially Weighted Moving Average
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Derivative)]
+#[derivative(Default)]
 struct EWMA {
     average: Option<f64>,
     variance: Option<f64>,
+    #[derivative(Default(value = "EWMA_ALPHA"))]
+    alpha: f64,
 }
 
 impl EWMA {
+    fn new(alpha: f64) -> Self {
+        Self {
+            average: None,
+            variance: None,
+            alpha,
+        }
+    }
+
     fn average(&self) -> Option<f64> {
         self.average
     }
@@ -276,8 +287,8 @@ impl EWMA {
                 let delta = point - avg;
                 let variance = self.variance.unwrap_or(0.0);
                 (
-                    point * EWMA_ALPHA + avg * (1.0 - EWMA_ALPHA),
-                    Some((1.0 - EWMA_ALPHA) * (variance + EWMA_ALPHA * delta * delta)),
+                    point * self.alpha + avg * (1.0 - self.alpha),
+                    Some((1.0 - self.alpha) * (variance + self.alpha * delta * delta)),
                 )
             }
         };
@@ -317,6 +328,11 @@ impl Mean {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::assert_within;
+    use rand::{
+        distributions::{Distribution, Normal},
+        thread_rng,
+    };
 
     #[test]
     fn mean_update_works() {
@@ -345,5 +361,19 @@ mod tests {
         mean.update(2.0);
         assert_eq!(mean.average(), Some(1.75));
         assert_eq!(mean.average, Some(1.75));
+    }
+
+    #[test]
+    fn ewma_stddev_works() {
+        let mut mean = EWMA::new(0.01); // Low alpha to keep the mean stable for testing
+        let _ = Normal::new(100.0, 10.0)
+            .sample_iter(&mut thread_rng())
+            .take(1000)
+            .map(|num| {
+                mean.update(num);
+            })
+            .last();
+        assert_within!(mean.average().unwrap(), 95.0, 105.0);
+        assert_within!(mean.stddev().unwrap(), 8.0, 12.0);
     }
 }
