@@ -2,7 +2,7 @@
 
 This RFC is to introduce a new metrics source to consume metrics from the
 [Nginx HTTP Server](https://www.nginx.com/). The high level plan is
-to implement a scrapper similar to the existing [prometheus
+to implement a scraper similar to the existing [prometheus
 source](https://vector.dev/docs/reference/sources/prometheus/) that will scrape
 the Nginx HTTP Server stats endpoint (provided by
 [`stub_status`](https://nginx.org/en/docs/http/ngx_http_stub_status_module.html#stub_status)) on an
@@ -57,7 +57,7 @@ We'll use this to generate the following metrics:
 
 - `nginx_up` (gauge)
 - `nginx_connections_active` (gauge)
-- `nginx_connections_accepted` (counter)
+- `nginx_connections_accepted_total` (counter)
 - `nginx_connections_reading` (gauge)
 - `nginx_connections_waiting` (gauge)
 - `nginx_connections_writing` (gauge)
@@ -77,7 +77,7 @@ The following additional source configuration will be added:
 ```toml
 [sources.my_source_id]
   type = "nginx_metrics" # required
-  endpoints = ["http://localhost/server-status?auto"] # required, default
+  endpoints = ["http://localhost/basic_status"] # required, default
   scrape_interval_secs = 15 # optional, default, seconds
   namespace = "nginx" # optional, default, namespace to put metrics under
 ```
@@ -107,6 +107,7 @@ the likelihood that a user will not be able to ingest metrics from their tools.
 - [Telegraf](https://github.com/influxdata/telegraf/tree/release-1.15/plugins/inputs/nginx)
 - [DataDog](https://www.datadoghq.com/blog/how-to-collect-nginx-metrics/)
 - [Collectd Nginx plugin](https://collectd.org/documentation/manpages/collectd.conf.5.shtml#plugin_nginx)
+- [New Relic Nginx](https://github.com/nginxinc/new-relic-agent)
 
 ## Drawbacks
 
@@ -142,9 +143,7 @@ If users are already running Telegraf though, they could opt for this path.
 
 ## Outstanding Questions
 
-- Nginx Plus support?
-  - https://github.com/influxdata/telegraf/tree/release-1.15/plugins/inputs/nginx_plus
-  - https://github.com/influxdata/telegraf/tree/release-1.15/plugins/inputs/nginx_plus_api
+- None
 
 ## Plan Of Attack
 
@@ -153,6 +152,14 @@ Incremental steps that execute this change. Generally this is in the form of:
 - [ ] Submit a PR with the initial sink implementation
 
 ## Future Work
+
+- Nginx Plus support
+  - https://github.com/influxdata/telegraf/tree/release-1.15/plugins/inputs/nginx_plus
+  - https://github.com/influxdata/telegraf/tree/release-1.15/plugins/inputs/nginx_plus_api
+- Support for:
+  - nginx_sts
+  - nginx_upstream_check
+  - nginx_vts 
 
 ### Refactor HTTP-scraping-based sources
 
