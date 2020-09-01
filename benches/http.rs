@@ -48,7 +48,7 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
 
                 let mut rt = runtime();
                 let topology = rt.block_on(async move {
-                    let (topology, _crash) = start_topology(config.build(), false).await;
+                    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
                     wait_for_tcp(in_addr).await;
                     topology
                 });
@@ -106,7 +106,7 @@ fn benchmark_http_gzip(c: &mut Criterion) {
 
                 let mut rt = runtime();
                 let topology = rt.block_on(async move {
-                    let (topology, _crash) = start_topology(config.build(), false).await;
+                    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
                     wait_for_tcp(in_addr).await;
                     topology
                 });

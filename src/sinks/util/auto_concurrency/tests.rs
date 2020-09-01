@@ -255,7 +255,7 @@ async fn run_test4(
     config.add_source("in", generator);
     config.add_sink("out", &["in"], test_config);
 
-    let (topology, _crash) = start_topology(config.build(), false).await;
+    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     let controller = get_controller().unwrap();
 

@@ -141,7 +141,7 @@ mod test {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build(), false).await;
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
         let bind_addr = next_addr();
         let socket = std::net::UdpSocket::bind(&bind_addr).unwrap();

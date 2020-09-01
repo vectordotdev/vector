@@ -1,6 +1,6 @@
 use super::{
-    default_data_dir, Config, GlobalOptions, SinkConfig, SinkOuter, SourceConfig, TestDefinition,
-    TransformConfig, TransformOuter,
+    compiler, default_data_dir, Config, GlobalOptions, SinkConfig, SinkOuter, SourceConfig,
+    TestDefinition, TransformConfig, TransformOuter,
 };
 use crate::event;
 use indexmap::IndexMap;
@@ -34,16 +34,8 @@ impl Clone for ConfigBuilder {
 }
 
 impl ConfigBuilder {
-    // TODO: compilation here
-    pub fn build(self) -> Config {
-        Config {
-            global: self.global,
-            sources: self.sources,
-            sinks: self.sinks,
-            transforms: self.transforms,
-            tests: self.tests,
-            expansions: Default::default(),
-        }
+    pub fn build(self) -> Result<Config, Vec<String>> {
+        compiler::compile(self)
     }
 
     pub fn add_source<S: SourceConfig + 'static>(&mut self, name: &str, source: S) {

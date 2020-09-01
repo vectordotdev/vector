@@ -91,7 +91,7 @@ fn load_from_inputs(
     }
 
     // TODO: this should be the last step
-    let mut config = config.build();
+    let mut config = config.build()?;
 
     if let Err(mut errs) = config.expand_macros() {
         errors.append(&mut errs);

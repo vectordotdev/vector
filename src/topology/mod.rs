@@ -650,12 +650,12 @@ mod tests {
         old_config.global.data_dir = Some(Path::new("/asdf").to_path_buf());
         let mut new_config = old_config.clone();
 
-        let (mut topology, _crash) = start_topology(old_config.build(), false).await;
+        let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
 
         new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
         topology
-            .reload_config_and_respawn(new_config.build(), false)
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
             .await
             .unwrap();
 
@@ -702,9 +702,9 @@ mod reload_tests {
             },
         );
 
-        let (mut topology, _crash) = start_topology(old_config.build(), false).await;
+        let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(new_config.build(), false)
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
             .await
             .unwrap());
     }
@@ -736,9 +736,9 @@ mod reload_tests {
             },
         );
 
-        let (mut topology, _crash) = start_topology(old_config.build(), false).await;
+        let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(!topology
-            .reload_config_and_respawn(new_config.build(), false)
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
             .await
             .unwrap());
     }
@@ -758,9 +758,9 @@ mod reload_tests {
             },
         );
 
-        let (mut topology, _crash) = start_topology(old_config.clone().build(), false).await;
+        let (mut topology, _crash) = start_topology(old_config.clone().build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(old_config.build(), false)
+            .reload_config_and_respawn(old_config.build().unwrap(), false)
             .await
             .unwrap());
     }
@@ -791,7 +791,7 @@ mod source_finished_tests {
             },
         );
 
-        let (topology, _crash) = start_topology(old_config.build(), false).await;
+        let (topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
 
         timeout(Duration::from_secs(2), topology.sources_finished().compat())
             .await
@@ -895,7 +895,7 @@ mod transient_state_tests {
         );
         new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
 
-        let (mut topology, _crash) = start_topology(old_config.build(), false).await;
+        let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
 
         trigger_old.cancel();
 
@@ -903,7 +903,7 @@ mod transient_state_tests {
         finished.compat().await.unwrap();
 
         assert!(topology
-            .reload_config_and_respawn(new_config.build(), false)
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
             .await
             .unwrap());
     }
@@ -937,9 +937,9 @@ mod transient_state_tests {
         );
         new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
 
-        let (mut topology, _crash) = start_topology(old_config.build(), false).await;
+        let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(new_config.build(), false)
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
             .await
             .unwrap());
     }
@@ -981,9 +981,9 @@ mod transient_state_tests {
         );
         new_config.add_sink("out1", &["trans1"], BlackholeConfig { print_amount: 1000 });
 
-        let (mut topology, _crash) = start_topology(old_config.build(), false).await;
+        let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(new_config.build(), false)
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
             .await
             .unwrap());
     }

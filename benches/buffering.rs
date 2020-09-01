@@ -44,7 +44,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = start_topology(config.build(), false).await;
+                        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
                         wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });
@@ -84,7 +84,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = start_topology(config.build(), false).await;
+                        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
                         wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });
@@ -126,7 +126,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = start_topology(config.build(), false).await;
+                        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
                         wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });

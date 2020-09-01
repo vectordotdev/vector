@@ -57,7 +57,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
 
                 let mut rt = runtime();
                 let (topology, input) = rt.block_on(async move {
-                    let (topology, _crash) = start_topology(config.build(), false).await;
+                    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
                     let mut options = OpenOptions::new();
                     options.create(true).write(true);

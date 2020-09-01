@@ -57,7 +57,7 @@ fn test_buffering() {
             when_full: Default::default(),
         };
         config.global.data_dir = Some(data_dir.clone());
-        config.build()
+        config.build().unwrap()
     };
 
     let mut rt = runtime();
@@ -106,7 +106,7 @@ fn test_buffering() {
             when_full: Default::default(),
         };
         config.global.data_dir = Some(data_dir);
-        config.build()
+        config.build().unwrap()
     };
 
     let mut rt = runtime();
@@ -168,7 +168,7 @@ fn test_max_size() {
             when_full: Default::default(),
         };
         config.global.data_dir = Some(data_dir.clone());
-        config.build()
+        config.build().unwrap()
     };
 
     let mut rt = runtime();
@@ -216,7 +216,7 @@ fn test_max_size() {
             when_full: Default::default(),
         };
         config.global.data_dir = Some(data_dir);
-        config.build()
+        config.build().unwrap()
     };
 
     let mut rt = runtime();

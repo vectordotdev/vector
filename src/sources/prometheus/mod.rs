@@ -226,7 +226,7 @@ mod test {
             },
         );
 
-        let (topology, _crash) = start_topology(config.build(), false).await;
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
         delay_for(Duration::from_secs(1)).await;
 
         let response = Client::new()

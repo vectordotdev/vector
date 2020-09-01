@@ -14,6 +14,7 @@ use std::fs::DirBuilder;
 use std::path::PathBuf;
 
 mod builder;
+mod compiler;
 pub mod component;
 mod diff;
 mod loading;

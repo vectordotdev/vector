@@ -39,7 +39,7 @@ async fn test_tcp_syslog() {
 
     let output_lines = CountReceiver::receive_lines(out_addr);
 
-    let (topology, _crash) = start_topology(config.build(), false).await;
+    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
 
@@ -92,7 +92,7 @@ async fn test_unix_stream_syslog() {
 
     let output_lines = CountReceiver::receive_lines(out_addr);
 
-    let (topology, _crash) = start_topology(config.build(), false).await;
+    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     // Wait for server to accept traffic
     while std::os::unix::net::UnixStream::connect(&in_path).is_err() {
@@ -155,7 +155,7 @@ async fn test_octet_counting_syslog() {
 
     let output_lines = CountReceiver::receive_lines(out_addr);
 
-    let (topology, _crash) = start_topology(config.build(), false).await;
+    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
 
