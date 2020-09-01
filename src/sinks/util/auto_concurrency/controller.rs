@@ -1,5 +1,5 @@
-use super::instant_now;
 use super::semaphore::ShrinkableSemaphore;
+use super::{instant_now, AutoConcurrencySettings};
 use crate::emit;
 use crate::internal_events::{
     AutoConcurrencyAveragedRtt, AutoConcurrencyInFlight, AutoConcurrencyLimit,
@@ -31,6 +31,7 @@ const THRESHOLD_RATIO: f64 = 0.05;
 pub(super) struct Controller<L> {
     semaphore: Arc<ShrinkableSemaphore>,
     in_flight_limit: Option<usize>,
+    settings: AutoConcurrencySettings,
     logic: L,
     pub(super) inner: Arc<Mutex<Inner>>,
     #[cfg(test)]
@@ -58,7 +59,11 @@ pub(super) struct ControllerStatistics {
 }
 
 impl<L> Controller<L> {
-    pub(super) fn new(in_flight_limit: Option<usize>, logic: L) -> Self {
+    pub(super) fn new(
+        in_flight_limit: Option<usize>,
+        settings: AutoConcurrencySettings,
+        logic: L,
+    ) -> Self {
         // If an in_flight_limit is specified, it becomse both the
         // current limit and the maximum, effectively bypassing all the
         // mechanisms. Otherwise, the current limit is set to 1 and the
@@ -67,6 +72,7 @@ impl<L> Controller<L> {
         Self {
             semaphore: Arc::new(ShrinkableSemaphore::new(current_limit)),
             in_flight_limit,
+            settings,
             logic,
             inner: Arc::new(Mutex::new(Inner {
                 current_limit,
@@ -210,7 +216,8 @@ impl<L> Controller<L> {
             && (inner.had_back_pressure || current_rtt.unwrap_or(0.0) >= past_rtt + threshold)
         {
             // Decrease (multiplicative) the current concurrency limit
-            let to_forget = inner.current_limit / 2;
+            let to_forget = inner.current_limit
+                - (inner.current_limit as f64 * self.settings.decrease_ratio) as usize;
             self.semaphore.forget_permits(to_forget);
             inner.current_limit -= to_forget;
         }
