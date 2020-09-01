@@ -21,10 +21,11 @@ SECURITY.md @binarylogic @jamtur01
 
 /scripts/build-* @hovebear
 /scripts/ci-docker-images/ @hovebear @jamtur01
+/scripts/check-meta.sh @binarylogic @jamtur01
 /scripts/check-* @jamtur01
 /scripts/docker-* @jamtur01
 /scripts/environment/* @hovebear @jamtur01
-/scripts/generate* @binarylogic
+/scripts/load-meta.rb @binarylogic @jamtur01
 /scripts/package-* @hovebear
 /scripts/release-* @hovebear
 /scripts/upgrade-* @hovebear
