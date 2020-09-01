@@ -22,7 +22,7 @@ pub(self) fn instant_now() -> std::time::Instant {
 #[derivative(Default)]
 pub struct AutoConcurrencySettings {
     #[serde(default)]
-    #[derivative(Default(value = "0.5"))]
+    #[derivative(Default(value = "0.9"))]
     pub(super) decrease_ratio: f64,
 
     // This value was picked as a reasonable default while we ensure the

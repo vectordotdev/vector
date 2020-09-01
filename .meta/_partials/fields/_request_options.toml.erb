@@ -81,7 +81,7 @@ duplicate data downstream.\
 [<%= namespace %>.request.children.decrease_ratio]
 type = "float"
 common = true
-default = <%= 0.5 %>
+default = <%= 0.9 %>
 groups = <%= groups.to_toml %>
 relevant_when = {in_flight_limit = "auto"}
 description = """\

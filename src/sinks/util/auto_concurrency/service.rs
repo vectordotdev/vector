@@ -168,7 +168,14 @@ mod tests {
 
     impl TestService {
         fn start() -> Self {
-            let layer = AutoConcurrencyLimitLayer::new(None, Default::default(), TestRetryLogic);
+            let layer = AutoConcurrencyLimitLayer::new(
+                None,
+                AutoConcurrencySettings {
+                    decrease_ratio: 0.5,
+                    ..Default::default()
+                },
+                TestRetryLogic,
+            );
             let (service, handle) = mock::spawn_layer(layer);
             let controller = Arc::clone(&service.get_ref().controller);
             let inner = Arc::clone(&controller.inner);
