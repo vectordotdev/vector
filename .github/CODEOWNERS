@@ -13,22 +13,22 @@ SECURITY.md @binarylogic @jamtur01
 .github/PULL_REQUEST_TEMPLATE.md @binarylogic @jamtur01
 .github/ISSUE_TEMPLATE/* @binarylogic @jamtur01
 
-/distribution/ @hovebear @jamtur01
+/distribution/ @hoverbear @jamtur01
 /distribution/kubernetes/ @MOZGIII
 /distribution/helm/ @MOZGIII
 
 /proto/ @lukesteensen
 
-/scripts/build-* @hovebear
-/scripts/ci-docker-images/ @hovebear @jamtur01
+/scripts/build-* @hoverbear
+/scripts/ci-docker-images/ @hoverbear @jamtur01
 /scripts/check-meta.sh @binarylogic @jamtur01
 /scripts/check-* @jamtur01
 /scripts/docker-* @jamtur01
-/scripts/environment/* @hovebear @jamtur01
+/scripts/environment/* @hoverbear @jamtur01
 /scripts/load-meta.rb @binarylogic @jamtur01
-/scripts/package-* @hovebear
-/scripts/release-* @hovebear
-/scripts/upgrade-* @hovebear
+/scripts/package-* @jamtur01
+/scripts/release-* @hoverbear
+/scripts/upgrade-* @hoverbear
 /scripts/ci-setup-minikube.sh @MOZGIII
 /scripts/ci-setup-helm.sh @MOZGIII
 /scripts/release-helm.sh @MOZGIII
@@ -104,16 +104,21 @@ SECURITY.md @binarylogic @jamtur01
 /src/event/merge_state.rs @MOZGIII
 /src/event/discriminant.rs @MOZGIII
 
+/src/wasm/* @hoverbear
+
 /lib/file-source/src/paths_provider/mod.rs @MOZGIII
 /lib/file-source/src/paths_provider/glob.rs @MOZGIII
 
 /lib/k8s-test-framework/ @MOZGIII
 
+/lib/vector-wasm/* @hoverbear
 /tests/buffering.rs @MOZGIII
+tests/data/wasm/* @hoverbear
 /tests/kubernetes-e2e.rs @MOZGIII
+
 
 /.github/workflows/e2e.yml @MOZGIII
 
-/skaffold/ @MOZGIII
+/skaffold/* @MOZGIII
 /skaffold.yaml @MOZGIII
 /kustomization.yaml @MOZGIII
