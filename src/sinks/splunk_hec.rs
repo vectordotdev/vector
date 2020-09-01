@@ -393,6 +393,7 @@ mod tests {
 #[cfg(feature = "splunk-integration-tests")]
 mod integration_tests {
     use super::*;
+    use crate::test_util::wait_for_tcp_duration;
     use crate::{
         assert_downcast_matches,
         config::{SinkConfig, SinkContext},
@@ -719,6 +720,9 @@ mod integration_tests {
             .danger_accept_invalid_certs(true)
             .build()
             .unwrap();
+
+        // Wait for port 8089 to be reachable before firing off request
+        wait_for_tcp_duration("127.0.0.1:8089".parse().unwrap(), Duration::from_secs(30)).await;
 
         let res = client
             .get("https://localhost:8089/services/data/inputs/http?output_mode=json")
