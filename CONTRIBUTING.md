@@ -154,10 +154,10 @@ docs: fix typos
 
 All pull requests should be reviewed by:
 
-* No review required for cosmetic changes like whitespace, types, and spelling
-* One Vector team member for minor changes
-* Two Vector team members for major changes
-* Three Vector team members for RFCs
+- No review required for cosmetic changes like whitespace, typos, and spelling
+- One Vector team member for minor changes
+- Two Vector team members for major changes
+- Three Vector team members for RFCs
 
 If there are any CODEOWNERs automatically assigned, you should also wait for
 their review.
