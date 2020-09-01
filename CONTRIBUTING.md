@@ -86,6 +86,17 @@ expanding into more specifics.
    with a few days. Although, depending on the circumstances, it may take
    longer.
 
+### New sources, sinks, and transforms
+
+If you're contributing a new source, sink, or transform to Vector, thank you that's way cool! There's a few steps you need think about if you want to make sure we can merge your contribution. We're here to help you along with these steps but they are a blocker to getting a new integration released.
+
+To merge a new source, sink, or transform, you need to:
+
+- [ ] Add tests, especially integration tests if your contribution connects to an external service.
+- [ ] Add instrumentation so folks using your integration can get insight into how it's working and performing. You can see some [example of instrumentation in existing integrations](https://github.com/timberio/vector/tree/master/src/internal_events).
+- [ ] Add internal documentation of options and fields. You can see [examples in the `.meta` directory](https://github.com/timberio/vector/blob/master/.meta/sources/kafka.toml.erb).
+- [ ] Update [`.github/CODEOWNERS`](https://github.com/timberio/vector/blob/master/.github/CODEOWNERS) or talk to us about identifying someone on the team to help look after the new integration.
+
 ## Change Control
 
 ### Git Branches
@@ -158,12 +169,12 @@ member. The review process is outlined in the [Review guide](REVIEWING.md).
 #### Merge Style
 
 All pull requests are squashed and merged. We generally discourage large pull
-requests that are over 300-500 lines of diff. If you would like to propose
-a change that is larger we suggest coming onto our gitter channel and
-discuss it with one of our engineers. This way we can talk through the
-solution and discuss if a change that large is even needed! This overall
-will produce a quicker response to the change and likely produce code that
-aligns better with our process.
+requests that are over 300-500 lines of diff. If you would like to propose a
+change that is larger we suggest coming onto our gitter channel and discuss it
+with one of our engineers. This way we can talk through the solution and
+discuss if a change that large is even needed! This will produce a quicker
+response to the change and likely produce code that aligns better with our
+process.
 
 ### CI
 
@@ -613,7 +624,7 @@ Once you have the requirements, use the `scripts/skaffold.sh dev` command.
 
 That's it, just one command should take care of everything!
 
-It will
+It will:
 
 1. build the `vector` binary in development mode,
 2. build a docker image from this binary via `skaffold/docker/Dockerfile`,
@@ -806,10 +817,10 @@ To protect all users of Vector, the following legal requirements are made.
 ### DCO
 
 Vector requires all contributors to agree to the DCO. DCO stands for Developer
-Certificate of Origin and is maintained by the
-[Linux Foundation](https://www.linuxfoundation.org). It is an attestation
-attached to every commit made by every developer. It ensures that all committed
-code adheres to the [Vector license](LICENSE.md) (Apache 2.0).
+Certificate of Origin and is maintained by the [Linux
+Foundation](https://www.linuxfoundation.org). It is an attestation attached to
+every commit made by every developer. It ensures that all committed code
+adheres to the [Vector license](LICENSE.md) (Apache 2.0).
 
 #### Trivial changes
 
