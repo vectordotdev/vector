@@ -260,7 +260,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) -k stop-integration-elasticsearch \
     ; rc=$$? \
 	$(MAKE) start-integration-elasticsearch
-	sleep 0 # Many services are very slow... Give them a sec...
+	sleep 20 # Many services are very slow... Give them a sec...
 endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features es-integration-tests --lib ::elasticsearch:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
