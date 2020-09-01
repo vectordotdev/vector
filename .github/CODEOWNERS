@@ -76,6 +76,7 @@ SECURITY.md @binarylogic @jamtur01
 /src/sources/udp.rs @bruceg
 /src/sources/vector.rs @lukesteensen
 /src/sources/util/multiline_config.rs @MOZGIII
+/src/sources/kubernetes_logs/ @MOZGIII
 
 /src/topology/ @lukesteensen
 
