@@ -45,11 +45,10 @@ prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio = { version = "0.2.13", features = ["blocking", "fs", "sync", "macros", "test-util", "rt-core", "io-std", "uds"] }
+tokio = { version = "0.2.13", features = ["blocking", "fs", "io-std", "macros", "rt-core", "rt-threaded", "uds", "sync"] }
 tokio-openssl = "0.4.0"
 tokio-retry = "0.2.0"
 tokio-signal = "0.2.7"
-tokio-compat = { version = "0.1", features = ["rt-full"] }
 tokio-util = { version = "0.3.1", features = ["codec"] }
 async-trait = "0.1"
 

@@ -40,7 +40,6 @@ pub mod list;
 pub mod metrics;
 pub(crate) mod pipeline;
 pub mod region;
-pub mod runtime;
 pub mod serde;
 pub mod shutdown;
 pub mod signal;
