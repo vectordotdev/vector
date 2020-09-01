@@ -187,37 +187,37 @@ CARGO_HANDLES_FRESHNESS:
 .PHONY: cross-%
 cross-%: export PAIR =$(subst -, ,$($(strip @):cross-%=%))
 cross-%: export COMMAND ?=$(word 1,${PAIR})
-cross-%: export TARGET ?=$(subst ${SPACE},-,$(wordlist 2,99,${PAIR}))
+cross-%: export TRIPLE ?=$(subst ${SPACE},-,$(wordlist 2,99,${PAIR}))
 cross-%: export PROFILE ?= release
 cross-%: export RUSTFLAGS += -C link-arg=-s
 cross-%:
 	cross ${COMMAND} \
 		$(if $(findstring release,$(PROFILE)),--release,) \
-		--target ${TARGET} \
+		--target ${TRIPLE} \
 		--no-default-features \
-		--features target-${TARGET}
+		--features target-${TRIPLE}
 
 target/%/vector: export PAIR =$(subst /, ,$(@:target/%/vector=%))
-target/%/vector: export TARGET ?=$(word 1,${PAIR})
+target/%/vector: export TRIPLE ?=$(word 1,${PAIR})
 target/%/vector: export PROFILE ?=$(word 2,${PAIR})
 target/%/vector: export RUSTFLAGS += -C link-arg=-s
 target/%/vector: CARGO_HANDLES_FRESHNESS
 	cross build \
 		$(if $(findstring release,$(PROFILE)),--release,) \
-		--target ${TARGET} \
+		--target ${TRIPLE} \
 		--no-default-features \
-		--features target-${TARGET}
+		--features target-${TRIPLE}
 
 target/%/vector.tar.gz: export PAIR =$(subst /, ,$(@:target/%/vector.tar.gz=%))
-target/%/vector.tar.gz: export TARGET ?=$(word 1,${PAIR})
+target/%/vector.tar.gz: export TRIPLE ?=$(word 1,${PAIR})
 target/%/vector.tar.gz: export PROFILE ?=$(word 2,${PAIR})
 target/%/vector.tar.gz: target/%/vector
 	tar --create \
 		--gzip \
-		--file target/${TARGET}/${PROFILE}/vector.tar.gz \
-		--transform='s|target/${TARGET}/${PROFILE}/|/bin/|' \
+		--file target/${TRIPLE}/${PROFILE}/vector.tar.gz \
+		--transform='s|target/${TRIPLE}/${PROFILE}/|/bin/|' \
 		--transform='s|distribution/|etc/|' \
-		target/${TARGET}/${PROFILE}/vector \
+		target/${TRIPLE}/${PROFILE}/vector \
 		README.md \
 		config \
 		distribution/init.d \
@@ -435,8 +435,16 @@ package-x86_64-unknown-linux-gnu-all: package-archive-x86_64-unknown-linux-gnu p
 package-aarch64-unknown-linux-musl-all: package-archive-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
 
 # archives
-
 .PHONY: package-archive
+
+target/artifacts/vector-%.tar.gz: export TRIPLE :=$(@:target/artifacts/vector-%.tar.gz=%)
+target/artifacts/vector-%.tar.gz: target/%/release/vector.tar.gz
+	@echo "Built to ${<}, relocating to ${@}"
+	@mkdir -p target/artifacts/
+	@cp -v \
+		${<} \
+		${@}
+
 package-archive: build ## Build the Vector archive
 	$(RUN) package-archive
 
@@ -448,26 +456,17 @@ package-archive-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## Bu
 	$(RUN) package-archive-x86_64-unknown-linux-musl
 
 .PHONY: package-archive-x86_64-unknown-linux-gnu
-package-archive-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz
+package-archive-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build the x86_64 archive
 	@echo "Output to ${<}."
-
-target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz: target/x86_64-unknown-linux-gnu/release/vector.tar.gz ## Build the x86_64 archive
-	@echo "Built to ${<}, relocating to ${@}"
-	@mkdir -p target/artifacts/
-	@cp -v \
-		${<} \
-		${@}
 
 .PHONY: package-archive-aarch64-unknown-linux-musl
 package-archive-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## Build the aarch64 archive
 	$(RUN) package-archive-aarch64-unknown-linux-musl
 
 .PHONY: package-archive-aarch64-unknown-linux-gnu
-package-archive-aarch64-unknown-linux-gnu: target/aarch64-unknown-linux-gnu/release/vector.tar.gz ## Build the aarch64 archive
-	@echo "Built to ${<}, relocating..."
-	@cp -v \
-		target/x86_64-unknown-linux-gnu/release/vector.tar.gz \
-		target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz
+package-archive-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build the aarch64 archive
+	@echo "Output to ${<}."
+
 
 # debs
 
