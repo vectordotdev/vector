@@ -43,7 +43,7 @@ SECURITY.md @binarylogic @jamtur01
 /src/main.rs @lukesteensen
 /src/region.rs 
 /src/template.rs @lukesteensen
-/src/tls.rs @bruceg
+/src/tls @bruceg
 /src/trace.rs 
 /src/types.rs @bruceg
 /src/line_agg.rs @MOZGIII
