@@ -12,8 +12,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SematextLogsConfig {
     region: Option<Region>,
-    // TODO: replace this with `UriEncode` once that is on master.
-    host: Option<String>,
+    // Deprecated name
+    #[serde(alias = "host")]
+    endpoint: Option<String>,
     token: String,
 
     #[serde(
@@ -43,7 +44,7 @@ pub enum Region {
 #[typetag::serde(name = "sematext")]
 impl SinkConfig for SematextLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let host = match (&self.host, &self.region) {
+        let endpoint = match (&self.endpoint, &self.region) {
             (Some(host), None) => host.clone(),
             (None, Some(Region::Na)) => "https://logsene-receiver.sematext.com".to_owned(),
             (None, Some(Region::Eu)) => "https://logsene-receiver.eu.sematext.com".to_owned(),
@@ -56,7 +57,7 @@ impl SinkConfig for SematextLogsConfig {
         };
 
         let (sink, healthcheck) = ElasticSearchConfig {
-            host,
+            endpoint,
             compression: Compression::None,
             doc_type: Some("logs".to_string()),
             index: Some(self.token.clone()),
@@ -101,12 +102,10 @@ mod tests {
     use super::*;
     use crate::{
         config::SinkConfig,
-        event::Event,
         sinks::util::test::{build_test_server, load_sink},
         test_util::{next_addr, random_lines_with_stream},
     };
-    use futures::compat::Future01CompatExt;
-    use futures01::{Sink, Stream};
+    use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
 
     #[tokio::test]
     async fn smoke() {
@@ -124,22 +123,21 @@ mod tests {
         let addr = next_addr();
         // Swap out the host so we can force send it
         // to our local server
-        config.host = Some(format!("http://{}", addr));
+        config.endpoint = Some(format!("http://{}", addr));
         config.region = None;
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let (rx, _trigger, server) = build_test_server(addr);
+        let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
-        let (expected, lines) = random_lines_with_stream(100, 10);
-        let pump = sink.send_all(lines.map(Event::from));
-        let _ = pump.compat().await.unwrap();
+        let (expected, mut events) = random_lines_with_stream(100, 10);
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 
-        let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();
+        let output = rx.next().await.unwrap();
 
         // A stream of `serde_json::Value`
-        let json = serde_json::Deserializer::from_slice(&output[0].1[..])
+        let json = serde_json::Deserializer::from_slice(&output.1[..])
             .into_iter::<serde_json::Value>()
             .map(|v| v.expect("decoding json"));
 

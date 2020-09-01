@@ -1,13 +1,16 @@
 #![cfg(feature = "leveldb")]
 
-use futures::compat::Future01CompatExt;
-use futures01::{Future, Sink};
+use futures::{
+    compat::{Future01CompatExt, Sink01CompatExt},
+    SinkExt,
+};
 use prost::Message;
 use tempfile::tempdir;
+use tokio::runtime::Runtime;
 use tracing::trace;
 use vector::{
     buffers::BufferConfig,
-    config, event, runtime,
+    config, event,
     test_util::{
         random_events_with_stream, runtime, start_topology, trace_init, wait_for_atomic_usize,
         CountReceiver,
@@ -17,8 +20,8 @@ use vector::{
 
 mod support;
 
-fn terminate_abruptly(rt: runtime::Runtime, topology: topology::RunningTopology) {
-    rt.shutdown_now().wait().unwrap();
+fn terminate_abruptly(rt: Runtime, topology: topology::RunningTopology) {
+    drop(rt);
     drop(topology);
 }
 
@@ -58,15 +61,15 @@ fn test_buffering() {
     };
 
     let mut rt = runtime();
-    let (topology, input_events) = rt.block_on_std(async move {
+    let (topology, input_events) = rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
-        let (input_events, input_events_stream) =
+        let (input_events, mut input_events_stream) =
             random_events_with_stream(line_length, num_events);
 
         let _ = in_tx
+            .sink_compat()
             .sink_map_err(|err| panic!(err))
-            .send_all(input_events_stream)
-            .compat()
+            .send_all(&mut input_events_stream)
             .await
             .unwrap();
 
@@ -107,16 +110,16 @@ fn test_buffering() {
     };
 
     let mut rt = runtime();
-    rt.block_on_std(async move {
+    rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
 
-        let (input_events2, input_events_stream) =
+        let (input_events2, mut input_events_stream) =
             random_events_with_stream(line_length, num_events);
 
         let _ = in_tx
+            .sink_compat()
             .sink_map_err(|err| panic!(err))
-            .send_all(input_events_stream)
-            .compat()
+            .send_all(&mut input_events_stream)
             .await
             .unwrap();
 
@@ -124,7 +127,7 @@ fn test_buffering() {
 
         topology.stop().compat().await.unwrap();
 
-        let output_events = output_events.wait().await;
+        let output_events = output_events.await;
         assert_eq!(expected_events_count, output_events.len());
         assert_eq!(input_events, &output_events[..num_events]);
         assert_eq!(input_events2, &output_events[num_events..]);
@@ -141,7 +144,8 @@ fn test_max_size() {
 
     let num_events: usize = 1000;
     let line_length = 1000;
-    let (input_events, input_events_stream) = random_events_with_stream(line_length, num_events);
+    let (input_events, mut input_events_stream) =
+        random_events_with_stream(line_length, num_events);
 
     let max_size = input_events
         .clone()
@@ -168,13 +172,13 @@ fn test_max_size() {
     };
 
     let mut rt = runtime();
-    let topology = rt.block_on_std(async move {
+    let topology = rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
 
         let _ = in_tx
+            .sink_compat()
             .sink_map_err(|err| panic!(err))
-            .send_all(input_events_stream)
-            .compat()
+            .send_all(&mut input_events_stream)
             .await
             .unwrap();
 
@@ -216,14 +220,14 @@ fn test_max_size() {
     };
 
     let mut rt = runtime();
-    rt.block_on_std(async move {
+    rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
 
         let output_events = CountReceiver::receive_events(out_rx);
 
         topology.stop().compat().await.unwrap();
 
-        let output_events = output_events.wait().await;
+        let output_events = output_events.await;
         assert_eq!(num_events / 2, output_events.len());
         assert_eq!(&input_events[..num_events / 2], &output_events[..]);
     });

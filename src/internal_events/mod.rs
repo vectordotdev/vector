@@ -6,6 +6,10 @@ mod ansi_stripper;
 mod auto_concurrency;
 mod aws_kinesis_streams;
 mod blackhole;
+#[cfg(feature = "transforms-coercer")]
+mod coercer;
+#[cfg(feature = "transforms-concat")]
+mod concat;
 #[cfg(feature = "sources-docker")]
 mod docker;
 mod elasticsearch;
@@ -21,6 +25,8 @@ mod json_parser;
 mod kafka;
 #[cfg(feature = "sources-kubernetes-logs")]
 mod kubernetes_logs;
+#[cfg(feature = "transforms-log_to_metric")]
+mod log_to_metric;
 mod logplex;
 #[cfg(feature = "transforms-lua")]
 mod lua;
@@ -29,6 +35,12 @@ mod process;
 mod prometheus;
 #[cfg(feature = "transforms-regex_parser")]
 mod regex_parser;
+#[cfg(feature = "transforms-remove_fields")]
+mod remove_fields;
+#[cfg(feature = "transforms-remove_tags")]
+mod remove_tags;
+#[cfg(feature = "transforms-rename_fields")]
+mod rename_fields;
 mod sampler;
 #[cfg(any(
     feature = "sources-socket",
@@ -43,6 +55,8 @@ mod splunk_hec;
 mod statsd;
 mod stdin;
 mod syslog;
+#[cfg(feature = "transforms-tag_cardinality_limit")]
+mod tag_cardinality_limit;
 mod tcp;
 mod unix;
 mod vector;
@@ -57,6 +71,10 @@ pub use self::ansi_stripper::*;
 pub use self::auto_concurrency::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
+#[cfg(feature = "transforms-coercer")]
+pub(crate) use self::coercer::*;
+#[cfg(feature = "transforms-concat")]
+pub use self::concat::*;
 #[cfg(feature = "sources-docker")]
 pub use self::docker::*;
 pub use self::elasticsearch::*;
@@ -73,6 +91,8 @@ pub(crate) use self::json_parser::*;
 pub use self::kafka::*;
 #[cfg(feature = "sources-kubernetes-logs")]
 pub use self::kubernetes_logs::*;
+#[cfg(feature = "transforms-log_to_metric")]
+pub(crate) use self::log_to_metric::*;
 pub use self::logplex::*;
 #[cfg(feature = "transforms-lua")]
 pub use self::lua::*;
@@ -81,6 +101,12 @@ pub use self::process::*;
 pub use self::prometheus::*;
 #[cfg(feature = "transforms-regex_parser")]
 pub(crate) use self::regex_parser::*;
+#[cfg(feature = "transforms-remove_fields")]
+pub use self::remove_fields::*;
+#[cfg(feature = "transforms-remove_tags")]
+pub use self::remove_tags::*;
+#[cfg(feature = "transforms-rename_fields")]
+pub use self::rename_fields::*;
 pub use self::sampler::*;
 #[cfg(any(
     feature = "sources-socket",
@@ -95,6 +121,8 @@ pub(crate) use self::splunk_hec::*;
 pub use self::statsd::*;
 pub use self::stdin::*;
 pub use self::syslog::*;
+#[cfg(feature = "transforms-tag_cardinality_limit")]
+pub(crate) use self::tag_cardinality_limit::*;
 pub use self::tcp::*;
 pub use self::unix::*;
 pub use self::vector::*;
@@ -123,7 +151,7 @@ mod file;
 
 const ELLIPSIS: &str = "[...]";
 
-pub(self) fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
+pub fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
     if s.len() >= maxlen {
         let mut len = maxlen - ELLIPSIS.len();
         while !s.is_char_boundary(len) {

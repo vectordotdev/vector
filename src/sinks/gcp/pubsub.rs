@@ -113,7 +113,7 @@ struct PubsubSink {
 
 impl PubsubSink {
     async fn from_config(config: &PubsubConfig) -> crate::Result<Self> {
-        // We only need to load the credentials if we are not targetting an emulator.
+        // We only need to load the credentials if we are not targeting an emulator.
         let creds = match config.emulator_host {
             None => config.auth.make_credentials(Scope::PubSub).await?,
             Some(_) => None,
@@ -214,8 +214,10 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::test_util::{random_events_with_stream, random_string, trace_init};
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
+    use futures::{
+        compat::{Future01CompatExt, Sink01CompatExt},
+        SinkExt,
+    };
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
 
@@ -248,10 +250,10 @@ mod integration_tests {
 
         healthcheck.compat().await.expect("Health check failed");
 
-        let (input, events) = random_events_with_stream(100, 100);
+        let (input, mut events) = random_events_with_stream(100, 100);
         let _ = sink
-            .send_all(events)
-            .compat()
+            .sink_compat()
+            .send_all(&mut events)
             .await
             .expect("Sending events failed");
 

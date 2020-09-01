@@ -35,7 +35,9 @@ use std::convert::TryFrom;
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ElasticSearchConfig {
-    pub host: String,
+    // Deprecated name
+    #[serde(alias = "host")]
+    pub endpoint: String,
     pub index: Option<String>,
     pub doc_type: Option<String>,
     pub id_key: Option<String>,
@@ -358,20 +360,20 @@ impl ElasticSearchCommon {
             _ => None,
         };
 
-        let base_url = config.host.clone();
+        let base_url = config.endpoint.clone();
         let region = match &config.aws {
             Some(region) => Region::try_from(region)?,
-            None => region_from_endpoint(&config.host)?,
+            None => region_from_endpoint(&config.endpoint)?,
         };
 
         // Test the configured host, but ignore the result
-        let uri = format!("{}/_test", &config.host);
+        let uri = format!("{}/_test", &config.endpoint);
         let uri = uri
             .parse::<Uri>()
             .with_context(|| InvalidHost { host: &base_url })?;
         if uri.host().is_none() {
             return Err(ParseError::HostMustIncludeHostname {
-                host: config.host.clone(),
+                host: config.endpoint.clone(),
             }
             .into());
         }
@@ -571,8 +573,11 @@ mod integration_tests {
         tls::TlsOptions,
         Event,
     };
-    use futures::compat::Future01CompatExt;
-    use futures01::{Sink, Stream};
+    use futures::{
+        compat::{Future01CompatExt, Sink01CompatExt},
+        SinkExt, TryStreamExt,
+    };
+    use futures01::Sink;
     use http::{Request, StatusCode};
     use hyper::Body;
     use serde_json::{json, Value};
@@ -585,7 +590,7 @@ mod integration_tests {
         let pipeline = String::from("test-pipeline");
 
         let config = ElasticSearchConfig {
-            host: "http://localhost:9200".into(),
+            endpoint: "http://localhost:9200".into(),
             index: Some(index.clone()),
             pipeline: Some(pipeline.clone()),
             ..config()
@@ -599,7 +604,7 @@ mod integration_tests {
     async fn structures_events_correctly() {
         let index = gen_index();
         let config = ElasticSearchConfig {
-            host: "http://localhost:9200".into(),
+            endpoint: "http://localhost:9200".into(),
             index: Some(index.clone()),
             doc_type: Some("log_lines".into()),
             id_key: Some("my_id".into()),
@@ -656,7 +661,7 @@ mod integration_tests {
 
         run_insert_tests(
             ElasticSearchConfig {
-                host: "http://localhost:9200".into(),
+                endpoint: "http://localhost:9200".into(),
                 doc_type: Some("log_lines".into()),
                 compression: Compression::None,
                 ..config()
@@ -672,7 +677,7 @@ mod integration_tests {
 
         run_insert_tests(
             ElasticSearchConfig {
-                host: "https://localhost:9201".into(),
+                endpoint: "https://localhost:9201".into(),
                 doc_type: Some("log_lines".into()),
                 compression: Compression::None,
                 tls: Some(TlsOptions {
@@ -693,7 +698,7 @@ mod integration_tests {
         run_insert_tests(
             ElasticSearchConfig {
                 auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
-                host: "http://localhost:4571".into(),
+                endpoint: "http://localhost:4571".into(),
                 ..config()
             },
             false,
@@ -707,7 +712,7 @@ mod integration_tests {
 
         run_insert_tests(
             ElasticSearchConfig {
-                host: "http://localhost:9200".into(),
+                endpoint: "http://localhost:9200".into(),
                 doc_type: Some("log_lines".into()),
                 compression: Compression::None,
                 ..config()
@@ -728,27 +733,27 @@ mod integration_tests {
 
         healthcheck.compat().await.expect("Health check failed");
 
-        let (input, events) = random_events_with_stream(100, 100);
+        let (input, mut events) = random_events_with_stream(100, 100);
         match break_events {
             true => {
                 // Break all but the first event to simulate some kind of partial failure
                 let mut doit = false;
                 let _ = sink
-                    .send_all(events.map(move |mut event| {
+                    .sink_compat()
+                    .send_all(&mut events.map_ok(move |mut event| {
                         if doit {
                             event.as_mut_log().insert("_type", 1);
                         }
                         doit = true;
                         event
                     }))
-                    .compat()
                     .await
                     .expect("Sending events failed");
             }
             false => {
                 let _ = sink
-                    .send_all(events)
-                    .compat()
+                    .sink_compat()
+                    .send_all(&mut events)
                     .await
                     .expect("Sending events failed");
             }

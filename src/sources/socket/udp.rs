@@ -5,7 +5,7 @@ use crate::{
     sources::Source,
     Pipeline,
 };
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::Sink;
@@ -78,7 +78,7 @@ pub fn udp(
 
                             event
                                 .as_mut_log()
-                                .insert(event::log_schema().source_type_key(), "socket");
+                                .insert(event::log_schema().source_type_key(), Bytes::from("socket"));
                             event
                                 .as_mut_log()
                                 .insert(host_key.clone(), address.to_string());

@@ -146,10 +146,10 @@ fn line_to_event(line: String) -> Event {
             log.insert(event::log_schema().timestamp_key().clone(), ts);
         }
 
-        log.insert(event::log_schema().host_key().clone(), hostname);
+        log.insert(event::log_schema().host_key().clone(), hostname.to_owned());
 
-        log.insert("app_name", app_name);
-        log.insert("proc_id", proc_id);
+        log.insert("app_name", app_name.to_owned());
+        log.insert("proc_id", proc_id.to_owned());
 
         event
     } else {
@@ -162,9 +162,10 @@ fn line_to_event(line: String) -> Event {
     };
 
     // Add source type
-    event
-        .as_mut_log()
-        .try_insert(event::log_schema().source_type_key(), "logplex");
+    event.as_mut_log().try_insert(
+        event::log_schema().source_type_key(),
+        Bytes::from("logplex"),
+    );
 
     event
 }
@@ -231,7 +232,7 @@ mod tests {
 
         assert_eq!(200, send(addr, body).await);
 
-        let mut events = collect_n(rx, body.lines().count()).compat().await.unwrap();
+        let mut events = collect_n(rx, body.lines().count()).await.unwrap();
         let event = events.remove(0);
         let log = event.as_log();
 

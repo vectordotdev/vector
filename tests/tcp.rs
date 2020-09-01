@@ -49,7 +49,7 @@ async fn pipe() {
     // Shut down server
     topology.stop().compat().await.unwrap();
 
-    let output_lines = output_lines.wait().await;
+    let output_lines = output_lines.await;
     assert_eq!(num_lines, output_lines.len());
     assert_eq!(input_lines, output_lines);
 }
@@ -96,7 +96,7 @@ async fn sample() {
     // Shut down server
     topology.stop().compat().await.unwrap();
 
-    let output_lines = output_lines.wait().await;
+    let output_lines = output_lines.await;
     let num_output_lines = output_lines.len();
 
     let output_lines_ratio = num_output_lines as f32 / num_lines as f32;
@@ -151,15 +151,15 @@ async fn fork() {
     // Shut down server
     topology.stop().compat().await.unwrap();
 
-    let output_lines1 = output_lines1.wait().await;
-    let output_lines2 = output_lines2.wait().await;
+    let output_lines1 = output_lines1.await;
+    let output_lines2 = output_lines2.await;
     assert_eq!(num_lines, output_lines1.len());
     assert_eq!(num_lines, output_lines2.len());
     assert_eq!(input_lines, output_lines1);
     assert_eq!(input_lines, output_lines2);
 }
 
-#[tokio::test(threaded_scheduler)]
+#[tokio::test]
 async fn merge_and_fork() {
     trace_init();
 
@@ -209,17 +209,19 @@ async fn merge_and_fork() {
     send_lines(in_addr1, input_lines1.clone()).await.unwrap();
     send_lines(in_addr2, input_lines2.clone()).await.unwrap();
 
+    // Accept connection in Vector, before shutdown
+    tokio::task::yield_now().await;
+
     // Shut down server
     topology.stop().compat().await.unwrap();
 
-    let output_lines1 = output_lines1.wait().await;
-    let output_lines2 = output_lines2.wait().await;
+    let output_lines1 = output_lines1.await;
+    let output_lines2 = output_lines2.await;
 
-    assert_eq!(num_lines, output_lines2.len());
-
+    assert_eq!(input_lines1.len() + input_lines2.len(), output_lines1.len());
+    assert_eq!(input_lines2.len(), output_lines2.len());
     assert_eq!(input_lines2, output_lines2);
 
-    assert_eq!(num_lines * 2, output_lines1.len());
     // Assert that all of the output lines were present in the input and in the same order
     let mut input_lines1 = input_lines1.into_iter().peekable();
     let mut input_lines2 = input_lines2.into_iter().peekable();
@@ -266,7 +268,7 @@ async fn reconnect() {
     // Shut down server and wait for it to fully flush
     topology.stop().compat().await.unwrap();
 
-    let output_lines = output_lines.wait().await;
+    let output_lines = output_lines.await;
     assert!(num_lines >= 2);
     assert!(output_lines.iter().all(|line| input_lines.contains(line)))
 }

@@ -7,7 +7,7 @@
   "properties": {
     "sinks": {
       "type": "object",
-      "description": "An object represeting all Vector sinks keyed by the sink's name.",
+      "description": "An object representing all Vector sinks keyed by the sink's name.",
       "patternProperties": {
         "^[a-z0-9_]+$": {
           "$ref": "#/definitions/sink"
@@ -16,7 +16,7 @@
     },
     "sources": {
       "type": "object",
-      "description": "An object represeting all Vector soures keyed by the source's name.",
+      "description": "An object representing all Vector sources keyed by the source's name.",
       "patternProperties": {
         "^[a-z0-9_]+$": {
           "$ref": "#/definitions/source"
@@ -29,7 +29,7 @@
     },
     "transforms": {
       "type": "object",
-      "description": "An object represeting all Vector transforms keyed by the transform's name.",
+      "description": "An object representing all Vector transforms keyed by the transform's name.",
       "patternProperties": {
         "^[a-z0-9_]+$": {
           "$ref": "#/definitions/transform"
@@ -81,7 +81,7 @@
         "properties": {
           "body": {
             "type": "string",
-            "description": "The output exmaple body. Markdown syntax is supported."
+            "description": "The output example body. Markdown syntax is supported."
           },
           "label": {
             "type": "string",
@@ -134,7 +134,7 @@
         },
         "groups": {
           "type": "array",
-          "description": "The overaching group that this configuration belongs to. This is an advanced option that should be used for large groups of mutually exclusive options. For example, a set of options specifically for v1 and another set for v2.",
+          "description": "The overarching group that this configuration belongs to. This is an advanced option that should be used for large groups of mutually exclusive options. For example, a set of options specifically for v1 and another set for v2.",
           "items": {
             "type": "string"
           }
@@ -145,7 +145,7 @@
         },
         "relevant_when": {
           "type": "object",
-          "description": "An object representing the conditions when an option is relevant. This is commonly used in conjuntion with `type` or `strategy` options."
+          "description": "An object representing the conditions when an option is relevant. This is commonly used in conjunction with `type` or `strategy` options."
         },
         "required": {
           "type": "boolean",
@@ -194,7 +194,7 @@
             "properties": {
               "visibility_level": {
                 "type": "string",
-                "description": "The visiblity level. `component` will bubble up the warning at the top of the component page (higher visibility). `option` will display the warning on the option only (lower visibility).",
+                "description": "The visibility level. `component` will bubble up the warning at the top of the component page (higher visibility). `option` will display the warning on the option only (lower visibility).",
                 "enum": ["component", "option"]
               },
               "text": {
@@ -355,7 +355,7 @@
         },
         "common": {
           "type": "boolean",
-          "description": "Is this sink common? Shold it be highlighted in a list of all sinks?"
+          "description": "Is this sink common? Should it be highlighted in a list of all sinks?"
         },
         "delivery_guarantee": {
           "type": "string",
@@ -373,7 +373,7 @@
         },
         "env_vars": {
           "$ref": "#/definitions/fields",
-          "description": "The environment variables supported by this sink, keyed by the variables's name."
+          "description": "The environment variables supported by this sink, keyed by the variable's name."
         },
         "examples": {
           "$ref": "#/definitions/examples",
@@ -437,7 +437,7 @@
           "type": "string",
           "description": "Short title for the sink",
           "minLength": 1,
-          "max_lenfth": 50
+          "max_length": 50
         },
         "write_to_description": {
           "type": "string",
@@ -480,7 +480,7 @@
         },
         "env_vars": {
           "$ref": "#/definitions/fields",
-          "description": "The environment variables supported by this source, keyed by the variables's name."
+          "description": "The environment variables supported by this source, keyed by the variable's name."
         },
         "examples": {
           "$ref": "#/definitions/examples",
@@ -541,7 +541,7 @@
         },
         "strategies": {
           "type": "array",
-          "description": "Any applicable stratgies that this source applies to. Must be strategy names only.",
+          "description": "Any applicable strategies that this source applies to. Must be strategy names only.",
           "minLength": 1,
           "items": {
             "type": "string"
@@ -556,7 +556,7 @@
           "type": "string",
           "description": "A simple title for this source, typically one word.",
           "minLength": 1,
-          "max_lenfth": 50
+          "max_length": 50
         }
       }
     },
@@ -593,7 +593,7 @@
       "properties": {
         "allow_you_to_description": {
           "type": "string",
-          "description": "A short one sentence description for this tramsform.",
+          "description": "A short one sentence description for this transform.",
           "minLength": 5
         },
         "beta": {
@@ -659,7 +659,7 @@
           "type": "string",
           "description": "A simple title for this transform, typically one word.",
           "minLength": 1,
-          "max_lenfth": 50
+          "max_length": 50
         },
         "only_operating_systems": {
           "$ref": "#/definitions/operating_systems",

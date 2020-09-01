@@ -30,12 +30,12 @@ write_to_description = "[Apache Pulsar][urls.pulsar] via the [Pulsar protocol][u
   default: "text"
 ) %>
 
-[sinks.pulsar.options.address]
+[sinks.pulsar.options.endpoint]
 type = "string"
 common = true
 examples = ["pulsar://127.0.0.1:6650"]
 required = true
-description = "A host and port pair that the pulsar client should connect to."
+description = "Endpoint to which the pulsar client should connect to."
 
 [sinks.pulsar.options.topic]
 type = "string"

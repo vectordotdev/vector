@@ -225,7 +225,11 @@ pub fn file_source(
                 futures::future::ready(val.ok())
             });
             let logic = line_agg::Logic::new(config);
-            Box::new(Compat::new(LineAgg::new(rx, logic).map(Ok)))
+            Box::new(Compat::new(
+                LineAgg::new(rx.map(|(line, src)| (src, line, ())), logic)
+                    .map(|(src, line, _context)| (line, src))
+                    .map(Ok),
+            ))
         };
         let messages: Box<dyn Stream<Item = (Bytes, String), Error = ()> + Send> =
             if let Some(ref multiline_config) = multiline_config {
@@ -293,7 +297,7 @@ fn create_event(
     // Add source type
     event
         .as_mut_log()
-        .insert(event::log_schema().source_type_key(), "file");
+        .insert(event::log_schema().source_type_key(), Bytes::from("file"));
 
     if let Some(file_key) = &file_key {
         event.as_mut_log().insert(file_key.clone(), file);

@@ -26,7 +26,9 @@ enum BuildError {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PulsarSinkConfig {
-    address: String,
+    // Deprecated name
+    #[serde(alias = "address")]
+    endpoint: String,
     topic: String,
     encoding: EncodingConfigWithDefault<Encoding>,
     auth: Option<AuthConfig>,
@@ -100,7 +102,7 @@ impl SinkConfig for PulsarSinkConfig {
 
 impl PulsarSinkConfig {
     async fn create_pulsar_producer(&self) -> Result<Producer<TokioExecutor>, PulsarError> {
-        let mut builder = Pulsar::builder(&self.address, TokioExecutor);
+        let mut builder = Pulsar::builder(&self.endpoint, TokioExecutor);
         if let Some(auth) = &self.auth {
             builder = builder.with_auth(Authentication {
                 name: auth.name.clone(),
@@ -227,7 +229,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
-    use futures::{compat::Future01CompatExt, StreamExt};
+    use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
     use pulsar::SubType;
 
     #[tokio::test]
@@ -235,17 +237,17 @@ mod integration_tests {
         trace_init();
 
         let num_events = 1_000;
-        let (_input, events) = random_lines_with_stream(100, num_events);
+        let (_input, mut events) = random_lines_with_stream(100, num_events);
 
         let topic = format!("test-{}", random_string(10));
         let cnf = PulsarSinkConfig {
-            address: "pulsar://127.0.0.1:6650".to_owned(),
+            endpoint: "pulsar://127.0.0.1:6650".to_owned(),
             topic: topic.clone(),
             encoding: Encoding::Text.into(),
             auth: None,
         };
 
-        let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.address, TokioExecutor)
+        let pulsar = Pulsar::<TokioExecutor>::builder(&cnf.endpoint, TokioExecutor)
             .build()
             .await
             .unwrap();
@@ -262,7 +264,7 @@ mod integration_tests {
         let (acker, ack_counter) = Acker::new_for_testing();
         let producer = cnf.create_pulsar_producer().await.unwrap();
         let sink = cnf.new_sink(producer, acker).unwrap();
-        let _ = sink.send_all(events).compat().await.unwrap();
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
         assert_eq!(
             ack_counter.load(std::sync::atomic::Ordering::Relaxed),
             num_events

@@ -220,8 +220,8 @@ mod tests {
         test_util::next_addr,
     };
     use chrono::{offset::TimeZone, Utc};
-    use futures::compat::Future01CompatExt;
-    use futures01::{Sink, Stream};
+    use futures::{compat::Future01CompatExt, StreamExt};
+    use futures01::Sink;
 
     #[test]
     fn test_config_without_tags() {
@@ -449,7 +449,7 @@ mod tests {
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let (rx, _trigger, server) = build_test_server(addr);
+        let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
         let lines = std::iter::repeat(())
@@ -475,14 +475,14 @@ mod tests {
         let pump = sink.send_all(futures01::stream::iter_ok(events));
         let _ = pump.compat().await.unwrap();
 
-        let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();
+        let output = rx.next().await.unwrap();
 
-        let request = &output[0].0;
+        let request = &output.0;
         let query = request.uri.query().unwrap();
         assert!(query.contains("db=my-database"));
         assert!(query.contains("precision=ns"));
 
-        let body = std::str::from_utf8(&output[0].1[..]).unwrap();
+        let body = std::str::from_utf8(&output.1[..]).unwrap();
         let mut lines = body.lines();
 
         assert_eq!(5, lines.clone().count());
@@ -513,7 +513,7 @@ mod tests {
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let (rx, _trigger, server) = build_test_server(addr);
+        let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
         let lines = std::iter::repeat(())
@@ -539,15 +539,15 @@ mod tests {
         let pump = sink.send_all(futures01::stream::iter_ok(events));
         let _ = pump.compat().await.unwrap();
 
-        let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();
+        let output = rx.next().await.unwrap();
 
-        let request = &output[0].0;
+        let request = &output.0;
         let query = request.uri.query().unwrap();
         assert!(query.contains("org=my-org"));
         assert!(query.contains("bucket=my-bucket"));
         assert!(query.contains("precision=ns"));
 
-        let body = std::str::from_utf8(&output[0].1[..]).unwrap();
+        let body = std::str::from_utf8(&output.1[..]).unwrap();
         let mut lines = body.lines();
 
         assert_eq!(5, lines.clone().count());

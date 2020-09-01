@@ -102,7 +102,7 @@ impl Transform for Split {
                 .iter()
                 .zip(split(value, self.separator.clone()).into_iter())
             {
-                match conversion.convert(value.as_bytes().into()) {
+                match conversion.convert(value.as_bytes().to_vec().into()) {
                     Ok(value) => {
                         event.as_mut_log().insert(name.clone(), value);
                     }
