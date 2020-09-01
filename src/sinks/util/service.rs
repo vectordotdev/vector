@@ -126,11 +126,11 @@ impl<'de> Deserialize<'de> for InFlightLimit {
 }
 
 pub trait InFlightLimitOption {
-    fn unwrap_with(&self, default: &Self) -> Option<usize>;
+    fn parse_in_flight_limit(&self, default: &Self) -> Option<usize>;
 }
 
 impl InFlightLimitOption for Option<usize> {
-    fn unwrap_with(&self, default: &Self) -> Option<usize> {
+    fn parse_in_flight_limit(&self, default: &Self) -> Option<usize> {
         let limit = match self {
             None => *default,
             Some(x) => Some(*x),
@@ -140,7 +140,7 @@ impl InFlightLimitOption for Option<usize> {
 }
 
 impl InFlightLimitOption for InFlightLimit {
-    fn unwrap_with(&self, default: &Self) -> Option<usize> {
+    fn parse_in_flight_limit(&self, default: &Self) -> Option<usize> {
         match self.if_none(*default) {
             InFlightLimit::None => Some(5),
             InFlightLimit::Auto => None,
@@ -165,7 +165,9 @@ pub struct TowerRequestConfig<T = InFlightLimit> {
 impl<T: InFlightLimitOption> TowerRequestConfig<T> {
     pub fn unwrap_with(&self, defaults: &Self) -> TowerRequestSettings {
         TowerRequestSettings {
-            in_flight_limit: self.in_flight_limit.unwrap_with(&defaults.in_flight_limit),
+            in_flight_limit: self
+                .in_flight_limit
+                .parse_in_flight_limit(&defaults.in_flight_limit),
             timeout: Duration::from_secs(self.timeout_secs.or(defaults.timeout_secs).unwrap_or(60)),
             rate_limit_duration: Duration::from_secs(
                 self.rate_limit_duration_secs
