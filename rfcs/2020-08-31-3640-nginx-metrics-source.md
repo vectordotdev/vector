@@ -30,10 +30,10 @@ source](https://github.com/timberio/vector/blob/61e806d01d4cc6d2a527b52aa9388d45
 and modify it to parse the output of the Nginx stub status page which looks like:
 
 ```text
-Active connections: 1 
+Active connections: 1
 server accepts handled requests
- 1 1 1 
-Reading: 0 Writing: 1 Waiting: 0 
+ 1 1 1
+Reading: 0 Writing: 1 Waiting: 0
 ```
 
 The breakdown of this output:
