@@ -65,7 +65,7 @@ SECURITY.md @binarylogic @jamtur01
 /src/sinks/tcp.rs @lukesteensen
 /src/sinks/util/auto_concurrency @bruceg
 
-/src/sources/docker.rs 
+/src/sources/docker.rs @fanatid
 /src/sources/file.rs 
 /src/sources/generator.rs @bruceg
 /src/sources/journald.rs @bruceg
