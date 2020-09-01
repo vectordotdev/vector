@@ -29,6 +29,7 @@ for FILE in $(git ls-files); do
   case "$FILE" in
     *png) continue;;
     *svg) continue;;
+    *gif) continue;;
     *ico) continue;;
     *sig) continue;;
     tests/data*) continue;;
