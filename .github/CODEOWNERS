@@ -41,7 +41,7 @@ SECURITY.md @binarylogic @jamtur01
 /src/list.rs 
 /src/metrics.rs @lukesteensen
 /src/main.rs @lukesteensen
-/src/region.rs 
+/src/region.rs @bruceg
 /src/template.rs @lukesteensen
 /src/tls @bruceg
 /src/trace.rs 
