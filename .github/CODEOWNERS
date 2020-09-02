@@ -49,6 +49,9 @@
 /src/trace.rs
 /src/types.rs @bruceg
 /src/line_agg.rs @MOZGIII
+/src/signal.rs @ktff
+/src/validate.rs @ktff
+/src/heartbeat.rs @ktff
 
 /src/buffers/
 
@@ -89,6 +92,7 @@
 /src/sources/vector.rs @lukesteensen
 /src/sources/util/multiline_config.rs @MOZGIII
 /src/sources/kubernetes_logs/ @MOZGIII
+/src/sources/splunk_hec.rs @ktff
 
 /src/topology/ @lukesteensen
 
@@ -116,6 +120,8 @@
 /tests/buffering.rs @MOZGIII
 /tests/data/wasm/ @hoverbear
 /tests/kubernetes-e2e.rs @MOZGIII
+/tests/shutdown.rs @ktff
+/tests/cli.rs @ktff
 
 /.github/semantic* @binarylogic @jamtur01
 /.github/SUPPORT.md @binarylogic @jamtur01
