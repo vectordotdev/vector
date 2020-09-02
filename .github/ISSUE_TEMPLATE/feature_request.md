@@ -25,7 +25,7 @@ If you're not using the latest version, please check to see if something related
 ...
 ```
 
-### Use-cases'
+### Use-cases
 
 <!---
 In order to properly evaluate a feature request, it is necessary to understand the use-cases for it.
