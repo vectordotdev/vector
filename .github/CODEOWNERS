@@ -18,6 +18,7 @@
 /lib/file-source/src/paths_provider/mod.rs @MOZGIII
 /lib/file-source/src/paths_provider/glob.rs @MOZGIII
 /lib/k8s-test-framework/ @MOZGIII
+/lib/prometheus-parser/ @juchiast
 /lib/vector-wasm/ @hoverbear
 
 /proto/ @lukesteensen
