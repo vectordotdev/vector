@@ -481,6 +481,18 @@ mod test {
     }
 
     #[test]
+    fn from_options_intermediate_ca() {
+        let options = TlsOptions {
+            ca_file: Some("tests/data/Chain_with_intermediate.crt".into()),
+            ..Default::default()
+        };
+        let settings = TlsSettings::from_options(&Some(options))
+            .expect("Failed to load authority certificate");
+        assert!(settings.identity.is_none());
+        assert_eq!(settings.authorities.len(), 3);
+    }
+
+    #[test]
     fn from_options_multi_ca() {
         let options = TlsOptions {
             ca_file: Some("tests/data/Multi_CA.crt".into()),
