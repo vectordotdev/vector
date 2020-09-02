@@ -58,14 +58,16 @@
 /src/kubernetes/ @MOZGIII
 
 /src/sinks/*_metrics.rs @lukesteensen
-/src/sinks/aws_kinesis_streams.rs
-/src/sinks/aws_s3.rs
+/src/sinks/aws_kinesis_streams.rs @jszwedko
+/src/sinks/aws_s3.rs @jszwedko
 /src/sinks/blackhole.rs
 /src/sinks/clickhouse.rs
 /src/sinks/console.rs @lukesteensen
 /src/sinks/elasticsearch.rs
 /src/sinks/gcp @bruceg
-/src/sinks/http.rs
+/src/sinks/http.rs @jszwedko
+/src/sinks/humio_logs.rs @jszwedko
+/src/sinks/splunk_hec.rs @jszwedko
 /src/sinks/kafka.rs @lukesteensen
 /src/sinks/prometheus.rs @lukesteensen
 /src/sinks/splunk_hec.rs @lukesteensen
