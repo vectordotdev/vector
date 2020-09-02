@@ -77,7 +77,7 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: TowerRequestConfig<Option<usize>>,
     pub assume_role: Option<String>,
 }
 
@@ -98,7 +98,7 @@ fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {
 }
 
 lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig<Option<usize>> = TowerRequestConfig {
         ..Default::default()
     };
 }
@@ -177,11 +177,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 
         let client = self.create_client(cx.resolver())?;
         let svc = ServiceBuilder::new()
-            .concurrency_limit(
-                request
-                    .in_flight_limit
-                    .expect("in_flight_limit=auto is not allowed"),
-            )
+            .concurrency_limit(request.in_flight_limit.unwrap())
             .service(CloudwatchLogsPartitionSvc::new(
                 self.clone(),
                 client.clone(),
@@ -248,11 +244,7 @@ impl Service<PartitionInnerBuffer<Vec<InputLogEvent>, CloudwatchKey>>
             // Buffer size is in_flight_limit because current service always ready.
             // Concurrency limit is 1 because we need token from previous request.
             let svc = ServiceBuilder::new()
-                .buffer(
-                    self.request_settings
-                        .in_flight_limit
-                        .expect("in_flight_limit=auto is not allowed"),
-                )
+                .buffer(self.request_settings.in_flight_limit.unwrap())
                 .concurrency_limit(1)
                 .rate_limit(
                     self.request_settings.rate_limit_num,
