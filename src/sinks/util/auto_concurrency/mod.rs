@@ -24,4 +24,12 @@ pub struct AutoConcurrencySettings {
     #[serde(default)]
     #[derivative(Default(value = "0.5"))]
     pub(super) decrease_ratio: f64,
+
+    // This value was picked as a reasonable default while we ensure the
+    // viability of the system. This value may need adjustment if later
+    // analysis discovers we need higher or lower weighting on past RTT
+    // weighting.
+    #[serde(default)]
+    #[derivative(Default(value = "0.5"))]
+    pub(super) ewma_alpha: f64,
 }

@@ -14,12 +14,6 @@ use std::time::{Duration, Instant};
 use tokio::sync::OwnedSemaphorePermit;
 use tower::timeout::error::Elapsed;
 
-// This value was picked as a reasonable default while we ensure the
-// viability of the system. This value may need adjustment if later
-// analysis discovers we need higher or lower weighting on past RTT
-// weighting.
-const EWMA_ALPHA: f64 = 0.5;
-
 // This was picked as a reasonable default threshold ratio to avoid
 // dropping concurrency too aggressively when there is fluctuation in
 // the RTT measurements.
@@ -77,7 +71,7 @@ impl<L> Controller<L> {
             inner: Arc::new(Mutex::new(Inner {
                 current_limit,
                 in_flight: 0,
-                past_rtt: Default::default(),
+                past_rtt: EWMA::new(settings.ewma_alpha),
                 next_update: instant_now(),
                 current_rtt: Default::default(),
                 had_back_pressure: false,
@@ -259,12 +253,18 @@ where
 }
 
 /// Exponentially Weighted Moving Average
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 struct EWMA {
     average: Option<f64>,
+    alpha: f64,
 }
 
 impl EWMA {
+    fn new(alpha: f64) -> Self {
+        let average = None;
+        Self { average, alpha }
+    }
+
     fn average(&self) -> Option<f64> {
         self.average
     }
@@ -273,7 +273,7 @@ impl EWMA {
     fn update(&mut self, point: f64) -> f64 {
         let average = match self.average {
             None => point,
-            Some(avg) => point * EWMA_ALPHA + avg * (1.0 - EWMA_ALPHA),
+            Some(avg) => point * self.alpha + avg * (1.0 - self.alpha),
         };
         self.average = Some(average);
         average
@@ -327,7 +327,7 @@ mod tests {
 
     #[test]
     fn ewma_update_works() {
-        let mut mean = EWMA::default();
+        let mut mean = EWMA::new(0.5);
         assert_eq!(mean.average(), None);
         mean.update(2.0);
         assert_eq!(mean.average(), Some(2.0));
