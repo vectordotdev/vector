@@ -110,9 +110,9 @@ Where the `prometheus` sink would simply output metrics with name prefixed by
 `apache_` and `aws_cloudwatch_metrics` would use it as the separate `Namespace`
 field in AWS API calls.
 
-Once [Make the `namespace` option on metrics sinks optional
-#3609](https://github.com/timberio/vector/issues/3609) is done. The sinks could
-look something like:
+Once [Make the `namespace` option on metrics sinks optional #3609](
+https://github.com/timberio/vector/issues/3609) is done. The sinks could look
+something like:
 
 ```toml
 [sinks.my_sink_id]
