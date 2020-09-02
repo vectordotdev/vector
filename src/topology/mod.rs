@@ -9,11 +9,10 @@
 pub mod builder;
 mod fanout;
 mod task;
-pub mod unit_test;
 
 use crate::{
     buffers,
-    config::{self, Config, ConfigDiff},
+    config::{Config, ConfigDiff},
     shutdown::SourceShutdownCoordinator,
     topology::{builder::Pieces, task::Task},
 };
@@ -71,29 +70,16 @@ pub async fn start_validated(
     Some((running_topology, abort_rx))
 }
 
+// TODO: inline this
 pub async fn validate(config: &Config, diff: &ConfigDiff) -> Option<Pieces> {
-    let check_build_result = match (
-        config::check(config),
-        builder::build_pieces(config, diff).await,
-    ) {
-        (Ok(warnings), Ok(new_pieces)) => Ok((new_pieces, warnings)),
-        (Err(t_errors), Err(p_errors)) => Err(t_errors.into_iter().chain(p_errors).collect()),
-        (Err(errors), Ok(_)) | (Ok(_), Err(errors)) => Err(errors),
-    };
-
-    match check_build_result {
+    match builder::build_pieces(config, diff).await {
         Err(errors) => {
             for error in errors {
                 error!("Configuration error: {}", error);
             }
             None
         }
-        Ok((new_pieces, warnings)) => {
-            for warning in warnings {
-                warn!("Configuration warning: {}", warning);
-            }
-            Some(new_pieces)
-        }
+        Ok(new_pieces) => Some(new_pieces),
     }
 }
 
@@ -226,13 +212,6 @@ impl RunningTopology {
     ) -> Result<bool, ()> {
         if self.config.global.data_dir != new_config.global.data_dir {
             error!("data_dir cannot be changed while reloading config file; reload aborted. Current value: {:?}", self.config.global.data_dir);
-            return Ok(false);
-        }
-
-        if let Err(errors) = config::check(&new_config) {
-            for error in errors {
-                error!("Configuration error: {}", error);
-            }
             return Ok(false);
         }
 
@@ -737,10 +716,7 @@ mod reload_tests {
         );
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
-        assert!(!topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
-            .await
-            .unwrap());
+        assert!(new_config.build().is_err());
     }
 
     #[tokio::test]
@@ -758,7 +734,8 @@ mod reload_tests {
             },
         );
 
-        let (mut topology, _crash) = start_topology(old_config.clone().build().unwrap(), false).await;
+        let (mut topology, _crash) =
+            start_topology(old_config.clone().build().unwrap(), false).await;
         assert!(topology
             .reload_config_and_respawn(old_config.build().unwrap(), false)
             .await

@@ -61,10 +61,6 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
         None => return exitcode::CONFIG,
     };
 
-    if !(opts.no_topology || opts.no.topology) {
-        validated &= validate_topology(opts, &config, &mut fmt);
-    }
-
     if !(opts.no_environment || opts.no.environment) {
         validated &= validate_environment(&config, &mut fmt).await;
     }
@@ -97,31 +93,6 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
             fmt.title(format!("Failed to load {:?}", paths));
             fmt.sub_error(errors);
             None
-        }
-    }
-}
-
-fn validate_topology(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool {
-    match config::check(config) {
-        Ok(warnings) => {
-            if warnings.is_empty() {
-                fmt.success("Configuration topology");
-                true
-            } else if opts.deny_warnings {
-                fmt.title("Topology errors");
-                fmt.sub_error(warnings);
-                false
-            } else {
-                fmt.title("Topology warnings");
-                fmt.sub_warning(warnings);
-                fmt.success("Configuration topology");
-                true
-            }
-        }
-        Err(errors) => {
-            fmt.title("Topology errors");
-            fmt.sub_error(errors);
-            false
         }
     }
 }
@@ -287,14 +258,6 @@ impl Formatter {
         I::Item: fmt::Display,
     {
         self.sub(self.error_intro.clone(), errors)
-    }
-
-    /// A list of warnings that go with a title.
-    fn sub_warning<I: IntoIterator>(&mut self, warnings: I)
-    where
-        I::Item: fmt::Display,
-    {
-        self.sub(self.warning_intro.clone(), warnings)
     }
 
     fn sub<I: IntoIterator>(&mut self, intro: impl AsRef<str>, msgs: I)

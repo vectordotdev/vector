@@ -55,6 +55,12 @@ pub fn process_paths(config_paths: &[PathBuf]) -> Option<Vec<PathBuf>> {
 }
 
 pub fn load_from_paths(config_paths: &[PathBuf]) -> Result<Config, Vec<String>> {
+    load_builder_from_paths(config_paths).and_then(|builder| builder.build())
+}
+
+pub(super) fn load_builder_from_paths(
+    config_paths: &[PathBuf],
+) -> Result<ConfigBuilder, Vec<String>> {
     let mut inputs = Vec::new();
     let mut errors = Vec::new();
 
@@ -74,12 +80,12 @@ pub fn load_from_paths(config_paths: &[PathBuf]) -> Result<Config, Vec<String>> 
 }
 
 pub fn load_from_str(input: &str) -> Result<Config, Vec<String>> {
-    load_from_inputs(std::iter::once(input.as_bytes()))
+    load_from_inputs(std::iter::once(input.as_bytes())).and_then(|builder| builder.build())
 }
 
 fn load_from_inputs(
     inputs: impl IntoIterator<Item = impl std::io::Read>,
-) -> Result<Config, Vec<String>> {
+) -> Result<ConfigBuilder, Vec<String>> {
     let mut config = Config::builder();
     let mut errors = Vec::new();
 
@@ -88,13 +94,6 @@ fn load_from_inputs(
             // TODO: add back paths
             errors.extend(errs.iter().map(|e| e.to_string()));
         }
-    }
-
-    // TODO: this should be the last step
-    let mut config = config.build()?;
-
-    if let Err(mut errs) = config.expand_macros() {
-        errors.append(&mut errs);
     }
 
     if errors.is_empty() {
