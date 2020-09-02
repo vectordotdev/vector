@@ -125,11 +125,35 @@ impl<'de> Deserialize<'de> for InFlightLimit {
     }
 }
 
+pub trait InFlightLimitOption {
+    fn parse_in_flight_limit(&self, default: &Self) -> Option<usize>;
+}
+
+impl InFlightLimitOption for Option<usize> {
+    fn parse_in_flight_limit(&self, default: &Self) -> Option<usize> {
+        let limit = match self {
+            None => *default,
+            Some(x) => Some(*x),
+        };
+        limit.or(Some(5))
+    }
+}
+
+impl InFlightLimitOption for InFlightLimit {
+    fn parse_in_flight_limit(&self, default: &Self) -> Option<usize> {
+        match self.if_none(*default) {
+            InFlightLimit::None => Some(5),
+            InFlightLimit::Auto => None,
+            InFlightLimit::Fixed(limit) => Some(limit),
+        }
+    }
+}
+
 /// Tower Request based configuration
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-pub struct TowerRequestConfig {
+pub struct TowerRequestConfig<T = InFlightLimit> {
     #[serde(default)]
-    pub in_flight_limit: InFlightLimit, // 5
+    pub in_flight_limit: T, // 5
     pub timeout_secs: Option<u64>,             // 60
     pub rate_limit_duration_secs: Option<u64>, // 1
     pub rate_limit_num: Option<u64>,           // 5
@@ -138,14 +162,12 @@ pub struct TowerRequestConfig {
     pub retry_initial_backoff_secs: Option<u64>, // 1
 }
 
-impl TowerRequestConfig {
-    pub fn unwrap_with(&self, defaults: &TowerRequestConfig) -> TowerRequestSettings {
+impl<T: InFlightLimitOption> TowerRequestConfig<T> {
+    pub fn unwrap_with(&self, defaults: &Self) -> TowerRequestSettings {
         TowerRequestSettings {
-            in_flight_limit: match self.in_flight_limit.if_none(defaults.in_flight_limit) {
-                InFlightLimit::None => Some(5),
-                InFlightLimit::Auto => None,
-                InFlightLimit::Fixed(limit) => Some(limit),
-            },
+            in_flight_limit: self
+                .in_flight_limit
+                .parse_in_flight_limit(&defaults.in_flight_limit),
             timeout: Duration::from_secs(self.timeout_secs.or(defaults.timeout_secs).unwrap_or(60)),
             rate_limit_duration: Duration::from_secs(
                 self.rate_limit_duration_secs
@@ -324,19 +346,26 @@ mod tests {
 
     #[test]
     fn in_flight_limit_works() {
-        let cfg = toml::from_str::<TowerRequestConfig>("").expect("Empty config failed");
+        type TowerRequestConfigTest = TowerRequestConfig<InFlightLimit>;
+
+        let cfg = toml::from_str::<TowerRequestConfigTest>("").expect("Empty config failed");
         assert_eq!(cfg.in_flight_limit, InFlightLimit::None);
-        let cfg = toml::from_str::<TowerRequestConfig>("in_flight_limit = 10")
+
+        let cfg = toml::from_str::<TowerRequestConfigTest>("in_flight_limit = 10")
             .expect("Fixed in_flight_limit failed");
         assert_eq!(cfg.in_flight_limit, InFlightLimit::Fixed(10));
-        let cfg = toml::from_str::<TowerRequestConfig>(r#"in_flight_limit = "auto""#)
+
+        let cfg = toml::from_str::<TowerRequestConfigTest>(r#"in_flight_limit = "auto""#)
             .expect("Auto in_flight_limit failed");
         assert_eq!(cfg.in_flight_limit, InFlightLimit::Auto);
-        toml::from_str::<TowerRequestConfig>(r#"in_flight_limit = "broken""#)
+
+        toml::from_str::<TowerRequestConfigTest>(r#"in_flight_limit = "broken""#)
             .expect_err("Invalid in_flight_limit didn't fail");
-        toml::from_str::<TowerRequestConfig>(r#"in_flight_limit = 0"#)
+
+        toml::from_str::<TowerRequestConfigTest>(r#"in_flight_limit = 0"#)
             .expect_err("Invalid in_flight_limit didn't fail on zero");
-        toml::from_str::<TowerRequestConfig>(r#"in_flight_limit = -9"#)
+
+        toml::from_str::<TowerRequestConfigTest>(r#"in_flight_limit = -9"#)
             .expect_err("Invalid in_flight_limit didn't fail on negative number");
     }
 }
