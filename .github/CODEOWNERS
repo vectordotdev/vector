@@ -53,7 +53,7 @@
 /src/validate.rs @ktff
 /src/heartbeat.rs @ktff
 
-/src/buffers/
+/src/buffers/ @lukesteensen
 
 /src/event/merge.rs @MOZGIII
 /src/event/merge_state.rs @MOZGIII
