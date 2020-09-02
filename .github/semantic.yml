@@ -102,6 +102,7 @@ scopes:
   - sematext provider
 
   # sources
+  - apache_metrics source
   - docker source
   - file source
   - generator source

@@ -17,6 +17,8 @@ program_transforms = "/components/?functions%5B%5D=program"
 
 [links.urls]
 add_company = "https://github.com/timberio/vector/blob/master/.meta/companies.toml"
+apache = "https://httpd.apache.org/"
+apache_mod_status = "http://httpd.apache.org/docs/current/mod/mod_status.html"
 arm = "https://en.wikipedia.org/wiki/ARM_architecture"
 aws_arm_g2_announcement = "https://aws.amazon.com/about-aws/whats-new/2019/12/announcing-new-amazon-ec2-m6g-c6g-and-r6g-instances-powered-by-next-generation-arm-based-aws-graviton2-processors/"
 aws_athena = "https://aws.amazon.com/athena/"
