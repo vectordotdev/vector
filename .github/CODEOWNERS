@@ -7,9 +7,18 @@
 /NOTICE @binarylogic @jamtur01
 /SECURITY.md @binarylogic @jamtur01
 
+/skaffold/ @MOZGIII
+/skaffold.yaml @MOZGIII
+/kustomization.yaml @MOZGIII
+
 /distribution/ @hoverbear @jamtur01
 /distribution/kubernetes/ @MOZGIII
 /distribution/helm/ @MOZGIII
+
+/lib/file-source/src/paths_provider/mod.rs @MOZGIII
+/lib/file-source/src/paths_provider/glob.rs @MOZGIII
+/lib/k8s-test-framework/ @MOZGIII
+/lib/vector-wasm/ @hoverbear
 
 /proto/ @lukesteensen
 
@@ -29,9 +38,6 @@
 /scripts/deploy-kubernetes-test.sh @MOZGIII
 /scripts/test-e2e-kubernetes.sh @MOZGIII
 
-/src/buffers/
-/src/kubernetes/ @MOZGIII
-
 /src/generate.rs
 /src/list.rs
 /src/metrics.rs @lukesteensen
@@ -42,6 +48,14 @@
 /src/trace.rs
 /src/types.rs @bruceg
 /src/line_agg.rs @MOZGIII
+
+/src/buffers/
+
+/src/event/merge.rs @MOZGIII
+/src/event/merge_state.rs @MOZGIII
+/src/event/discriminant.rs @MOZGIII
+
+/src/kubernetes/ @MOZGIII
 
 /src/sinks/*_metrics.rs @lukesteensen
 /src/sinks/aws_kinesis_streams.rs
@@ -94,22 +108,11 @@
 /src/transforms/split.rs @lukesteensen
 /src/transforms/tokenzier.rs @lukesteensen
 
-/src/event/merge.rs @MOZGIII
-/src/event/merge_state.rs @MOZGIII
-/src/event/discriminant.rs @MOZGIII
-
 /src/wasm/ @hoverbear
 
-/lib/file-source/src/paths_provider/mod.rs @MOZGIII
-/lib/file-source/src/paths_provider/glob.rs @MOZGIII
-
-/lib/k8s-test-framework/ @MOZGIII
-
-/lib/vector-wasm/ @hoverbear
 /tests/buffering.rs @MOZGIII
 /tests/data/wasm/ @hoverbear
 /tests/kubernetes-e2e.rs @MOZGIII
-
 
 /.github/semantic* @binarylogic @jamtur01
 /.github/SUPPORT.md @binarylogic @jamtur01
@@ -117,7 +120,3 @@
 /.github/ISSUE_TEMPLATE/ @binarylogic @jamtur01
 /.github/workflows/e2e.yml @MOZGIII
 /.github/workflows/ @jamtur01
-
-/skaffold/ @MOZGIII
-/skaffold.yaml @MOZGIII
-/kustomization.yaml @MOZGIII
