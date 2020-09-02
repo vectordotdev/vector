@@ -32,4 +32,11 @@ pub struct AutoConcurrencySettings {
     #[serde(default)]
     #[derivative(Default(value = "0.5"))]
     pub(super) ewma_alpha: f64,
+
+    // This was picked as a reasonable default threshold ratio to avoid
+    // dropping concurrency too aggressively when there is fluctuation
+    // in the RTT measurements.
+    #[serde(default)]
+    #[derivative(Default(value = "0.05"))]
+    pub(super) rtt_threshold_ratio: f64,
 }

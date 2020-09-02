@@ -14,11 +14,6 @@ use std::time::{Duration, Instant};
 use tokio::sync::OwnedSemaphorePermit;
 use tower::timeout::error::Elapsed;
 
-// This was picked as a reasonable default threshold ratio to avoid
-// dropping concurrency too aggressively when there is fluctuation in
-// the RTT measurements.
-const THRESHOLD_RATIO: f64 = 0.05;
-
 /// Shared class for `tokio::sync::Semaphore` that manages adjusting the
 /// semaphore size and other associated data.
 #[derive(Clone, Debug)]
@@ -187,7 +182,7 @@ impl<L> Controller<L> {
     }
 
     fn manage_limit(&self, inner: &mut MutexGuard<Inner>, past_rtt: f64, current_rtt: Option<f64>) {
-        let threshold = past_rtt * THRESHOLD_RATIO;
+        let threshold = past_rtt * self.settings.rtt_threshold_ratio;
 
         // Normal quick responses trigger an increase in the
         // concurrency limit. Note that we only check this if we had
