@@ -5,7 +5,7 @@ use crate::{
         UnixSocketEventSent,
     },
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, StreamSink},
-    sinks::{Healthcheck, RouterSink},
+    sinks::{Healthcheck, VectorSink},
 };
 use bytes::Bytes;
 use futures::{compat::CompatSink, FutureExt, TryFutureExt};
@@ -33,7 +33,7 @@ impl UnixSinkConfig {
         Self { path, encoding }
     }
 
-    pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    pub fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let encoding = self.encoding.clone();
         let unix = UnixSink::new(self.path.clone());
         let sink = StreamSink::new(unix, cx.acker());
@@ -42,7 +42,7 @@ impl UnixSinkConfig {
             Box::new(sink.with_flat_map(move |event| iter_ok(encode_event(event, &encoding))));
         let healthcheck = healthcheck(self.path.clone()).boxed().compat();
 
-        Ok((sink, Box::new(healthcheck)))
+        Ok((VectorSink::Futures01Sink(sink), Box::new(healthcheck)))
     }
 }
 
@@ -228,7 +228,12 @@ mod tests {
 
         // Send the test data
         let (input_lines, mut events) = random_lines_with_stream(100, num_lines);
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let _ = sink
+            .as_futures01sink()
+            .sink_compat()
+            .send_all(&mut events)
+            .await
+            .unwrap();
 
         // Wait for output to connect
         receiver.connected().await;

@@ -11,7 +11,7 @@ use crate::{
             BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
             PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
-        Healthcheck, RouterSink,
+        Healthcheck, VectorSink,
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
@@ -151,11 +151,11 @@ inventory::submit! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
-    fn build(&self, _cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         unimplemented!()
     }
 
-    async fn build_async(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    async fn build_async(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = GcsSink::new(self, &cx).await?;
         let healthcheck = sink.clone().healthcheck().boxed().compat();
         let service = sink.service(self, &cx)?;
@@ -202,7 +202,7 @@ impl GcsSink {
         })
     }
 
-    fn service(self, config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<RouterSink> {
+    fn service(self, config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<VectorSink> {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
@@ -227,7 +227,7 @@ impl GcsSink {
             .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
-        Ok(Box::new(sink))
+        Ok(VectorSink::Futures01Sink(Box::new(sink)))
     }
 
     async fn healthcheck(mut self) -> crate::Result<()> {

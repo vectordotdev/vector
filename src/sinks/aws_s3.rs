@@ -141,7 +141,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(cx.resolver())?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed().compat();
         let sink = self.new(client, cx)?;
@@ -168,7 +168,7 @@ enum HealthcheckError {
 }
 
 impl S3SinkConfig {
-    pub fn new(&self, client: S3Client, cx: SinkContext) -> crate::Result<super::RouterSink> {
+    pub fn new(&self, client: S3Client, cx: SinkContext) -> crate::Result<super::VectorSink> {
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = self.encoding.clone();
 
@@ -213,7 +213,7 @@ impl S3SinkConfig {
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
             .sink_map_err(|error| error!("Sink failed to flush: {}", error));
 
-        Ok(Box::new(sink))
+        Ok(super::VectorSink::Futures01Sink(Box::new(sink)))
     }
 
     pub async fn healthcheck(self, client: S3Client) -> crate::Result<()> {

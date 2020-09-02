@@ -1,6 +1,7 @@
 use crate::Event;
 use futures::{compat::Future01CompatExt, TryFutureExt};
 use snafu::Snafu;
+use std::fmt;
 
 pub mod streaming_sink;
 pub mod util;
@@ -96,5 +97,20 @@ impl VectorSink {
         match self {
             Self::Futures01Sink(sink) => input.forward(sink).compat().map_ok(|_| ()).await,
         }
+    }
+
+    pub fn as_futures01sink(
+        self,
+    ) -> Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + 'static + Send> {
+        match self {
+            Self::Futures01Sink(sink) => sink,
+            // _ => panic!("Failed type coercion, {:?} is not a Futures01Sink", self),
+        }
+    }
+}
+
+impl fmt::Debug for VectorSink {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("VectorSink").finish()
     }
 }

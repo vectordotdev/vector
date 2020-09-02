@@ -65,7 +65,7 @@ impl From<UdpSinkConfig> for SocketSinkConfig {
 
 #[typetag::serde(name = "socket")]
 impl SinkConfig for SocketSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         match &self.mode {
             Mode::Tcp(config) => config.build(cx),
             Mode::Udp(config) => config.build(cx),
@@ -116,7 +116,7 @@ mod test {
         let (sink, _healthcheck) = config.build(context).unwrap();
 
         let event = Event::from("raw log line");
-        let _ = sink.send(event).compat().await.unwrap();
+        let _ = sink.as_futures01sink().send(event).compat().await.unwrap();
 
         let mut buf = [0; 256];
         let (size, _src_addr) = receiver
@@ -150,7 +150,12 @@ mod test {
         let mut receiver = CountReceiver::receive_lines(addr);
 
         let (lines, mut events) = random_lines_with_stream(10, 100);
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let _ = sink
+            .as_futures01sink()
+            .sink_compat()
+            .send_all(&mut events)
+            .await
+            .unwrap();
 
         // Wait for output to connect
         receiver.connected().await;
@@ -214,7 +219,7 @@ mod test {
         };
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).unwrap();
-        let mut sink = sink.sink_compat();
+        let mut sink = sink.as_futures01sink().sink_compat();
 
         let msg_counter = Arc::new(AtomicUsize::new(0));
         let msg_counter1 = Arc::clone(&msg_counter);

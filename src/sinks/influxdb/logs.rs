@@ -11,7 +11,7 @@ use crate::{
             http::{BatchedHttpSink, HttpClient, HttpSink},
             BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
         },
-        Healthcheck,
+        Healthcheck, VectorSink,
     },
 };
 use futures01::Sink;
@@ -72,7 +72,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "influxdb_logs")]
 impl SinkConfig for InfluxDBLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         // let mut config = self.clone();
         let mut tags: HashSet<String> = self.tags.clone().into_iter().collect();
         tags.insert(log_schema().host_key().to_string());
@@ -118,7 +118,10 @@ impl SinkConfig for InfluxDBLogsConfig {
         )
         .sink_map_err(|e| error!("Fatal influxdb_logs sink error: {}", e));
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(healthcheck),
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -472,7 +475,9 @@ mod tests {
             events.push(event);
         }
 
-        let pump = sink.send_all(futures01::stream::iter_ok(events));
+        let pump = sink
+            .as_futures01sink()
+            .send_all(futures01::stream::iter_ok(events));
         let _ = pump.compat().await.unwrap();
 
         let output = rx.next().await.unwrap();
@@ -536,7 +541,9 @@ mod tests {
             events.push(event);
         }
 
-        let pump = sink.send_all(futures01::stream::iter_ok(events));
+        let pump = sink
+            .as_futures01sink()
+            .send_all(futures01::stream::iter_ok(events));
         let _ = pump.compat().await.unwrap();
 
         let output = rx.next().await.unwrap();

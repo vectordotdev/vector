@@ -76,7 +76,7 @@ pub(crate) fn skip_serializing_if_default(e: &EncodingConfigWithDefault<Encoding
 
 #[typetag::serde(name = "new_relic_logs")]
 impl SinkConfig for NewRelicLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let http_conf = self.create_config()?;
         http_conf.build(cx)
     }
@@ -290,7 +290,7 @@ mod tests {
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
         let events = stream01::iter_ok(input_lines.clone().into_iter().map(Event::from));
 
-        let pump = sink.send_all(events);
+        let pump = sink.as_futures01sink().send_all(events);
 
         tokio::spawn(server);
 

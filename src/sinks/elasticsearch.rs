@@ -100,7 +100,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
         let client = HttpClient::new(cx.resolver(), common.tls_settings.clone())?;
 
@@ -125,7 +125,10 @@ impl SinkConfig for ElasticSearchConfig {
         )
         .sink_map_err(|e| error!("Fatal elasticsearch sink error: {}", e));
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(healthcheck),
+        ))
     }
 
     fn input_type(&self) -> DataType {

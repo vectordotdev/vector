@@ -164,7 +164,7 @@ impl CloudwatchLogsSinkConfig {
 
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let batch = BatchSettings::default()
             .bytes(1_048_576)
             .events(10_000)
@@ -196,7 +196,10 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 
         let healthcheck = healthcheck(self.clone(), client).boxed().compat();
 
-        Ok((sink, Box::new(healthcheck)))
+        Ok((
+            super::VectorSink::Futures01Sink(sink),
+            Box::new(healthcheck),
+        ))
     }
 
     fn input_type(&self) -> DataType {
