@@ -11,20 +11,9 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Opts {
-    /// Disables topology check
-    #[structopt(long)]
-    no_topology: bool,
-
     /// Disables environment checks. That includes component checks and health checks.
     #[structopt(long)]
     no_environment: bool,
-
-    /// Shorthand for `--no-topology` and `--no-environment` flags. Just `-n` won't disable anything,
-    /// it needs to be used with `t` for `--no-topology`, and or `e` for `--no-environment` in any order.
-    /// Example:
-    /// `-nte` and `-net` both mean `--no-topology` and `--no-environment`
-    #[structopt(short, parse(from_str = NoCheck::from_str), possible_values = &["","t", "e","et","te"], default_value="")]
-    no: NoCheck,
 
     /// Fail validation on warnings
     #[structopt(short, long)]
@@ -33,21 +22,6 @@ pub struct Opts {
     /// Any number of Vector config files to validate. If none are specified the
     /// default config path `/etc/vector/vector.toml` will be targeted.
     paths: Vec<PathBuf>,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct NoCheck {
-    topology: bool,
-    environment: bool,
-}
-
-impl NoCheck {
-    fn from_str(s: &str) -> Self {
-        Self {
-            topology: s.find('t').is_some(),
-            environment: s.find('e').is_some(),
-        }
-    }
 }
 
 /// Performs topology, component, and health checks.
@@ -61,7 +35,7 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
         None => return exitcode::CONFIG,
     };
 
-    if !(opts.no_environment || opts.no.environment) {
+    if !opts.no_environment {
         validated &= validate_environment(&config, &mut fmt).await;
     }
 
