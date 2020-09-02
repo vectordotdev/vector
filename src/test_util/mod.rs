@@ -255,6 +255,19 @@ where
     rx.take(n).collect().await
 }
 
+pub async fn collect_n_stream<T, S: Stream<Item = T> + Unpin>(
+    stream: &mut S,
+    n: usize,
+) -> Vec<T> {
+    let mut events = Vec::new();
+
+    while events.len() < n {
+        let e = stream.next().await.unwrap();
+        events.push(e);
+    }
+    mem::replace(&mut events, Vec::new())
+}
+
 pub async fn collect_ready<S>(mut rx: S) -> Vec<S::Item>
 where
     S: Stream + Unpin,

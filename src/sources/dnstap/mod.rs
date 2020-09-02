@@ -2,11 +2,11 @@ use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
     event::{self, Event},
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     Result,
+    Pipeline,
 };
 use bytes::Bytes;
-use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -72,12 +72,12 @@ impl SourceConfig for DnstapConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> Result<super::Source> {
         let host_key = self
             .host_key
             .clone()
-            .unwrap_or(event::log_schema().host_key().to_string());
+            .unwrap_or_else(||event::log_schema().host_key().to_string());
 
         let frame_handler = DnstapFrameHandler::new(
             self.max_length,

@@ -1,12 +1,20 @@
 use crate::{
     event::Event,
-    internal_events::{UnixSocketError, UnixSocketEventReceived},
+    internal_events::{SocketEventReceived, SocketMode, UnixSocketError},
     shutdown::ShutdownSignal,
     sources::Source,
-    stream::StreamExt,
+    Pipeline,
 };
-use bytes::Bytes;
-use futures01::{future, sync::mpsc::Sender, Future, Sink, Stream};
+use bytes::{Buf, Bytes, BytesMut};
+use futures::{
+    compat::{Future01CompatExt, Sink01CompatExt},
+    executor::block_on,
+    future,
+    sink::{Sink, SinkExt},
+    stream::{self, StreamExt, TryStreamExt},
+    FutureExt, TryFutureExt,
+};
+use futures01::Sink as Sink01;
 use std::convert::TryInto;
 use std::fs;
 use std::marker::{Send, Sync};
@@ -14,28 +22,23 @@ use std::{
     path::PathBuf,
     sync::{
         atomic::{AtomicI32, Ordering},
-        Arc,
+        Arc, Mutex,
     },
     thread,
     time::Duration,
 };
-use tokio01::{
-    self,
-    codec::{length_delimited, Framed},
-    executor::Spawn,
-    sync::lock::Lock,
-};
-use tokio_uds::UnixListener;
+use tokio::{self, net::UnixListener, task::JoinHandle};
+use tokio_util::codec::{length_delimited, Framed};
 use tracing::field;
 use tracing_futures::Instrument;
 
 const FSTRM_CONTROL_FRAME_LENGTH_MAX: usize = 512;
 const FSTRM_CONTROL_FIELD_CONTENT_TYPE_LENGTH_MAX: usize = 256;
 
-pub type FrameStreamSink = Box<dyn Sink<SinkItem = Bytes, SinkError = std::io::Error> + Send>;
+pub type FrameStreamSink = Box<dyn Sink<Bytes, Error = std::io::Error> + Send + Unpin>;
 
 struct FrameStreamReader {
-    response_sink: Lock<Option<FrameStreamSink>>,
+    response_sink: Mutex<FrameStreamSink>,
     expected_content_type: String,
     state: FrameStreamState,
 }
@@ -132,7 +135,7 @@ fn advance_u32(b: &mut Bytes) -> Result<u32, ()> {
 impl FrameStreamReader {
     pub fn new(response_sink: FrameStreamSink, expected_content_type: String) -> Self {
         FrameStreamReader {
-            response_sink: Lock::new(Some(response_sink)),
+            response_sink: Mutex::new(response_sink),
             expected_content_type,
             state: FrameStreamState::new(),
         }
@@ -150,8 +153,9 @@ impl FrameStreamReader {
         } else {
             //data frame
             if self.state.control_state == ControlState::ReadingData {
-                emit!(UnixSocketEventReceived {
-                    byte_size: frame.len()
+                emit!(SocketEventReceived {
+                    byte_size: frame.len(),
+                    mode: SocketMode::Unix,
                 });
                 Some(frame) //return data frame
             } else {
@@ -316,35 +320,23 @@ impl FrameStreamReader {
     }
 
     fn make_frame(header: ControlHeader, content_type: Option<String>) -> Bytes {
-        let mut frame = Bytes::new();
+        let mut frame = BytesMut::new();
         frame.extend(&header.to_u32().to_be_bytes());
         if let Some(s) = content_type {
             frame.extend(&ControlField::ContentType.to_u32().to_be_bytes()); //field type: ContentType
             frame.extend(&(s.len() as u32).to_be_bytes()); //length of type
             frame.extend(s.as_bytes());
         }
-        frame
+        Bytes::from(frame)
     }
 
     fn send_control_frame(&mut self, frame: Bytes) {
         let empty_frame = Bytes::from(&b""[..]); //send empty frame to say we are control frame
-        let stream =
-            futures01::stream::iter_ok::<_, std::io::Error>(vec![empty_frame, frame].into_iter());
+        let mut stream = stream::iter(vec![Ok(empty_frame), Ok(frame)].into_iter());
 
-        self.response_sink.poll_lock().map(|mut sink| {
-            //send and send_all consume the sink so need to use Option so we can .take()
-            //get the sink back as first element of tuple
-            let handler = sink
-                .take()
-                .unwrap()
-                .send_all(stream)
-                .and_then(move |(same_sink, _stream)| {
-                    *sink = Some(same_sink);
-                    futures01::done(Ok(()))
-                })
-                .map_err(|_e| ());
-            tokio01::spawn(handler);
-        });
+        if let Err(e) = block_on(self.response_sink.lock().unwrap().send_all(&mut stream)) {
+            error!("Encountered error '{:#?}' while sending control frame", e);
+        }
     }
 }
 
@@ -363,10 +355,11 @@ pub trait FrameHandler {
  * Functions similarly, but uses the FrameStreamReader to deal with
  * framestream control packets, and responds appropriately.
  **/
-pub fn build_framestream_unix_source(
+pub fn 
+build_framestream_unix_source(
     frame_handler: impl FrameHandler + Send + Sync + Clone + 'static,
     shutdown: ShutdownSignal,
-    out: Sender<Event>,
+    out: Pipeline,
 ) -> Source {
     let path = frame_handler.socket_path();
 
@@ -383,124 +376,147 @@ pub fn build_framestream_unix_source(
         Err(e) => error!("failed to bind to listener socket; error = {:?}", e),
     };
 
-    Box::new(future::lazy(move || {
-        let listener = UnixListener::bind(&path).expect("failed to bind to listener socket");
+    let fut = async move {
+        let mut listener = UnixListener::bind(&path).expect("failed to bind to listener socket");
         let parsing_task_counter = Arc::new(AtomicI32::new(0));
 
-        info!(message = "listening.", ?path, r#type = "unix");
+        info!(message = "listening...", ?path, r#type = "unix");
 
-        listener
-            .incoming()
-            .take_until(shutdown.clone())
-            .map_err(|e| error!("failed to accept socket; error = {:?}", e))
-            .for_each(move |socket| {
-                let peer_addr = socket.peer_addr().ok();
-                let content_type = frame_handler.content_type();
-                let listen_path = path.clone();
-                let event_sink = out.clone();
-                let task_counter = parsing_task_counter.clone();
+        let mut stream = listener.incoming().take_until(shutdown.clone().compat());
+        while let Some(socket) = stream.next().await {
+            let socket = match socket {
+                Err(e) => {
+                    error!("failed to accept socket; error = {:?}", e);
+                    continue;
+                }
+                Ok(s) => s,
+            };
+            let peer_addr = socket.peer_addr().ok();
+            let content_type = frame_handler.content_type();
+            let listen_path = path.clone();
+            let event_sink = out.clone();
+            let task_counter = Arc::clone(&parsing_task_counter);
 
-                let span = info_span!("connection");
-                let path = if let Some(addr) = peer_addr {
-                    if let Some(path) = addr.as_pathname().map(|e| e.to_owned()) {
-                        span.record("peer_path", &field::debug(&path));
-                        Some(path)
-                    } else {
-                        None
-                    }
+            let span = info_span!("connection");
+            let path = if let Some(addr) = peer_addr {
+                if let Some(path) = addr.as_pathname().map(|e| e.to_owned()) {
+                    span.record("peer_path", &field::debug(&path));
+                    Some(path)
                 } else {
                     None
+                }
+            } else {
+                None
+            };
+            let received_from: Option<Bytes> =
+                path.map(|p| p.to_string_lossy().into_owned().into());
+
+            let (sock_sink, sock_stream) = Framed::new(
+                socket,
+                length_delimited::Builder::new()
+                    .max_frame_length(frame_handler.max_length())
+                    .new_codec(),
+            )
+            .split();
+            let mut fs_reader = FrameStreamReader::new(Box::new(sock_sink), content_type);
+            let frame_handler_copy = frame_handler.clone();
+            let frames = sock_stream
+                .take_until(shutdown.clone().compat())
+                .map_err(move |error| {
+                    emit!(UnixSocketError {
+                        error,
+                        path: &listen_path,
+                    });
+                })
+                .filter_map(move |frame| {
+                    future::ready(match frame {
+                        Ok(f) => fs_reader.handle_frame(Bytes::from(f)),
+                        Err(_) => None,
+                    })
+                });
+            if !frame_handler.multithreaded() {
+                let mut events = frames.filter_map(move |f| {
+                    future::ready(
+                        frame_handler_copy
+                            .handle_event(received_from.clone(), f)
+                            .map(Ok),
+                    )
+                });
+
+                let handler = async move {
+                    let _ = event_sink.sink_compat().send_all(&mut events).await;
+                    info!("finished sending");
+
+                    //TODO: shutdown
+                    // let splitstream = events.get_ref().get_ref();
+                    // let _ = socket.shutdown(std::net::Shutdown::Both);
                 };
-                let received_from: Option<Bytes> =
-                    path.map(|p| p.to_string_lossy().into_owned().into());
-
-                let (sock_sink, sock_stream) = Framed::new(
-                    socket,
-                    length_delimited::Builder::new()
-                        .max_frame_length(frame_handler.max_length())
-                        .new_codec(),
-                )
-                .split();
-                let mut fs_reader = FrameStreamReader::new(Box::new(sock_sink), content_type);
-                let frame_handler_copy = frame_handler.clone();
-                let frames = sock_stream
-                    .take_until(shutdown.clone())
-                    .filter_map(move |frame| fs_reader.handle_frame(Bytes::from(frame)));
-                if !frame_handler.multithreaded() {
-                    let events = frames
-                        .filter_map(move |f| {
-                            frame_handler_copy.handle_event(received_from.clone(), f)
-                        })
-                        .map_err(move |error| {
-                            emit!(UnixSocketError {
-                                error,
-                                path: &listen_path,
-                            });
-                        });
-
-                    let handler = events
-                        .forward(event_sink)
-                        .map(|_| info!("finished sending"));
-                    tokio01::spawn(handler.instrument(span))
-                } else {
-                    let handler = frames
+                tokio::spawn(handler.instrument(span));
+            } else {
+                let handler = async move {
+                    frames
                         .for_each(move |f| {
-                            let max_frame_handling_tasks =
-                                frame_handler_copy.max_frame_handling_tasks();
-                            let f_handler = frame_handler_copy.clone();
-                            let received_from_copy = received_from.clone();
-                            let mut event_sink_copy = event_sink.clone();
-                            let task_counter_copy = task_counter.clone();
+                            future::ready({
+                                let max_frame_handling_tasks =
+                                    frame_handler_copy.max_frame_handling_tasks();
+                                let f_handler = frame_handler_copy.clone();
+                                let received_from_copy = received_from.clone();
+                                let event_sink_copy = event_sink.clone();
+                                let task_counter_copy = Arc::clone(&task_counter);
 
-                            let event_handler = move || {
-                                if let Some(e) = f_handler.handle_event(received_from_copy, f) {
-                                    if let Err(e) = event_sink_copy.get_mut().try_send(e) {
-                                        error!("{:#?}", e);
+                                let event_handler = move || {
+                                    if let Some(evt) = f_handler.handle_event(received_from_copy, f)
+                                    {
+                                        if let Err(err) = event_sink_copy.wait().send(evt) {
+                                            error!(
+                                                "Encountered error '{:#?}' while sending event",
+                                                err
+                                            );
+                                        }
                                     }
                                 };
-                            };
 
-                            spawn_event_handling_tasks(
-                                event_handler,
-                                task_counter_copy,
-                                max_frame_handling_tasks,
-                            );
-                            Ok(())
+                                spawn_event_handling_tasks(
+                                    event_handler,
+                                    task_counter_copy,
+                                    max_frame_handling_tasks,
+                                );
+                            })
                         })
-                        .map_err(move |error| {
-                            emit!(UnixSocketError {
-                                error,
-                                path: &listen_path,
-                            });
-                        })
-                        .map(|_| info!("finished sending"));
-                    tokio01::spawn(handler)
-                }
-            })
-    }))
+                        .await;
+                    info!("finished sending");
+                };
+                tokio::spawn(handler.instrument(span));
+            }
+        }
+        Ok(())
+    };
+
+    Box::new(fut.boxed().compat())
 }
 
 fn spawn_event_handling_tasks<F>(
     event_handler: F,
     task_counter: Arc<AtomicI32>,
     max_frame_handling_tasks: i32,
-) -> Spawn
+) -> JoinHandle<()>
 where
     F: Send + Sync + Clone + FnOnce() -> () + 'static,
 {
     wait_for_task_quota(&task_counter, max_frame_handling_tasks);
 
-    tokio01::spawn(future::lazy(move || {
-        event_handler();
-        task_counter.fetch_sub(1, Ordering::Relaxed);
-        Ok(())
-    }))
+    tokio::spawn(async move {
+        future::ready({
+            event_handler();
+            task_counter.fetch_sub(1, Ordering::Relaxed);
+        })
+        .await;
+    })
 }
 
 fn wait_for_task_quota(task_counter: &Arc<AtomicI32>, max_tasks: i32) {
-    let waiting_time = Duration::from_millis(10);
     while max_tasks > 0 && max_tasks < task_counter.load(Ordering::Relaxed) {
-        thread::sleep(waiting_time);
+        thread::sleep(Duration::from_millis(3));
     }
     task_counter.fetch_add(1, Ordering::Relaxed);
 }
@@ -514,11 +530,17 @@ mod test {
     use crate::test_util::{collect_n, collect_n_stream};
     use crate::{
         event::{self, Event},
-        runtime,
-        shutdown::ShutdownSignal,
+        shutdown::SourceShutdownCoordinator,
+        Pipeline,
     };
-    use bytes::{Bytes, BytesMut};
-    use futures01::{sync::mpsc, Future, IntoFuture, Sink, Stream};
+    use bytes::{buf::Buf, Bytes, BytesMut};
+    use futures::{
+        compat::Future01CompatExt,
+        future,
+        sink::{Sink, SinkExt},
+        stream::{self, StreamExt},
+    };
+    use futures01::sync::mpsc;
     #[cfg(unix)]
     use std::{
         path::PathBuf,
@@ -527,13 +549,14 @@ mod test {
             Arc, Mutex,
         },
         thread,
-        time::Duration,
     };
-    use tokio01::{
+    use tokio::{
         self,
-        codec::{length_delimited, Framed},
+        net::UnixStream,
+        task::JoinHandle,
+        time::{Duration, Instant},
     };
-    use tokio_uds::UnixStream;
+    use tokio_util::codec::{length_delimited, Framed};
 
     #[derive(Clone)]
     struct MockFrameHandler {
@@ -592,62 +615,74 @@ mod test {
     }
 
     fn init_framstream_unix(
+        source_name: &str,
         frame_handler: MockFrameHandler,
         sender: mpsc::Sender<event::Event>,
-    ) -> (PathBuf, runtime::Runtime) {
+    ) -> (
+        PathBuf,
+        JoinHandle<Result<(), ()>>,
+        SourceShutdownCoordinator,
+    ) {
         let socket_path = frame_handler.socket_path();
-        let server = build_framestream_unix_source(frame_handler, ShutdownSignal::noop(), sender);
+        let mut shutdown = SourceShutdownCoordinator::default();
+        let (shutdown_signal, _) = shutdown.register_source(source_name);
+        let server = build_framestream_unix_source(
+            frame_handler,
+            shutdown_signal,
+            Pipeline::from_sender(sender),
+        )
+        .compat();
 
-        let mut rt = runtime::Runtime::new().unwrap();
-        rt.spawn(server);
+        // let mut rt = runtime::Runtime::new().unwrap();
+        // rt.spawn(server);
+        let join_handle = tokio::spawn(server);
 
         // Wait for server to accept traffic
-        while let Err(_) = std::os::unix::net::UnixStream::connect(&socket_path) {}
+        while let Err(_) = std::os::unix::net::UnixStream::connect(&socket_path) {
+            thread::sleep(Duration::from_millis(2));
+        }
 
-        (socket_path, rt)
+        (socket_path, join_handle, shutdown)
     }
 
-    fn make_unix_stream(
+    async fn make_unix_stream(
         path: PathBuf,
     ) -> Framed<UnixStream, length_delimited::LengthDelimitedCodec> {
-        let socket = UnixStream::connect(&path)
-            .map_err(|e| panic!("{:}", e))
-            .wait()
-            .unwrap();
+        let socket = UnixStream::connect(&path).await.unwrap();
         Framed::new(socket, length_delimited::Builder::new().new_codec())
     }
 
-    fn send_data_frames<S: Sink<SinkItem = Bytes, SinkError = std::io::Error>>(
-        sock_sink: S,
-        frames: Vec<Bytes>,
-    ) -> S {
-        let stream = futures01::stream::iter_ok::<_, std::io::Error>(frames.into_iter());
+    async fn send_data_frames<S: Sink<Bytes, Error = std::io::Error> + Unpin>(
+        sock_sink: &mut S,
+        frames: Vec<Result<Bytes, std::io::Error>>,
+    ) {
+        let mut stream = stream::iter(frames.into_iter());
         //send and send_all consume the sink
-        sock_sink.send_all(stream).into_future().wait().unwrap().0
+        let _ = sock_sink.send_all(&mut stream).await;
     }
 
-    fn send_control_frame<S: Sink<SinkItem = Bytes, SinkError = std::io::Error>>(
-        sock_sink: S,
+    async fn send_control_frame<S: Sink<Bytes, Error = std::io::Error> + Unpin>(
+        sock_sink: &mut S,
         frame: Bytes,
-    ) -> S {
-        send_data_frames(sock_sink, vec![Bytes::new(), frame]) //send empty frame to say we are control frame
+    ) {
+        send_data_frames(sock_sink, vec![Ok(Bytes::new()), Ok(frame)]).await; //send empty frame to say we are control frame
     }
 
     fn create_control_frame(header: ControlHeader) -> Bytes {
-        Bytes::from(&header.to_u32().to_be_bytes()[..])
+        Bytes::from(header.to_u32().to_be_bytes().to_vec())
     }
 
     fn create_control_frame_with_content(
         header: ControlHeader,
         content_types: Vec<Bytes>,
     ) -> Bytes {
-        let mut frame = create_control_frame(header);
+        let mut frame = BytesMut::from(&header.to_u32().to_be_bytes()[..]);
         for content_type in content_types {
             frame.extend(&ControlField::ContentType.to_u32().to_be_bytes());
             frame.extend(&(content_type.len() as u32).to_be_bytes());
             frame.extend(content_type.clone());
         }
-        frame
+        Bytes::from(frame)
     }
 
     fn assert_accept_frame(frame: &mut BytesMut, expected_content_type: Bytes) {
@@ -671,39 +706,50 @@ mod test {
         assert_eq!(&frame[..], &expected_content_type[..]);
     }
 
-    #[test]
-    fn normal_framestream() {
+    async fn signal_shutdown(source_name: &str, shutdown: &mut SourceShutdownCoordinator) {
+        // Now signal to the Source to shut down.
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let shutdown_complete = shutdown.shutdown_source(source_name, deadline);
+        let shutdown_success = shutdown_complete.compat().await.unwrap();
+        assert_eq!(true, shutdown_success);
+    }
+
+    #[tokio::test(threaded_scheduler)]
+    async fn normal_framestream() {
+        let source_name = "test_source";
         let (tx, rx) = mpsc::channel(2);
-        let (path, mut rt) =
-            init_framstream_unix(MockFrameHandler::new("test_content".to_string()), tx);
-        let (mut sock_sink, mut sock_stream) = make_unix_stream(path).split();
+        let (path, source_handle, mut shutdown) = init_framstream_unix(
+            source_name,
+            MockFrameHandler::new("test_content".to_string()),
+            tx,
+        );
+        let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
 
         //1 - send READY frame (with content_type)
         let content_type = Bytes::from(&b"test_content"[..]);
         let ready_msg =
             create_control_frame_with_content(ControlHeader::Ready, vec![content_type.clone()]);
-        sock_sink = send_control_frame(sock_sink, ready_msg);
+        send_control_frame(&mut sock_sink, ready_msg).await;
 
         //2 - wait for ACCEPT frame
-        let (mut frame_vec, tmp_stream) =
-            rt.block_on(collect_n_stream(sock_stream, 2)).ok().unwrap();
-        sock_stream = tmp_stream;
+        let mut frame_vec = collect_n_stream(&mut sock_stream, 2).await;
         //take second element, because first will be empty (signifying control frame)
-        assert_eq!(frame_vec[0].len(), 0);
-        assert_accept_frame(&mut frame_vec[1], content_type);
+        assert_eq!(frame_vec[0].as_ref().unwrap().len(), 0);
+        assert_accept_frame(frame_vec[1].as_mut().unwrap(), content_type);
 
         //3 - send START frame
-        sock_sink = send_control_frame(sock_sink, create_control_frame(ControlHeader::Start));
+        send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Start)).await;
 
         //4 - send data
-        sock_sink = send_data_frames(
-            sock_sink,
-            vec![Bytes::from(&"hello"[..]), Bytes::from(&"world"[..])],
-        );
-        let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
+        send_data_frames(
+            &mut sock_sink,
+            vec![Ok(Bytes::from(&"hello"[..])), Ok(Bytes::from(&"world"[..]))],
+        )
+        .await;
+        let events = collect_n(rx, 2).await.unwrap();
 
         //5 - send STOP frame
-        let _ = send_control_frame(sock_sink, create_control_frame(ControlHeader::Stop));
+        send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Stop)).await;
 
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],
@@ -715,14 +761,22 @@ mod test {
         );
 
         std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+
+        // Ensure source actually shut down successfully.
+        signal_shutdown(source_name, &mut shutdown).await;
+        let _ = source_handle.await.unwrap();
     }
 
-    #[test]
-    fn multiple_content_types() {
+    #[tokio::test(threaded_scheduler)]
+    async fn multiple_content_types() {
+        let source_name = "test_source";
         let (tx, _) = mpsc::channel(2);
-        let (path, mut rt) =
-            init_framstream_unix(MockFrameHandler::new("test_content".to_string()), tx);
-        let (sock_sink, mut sock_stream) = make_unix_stream(path).split();
+        let (path, source_handle, mut shutdown) = init_framstream_unix(
+            source_name,
+            MockFrameHandler::new("test_content".to_string()),
+            tx,
+        );
+        let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
 
         //1 - send READY frame (with content_type)
         let content_type = Bytes::from(&b"test_content"[..]);
@@ -730,92 +784,104 @@ mod test {
             ControlHeader::Ready,
             vec![Bytes::from(&b"test_content2"[..]), content_type.clone()],
         ); //can have multiple content types
-        let _ = send_control_frame(sock_sink, ready_msg);
+        send_control_frame(&mut sock_sink, ready_msg).await;
 
         //2 - wait for ACCEPT frame
-        let (mut frame_vec, tmp_stream) =
-            rt.block_on(collect_n_stream(sock_stream, 2)).ok().unwrap();
-        sock_stream = tmp_stream;
+        let mut frame_vec = collect_n_stream(&mut sock_stream, 2).await;
 
         //take second element, because first will be empty (signifying control frame)
-        assert_eq!(frame_vec[0].len(), 0);
-        assert_accept_frame(&mut frame_vec[1], content_type);
+        assert_eq!(frame_vec[0].as_ref().unwrap().len(), 0);
+        assert_accept_frame(frame_vec[1].as_mut().unwrap(), content_type);
 
         std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+
+        // Ensure source actually shut down successfully.
+        signal_shutdown(source_name, &mut shutdown).await;
+        let _ = source_handle.await.unwrap();
     }
 
-    #[test]
-    fn wrong_content_type() {
+    #[tokio::test(threaded_scheduler)]
+    async fn wrong_content_type() {
+        let source_name = "test_source";
         let (tx, _) = mpsc::channel(2);
-        let (path, mut rt) =
-            init_framstream_unix(MockFrameHandler::new("test_content".to_string()), tx);
-        let (mut sock_sink, mut sock_stream) = make_unix_stream(path).split();
+        let (path, source_handle, mut shutdown) = init_framstream_unix(
+            source_name,
+            MockFrameHandler::new("test_content".to_string()),
+            tx,
+        );
+        let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
 
         //1 - send READY frame (with WRONG content_type)
         let ready_msg = create_control_frame_with_content(
             ControlHeader::Ready,
             vec![Bytes::from(&b"test_content2"[..])],
         ); //can have multiple content types
-        sock_sink = send_control_frame(sock_sink, ready_msg);
+        send_control_frame(&mut sock_sink, ready_msg).await;
 
         //2 - send READY frame (with RIGHT content_type)
         let content_type = Bytes::from(&b"test_content"[..]);
         let ready_msg =
             create_control_frame_with_content(ControlHeader::Ready, vec![content_type.clone()]);
-        let _ = send_control_frame(sock_sink, ready_msg);
+        send_control_frame(&mut sock_sink, ready_msg).await;
 
         //3 - wait for ACCEPT frame
-        let (mut frame_vec, tmp_stream) =
-            rt.block_on(collect_n_stream(sock_stream, 2)).ok().unwrap();
-        sock_stream = tmp_stream;
+        let mut frame_vec = collect_n_stream(&mut sock_stream, 2).await;
 
         //take second element, because first will be empty (signifying control frame)
-        assert_eq!(frame_vec[0].len(), 0);
-        assert_accept_frame(&mut frame_vec[1], content_type);
+        assert_eq!(frame_vec[0].as_ref().unwrap().len(), 0);
+        assert_accept_frame(frame_vec[1].as_mut().unwrap(), content_type);
 
         std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+
+        // Ensure source actually shut down successfully.
+        signal_shutdown(source_name, &mut shutdown).await;
+        let _ = source_handle.await.unwrap();
     }
 
-    #[test]
-    fn data_too_soon() {
+    #[tokio::test(threaded_scheduler)]
+    async fn data_too_soon() {
+        let source_name = "test_source";
         let (tx, rx) = mpsc::channel(2);
-        let (path, mut rt) =
-            init_framstream_unix(MockFrameHandler::new("test_content".to_string()), tx);
-        let (mut sock_sink, mut sock_stream) = make_unix_stream(path).split();
+        let (path, source_handle, mut shutdown) = init_framstream_unix(
+            source_name,
+            MockFrameHandler::new("test_content".to_string()),
+            tx,
+        );
+        let (mut sock_sink, mut sock_stream) = make_unix_stream(path).await.split();
 
         //1 - send data frame (too soon!)
-        sock_sink = send_data_frames(
-            sock_sink,
-            vec![Bytes::from(&"bad"[..]), Bytes::from(&"data"[..])],
-        );
+        send_data_frames(
+            &mut sock_sink,
+            vec![Ok(Bytes::from(&"bad"[..])), Ok(Bytes::from(&"data"[..]))],
+        )
+        .await;
 
         //2 - send READY frame (with content_type)
         let content_type = Bytes::from(&b"test_content"[..]);
         let ready_msg =
             create_control_frame_with_content(ControlHeader::Ready, vec![content_type.clone()]);
-        sock_sink = send_control_frame(sock_sink, ready_msg);
+        send_control_frame(&mut sock_sink, ready_msg).await;
 
         //3 - wait for ACCEPT frame
-        let (mut frame_vec, tmp_stream) =
-            rt.block_on(collect_n_stream(sock_stream, 2)).ok().unwrap();
-        sock_stream = tmp_stream;
+        let mut frame_vec = collect_n_stream(&mut sock_stream, 2).await;
 
         //take second element, because first will be empty (signifying control frame)
-        assert_eq!(frame_vec[0].len(), 0);
-        assert_accept_frame(&mut frame_vec[1], content_type);
+        assert_eq!(frame_vec[0].as_ref().unwrap().len(), 0);
+        assert_accept_frame(frame_vec[1].as_mut().unwrap(), content_type);
 
         //4 - send START frame
-        sock_sink = send_control_frame(sock_sink, create_control_frame(ControlHeader::Start));
+        send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Start)).await;
 
         //5 - send data (will go through)
-        sock_sink = send_data_frames(
-            sock_sink,
-            vec![Bytes::from(&"hello"[..]), Bytes::from(&"world"[..])],
-        );
-        let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
+        send_data_frames(
+            &mut sock_sink,
+            vec![Ok(Bytes::from(&"hello"[..])), Ok(Bytes::from(&"world"[..]))],
+        )
+        .await;
+        let events = collect_n(rx, 2).await.unwrap();
 
         //6 - send STOP frame
-        let _ = send_control_frame(sock_sink, create_control_frame(ControlHeader::Stop));
+        send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Stop)).await;
 
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],
@@ -827,29 +893,38 @@ mod test {
         );
 
         std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+
+        // Ensure source actually shut down successfully.
+        signal_shutdown(source_name, &mut shutdown).await;
+        let _ = source_handle.await.unwrap();
     }
 
-    #[test]
-    fn unidirectional_framestream() {
+    #[tokio::test(threaded_scheduler)]
+    async fn unidirectional_framestream() {
+        let source_name = "test_source";
         let (tx, rx) = mpsc::channel(2);
-        let (path, mut rt) =
-            init_framstream_unix(MockFrameHandler::new("test_content".to_string()), tx);
-        let (mut sock_sink, _) = make_unix_stream(path).split();
+        let (path, source_handle, mut shutdown) = init_framstream_unix(
+            source_name,
+            MockFrameHandler::new("test_content".to_string()),
+            tx,
+        );
+        let (mut sock_sink, _) = make_unix_stream(path).await.split();
 
         //1 - send START frame (with content_type)
         let content_type = Bytes::from(&b"test_content"[..]);
         let start_msg = create_control_frame_with_content(ControlHeader::Start, vec![content_type]);
-        sock_sink = send_control_frame(sock_sink, start_msg);
+        send_control_frame(&mut sock_sink, start_msg).await;
 
         //4 - send data
-        sock_sink = send_data_frames(
-            sock_sink,
-            vec![Bytes::from(&"hello"[..]), Bytes::from(&"world"[..])],
-        );
-        let events = rt.block_on(collect_n(rx, 2)).ok().unwrap();
+        send_data_frames(
+            &mut sock_sink,
+            vec![Ok(Bytes::from(&"hello"[..])), Ok(Bytes::from(&"world"[..]))],
+        )
+        .await;
+        let events = collect_n(rx, 2).await.unwrap();
 
         //5 - send STOP frame
-        let _ = send_control_frame(sock_sink, create_control_frame(ControlHeader::Stop));
+        send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Stop)).await;
 
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],
@@ -861,35 +936,39 @@ mod test {
         );
 
         // std::mem::drop(sock_stream); //explicitly drop the stream so we don't get warnings about not using it
+
+        // Ensure source actually shut down successfully.
+        signal_shutdown(source_name, &mut shutdown).await;
+        let _ = source_handle.await.unwrap();
     }
 
-    #[test]
-    fn test_spawn_event_handling_tasks() {
+    #[tokio::test(threaded_scheduler)]
+    async fn test_spawn_event_handling_tasks() {
         let max_frame_handling_tasks = 100;
         let task_counter = Arc::new(AtomicI32::new(0));
         let task_counter_copy = task_counter.clone();
         let max_task_counter_value = Arc::new(Mutex::new(0));
         let max_task_counter_value_copy = max_task_counter_value.clone();
-        tokio01::run(futures01::lazy(move || {
-            let mut handles = vec![];
-            let task_counter_copy_2 = task_counter_copy.clone();
-            let mock_event_handler = move || {
-                let current_task_counter = task_counter_copy_2.load(Ordering::Relaxed);
-                thread::sleep(Duration::from_millis(10));
-                let mut max = max_task_counter_value_copy.lock().unwrap(); // Also to simulate writing to a single sink
-                if *max < current_task_counter {
-                    *max = current_task_counter
-                };
+
+        let mut handles = vec![];
+        let task_counter_copy_2 = task_counter_copy.clone();
+        let mock_event_handler = move || {
+            info!("{}", "mock event handler");
+            let current_task_counter = task_counter_copy_2.load(Ordering::Relaxed);
+            thread::sleep(Duration::from_millis(10));
+            let mut max = max_task_counter_value_copy.lock().unwrap(); // Also to simulate writing to a single sink
+            if *max < current_task_counter {
+                *max = current_task_counter
             };
-            for _ in 0..max_frame_handling_tasks * 10 {
-                handles.push(spawn_event_handling_tasks(
-                    mock_event_handler.clone(),
-                    task_counter_copy.clone(),
-                    max_frame_handling_tasks,
-                ));
-            }
-            Ok(())
-        }));
+        };
+        for _ in 0..max_frame_handling_tasks * 10 {
+            handles.push(spawn_event_handling_tasks(
+                mock_event_handler.clone(),
+                task_counter_copy.clone(),
+                max_frame_handling_tasks,
+            ));
+        }
+        future::join_all(handles).await;
 
         let final_task_counter = task_counter.load(Ordering::Relaxed);
         assert_eq!(

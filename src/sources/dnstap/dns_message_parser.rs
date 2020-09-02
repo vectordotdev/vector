@@ -663,7 +663,7 @@ impl DnsMessageParser {
             },
 
             _ => match rdata.anything() {
-                Some(raw_rdata) => Ok((None, Some(raw_rdata.clone()))),
+                Some(raw_rdata) => Ok((None, Some(raw_rdata.to_vec()))),
                 None => Err(DnsMessageParserError::SimpleError {
                     cause: String::from("Empty rdata"),
                 }),
@@ -772,9 +772,9 @@ fn format_rdata(rdata: &RData) -> Result<(Option<String>, Option<Vec<u8>>), DnsM
         RData::TLSA(tlsa) => {
             let tlsa_rdata = format!(
                 "{} {} {} {}",
-                u8::from(*tlsa.cert_usage()),
-                u8::from(*tlsa.selector()),
-                u8::from(*tlsa.matching()),
+                u8::from(tlsa.cert_usage()),
+                u8::from(tlsa.selector()),
+                u8::from(tlsa.matching()),
                 HEXUPPER.encode(&tlsa.cert_data())
             );
             Ok((Some(tlsa_rdata), None))
@@ -817,7 +817,7 @@ fn format_rdata(rdata: &RData) -> Result<(Option<String>, Option<Vec<u8>>), DnsM
                 let ds_rdata = format!(
                     "{} {} {} {}",
                     ds.key_tag(),
-                    u8::from(*ds.algorithm()),
+                    u8::from(ds.algorithm()),
                     u8::from(ds.digest_type()),
                     HEXUPPER.encode(ds.digest())
                 );
@@ -899,7 +899,7 @@ fn format_rdata(rdata: &RData) -> Result<(Option<String>, Option<Vec<u8>>), DnsM
                 Ok((Some(sig_rdata), None))
             }
             DNSSECRData::Unknown { code, rdata } => match rdata.anything() {
-                Some(raw_rdata) => Ok((None, Some(raw_rdata.clone()))),
+                Some(raw_rdata) => Ok((None, Some(raw_rdata.to_vec()))),
                 None => Err(DnsMessageParserError::SimpleError {
                     cause: format!("Empty rdata with rcode {}", code),
                 }),

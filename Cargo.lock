@@ -1572,23 +1572,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "data-encoding"
-version = "2.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72aa14c04dfae8dd7d8a2b1cb7ca2152618cd01336dbfe704b8dcbf8d41dbd69"
-
-[[package]]
-name = "data-encoding-macro"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1995a2e32b5306e4f49cf55ffcf4365a4dab2c7ca3a97163a4f099ec2fee3453"
-dependencies = [
- "data-encoding",
- "data-encoding-macro-internal",
- "proc-macro-hack",
-]
-
-[[package]]
 name = "ctor"
 version = "0.1.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5521,9 +5504,9 @@ version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "54c0fb387dcbe19412ee9e7ddcca2aa31bedcc62e7f9faef6db431da5fadb883"
 dependencies = [
- "proc-macro2 1.0.8",
+ "proc-macro2 1.0.18",
  "quote 1.0.2",
- "syn 1.0.14",
+ "syn 1.0.33",
 ]
 
 [[package]]
@@ -7970,6 +7953,7 @@ dependencies = [
  "tracing-tower",
  "tui",
  "twox-hash",
+ "trust-dns-proto",
  "typetag",
  "url",
  "uuid 0.8.2",
