@@ -444,7 +444,7 @@ services:
       [
         "sh",
         "-c",
-        "./bin/splunk remove index custom_index; ./bin/splunk set minfreemb 5 && ./entrypoint.sh",
+        "./bin/splunk add index custom_index && ./bin/splunk set minfreemb 5 && ./entrypoint.sh",
       ]
   elasticsearch:
     image: elasticsearch:6.6.2
