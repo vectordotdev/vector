@@ -704,7 +704,7 @@ mod reload_tests {
         );
 
         let mut new_config = Config::builder();
-        old_config.add_source("in1", SplunkConfig::on(address));
+        new_config.add_source("in1", SplunkConfig::on(address));
         new_config.add_source("in2", SplunkConfig::on(address));
         new_config.add_sink(
             "out",
@@ -716,7 +716,10 @@ mod reload_tests {
         );
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
-        assert!(new_config.build().is_err());
+        assert!(!topology
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .await
+            .unwrap());
     }
 
     #[tokio::test]
