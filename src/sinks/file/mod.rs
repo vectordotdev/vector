@@ -1,6 +1,6 @@
 use crate::expiring_hash_map::ExpiringHashMap;
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -290,7 +290,7 @@ pub fn encode_event(encoding: &EncodingConfigWithDefault<Encoding>, mut event: E
     match encoding.codec() {
         Encoding::Ndjson => serde_json::to_vec(&log).expect("Unable to encode event as JSON."),
         Encoding::Text => log
-            .get(&crate::config::log_schema().message_key())
+            .get(&log_schema().message_key())
             .map(|v| v.to_string_lossy().into_bytes())
             .unwrap_or_default(),
     }
@@ -428,35 +428,35 @@ mod tests {
         ];
 
         assert_eq!(
-            input[0].as_log()[&crate::config::log_schema().message_key()],
+            input[0].as_log()[&log_schema().message_key()],
             From::<&str>::from(&output[0][0])
         );
         assert_eq!(
-            input[1].as_log()[&crate::config::log_schema().message_key()],
+            input[1].as_log()[&log_schema().message_key()],
             From::<&str>::from(&output[1][0])
         );
         assert_eq!(
-            input[2].as_log()[&crate::config::log_schema().message_key()],
+            input[2].as_log()[&log_schema().message_key()],
             From::<&str>::from(&output[0][1])
         );
         assert_eq!(
-            input[3].as_log()[&crate::config::log_schema().message_key()],
+            input[3].as_log()[&log_schema().message_key()],
             From::<&str>::from(&output[3][0])
         );
         assert_eq!(
-            input[4].as_log()[&crate::config::log_schema().message_key()],
+            input[4].as_log()[&log_schema().message_key()],
             From::<&str>::from(&output[2][0])
         );
         assert_eq!(
-            input[5].as_log()[&crate::config::log_schema().message_key()],
+            input[5].as_log()[&log_schema().message_key()],
             From::<&str>::from(&output[2][1])
         );
         assert_eq!(
-            input[6].as_log()[&crate::config::log_schema().message_key()],
+            input[6].as_log()[&log_schema().message_key()],
             From::<&str>::from(&output[4][0])
         );
         assert_eq!(
-            input[7].as_log()[&crate::config::log_schema().message_key()],
+            input[7].as_log()[&log_schema().message_key()],
             From::<&str>::from(&output[5][0])
         );
     }

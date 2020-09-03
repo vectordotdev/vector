@@ -1,4 +1,5 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
+use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
@@ -382,7 +383,7 @@ impl From<Event> for Vec<u8> {
     fn from(event: Event) -> Vec<u8> {
         event
             .into_log()
-            .remove(&crate::config::log_schema().message_key())
+            .remove(&log_schema().message_key())
             .unwrap()
             .as_bytes()
             .to_vec()
@@ -395,10 +396,10 @@ impl From<Bytes> for Event {
 
         event
             .as_mut_log()
-            .insert(crate::config::log_schema().message_key(), message);
+            .insert(log_schema().message_key(), message);
         event
             .as_mut_log()
-            .insert(crate::config::log_schema().timestamp_key(), Utc::now());
+            .insert(log_schema().timestamp_key(), Utc::now());
 
         event
     }
@@ -430,7 +431,7 @@ impl From<Metric> for Event {
 
 #[cfg(test)]
 mod test {
-    use super::{Atom, Event, Value};
+    use super::*;
     use regex::Regex;
     use std::collections::HashSet;
 
@@ -444,7 +445,7 @@ mod test {
             "message": "raw log line",
             "foo": "bar",
             "bar": "baz",
-            "timestamp": event.as_log().get(&crate::config::log_schema().timestamp_key()),
+            "timestamp": event.as_log().get(&log_schema().timestamp_key()),
         });
 
         let actual_all = serde_json::to_value(event.as_log().all_fields()).unwrap();

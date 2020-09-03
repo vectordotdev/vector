@@ -12,14 +12,14 @@ use std::path::PathBuf;
 pub mod component;
 mod diff;
 mod loading;
-pub mod log_schema;
+mod log_schema;
 mod validation;
 mod vars;
 pub mod watcher;
 
 pub use diff::ConfigDiff;
 pub use loading::{load_from_paths, load_from_str, process_paths, CONFIG_PATHS};
-pub use log_schema::{log_schema, LogSchema};
+pub use log_schema::{log_schema, LogSchema, LOG_SCHEMA};
 pub use validation::check;
 
 #[derive(Deserialize, Serialize, Debug)]

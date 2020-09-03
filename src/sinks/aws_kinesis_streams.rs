@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::Event,
     internal_events::AwsKinesisStreamsEventSent,
@@ -273,7 +273,7 @@ fn encode_event(
     let data = match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
         Encoding::Text => log
-            .get(&crate::config::log_schema().message_key())
+            .get(&log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };
@@ -322,10 +322,7 @@ mod tests {
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
-        assert_eq!(
-            map[&crate::config::log_schema().message_key().to_string()],
-            message
-        );
+        assert_eq!(map[&log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
     }
 

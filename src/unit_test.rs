@@ -15,7 +15,7 @@ fn build_tests(path: PathBuf) -> Result<Vec<UnitTest>, Vec<String>> {
     let mut config = config::load_from_paths(&[path])?;
 
     // Ignore failures on calls other than the first
-    crate::config::log_schema::LOG_SCHEMA
+    crate::config::LOG_SCHEMA
         .set(config.global.log_schema.clone())
         .ok();
 

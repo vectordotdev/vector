@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
@@ -152,9 +152,7 @@ impl Sink for KafkaSink {
 
         let mut record = FutureRecord::to(&topic).key(&key).payload(&body[..]);
 
-        if let Some(Value::Timestamp(timestamp)) = item
-            .as_log()
-            .get(&crate::config::log_schema().timestamp_key())
+        if let Some(Value::Timestamp(timestamp)) = item.as_log().get(&log_schema().timestamp_key())
         {
             record = record.timestamp(timestamp.timestamp_millis());
         }
@@ -268,7 +266,7 @@ fn encode_event(
         Encoding::Json => serde_json::to_vec(&event.as_log()).unwrap(),
         Encoding::Text => event
             .as_log()
-            .get(&crate::config::log_schema().message_key())
+            .get(&log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };
@@ -312,10 +310,7 @@ mod tests {
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(&key[..], b"value");
-        assert_eq!(
-            map[&crate::config::log_schema().message_key().to_string()],
-            message
-        );
+        assert_eq!(map[&log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
         assert_eq!(map["foo"], "bar".to_string());
     }

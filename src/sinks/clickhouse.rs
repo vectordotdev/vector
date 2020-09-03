@@ -234,8 +234,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::{SinkConfig, SinkContext},
-        event,
+        config::{log_schema, SinkConfig, SinkContext},
         event::Event,
         sinks::util::encoding::TimestampFormat,
         test_util::{random_string, trace_init},
@@ -331,11 +330,11 @@ mod integration_tests {
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            crate::config::log_schema().timestamp_key().clone(),
+            log_schema().timestamp_key().clone(),
             format!(
                 "{}",
                 exp_event
-                    .get(&crate::config::log_schema().timestamp_key())
+                    .get(&log_schema().timestamp_key())
                     .unwrap()
                     .as_timestamp()
                     .unwrap()
@@ -389,11 +388,11 @@ timestamp_format = "unix""#,
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            crate::config::log_schema().timestamp_key().clone(),
+            log_schema().timestamp_key().clone(),
             format!(
                 "{}",
                 exp_event
-                    .get(&crate::config::log_schema().timestamp_key())
+                    .get(&log_schema().timestamp_key())
                     .unwrap()
                     .as_timestamp()
                     .unwrap()
