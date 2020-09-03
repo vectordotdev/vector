@@ -39,14 +39,11 @@
 /scripts/deploy-kubernetes-test.sh @MOZGIII @JeanMertz
 /scripts/test-e2e-kubernetes.sh @MOZGIII @JeanMertz
 
-/src/generate.rs
-/src/list.rs
 /src/metrics.rs @lukesteensen
 /src/main.rs @lukesteensen
 /src/region.rs @bruceg
 /src/template.rs @lukesteensen
 /src/tls @bruceg
-/src/trace.rs
 /src/types.rs @bruceg
 /src/line_agg.rs @MOZGIII
 /src/signal.rs @ktff
@@ -66,10 +63,7 @@
 /src/sinks/*_metrics.rs @lukesteensen
 /src/sinks/aws_kinesis_streams.rs @jszwedko
 /src/sinks/aws_s3.rs @jszwedko
-/src/sinks/blackhole.rs
-/src/sinks/clickhouse.rs
 /src/sinks/console.rs @lukesteensen
-/src/sinks/elasticsearch.rs
 /src/sinks/gcp @bruceg
 /src/sinks/http.rs @jszwedko
 /src/sinks/humio_logs.rs @jszwedko
@@ -83,10 +77,8 @@
 /src/sinks/util/auto_concurrency @bruceg
 
 /src/sources/docker.rs @fanatid
-/src/sources/file.rs
 /src/sources/generator.rs @bruceg
 /src/sources/journald.rs @bruceg
-/src/sources/kafka.rs
 /src/sources/stdin.rs @bruceg
 /src/sources/syslog.rs @lukesteensen
 /src/sources/tcp.rs @bruceg
@@ -98,7 +90,6 @@
 
 /src/topology/ @lukesteensen
 
-/src/transforms/add_fields.rs
 /src/transforms/add_tags.rs @lukesteensen
 /src/transforms/ansi_stripper.rs @JeanMertz
 /src/transforms/coercer.rs @bruceg
@@ -106,12 +97,9 @@
 /src/transforms/field_filter.rs @lukesteensen
 /src/transforms/geoip.rs @lukesteensen
 /src/transforms/grok_parser.rs @lukesteensen
-/src/transforms/json_parser.rs
 /src/transforms/log_to_metric.rs @lukesteensen
-/src/transforms/lua/
 /src/transforms/merge.rs @MOZGIII
 /src/transforms/regex_parser.rs @lukesteensen
-/src/transforms/remove_fields.rs
 /src/transforms/remove_tags.rs @lukesteensen
 /src/transforms/sampler.rs @lukesteensen
 /src/transforms/split.rs @lukesteensen
