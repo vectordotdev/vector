@@ -88,7 +88,7 @@ description = "Configures parameters for the automatic concurrency limiter."
 
 [<%= namespace %>.request.children.auto_concurrency.children.decrease_ratio]
 type = "float"
-common = true
+common = false
 default = <%= 0.9 %>
 groups = <%= groups.to_toml %>
 description = """\
@@ -100,7 +100,7 @@ Typical values range from 0.5 to 0.9.\
 
 [<%= namespace %>.request.children.auto_concurrency.children.ewma_alpha]
 type = "float"
-common = true
+common = false
 default = <%= 0.5 %>
 groups = <%= groups.to_toml %>
 description = """\
@@ -112,7 +112,7 @@ The value must be greater than 0 and less than 1. \
 
 [<%= namespace %>.request.children.auto_concurrency.children.rtt_threshold_ratio]
 type = "float"
-common = true
+common = false
 default = <%= 0.05 %>
 groups = <%= groups.to_toml %>
 description = """\
