@@ -855,7 +855,7 @@ mod integration_tests {
     use rusoto_logs::{CloudWatchLogs, CreateLogGroupRequest, GetLogEventsRequest};
     use std::convert::TryFrom;
 
-    const GROUP_NAME: &'static str = "vector-cw";
+    const GROUP_NAME: &str = "vector-cw";
 
     #[tokio::test]
     async fn cloudwatch_insert_log_event() {

@@ -235,7 +235,6 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{log_schema, SinkConfig, SinkContext},
-        event,
         event::Event,
         sinks::util::encoding::TimestampFormat,
         test_util::{random_string, trace_init},

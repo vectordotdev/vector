@@ -142,7 +142,7 @@ async fn validate_components(
     diff: &ConfigDiff,
     fmt: &mut Formatter,
 ) -> Option<Pieces> {
-    crate::config::log_schema::LOG_SCHEMA
+    crate::config::LOG_SCHEMA
         .set(config.global.log_schema.clone())
         .expect("Couldn't set schema");
 

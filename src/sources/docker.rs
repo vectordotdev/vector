@@ -1500,7 +1500,7 @@ mod tests {
             .map(|event| {
                 event
                     .into_log()
-                    .remove(event::log_schema().message_key())
+                    .remove(crate::config::log_schema().message_key())
                     .unwrap()
                     .to_string_lossy()
             })

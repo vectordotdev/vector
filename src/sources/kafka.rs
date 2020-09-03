@@ -257,9 +257,8 @@ mod test {
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use super::{kafka_source, KafkaSourceConfig};
+    use super::*;
     use crate::{
-        event,
         shutdown::ShutdownSignal,
         test_util::{collect_n, random_string},
         Pipeline,
