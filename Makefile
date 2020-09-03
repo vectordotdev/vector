@@ -204,6 +204,8 @@ stop-integration-aws:
 	$(CONTAINER_TOOL) rm --force ec2_metadata mockwatchlogs localstack 2>/dev/null; true
 	$(CONTAINER_TOOL) network rm test-integration-aws 2>/dev/null; true
 
+test-integration-aws: AWS_ACCESS_KEY_ID ?= "dummy"
+test-integration-aws: AWS_SECRET_ACCESS_KEY ?= "dummy"
 test-integration-aws: ## Runs AWS integration tests
 ifeq ($(AUTOSPAWN), true)
 	$(MAKE) -k stop-integration-aws \
@@ -661,6 +663,9 @@ signoff: ## Signsoff all previous commits since branch creation
 
 slim-builds: ## Updates the Cargo config to product disk optimized builds (for CI, not for users)
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/slim-builds.sh
+
+target-graph: ## Display dependencies between targets in this Makefile
+	@cd $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))) && docker-compose run --rm target-graph $(TARGET)
 
 version: ## Get the current Vector version
 	@scripts/version.sh
