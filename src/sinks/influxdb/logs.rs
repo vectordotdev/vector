@@ -654,6 +654,7 @@ mod integration_tests {
         events.push(event2);
 
         let _ = sink
+            .into_futures01sink()
             .send_all(futures01::stream::iter_ok(events))
             .compat()
             .await

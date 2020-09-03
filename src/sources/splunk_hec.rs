@@ -1007,7 +1007,12 @@ mod tests {
         event.as_mut_log().insert("greeting", "hello");
         event.as_mut_log().insert("name", "bob");
 
-        let _ = sink.into_futures01sink().send(event).compat().await.unwrap();
+        let _ = sink
+            .into_futures01sink()
+            .send(event)
+            .compat()
+            .await
+            .unwrap();
         let event = collect_n(source, 1).await.unwrap().remove(0);
 
         assert_eq!(event.as_log()[&"greeting".into()], "hello".into());
@@ -1031,7 +1036,12 @@ mod tests {
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("line", "hello");
 
-        let _ = sink.into_futures01sink().send(event).compat().await.unwrap();
+        let _ = sink
+            .into_futures01sink()
+            .send(event)
+            .compat()
+            .await
+            .unwrap();
         let event = collect_n(source, 1).await.unwrap().remove(0);
 
         assert_eq!(

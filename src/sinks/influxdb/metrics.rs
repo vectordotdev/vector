@@ -819,7 +819,12 @@ mod integration_tests {
 
         let stream = stream01::iter_ok(events.clone().into_iter());
 
-        let _ = sink.send_all(stream).compat().await.unwrap();
+        let _ = sink
+            .into_futures01sink()
+            .send_all(stream)
+            .compat()
+            .await
+            .unwrap();
 
         let mut body = std::collections::HashMap::new();
         body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));

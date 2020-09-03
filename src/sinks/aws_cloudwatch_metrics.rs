@@ -508,6 +508,11 @@ mod integration_tests {
 
         let stream = stream::iter_ok(events.clone().into_iter());
 
-        let _ = sink.send_all(stream).compat().await.unwrap();
+        let _ = sink
+            .into_futures01sink()
+            .send_all(stream)
+            .compat()
+            .await
+            .unwrap();
     }
 }

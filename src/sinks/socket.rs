@@ -116,7 +116,12 @@ mod test {
         let (sink, _healthcheck) = config.build(context).unwrap();
 
         let event = Event::from("raw log line");
-        let _ = sink.into_futures01sink().send(event).compat().await.unwrap();
+        let _ = sink
+            .into_futures01sink()
+            .send(event)
+            .compat()
+            .await
+            .unwrap();
 
         let mut buf = [0; 256];
         let (size, _src_addr) = receiver

@@ -556,7 +556,12 @@ mod integration_tests {
 
         let (lines, mut events) = random_lines_with_stream(100, 10);
 
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let _ = sink
+            .into_futures01sink()
+            .sink_compat()
+            .send_all(&mut events)
+            .await
+            .unwrap();
 
         let keys = get_keys(prefix.unwrap()).await;
         assert_eq!(keys.len(), 1);
@@ -601,6 +606,7 @@ mod integration_tests {
         });
 
         let _ = sink
+            .into_futures01sink()
             .send_all(futures01::stream::iter_ok(events))
             .compat()
             .await
@@ -637,7 +643,12 @@ mod integration_tests {
 
         let (lines, mut events) = random_lines_with_stream(100, 500);
 
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let _ = sink
+            .into_futures01sink()
+            .sink_compat()
+            .send_all(&mut events)
+            .await
+            .unwrap();
 
         let keys = get_keys(prefix.unwrap()).await;
         assert_eq!(keys.len(), 6);

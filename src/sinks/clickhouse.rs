@@ -280,7 +280,11 @@ mod integration_tests {
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.send(input_event.clone()).compat().await.unwrap();
+        sink.into_futures01sink()
+            .send(input_event.clone())
+            .compat()
+            .await
+            .unwrap();
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -327,7 +331,11 @@ mod integration_tests {
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.send(input_event.clone()).compat().await.unwrap();
+        sink.into_futures01sink()
+            .send(input_event.clone())
+            .compat()
+            .await
+            .unwrap();
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -385,7 +393,11 @@ timestamp_format = "unix""#,
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.send(input_event.clone()).compat().await.unwrap();
+        sink.into_futures01sink()
+            .send(input_event.clone())
+            .compat()
+            .await
+            .unwrap();
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -442,7 +454,7 @@ timestamp_format = "unix""#,
         // this timeout should trigger.
         timeout(
             Duration::from_secs(5),
-            sink.send(input_event.clone()).compat(),
+            sink.into_futures01sink().send(input_event.clone()).compat(),
         )
         .await
         .unwrap()

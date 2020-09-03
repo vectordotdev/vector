@@ -624,7 +624,11 @@ mod integration_tests {
         input_event.as_mut_log().insert("my_id", "42");
         input_event.as_mut_log().insert("foo", "bar");
 
-        sink.send(input_event.clone()).compat().await.unwrap();
+        sink.into_futures01sink()
+            .send(input_event.clone())
+            .compat()
+            .await
+            .unwrap();
 
         // make sure writes all all visible
         flush(cx.resolver(), common).await.unwrap();
@@ -742,6 +746,7 @@ mod integration_tests {
                 // Break all but the first event to simulate some kind of partial failure
                 let mut doit = false;
                 let _ = sink
+                    .into_futures01sink()
                     .sink_compat()
                     .send_all(&mut events.map_ok(move |mut event| {
                         if doit {
@@ -755,6 +760,7 @@ mod integration_tests {
             }
             false => {
                 let _ = sink
+                    .into_futures01sink()
                     .sink_compat()
                     .send_all(&mut events)
                     .await

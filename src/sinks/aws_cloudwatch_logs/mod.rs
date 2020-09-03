@@ -886,7 +886,12 @@ mod integration_tests {
 
         let (input_lines, mut events) = random_lines_with_stream(100, 11);
 
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let _ = sink
+            .into_futures01sink()
+            .sink_compat()
+            .send_all(&mut events)
+            .await
+            .unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -935,6 +940,7 @@ mod integration_tests {
         // out-of-order timestamps.
         let mut doit = false;
         let _ = sink
+            .into_futures01sink()
             .sink_compat()
             .send_all(&mut events.map_ok(move |mut event| {
                 if doit {
@@ -1022,7 +1028,7 @@ mod integration_tests {
         lines.push(add_event(Duration::days(-1)));
         lines.push(add_event(Duration::days(-13)));
 
-        let pump = sink.send_all(stream::iter_ok(events));
+        let pump = sink.into_futures01sink().send_all(stream::iter_ok(events));
         let (sink, _) = pump.compat().await.unwrap();
         // drop the sink so it closes all its connections
         drop(sink);
@@ -1070,7 +1076,12 @@ mod integration_tests {
 
         let (input_lines, mut events) = random_lines_with_stream(100, 11);
 
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let _ = sink
+            .into_futures01sink()
+            .sink_compat()
+            .send_all(&mut events)
+            .await
+            .unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -1120,7 +1131,12 @@ mod integration_tests {
 
         let (input_lines, mut events) = random_lines_with_stream(100, 11);
 
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let _ = sink
+            .into_futures01sink()
+            .sink_compat()
+            .send_all(&mut events)
+            .await
+            .unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -1177,7 +1193,7 @@ mod integration_tests {
             })
             .collect::<Vec<_>>();
 
-        let pump = sink.send_all(iter_ok(events));
+        let pump = sink.into_futures01sink().send_all(iter_ok(events));
         let (sink, _) = pump.compat().await.unwrap();
         let sink = sink.flush().compat().await.unwrap();
         // drop the sink so it closes all its connections
