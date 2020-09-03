@@ -334,7 +334,7 @@ impl RuntimeTransform for Lua {
 }
 
 #[cfg(test)]
-pub(crate) fn format_error(error: &rlua::Error) -> String {
+fn format_error(error: &rlua::Error) -> String {
     match error {
         rlua::Error::CallbackError { traceback, cause } => format_error(&cause) + "\n" + traceback,
         err => err.to_string(),
