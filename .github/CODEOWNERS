@@ -1,49 +1,73 @@
 # https://help.github.com/articles/about-codeowners/
 
-/distribution/ @a-rodin
+/PRIVACY.md @binarylogic @jamtur01
+/LICENSE @binarylogic @jamtur01
+/CONTRIBUTING.md @binarylogic @jamtur01
+/CODE_OF_CONDUCT.md @binarylogic @jamtur01
+/NOTICE @binarylogic @jamtur01
+/SECURITY.md @binarylogic @jamtur01
+
+/skaffold/ @MOZGIII
+/skaffold.yaml @MOZGIII
+/kustomization.yaml @MOZGIII
+
+/distribution/ @hoverbear @jamtur01
 /distribution/kubernetes/ @MOZGIII
 /distribution/helm/ @MOZGIII
 
+/lib/file-source/src/paths_provider/mod.rs @MOZGIII
+/lib/file-source/src/paths_provider/glob.rs @MOZGIII
+/lib/k8s-test-framework/ @MOZGIII @JeanMertz
+/lib/prometheus-parser/ @juchiast
+/lib/vector-wasm/ @hoverbear @JeanMertz
+
 /proto/ @lukesteensen
 
-/scripts/build-* @a-rodin
-/scripts/ci-docker-images/ @a-rodin
-/scripts/check-* @a-rodin
-/scripts/docker-* @a-rodin
-/scripts/generate* @binarylogic
-/scripts/package-* @a-rodin
-/scripts/release-* @a-rodin
-/scripts/upgrade-* @a-rodin
+/scripts/build-* @hoverbear
+/scripts/ci-docker-images/ @hoverbear @jamtur01
+/scripts/check-meta.sh @binarylogic @jamtur01
+/scripts/check-* @jamtur01
+/scripts/docker-* @jamtur01
+/scripts/environment/* @hoverbear @jamtur01
+/scripts/load-meta.rb @binarylogic @jamtur01
+/scripts/package-* @jamtur01
+/scripts/release-* @hoverbear
+/scripts/upgrade-* @hoverbear
 /scripts/ci-setup-minikube.sh @MOZGIII
 /scripts/ci-setup-helm.sh @MOZGIII
 /scripts/release-helm.sh @MOZGIII
-/scripts/deploy-kubernetes-test.sh @MOZGIII
-/scripts/test-e2e-kubernetes.sh @MOZGIII
+/scripts/deploy-kubernetes-test.sh @MOZGIII @JeanMertz
+/scripts/test-e2e-kubernetes.sh @MOZGIII @JeanMertz
 
-/src/buffers/ @a-rodin
-/src/kubernetes/ @MOZGIII
-
-/src/generate.rs @Jeffail
-/src/list.rs @Jeffail
 /src/metrics.rs @lukesteensen
 /src/main.rs @lukesteensen
-/src/region.rs @LucioFranco
-/src/runtime.rs @LucioFranco
+/src/region.rs @bruceg
 /src/template.rs @lukesteensen
-/src/tls.rs @bruceg
-/src/trace.rs @LucioFranco
+/src/tls @bruceg
 /src/types.rs @bruceg
 /src/line_agg.rs @MOZGIII
+/src/signal.rs @ktff
+/src/validate.rs @ktff
+/src/heartbeat.rs @ktff
+
+/src/buffers/ @lukesteensen
+
+/src/event/merge.rs @MOZGIII
+/src/event/merge_state.rs @MOZGIII
+/src/event/discriminant.rs @MOZGIII
+
+/src/internal_events/ @JeanMertz
+
+/src/kubernetes/ @MOZGIII @JeanMertz
 
 /src/sinks/*_metrics.rs @lukesteensen
-/src/sinks/aws_kinesis_streams.rs @LucioFranco
-/src/sinks/aws_s3.rs @LucioFranco
-/src/sinks/blackhole.rs @LucioFranco
-/src/sinks/clickhouse.rs @a-rodin
+/src/sinks/aws_kinesis_streams.rs @jszwedko
+/src/sinks/aws_s3.rs @jszwedko
 /src/sinks/console.rs @lukesteensen
-/src/sinks/elasticsearch.rs @LucioFranco
 /src/sinks/gcp @bruceg
-/src/sinks/http.rs @LucioFranco
+/src/sinks/http.rs @jszwedko
+/src/sinks/humio_logs.rs @jszwedko
+/src/sinks/splunk_hec.rs @jszwedko
 /src/sinks/kafka.rs @lukesteensen
 /src/sinks/prometheus.rs @lukesteensen
 /src/sinks/splunk_hec.rs @lukesteensen
@@ -52,51 +76,46 @@
 /src/sinks/tcp.rs @lukesteensen
 /src/sinks/util/auto_concurrency @bruceg
 
-/src/sources/docker.rs @LucioFranco
-/src/sources/file.rs @LucioFranco
+/src/sources/docker.rs @fanatid
 /src/sources/generator.rs @bruceg
 /src/sources/journald.rs @bruceg
-/src/sources/kafka.rs @a-rodin
 /src/sources/stdin.rs @bruceg
 /src/sources/syslog.rs @lukesteensen
 /src/sources/tcp.rs @bruceg
 /src/sources/udp.rs @bruceg
 /src/sources/vector.rs @lukesteensen
-/src/sources/util/multiline_config.rs @MOZGIII
+/src/sources/util/multiline_config.rs @MOZGIII @JeanMertz
+/src/sources/kubernetes_logs/ @MOZGIII @JeanMertz
+/src/sources/splunk_hec.rs @ktff
 
 /src/topology/ @lukesteensen
 
-/src/transforms/add_fields.rs @LucioFranco
 /src/transforms/add_tags.rs @lukesteensen
-/src/transforms/ansi_stripper.rs @lukesteensen
+/src/transforms/ansi_stripper.rs @JeanMertz
 /src/transforms/coercer.rs @bruceg
 /src/transforms/filter.rs @bruceg
 /src/transforms/field_filter.rs @lukesteensen
 /src/transforms/geoip.rs @lukesteensen
 /src/transforms/grok_parser.rs @lukesteensen
-/src/transforms/json_parser.rs @LucioFranco
 /src/transforms/log_to_metric.rs @lukesteensen
-/src/transforms/lua/ @a-rodin
 /src/transforms/merge.rs @MOZGIII
 /src/transforms/regex_parser.rs @lukesteensen
-/src/transforms/remove_fields.rs @LucioFranco
 /src/transforms/remove_tags.rs @lukesteensen
 /src/transforms/sampler.rs @lukesteensen
 /src/transforms/split.rs @lukesteensen
 /src/transforms/tokenzier.rs @lukesteensen
 
-/src/event/merge.rs @MOZGIII
-
-/lib/file-source/src/paths_provider/mod.rs @MOZGIII
-/lib/file-source/src/paths_provider/glob.rs @MOZGIII
-
-/lib/k8s-test-framework/ @MOZGIII
+/src/wasm/ @hoverbear @JeanMertz
 
 /tests/buffering.rs @MOZGIII
-/tests/kubernetes-e2e.rs @MOZGIII
+/tests/data/wasm/ @hoverbear @JeanMertz
+/tests/kubernetes-e2e.rs @MOZGIII @JeanMertz
+/tests/shutdown.rs @ktff
+/tests/cli.rs @ktff
 
+/.github/semantic* @binarylogic @jamtur01
+/.github/SUPPORT.md @binarylogic @jamtur01
+/.github/PULL_REQUEST_TEMPLATE.md @binarylogic @jamtur01
+/.github/ISSUE_TEMPLATE/ @binarylogic @jamtur01
 /.github/workflows/e2e.yml @MOZGIII
-
-/skaffold/ @MOZGIII
-/skaffold.yaml @MOZGIII
-/kustomization.yaml @MOZGIII
+/.github/workflows/ @jamtur01
