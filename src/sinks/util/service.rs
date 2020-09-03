@@ -162,7 +162,7 @@ pub struct TowerRequestConfig<T = InFlightLimit> {
     pub retry_attempts: Option<usize>,         // max_value()
     pub retry_max_duration_secs: Option<u64>,
     pub retry_initial_backoff_secs: Option<u64>, // 1
-    #[serde(default, flatten)]
+    #[serde(default)]
     pub auto_concurrency: AutoConcurrencySettings,
 }
 
