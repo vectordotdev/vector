@@ -1,0 +1,28 @@
+# With a constant response time link and enough responses, the limiter
+# will ramp up towards the maximum concurrency.
+
+[params]
+requests = 500
+delay = 0.100
+
+[stats.in_flight]
+max = [10, 200]
+mean = [6.0, 200.0]
+
+[controller.observed_rtt]
+min = [0.090, 0.125]
+max = [0.090, 0.125]
+mean = [0.090, 0.125]
+
+[controller.averaged_rtt]
+min = [0.090, 0.125]
+max = [0.090, 0.125]
+mean = [0.090, 0.125]
+
+[controller.concurrency_limit]
+max = [9, 200]
+mean = [5.0, 200.0]
+
+[controller.in_flight]
+max = [9, 200]
+mean = [6.5, 200.0]

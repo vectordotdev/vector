@@ -1,0 +1,28 @@
+[params]
+requests = 500
+interval = 0.025
+delay = 0.100
+
+# With a generator running at four times the speed as the link RTT,
+# the limiter will keep around 4-5 requests in flight depending on
+# timing jitter.
+
+[stats.in_flight]
+mode = [4, 5]
+mean = [4.0, 6.0]
+
+[controller.in_flight]
+max = [4, 20]
+mode = [4, 5]
+mean = [4.0, 5.0]
+
+[controller.concurrency_limit]
+max = [4, 20]
+
+[controller.observed_rtt]
+min = [0.090, 0.125]
+max = [0.090, 0.125]
+
+[controller.averaged_rtt]
+min = [0.090, 0.125]
+max = [0.090, 0.125]

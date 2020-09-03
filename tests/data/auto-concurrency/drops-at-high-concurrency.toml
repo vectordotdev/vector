@@ -1,0 +1,32 @@
+[params]
+requests = 500
+delay = 0.100
+concurrency_drop = 5
+
+[stats.in_flight]
+max = [4, 5]
+mean = [2.5, 5.0]
+mode = [3, 5]
+
+# Since our internal framework doesn't track the dropped requests, the
+# values won't be representative of the actual number of requests in
+# flight.
+
+[controller.in_flight]
+max = [8, 15]
+mean = [5.0, 10.0]
+mode = [3, 10]
+
+[controller.concurrency_limit]
+mean = [3.5, 8.0]
+mode = [4, 10]
+
+[controller.observed_rtt]
+min = [0.090, 0.125]
+max = [0.090, 0.125]
+mean = [0.090, 0.125]
+
+[controller.averaged_rtt]
+min = [0.090, 0.125]
+max = [0.090, 0.125]
+mean = [0.090, 0.125]

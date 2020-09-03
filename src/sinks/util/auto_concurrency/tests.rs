@@ -3,7 +3,6 @@
 #![cfg(all(test, not(target_os = "macos"), feature = "sources-generator"))]
 
 use super::controller::ControllerStatistics;
-use super::MAX_CONCURRENCY;
 use crate::{
     assert_within,
     config::{self, DataType, SinkConfig, SinkContext},
@@ -17,7 +16,10 @@ use crate::{
         Healthcheck, RouterSink,
     },
     sources::generator::GeneratorConfig,
-    test_util::{start_topology, stats::LevelTimeHistogram},
+    test_util::{
+        start_topology,
+        stats::{HistogramStats, LevelTimeHistogram, WeightedSumStats},
+    },
 };
 use core::task::Context;
 use futures::{
@@ -26,17 +28,21 @@ use futures::{
 };
 use futures01::{future, Sink};
 use rand::{distributions::Exp1, prelude::*};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use std::task::Poll;
-use std::time::{Duration, Instant};
+use std::{
+    collections::HashMap,
+    fs::{read_dir, File},
+    io::Read,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    task::Poll,
+    time::{Duration, Instant},
+};
 use tokio::time::{delay_for, delay_until};
 use tower::Service;
 
-#[derive(Copy, Clone, Debug, Derivative, Serialize)]
-#[derivative(Default)]
+#[derive(Copy, Clone, Debug, Default, Deserialize, Serialize)]
 struct TestParams {
     // The number of requests to issue.
     requests: usize,
@@ -68,9 +74,12 @@ struct TestParams {
     #[serde(default)]
     concurrency_drop: usize,
 
-    #[serde(default)]
-    #[derivative(Default(value = "InFlightLimit::Auto"))]
+    #[serde(default = "default_in_flight_limit")]
     in_flight_limit: InFlightLimit,
+}
+
+fn default_in_flight_limit() -> InFlightLimit {
+    InFlightLimit::Auto
 }
 
 #[derive(Debug, Default, Serialize)]
@@ -231,12 +240,12 @@ struct Statistics {
 }
 
 #[derive(Debug)]
-struct TestData {
+struct TestResults {
     stats: Statistics,
     cstats: ControllerStatistics,
 }
 
-async fn run_test(params: TestParams) -> TestData {
+async fn run_test(params: TestParams) -> TestResults {
     let _ = metrics::init();
 
     let test_config = TestConfig {
@@ -306,312 +315,152 @@ async fn run_test(params: TestParams) -> TestData {
                  MetricValue::Distribution { .. })
     );
 
-    TestData { stats, cstats }
+    TestResults { stats, cstats }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+struct Range(f64, f64);
+
+impl Range {
+    fn assert_usize(&self, value: usize, name1: &str, name2: &str, results: &TestResults) {
+        assert_within!(
+            value,
+            self.0 as usize,
+            self.1 as usize,
+            "Value: {} {}\n{:#?}",
+            name1,
+            name2,
+            results
+        );
+    }
+
+    fn assert_f64(&self, value: f64, name1: &str, name2: &str, results: &TestResults) {
+        assert_within!(
+            value,
+            self.0,
+            self.1,
+            "Value: {} {}\n{:#?}",
+            name1,
+            name2,
+            results
+        );
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+struct ResultTest {
+    min: Option<Range>,
+    max: Option<Range>,
+    mode: Option<Range>,
+    mean: Option<Range>,
+}
+
+impl ResultTest {
+    fn compare_histogram(&self, stat: HistogramStats, name: &str, results: &TestResults) {
+        if let Some(range) = self.min {
+            range.assert_usize(stat.min, name, "min", results);
+        }
+        if let Some(range) = self.max {
+            range.assert_usize(stat.max, name, "max", results);
+        }
+        if let Some(range) = self.mean {
+            range.assert_f64(stat.mean, name, "mean", results);
+        }
+        if let Some(range) = self.mode {
+            range.assert_usize(stat.mode, name, "mode", results);
+        }
+    }
+
+    fn compare_weighted_sum(&self, stat: WeightedSumStats, name: &str, results: &TestResults) {
+        if let Some(range) = self.min {
+            range.assert_f64(stat.min, name, "min", results);
+        }
+        if let Some(range) = self.max {
+            range.assert_f64(stat.max, name, "max", results);
+        }
+        if let Some(range) = self.mean {
+            range.assert_f64(stat.mean, name, "mean", results);
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ControllerResults {
+    observed_rtt: Option<ResultTest>,
+    averaged_rtt: Option<ResultTest>,
+    concurrency_limit: Option<ResultTest>,
+    in_flight: Option<ResultTest>,
+}
+
+#[derive(Debug, Deserialize)]
+struct StatsResults {
+    in_flight: Option<ResultTest>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TestInput {
+    params: TestParams,
+    stats: StatsResults,
+    controller: ControllerResults,
+}
+
+async fn run_compare(file_path: PathBuf, input: TestInput) {
+    eprintln!("Running test in {:?}", file_path);
+
+    let results = run_test(input.params).await;
+
+    if let Some(test) = input.stats.in_flight {
+        let in_flight = results.stats.in_flight.stats().unwrap();
+        test.compare_histogram(in_flight, "stats in_flight", &results);
+    }
+
+    if let Some(test) = input.controller.in_flight {
+        let in_flight = results.cstats.in_flight.stats().unwrap();
+        test.compare_histogram(in_flight, "controller in_flight", &results);
+    }
+
+    if let Some(test) = input.controller.concurrency_limit {
+        let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
+        test.compare_histogram(concurrency_limit, "controller concurrency_limit", &results);
+    }
+
+    if let Some(test) = input.controller.observed_rtt {
+        let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
+        test.compare_weighted_sum(observed_rtt, "controller observed_rtt", &results);
+    }
+
+    if let Some(test) = input.controller.averaged_rtt {
+        let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
+        test.compare_weighted_sum(averaged_rtt, "controller averaged_rtt", &results);
+    }
 }
 
 #[tokio::test]
-async fn fixed_concurrency() {
-    // Simulate a very jittery link, but with a fixed concurrency
-    let results = run_test(TestParams {
-        requests: 200,
-        delay: 0.100,
-        jitter: 0.5,
-        in_flight_limit: InFlightLimit::Fixed(10),
-        ..Default::default()
-    })
-    .await;
+async fn all_tests() {
+    const PATH: &str = "tests/data/auto-concurrency";
 
-    let in_flight = results.stats.in_flight.stats().unwrap();
-    assert_eq!(in_flight.max, 10, "{:#?}", results);
-    assert_eq!(in_flight.mode, 10, "{:#?}", results);
+    // Read and parse everything first
+    let entries = read_dir(PATH)
+        .expect("Could not open data directory")
+        .map(|entry| entry.expect("Could not read data directory").path())
+        .filter_map(|file_path| {
+            if (file_path.extension().map(|ext| ext == "toml")).unwrap_or(false) {
+                let mut data = String::new();
+                File::open(&file_path)
+                    .unwrap()
+                    .read_to_string(&mut data)
+                    .unwrap();
+                let input: TestInput = toml::from_str(&data)
+                    .unwrap_or_else(|error| panic!("Invalid TOML in {:?}: {:?}", file_path, error));
+                Some((file_path, input))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
 
-    // Even with jitter, the concurrency limit should never vary
-    let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
-    assert_eq!(concurrency_limit.min, 10, "{:#?}", results);
-    assert_eq!(concurrency_limit.max, 10, "{:#?}", results);
-    let in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_eq!(in_flight.max, 10, "{:#?}", results);
-    assert_eq!(in_flight.mode, 10, "{:#?}", results);
-}
-
-#[tokio::test]
-async fn constant_link() {
-    let results = run_test(TestParams {
-        requests: 500,
-        delay: 0.100,
-        ..Default::default()
-    })
-    .await;
-
-    // With a constant response time link and enough responses, the
-    // limiter will ramp up towards the maximum concurrency.
-    let in_flight = results.stats.in_flight.stats().unwrap();
-    assert_within!(in_flight.max, 10, MAX_CONCURRENCY, "{:#?}", results);
-    assert_within!(
-        in_flight.mean,
-        6.0,
-        MAX_CONCURRENCY as f64,
-        "{:#?}",
-        results
-    );
-
-    let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
-    assert_within!(observed_rtt.min, 0.090, 0.120, "{:#?}", results);
-    assert_within!(observed_rtt.max, 0.090, 0.130, "{:#?}", results);
-    assert_within!(observed_rtt.mean, 0.090, 0.120, "{:#?}", results);
-    let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
-    assert_within!(averaged_rtt.min, 0.090, 0.120, "{:#?}", results);
-    assert_within!(averaged_rtt.max, 0.090, 0.130, "{:#?}", results);
-    assert_within!(averaged_rtt.mean, 0.090, 0.120, "{:#?}", results);
-    let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
-    assert_within!(concurrency_limit.max, 9, MAX_CONCURRENCY, "{:#?}", results);
-    assert_within!(
-        concurrency_limit.mean,
-        5.0,
-        MAX_CONCURRENCY as f64,
-        "{:#?}",
-        results
-    );
-    let c_in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(c_in_flight.max, 9, MAX_CONCURRENCY, "{:#?}", results);
-    assert_within!(
-        c_in_flight.mean,
-        6.5,
-        MAX_CONCURRENCY as f64,
-        "{:#?}",
-        results
-    );
-}
-
-#[tokio::test]
-async fn defers_at_high_concurrency() {
-    let results = run_test(TestParams {
-        requests: 500,
-        delay: 0.100,
-        concurrency_defer: 5,
-        ..Default::default()
-    })
-    .await;
-
-    // With a constant time link that gives deferrals over a certain
-    // concurrency, the limiter will ramp up to that concurrency and
-    // then drop down repeatedly. Note that, due to the timing of the
-    // adjustment, this may actually occasionally go over the error
-    // limit above, but it will be rare.
-    let in_flight = results.stats.in_flight.stats().unwrap();
-    assert_within!(in_flight.max, 4, 6, "{:#?}", results);
-    // Since the concurrency will drop down by half each time, the
-    // average will be below this maximum.
-    assert_within!(in_flight.mode, 2, 4, "{:#?}", results);
-    assert_within!(in_flight.mean, 2.0, 4.0, "{:#?}", results);
-
-    let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
-    assert_within!(observed_rtt.min, 0.090, 0.120, "{:#?}", results);
-    assert_within!(observed_rtt.max, 0.090, 0.130, "{:#?}", results);
-    assert_within!(observed_rtt.mean, 0.090, 0.120, "{:#?}", results);
-    let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
-    assert_within!(averaged_rtt.min, 0.090, 0.120, "{:#?}", results);
-    assert_within!(averaged_rtt.max, 0.090, 0.130, "{:#?}", results);
-    assert_within!(averaged_rtt.mean, 0.090, 0.120, "{:#?}", results);
-    let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
-    assert_within!(concurrency_limit.max, 5, 6, "{:#?}", results);
-    assert_within!(concurrency_limit.mode, 2, 5, "{:#?}", results);
-    assert_within!(concurrency_limit.mean, 2.0, 4.9, "{:#?}", results);
-    let c_in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(c_in_flight.max, 5, 6, "{:#?}", results);
-    assert_within!(c_in_flight.mode, 2, 4, "{:#?}", results);
-    assert_within!(c_in_flight.mean, 2.0, 4.0, "{:#?}", results);
-}
-
-#[tokio::test]
-async fn drops_at_high_concurrency() {
-    let results = run_test(TestParams {
-        requests: 500,
-        delay: 0.100,
-        concurrency_drop: 5,
-        ..Default::default()
-    })
-    .await;
-
-    // Since our internal framework doesn't track the "dropped"
-    // requests, the values won't be representative of the actual number
-    // of requests in flight (tracked below in the internal stats).
-    let in_flight = results.stats.in_flight.stats().unwrap();
-    assert_within!(in_flight.max, 4, 5, "{:#?}", results);
-    assert_within!(in_flight.mode, 3, 4, "{:#?}", results);
-    assert_within!(in_flight.mean, 1.5, 3.5, "{:#?}", results);
-
-    let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
-    assert_within!(observed_rtt.min, 0.090, 0.125, "{:#?}", results);
-    assert_within!(observed_rtt.max, 0.090, 0.125, "{:#?}", results);
-    assert_within!(observed_rtt.mean, 0.090, 0.125, "{:#?}", results);
-    let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
-    assert_within!(averaged_rtt.min, 0.090, 0.125, "{:#?}", results);
-    assert_within!(averaged_rtt.max, 0.090, 0.125, "{:#?}", results);
-    assert_within!(averaged_rtt.mean, 0.090, 0.125, "{:#?}", results);
-    let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
-    assert_within!(concurrency_limit.max, 8, 15, "{:#?}", results);
-    assert_within!(concurrency_limit.mode, 5, 10, "{:#?}", results);
-    assert_within!(concurrency_limit.mean, 5.0, 10.0, "{:#?}", results);
-    let c_in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(c_in_flight.max, 8, 15, "{:#?}", results);
-    assert_within!(c_in_flight.mode, 5, 10, "{:#?}", results);
-    assert_within!(c_in_flight.mean, 5.0, 10.0, "{:#?}", results);
-}
-
-#[tokio::test]
-async fn slow_link() {
-    let results = run_test(TestParams {
-        requests: 200,
-        delay: 0.100,
-        concurrency_scale: 1.0,
-        ..Default::default()
-    })
-    .await;
-
-    // With a link that slows down heavily as concurrency increases, the
-    // limiter will keep the concurrency low (timing skews occasionally
-    // has it reaching 3, but usually just 2),
-    let in_flight = results.stats.in_flight.stats().unwrap();
-    assert_within!(in_flight.max, 1, 3, "{:#?}", results);
-    // and it will spend most of its time between 1 and 2.
-    assert_within!(in_flight.mode, 1, 2, "{:#?}", results);
-    assert_within!(in_flight.mean, 1.0, 2.0, "{:#?}", results);
-
-    let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
-    assert_within!(observed_rtt.min, 0.090, 0.120, "{:#?}", results);
-    assert_within!(observed_rtt.mean, 0.090, 0.310, "{:#?}", results);
-    let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
-    assert_within!(averaged_rtt.min, 0.090, 0.120, "{:#?}", results);
-    assert_within!(averaged_rtt.mean, 0.090, 0.310, "{:#?}", results);
-    let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
-    assert_within!(concurrency_limit.mode, 1, 3, "{:#?}", results);
-    assert_within!(concurrency_limit.mean, 1.0, 2.0, "{:#?}", results);
-    let c_in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(c_in_flight.max, 1, 3, "{:#?}", results);
-    assert_within!(c_in_flight.mode, 1, 2, "{:#?}", results);
-    assert_within!(c_in_flight.mean, 1.0, 2.0, "{:#?}", results);
-}
-
-#[tokio::test]
-async fn slow_send_1() {
-    let results = run_test(TestParams {
-        requests: 100,
-        interval: Some(0.100),
-        delay: 0.050,
-        ..Default::default()
-    })
-    .await;
-
-    // With a generator running slower than the link can process, the
-    // limiter will never raise the concurrency above 1.
-    let in_flight = results.stats.in_flight.stats().unwrap();
-    assert_eq!(in_flight.max, 1, "{:#?}", results);
-    assert_eq!(in_flight.mode, 1, "{:#?}", results);
-    assert_within!(in_flight.mean, 0.5, 1.0, "{:#?}", results);
-
-    let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
-    assert_within!(observed_rtt.min, 0.045, 0.060, "{:#?}", results);
-    assert_within!(observed_rtt.mean, 0.045, 0.060, "{:#?}", results);
-    let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
-    assert_within!(averaged_rtt.min, 0.045, 0.060, "{:#?}", results);
-    assert_within!(averaged_rtt.mean, 0.045, 0.060, "{:#?}", results);
-    let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
-    assert_eq!(concurrency_limit.mode, 1, "{:#?}", results);
-    assert_eq!(concurrency_limit.mean, 1.0, "{:#?}", results);
-    let c_in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_eq!(c_in_flight.max, 1, "{:#?}", results);
-    assert_eq!(c_in_flight.mode, 1, "{:#?}", results);
-    assert_within!(c_in_flight.mean, 0.5, 1.0, "{:#?}", results);
-}
-
-#[tokio::test]
-async fn slow_send_2() {
-    let results = run_test(TestParams {
-        requests: 100,
-        interval: Some(0.050),
-        delay: 0.050,
-        ..Default::default()
-    })
-    .await;
-
-    // With a generator running at the same speed as the link RTT, the
-    // limiter will keep the limit around 1-2 depending on timing jitter.
-    let in_flight = results.stats.in_flight.stats().unwrap();
-    assert_within!(in_flight.max, 1, 3, "{:#?}", results);
-    assert_within!(in_flight.mode, 1, 2, "{:#?}", results);
-    assert_within!(in_flight.mean, 0.5, 2.0, "{:#?}", results);
-
-    let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
-    assert_within!(observed_rtt.min, 0.045, 0.060, "{:#?}", results);
-    assert_within!(observed_rtt.mean, 0.045, 0.110, "{:#?}", results);
-    let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
-    assert_within!(averaged_rtt.min, 0.045, 0.060, "{:#?}", results);
-    assert_within!(averaged_rtt.mean, 0.045, 0.110, "{:#?}", results);
-    let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
-    assert_within!(concurrency_limit.mode, 1, 2, "{:#?}", results);
-    assert_within!(concurrency_limit.mean, 1.0, 2.0, "{:#?}", results);
-    let c_in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(c_in_flight.max, 1, 3, "{:#?}", results);
-    assert_within!(c_in_flight.mode, 1, 2, "{:#?}", results);
-    assert_within!(c_in_flight.mean, 1.0, 2.0, "{:#?}", results);
-}
-
-#[tokio::test]
-async fn medium_send() {
-    let results = run_test(TestParams {
-        requests: 500,
-        interval: Some(0.025),
-        delay: 0.100,
-        ..Default::default()
-    })
-    .await;
-
-    let in_flight = results.stats.in_flight.stats().unwrap();
-    // With a generator running at four times the speed as the link RTT,
-    // the limiter will keep around 4-5 requests in flight depending on
-    // timing jitter.
-    assert_within!(in_flight.mode, 4, 5, "{:#?}", results);
-    assert_within!(in_flight.mean, 4.0, 6.0, "{:#?}", results);
-
-    let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
-    assert_within!(observed_rtt.min, 0.090, 0.120, "{:#?}", results);
-    assert_within!(observed_rtt.mean, 0.090, 0.120, "{:#?}", results);
-    let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
-    assert_within!(averaged_rtt.min, 0.090, 0.120, "{:#?}", results);
-    assert_within!(averaged_rtt.mean, 0.090, 0.500, "{:#?}", results);
-    let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
-    assert_within!(concurrency_limit.max, 4, MAX_CONCURRENCY, "{:#?}", results);
-    let c_in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(c_in_flight.max, 4, MAX_CONCURRENCY, "{:#?}", results);
-    assert_within!(c_in_flight.mode, 4, 5, "{:#?}", results);
-    assert_within!(c_in_flight.mean, 4.0, 5.0, "{:#?}", results);
-}
-
-#[tokio::test]
-async fn jittery_link_small() {
-    let results = run_test(TestParams {
-        requests: 500,
-        delay: 0.100,
-        jitter: 0.1,
-        ..Default::default()
-    })
-    .await;
-
-    // Jitter can cause concurrency management to vary widely, though it
-    // will typically reach the maximum of 10 in flight.
-    let in_flight = results.stats.in_flight.stats().unwrap();
-    assert_within!(in_flight.max, 15, 30, "{:#?}", results);
-    assert_within!(in_flight.mean, 4.0, 20.0, "{:#?}", results);
-
-    let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
-    assert_within!(observed_rtt.mean, 0.090, 0.130, "{:#?}", results);
-    let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
-    assert_within!(averaged_rtt.mean, 0.090, 0.130, "{:#?}", results);
-    let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
-    assert_within!(concurrency_limit.max, 10, 30, "{:#?}", results);
-    assert_within!(concurrency_limit.mean, 6.0, 20.0, "{:#?}", results);
-    let c_in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(c_in_flight.max, 15, 30, "{:#?}", results);
-    assert_within!(c_in_flight.mean, 6.0, 20.0, "{:#?}", results);
+    // Then run all the tests
+    for (file_path, input) in entries {
+        run_compare(file_path, input).await;
+    }
 }

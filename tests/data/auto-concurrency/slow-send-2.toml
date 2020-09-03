@@ -1,0 +1,29 @@
+# With a generator running at the same speed as the link RTT, the
+# limiter will keep the limit around 1-2 depending on timing jitter.
+
+[params]
+requests = 100
+interval = 0.050
+delay = 0.050
+
+[stats.in_flight]
+max = [1, 3]
+mode = [1, 2]
+mean = [0.5, 2.0]
+
+[controller.in_flight]
+max = [1, 3]
+mode = [1, 2]
+mean = [1.0, 2.0]
+
+[controller.concurrency_limit]
+mode = [1, 2]
+mean = [1.0, 2.0]
+
+[controller.observed_rtt]
+min = [0.045, 0.060]
+mean = [0.045, 0.060]
+
+[controller.averaged_rtt]
+min = [0.045, 0.060]
+mean = [0.045, 0.060]
