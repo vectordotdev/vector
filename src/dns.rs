@@ -37,11 +37,18 @@ impl Resolver {
                 vec![SocketAddr::new(Ipv4Addr::LOCALHOST.into(), dummy_port)].into_iter(),
             ))
         } else {
-            spawn_blocking(move || (name.as_ref(), dummy_port).to_socket_addrs())
-                .await
-                .context(JoinError)?
-                .map(LookupIp)
-                .context(UnableLookup)
+            spawn_blocking(move || {
+                let mut name_ref = name.as_str();
+                // strip IPv6 prefix and suffix
+                if name_ref.starts_with('[') && name_ref.ends_with(']') {
+                    name_ref = &name_ref[1..name_ref.len() - 1];
+                }
+                (name_ref, dummy_port).to_socket_addrs()
+            })
+            .await
+            .context(JoinError)?
+            .map(LookupIp)
+            .context(UnableLookup)
         }
     }
 }

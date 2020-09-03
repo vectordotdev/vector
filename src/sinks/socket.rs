@@ -89,7 +89,7 @@ mod test {
     use crate::{
         config::SinkContext,
         event::Event,
-        test_util::{next_addr, random_lines_with_stream, trace_init, CountReceiver},
+        test_util::{next_addr, next_addr_v6, random_lines_with_stream, trace_init, CountReceiver},
     };
     use futures::{
         compat::{Future01CompatExt, Sink01CompatExt},
@@ -97,13 +97,9 @@ mod test {
     };
     use futures01::Sink;
     use serde_json::Value;
-    use std::net::UdpSocket;
+    use std::net::{SocketAddr, UdpSocket};
 
-    #[tokio::test]
-    async fn udp_message() {
-        trace_init();
-
-        let addr = next_addr();
+    async fn test_udp(addr: SocketAddr) {
         let receiver = UdpSocket::bind(addr).unwrap();
 
         let config = SocketSinkConfig {
@@ -129,6 +125,20 @@ mod test {
         assert!(data.get("timestamp").is_some());
         let message = data.get("message").expect("No message in JSON");
         assert_eq!(message, &Value::String("raw log line".into()));
+    }
+
+    #[tokio::test]
+    async fn udp_ipv4() {
+        trace_init();
+
+        test_udp(next_addr()).await;
+    }
+
+    #[tokio::test]
+    async fn udp_ipv6() {
+        trace_init();
+
+        test_udp(next_addr_v6()).await;
     }
 
     #[tokio::test]
