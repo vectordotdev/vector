@@ -36,9 +36,8 @@ pub fn compile(raw: ConfigBuilder) -> Result<Config, Vec<String>> {
     }
 }
 
-/// Some component configs can act like macros and expand themselves into
-/// multiple replacement configs. Returns a map of components to their
-/// expanded child names.
+/// Some component configs can act like macros and expand themselves into multiple replacement
+/// configs. Performs those expansions and records the relevant metadata.
 pub(super) fn expand_macros(config: &mut Config) -> Result<(), Vec<String>> {
     let mut expanded_transforms = IndexMap::new();
     let mut expansions = IndexMap::new();
