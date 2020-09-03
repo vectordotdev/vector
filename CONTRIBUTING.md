@@ -155,7 +155,8 @@ docs: fix typos
 All pull requests should be reviewed by:
 
 - No review required for cosmetic changes like whitespace, typos, and spelling
-- One Vector team member for minor changes
+  by a maintainer
+- One Vector team member for minor changes or trivial changes from contributors
 - Two Vector team members for major changes
 - Three Vector team members for RFCs
 
