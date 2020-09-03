@@ -372,9 +372,9 @@ mod tests {
         time::Duration,
     };
 
-    #[allow(clippy::never_loop)]
+    // helper which errors the first 3x, and succeeds on the 4th
     async fn retry_until_helper(count: Arc<RwLock<i32>>) -> Result<(), ()> {
-        while *count.read().unwrap() < 3 {
+        if *count.read().unwrap() < 3 {
             let mut c = count.write().unwrap();
             *c += 1;
             return Err(());
