@@ -9721,7 +9721,7 @@ require('custom_module')
 
 # Streams `metric` events to StatsD metrics service.
 [sinks.statsd]
-  # The address to connect to. The address _must_ include a port.
+  # The address to send stats to. The address _must_ include a port.
   #
   # * required
   # * type: string
