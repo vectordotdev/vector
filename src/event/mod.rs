@@ -378,18 +378,6 @@ impl From<Event> for proto::EventWrapper {
     }
 }
 
-// TODO: should probably get rid of this
-impl From<Event> for Vec<u8> {
-    fn from(event: Event) -> Vec<u8> {
-        event
-            .into_log()
-            .remove(&log_schema().message_key())
-            .unwrap()
-            .as_bytes()
-            .to_vec()
-    }
-}
-
 impl From<Bytes> for Event {
     fn from(message: Bytes) -> Self {
         let mut event = Event::Log(LogEvent::from(BTreeMap::new()));
