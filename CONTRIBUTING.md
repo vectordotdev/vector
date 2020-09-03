@@ -832,7 +832,8 @@ Trivial changes, such as spelling fixes, do not need to be signed.
 
 It is important to note that the DCO is not a license. The license of the
 project is the license under which the contribution is made. However, the DCO
-in conjunction with the Vector License may be considered an alternate CLA.
+in conjunction with the Vector License may be considered an alternate
+Contributor License Agreement (CLA).
 
 ## FAQ
 
