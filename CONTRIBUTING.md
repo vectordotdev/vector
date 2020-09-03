@@ -9,6 +9,7 @@ expanding into more specifics.
 
 1. [Assumptions](#assumptions)
 1. [Your First Contribution](#your-first-contribution)
+   1. [New sources, sinks, and transforms](#new-sources-sinks-and-transforms)
 1. [Change Control](#change-control)
    1. [Git Branches](#git-branches)
    1. [Git Commits](#git-commits)
@@ -31,6 +32,7 @@ expanding into more specifics.
       1. [Dependencies](#dependencies)
    1. [Guidelines](#guidelines)
       1. [Sink Healthchecks](#sink-healthchecks)
+      1. [Metric naming convention](#metric-naming-convention)
    1. [Testing](#testing)
       1. [Sample Logs](#sample-logs)
       1. [Tips and Tricks](#tips-and-tricks)
@@ -817,10 +819,10 @@ To protect all users of Vector, the following legal requirements are made.
 ### DCO
 
 Vector requires all contributors to agree to the DCO. DCO stands for Developer
-Certificate of Origin and is maintained by the [Linux
-Foundation](https://www.linuxfoundation.org). It is an attestation attached to
-every commit made by every developer. It ensures that all committed code
-adheres to the [Vector license](LICENSE.md) (Apache 2.0).
+Certificate of Origin and is maintained by the
+[Linux Foundation](https://www.linuxfoundation.org). It is an attestation
+attached to every commit made by every developer. It ensures that all committed
+code adheres to the [Vector license](LICENSE.md).
 
 #### Trivial changes
 
@@ -829,16 +831,9 @@ Trivial changes, such as spelling fixes, do not need to be signed.
 ### Granted rights and copyright assignment
 
 It is important to note that the DCO is not a license. The license of the
-project – in our case the Apache License – is the license under which the
-contribution is made. However, the DCO in conjunction with the Apache License
-may be considered an alternate CLA.
-
-The existence of section 5 of the Apache License is proof that the Apache
-License is intended to be usable without CLAs. Users need for the code to be
-open-source, with all the legal rights that imply, but it is the open source
-license that provides this. The Apache License provides very generous
-copyright permissions from contributors, and contributors explicitly grant
-patent licenses as well. These rights are granted to everyone.
+project is the license under which the contribution is made. However, the DCO
+in conjunction with the Vector License may be considered an alternate
+Contributor License Agreement (CLA).
 
 ## FAQ
 
