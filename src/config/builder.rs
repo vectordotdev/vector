@@ -37,11 +37,16 @@ impl ConfigBuilder {
         compiler::compile(self)
     }
 
-    pub fn add_source<S: SourceConfig + 'static>(&mut self, name: &str, source: S) {
-        self.sources.insert(name.to_string(), Box::new(source));
+    pub fn add_source<S: SourceConfig + 'static, T: Into<String>>(&mut self, name: T, source: S) {
+        self.sources.insert(name.into(), Box::new(source));
     }
 
-    pub fn add_sink<S: SinkConfig + 'static>(&mut self, name: &str, inputs: &[&str], sink: S) {
+    pub fn add_sink<S: SinkConfig + 'static, T: Into<String>>(
+        &mut self,
+        name: T,
+        inputs: &[&str],
+        sink: S,
+    ) {
         let inputs = inputs.iter().map(|&s| s.to_owned()).collect::<Vec<_>>();
         let sink = SinkOuter {
             buffer: Default::default(),
@@ -50,12 +55,12 @@ impl ConfigBuilder {
             inputs,
         };
 
-        self.sinks.insert(name.to_string(), sink);
+        self.sinks.insert(name.into(), sink);
     }
 
-    pub fn add_transform<T: TransformConfig + 'static>(
+    pub fn add_transform<T: TransformConfig + 'static, S: Into<String>>(
         &mut self,
-        name: &str,
+        name: S,
         inputs: &[&str],
         transform: T,
     ) {
@@ -65,7 +70,7 @@ impl ConfigBuilder {
             inputs,
         };
 
-        self.transforms.insert(name.to_string(), transform);
+        self.transforms.insert(name.into(), transform);
     }
 
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {
