@@ -257,6 +257,8 @@ stop-integration-elasticsearch:
 	$(CONTAINER_TOOL) rm --force localstack elasticsearch elasticsearch-tls 2>/dev/null; true
 	$(CONTAINER_TOOL) network rm test-integration-elasticsearch 2>/dev/null; true
 
+test-integration-elasticsearch: AWS_ACCESS_KEY_ID ?= "dummy"
+test-integration-elasticsearch: AWS_SECRET_ACCESS_KEY ?= "dummy"
 test-integration-elasticsearch: ## Runs Elasticsearch integration tests
 ifeq ($(AUTOSPAWN), true)
 	$(MAKE) -k stop-integration-elasticsearch \
