@@ -303,9 +303,66 @@ mod test {
         ];
 
         wait_for_tcp(addr).await;
-        send_lines_tls(addr, "localhost".into(), lines.into_iter())
+        send_lines_tls(addr, "localhost".into(), lines.into_iter(), None)
             .await
             .unwrap();
+
+        let event = rx.next().await.unwrap().unwrap();
+        assert_eq!(
+            event.as_log()[&event::log_schema().message_key()],
+            "short".into()
+        );
+
+        let event = rx.next().await.unwrap().unwrap();
+        assert_eq!(
+            event.as_log()[&event::log_schema().message_key()],
+            "more short".into()
+        );
+    }
+
+    #[tokio::test]
+    async fn tcp_with_tls_intermediate_ca() {
+        let (tx, rx) = Pipeline::new_test();
+        let mut rx = rx.compat();
+        let addr = next_addr();
+
+        let mut config = TcpConfig::new(addr.into());
+        config.max_length = 10;
+        config.tls = Some(TlsConfig {
+            enabled: Some(true),
+            options: TlsOptions {
+                crt_file: Some("tests/data/Chain_with_intermediate.crt".into()),
+                key_file: Some("tests/data/Crt_from_intermediate.key".into()),
+                ..Default::default()
+            },
+        });
+
+        let server = SocketConfig::from(config)
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                tx,
+            )
+            .unwrap()
+            .compat();
+        tokio::spawn(server);
+
+        let lines = vec![
+            "short".to_owned(),
+            "this is too long".to_owned(),
+            "more short".to_owned(),
+        ];
+
+        wait_for_tcp(addr).await;
+        send_lines_tls(
+            addr,
+            "localhost".into(),
+            lines.into_iter(),
+            std::path::Path::new("tests/data/Vector_CA.crt"),
+        )
+        .await
+        .unwrap();
 
         let event = rx.next().await.unwrap().unwrap();
         assert_eq!(

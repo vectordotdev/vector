@@ -161,11 +161,17 @@ pub async fn send_lines_tls(
     addr: SocketAddr,
     host: String,
     lines: impl Iterator<Item = String>,
+    ca: impl Into<Option<&Path>>,
 ) -> Result<(), Infallible> {
     let stream = TcpStream::connect(&addr).await.unwrap();
 
     let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
-    connector.set_verify(SslVerifyMode::NONE);
+    if let Some(ca) = ca.into() {
+        connector.set_ca_file(ca).unwrap();
+    } else {
+        connector.set_verify(SslVerifyMode::NONE);
+    }
+
     let config = connector.build().configure().unwrap();
 
     let stream = tokio_openssl::connect(config, &host, stream).await.unwrap();
