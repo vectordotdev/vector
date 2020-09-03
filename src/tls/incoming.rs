@@ -89,6 +89,7 @@ pub struct MaybeTlsIncomingStream<S> {
 enum StreamState<S> {
     Accepted(MaybeTlsStream<S>),
     Accepting(BoxFuture<'static, Result<SslStream<S>, HandshakeError<S>>>),
+    AcceptError(String),
 }
 
 #[cfg(feature = "listenfd")]
@@ -105,6 +106,7 @@ impl<S> MaybeTlsIncomingStream<S> {
                 MaybeTls::Tls(s) => s.get_ref(),
             }),
             StreamState::Accepting(_) => None,
+            StreamState::AcceptError(_) => None,
         }
     }
 }
@@ -165,9 +167,13 @@ impl MaybeTlsIncomingStream<TcpStream> {
                     }
                     Err(error) => {
                         let error = io::Error::new(io::ErrorKind::Other, error);
+                        this.state = StreamState::AcceptError(error.to_string());
                         Poll::Ready(Err(error))
                     }
                 },
+                StreamState::AcceptError(error) => {
+                    Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, error.to_owned())))
+                }
             };
         }
     }
