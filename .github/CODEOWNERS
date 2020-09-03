@@ -17,9 +17,9 @@
 
 /lib/file-source/src/paths_provider/mod.rs @MOZGIII
 /lib/file-source/src/paths_provider/glob.rs @MOZGIII
-/lib/k8s-test-framework/ @MOZGIII
+/lib/k8s-test-framework/ @MOZGIII @JeanMertz
 /lib/prometheus-parser/ @juchiast
-/lib/vector-wasm/ @hoverbear
+/lib/vector-wasm/ @hoverbear @JeanMertz
 
 /proto/ @lukesteensen
 
@@ -36,8 +36,8 @@
 /scripts/ci-setup-minikube.sh @MOZGIII
 /scripts/ci-setup-helm.sh @MOZGIII
 /scripts/release-helm.sh @MOZGIII
-/scripts/deploy-kubernetes-test.sh @MOZGIII
-/scripts/test-e2e-kubernetes.sh @MOZGIII
+/scripts/deploy-kubernetes-test.sh @MOZGIII @JeanMertz
+/scripts/test-e2e-kubernetes.sh @MOZGIII @JeanMertz
 
 /src/generate.rs
 /src/list.rs
@@ -59,7 +59,9 @@
 /src/event/merge_state.rs @MOZGIII
 /src/event/discriminant.rs @MOZGIII
 
-/src/kubernetes/ @MOZGIII
+/src/internal_events/ @JeanMertz
+
+/src/kubernetes/ @MOZGIII @JeanMertz
 
 /src/sinks/*_metrics.rs @lukesteensen
 /src/sinks/aws_kinesis_streams.rs @jszwedko
@@ -90,15 +92,15 @@
 /src/sources/tcp.rs @bruceg
 /src/sources/udp.rs @bruceg
 /src/sources/vector.rs @lukesteensen
-/src/sources/util/multiline_config.rs @MOZGIII
-/src/sources/kubernetes_logs/ @MOZGIII
+/src/sources/util/multiline_config.rs @MOZGIII @JeanMertz
+/src/sources/kubernetes_logs/ @MOZGIII @JeanMertz
 /src/sources/splunk_hec.rs @ktff
 
 /src/topology/ @lukesteensen
 
 /src/transforms/add_fields.rs
 /src/transforms/add_tags.rs @lukesteensen
-/src/transforms/ansi_stripper.rs @lukesteensen
+/src/transforms/ansi_stripper.rs @JeanMertz
 /src/transforms/coercer.rs @bruceg
 /src/transforms/filter.rs @bruceg
 /src/transforms/field_filter.rs @lukesteensen
@@ -115,11 +117,11 @@
 /src/transforms/split.rs @lukesteensen
 /src/transforms/tokenzier.rs @lukesteensen
 
-/src/wasm/ @hoverbear
+/src/wasm/ @hoverbear @JeanMertz
 
 /tests/buffering.rs @MOZGIII
-/tests/data/wasm/ @hoverbear
-/tests/kubernetes-e2e.rs @MOZGIII
+/tests/data/wasm/ @hoverbear @JeanMertz
+/tests/kubernetes-e2e.rs @MOZGIII @JeanMertz
 /tests/shutdown.rs @ktff
 /tests/cli.rs @ktff
 
