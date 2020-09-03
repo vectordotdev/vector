@@ -24,7 +24,7 @@ lazy_static! {
 ///
 /// [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
 pub struct Cri {
-    // TODO: patch `RegexParser` to expose the concerete type on build.
+    // TODO: patch `RegexParser` to expose the concrete type on build.
     regex_parser: Box<dyn Transform>,
 }
 

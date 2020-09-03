@@ -214,7 +214,7 @@ impl FileSink {
                             drop(expired_file); // ignore close error
                         }
                         Some(Err(error)) => error!(
-                            message = "An error occured while expiring a file.",
+                            message = "An error occurred while expiring a file.",
                             %error,
                         ),
                     }
@@ -247,7 +247,7 @@ impl FileSink {
             let file = match open_file(BytesPath::new(path.clone())).await {
                 Ok(file) => file,
                 Err(error) => {
-                    // We coundn't open the file for this event.
+                    // We couldn't open the file for this event.
                     // Maybe other events will work though! Just log
                     // the error and skip this event.
                     error!(message = "Unable to open the file.", ?path, %error);

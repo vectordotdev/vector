@@ -1,13 +1,12 @@
 use crate::{
     config::{Config, ConfigDiff},
-    runtime::Runtime,
     topology::{self, RunningTopology},
     trace, Event,
 };
 use flate2::read::GzDecoder;
 use futures::{
-    compat::Stream01CompatExt, future, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream,
-    StreamExt, TryFutureExt, TryStreamExt,
+    compat::Stream01CompatExt, future, ready, stream, task::noop_waker_ref, FutureExt, SinkExt,
+    Stream, StreamExt, TryStreamExt,
 };
 use futures01::{sync::mpsc, Stream as Stream01};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
@@ -31,6 +30,7 @@ use std::{
 use tokio::{
     io::{AsyncRead, AsyncWrite, Result as IoResult},
     net::{TcpListener, TcpStream},
+    runtime,
     sync::oneshot,
     task::JoinHandle,
     time::{delay_for, Duration, Instant},
@@ -261,7 +261,7 @@ where
 
     let mut vec = Vec::new();
     loop {
-        match Pin::new(&mut rx).poll_next(&mut cx) {
+        match rx.poll_next_unpin(&mut cx) {
             Poll::Ready(Some(Ok(item))) => vec.push(item),
             Poll::Ready(Some(Err(()))) => return Err(()),
             Poll::Ready(None) | Poll::Pending => return Ok(vec),
@@ -289,27 +289,16 @@ pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     output.lines().map(|s| s.to_owned()).collect()
 }
 
-pub fn runtime() -> Runtime {
-    Runtime::single_threaded().unwrap()
-}
-
-pub fn basic_scheduler_block_on_std<F>(future: F) -> F::Output
-where
-    F: Future + Send + 'static,
-    F::Output: Send + 'static,
-{
-    // `tokio::time::advance` is not work on threaded scheduler
-    // `tokio_compat::runtime::current_thread` use `basic_scheduler`
-    // Example: https://pastebin.com/7fK4nxEW
-    tokio_compat::runtime::current_thread::Builder::new()
+pub fn runtime() -> runtime::Runtime {
+    runtime::Builder::new()
+        .threaded_scheduler()
+        .enable_all()
         .build()
         .unwrap()
-        // This is limit of `compat`, otherwise we get error: `no Task is currently running`
-        .block_on(future.never_error().boxed().compat())
-        .unwrap()
 }
 
-pub async fn wait_for<F, Fut>(mut f: F)
+// Wait for a Future to resolve, or the duration to elapse (will panic)
+pub async fn wait_for_duration<F, Fut>(mut f: F, duration: Duration)
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = bool> + Send + 'static,
@@ -317,14 +306,33 @@ where
     let started = Instant::now();
     while !f().await {
         delay_for(Duration::from_millis(5)).await;
-        if started.elapsed().as_secs() > 5 {
+        if started.elapsed() > duration {
             panic!("Timed out while waiting");
         }
     }
 }
 
+// Wait for 5 seconds
+pub async fn wait_for<F, Fut>(f: F)
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = bool> + Send + 'static,
+{
+    wait_for_duration(f, Duration::from_secs(5)).await
+}
+
+// Wait (for 5 secs) for a TCP socket to be reachable
 pub async fn wait_for_tcp(addr: SocketAddr) {
     wait_for(|| async move { TcpStream::connect(addr).await.is_ok() }).await
+}
+
+// Allows specifying a custom duration to wait for a TCP socket to be reachable
+pub async fn wait_for_tcp_duration(addr: SocketAddr, duration: Duration) {
+    wait_for_duration(
+        || async move { TcpStream::connect(addr).await.is_ok() },
+        duration,
+    )
+    .await
 }
 
 pub async fn wait_for_atomic_usize<T, F>(value: T, unblock: F)
@@ -352,7 +360,7 @@ impl<T: Send + 'static> CountReceiver<T> {
         self.count.load(Ordering::Relaxed)
     }
 
-    /// Succeds once first connection has been made.
+    /// Succeeds once first connection has been made.
     pub async fn connected(&mut self) {
         if let Some(tripwire) = self.connected.take() {
             tripwire.await.unwrap();
@@ -386,7 +394,7 @@ impl<T> Future for CountReceiver<T> {
             let _ = trigger.send(());
         }
 
-        let result = futures::ready!(Pin::new(&mut this.handle).poll(cx));
+        let result = ready!(this.handle.poll_unpin(cx));
         Poll::Ready(result.unwrap())
     }
 }
