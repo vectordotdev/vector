@@ -406,8 +406,7 @@ endif
 start-integration-splunk:
 	$(CONTAINER_TOOL) network create test-integration-splunk
 	$(CONTAINER_TOOL) run -d --network=test-integration-splunk -p 8088:8088 -p 8000:8000 -p 8089:8089 \
-	 --entrypoint 'sh -c ./bin/splunk add index custom_index && ./bin/splunk set minfreemb 5 && ./entrypoint.sh' \
-     --name splunk timberio/splunk-hec-test:latest
+     --name splunk timberio/splunk-hec-test:minus_compose
 
 stop-integration-splunk:
 	$(CONTAINER_TOOL) rm --force splunk 2>/dev/null; true
