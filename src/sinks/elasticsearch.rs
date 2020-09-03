@@ -593,7 +593,6 @@ mod tests {
 #[cfg(feature = "es-integration-tests")]
 mod integration_tests {
     use super::*;
-    use crate::test_util::wait_for_tcp_duration;
     use crate::{
         config::{SinkConfig, SinkContext},
         dns::Resolver,
@@ -609,7 +608,6 @@ mod integration_tests {
     use serde_json::{json, Value};
     use std::fs::File;
     use std::io::Read;
-    use tokio::time::Duration;
 
     #[test]
     fn ensure_pipeline_in_params() {
@@ -688,9 +686,6 @@ mod integration_tests {
     async fn insert_events_over_http() {
         trace_init();
 
-        // Wait for port 9200 to be reachable before firing off request
-        wait_for_tcp_duration("127.0.0.1:9200".parse().unwrap(), Duration::from_secs(30)).await;
-
         run_insert_tests(
             ElasticSearchConfig {
                 endpoint: "http://localhost:9200".into(),
@@ -706,9 +701,6 @@ mod integration_tests {
     #[tokio::test]
     async fn insert_events_over_https() {
         trace_init();
-
-        // Wait for port 9201 to be reachable before firing off request
-        wait_for_tcp_duration("127.0.0.1:9201".parse().unwrap(), Duration::from_secs(30)).await;
 
         run_insert_tests(
             ElasticSearchConfig {
@@ -730,9 +722,6 @@ mod integration_tests {
     async fn insert_events_on_aws() {
         trace_init();
 
-        // Wait for port 4571 to be reachable before firing off request
-        wait_for_tcp_duration("127.0.0.1:4571".parse().unwrap(), Duration::from_secs(30)).await;
-
         run_insert_tests(
             ElasticSearchConfig {
                 auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
@@ -747,9 +736,6 @@ mod integration_tests {
     #[tokio::test]
     async fn insert_events_with_failure() {
         trace_init();
-
-        // Wait for port 9200 to be reachable before firing off request
-        wait_for_tcp_duration("127.0.0.1:9200".parse().unwrap(), Duration::from_secs(30)).await;
 
         run_insert_tests(
             ElasticSearchConfig {
