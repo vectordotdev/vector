@@ -110,6 +110,44 @@ jobs:
       - run: make slim-builds
       - run: make build-x86_64-unknown-linux-gnu
 
+  # TODO: Upgrade to test once the tz issues are solved.
+  build-x86_64-unknown-linux-musl:
+    name: Unit - x86_64-unknown-linux-gnu
+    runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make build-x86_64-unknown-linux-gnu
+
+  # TODO: Upgrade to test once the tz issues are solved.
+  build-aarch64-unknown-linux-musl:
+    name: Unit - aarch64-unknown-linux-gnu
+    runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make build-x86_64-unknown-linux-gnu
+
   test-mac:
     name: Unit - Mac
     # Full CI suites for this platform were only recently introduced.

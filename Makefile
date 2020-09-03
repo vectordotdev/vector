@@ -173,11 +173,11 @@ build-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/release/vector #
 build-aarch64-unknown-linux-gnu: target/aarch64-unknown-linux-gnu/release/vector ## Build a release binary for the aarch64-unknown-linux-gnu triple.
 	@echo "Output to ${<}"
 
-build-x86_64-unknown-linux-musl: ## Build static binary in release mode for the x86_64 architecture
-	$(RUN) build-x86_64-unknown-linux-musl
+build-x86_64-unknown-linux-musl: target/x86_64-unknown-linux-musl/release/vector ## Build a release binary for the x86_64-unknown-linux-musl triple.
+	@echo "Output to ${<}"
 
-build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in release mode for the aarch64 architecture
-	$(RUN) build-aarch64-unknown-linux-musl
+build-aarch64-unknown-linux-musl: target/aarch64-unknown-linux-musl/release/vector ## Build a release binary for the aarch64-unknown-linux-musl triple.
+	@echo "Output to ${<}"
 
 ##@ Cross Compiling
 .PHONY: cross-enable
@@ -466,19 +466,20 @@ package-archive: build ## Build the Vector archive
 package-archive-all: package-archive-x86_64-unknown-linux-musl package-archive-x86_64-unknown-linux-gnu package-archive-aarch64-unknown-linux-musl ## Build all archives
 
 .PHONY: package-archive-x86_64-unknown-linux-musl
-package-archive-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## Build the x86_64 archive
-	$(RUN) package-archive-x86_64-unknown-linux-musl
+package-archive-x86_64-unknown-linux-musl: target/artifacts/vector-x86_64-unknown-linux-musl.tar.gz ## Build an archive of the x86_64-unknown-linux-musl triple.
+	@echo "Output to ${<}."
+
 
 .PHONY: package-archive-x86_64-unknown-linux-gnu
 package-archive-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build an archive of the x86_64-unknown-linux-gnu triple.
 	@echo "Output to ${<}."
 
 .PHONY: package-archive-aarch64-unknown-linux-musl
-package-archive-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## Build an archive of the aarch64-unknown-linux-gnu triple.
-	$(RUN) package-archive-aarch64-unknown-linux-musl
+package-archive-aarch64-unknown-linux-musl: target/artifacts/vector-aarch64-unknown-linux-musl.tar.gz## Build an archive of the aarch64-unknown-linux-gnu triple.
+	@echo "Output to ${<}."
 
 .PHONY: package-archive-aarch64-unknown-linux-gnu
-package-archive-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build the aarch64 archive
+package-archive-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz## Build an archive of the aarch64-unknown-linux-musl triple.
 	@echo "Output to ${<}."
 
 
