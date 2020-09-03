@@ -27,8 +27,8 @@ impl Clone for ConfigBuilder {
         // we first serialize it into JSON, then back from
         // JSON. Originally we used TOML here but TOML does not
         // support serializing `None`.
-        let json = serde_json::to_vec(self).unwrap();
-        serde_json::from_slice(&json[..]).unwrap()
+        let json = serde_json::to_value(self).unwrap();
+        serde_json::from_value(json).unwrap()
     }
 }
 
