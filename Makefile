@@ -39,7 +39,11 @@ export WASM_MODULES = $(patsubst tests/data/wasm/%/,%,$(wildcard tests/data/wasm
 # The same WASM modules, by output path.
 export WASM_MODULE_OUTPUTS = $(patsubst %,/target/wasm32-wasi/%,$(WASM_MODULES))
 
- # Deprecated.
+# Set dummy AWS credentials if not present - used for AWS and ES integration tests
+export AWS_ACCESS_KEY_ID ?= "dummy"
+export AWS_SECRET_ACCESS_KEY ?= "dummy"
+
+# Deprecated.
 export USE_CONTAINER ?= $(CONTAINER_TOOL)
 
 FORMATTING_BEGIN_YELLOW = \033[0;33m
@@ -204,8 +208,6 @@ stop-integration-aws:
 	$(CONTAINER_TOOL) rm --force ec2_metadata mockwatchlogs localstack 2>/dev/null; true
 	$(CONTAINER_TOOL) network rm test-integration-aws 2>/dev/null; true
 
-test-integration-aws: AWS_ACCESS_KEY_ID ?= "dummy"
-test-integration-aws: AWS_SECRET_ACCESS_KEY ?= "dummy"
 test-integration-aws: ## Runs AWS integration tests
 ifeq ($(AUTOSPAWN), true)
 	$(MAKE) -k stop-integration-aws \
@@ -257,8 +259,6 @@ stop-integration-elasticsearch:
 	$(CONTAINER_TOOL) rm --force localstack elasticsearch elasticsearch-tls 2>/dev/null; true
 	$(CONTAINER_TOOL) network rm test-integration-elasticsearch 2>/dev/null; true
 
-test-integration-elasticsearch: AWS_ACCESS_KEY_ID ?= "dummy"
-test-integration-elasticsearch: AWS_SECRET_ACCESS_KEY ?= "dummy"
 test-integration-elasticsearch: ## Runs Elasticsearch integration tests
 ifeq ($(AUTOSPAWN), true)
 	$(MAKE) -k stop-integration-elasticsearch \
