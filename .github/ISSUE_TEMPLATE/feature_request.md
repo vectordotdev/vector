@@ -1,7 +1,7 @@
 ---
 name: Feature Request
-about: Suggest a new feature or other enhancement.
-labels: 'type: enhancement'
+about: Suggest a new feature or enhancement.
+labels: 'type: feature'
 assignees: ''
 title: ''
 
@@ -11,13 +11,10 @@ title: ''
 Hi there,
 
 Thank you for opening an issue. Please note that we try to keep the Vector issue tracker reserved for bug reports and feature requests. For general usage questions, please see: https://chat.vector.dev.
-
-PSA: Using Vector? Let us know! Add your company here:
-
-https://github.com/timberio/vector/blob/master/.meta/companies.toml
 -->
 
 ### Current Vector Version
+
 <!---
 Run `vector --version` to show the version, and paste the result between the ``` marks below. This will record which version was current at the time of your feature request, to help manage the request backlog.
 
@@ -29,6 +26,7 @@ If you're not using the latest version, please check to see if something related
 ```
 
 ### Use-cases
+
 <!---
 In order to properly evaluate a feature request, it is necessary to understand the use-cases for it.
 
@@ -38,6 +36,7 @@ Please keep this section focused on the problem and not on the suggested solutio
 -->
 
 ### Attempted Solutions
+
 <!---
 If you've already tried to solve the problem within Vector's existing features and found a limitation that prevented you from succeeding, please describe it below in as much detail as possible.
 
@@ -47,6 +46,7 @@ Please remove any sensitive information such as passwords before sharing configu
 --->
 
 ### Proposal
+
 <!---
 If you have an idea for a way to address the problem via a change to Vector features, please describe it below.
 
@@ -56,6 +56,7 @@ If you're not sure of some details, don't worry! When we evaluate the feature re
 -->
 
 ### References
+
 <!--
 Are there any other GitHub issues, whether open or closed, that are related to the problem you've described above or to the suggested solution? If so, please create a list below that mentions each of them. For example:
 
