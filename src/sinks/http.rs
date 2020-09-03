@@ -411,7 +411,7 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).unwrap();
-        let mut sink = sink.as_futures01sink().sink_compat();
+        let mut sink = sink.into_futures01sink().sink_compat();
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let (input_lines, mut events) = random_lines_with_stream(100, num_lines);
@@ -467,7 +467,7 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).unwrap();
-        let mut sink = sink.as_futures01sink().sink_compat();
+        let mut sink = sink.into_futures01sink().sink_compat();
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let (input_lines, mut events) = random_lines_with_stream(100, num_lines);
@@ -520,7 +520,7 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).unwrap();
-        let mut sink = sink.as_futures01sink().sink_compat();
+        let mut sink = sink.into_futures01sink().sink_compat();
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let (input_lines, mut events) = random_lines_with_stream(100, num_lines);

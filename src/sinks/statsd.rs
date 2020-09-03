@@ -416,7 +416,7 @@ mod test {
 
         let stream = stream::iter_ok(events);
         let _ = sink
-            .as_futures01sink()
+            .into_futures01sink()
             .send_all(stream)
             .compat()
             .await

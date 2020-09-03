@@ -442,7 +442,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.as_futures01sink().send(event).compat().await.unwrap();
+        sink.into_futures01sink().send(event).compat().await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -461,7 +461,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.as_futures01sink().send(event).compat().await.unwrap();
+        sink.into_futures01sink().send(event).compat().await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -478,7 +478,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.as_futures01sink().send(event).compat().await.unwrap();
+        sink.into_futures01sink().send(event).compat().await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -494,7 +494,7 @@ mod integration_tests {
 
         let (messages, mut events) = random_lines_with_stream(100, 10);
         let _ = sink
-            .as_futures01sink()
+            .into_futures01sink()
             .sink_compat()
             .send_all(&mut events)
             .await
@@ -531,7 +531,7 @@ mod integration_tests {
         let message = random_string(100);
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
-        sink.as_futures01sink().send(event).compat().await.unwrap();
+        sink.into_futures01sink().send(event).compat().await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -552,7 +552,7 @@ mod integration_tests {
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
         event.as_mut_log().insert("host", "example.com:1234");
-        sink.as_futures01sink().send(event).compat().await.unwrap();
+        sink.into_futures01sink().send(event).compat().await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -576,7 +576,7 @@ mod integration_tests {
         let message = random_string(100);
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
-        sink.as_futures01sink().send(event).compat().await.unwrap();
+        sink.into_futures01sink().send(event).compat().await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -603,7 +603,7 @@ mod integration_tests {
         event.as_mut_log().insert("asdf", "hello");
         event.as_mut_log().insert("host", "example.com:1234");
         event.as_mut_log().insert("roast", "beef.example.com:1234");
-        sink.as_futures01sink().send(event).compat().await.unwrap();
+        sink.into_futures01sink().send(event).compat().await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 

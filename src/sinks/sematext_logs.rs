@@ -68,7 +68,7 @@ impl SinkConfig for SematextLogsConfig {
         }
         .build(cx)?;
 
-        let sink = Box::new(sink.as_futures01sink().with(map_timestamp));
+        let sink = Box::new(sink.into_futures01sink().with(map_timestamp));
 
         Ok((super::VectorSink::Futures01Sink(sink), healthcheck))
     }
@@ -133,7 +133,7 @@ mod tests {
 
         let (expected, mut events) = random_lines_with_stream(100, 10);
         let _ = sink
-            .as_futures01sink()
+            .into_futures01sink()
             .sink_compat()
             .send_all(&mut events)
             .await

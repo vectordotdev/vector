@@ -290,7 +290,7 @@ mod tests {
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
         let events = stream01::iter_ok(input_lines.clone().into_iter().map(Event::from));
 
-        let pump = sink.as_futures01sink().send_all(events);
+        let pump = sink.into_futures01sink().send_all(events);
 
         tokio::spawn(server);
 

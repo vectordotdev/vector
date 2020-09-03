@@ -99,7 +99,7 @@ impl VectorSink {
         }
     }
 
-    pub fn as_futures01sink(
+    pub fn into_futures01sink(
         self,
     ) -> Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + 'static + Send> {
         match self {

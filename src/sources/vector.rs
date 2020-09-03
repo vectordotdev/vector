@@ -147,7 +147,7 @@ mod test {
         ];
 
         let _ = sink
-            .as_futures01sink()
+            .into_futures01sink()
             .send_all(stream::iter_ok(events.clone().into_iter()))
             .compat()
             .await

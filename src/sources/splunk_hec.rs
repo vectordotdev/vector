@@ -845,7 +845,7 @@ mod tests {
     ) -> Vec<Event> {
         let n = messages.len();
         let pump = sink
-            .as_futures01sink()
+            .into_futures01sink()
             .send_all(stream::iter_ok(messages.into_iter().map(Into::into)));
         tokio::spawn(pump.map(|_| ()).map_err(|()| panic!()).compat());
         let events = collect_n(source, n).await.unwrap();
@@ -1007,7 +1007,7 @@ mod tests {
         event.as_mut_log().insert("greeting", "hello");
         event.as_mut_log().insert("name", "bob");
 
-        let _ = sink.as_futures01sink().send(event).compat().await.unwrap();
+        let _ = sink.into_futures01sink().send(event).compat().await.unwrap();
         let event = collect_n(source, 1).await.unwrap().remove(0);
 
         assert_eq!(event.as_log()[&"greeting".into()], "hello".into());
@@ -1031,7 +1031,7 @@ mod tests {
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("line", "hello");
 
-        let _ = sink.as_futures01sink().send(event).compat().await.unwrap();
+        let _ = sink.into_futures01sink().send(event).compat().await.unwrap();
         let event = collect_n(source, 1).await.unwrap().remove(0);
 
         assert_eq!(

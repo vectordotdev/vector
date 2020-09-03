@@ -476,7 +476,7 @@ mod tests {
         }
 
         let pump = sink
-            .as_futures01sink()
+            .into_futures01sink()
             .send_all(futures01::stream::iter_ok(events));
         let _ = pump.compat().await.unwrap();
 
@@ -542,7 +542,7 @@ mod tests {
         }
 
         let pump = sink
-            .as_futures01sink()
+            .into_futures01sink()
             .send_all(futures01::stream::iter_ok(events));
         let _ = pump.compat().await.unwrap();
 

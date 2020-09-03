@@ -229,7 +229,7 @@ mod tests {
         // Send the test data
         let (input_lines, mut events) = random_lines_with_stream(100, num_lines);
         let _ = sink
-            .as_futures01sink()
+            .into_futures01sink()
             .sink_compat()
             .send_all(&mut events)
             .await
