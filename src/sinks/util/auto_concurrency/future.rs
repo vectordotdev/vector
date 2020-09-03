@@ -22,7 +22,7 @@ use tokio::sync::OwnedSemaphorePermit;
 /// semaphore permit that is used to control concurrency such that the
 /// semaphore is returned when this future is dropped.
 ///
-/// Note that this future must be 'await'ed immediately (such as by
+/// Note that this future must be awaited immediately (such as by
 /// spawning it) to prevent extraneous delays from causing discrepancies
 /// in the measurements.
 #[pin_project]

@@ -8,12 +8,12 @@ use bytes::Bytes;
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     future::{self, BoxFuture},
-    stream, FutureExt, Stream, StreamExt, TryFutureExt,
+    stream, FutureExt, StreamExt, TryFutureExt,
 };
 use futures01::Sink;
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
-use std::{fmt, future::Future, io, net::SocketAddr, pin::Pin, task::Poll, time::Duration};
+use std::{fmt, io, net::SocketAddr, task::Poll, time::Duration};
 use tokio::{
     net::{TcpListener, TcpStream},
     time::delay_for,
@@ -177,9 +177,9 @@ async fn handle_stream(
     let mut reader = FramedRead::new(socket, source.decoder());
     stream::poll_fn(move |cx| {
         if let Some(fut) = shutdown.as_mut() {
-            match Pin::new(fut).poll(cx) {
+            match fut.poll_unpin(cx) {
                 Poll::Ready(Ok(token)) => {
-                    debug!("Start gracefull shutdown");
+                    debug!("Start graceful shutdown");
                     // Close our write part of TCP socket to signal the other side
                     // that it should stop writing and close the channel.
                     let socket: Option<&TcpStream> = reader.get_ref().get_ref();
@@ -203,7 +203,7 @@ async fn handle_stream(
             }
         }
 
-        Pin::new(&mut reader).poll_next(cx)
+        reader.poll_next_unpin(cx)
     })
     .take_until(tripwire)
     .filter_map(move |frame| future::ready(match frame {

@@ -259,7 +259,7 @@ impl SplunkSource {
                         Ok(Async::Ready(())) => Ok(warp::reply().into_response()),
                         // Since channel of mpsc::Sender increase by one with each sender, technically
                         // channel will never be full, and this will never be returned.
-                        // This behavior dosn't fulfill one of purposes of healthcheck.
+                        // This behavior doesn't fulfill one of the purposes of healthcheck.
                         Ok(Async::NotReady) => Ok(warp::reply::with_status(
                             warp::reply(),
                             StatusCode::SERVICE_UNAVAILABLE,
@@ -328,9 +328,9 @@ impl SplunkSource {
 struct EventStream<R: Read> {
     /// Remaining request with JSON events
     data: R,
-    /// Count of sended events
+    /// Count of sent events
     events: usize,
-    /// Optinal channel from headers
+    /// Optional channel from headers
     channel: Option<Value>,
     /// Default time
     time: Time,
@@ -395,7 +395,7 @@ impl<R: Read> Stream for EventStream<R> {
             }
         };
 
-        // Concstruct Event from parsed json event
+        // Construct Event from parsed json event
         let mut event = Event::new_empty_log();
         let log = event.as_mut_log();
 
@@ -505,7 +505,7 @@ impl<R: Read> Stream for EventStream<R> {
 /// This attempts to parse timestamps based on what cutoff range they fall into.
 /// For seconds to be parsed the timestamp must be less than the unix epoch of
 /// the year `2400`. For this to parse milliseconds the time must be smaller
-/// than the year `10,000` in unix epcoch milliseconds. If the value is larger
+/// than the year `10,000` in unix epoch milliseconds. If the value is larger
 /// than both we attempt to parse it as nanoseconds.
 ///
 /// Returns `None` if `t` is negative.
@@ -674,7 +674,7 @@ mod splunk_response {
         pub static ref SERVER_ERROR: Bytes =
             json_to_bytes(json!({"text":"Internal server error","code":8}));
         pub static ref SERVER_SHUTDOWN: Bytes =
-            json_to_bytes(json!({"text":"Server is shuting down","code":9}));
+            json_to_bytes(json!({"text":"Server is shutting down","code":9}));
         pub static ref UNSUPPORTED_MEDIA_TYPE: Bytes =
             json_to_bytes(json!({"text":"unsupported content encoding"}));
         pub static ref NO_CHANNEL: Bytes =

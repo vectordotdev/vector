@@ -1,14 +1,16 @@
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
-use futures::TryFutureExt;
-use futures01::Future;
+use futures::{compat::Future01CompatExt, TryFutureExt};
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Response, Server,
 };
 use std::net::SocketAddr;
-use tokio::runtime::{Builder, Runtime};
-use vector::test_util::{next_addr, random_lines, send_lines, start_topology, wait_for_tcp};
-use vector::{config, runtime, sinks, sources, Error};
+use tokio::runtime::Runtime;
+use vector::{
+    config, sinks, sources,
+    test_util::{next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp},
+    Error,
+};
 
 fn benchmark_http_no_compression(c: &mut Criterion) {
     let num_lines: usize = 100_000;
@@ -17,7 +19,7 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let _ = serve(out_addr);
+    let _srv = serve(out_addr);
 
     let bench = Benchmark::new("http_no_compression", move |b| {
         b.iter_with_setup(
@@ -44,20 +46,20 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
                     },
                 );
 
-                let mut rt = runtime::Runtime::new().unwrap();
-
-                let (topology, _crash) = rt.block_on_std(start_topology(config, false));
-                rt.block_on_std(async move { wait_for_tcp(in_addr).await });
-
+                let mut rt = runtime();
+                let topology = rt.block_on(async move {
+                    let (topology, _crash) = start_topology(config, false).await;
+                    wait_for_tcp(in_addr).await;
+                    topology
+                });
                 (rt, topology)
             },
             |(mut rt, topology)| {
-                let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                rt.block_on_std(send).unwrap();
-
-                rt.block_on(topology.stop()).unwrap();
-
-                rt.shutdown_now().wait().unwrap();
+                rt.block_on(async move {
+                    let lines = random_lines(line_size).take(num_lines);
+                    send_lines(in_addr, lines).await.unwrap();
+                    topology.stop().compat().await.unwrap();
+                });
             },
         )
     })
@@ -75,7 +77,7 @@ fn benchmark_http_gzip(c: &mut Criterion) {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let _ = serve(out_addr);
+    let _srv = serve(out_addr);
 
     let bench = Benchmark::new("http_gzip", move |b| {
         b.iter_with_setup(
@@ -102,20 +104,20 @@ fn benchmark_http_gzip(c: &mut Criterion) {
                     },
                 );
 
-                let mut rt = runtime::Runtime::new().unwrap();
-
-                let (topology, _crash) = rt.block_on_std(start_topology(config, false));
-                rt.block_on_std(async move { wait_for_tcp(in_addr).await });
-
+                let mut rt = runtime();
+                let topology = rt.block_on(async move {
+                    let (topology, _crash) = start_topology(config, false).await;
+                    wait_for_tcp(in_addr).await;
+                    topology
+                });
                 (rt, topology)
             },
             |(mut rt, topology)| {
-                let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                rt.block_on_std(send).unwrap();
-
-                rt.block_on(topology.stop()).unwrap();
-
-                rt.shutdown_now().wait().unwrap();
+                rt.block_on(async move {
+                    let lines = random_lines(line_size).take(num_lines);
+                    send_lines(in_addr, lines).await.unwrap();
+                    topology.stop().compat().await.unwrap();
+                });
             },
         )
     })
@@ -127,21 +129,20 @@ fn benchmark_http_gzip(c: &mut Criterion) {
 }
 
 fn serve(addr: SocketAddr) -> Runtime {
-    let runtime = Builder::new().core_threads(1).build().unwrap();
+    let rt = runtime();
+    rt.spawn(async move {
+        let make_service = make_service_fn(|_| async {
+            Ok::<_, Error>(service_fn(|_req| async {
+                Ok::<_, Error>(Response::new(Body::empty()))
+            }))
+        });
 
-    let make_service = make_service_fn(|_| async {
-        Ok::<_, Error>(service_fn(|_req| async {
-            Ok::<_, Error>(Response::new(Body::empty()))
-        }))
-    });
-
-    runtime.spawn(
         Server::bind(&addr)
             .serve(make_service)
-            .map_err(|e| panic!(e)),
-    );
-
-    runtime
+            .map_err(|e| panic!(e))
+            .await
+    });
+    rt
 }
 
 criterion_group!(http, benchmark_http_no_compression, benchmark_http_gzip);
