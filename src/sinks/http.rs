@@ -73,7 +73,7 @@ lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
         in_flight_limit: InFlightLimit::Fixed(10),
         timeout_secs: Some(30),
-        rate_limit_num: Some(10),
+        rate_limit_num: Some(u64::max_value()),
         ..Default::default()
     };
 }

@@ -5,7 +5,7 @@ use futures::{future::BoxFuture, FutureExt};
 use std::{collections::VecDeque, time::Duration};
 use tokio::time::{delay_until, Instant};
 
-/// A [`super::Write`] implementatiom that wraps another [`super::Write`] and
+/// A [`super::Write`] implementation that wraps another [`super::Write`] and
 /// delays the delete calls.
 /// Implements the logic for delaying the deletion of items from the storage.
 pub struct Writer<T>
@@ -206,7 +206,7 @@ mod tests {
         assert!(writer.maintenance_request().is_none());
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn add() {
         trace_init();
 
@@ -219,7 +219,7 @@ mod tests {
         .await
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn update() {
         trace_init();
 
@@ -232,7 +232,7 @@ mod tests {
         .await
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn delete() {
         trace_init();
 
@@ -272,7 +272,7 @@ mod tests {
             assert_eq!(event.unwrap_op(), (pod, mock::OpKind::Delete));
             actions_tx.send(()).await.unwrap();
 
-            // Control for the mock perform maintenance call (donwstream maintenance).
+            // Control for the mock perform maintenance call (downstream maintenance).
             let event = events_rx.next().await.unwrap();
             assert!(matches!(event, mock::ScenarioEvent::Maintenance));
             actions_tx.send(()).await.unwrap();
@@ -288,7 +288,7 @@ mod tests {
         tokio::time::resume();
     }
 
-    #[tokio::test(threaded_scheduler)]
+    #[tokio::test]
     async fn resync() {
         trace_init();
 

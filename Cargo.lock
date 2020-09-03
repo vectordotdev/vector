@@ -4812,33 +4812,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-compat"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "107b625135aa7b9297dd2d99ccd6ca6ab124a5d1230778e159b9095adca4c722"
-dependencies = [
- "futures 0.1.29",
- "futures-core",
- "futures-util",
- "pin-project-lite",
- "tokio",
- "tokio-current-thread",
- "tokio-executor",
- "tokio-reactor",
- "tokio-timer",
-]
-
-[[package]]
-name = "tokio-current-thread"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1de0e32a83f131e002238d7ccde18211c0a5397f60cbfffcb112868c2e0e20e"
-dependencies = [
- "futures 0.1.29",
- "tokio-executor",
-]
-
-[[package]]
 name = "tokio-executor"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5524,7 +5497,6 @@ dependencies = [
  "task-compat",
  "tempfile",
  "tokio",
- "tokio-compat",
  "tokio-openssl",
  "tokio-retry",
  "tokio-signal",

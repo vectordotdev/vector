@@ -48,13 +48,13 @@ write_to_description = "[Sematext][urls.sematext] via the [Elasticsearch API][ur
 type = "string"
 required = false
 examples = ["na", "eu"]
-description = "The region destination to send logs to. This option is required if `host` is not set."
+description = "The region destination to send logs to. This option is required if `endpoint` is not set."
 
-[sinks.sematext_logs.options.host]
+[sinks.sematext_logs.options.endpoint]
 type = "string"
 required = false
 examples = ["http://127.0.0.1", "http://example.com"]
-description = "The host that will be used to send logs to. This option is required if `region` is not set."
+description = "The endpoint that will be used to send logs to. This option is required if `region` is not set."
 
 [sinks.sematext_logs.options.token]
 type = "string"

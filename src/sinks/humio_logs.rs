@@ -13,7 +13,9 @@ const HOST: &str = "https://cloud.humio.com";
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct HumioLogsConfig {
     token: String,
-    host: Option<String>,
+    // Deprecated name
+    #[serde(alias = "host")]
+    endpoint: Option<String>,
     source: Option<Template>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
@@ -72,11 +74,11 @@ impl SinkConfig for HumioLogsConfig {
 
 impl HumioLogsConfig {
     fn build_hec_config(&self) -> HecSinkConfig {
-        let host = self.host.clone().unwrap_or_else(|| HOST.to_string());
+        let endpoint = self.endpoint.clone().unwrap_or_else(|| HOST.to_string());
 
         HecSinkConfig {
             token: self.token.clone(),
-            host,
+            endpoint,
             source: self.source.clone(),
             sourcetype: self.event_type.clone(),
             encoding: self.encoding.clone().transmute(),
@@ -254,7 +256,7 @@ mod integration_tests {
     /// create a new test config with the given ingest token
     fn config(token: &str) -> super::HumioLogsConfig {
         super::HumioLogsConfig {
-            host: Some(HOST.to_string()),
+            endpoint: Some(HOST.to_string()),
             token: token.to_string(),
             compression: Compression::None,
             encoding: Encoding::Json.into(),

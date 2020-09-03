@@ -88,7 +88,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             out.send_all(futures01::stream::iter_ok(events))
                                 .compat()
                                 .map_err(move |e: futures01::sync::mpsc::SendError<Event>| {
-                                    // can only fail if receiving end disconnected, so we are shuting down,
+                                    // can only fail if receiving end disconnected, so we are shutting down,
                                     // probably not gracefully.
                                     error!("Failed to forward events, downstream is closed");
                                     error!("Tried to send the following event: {:?}", e);

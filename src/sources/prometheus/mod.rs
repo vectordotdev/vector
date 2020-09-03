@@ -22,7 +22,9 @@ pub mod parser;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 struct PrometheusConfig {
-    hosts: Vec<String>,
+    // Deprecated name
+    #[serde(alias = "hosts")]
+    endpoints: Vec<String>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
 }
@@ -41,7 +43,7 @@ impl crate::config::SourceConfig for PrometheusConfig {
         out: Pipeline,
     ) -> crate::Result<super::Source> {
         let mut urls = Vec::new();
-        for host in self.hosts.iter() {
+        for host in self.endpoints.iter() {
             let base_uri = host.parse::<http::Uri>().context(super::UriParseError)?;
             urls.push(format!("{}metrics", base_uri));
         }
@@ -209,7 +211,7 @@ mod test {
         config.add_source(
             "in",
             PrometheusConfig {
-                hosts: vec![format!("http://{}", in_addr)],
+                endpoints: vec![format!("http://{}", in_addr)],
                 scrape_interval_secs: 1,
             },
         );
