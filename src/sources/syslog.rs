@@ -195,7 +195,7 @@ impl SyslogDecoder {
         } else if src.len() < self.other.max_length() {
             Ok(None)
         } else {
-            // This is certainly mallformed, and there is no recovering from this.
+            // This is certainly malformed, and there is no recovering from this.
             Err(LinesCodecError::Io(io::Error::new(
                 io::ErrorKind::Other,
                 "Frame length limit exceeded",

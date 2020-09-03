@@ -1,15 +1,16 @@
 use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
-use futures::future;
+use futures::{compat::Future01CompatExt, future};
 use futures01::{Sink, Stream};
-use std::convert::Infallible;
-use std::time::Duration;
-use vector::buffers::Acker;
-use vector::sinks::util::{
-    batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
-    BatchSink, Buffer, Compression, Partition, PartitionBatchSink,
+use std::{convert::Infallible, time::Duration};
+use vector::{
+    buffers::Acker,
+    sinks::util::{
+        batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
+        BatchSink, Buffer, Compression, Partition, PartitionBatchSink,
+    },
+    test_util::{random_lines, runtime},
 };
-use vector::test_util::random_lines;
 
 fn batching(
     bench_name: &'static str,
@@ -28,7 +29,7 @@ fn batching(
                 futures01::stream::iter_ok::<_, ()>(input.into_iter())
             },
             |input| {
-                let mut rt = vector::test_util::runtime();
+                let mut rt = runtime();
                 let (acker, _) = Acker::new_for_testing();
                 let batch = BatchSettings::default()
                     .bytes(max_bytes as u64)
@@ -42,7 +43,7 @@ fn batching(
                 )
                 .sink_map_err(|e| panic!(e));
 
-                let _ = rt.block_on(input.forward(batch_sink)).unwrap();
+                let _ = rt.block_on(input.forward(batch_sink).compat()).unwrap();
             },
         )
     })
@@ -73,7 +74,7 @@ fn partitioned_batching(
                 futures01::stream::iter_ok::<_, ()>(input.into_iter())
             },
             |input| {
-                let mut rt = vector::test_util::runtime();
+                let mut rt = runtime();
                 let (acker, _) = Acker::new_for_testing();
                 let batch = BatchSettings::default()
                     .bytes(max_bytes as u64)
@@ -87,7 +88,7 @@ fn partitioned_batching(
                 )
                 .sink_map_err(|e| panic!(e));
 
-                let _ = rt.block_on(input.forward(batch_sink)).unwrap();
+                let _ = rt.block_on(input.forward(batch_sink).compat()).unwrap();
             },
         )
     })

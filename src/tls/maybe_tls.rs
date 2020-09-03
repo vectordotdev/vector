@@ -49,7 +49,7 @@ impl<T> From<Option<T>> for MaybeTls<(), T> {
     }
 }
 
-// Conditionally implement Clone for Clonable types
+// Conditionally implement Clone for Cloneable types
 impl<R: Clone, T: Clone> Clone for MaybeTls<R, T> {
     fn clone(&self) -> Self {
         match self {
@@ -59,7 +59,7 @@ impl<R: Clone, T: Clone> Clone for MaybeTls<R, T> {
     }
 }
 
-// Conditionally implement Debug for Debugable types
+// Conditionally implement Debug for Debuggable types
 impl<R: fmt::Debug, T: fmt::Debug> fmt::Debug for MaybeTls<R, T> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

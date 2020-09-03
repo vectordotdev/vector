@@ -28,7 +28,7 @@ To add an image:
 ## `builder-*` Images
 
 The `builder-*` images are our own target builder images. They represent
-the finaly environment where the build actually happens. In some cases they
+the final environment where the build actually happens. In some cases they
 extend the `builde-base-*` images described above.
 
 ## `releaser-*` Images

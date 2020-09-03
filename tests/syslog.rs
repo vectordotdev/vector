@@ -70,12 +70,11 @@ async fn test_tcp_syslog() {
 }
 
 #[cfg(unix)]
-#[test]
-fn test_unix_stream_syslog() {
+#[tokio::test]
+async fn test_unix_stream_syslog() {
     use futures::{stream, SinkExt, StreamExt};
-    use tokio::net::UnixStream;
+    use tokio::{net::UnixStream, task::yield_now};
     use tokio_util::codec::{FramedWrite, LinesCodec};
-    use vector::test_util::runtime;
 
     let num_messages: usize = 10000;
 
@@ -91,48 +90,48 @@ fn test_unix_stream_syslog() {
     );
     config.add_sink("out", &["in"], tcp_json_sink(out_addr.to_string()));
 
-    let mut rt = runtime();
-    rt.block_on_std(async move {
-        let output_lines = CountReceiver::receive_lines(out_addr);
+    let output_lines = CountReceiver::receive_lines(out_addr);
 
-        let (topology, _crash) = start_topology(config, false).await;
-        // Wait for server to accept traffic
-        while std::os::unix::net::UnixStream::connect(&in_path).is_err() {}
+    let (topology, _crash) = start_topology(config, false).await;
 
-        let input_messages: Vec<SyslogMessageRFC5424> = (0..num_messages)
-            .map(|i| SyslogMessageRFC5424::random(i, 30, 4, 3, 3))
-            .collect();
+    // Wait for server to accept traffic
+    while std::os::unix::net::UnixStream::connect(&in_path).is_err() {
+        yield_now().await;
+    }
 
-        let stream = UnixStream::connect(&in_path).await.unwrap();
-        let mut sink = FramedWrite::new(stream, LinesCodec::new());
+    let input_messages: Vec<SyslogMessageRFC5424> = (0..num_messages)
+        .map(|i| SyslogMessageRFC5424::random(i, 30, 4, 3, 3))
+        .collect();
 
-        let lines: Vec<String> = input_messages.iter().map(|msg| msg.to_string()).collect();
-        let mut lines = stream::iter(lines).map(Ok);
-        sink.send_all(&mut lines).await.unwrap();
+    let stream = UnixStream::connect(&in_path).await.unwrap();
+    let mut sink = FramedWrite::new(stream, LinesCodec::new());
 
-        let stream = sink.get_mut();
-        stream.shutdown(std::net::Shutdown::Both).unwrap();
+    let lines: Vec<String> = input_messages.iter().map(|msg| msg.to_string()).collect();
+    let mut lines = stream::iter(lines).map(Ok);
+    sink.send_all(&mut lines).await.unwrap();
 
-        // Otherwise some lines will be lost
-        tokio::time::delay_for(std::time::Duration::from_millis(1000)).await;
+    let stream = sink.get_mut();
+    stream.shutdown(std::net::Shutdown::Both).unwrap();
 
-        // Shut down server
-        topology.stop().compat().await.unwrap();
+    // Otherwise some lines will be lost
+    tokio::time::delay_for(std::time::Duration::from_millis(1000)).await;
 
-        let output_lines = output_lines.await;
-        assert_eq!(output_lines.len(), num_messages);
+    // Shut down server
+    topology.stop().compat().await.unwrap();
 
-        let output_messages: Vec<SyslogMessageRFC5424> = output_lines
-            .iter()
-            .map(|s| {
-                let mut value = Value::from_str(s).unwrap();
-                value.as_object_mut().unwrap().remove("hostname"); // Vector adds this field which will cause a parse error.
-                value.as_object_mut().unwrap().remove("source_ip"); // Vector adds this field which will cause a parse error.
-                serde_json::from_value(value).unwrap()
-            })
-            .collect();
-        assert_eq!(output_messages, input_messages);
-    });
+    let output_lines = output_lines.await;
+    assert_eq!(output_lines.len(), num_messages);
+
+    let output_messages: Vec<SyslogMessageRFC5424> = output_lines
+        .iter()
+        .map(|s| {
+            let mut value = Value::from_str(s).unwrap();
+            value.as_object_mut().unwrap().remove("hostname"); // Vector adds this field which will cause a parse error.
+            value.as_object_mut().unwrap().remove("source_ip"); // Vector adds this field which will cause a parse error.
+            serde_json::from_value(value).unwrap()
+        })
+        .collect();
+    assert_eq!(output_messages, input_messages);
 }
 
 #[tokio::test]

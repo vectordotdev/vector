@@ -164,10 +164,10 @@ mod test {
         }
     }
 
-    // This is a test that checks that we properly receieve all events in the
+    // This is a test that checks that we properly receive all events in the
     // case of a proper server side write side shutdown.
     //
-    // This test basically sends 10 events, shutsdown the server and forces a
+    // This test basically sends 10 events, shuts down the server and forces a
     // reconnect. It then forces another 10 events through and we should get a
     // total of 20 events.
     //
@@ -179,7 +179,6 @@ mod test {
         use crate::tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
         use futures::{future, FutureExt, StreamExt};
         use std::{
-            future::Future,
             net::Shutdown,
             pin::Pin,
             sync::{
@@ -250,7 +249,7 @@ mod test {
                     let mut stream: MaybeTlsIncomingStream<TcpStream> = connection.unwrap();
                     future::poll_fn(move |cx| loop {
                         if let Some(fut) = close_rx.as_mut() {
-                            if let Poll::Ready(()) = Pin::new(fut).poll(cx) {
+                            if let Poll::Ready(()) = fut.poll_unpin(cx) {
                                 stream.get_ref().unwrap().shutdown(Shutdown::Write).unwrap();
                                 close_rx = None;
                             }
@@ -299,7 +298,7 @@ mod test {
         // Wait for server task to be complete.
         let _ = jh.await.unwrap();
 
-        // Check that there are exacty 20 events.
+        // Check that there are exactly 20 events.
         assert_eq!(msg_counter.load(Ordering::SeqCst), 20);
         assert_eq!(conn_counter.load(Ordering::SeqCst), 2);
     }

@@ -84,7 +84,7 @@ pub enum TlsError {
     AddExtraChainCert { source: ErrorStack },
     #[snafu(display("Error creating a certificate store: {}", source))]
     NewStoreBuilder { source: ErrorStack },
-    #[snafu(display("Error adding a certifcate to a store: {}", source))]
+    #[snafu(display("Error adding a certificate to a store: {}", source))]
     AddCertToStore { source: ErrorStack },
     #[snafu(display("Error setting up the verification certificate: {}", source))]
     SetVerifyCert { source: ErrorStack },

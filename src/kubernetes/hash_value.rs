@@ -4,7 +4,7 @@ use k8s_openapi::{apimachinery::pkg::apis::meta::v1::ObjectMeta, Metadata};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
-/// A wrapper that provdies a [`Hash`] implementation for any k8s resource
+/// A wrapper that provides a [`Hash`] implementation for any k8s resource
 /// object.
 /// Delegates to object uid for hashing and equality.
 #[derive(Debug)]
