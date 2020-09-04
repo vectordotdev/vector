@@ -465,6 +465,15 @@ host_cpu_seconds_total{cpu="0",mode="user"}
 host_cpu_seconds_total
 ```
 
+#### Option naming
+
+When naming options for sinks, sources, and transforms it's important to keep in mind these guidelines:
+
+- Suffix options with their unit. Ex: `_seconds`, `_bytes`, etc.
+- Don't repeat the name space in the option name, ex. `fingerprinting.fingerprint_bytes`.
+- Normalize around time units where relevant and possible, for example using seconds consistently rather than seconds and milliseconds.
+- Use nouns as category names, for example `fingerprint` instead of `fingerprinting`.
+
 ### Testing
 
 You can run Vector's tests via the `make test` command. Our tests use Docker
