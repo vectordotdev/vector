@@ -132,12 +132,17 @@ fn main() {
         // API
         #[cfg(feature = "api")]
         if config.api.enabled {
-            let addr = config.api.bind.unwrap();
-            let playground = config.api.playground;
-
+            let opt = config.api; // copy to move to spawn
             tokio::spawn(async move {
-                info!(message="API server running", ip=&*addr.ip().to_string(), port=&*addr.port().to_string());
-                let _ = api::make_server(addr, playground).await;
+                let addr = opt.bind.unwrap();
+                let playground = &*format!("http://{}:{}/playground", addr.ip(), addr.port());
+
+                info!(
+                    message="API server running",
+                    bind = ?addr,
+                    playground = %if opt.playground { playground } else { "off" });
+
+                let _ = api::make_server(addr, opt.playground).await;
             });
         }
 
