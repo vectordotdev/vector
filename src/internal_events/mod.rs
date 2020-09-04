@@ -13,6 +13,8 @@ mod concat;
 #[cfg(feature = "sources-docker")]
 mod docker;
 mod elasticsearch;
+#[cfg(feature = "sources-generator")]
+mod generator;
 #[cfg(feature = "transforms-grok_parser")]
 mod grok_parser;
 mod heartbeat;
@@ -79,6 +81,8 @@ pub use self::concat::*;
 pub use self::docker::*;
 pub use self::elasticsearch::*;
 pub use self::file::*;
+#[cfg(feature = "sources-generator")]
+pub use self::generator::*;
 #[cfg(feature = "transforms-grok_parser")]
 pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;

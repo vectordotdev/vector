@@ -2,7 +2,7 @@ use super::Config;
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, SocketAddr};
 
-#[derive(Default, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Default, Debug, Deserialize, Serialize, PartialEq, Copy, Clone)]
 #[serde(default)]
 pub struct Options {
     #[serde(default = "default_enabled")]
@@ -29,18 +29,5 @@ fn default_playground() -> bool {
 
 /// Updates the configuration to take into account API changes
 pub fn update_config(old_config: &mut Config, new_config: &Config) {
-    // API enablement
-    if new_config.api.enabled != default_enabled() {
-        old_config.api.enabled = new_config.api.enabled
-    }
-
-    // IP/port
-    if let Some(bind) = new_config.api.bind {
-        old_config.api.bind = Some(bind)
-    }
-
-    // Playground
-    if new_config.api.playground != default_playground() {
-        old_config.api.playground = new_config.api.playground;
-    }
+    old_config.api = new_config.api; // copy
 }

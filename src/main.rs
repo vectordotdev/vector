@@ -132,12 +132,16 @@ fn main() {
         // API
         #[cfg(feature = "api")]
         if config.api.enabled {
-            let bind = config.api.bind.unwrap();
-            let server = api::Server::new(bind);
-            let _ = server.run().await;
-            info!(message="API server running", port=&*bind.port().to_string(), ip=&*bind.ip().to_string());
-        }
+            let addr = config.api.bind.unwrap();
+            let playground = config.api.playground;
 
+            println!("API: {:?}", config.api);
+
+            tokio::spawn(async move {
+                info!(message="API server running", ip=&*addr.ip().to_string(), port=&*addr.port().to_string());
+                let _ = api::make_server(addr, playground).await;
+            });
+        }
 
         let result =
             topology::start_validated(config, diff, pieces, opts.require_healthy).await;

@@ -80,7 +80,7 @@ fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
         while let _ = interval.tick().await {
             for ev in capture_metrics(&controller) {
                 if let Event::Metric(m) = ev {
-                    yield m
+                    yield m;
                 }
             }
         }
