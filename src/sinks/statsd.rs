@@ -3,7 +3,7 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::Event,
-    sinks::util::{BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
+    sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
 };
 use futures::{future, FutureExt, TryFutureExt};
 use futures01::{stream, Sink};
@@ -195,11 +195,7 @@ fn encode_event(event: Event, namespace: Option<&str>) -> Option<Vec<u8>> {
         }
     };
 
-    let mut message: String = buf.join("|");
-    message = match namespace {
-        Some(namespace) if !namespace.is_empty() => format!("{}.{}", namespace, message),
-        _ => message,
-    };
+    let message = encode_namespace(namespace, '.', buf.join("|"));
 
     let mut body: Vec<u8> = message.into_bytes();
     body.push(b'\n');

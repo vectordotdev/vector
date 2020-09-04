@@ -21,6 +21,7 @@ use bytes::Bytes;
 use encoding::{EncodingConfig, EncodingConfiguration};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use std::borrow::Cow;
 
 pub use batch::{Batch, BatchConfig, BatchSettings, BatchSize, PushResult};
 pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
@@ -79,4 +80,17 @@ pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Op
     })
     .map_err(|error| error!(message = "Unable to encode.", %error))
     .ok()
+}
+
+/// Joins namespace with name via delimiter if namespace is present and not empty.
+pub fn encode_namespace<'a>(
+    namespace: Option<&str>,
+    delimiter: char,
+    name: impl Into<Cow<'a, str>>,
+) -> String {
+    let name = name.into();
+    match namespace {
+        Some(namespace) if !namespace.is_empty() => format!("{}{}{}", namespace, delimiter, name),
+        _ => name.into_owned(),
+    }
 }

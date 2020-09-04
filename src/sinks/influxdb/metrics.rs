@@ -175,7 +175,7 @@ fn encode_events(
 ) -> String {
     let mut output = String::new();
     for event in events.into_iter() {
-        let fullname = encode_namespace(namespace, &event.name);
+        let fullname = encode_namespace(namespace, '.', &event.name);
         let ts = encode_timestamp(event.timestamp);
         let tags = event.tags.clone();
         match event.value {

@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue},
-    sinks::util::MetricEntry,
+    sinks::util::{encode_namespace, MetricEntry},
     Event,
 };
 use chrono::Utc;
@@ -96,13 +96,6 @@ struct PrometheusSink {
     acker: Acker,
 }
 
-fn encode_namespace(namespace: Option<&str>, name: &str) -> String {
-    match namespace {
-        Some(namespace) if !namespace.is_empty() => format!("{}_{}", namespace, name),
-        _ => name.to_string(),
-    }
-}
-
 fn encode_tags(tags: &Option<BTreeMap<String, String>>) -> String {
     if let Some(tags) = tags {
         let mut parts: Vec<_> = tags
@@ -138,7 +131,7 @@ fn encode_tags_with_extra(
 fn encode_metric_header(namespace: Option<&str>, metric: &Metric) -> String {
     let mut s = String::new();
     let name = &metric.name;
-    let fullname = encode_namespace(namespace, name);
+    let fullname = encode_namespace(namespace, '_', name);
 
     let r#type = match &metric.value {
         MetricValue::Counter { .. } => "counter",
@@ -161,7 +154,7 @@ fn encode_metric_datum(
     metric: &Metric,
 ) -> String {
     let mut s = String::new();
-    let fullname = encode_namespace(namespace, &metric.name);
+    let fullname = encode_namespace(namespace, '_', &metric.name);
 
     if metric.kind.is_absolute() {
         let tags = &metric.tags;

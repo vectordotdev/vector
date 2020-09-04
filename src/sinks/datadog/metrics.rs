@@ -5,6 +5,7 @@ use crate::{
         Event,
     },
     sinks::{
+        encode_namespace,
         util::{
             http::{BatchedHttpSink, HttpClient, HttpSink},
             BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
@@ -224,13 +225,6 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     }
 }
 
-fn encode_namespace(namespace: Option<&str>, name: &str) -> String {
-    match namespace {
-        Some(namespace) if !namespace.is_empty() => format!("{}.{}", namespace, name),
-        _ => name.to_string(),
-    }
-}
-
 fn stats(values: &[f64], counts: &[u32]) -> Option<DatadogStats> {
     if values.len() != counts.len() {
         return None;
@@ -287,7 +281,7 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: Option<&str>) ->
     let series = events
         .into_iter()
         .filter_map(|event| {
-            let fullname = encode_namespace(namespace, &event.name);
+            let fullname = encode_namespace(namespace, '.', &event.name);
             let ts = encode_timestamp(event.timestamp);
             let tags = event.tags.clone().map(encode_tags);
             match event.kind {
