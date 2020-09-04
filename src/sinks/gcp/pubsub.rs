@@ -60,6 +60,13 @@ inventory::submit! {
     SinkDescription::new::<PubsubConfig>("gcp_pubsub")
 }
 
+lazy_static::lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        rate_limit_num: Some(100),
+        ..Default::default()
+    };
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
