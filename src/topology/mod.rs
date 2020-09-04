@@ -70,8 +70,7 @@ pub async fn start_validated(
     Some((running_topology, abort_rx))
 }
 
-// TODO: inline this
-pub async fn validate(config: &Config, diff: &ConfigDiff) -> Option<Pieces> {
+pub async fn build_or_log_errors(config: &Config, diff: &ConfigDiff) -> Option<Pieces> {
     match builder::build_pieces(config, diff).await {
         Err(errors) => {
             for error in errors {
@@ -221,7 +220,7 @@ impl RunningTopology {
         self.shutdown_diff(&diff).await;
 
         // Now let's actually build the new pieces.
-        if let Some(mut new_pieces) = validate(&new_config, &diff).await {
+        if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff).await {
             if self
                 .run_healthchecks(&diff, &mut new_pieces, require_healthy)
                 .await
@@ -237,7 +236,7 @@ impl RunningTopology {
         // We need to rebuild the removed.
         info!("Rebuilding old configuration.");
         let diff = diff.flip();
-        if let Some(mut new_pieces) = validate(&self.config, &diff).await {
+        if let Some(mut new_pieces) = build_or_log_errors(&self.config, &diff).await {
             if self
                 .run_healthchecks(&diff, &mut new_pieces, require_healthy)
                 .await
