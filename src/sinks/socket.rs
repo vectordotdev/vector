@@ -288,7 +288,7 @@ mod test {
         assert_eq!(conn_counter.load(Ordering::SeqCst), 1);
 
         // Send another 10 events
-        let (_, events) = random_lines_with_stream(10, 10);
+        let (_, mut events) = random_lines_with_stream(10, 10);
         sink.send_all(&mut events).await.unwrap();
 
         // Wait for server task to be complete.
