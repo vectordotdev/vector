@@ -1,4 +1,4 @@
-use crate::{config, topology::unit_test::UnitTest};
+use crate::config;
 use colored::*;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -9,17 +9,6 @@ pub struct Opts {
     /// Any number of Vector config files to test. If none are specified the
     /// default config path `/etc/vector/vector.toml` will be targeted.
     paths: Vec<PathBuf>,
-}
-
-fn build_tests(path: PathBuf) -> Result<Vec<UnitTest>, Vec<String>> {
-    let mut config = config::load_from_paths(&[path])?;
-
-    // Ignore failures on calls other than the first
-    crate::event::LOG_SCHEMA
-        .set(config.global.log_schema.clone())
-        .ok();
-
-    crate::topology::unit_test::build_unit_tests(&mut config)
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
@@ -36,7 +25,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
             println!();
         }
         println!("Running {} tests", path_str);
-        match build_tests(path.clone()) {
+        match config::build_unit_tests(path.clone()) {
             Ok(mut tests) => {
                 let mut aggregated_test_errors = Vec::new();
                 let mut aggregated_test_inspections = Vec::new();

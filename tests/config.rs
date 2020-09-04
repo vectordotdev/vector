@@ -8,14 +8,12 @@ async fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
         Ok(c) => {
             let diff = ConfigDiff::initial(&c);
             match (
-                config::check(&c),
+                config::warnings(&c),
                 topology::builder::build_pieces(&c, &diff).await,
             ) {
-                (Ok(warnings), Ok(_new_pieces)) => Ok(warnings),
-                (Err(t_errors), Err(p_errors)) => {
-                    Err(t_errors.into_iter().chain(p_errors).collect())
-                }
-                (Err(errors), Ok(_)) | (Ok(_), Err(errors)) => Err(errors),
+                (Some(warnings), Ok(_pieces)) => Ok(warnings),
+                (None, Ok(_pieces)) => Ok(vec![]),
+                (_, Err(errors)) => Err(errors),
             }
         }
         Err(error) => Err(error),

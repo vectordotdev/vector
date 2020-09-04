@@ -24,7 +24,7 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
     let bench = Benchmark::new("http_no_compression", move |b| {
         b.iter_with_setup(
             || {
-                let mut config = config::Config::empty();
+                let mut config = config::Config::builder();
                 config.add_source(
                     "in",
                     sources::socket::SocketConfig::make_tcp_config(in_addr),
@@ -48,7 +48,7 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
 
                 let mut rt = runtime();
                 let topology = rt.block_on(async move {
-                    let (topology, _crash) = start_topology(config, false).await;
+                    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
                     wait_for_tcp(in_addr).await;
                     topology
                 });
@@ -82,7 +82,7 @@ fn benchmark_http_gzip(c: &mut Criterion) {
     let bench = Benchmark::new("http_gzip", move |b| {
         b.iter_with_setup(
             || {
-                let mut config = config::Config::empty();
+                let mut config = config::Config::builder();
                 config.add_source(
                     "in",
                     sources::socket::SocketConfig::make_tcp_config(in_addr),
@@ -106,7 +106,7 @@ fn benchmark_http_gzip(c: &mut Criterion) {
 
                 let mut rt = runtime();
                 let topology = rt.block_on(async move {
-                    let (topology, _crash) = start_topology(config, false).await;
+                    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
                     wait_for_tcp(in_addr).await;
                     topology
                 });

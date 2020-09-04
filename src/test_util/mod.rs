@@ -547,7 +547,7 @@ pub async fn start_topology(
     require_healthy: bool,
 ) -> (RunningTopology, mpsc::UnboundedReceiver<()>) {
     let diff = ConfigDiff::initial(&config);
-    let pieces = topology::validate(&config, &diff).await.unwrap();
+    let pieces = topology::build_or_log_errors(&config, &diff).await.unwrap();
     topology::start_validated(config, diff, pieces, require_healthy)
         .await
         .unwrap()

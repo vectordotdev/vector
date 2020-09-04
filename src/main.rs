@@ -123,7 +123,7 @@ fn main() {
             .expect("Couldn't set schema");
 
         let diff = ConfigDiff::initial(&config);
-        let pieces = topology::validate(&config, &diff).await.unwrap_or_else(|| {
+        let pieces = topology::build_or_log_errors(&config, &diff).await.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });
 

@@ -1,4 +1,4 @@
-use super::{vars, Config};
+use super::{builder::ConfigBuilder, vars, Config};
 use glob::glob;
 use lazy_static::lazy_static;
 use once_cell::sync::OnceCell;
@@ -55,6 +55,12 @@ pub fn process_paths(config_paths: &[PathBuf]) -> Option<Vec<PathBuf>> {
 }
 
 pub fn load_from_paths(config_paths: &[PathBuf]) -> Result<Config, Vec<String>> {
+    load_builder_from_paths(config_paths).and_then(|builder| builder.build())
+}
+
+pub(super) fn load_builder_from_paths(
+    config_paths: &[PathBuf],
+) -> Result<ConfigBuilder, Vec<String>> {
     let mut inputs = Vec::new();
     let mut errors = Vec::new();
 
@@ -74,13 +80,13 @@ pub fn load_from_paths(config_paths: &[PathBuf]) -> Result<Config, Vec<String>> 
 }
 
 pub fn load_from_str(input: &str) -> Result<Config, Vec<String>> {
-    load_from_inputs(std::iter::once(input.as_bytes()))
+    load_from_inputs(std::iter::once(input.as_bytes())).and_then(|builder| builder.build())
 }
 
 fn load_from_inputs(
     inputs: impl IntoIterator<Item = impl std::io::Read>,
-) -> Result<Config, Vec<String>> {
-    let mut config = Config::empty();
+) -> Result<ConfigBuilder, Vec<String>> {
+    let mut config = Config::builder();
     let mut errors = Vec::new();
 
     for input in inputs {
@@ -88,10 +94,6 @@ fn load_from_inputs(
             // TODO: add back paths
             errors.extend(errs.iter().map(|e| e.to_string()));
         }
-    }
-
-    if let Err(mut errs) = config.expand_macros() {
-        errors.append(&mut errs);
     }
 
     if errors.is_empty() {
@@ -116,7 +118,7 @@ fn open_config(path: &Path) -> Option<File> {
     }
 }
 
-fn load(mut input: impl std::io::Read) -> Result<Config, Vec<String>> {
+fn load(mut input: impl std::io::Read) -> Result<ConfigBuilder, Vec<String>> {
     let mut source_string = String::new();
     input
         .read_to_string(&mut source_string)

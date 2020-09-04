@@ -1,21 +1,21 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
-use getset::{Getters, Setters};
 use lazy_static::lazy_static;
 use metric::{MetricKind, MetricValue};
-use once_cell::sync::OnceCell;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Serialize, Serializer};
 use serde_json::Value as JsonValue;
 use std::{collections::BTreeMap, iter::FromIterator};
 use string_cache::DefaultAtom as Atom;
 
 pub mod discriminant;
+mod log_schema;
 pub mod merge;
 pub mod merge_state;
 pub mod metric;
 mod util;
 
+pub use log_schema::{log_schema, LogSchema, LOG_SCHEMA};
 pub use metric::{Metric, StatisticKind};
 pub(crate) use util::log::PathComponent;
 pub(crate) use util::log::PathIter;
@@ -24,18 +24,10 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
 }
 
-pub static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
-
 pub const PARTIAL_STR: &str = "_partial"; // TODO: clean up the _STR suffix after we get rid of atoms
 
 lazy_static! {
     pub static ref PARTIAL: Atom = Atom::from(PARTIAL_STR);
-    static ref LOG_SCHEMA_DEFAULT: LogSchema = LogSchema {
-        message_key: Atom::from("message"),
-        timestamp_key: Atom::from("timestamp"),
-        host_key: Atom::from("host"),
-        source_type_key: Atom::from("source_type"),
-    };
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -208,53 +200,6 @@ impl Serialize for LogEvent {
         S: Serializer,
     {
         serializer.collect_map(self.fields.iter())
-    }
-}
-
-pub fn log_schema() -> &'static LogSchema {
-    LOG_SCHEMA.get().unwrap_or(&LOG_SCHEMA_DEFAULT)
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Getters, Setters)]
-#[serde(default)]
-pub struct LogSchema {
-    #[serde(default = "LogSchema::default_message_key")]
-    #[getset(get = "pub", set = "pub(crate)")]
-    message_key: Atom,
-    #[serde(default = "LogSchema::default_timestamp_key")]
-    #[getset(get = "pub", set = "pub(crate)")]
-    timestamp_key: Atom,
-    #[serde(default = "LogSchema::default_host_key")]
-    #[getset(get = "pub", set = "pub(crate)")]
-    host_key: Atom,
-    #[serde(default = "LogSchema::default_source_type_key")]
-    #[getset(get = "pub", set = "pub(crate)")]
-    source_type_key: Atom,
-}
-
-impl Default for LogSchema {
-    fn default() -> Self {
-        LogSchema {
-            message_key: Atom::from("message"),
-            timestamp_key: Atom::from("timestamp"),
-            host_key: Atom::from("host"),
-            source_type_key: Atom::from("source_type"),
-        }
-    }
-}
-
-impl LogSchema {
-    fn default_message_key() -> Atom {
-        Atom::from("message")
-    }
-    fn default_timestamp_key() -> Atom {
-        Atom::from("timestamp")
-    }
-    fn default_host_key() -> Atom {
-        Atom::from("host")
-    }
-    fn default_source_type_key() -> Atom {
-        Atom::from("source_type")
     }
 }
 

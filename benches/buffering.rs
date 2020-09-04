@@ -24,7 +24,7 @@ fn benchmark_buffers(c: &mut Criterion) {
         Benchmark::new("in-memory", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut config = config::Config::empty();
+                    let mut config = config::Config::builder();
                     config.add_source(
                         "in",
                         sources::socket::SocketConfig::make_tcp_config(in_addr),
@@ -44,7 +44,8 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = start_topology(config, false).await;
+                        let (topology, _crash) =
+                            start_topology(config.build().unwrap(), false).await;
                         wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });
@@ -64,7 +65,7 @@ fn benchmark_buffers(c: &mut Criterion) {
         .with_function("on-disk", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut config = config::Config::empty();
+                    let mut config = config::Config::builder();
                     config.add_source(
                         "in",
                         sources::socket::SocketConfig::make_tcp_config(in_addr),
@@ -84,7 +85,8 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = start_topology(config, false).await;
+                        let (topology, _crash) =
+                            start_topology(config.build().unwrap(), false).await;
                         wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });
@@ -106,7 +108,7 @@ fn benchmark_buffers(c: &mut Criterion) {
         .with_function("low-limit-on-disk", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut config = config::Config::empty();
+                    let mut config = config::Config::builder();
                     config.add_source(
                         "in",
                         sources::socket::SocketConfig::make_tcp_config(in_addr),
@@ -126,7 +128,8 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
-                        let (topology, _crash) = start_topology(config, false).await;
+                        let (topology, _crash) =
+                            start_topology(config.build().unwrap(), false).await;
                         wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });

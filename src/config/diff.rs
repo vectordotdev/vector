@@ -10,7 +10,7 @@ pub struct ConfigDiff {
 
 impl ConfigDiff {
     pub fn initial(initial: &Config) -> Self {
-        Self::new(&Config::empty(), initial)
+        Self::new(&Config::default(), initial)
     }
 
     pub fn new(old: &Config, new: &Config) -> Self {

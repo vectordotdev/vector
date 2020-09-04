@@ -207,7 +207,7 @@ mod test {
             }
         });
 
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source(
             "in",
             PrometheusConfig {
@@ -226,7 +226,7 @@ mod test {
             },
         );
 
-        let (topology, _crash) = start_topology(config, false).await;
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
         delay_for(Duration::from_secs(1)).await;
 
         let response = Client::new()

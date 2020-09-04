@@ -1,9 +1,8 @@
 use super::{Config, DataType};
 use std::collections::HashMap;
 
-pub fn check(config: &Config) -> Result<Vec<String>, Vec<String>> {
+pub fn check_shape(config: &Config) -> Result<(), Vec<String>> {
     let mut errors = vec![];
-    let mut warnings = vec![];
 
     if config.sources.is_empty() {
         errors.push("No sources defined in the config.".to_owned());
@@ -40,6 +39,16 @@ pub fn check(config: &Config) -> Result<Vec<String>, Vec<String>> {
         }
     }
 
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
+
+pub fn warnings(config: &Config) -> Option<Vec<String>> {
+    let mut warnings = vec![];
+
     let source_names = config.sources.keys().map(|name| ("source", name.clone()));
     let transform_names = config
         .transforms
@@ -63,14 +72,10 @@ pub fn check(config: &Config) -> Result<Vec<String>, Vec<String>> {
         }
     }
 
-    if let Err(type_errors) = config.typecheck() {
-        errors.extend(type_errors);
-    }
-
-    if errors.is_empty() {
-        Ok(warnings)
+    if warnings.is_empty() {
+        None
     } else {
-        Err(errors)
+        Some(warnings)
     }
 }
 

@@ -405,7 +405,7 @@ mod tests {
         let global_dir = tempdir().unwrap();
         let local_dir = tempdir().unwrap();
 
-        let mut config = Config::empty();
+        let mut config = Config::default();
         config.global.data_dir = global_dir.into_path().into();
 
         // local path given -- local should win
