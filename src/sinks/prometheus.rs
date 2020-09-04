@@ -35,7 +35,7 @@ enum BuildError {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusSinkConfig {
-    pub namespace: String,
+    pub namespace: Option<String>,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
     #[serde(default = "default_histogram_buckets")]
@@ -96,11 +96,11 @@ struct PrometheusSink {
     acker: Acker,
 }
 
-fn encode_namespace(namespace: &str, name: &str) -> String {
-    if !namespace.is_empty() {
-        format!("{}_{}", namespace, name)
-    } else {
-        name.to_string()
+fn encode_namespace(namespace: Option<&str>, name: &str) -> String {
+    match namespace {
+        Some(namespace) if namespace.is_empty() => name.to_string(),
+        Some(namespace) => format!("{}_{}", namespace, name),
+        None => name.to_string(),
     }
 }
 
@@ -136,7 +136,7 @@ fn encode_tags_with_extra(
     format!("{{{}}}", parts.join(","))
 }
 
-fn encode_metric_header(namespace: &str, metric: &Metric) -> String {
+fn encode_metric_header(namespace: Option<&str>, metric: &Metric) -> String {
     let mut s = String::new();
     let name = &metric.name;
     let fullname = encode_namespace(namespace, name);
@@ -155,7 +155,12 @@ fn encode_metric_header(namespace: &str, metric: &Metric) -> String {
     s
 }
 
-fn encode_metric_datum(namespace: &str, buckets: &[f64], expired: bool, metric: &Metric) -> String {
+fn encode_metric_datum(
+    namespace: Option<&str>,
+    buckets: &[f64],
+    expired: bool,
+    metric: &Metric,
+) -> String {
     let mut s = String::new();
     let fullname = encode_namespace(namespace, &metric.name);
 
@@ -267,7 +272,7 @@ fn encode_metric_datum(namespace: &str, buckets: &[f64], expired: bool, metric: 
 
 fn handle(
     req: Request<Body>,
-    namespace: &str,
+    namespace: Option<&str>,
     buckets: &[f64],
     expired: bool,
     metrics: &IndexSet<MetricEntry>,
@@ -283,10 +288,10 @@ fn handle(
 
             for metric in metrics {
                 let name = &metric.0.name;
-                let frame = encode_metric_datum(&namespace, &buckets, expired, &metric.0);
+                let frame = encode_metric_datum(namespace, &buckets, expired, &metric.0);
 
                 if !processed_headers.contains(&name) {
-                    let header = encode_metric_header(&namespace, &metric.0);
+                    let header = encode_metric_header(namespace, &metric.0);
                     s.push_str(&header);
                     processed_headers.insert(name);
                 };
@@ -353,7 +358,15 @@ impl PrometheusSink {
                         method = field::debug(req.method()),
                         path = field::debug(req.uri().path()),
                     )
-                    .in_scope(|| handle(req, &namespace, &buckets, expired, &metrics))
+                    .in_scope(|| {
+                        handle(
+                            req,
+                            namespace.as_ref().map(|s| s.as_str()),
+                            &buckets,
+                            expired,
+                            &metrics,
+                        )
+                    })
                     .compat()
                 }))
             }
@@ -444,8 +457,8 @@ mod tests {
             value: MetricValue::Counter { value: 10.0 },
         };
 
-        let header = encode_metric_header("vector", &metric);
-        let frame = encode_metric_datum("vector", &[], false, &metric);
+        let header = encode_metric_header(Some("vector"), &metric);
+        let frame = encode_metric_datum(Some("vector"), &[], false, &metric);
 
         assert_eq!(
             header,
@@ -464,8 +477,8 @@ mod tests {
             value: MetricValue::Gauge { value: -1.1 },
         };
 
-        let header = encode_metric_header("vector", &metric);
-        let frame = encode_metric_datum("vector", &[], false, &metric);
+        let header = encode_metric_header(Some("vector"), &metric);
+        let frame = encode_metric_datum(Some("vector"), &[], false, &metric);
 
         assert_eq!(
             header,
@@ -486,8 +499,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("", &metric);
-        let frame = encode_metric_datum("", &[], false, &metric);
+        let header = encode_metric_header(None, &metric);
+        let frame = encode_metric_datum(None, &[], false, &metric);
 
         assert_eq!(
             header,
@@ -508,8 +521,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("", &metric);
-        let frame = encode_metric_datum("", &[], true, &metric);
+        let header = encode_metric_header(None, &metric);
+        let frame = encode_metric_datum(None, &[], true, &metric);
 
         assert_eq!(
             header,
@@ -532,8 +545,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("", &metric);
-        let frame = encode_metric_datum("", &[0.0, 2.5, 5.0], false, &metric);
+        let header = encode_metric_header(None, &metric);
+        let frame = encode_metric_datum(None, &[0.0, 2.5, 5.0], false, &metric);
 
         assert_eq!(
             header,
@@ -557,8 +570,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("", &metric);
-        let frame = encode_metric_datum("", &[], false, &metric);
+        let header = encode_metric_header(None, &metric);
+        let frame = encode_metric_datum(None, &[], false, &metric);
 
         assert_eq!(
             header,
@@ -582,8 +595,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("", &metric);
-        let frame = encode_metric_datum("", &[], false, &metric);
+        let header = encode_metric_header(None, &metric);
+        let frame = encode_metric_datum(None, &[], false, &metric);
 
         assert_eq!(
             header,
