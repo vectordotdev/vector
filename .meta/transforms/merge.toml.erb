@@ -10,7 +10,7 @@ requirements = {}
 
 <%= render("_partials/fields/_component_options.toml", type: "transform", name: "merge") %>
 
-[transforms.merge.options.merge_fields]
+[transforms.merge.options.fields]
 type = "[string]"
 common = true
 default = ["message"]
@@ -104,7 +104,7 @@ A single _merged_ log event will be produced:
 ```
 
 Notice that `custom_string_field` and `custom_int_field` were not overridden. \
-This is because they were not listed in the `merge_fields` option.\
+This is because they were not listed in the `fields` option.\
 """
 
 [[transforms.merge.examples]]
@@ -116,7 +116,7 @@ Given the following configuration:
 [transforms.merge_events]
   type = "merge"
   inputs = [...]
-  merge_fields = ["message", "custom_string_field", "custom_int_field"]
+  fields = ["message", "custom_string_field", "custom_int_field"]
 ```
 
 And these three partial [`log` events][docs.data-model.log]:
@@ -162,5 +162,5 @@ A single _merged_ log event will be produced:
 ```
 
 Notice that `custom_string_field` is concatenated and `custom_int_field` \
-overridden. This is because it was specified in the `merge_fields` option.\
+overridden. This is because it was specified in the `fields` option.\
 """

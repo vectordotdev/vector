@@ -2238,8 +2238,8 @@ require('custom_module')
   # * optional
   # * default: ["message"]
   # * type: [string]
-  merge_fields = ["message"]
-  merge_fields = ["message", "parent.child"]
+  fields = ["message"]
+  mfields = ["message", "parent.child"]
 
   # The field that indicates that the event is partial. A consequent stream of
   # partial events along with the first non-partial event will be merged together.
