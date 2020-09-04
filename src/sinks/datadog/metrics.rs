@@ -37,7 +37,7 @@ struct DatadogState {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogConfig {
-    pub namespace: String,
+    pub namespace: Option<String>,
     // Deprecated name
     #[serde(alias = "host", default = "default_endpoint")]
     pub endpoint: String,
@@ -166,7 +166,11 @@ impl HttpSink for DatadogSink {
         let interval = now - self.last_sent_timestamp.load(SeqCst);
         self.last_sent_timestamp.store(now, SeqCst);
 
-        let input = encode_events(events, interval, &self.config.namespace);
+        let input = encode_events(
+            events,
+            interval,
+            self.config.namespace.as_ref().map(|s| s.as_str()),
+        );
         let body = serde_json::to_vec(&input).unwrap();
 
         Request::post(self.uri.clone())
@@ -220,11 +224,10 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     }
 }
 
-fn encode_namespace(namespace: &str, name: &str) -> String {
-    if !namespace.is_empty() {
-        format!("{}.{}", namespace, name)
-    } else {
-        name.to_string()
+fn encode_namespace(namespace: Option<&str>, name: &str) -> String {
+    match namespace {
+        Some(namespace) if !namespace.is_empty() => format!("{}.{}", namespace, name),
+        _ => name.to_string(),
     }
 }
 
@@ -280,7 +283,7 @@ fn stats(values: &[f64], counts: &[u32]) -> Option<DatadogStats> {
     })
 }
 
-fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> DatadogRequest {
+fn encode_events(events: Vec<Metric>, interval: i64, namespace: Option<&str>) -> DatadogRequest {
     let series = events
         .into_iter()
         .filter_map(|event| {
@@ -501,7 +504,7 @@ mod tests {
                 value: MetricValue::Counter { value: 1.0 },
             },
         ];
-        let input = encode_events(events, interval, "ns");
+        let input = encode_events(events, interval, Some("ns"));
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(
@@ -528,7 +531,7 @@ mod tests {
                 value: MetricValue::Gauge { value: -1.1 },
             },
         ];
-        let input = encode_events(events, 60, "");
+        let input = encode_events(events, 60, Some(""));
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(
@@ -548,7 +551,7 @@ mod tests {
                 values: vec!["alice".into(), "bob".into()].into_iter().collect(),
             },
         }];
-        let input = encode_events(events, 60, "");
+        let input = encode_events(events, 60, Some(""));
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(
@@ -656,7 +659,7 @@ mod tests {
                 statistic: StatisticKind::Histogram,
             },
         }];
-        let input = encode_events(events, 60, "");
+        let input = encode_events(events, 60, Some(""));
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(
