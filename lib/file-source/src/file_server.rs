@@ -502,7 +502,7 @@ mod test {
     #[test]
     fn test_checksum_fingerprint() {
         let fingerprinter = Fingerprinter::Checksum {
-            fingerprint_bytes: 256,
+            bytes: 256,
             ignored_header_bytes: 0,
         };
 
