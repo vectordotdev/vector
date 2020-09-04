@@ -243,8 +243,7 @@ mod integration_tests {
         sinks::util::encoding::TimestampFormat,
         test_util::{random_string, trace_init},
     };
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
+    use futures::{compat::Future01CompatExt, future, stream};
     use serde_json::Value;
     use tokio::time::{timeout, Duration};
 
@@ -280,9 +279,7 @@ mod integration_tests {
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.into_futures01sink()
-            .send(input_event.clone())
-            .compat()
+        sink.run(stream::once(future::ok(input_event.clone())))
             .await
             .unwrap();
 
@@ -331,9 +328,7 @@ mod integration_tests {
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.into_futures01sink()
-            .send(input_event.clone())
-            .compat()
+        sink.run(stream::once(future::ok(input_event.clone())))
             .await
             .unwrap();
 
@@ -393,9 +388,7 @@ timestamp_format = "unix""#,
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.into_futures01sink()
-            .send(input_event.clone())
-            .compat()
+        sink.run(stream::once(future::ok(input_event.clone())))
             .await
             .unwrap();
 
@@ -454,7 +447,7 @@ timestamp_format = "unix""#,
         // this timeout should trigger.
         timeout(
             Duration::from_secs(5),
-            sink.into_futures01sink().send(input_event.clone()).compat(),
+            sink.run(stream::once(future::ok(input_event))),
         )
         .await
         .unwrap()

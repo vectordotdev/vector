@@ -576,11 +576,7 @@ mod integration_tests {
         tls::TlsOptions,
         Event,
     };
-    use futures::{
-        compat::{Future01CompatExt, Sink01CompatExt},
-        SinkExt, TryStreamExt,
-    };
-    use futures01::Sink;
+    use futures::{compat::Future01CompatExt, future, stream, TryStreamExt};
     use http::{Request, StatusCode};
     use hyper::Body;
     use serde_json::{json, Value};
@@ -624,9 +620,7 @@ mod integration_tests {
         input_event.as_mut_log().insert("my_id", "42");
         input_event.as_mut_log().insert("foo", "bar");
 
-        sink.into_futures01sink()
-            .send(input_event.clone())
-            .compat()
+        sink.run(stream::once(future::ok(input_event.clone())))
             .await
             .unwrap();
 
@@ -740,31 +734,23 @@ mod integration_tests {
 
         healthcheck.compat().await.expect("Health check failed");
 
-        let (input, mut events) = random_events_with_stream(100, 100);
+        let (input, events) = random_events_with_stream(100, 100);
         match break_events {
             true => {
                 // Break all but the first event to simulate some kind of partial failure
                 let mut doit = false;
-                let _ = sink
-                    .into_futures01sink()
-                    .sink_compat()
-                    .send_all(&mut events.map_ok(move |mut event| {
-                        if doit {
-                            event.as_mut_log().insert("_type", 1);
-                        }
-                        doit = true;
-                        event
-                    }))
-                    .await
-                    .expect("Sending events failed");
+                sink.run(events.map_ok(move |mut event| {
+                    if doit {
+                        event.as_mut_log().insert("_type", 1);
+                    }
+                    doit = true;
+                    event
+                }))
+                .await
+                .expect("Sending events failed");
             }
             false => {
-                let _ = sink
-                    .into_futures01sink()
-                    .sink_compat()
-                    .send_all(&mut events)
-                    .await
-                    .expect("Sending events failed");
+                sink.run(events).await.expect("Sending events failed");
             }
         };
 

@@ -533,11 +533,7 @@ mod integration_tests {
     };
     use bytes::{buf::BufExt, BytesMut};
     use flate2::read::GzDecoder;
-    use futures::{
-        compat::{Future01CompatExt, Sink01CompatExt},
-        stream, SinkExt, StreamExt,
-    };
-    use futures01::Sink;
+    use futures::{stream, StreamExt};
     use pretty_assertions::assert_eq;
     use rusoto_core::region::Region;
     use rusoto_s3::{S3Client, S3};
@@ -554,14 +550,8 @@ mod integration_tests {
         let client = config.create_client(cx.resolver()).unwrap();
         let sink = config.new(client, cx).unwrap();
 
-        let (lines, mut events) = random_lines_with_stream(100, 10);
-
-        let _ = sink
-            .into_futures01sink()
-            .sink_compat()
-            .send_all(&mut events)
-            .await
-            .unwrap();
+        let (lines, events) = random_lines_with_stream(100, 10);
+        sink.run(events).await.unwrap();
 
         let keys = get_keys(prefix.unwrap()).await;
         assert_eq!(keys.len(), 1);
@@ -602,15 +592,9 @@ mod integration_tests {
                 3
             };
             e.as_mut_log().insert("i", format!("{}", i));
-            e
+            Ok(e)
         });
-
-        let _ = sink
-            .into_futures01sink()
-            .send_all(futures01::stream::iter_ok(events))
-            .compat()
-            .await
-            .unwrap();
+        sink.run(stream::iter(events)).await.unwrap();
 
         let keys = get_keys(prefix.unwrap()).await;
         assert_eq!(keys.len(), 3);
@@ -641,14 +625,8 @@ mod integration_tests {
         let client = config.create_client(cx.resolver()).unwrap();
         let sink = config.new(client, cx).unwrap();
 
-        let (lines, mut events) = random_lines_with_stream(100, 500);
-
-        let _ = sink
-            .into_futures01sink()
-            .sink_compat()
-            .send_all(&mut events)
-            .await
-            .unwrap();
+        let (lines, events) = random_lines_with_stream(100, 500);
+        sink.run(events).await.unwrap();
 
         let keys = get_keys(prefix.unwrap()).await;
         assert_eq!(keys.len(), 6);

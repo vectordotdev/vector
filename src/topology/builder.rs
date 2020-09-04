@@ -157,7 +157,7 @@ pub async fn build_pieces(
         };
 
         let sink = sink
-            .run(filter_event_type(rx, input_type))
+            .run01(filter_event_type(rx, input_type))
             .inspect(|_| debug!("Finished"));
         let task = Task::new(name, typetag, sink);
 

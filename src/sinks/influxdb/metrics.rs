@@ -752,7 +752,7 @@ mod integration_tests {
         Event,
     };
     use chrono::Utc;
-    use futures::compat::Future01CompatExt;
+    use futures::{compat::Future01CompatExt, stream, StreamExt};
     use futures01::{stream as stream01, Sink};
 
     //    fn onboarding_v1() {
@@ -816,15 +816,7 @@ mod integration_tests {
 
         let client = HttpClient::new(cx.resolver(), None).unwrap();
         let sink = InfluxDBSvc::new(config, cx, client).unwrap();
-
-        let stream = stream01::iter_ok(events.clone().into_iter());
-
-        let _ = sink
-            .into_futures01sink()
-            .send_all(stream)
-            .compat()
-            .await
-            .unwrap();
+        sink.run(stream::iter(events).map(Ok)).await.unwrap();
 
         let mut body = std::collections::HashMap::new();
         body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));

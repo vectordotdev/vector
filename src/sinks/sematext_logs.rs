@@ -105,7 +105,7 @@ mod tests {
         sinks::util::test::{build_test_server, load_sink},
         test_util::{next_addr, random_lines_with_stream},
     };
-    use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
+    use futures::StreamExt;
 
     #[tokio::test]
     async fn smoke() {
@@ -131,13 +131,8 @@ mod tests {
         let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
-        let (expected, mut events) = random_lines_with_stream(100, 10);
-        let _ = sink
-            .into_futures01sink()
-            .sink_compat()
-            .send_all(&mut events)
-            .await
-            .unwrap();
+        let (expected, events) = random_lines_with_stream(100, 10);
+        sink.run(events).await.unwrap();
 
         let output = rx.next().await.unwrap();
 

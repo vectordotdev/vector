@@ -223,8 +223,7 @@ mod tests {
         test_util::next_addr,
     };
     use chrono::{offset::TimeZone, Utc};
-    use futures::{compat::Future01CompatExt, StreamExt};
-    use futures01::Sink;
+    use futures::{stream, StreamExt};
 
     #[test]
     fn test_config_without_tags() {
@@ -475,10 +474,7 @@ mod tests {
             events.push(event);
         }
 
-        let pump = sink
-            .into_futures01sink()
-            .send_all(futures01::stream::iter_ok(events));
-        let _ = pump.compat().await.unwrap();
+        sink.run(stream::iter(events).map(Ok)).await.unwrap();
 
         let output = rx.next().await.unwrap();
 
@@ -541,10 +537,7 @@ mod tests {
             events.push(event);
         }
 
-        let pump = sink
-            .into_futures01sink()
-            .send_all(futures01::stream::iter_ok(events));
-        let _ = pump.compat().await.unwrap();
+        sink.run(stream::iter(events).map(Ok)).await.unwrap();
 
         let output = rx.next().await.unwrap();
 
@@ -653,12 +646,7 @@ mod integration_tests {
         events.push(event1);
         events.push(event2);
 
-        let _ = sink
-            .into_futures01sink()
-            .send_all(futures01::stream::iter_ok(events))
-            .compat()
-            .await
-            .unwrap();
+        sink.run(stream::iter(events).map(Ok)).await.unwrap();
 
         let mut body = std::collections::HashMap::new();
         body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"{}.vector\")", ns.clone()));

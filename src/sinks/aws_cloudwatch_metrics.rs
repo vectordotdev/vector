@@ -432,8 +432,7 @@ mod integration_tests {
         test_util::random_string,
     };
     use chrono::offset::TimeZone;
-    use futures::compat::Future01CompatExt;
-    use futures01::{stream, Sink};
+    use futures::{stream, StreamExt};
 
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
@@ -506,13 +505,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let stream = stream::iter_ok(events.clone().into_iter());
-
-        let _ = sink
-            .into_futures01sink()
-            .send_all(stream)
-            .compat()
-            .await
-            .unwrap();
+        let stream = stream::iter(events).map(|x| Ok(x.into()));
+        sink.run(stream).await.unwrap();
     }
 }

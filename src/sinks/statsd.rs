@@ -233,11 +233,8 @@ mod test {
         Event,
     };
     use bytes::Bytes;
-    use futures::{
-        compat::{Future01CompatExt, Sink01CompatExt},
-        {SinkExt, StreamExt, TryStreamExt},
-    };
-    use futures01::{sync::mpsc, Sink};
+    use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt, TryStreamExt};
+    use futures01::sync::mpsc;
     use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
     #[cfg(feature = "sources-statsd")]
@@ -414,13 +411,7 @@ mod test {
                 .unwrap()
         });
 
-        let stream = stream::iter_ok(events);
-        let _ = sink
-            .into_futures01sink()
-            .send_all(stream)
-            .compat()
-            .await
-            .unwrap();
+        sink.run(stream::iter(events).map(Ok)).await.unwrap();
 
         let messages = collect_n(rx, 1).await.unwrap();
         assert_eq!(

@@ -404,11 +404,7 @@ mod integration_tests {
         test_util::{random_lines_with_stream, random_string},
         Event,
     };
-    use futures::{
-        compat::{Future01CompatExt, Sink01CompatExt},
-        SinkExt,
-    };
-    use futures01::Sink;
+    use futures::{future, stream};
     use serde_json::Value as JsonValue;
     use std::net::SocketAddr;
     use tokio::time::{delay_for, Duration};
@@ -442,11 +438,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.into_futures01sink()
-            .send(event)
-            .compat()
-            .await
-            .unwrap();
+        sink.run(stream::once(future::ok(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -465,11 +457,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.into_futures01sink()
-            .send(event)
-            .compat()
-            .await
-            .unwrap();
+        sink.run(stream::once(future::ok(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -486,11 +474,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.into_futures01sink()
-            .send(event)
-            .compat()
-            .await
-            .unwrap();
+        sink.run(stream::once(future::ok(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -504,13 +488,8 @@ mod integration_tests {
         let config = config(Encoding::Text, vec![]).await;
         let (sink, _) = config.build(cx).unwrap();
 
-        let (messages, mut events) = random_lines_with_stream(100, 10);
-        let _ = sink
-            .into_futures01sink()
-            .sink_compat()
-            .send_all(&mut events)
-            .await
-            .unwrap();
+        let (messages, events) = random_lines_with_stream(100, 10);
+        sink.run(events).await.unwrap();
 
         let mut found_all = false;
         for _ in 0..20 {
@@ -543,11 +522,7 @@ mod integration_tests {
         let message = random_string(100);
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
-        sink.into_futures01sink()
-            .send(event)
-            .compat()
-            .await
-            .unwrap();
+        sink.run(stream::once(future::ok(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -568,11 +543,7 @@ mod integration_tests {
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
         event.as_mut_log().insert("host", "example.com:1234");
-        sink.into_futures01sink()
-            .send(event)
-            .compat()
-            .await
-            .unwrap();
+        sink.run(stream::once(future::ok(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -596,11 +567,7 @@ mod integration_tests {
         let message = random_string(100);
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
-        sink.into_futures01sink()
-            .send(event)
-            .compat()
-            .await
-            .unwrap();
+        sink.run(stream::once(future::ok(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -627,11 +594,7 @@ mod integration_tests {
         event.as_mut_log().insert("asdf", "hello");
         event.as_mut_log().insert("host", "example.com:1234");
         event.as_mut_log().insert("roast", "beef.example.com:1234");
-        sink.into_futures01sink()
-            .send(event)
-            .compat()
-            .await
-            .unwrap();
+        sink.run(stream::once(future::ok(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 

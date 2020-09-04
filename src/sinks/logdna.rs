@@ -228,8 +228,7 @@ mod tests {
         sinks::util::test::{build_test_server, load_sink},
         test_util::{next_addr, random_lines, trace_init},
     };
-    use futures::{compat::Future01CompatExt, StreamExt};
-    use futures01::Sink;
+    use futures::{stream, StreamExt};
     use serde_json::json;
 
     #[test]
@@ -308,10 +307,7 @@ mod tests {
             events.push(event);
         }
 
-        let pump = sink
-            .into_futures01sink()
-            .send_all(futures01::stream::iter_ok(events));
-        let _ = pump.compat().await.unwrap();
+        sink.run(stream::iter(events).map(Ok)).await.unwrap();
 
         let output = rx.next().await.unwrap();
 

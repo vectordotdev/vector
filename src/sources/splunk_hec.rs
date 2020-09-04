@@ -776,8 +776,8 @@ mod tests {
         Pipeline,
     };
     use chrono::{TimeZone, Utc};
-    use futures::compat::Future01CompatExt;
-    use futures01::{stream, sync::mpsc, Future, Sink};
+    use futures::{compat::Future01CompatExt, future, stream, StreamExt};
+    use futures01::sync::mpsc;
     use std::net::SocketAddr;
 
     /// Splunk token
@@ -844,12 +844,14 @@ mod tests {
         source: mpsc::Receiver<Event>,
     ) -> Vec<Event> {
         let n = messages.len();
-        let pump = sink
-            .into_futures01sink()
-            .send_all(stream::iter_ok(messages.into_iter().map(Into::into)));
-        tokio::spawn(pump.map(|_| ()).map_err(|()| panic!()).compat());
-        let events = collect_n(source, n).await.unwrap();
 
+        tokio::spawn(async move {
+            sink.run(stream::iter(messages).map(|x| Ok(x.into())))
+                .await
+                .unwrap();
+        });
+
+        let events = collect_n(source, n).await.unwrap();
         assert_eq!(n, events.len());
 
         events
@@ -1006,15 +1008,9 @@ mod tests {
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("greeting", "hello");
         event.as_mut_log().insert("name", "bob");
+        sink.run(stream::once(future::ok(event))).await.unwrap();
 
-        let _ = sink
-            .into_futures01sink()
-            .send(event)
-            .compat()
-            .await
-            .unwrap();
         let event = collect_n(source, 1).await.unwrap().remove(0);
-
         assert_eq!(event.as_log()[&"greeting".into()], "hello".into());
         assert_eq!(event.as_log()[&"name".into()], "bob".into());
         assert!(event
@@ -1035,15 +1031,9 @@ mod tests {
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("line", "hello");
+        sink.run(stream::once(future::ok(event))).await.unwrap();
 
-        let _ = sink
-            .into_futures01sink()
-            .send(event)
-            .compat()
-            .await
-            .unwrap();
         let event = collect_n(source, 1).await.unwrap().remove(0);
-
         assert_eq!(
             event.as_log()[&event::log_schema().message_key()],
             "hello".into()
