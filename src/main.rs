@@ -12,6 +12,8 @@ use futures::{
 };
 use std::cmp::max;
 use tokio::{runtime, select};
+#[cfg(feature = "api")]
+use vector::api;
 use vector::{
     config::{self, ConfigDiff},
     generate, heartbeat,
@@ -126,6 +128,16 @@ fn main() {
         let pieces = topology::validate(&config, &diff).await.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });
+
+        // API
+        #[cfg(feature = "api")]
+        if config.api.enabled {
+            let bind = config.api.bind.unwrap();
+            let server = api::Server::new(bind);
+            let _ = server.run().await;
+            info!(message="API server running", port=&*bind.port().to_string(), ip=&*bind.ip().to_string());
+        }
+
 
         let result =
             topology::start_validated(config, diff, pieces, opts.require_healthy).await;

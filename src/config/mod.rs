@@ -13,6 +13,8 @@ use snafu::{ResultExt, Snafu};
 use std::fs::DirBuilder;
 use std::path::PathBuf;
 
+#[cfg(feature = "api")]
+mod api;
 pub mod component;
 mod diff;
 mod loading;
@@ -29,6 +31,9 @@ pub use validation::check;
 pub struct Config {
     #[serde(flatten)]
     pub global: GlobalOptions,
+    #[cfg(feature = "api")]
+    #[serde(default)]
+    pub api: api::Options,
     #[serde(default)]
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
     #[serde(default)]
@@ -327,6 +332,8 @@ impl Config {
                 data_dir: None,
                 log_schema: event::LogSchema::default(),
             },
+            #[cfg(feature = "api")]
+            api: api::Options::default(),
             sources: IndexMap::new(),
             sinks: IndexMap::new(),
             transforms: IndexMap::new(),
@@ -421,6 +428,10 @@ impl Config {
 
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
+
+        // API
+        #[cfg(feature = "api")]
+        api::update_config(self, &with);
 
         if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
             self.global.data_dir = with.global.data_dir;
