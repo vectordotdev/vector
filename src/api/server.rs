@@ -42,7 +42,7 @@ pub async fn make_server(address: SocketAddr, playground: bool) {
             })
             .boxed()
     } else {
-        not_found.boxed().clone()
+        not_found.boxed()
     };
 
     let routes = health
