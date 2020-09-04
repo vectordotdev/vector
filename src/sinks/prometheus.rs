@@ -98,9 +98,8 @@ struct PrometheusSink {
 
 fn encode_namespace(namespace: Option<&str>, name: &str) -> String {
     match namespace {
-        Some(namespace) if namespace.is_empty() => name.to_string(),
-        Some(namespace) => format!("{}_{}", namespace, name),
-        None => name.to_string(),
+        Some(namespace) if !namespace.is_empty() => format!("{}_{}", namespace, name),
+        _ => name.to_string(),
     }
 }
 

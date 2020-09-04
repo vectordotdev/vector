@@ -282,11 +282,10 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     }
 }
 
-fn encode_namespace(namespace: &str, name: &str) -> String {
-    if !namespace.is_empty() {
-        format!("{}.{}", namespace, name)
-    } else {
-        name.to_string()
+fn encode_namespace(namespace: Option<&str>, name: &str) -> String {
+    match namespace {
+        Some(namespace) if !namespace.is_empty() => format!("{}.{}", namespace, name),
+        _ => name.to_string(),
     }
 }
 
@@ -653,8 +652,11 @@ mod tests {
 
     #[test]
     fn test_encode_namespace() {
-        assert_eq!(encode_namespace("services", "status"), "services.status");
-        assert_eq!(encode_namespace("", "status"), "status")
+        assert_eq!(
+            encode_namespace(Some("services"), "status"),
+            "services.status"
+        );
+        assert_eq!(encode_namespace(None, "status"), "status")
     }
 
     #[test]
