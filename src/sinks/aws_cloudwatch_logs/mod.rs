@@ -848,7 +848,7 @@ mod integration_tests {
         region::RegionOrEndpoint,
         test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
     };
-    use futures::{stream, StreamExt, TryStreamExt};
+    use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt, TryStreamExt};
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_logs::{CloudWatchLogs, CreateLogGroupRequest, GetLogEventsRequest};
@@ -1106,8 +1106,13 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, events) = random_lines_with_stream(100, 11);
-        sink.run(events).await.unwrap();
+        let (input_lines, mut events) = random_lines_with_stream(100, 11);
+        let _ = sink
+            .into_futures01sink()
+            .sink_compat()
+            .send_all(&mut events)
+            .await
+            .unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
