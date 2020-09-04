@@ -110,7 +110,7 @@ impl KeyValue {
             let key = key.trim();
             let val = pair[split_index + field_split.len()..].trim();
 
-            if key.is_empty() || val.is_empty() {
+            if key.is_empty() {
                 return None;
             }
 
@@ -330,9 +330,25 @@ mod tests {
     }
 
     #[test]
-    fn it_fails_graceful_on_empty_values() {
+    fn it_handles_empty_values() {
         let log = parse_log(
-            "foo::0, ::beep, score::",
+            "foo::0, bop::beep, score::",
+            ",".to_string(),
+            "::".to_string(),
+            false,
+            &[],
+            None,
+            None,
+            None,
+        );
+        assert!(log.contains(&"score".into()));
+        assert_eq!(log[&"score".into()], Value::Bytes("".into()))
+    }
+
+    #[test]
+    fn it_handles_empty_keys() {
+        let log = parse_log(
+            "foo::0, ::beep, score::12",
             ",".to_string(),
             "::".to_string(),
             false,
@@ -343,7 +359,7 @@ mod tests {
         );
         assert!(log.contains(&"foo".into()));
         assert!(!log.contains(&"beep".into()));
-        assert!(!log.contains(&"score".into()));
+        assert!(log.contains(&"score".into()));
     }
 
     #[test]
