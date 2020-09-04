@@ -77,3 +77,47 @@ recommended that you do not lower this value below the service's internal timeou
 as this could create orphaned requests, pile on retries, and result in \
 duplicate data downstream.\
 """
+
+[<%= namespace %>.request.children.auto_concurrency]
+type = "table"
+category = "Request"
+common = <%= common.to_toml %>
+groups = <%= groups.to_toml %>
+relevant_when = {in_flight_limit = "auto"}
+description = "Configures parameters for the automatic concurrency limiter."
+
+[<%= namespace %>.request.children.auto_concurrency.children.decrease_ratio]
+type = "float"
+common = false
+default = <%= 0.9 %>
+groups = <%= groups.to_toml %>
+description = """\
+The automatic concurrency limiter works on the AIMD principle (Additive Increase, Multiplicative Decrease). \
+This setting controls the ratio at which the concurrency limit will be decreased when adverse conditions are detected. \
+The value must be greater than 0 and less than 1. \
+Typical values range from 0.5 to 0.9.\
+"""
+
+[<%= namespace %>.request.children.auto_concurrency.children.ewma_alpha]
+type = "float"
+common = false
+default = <%= 0.5 %>
+groups = <%= groups.to_toml %>
+description = """\
+The automatic concurrency limiter keeps a moving average of previously measured RTT (return trip times) \
+using an EWMA (exponentially weighted moving average). \
+This setting controls the how heavily new measurements are weighted versus older measurements. \
+The value must be greater than 0 and less than 1. \
+"""
+
+[<%= namespace %>.request.children.auto_concurrency.children.rtt_threshold_ratio]
+type = "float"
+common = false
+default = <%= 0.05 %>
+groups = <%= groups.to_toml %>
+description = """\
+The automatic concurrency limiter calculates a threshold range within which the RTT is allowed to vary \
+without being considered as going over or under the previous value. \
+This setting controls what ratio of the past RTT is used as this threshold value. \
+The value must be greater than 0.\
+"""
