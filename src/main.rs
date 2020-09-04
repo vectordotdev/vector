@@ -135,8 +135,6 @@ fn main() {
             let addr = config.api.bind.unwrap();
             let playground = config.api.playground;
 
-            println!("API: {:?}", config.api);
-
             tokio::spawn(async move {
                 info!(message="API server running", ip=&*addr.ip().to_string(), port=&*addr.port().to_string());
                 let _ = api::make_server(addr, playground).await;
