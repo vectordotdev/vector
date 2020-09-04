@@ -250,12 +250,12 @@ async fn run_test4(
     let stats = Arc::clone(&test_config.stats);
     let cstats = Arc::clone(&test_config.controller_stats);
 
-    let mut config = config::Config::empty();
+    let mut config = config::Config::builder();
     let generator = GeneratorConfig::repeat(vec!["line 1".into()], lines, interval);
     config.add_source("in", generator);
     config.add_sink("out", &["in"], test_config);
 
-    let (topology, _crash) = start_topology(config, false).await;
+    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     let controller = get_controller().unwrap();
 

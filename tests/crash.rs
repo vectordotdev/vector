@@ -55,7 +55,7 @@ async fn test_sink_panic() {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let mut config = config::Config::empty();
+    let mut config = config::Config::builder();
     config.add_source(
         "in",
         sources::socket::SocketConfig::make_tcp_config(in_addr),
@@ -70,7 +70,7 @@ async fn test_sink_panic() {
     let mut output_lines = CountReceiver::receive_lines(out_addr);
 
     std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
-    let (topology, crash) = start_topology(config, false).await;
+    let (topology, crash) = start_topology(config.build().unwrap(), false).await;
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
     delay_for(Duration::from_millis(100)).await;
@@ -136,7 +136,7 @@ async fn test_sink_error() {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let mut config = config::Config::empty();
+    let mut config = config::Config::builder();
     config.add_source(
         "in",
         sources::socket::SocketConfig::make_tcp_config(in_addr),
@@ -150,7 +150,7 @@ async fn test_sink_error() {
 
     let mut output_lines = CountReceiver::receive_lines(out_addr);
 
-    let (topology, crash) = start_topology(config, false).await;
+    let (topology, crash) = start_topology(config.build().unwrap(), false).await;
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
     delay_for(Duration::from_millis(100)).await;
@@ -202,7 +202,7 @@ async fn test_source_error() {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let mut config = config::Config::empty();
+    let mut config = config::Config::builder();
     config.add_source(
         "in",
         sources::socket::SocketConfig::make_tcp_config(in_addr),
@@ -216,7 +216,7 @@ async fn test_source_error() {
 
     let mut output_lines = CountReceiver::receive_lines(out_addr);
 
-    let (topology, crash) = start_topology(config, false).await;
+    let (topology, crash) = start_topology(config.build().unwrap(), false).await;
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
     delay_for(Duration::from_millis(100)).await;
@@ -270,7 +270,7 @@ async fn test_source_panic() {
     let in_addr = next_addr();
     let out_addr = next_addr();
 
-    let mut config = config::Config::empty();
+    let mut config = config::Config::builder();
     config.add_source(
         "in",
         sources::socket::SocketConfig::make_tcp_config(in_addr),
@@ -285,7 +285,7 @@ async fn test_source_panic() {
     let mut output_lines = CountReceiver::receive_lines(out_addr);
 
     std::panic::set_hook(Box::new(|_| {})); // Suppress panic print on background thread
-    let (topology, crash) = start_topology(config, false).await;
+    let (topology, crash) = start_topology(config.build().unwrap(), false).await;
     // Wait for server to accept traffic
     wait_for_tcp(in_addr).await;
     delay_for(Duration::from_millis(100)).await;
