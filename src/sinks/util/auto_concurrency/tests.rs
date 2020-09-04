@@ -459,11 +459,13 @@ async fn drops_at_high_concurrency() {
     assert_within!(averaged_rtt.max, 0.090, 0.125, "{:#?}", results);
     assert_within!(averaged_rtt.mean, 0.090, 0.125, "{:#?}", results);
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
-    assert_within!(concurrency_limit.mode, 1, 3, "{:#?}", results);
-    assert_within!(concurrency_limit.mean, 3.5, 5.0, "{:#?}", results);
+    assert_within!(concurrency_limit.max, 8, 15, "{:#?}", results);
+    assert_within!(concurrency_limit.mode, 5, 10, "{:#?}", results);
+    assert_within!(concurrency_limit.mean, 5.0, 10.0, "{:#?}", results);
     let c_in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(c_in_flight.mode, 1, 3, "{:#?}", results);
-    assert_within!(c_in_flight.mean, 3.0, 5.0, "{:#?}", results);
+    assert_within!(c_in_flight.max, 8, 15, "{:#?}", results);
+    assert_within!(c_in_flight.mode, 5, 10, "{:#?}", results);
+    assert_within!(c_in_flight.mean, 5.0, 10.0, "{:#?}", results);
 }
 
 #[tokio::test]
@@ -620,7 +622,7 @@ async fn jittery_link_small() {
     // Jitter can cause concurrency management to vary widely, though it
     // will typically reach the maximum of 10 in flight.
     let in_flight = results.stats.in_flight.stats().unwrap();
-    assert_within!(in_flight.max, 6, MAX_CONCURRENCY, "{:#?}", results);
+    assert_within!(in_flight.max, 15, 30, "{:#?}", results);
     assert_within!(in_flight.mean, 4.0, 20.0, "{:#?}", results);
 
     let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
@@ -628,15 +630,9 @@ async fn jittery_link_small() {
     let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
     assert_within!(averaged_rtt.mean, 0.090, 0.130, "{:#?}", results);
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
-    assert_within!(concurrency_limit.max, 6, MAX_CONCURRENCY, "{:#?}", results);
-    assert_within!(
-        concurrency_limit.mean,
-        4.0,
-        MAX_CONCURRENCY as f64,
-        "{:#?}",
-        results
-    );
+    assert_within!(concurrency_limit.max, 10, 30, "{:#?}", results);
+    assert_within!(concurrency_limit.mean, 6.0, 20.0, "{:#?}", results);
     let c_in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(c_in_flight.max, 6, MAX_CONCURRENCY, "{:#?}", results);
-    assert_within!(c_in_flight.mean, 4.0, 20.0, "{:#?}", results);
+    assert_within!(c_in_flight.max, 15, 30, "{:#?}", results);
+    assert_within!(c_in_flight.mean, 6.0, 20.0, "{:#?}", results);
 }

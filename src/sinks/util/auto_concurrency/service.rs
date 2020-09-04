@@ -1,5 +1,4 @@
-use super::controller::Controller;
-use super::future::ResponseFuture;
+use super::{controller::Controller, future::ResponseFuture, AutoConcurrencySettings};
 use crate::sinks::util::retries::RetryLogic;
 
 use tower::Service;
@@ -32,10 +31,15 @@ enum State {
 
 impl<S, L> AutoConcurrencyLimit<S, L> {
     /// Create a new automated concurrency limiter.
-    pub(crate) fn new(inner: S, logic: L, in_flight_limit: Option<usize>) -> Self {
+    pub(crate) fn new(
+        inner: S,
+        logic: L,
+        in_flight_limit: Option<usize>,
+        options: AutoConcurrencySettings,
+    ) -> Self {
         AutoConcurrencyLimit {
             inner,
-            controller: Arc::new(Controller::new(in_flight_limit, logic)),
+            controller: Arc::new(Controller::new(in_flight_limit, options, logic)),
             state: State::Empty,
         }
     }
@@ -164,7 +168,14 @@ mod tests {
 
     impl TestService {
         fn start() -> Self {
-            let layer = AutoConcurrencyLimitLayer::new(None, TestRetryLogic);
+            let layer = AutoConcurrencyLimitLayer::new(
+                None,
+                AutoConcurrencySettings {
+                    decrease_ratio: 0.5,
+                    ..Default::default()
+                },
+                TestRetryLogic,
+            );
             let (service, handle) = mock::spawn_layer(layer);
             let controller = Arc::clone(&service.get_ref().controller);
             let inner = Arc::clone(&controller.inner);
