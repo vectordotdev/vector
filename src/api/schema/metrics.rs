@@ -77,7 +77,8 @@ fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
     let mut interval = tokio::time::interval(Duration::from_millis(interval as u64));
 
     stream! {
-        while let _ = interval.tick().await {
+        loop {
+            interval.tick().await;
             for ev in capture_metrics(&controller) {
                 if let Event::Metric(m) = ev {
                     yield m;
