@@ -752,8 +752,7 @@ mod integration_tests {
         Event,
     };
     use chrono::Utc;
-    use futures::{compat::Future01CompatExt, stream, StreamExt};
-    use futures01::{stream as stream01, Sink};
+    use futures::{stream, StreamExt};
 
     //    fn onboarding_v1() {
     //        let client = reqwest::Client::builder()

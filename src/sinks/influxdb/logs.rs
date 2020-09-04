@@ -605,8 +605,7 @@ mod integration_tests {
         },
     };
     use chrono::Utc;
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
+    use futures::{stream, StreamExt};
 
     #[tokio::test]
     async fn influxdb2_logs_put_data() {
