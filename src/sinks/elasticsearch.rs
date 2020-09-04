@@ -172,8 +172,6 @@ impl HttpSink for ElasticSearchCommon {
     type Output = Vec<u8>;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-        self.config.encoding.apply_rules(&mut event);
-
         let index = self
             .index
             .render_string(&event)
@@ -196,6 +194,8 @@ impl HttpSink for ElasticSearchCommon {
 
         let mut body = serde_json::to_vec(&action).unwrap();
         body.push(b'\n');
+
+        self.config.encoding.apply_rules(&mut event);
 
         serde_json::to_writer(&mut body, &event.into_log()).unwrap();
         body.push(b'\n');
@@ -505,6 +505,7 @@ mod tests {
     use super::*;
     use crate::{sinks::util::retries::RetryAction, Event};
     use http::{Response, StatusCode};
+    use pretty_assertions::assert_eq;
     use serde_json::json;
     use string_cache::DefaultAtom as Atom;
 
@@ -557,6 +558,31 @@ mod tests {
             logic.should_retry_response(&response),
             RetryAction::DontRetry(_)
         ));
+    }
+
+    #[test]
+    fn allows_using_excepted_fields() {
+        let config = ElasticSearchConfig {
+            index: Some(String::from("{{ idx }}")),
+            encoding: EncodingConfigWithDefault {
+                codec: Encoding::Default,
+                except_fields: Some(vec![Atom::from("idx"), Atom::from("timestamp")]),
+                ..Default::default()
+            },
+            endpoint: String::from("https://example.com"),
+            ..Default::default()
+        };
+        let es = ElasticSearchCommon::parse_config(&config).unwrap();
+
+        let mut event = Event::from("hello there");
+        event.as_mut_log().insert("foo", "bar");
+        event.as_mut_log().insert("idx", "purple");
+
+        let encoded = es.encode_event(event).unwrap();
+        let expected = r#"{"index":{"_index":"purple","_type":"_doc"}}
+{"foo":"bar","message":"hello there"}
+"#;
+        assert_eq!(std::str::from_utf8(&encoded).unwrap(), &expected[..]);
     }
 }
 
