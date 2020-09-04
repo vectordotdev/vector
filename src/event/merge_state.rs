@@ -50,8 +50,7 @@ mod test {
 
         let mut state = LogEventMergeState::new(log_event_with_message("hel"));
         state.merge_in_next_event(log_event_with_message("lo "), fields);
-        let merged_event =
-            state.merge_in_final_event(log_event_with_message("world"), fields);
+        let merged_event = state.merge_in_final_event(log_event_with_message("world"), fields);
 
         assert_eq!(
             merged_event

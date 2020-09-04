@@ -108,9 +108,7 @@ impl Transform for Merge {
                     entry.insert(LogEventMergeState::new(event));
                 }
                 hash_map::Entry::Occupied(mut entry) => {
-                    entry
-                        .get_mut()
-                        .merge_in_next_event(event, &self.fields);
+                    entry.get_mut().merge_in_next_event(event, &self.fields);
                 }
             }
 
