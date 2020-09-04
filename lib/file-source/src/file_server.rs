@@ -405,7 +405,7 @@ impl Checkpointer {
 #[derive(Clone)]
 pub enum Fingerprinter {
     Checksum {
-        fingerprint_bytes: usize,
+        bytes: usize,
         ignored_header_bytes: usize,
     },
     FirstLineChecksum {
@@ -431,10 +431,10 @@ impl Fingerprinter {
             }
             Fingerprinter::Checksum {
                 ignored_header_bytes,
-                fingerprint_bytes,
+                bytes,
             } => {
                 let i = ignored_header_bytes as u64;
-                let b = fingerprint_bytes;
+                let b = bytes;
                 buffer.resize(b, 0u8);
                 let mut fp = fs::File::open(path)?;
                 fp.seek(io::SeekFrom::Start(i))?;
@@ -500,7 +500,7 @@ mod test {
     use tempfile::tempdir;
 
     #[test]
-    fn test_checksum_fingerprinting() {
+    fn test_checksum_fingerprint() {
         let fingerprinter = Fingerprinter::Checksum {
             fingerprint_bytes: 256,
             ignored_header_bytes: 0,
@@ -539,7 +539,7 @@ mod test {
     }
 
     #[test]
-    fn test_first_line_checksum_fingerprinting() {
+    fn test_first_line_checksum_fingerprint() {
         let max_line_length = 64;
         let fingerprinter = Fingerprinter::FirstLineChecksum { max_line_length };
 
@@ -606,7 +606,7 @@ mod test {
     }
 
     #[test]
-    fn test_inode_fingerprinting() {
+    fn test_inode_fingerprint() {
         let fingerprinter = Fingerprinter::DevInode;
 
         let target_dir = tempdir().unwrap();

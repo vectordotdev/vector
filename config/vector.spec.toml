@@ -250,7 +250,7 @@ data_dir = "/home/user/vector/"
   # Fingerprinting
   #
 
-  [sources.file.fingerprinting]
+  [sources.file.fingerprinti]
     # The number of bytes read off the head of the file to generate a unique
     # fingerprint.
     #
@@ -259,7 +259,7 @@ data_dir = "/home/user/vector/"
     # * type: uint
     # * unit: bytes
     # * relevant when strategy = "checksum"
-    fingerprint_bytes = 256
+    bytes = 256
 
     # The number of bytes to skip ahead (or ignore) when generating a unique
     # fingerprint. This is helpful if all files share a common header.
