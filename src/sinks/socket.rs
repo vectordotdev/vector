@@ -290,6 +290,7 @@ mod test {
         // Send another 10 events
         let (_, mut events) = random_lines_with_stream(10, 10);
         sink.send_all(&mut events).await.unwrap();
+        drop(sink);
 
         // Wait for server task to be complete.
         let _ = jh.await.unwrap();
