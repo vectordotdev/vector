@@ -126,7 +126,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 * **Customizable log schema** - [Change Vector's log schema][docs.global-options#log_schema] to anything you like.
 * **Rich type system** - Support for [JSON primitive types][docs.data-model.log#types] and [timestamps][docs.data-model.log#timestamps].
 * **Metrics interoperability** - A [sophisticated metrics data model][docs.data-model.metric] ensures _correct_ interoperability between systems.
-* **Metrics aggregation** - Aggregated [histgorams][docs.data-model.metric#aggregated_histogram] and [summaries][docs.data-model.metric#aggregated_summary] reduce volume without loss of precision.
+* **Metrics aggregation** - Aggregated [histograms][docs.data-model.metric#aggregated_histogram] and [summaries][docs.data-model.metric#aggregated_summary] reduce volume without loss of precision.
 
 ### Control Flow
 
@@ -157,8 +157,8 @@ To learn more about our correctness tests, please see the [Vector test harness][
 
 * **Memory safety** - Vector is built in Rust and is [memory safe][urls.rust_memory_safety], avoiding a large class of memory related errors.
 * **Decoupled buffer design** - Buffers are per-[sink][docs.sinks]; a bad sink won't bring the entire pipeline to a halt.
-* **Intelligent retries** - A fibonacci backoff algorithsm with jitter makes Vector a good citizen during outages.
-* **Backpressure & load shedding** - Buffers can be configured to provide backpressure or shed load.
+* **Intelligent retries** - A fibonacci backoff algorithm with jitter makes Vector a good citizen during outages.
+* **Backpressure & load shedding** - Buffers can be configured to provide back-pressure or shed load.
 * **Rate-limited internal logging** - Vector's internal logging is rate-limited avoiding IO saturation if errors occur.
 * **Sink healthchecks** - Healthchecks provide startup safety and prevent deploys with bad configuration.
 * **Robust disk buffering** - Vector uses `leveldb` for robust data durability across restarts.

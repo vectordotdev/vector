@@ -49,7 +49,7 @@ impl Client {
     /// specific to our [`HttpClient`] implementation.
     ///
     /// Consumes the configuration to populate the internal state.
-    /// Retunrs an error if the configuratiton is not valid.
+    /// Returns an error if the configuration is not valid.
     // TODO: add a proper error type.
     pub fn new(config: Config, resolver: Resolver) -> crate::Result<Self> {
         let Config {
@@ -79,7 +79,7 @@ impl Client {
         })
     }
 
-    /// Alters a request according to the client configuraion and sends it.
+    /// Alters a request according to the client configuration and sends it.
     pub async fn send<B: Into<Body>>(&mut self, req: Request<B>) -> crate::Result<Response<Body>> {
         let req = self.prepare_request(req);
         self.inner.send(req).await

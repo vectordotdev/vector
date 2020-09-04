@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use tokio_util::codec::{Decoder, Encoder};
 
 #[test]
-fn bytes_delim_decod() {
+fn bytes_delim_decode() {
     let mut codec = BytesDelimitedCodec::new(b'\n');
     let buf = &mut BytesMut::new();
     buf.put_slice(b"abc\n");

@@ -31,7 +31,7 @@ impl PathsProvider for K8sPathsProvider {
             None => {
                 // The state is not initialized or gone, fallback to using an
                 // empty array.
-                // TODO: consider `panic`ing here instead - fail-fast appoach
+                // TODO: consider `panic`ing here instead - fail-fast approach
                 // is always better if possible, but it's not clear if it's
                 // a sane strategy here.
                 warn!(message = "Unable to read the state of the pods");
@@ -222,8 +222,8 @@ mod tests {
             };
 
             let actual_paths: Vec<_> = list_pod_log_paths(mock_glob, &pod).collect();
-            let expeced_paths: Vec<_> = expected_paths.into_iter().map(PathBuf::from).collect();
-            assert_eq!(actual_paths, expeced_paths)
+            let expected_paths: Vec<_> = expected_paths.into_iter().map(PathBuf::from).collect();
+            assert_eq!(actual_paths, expected_paths)
         }
     }
 }

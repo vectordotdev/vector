@@ -6,6 +6,8 @@ mod ansi_stripper;
 mod auto_concurrency;
 mod aws_kinesis_streams;
 mod blackhole;
+#[cfg(feature = "transforms-coercer")]
+mod coercer;
 #[cfg(feature = "transforms-concat")]
 mod concat;
 #[cfg(feature = "sources-docker")]
@@ -53,6 +55,8 @@ mod splunk_hec;
 mod statsd;
 mod stdin;
 mod syslog;
+#[cfg(feature = "transforms-tag_cardinality_limit")]
+mod tag_cardinality_limit;
 mod tcp;
 mod unix;
 mod vector;
@@ -67,6 +71,8 @@ pub use self::ansi_stripper::*;
 pub use self::auto_concurrency::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
+#[cfg(feature = "transforms-coercer")]
+pub(crate) use self::coercer::*;
 #[cfg(feature = "transforms-concat")]
 pub use self::concat::*;
 #[cfg(feature = "sources-docker")]
@@ -115,6 +121,8 @@ pub(crate) use self::splunk_hec::*;
 pub use self::statsd::*;
 pub use self::stdin::*;
 pub use self::syslog::*;
+#[cfg(feature = "transforms-tag_cardinality_limit")]
+pub(crate) use self::tag_cardinality_limit::*;
 pub use self::tcp::*;
 pub use self::unix::*;
 pub use self::vector::*;
