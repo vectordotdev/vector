@@ -26,12 +26,14 @@ impl InternalEvent for StatsdEventReceived {
     }
 }
 
+#[cfg(feature = "sources-statsd")]
 #[derive(Debug)]
 pub struct StatsdInvalidRecord<'a> {
     pub error: crate::sources::statsd::parser::ParseError,
     pub text: &'a str,
 }
 
+#[cfg(feature = "sources-statsd")]
 impl InternalEvent for StatsdInvalidRecord<'_> {
     fn emit_logs(&self) {
         error!(message = "Invalid packet from statsd, discarding.", error = %self.error, text = %self.text);
