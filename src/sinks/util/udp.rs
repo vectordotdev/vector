@@ -2,7 +2,7 @@ use super::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, St
 use crate::{
     config::SinkContext,
     dns::{Resolver, ResolverFuture},
-    sinks::{Healthcheck, RouterSink},
+    sinks::{Healthcheck, VectorSink},
 };
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
@@ -49,12 +49,12 @@ impl UdpSinkConfig {
         &self,
         cx: SinkContext,
         encoding: EncodingConfig<Encoding>,
-    ) -> crate::Result<(RouterSink, Healthcheck)> {
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         let (udp, healthcheck) = self.prepare(cx.clone())?;
         let sink = StreamSink::new(udp.into_sink()?, cx.acker())
             .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
 
-        Ok((Box::new(sink), healthcheck))
+        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
 }
 

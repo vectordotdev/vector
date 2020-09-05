@@ -7,7 +7,7 @@ use crate::{
         TcpConnectionShutdown, TcpEventSent, TcpFlushError,
     },
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSink},
-    sinks::{Healthcheck, RouterSink},
+    sinks::{Healthcheck, VectorSink},
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
 };
 use bytes::Bytes;
@@ -81,12 +81,12 @@ impl TcpSinkConfig {
         &self,
         cx: SinkContext,
         encoding: EncodingConfig<Encoding>,
-    ) -> crate::Result<(RouterSink, Healthcheck)> {
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         let (tcp, healthcheck) = self.prepare(cx.clone())?;
         let sink = StreamSink::new(tcp.into_sink(), cx.acker())
             .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
 
-        Ok((Box::new(sink), healthcheck))
+        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
 }
 

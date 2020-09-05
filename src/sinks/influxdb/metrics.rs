@@ -1,13 +1,16 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricValue},
-    sinks::influxdb::{
-        encode_namespace, encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings,
-        Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
-    },
-    sinks::util::{
-        http::{HttpBatchService, HttpClient, HttpRetryLogic},
-        BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
+    sinks::{
+        influxdb::{
+            encode_namespace, encode_timestamp, healthcheck, influx_line_protocol,
+            influxdb_settings, Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
+        },
+        util::{
+            http::{HttpBatchService, HttpClient, HttpRetryLogic},
+            BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
+        },
+        Healthcheck, VectorSink,
     },
 };
 use bytes::Bytes;
@@ -61,7 +64,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDBConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = HttpClient::new(cx.resolver(), None)?;
         let healthcheck = healthcheck(
             self.clone().endpoint,
@@ -87,7 +90,7 @@ impl InfluxDBSvc {
         config: InfluxDBConfig,
         cx: SinkContext,
         client: HttpClient,
-    ) -> crate::Result<super::RouterSink> {
+    ) -> crate::Result<VectorSink> {
         let settings = influxdb_settings(
             config.influxdb1_settings.clone(),
             config.influxdb2_settings.clone(),
@@ -123,7 +126,7 @@ impl InfluxDBSvc {
             )
             .sink_map_err(|e| error!("Fatal influxdb sink error: {}", e));
 
-        Ok(Box::new(sink))
+        Ok(VectorSink::Futures01Sink(Box::new(sink)))
     }
 }
 
@@ -749,8 +752,7 @@ mod integration_tests {
         Event,
     };
     use chrono::Utc;
-    use futures::compat::Future01CompatExt;
-    use futures01::{stream as stream01, Sink};
+    use futures::{stream, StreamExt};
 
     //    fn onboarding_v1() {
     //        let client = reqwest::Client::builder()
@@ -813,10 +815,7 @@ mod integration_tests {
 
         let client = HttpClient::new(cx.resolver(), None).unwrap();
         let sink = InfluxDBSvc::new(config, cx, client).unwrap();
-
-        let stream = stream01::iter_ok(events.clone().into_iter());
-
-        let _ = sink.send_all(stream).compat().await.unwrap();
+        sink.run(stream::iter(events).map(Ok)).await.unwrap();
 
         let mut body = std::collections::HashMap::new();
         body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));

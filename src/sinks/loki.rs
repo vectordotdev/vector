@@ -71,7 +71,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "loki")]
 impl SinkConfig for LokiConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         if self.labels.is_empty() {
             return Err("`labels` must include at least one label.".into());
         }
@@ -97,7 +97,10 @@ impl SinkConfig for LokiConfig {
 
         let healthcheck = healthcheck(self.clone(), client).boxed().compat();
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(healthcheck),
+        ))
     }
 
     fn input_type(&self) -> DataType {

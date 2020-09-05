@@ -86,10 +86,13 @@ inventory::submit! {
 
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = KafkaSink::new(self.clone(), cx.acker())?;
         let hc = healthcheck(self.clone()).boxed().compat();
-        Ok((Box::new(sink), Box::new(hc)))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(hc),
+        ))
     }
 
     fn input_type(&self) -> DataType {
