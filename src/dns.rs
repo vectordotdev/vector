@@ -38,11 +38,13 @@ impl Resolver {
             ))
         } else {
             spawn_blocking(move || {
-                let mut name_ref = name.as_str();
-                // strip IPv6 prefix and suffix
-                if name_ref.starts_with('[') && name_ref.ends_with(']') {
-                    name_ref = &name_ref[1..name_ref.len() - 1];
-                }
+                let name_ref = match name.as_str() {
+                    // strip IPv6 prefix and suffix
+                    name if name.starts_with('[') && name.ends_with(']') => {
+                        &name[1..name.len() - 1]
+                    }
+                    name => name,
+                };
                 (name_ref, dummy_port).to_socket_addrs()
             })
             .await
