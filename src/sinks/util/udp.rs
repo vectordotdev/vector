@@ -119,14 +119,16 @@ impl UdpSink {
                 },
                 State::ResolvedDns(addr) => {
                     let bind_address = find_bind_address(&addr);
-                    let socket = match UdpSocket::bind(bind_address) {
-                        Ok(socket) => socket,
-                        Err(_) => unreachable!(),
-                    };
-                    match socket.connect(addr) {
-                        Ok(()) => State::Connected(socket),
+                    match UdpSocket::bind(bind_address) {
+                        Ok(socket) => match socket.connect(addr) {
+                            Ok(()) => State::Connected(socket),
+                            Err(error) => {
+                                error!(message = "unable to connect UDP socket", addr = %addr, %error);
+                                State::Backoff(self.next_delay01())
+                            }
+                        },
                         Err(error) => {
-                            error!(message = "unable to connect UDP socket", addr = %addr, %error);
+                            error!(message = "unable to bind local address", %error);
                             State::Backoff(self.next_delay01())
                         }
                     }
