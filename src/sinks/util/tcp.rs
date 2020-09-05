@@ -107,7 +107,6 @@ impl TcpConnector {
         let tls = self.tls.clone();
 
         async move {
-            debug!(message = "resolving DNS.", host = %host);
             let ip = resolver
                 .lookup_ip(host.clone())
                 .await
@@ -116,9 +115,8 @@ impl TcpConnector {
                 .ok_or(TcpError::NoAddresses)?;
 
             let addr = SocketAddr::new(ip, port);
-            debug!(message = "connecting", %addr);
             let stream = tls.connect(host, addr).await.context(ConnectError)?;
-            Ok(CompatSink::new(FramedWrite::new(stream, BytesCodec::new())))
+            Ok(FramedWrite::new(stream, BytesCodec::new()))
         }
         .boxed()
     }
@@ -148,11 +146,12 @@ pub struct TcpSink {
 enum TcpSinkState {
     Disconnected,
     Connecting(Box<dyn Future<Item = TcpOrTlsStream, Error = TcpError> + Send>),
-    Connected(TcpOrTlsStream),
+    Connected(TcpOrTlsStream01),
     Backoff(Box<dyn Future<Item = (), Error = ()> + Send>),
 }
 
-type TcpOrTlsStream = CompatSink<FramedWrite<MaybeTlsStream<TcpStream>, BytesCodec>, Bytes>;
+type TcpOrTlsStream = FramedWrite<MaybeTlsStream<TcpStream>, BytesCodec>;
+type TcpOrTlsStream01 = CompatSink<TcpOrTlsStream, Bytes>;
 
 impl TcpSink {
     pub fn new(host: String, port: u16, resolver: Resolver, tls: MaybeTlsSettings) -> Self {
@@ -191,7 +190,7 @@ impl TcpSink {
         Box::new(async move { Ok(delay.await) }.boxed().compat())
     }
 
-    fn poll_connection(&mut self) -> Poll01<&mut TcpOrTlsStream, ()> {
+    fn poll_connection(&mut self) -> Poll01<&mut TcpOrTlsStream01, ()> {
         loop {
             self.state = match self.state {
                 TcpSinkState::Disconnected => {
@@ -199,12 +198,12 @@ impl TcpSink {
                 }
                 TcpSinkState::Connecting(ref mut connect_future) => match connect_future.poll() {
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
-                    Ok(Async::Ready(stream)) => {
+                    Ok(Async::Ready(connection)) => {
                         emit!(TcpConnectionEstablished {
-                            peer_addr: stream.get_mut().get_mut().peer_addr().ok(),
+                            peer_addr: connection.get_mut().peer_addr().ok(),
                         });
                         self.backoff = Self::fresh_backoff();
-                        TcpSinkState::Connected(stream)
+                        TcpSinkState::Connected(CompatSink::new(connection))
                     }
                     Err(error) => {
                         emit!(TcpConnectionFailed { error });
@@ -311,7 +310,7 @@ impl Sink for TcpSink {
     }
 }
 
-pub async fn tcp_healthcheck(
+async fn tcp_healthcheck(
     host: String,
     port: u16,
     resolver: Resolver,
