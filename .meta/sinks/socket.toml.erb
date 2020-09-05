@@ -15,7 +15,12 @@ input_types = ["log"]
 requirements = {}
 write_to_description = "a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket"
 
-<%= render("_partials/fields/_component_options.toml", type: "sink", name: "socket") %>
+<%= render(
+  "_partials/fields/_component_options.toml",
+  type: "sink",
+  name: "socket",
+  groups: ["tcp", "udp", "unix"]
+) %>
 
 <%= render(
   "_partials/fields/_buffer_options.toml",
@@ -72,4 +77,3 @@ description = """The unix socket path. This should be the absolute path.\
   can_verify_hostname: true,
   groups: ["tcp"]
 ) %>
-
