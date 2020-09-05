@@ -14,7 +14,7 @@ use crate::{
             retries::RetryLogic, BatchSettings, EncodedLength, InFlightLimit, TowerRequestConfig,
             VecBuffer,
         },
-        Healthcheck, RouterSink,
+        Healthcheck, VectorSink,
     },
     sources::generator::GeneratorConfig,
     test_util::{start_topology, stats::LevelTimeHistogram},
@@ -80,7 +80,7 @@ struct TestConfig {
 
 #[typetag::serialize(name = "test")]
 impl SinkConfig for TestConfig {
-    fn build(&self, cx: SinkContext) -> Result<(RouterSink, Healthcheck), crate::Error> {
+    fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
         let batch = BatchSettings::default().events(1).bytes(9999).timeout(9999);
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let sink = request
@@ -106,7 +106,10 @@ impl SinkConfig for TestConfig {
         );
         *self.controller_stats.lock().unwrap() = stats;
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(healthcheck),
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -250,12 +253,12 @@ async fn run_test4(
     let stats = Arc::clone(&test_config.stats);
     let cstats = Arc::clone(&test_config.controller_stats);
 
-    let mut config = config::Config::empty();
+    let mut config = config::Config::builder();
     let generator = GeneratorConfig::repeat(vec!["line 1".into()], lines, interval);
     config.add_source("in", generator);
     config.add_sink("out", &["in"], test_config);
 
-    let (topology, _crash) = start_topology(config, false).await;
+    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     let controller = get_controller().unwrap();
 
@@ -459,11 +462,13 @@ async fn drops_at_high_concurrency() {
     assert_within!(averaged_rtt.max, 0.090, 0.125, "{:#?}", results);
     assert_within!(averaged_rtt.mean, 0.090, 0.125, "{:#?}", results);
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
-    assert_within!(concurrency_limit.mode, 1, 3, "{:#?}", results);
-    assert_within!(concurrency_limit.mean, 3.5, 5.0, "{:#?}", results);
+    assert_within!(concurrency_limit.max, 8, 15, "{:#?}", results);
+    assert_within!(concurrency_limit.mode, 5, 10, "{:#?}", results);
+    assert_within!(concurrency_limit.mean, 5.0, 10.0, "{:#?}", results);
     let c_in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(c_in_flight.mode, 1, 3, "{:#?}", results);
-    assert_within!(c_in_flight.mean, 3.0, 5.0, "{:#?}", results);
+    assert_within!(c_in_flight.max, 8, 15, "{:#?}", results);
+    assert_within!(c_in_flight.mode, 5, 10, "{:#?}", results);
+    assert_within!(c_in_flight.mean, 5.0, 10.0, "{:#?}", results);
 }
 
 #[tokio::test]
@@ -620,7 +625,7 @@ async fn jittery_link_small() {
     // Jitter can cause concurrency management to vary widely, though it
     // will typically reach the maximum of 10 in flight.
     let in_flight = results.stats.in_flight.stats().unwrap();
-    assert_within!(in_flight.max, 6, MAX_CONCURRENCY, "{:#?}", results);
+    assert_within!(in_flight.max, 15, 30, "{:#?}", results);
     assert_within!(in_flight.mean, 4.0, 20.0, "{:#?}", results);
 
     let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
@@ -628,15 +633,9 @@ async fn jittery_link_small() {
     let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
     assert_within!(averaged_rtt.mean, 0.090, 0.130, "{:#?}", results);
     let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
-    assert_within!(concurrency_limit.max, 6, MAX_CONCURRENCY, "{:#?}", results);
-    assert_within!(
-        concurrency_limit.mean,
-        4.0,
-        MAX_CONCURRENCY as f64,
-        "{:#?}",
-        results
-    );
+    assert_within!(concurrency_limit.max, 10, 30, "{:#?}", results);
+    assert_within!(concurrency_limit.mean, 6.0, 20.0, "{:#?}", results);
     let c_in_flight = results.cstats.in_flight.stats().unwrap();
-    assert_within!(c_in_flight.max, 6, MAX_CONCURRENCY, "{:#?}", results);
-    assert_within!(c_in_flight.mean, 4.0, 20.0, "{:#?}", results);
+    assert_within!(c_in_flight.max, 15, 30, "{:#?}", results);
+    assert_within!(c_in_flight.mean, 6.0, 20.0, "{:#?}", results);
 }

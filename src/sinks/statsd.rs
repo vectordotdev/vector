@@ -65,7 +65,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "statsd")]
 impl SinkConfig for StatsdSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = StatsdSvc::new(self.clone(), cx.acker())?;
         let healthcheck = StatsdSvc::healthcheck(self.clone()).boxed().compat();
         Ok((sink, Box::new(healthcheck)))
@@ -81,7 +81,7 @@ impl SinkConfig for StatsdSinkConfig {
 }
 
 impl StatsdSvc {
-    pub fn new(config: StatsdSinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {
+    pub fn new(config: StatsdSinkConfig, acker: Acker) -> crate::Result<super::VectorSink> {
         // 1432 bytes is a recommended packet size to fit into MTU
         // https://github.com/statsd/statsd/blob/master/docs/metric_types.md#multi-metric-packets
         // However we need to leave some space for +1 extra trailing event in the buffer.
@@ -108,7 +108,7 @@ impl StatsdSvc {
         .sink_map_err(|e| error!("Fatal statsd sink error: {}", e))
         .with_flat_map(move |event| stream::iter_ok(encode_event(event, &namespace)));
 
-        Ok(Box::new(sink))
+        Ok(super::VectorSink::Futures01Sink(Box::new(sink)))
     }
 
     async fn healthcheck(_config: StatsdSinkConfig) -> crate::Result<()> {
@@ -233,11 +233,8 @@ mod test {
         Event,
     };
     use bytes::Bytes;
-    use futures::{
-        compat::{Future01CompatExt, Sink01CompatExt},
-        {SinkExt, StreamExt, TryStreamExt},
-    };
-    use futures01::{sync::mpsc, Sink};
+    use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt, TryStreamExt};
+    use futures01::sync::mpsc;
     use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
     #[cfg(feature = "sources-statsd")]
@@ -414,8 +411,7 @@ mod test {
                 .unwrap()
         });
 
-        let stream = stream::iter_ok(events);
-        let _ = sink.send_all(stream).compat().await.unwrap();
+        sink.run(stream::iter(events).map(Ok)).await.unwrap();
 
         let messages = collect_n(rx, 1).await.unwrap();
         assert_eq!(

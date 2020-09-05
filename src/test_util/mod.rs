@@ -168,11 +168,17 @@ pub async fn send_lines_tls(
     addr: SocketAddr,
     host: String,
     lines: impl Iterator<Item = String>,
+    ca: impl Into<Option<&Path>>,
 ) -> Result<(), Infallible> {
     let stream = TcpStream::connect(&addr).await.unwrap();
 
     let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
-    connector.set_verify(SslVerifyMode::NONE);
+    if let Some(ca) = ca.into() {
+        connector.set_ca_file(ca).unwrap();
+    } else {
+        connector.set_verify(SslVerifyMode::NONE);
+    }
+
     let config = connector.build().configure().unwrap();
 
     let stream = tokio_openssl::connect(config, &host, stream).await.unwrap();
@@ -355,6 +361,64 @@ where
     .await
 }
 
+// Retries a func every `retry` duration until given an Ok(T); panics after `until` elapses
+pub async fn retry_until<F, Fut, T, E>(mut f: F, retry: Duration, until: Duration) -> T
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, E>> + Send + 'static,
+{
+    let started = Instant::now();
+    while started.elapsed() < until {
+        match f().await {
+            Ok(res) => return res,
+            Err(_) => tokio::time::delay_for(retry).await,
+        }
+    }
+    panic!("Timeout")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::retry_until;
+    use std::{
+        sync::{Arc, RwLock},
+        time::Duration,
+    };
+
+    // helper which errors the first 3x, and succeeds on the 4th
+    async fn retry_until_helper(count: Arc<RwLock<i32>>) -> Result<(), ()> {
+        if *count.read().unwrap() < 3 {
+            let mut c = count.write().unwrap();
+            *c += 1;
+            return Err(());
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn retry_until_before_timeout() {
+        let count = Arc::new(RwLock::new(0));
+        let func = || {
+            let count = Arc::clone(&count);
+            retry_until_helper(count)
+        };
+
+        retry_until(func, Duration::from_millis(10), Duration::from_secs(1)).await;
+    }
+
+    #[tokio::test]
+    #[should_panic]
+    async fn retry_until_after_timeout() {
+        let count: Arc<RwLock<i32>> = Arc::new(RwLock::new(0));
+        let func = || {
+            let count = Arc::clone(&count);
+            retry_until_helper(count)
+        };
+
+        retry_until(func, Duration::from_millis(50), Duration::from_millis(100)).await;
+    }
+}
+
 pub struct CountReceiver<T> {
     count: Arc<AtomicUsize>,
     trigger: Option<oneshot::Sender<()>>,
@@ -490,7 +554,7 @@ pub async fn start_topology(
     require_healthy: bool,
 ) -> (RunningTopology, mpsc::UnboundedReceiver<()>) {
     let diff = ConfigDiff::initial(&config);
-    let pieces = topology::validate(&config, &diff).await.unwrap();
+    let pieces = topology::build_or_log_errors(&config, &diff).await.unwrap();
     topology::start_validated(config, diff, pieces, require_healthy)
         .await
         .unwrap()

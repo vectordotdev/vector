@@ -37,7 +37,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "honeycomb")]
 impl SinkConfig for HoneycombConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch_settings = BatchSettings::default()
             .bytes(bytesize::kib(100u64))
@@ -58,7 +58,10 @@ impl SinkConfig for HoneycombConfig {
 
         let healthcheck = Box::new(Box::pin(healthcheck(self.clone(), client)).compat());
 
-        Ok((Box::new(sink), healthcheck))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {

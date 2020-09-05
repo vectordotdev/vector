@@ -57,7 +57,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "aws_cloudwatch_metrics")]
 impl SinkConfig for CloudWatchMetricsSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(cx.resolver())?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed().compat();
         let sink = CloudWatchMetricsSvc::new(self.clone(), client, cx)?;
@@ -116,7 +116,7 @@ impl CloudWatchMetricsSvc {
         config: CloudWatchMetricsSinkConfig,
         client: CloudWatchClient,
         cx: SinkContext,
-    ) -> crate::Result<super::RouterSink> {
+    ) -> crate::Result<super::VectorSink> {
         let batch = BatchSettings::default()
             .events(20)
             .timeout(1)
@@ -135,7 +135,7 @@ impl CloudWatchMetricsSvc {
             )
             .sink_map_err(|e| error!("CloudwatchMetrics sink error: {}", e));
 
-        Ok(Box::new(sink))
+        Ok(super::VectorSink::Futures01Sink(Box::new(sink)))
     }
 
     fn encode_events(&mut self, events: Vec<Metric>) -> PutMetricDataInput {
@@ -432,8 +432,7 @@ mod integration_tests {
         test_util::random_string,
     };
     use chrono::offset::TimeZone;
-    use futures::compat::Future01CompatExt;
-    use futures01::{stream, Sink};
+    use futures::{stream, StreamExt};
 
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
@@ -506,8 +505,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let stream = stream::iter_ok(events.clone().into_iter());
-
-        let _ = sink.send_all(stream).compat().await.unwrap();
+        let stream = stream::iter(events).map(|x| Ok(x.into()));
+        sink.run(stream).await.unwrap();
     }
 }
