@@ -239,16 +239,18 @@ impl Sink for TcpSink {
                         Ok(AsyncSink::NotReady(line))
                     }
                     _ => {
-                        emit!(TcpEventSent {
-                            byte_size: line.len()
-                        });
+                        let byte_size = line.len();
                         match connection.start_send(line) {
+                            Ok(AsyncSink::NotReady(line)) => Ok(AsyncSink::NotReady(line)),
                             Err(error) => {
                                 error!(message = "connection disconnected.", %error);
                                 self.state = TcpSinkState::Disconnected;
                                 Ok(AsyncSink::Ready)
                             }
-                            Ok(res) => Ok(res),
+                            Ok(AsyncSink::Ready) => {
+                                emit!(TcpEventSent { byte_size });
+                                Ok(AsyncSink::Ready)
+                            }
                         }
                     }
                 }
