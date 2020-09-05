@@ -61,7 +61,7 @@ pub enum Encoding {
 
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let batch = BatchSettings::default()
             .bytes(bytesize::mib(10u64))
             .timeout(1)
@@ -82,7 +82,10 @@ impl SinkConfig for ClickhouseConfig {
 
         let healthcheck = healthcheck(client, self.clone()).boxed().compat();
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(healthcheck),
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -240,8 +243,7 @@ mod integration_tests {
         sinks::util::encoding::TimestampFormat,
         test_util::{random_string, trace_init},
     };
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
+    use futures::{compat::Future01CompatExt, future, stream};
     use serde_json::Value;
     use tokio::time::{timeout, Duration};
 
@@ -277,7 +279,9 @@ mod integration_tests {
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.send(input_event.clone()).compat().await.unwrap();
+        sink.run(stream::once(future::ok(input_event.clone())))
+            .await
+            .unwrap();
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -324,7 +328,9 @@ mod integration_tests {
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.send(input_event.clone()).compat().await.unwrap();
+        sink.run(stream::once(future::ok(input_event.clone())))
+            .await
+            .unwrap();
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -382,7 +388,9 @@ timestamp_format = "unix""#,
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.send(input_event.clone()).compat().await.unwrap();
+        sink.run(stream::once(future::ok(input_event.clone())))
+            .await
+            .unwrap();
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -439,7 +447,7 @@ timestamp_format = "unix""#,
         // this timeout should trigger.
         timeout(
             Duration::from_secs(5),
-            sink.send(input_event.clone()).compat(),
+            sink.run(stream::once(future::ok(input_event))),
         )
         .await
         .unwrap()

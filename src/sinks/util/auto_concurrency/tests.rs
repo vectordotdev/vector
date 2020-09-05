@@ -14,7 +14,7 @@ use crate::{
             retries::RetryLogic, BatchSettings, EncodedLength, InFlightLimit, TowerRequestConfig,
             VecBuffer,
         },
-        Healthcheck, RouterSink,
+        Healthcheck, VectorSink,
     },
     sources::generator::GeneratorConfig,
     test_util::{start_topology, stats::LevelTimeHistogram},
@@ -80,7 +80,7 @@ struct TestConfig {
 
 #[typetag::serialize(name = "test")]
 impl SinkConfig for TestConfig {
-    fn build(&self, cx: SinkContext) -> Result<(RouterSink, Healthcheck), crate::Error> {
+    fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
         let batch = BatchSettings::default().events(1).bytes(9999).timeout(9999);
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let sink = request
@@ -106,7 +106,10 @@ impl SinkConfig for TestConfig {
         );
         *self.controller_stats.lock().unwrap() = stats;
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(healthcheck),
+        ))
     }
 
     fn input_type(&self) -> DataType {

@@ -66,7 +66,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "prometheus")]
 impl SinkConfig for PrometheusSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         if self.flush_period_secs < MIN_FLUSH_PERIOD_SECS {
             return Err(Box::new(BuildError::FlushPeriodTooShort {
                 min: MIN_FLUSH_PERIOD_SECS,
@@ -76,7 +76,7 @@ impl SinkConfig for PrometheusSinkConfig {
         let sink = Box::new(PrometheusSink::new(self.clone(), cx.acker()));
         let healthcheck = Box::new(future::ok(()));
 
-        Ok((sink, healthcheck))
+        Ok((super::VectorSink::Futures01Sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

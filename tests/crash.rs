@@ -8,7 +8,11 @@ use vector::{
     config::{self, GlobalOptions, SinkContext},
     shutdown::ShutdownSignal,
     test_util::{next_addr, random_lines, send_lines, start_topology, wait_for_tcp, CountReceiver},
-    Event, Pipeline, {sinks, sources},
+    Event, Pipeline,
+    {
+        sinks::{self, Healthcheck, VectorSink},
+        sources,
+    },
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -16,11 +20,11 @@ struct PanicSink;
 
 #[typetag::serde(name = "panic")]
 impl config::SinkConfig for PanicSink {
-    fn build(
-        &self,
-        _cx: SinkContext,
-    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), vector::Error> {
-        Ok((Box::new(PanicSink), Box::new(future::ok(()))))
+    fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
+        Ok((
+            VectorSink::Futures01Sink(Box::new(PanicSink)),
+            Box::new(future::ok(())),
+        ))
     }
 
     fn input_type(&self) -> config::DataType {
@@ -97,11 +101,11 @@ struct ErrorSink;
 
 #[typetag::serde(name = "panic")]
 impl config::SinkConfig for ErrorSink {
-    fn build(
-        &self,
-        _cx: SinkContext,
-    ) -> Result<(sinks::RouterSink, sinks::Healthcheck), vector::Error> {
-        Ok((Box::new(ErrorSink), Box::new(future::ok(()))))
+    fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
+        Ok((
+            VectorSink::Futures01Sink(Box::new(ErrorSink)),
+            Box::new(future::ok(())),
+        ))
     }
 
     fn input_type(&self) -> config::DataType {

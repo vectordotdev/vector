@@ -40,7 +40,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "vector")]
 impl SinkConfig for VectorSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(BuildError::MissingHost)?.to_string();
@@ -53,7 +53,10 @@ impl SinkConfig for VectorSinkConfig {
         let sink = StreamSink::new(sink, cx.acker())
             .with_flat_map(move |event| iter_ok(encode_event(event)));
 
-        Ok((Box::new(sink), Box::new(healthcheck.compat())))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(healthcheck.compat()),
+        ))
     }
 
     fn input_type(&self) -> DataType {

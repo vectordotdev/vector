@@ -4,9 +4,12 @@ use crate::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
     },
-    sinks::util::{
-        http::{BatchedHttpSink, HttpClient, HttpSink},
-        BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
+    sinks::{
+        util::{
+            http::{BatchedHttpSink, HttpClient, HttpSink},
+            BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
+        },
+        Healthcheck, HealthcheckError, UriParseError, VectorSink,
     },
 };
 use chrono::{DateTime, Utc};
@@ -105,7 +108,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = HttpClient::new(cx.resolver(), None)?;
         let healthcheck = healthcheck(self.clone(), client.clone()).boxed().compat();
 
@@ -134,7 +137,10 @@ impl SinkConfig for DatadogConfig {
         )
         .sink_map_err(|e| error!("Fatal datadog error: {}", e));
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(healthcheck),
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -174,7 +180,7 @@ impl HttpSink for DatadogSink {
 fn build_uri(host: &str) -> crate::Result<Uri> {
     let uri = format!("{}/api/v1/series", host)
         .parse::<Uri>()
-        .context(super::UriParseError)?;
+        .context(UriParseError)?;
 
     Ok(uri)
 }
@@ -182,7 +188,7 @@ fn build_uri(host: &str) -> crate::Result<Uri> {
 async fn healthcheck(config: DatadogConfig, mut client: HttpClient) -> crate::Result<()> {
     let uri = format!("{}/api/v1/validate", config.endpoint)
         .parse::<Uri>()
-        .context(super::UriParseError)?;
+        .context(UriParseError)?;
 
     let request = Request::get(uri)
         .header("DD-API-KEY", config.api_key)
@@ -193,7 +199,7 @@ async fn healthcheck(config: DatadogConfig, mut client: HttpClient) -> crate::Re
 
     match response.status() {
         StatusCode::OK => Ok(()),
-        other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
+        other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
 }
 

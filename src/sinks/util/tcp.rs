@@ -7,7 +7,7 @@ use crate::{
         TcpConnectionShutdown, TcpEventSent, TcpFlushError,
     },
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSink},
-    sinks::{Healthcheck, RouterSink},
+    sinks::{Healthcheck, VectorSink},
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
 };
 use bytes::Bytes;
@@ -50,7 +50,7 @@ impl TcpSinkConfig {
         }
     }
 
-    pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    pub fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -67,7 +67,10 @@ impl TcpSinkConfig {
                 .with_flat_map(move |event| iter_ok(encode_event(event, &encoding))),
         );
 
-        Ok((sink, Box::new(healthcheck.compat())))
+        Ok((
+            VectorSink::Futures01Sink(sink),
+            Box::new(healthcheck.compat()),
+        ))
     }
 }
 

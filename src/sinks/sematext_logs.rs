@@ -43,7 +43,7 @@ pub enum Region {
 
 #[typetag::serde(name = "sematext")]
 impl SinkConfig for SematextLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let endpoint = match (&self.endpoint, &self.region) {
             (Some(host), None) => host.clone(),
             (None, Some(Region::Na)) => "https://logsene-receiver.sematext.com".to_owned(),
@@ -68,9 +68,9 @@ impl SinkConfig for SematextLogsConfig {
         }
         .build(cx)?;
 
-        let sink = Box::new(sink.with(map_timestamp));
+        let sink = Box::new(sink.into_futures01sink().with(map_timestamp));
 
-        Ok((sink, healthcheck))
+        Ok((super::VectorSink::Futures01Sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -105,7 +105,7 @@ mod tests {
         sinks::util::test::{build_test_server, load_sink},
         test_util::{next_addr, random_lines_with_stream},
     };
-    use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
+    use futures::StreamExt;
 
     #[tokio::test]
     async fn smoke() {
@@ -131,8 +131,8 @@ mod tests {
         let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
-        let (expected, mut events) = random_lines_with_stream(100, 10);
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let (expected, events) = random_lines_with_stream(100, 10);
+        sink.run(events).await.unwrap();
 
         let output = rx.next().await.unwrap();
 

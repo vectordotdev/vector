@@ -1,11 +1,14 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{log_schema, Event},
-    sinks::util::{
-        self,
-        encoding::{EncodingConfig, EncodingConfiguration},
-        tcp::TcpSink,
-        Encoding, StreamSink, UriSerde,
+    sinks::{
+        util::{
+            self,
+            encoding::{EncodingConfig, EncodingConfiguration},
+            tcp::TcpSink,
+            Encoding, StreamSink, UriSerde,
+        },
+        Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsConfig},
 };
@@ -29,7 +32,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let (host, port, tls) = if let Some(uri) = &self.endpoint {
             let host = uri
                 .host()
@@ -60,7 +63,10 @@ impl SinkConfig for DatadogLogsConfig {
         let sink = StreamSink::new(sink, cx.acker())
             .with_flat_map(move |e| iter_ok(encode_event(e, &api_key, &encoding)));
 
-        Ok((Box::new(sink), Box::new(healthcheck.compat())))
+        Ok((
+            VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(healthcheck.compat()),
+        ))
     }
 
     fn input_type(&self) -> DataType {

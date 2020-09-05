@@ -59,7 +59,7 @@ impl From<Encoding> for splunk_hec::Encoding {
 
 #[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         self.build_hec_config().build(cx)
     }
 

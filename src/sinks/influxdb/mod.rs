@@ -1,8 +1,6 @@
 pub mod logs;
 pub mod metrics;
 
-pub(self) use super::{Healthcheck, RouterSink};
-
 use crate::sinks::util::http::HttpClient;
 use chrono::{DateTime, Utc};
 use futures::TryFutureExt;

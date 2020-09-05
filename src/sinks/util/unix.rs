@@ -5,11 +5,11 @@ use crate::{
         UnixSocketEventSent,
     },
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, StreamSink},
-    sinks::{Healthcheck, RouterSink},
+    sinks::{Healthcheck, VectorSink},
 };
 use bytes::Bytes;
 use futures::{compat::CompatSink, FutureExt, TryFutureExt};
-use futures01::{stream::iter_ok, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use futures01::{stream, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{path::PathBuf, time::Duration};
@@ -33,16 +33,17 @@ impl UnixSinkConfig {
         Self { path, encoding }
     }
 
-    pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    pub fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let encoding = self.encoding.clone();
         let unix = UnixSink::new(self.path.clone());
         let sink = StreamSink::new(unix, cx.acker());
 
-        let sink =
-            Box::new(sink.with_flat_map(move |event| iter_ok(encode_event(event, &encoding))));
+        let sink = Box::new(
+            sink.with_flat_map(move |event| stream::iter_ok(encode_event(event, &encoding))),
+        );
         let healthcheck = healthcheck(self.path.clone()).boxed().compat();
 
-        Ok((sink, Box::new(healthcheck)))
+        Ok((VectorSink::Futures01Sink(sink), Box::new(healthcheck)))
     }
 }
 
@@ -196,7 +197,6 @@ impl Sink for UnixSink {
 mod tests {
     use super::*;
     use crate::test_util::{random_lines_with_stream, CountReceiver};
-    use futures::{compat::Sink01CompatExt, SinkExt};
     use tokio::net::UnixListener;
 
     fn temp_uds_path(name: &str) -> PathBuf {
@@ -227,8 +227,8 @@ mod tests {
         let (sink, _healthcheck) = config.build(cx).unwrap();
 
         // Send the test data
-        let (input_lines, mut events) = random_lines_with_stream(100, num_lines);
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let (input_lines, events) = random_lines_with_stream(100, num_lines);
+        sink.run(events).await.unwrap();
 
         // Wait for output to connect
         receiver.connected().await;

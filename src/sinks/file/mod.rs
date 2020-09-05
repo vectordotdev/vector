@@ -116,11 +116,14 @@ impl OutFile {
 
 #[typetag::serde(name = "file")]
 impl SinkConfig for FileSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = FileSink::new(&self);
         let sink = streaming_sink::compat::adapt_to_topology(sink);
-        let sink = StreamSink::new(sink, cx.acker());
-        Ok((Box::new(sink), Box::new(futures01::future::ok(()))))
+        let sink = StreamSink::new(sink.into_futures01sink(), cx.acker());
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(futures01::future::ok(())),
+        ))
     }
 
     fn input_type(&self) -> DataType {
