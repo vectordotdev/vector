@@ -72,11 +72,14 @@ inventory::submit! {
 
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(cx.resolver())?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed().compat();
         let sink = KinesisFirehoseService::new(self.clone(), client, cx)?;
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(healthcheck),
+        ))
     }
 
     fn input_type(&self) -> DataType {

@@ -1,9 +1,6 @@
 use super::StreamingSink;
-use crate::sinks;
-use crate::Event;
-use futures::channel::mpsc;
-use futures::compat::CompatSink;
-use futures::future::TryFutureExt;
+use crate::{sinks::VectorSink, Event};
+use futures::{channel::mpsc, compat::CompatSink, TryFutureExt};
 use futures01::{future::Future, sink::Sink, Async, AsyncSink, Poll};
 
 /// This function provides the compatibility with our old interfaces.
@@ -47,7 +44,7 @@ pub type OldSink = Box<dyn Sink<SinkItem = Event, SinkError = ()> + 'static + Se
 /// Among other things, this adapter maintains backpressure through the sink, as
 /// it'll only go as fast as `streaming_sink` is able to poll items, without any
 /// buffering.
-pub fn adapt_to_topology(mut streaming_sink: impl StreamingSink + 'static) -> sinks::RouterSink {
+pub fn adapt_to_topology(mut streaming_sink: impl StreamingSink + 'static) -> VectorSink {
     let (stream, sink) = sink_interface_compat();
 
     let handle = tokio::spawn(async move {
@@ -68,7 +65,7 @@ pub fn adapt_to_topology(mut streaming_sink: impl StreamingSink + 'static) -> si
         })),
     };
 
-    Box::new(synched)
+    VectorSink::Futures01Sink(Box::new(synched))
 }
 
 /// Behaves in all regards like the underlying sink, except that on close

@@ -76,7 +76,7 @@ pub(crate) fn skip_serializing_if_default(e: &EncodingConfigWithDefault<Encoding
 
 #[typetag::serde(name = "new_relic_logs")]
 impl SinkConfig for NewRelicLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let http_conf = self.create_config()?;
         http_conf.build(cx)
     }
@@ -151,8 +151,7 @@ mod tests {
         test_util::next_addr,
     };
     use bytes::buf::BufExt;
-    use futures::{compat::Future01CompatExt, stream, StreamExt};
-    use futures01::{stream as stream01, Sink};
+    use futures::{stream, StreamExt};
     use hyper::Method;
     use serde_json::Value;
     use std::io::BufRead;
@@ -288,13 +287,12 @@ mod tests {
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
-        let events = stream01::iter_ok(input_lines.clone().into_iter().map(Event::from));
-
-        let pump = sink.send_all(events);
+        let events = stream::iter(input_lines.clone()).map(|x| Ok(Event::from(x)));
+        let pump = sink.run(events);
 
         tokio::spawn(server);
 
-        let _ = pump.compat().await.unwrap();
+        pump.await.unwrap();
         drop(trigger);
 
         let output_lines = rx

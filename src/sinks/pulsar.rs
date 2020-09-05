@@ -69,14 +69,14 @@ inventory::submit! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "pulsar")]
 impl SinkConfig for PulsarSinkConfig {
-    fn build(&self, _cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, _cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         unimplemented!()
     }
 
     async fn build_async(
         &self,
         cx: SinkContext,
-    ) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let producer = self
             .create_pulsar_producer()
             .await
@@ -88,7 +88,10 @@ impl SinkConfig for PulsarSinkConfig {
             .await
             .context(CreatePulsarSink)?;
         let hc = healthcheck(producer);
-        Ok((Box::new(sink), Box::new(hc.boxed().compat())))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(hc.boxed().compat()),
+        ))
     }
 
     fn input_type(&self) -> DataType {

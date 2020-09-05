@@ -8,7 +8,7 @@ use crate::{
             http::{BatchedHttpSink, HttpClient, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
-        Healthcheck, RouterSink, UriParseError,
+        Healthcheck, UriParseError, VectorSink,
     },
     tls::{TlsOptions, TlsSettings},
 };
@@ -70,11 +70,11 @@ lazy_static::lazy_static! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
-    fn build(&self, _cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         unimplemented!()
     }
 
-    async fn build_async(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    async fn build_async(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = PubsubSink::from_config(self).await?;
         let batch_settings = BatchSettings::default()
             .bytes(bytesize::mib(10u64))
@@ -99,7 +99,10 @@ impl SinkConfig for PubsubConfig {
         )
         .sink_map_err(|e| error!("Fatal gcp pubsub sink error: {}", e));
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(healthcheck),
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -240,7 +243,7 @@ mod integration_tests {
         }
     }
 
-    async fn config_build(topic: &str) -> (crate::sinks::RouterSink, crate::sinks::Healthcheck) {
+    async fn config_build(topic: &str) -> (VectorSink, crate::sinks::Healthcheck) {
         let cx = SinkContext::new_test();
         config(topic)
             .build_async(cx)
