@@ -40,12 +40,30 @@ pub struct TcpSinkConfig {
     pub tls: Option<TlsConfig>,
 }
 
+#[derive(Clone)]
+pub struct TcpConnector {
+    host: String,
+    port: u16,
+    resolver: Resolver,
+    tls: MaybeTlsSettings,
+}
+
+#[derive(Debug, Snafu)]
+enum TcpError {
+    #[snafu(display("Connect error: {}", source))]
+    ConnectError { source: TlsError },
+    #[snafu(display("Unable to resolve DNS: {}", source))]
+    DnsError { source: crate::dns::DnsError },
+    #[snafu(display("No addresses returned."))]
+    NoAddresses,
+}
+
 impl TcpSinkConfig {
     pub fn new(address: String) -> Self {
         Self { address, tls: None }
     }
 
-    pub fn prepare(&self, cx: SinkContext) -> crate::Result<(IntoTcpSink, Healthcheck)> {
+    pub fn prepare(&self, cx: SinkContext) -> crate::Result<(TcpConnector, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -53,7 +71,7 @@ impl TcpSinkConfig {
 
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
-        let tcp = IntoTcpSink::new(host, port, cx.resolver(), tls);
+        let tcp = TcpConnector::new(host, port, cx.resolver(), tls);
         let healthcheck = tcp.healthcheck();
 
         Ok((tcp, healthcheck))
@@ -72,22 +90,30 @@ impl TcpSinkConfig {
     }
 }
 
-#[derive(Clone)]
-pub struct IntoTcpSink {
-    host: String,
-    port: u16,
-    resolver: Resolver,
-    tls: MaybeTlsSettings,
-}
-
-impl IntoTcpSink {
+impl TcpConnector {
     fn new(host: String, port: u16, resolver: Resolver, tls: MaybeTlsSettings) -> Self {
-        IntoTcpSink {
+        Self {
             host,
             port,
             resolver,
             tls,
         }
+    }
+
+    pub async fn connect(&self) -> Result<MaybeTlsStream<TcpStream>, TcpError> {
+        let ip = self
+            .resolver
+            .lookup_ip(self.host.clone())
+            .await
+            .context(DnsError)?
+            .next()
+            .ok_or(TcpError::NoAddresses)?;
+        let addr = SocketAddr::new(ip, self.port);
+        self.tls
+            .clone()
+            .connect(self.host.clone(), addr)
+            .await
+            .context(ConnectError)
     }
 
     pub fn into_sink(self) -> TcpSink {
@@ -315,16 +341,6 @@ impl Sink for TcpSink {
     }
 }
 
-#[derive(Debug, Snafu)]
-enum HealthcheckError {
-    #[snafu(display("Connect error: {}", source))]
-    ConnectError { source: TlsError },
-    #[snafu(display("Unable to resolve DNS: {}", source))]
-    DnsError { source: crate::dns::DnsError },
-    #[snafu(display("No addresses returned."))]
-    NoAddresses,
-}
-
 pub async fn tcp_healthcheck(
     host: String,
     port: u16,
@@ -336,7 +352,7 @@ pub async fn tcp_healthcheck(
         .await
         .context(DnsError)?
         .next()
-        .ok_or_else(|| HealthcheckError::NoAddresses)?;
+        .ok_or_else(|| TcpError::NoAddresses)?;
 
     let _ = tls
         .connect(host, SocketAddr::new(ip, port))
