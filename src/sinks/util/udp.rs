@@ -123,12 +123,12 @@ impl UdpSink {
                         Ok(socket) => match socket.connect(addr) {
                             Ok(()) => State::Connected(socket),
                             Err(error) => {
-                                error!(message = "unable to connect UDP socket", addr = %addr, %error);
+                                error!(message = "unable to connect UDP socket", %addr, %error);
                                 State::Backoff(self.next_delay01())
                             }
                         },
                         Err(error) => {
-                            error!(message = "unable to bind local address", %error);
+                            error!(message = "unable to bind local address", addr = %bind_address, %error);
                             State::Backoff(self.next_delay01())
                         }
                     }
