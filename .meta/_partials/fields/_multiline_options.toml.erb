@@ -3,7 +3,7 @@ type = "table"
 category = "Multiline"
 description = """\
 Multiline parsing configuration.
-If not speicified, multiline parsing is disabled.\
+If not specified, multiline parsing is disabled.\
 """
 
 [<%= namespace %>.options.multiline.children.start_pattern]
@@ -42,7 +42,7 @@ The first line (the line that matched the start pattern) does not need \
 to match the `ContinueThrough` pattern. \
 This is useful in cases such as a Java stack trace, where some indicator \
 in the line (such as leading whitespace) indicates that it is an \
-extension of the preceeding line.\
+extension of the preceding line.\
 """
 continue_past = """\
 All consecutive lines matching this pattern, plus one additional line, \
@@ -74,6 +74,6 @@ required = true
 sort = 4
 description = """\
 The maximum time to wait for the continuation. Once this timeout is \
-reached, the buffered message is guaraneed to be flushed, even if \
+reached, the buffered message is guaranteed to be flushed, even if \
 incomplete.\
 """

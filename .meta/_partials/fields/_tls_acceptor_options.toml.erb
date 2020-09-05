@@ -26,7 +26,7 @@ groups = <%= groups.to_toml %>
 <%= relevant %>
 description = """\
 Absolute path to an additional CA certificate file, in DER or PEM format \
-(X.509), or an inline CA certificate in PEM format.\
+(X.509), or an in-line CA certificate in PEM format.\
 """
 
 [<%= namespace %>.tls.children.crt_file]
@@ -37,7 +37,7 @@ groups = <%= groups.to_toml %>
 <%= relevant %>
 description = """\
 Absolute path to a certificate file used to identify this server, in DER \
-or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. \
+or PEM format (X.509) or PKCS#12, or an in-line certificate in PEM format. \
 If this is set, and is not a PKCS#12 archive, `key_file` must also be set. \
 This is required if `enabled` is set to `true`.\
 """
@@ -50,7 +50,7 @@ groups = <%= groups.to_toml %>
 <%= relevant %>
 description = """\
 Absolute path to a private key file used to identify this server, in \
-DER or PEM format (PKCS#8), or an inline private key in PEM format.\
+DER or PEM format (PKCS#8), or an in-line private key in PEM format.\
 """
 
 [<%= namespace %>.tls.children.key_pass]
@@ -71,7 +71,7 @@ groups = <%= groups.to_toml %>
 <%= relevant %>
 description = """\
 If `true`, Vector will require a TLS certificate from the connecting host \
-and terminate the connection if the certicate is not valid. \
+and terminate the connection if the certificate is not valid. \
 If `false` (the default), Vector will not request a certificate from the \
 client.\
 """

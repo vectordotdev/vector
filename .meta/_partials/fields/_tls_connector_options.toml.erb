@@ -22,7 +22,7 @@ examples = ["/path/to/certificate_authority.crt"]
 groups = <%= groups.to_toml %>
 description = """\
 Absolute path to an additional CA certificate file, in DER or PEM format \
-(X.509), or an inline CA certificate in PEM format.\
+(X.509), or an in-line CA certificate in PEM format.\
 """
 
 [<%= namespace %>.tls.children.crt_file]
@@ -32,7 +32,7 @@ examples = ["/path/to/host_certificate.crt"]
 groups = <%= groups.to_toml %>
 description = """\
 Absolute path to a certificate file used to identify this connection, in DER \
-or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. \
+or PEM format (X.509) or PKCS#12, or an in-line certificate in PEM format. \
 If this is set and is not a PKCS#12 archive, `key_file` must also be set.\
 """
 
@@ -43,7 +43,7 @@ examples = ["/path/to/host_certificate.key"]
 groups = <%= groups.to_toml %>
 description = """\
 Absolute path to a private key file used to identify this connection, in \
-DER or PEM format (PKCS#8), or an inline private key in PEM format. \
+DER or PEM format (PKCS#8), or an in-line private key in PEM format. \
 If this is set, `crt_file` must also be set.\
 """
 
