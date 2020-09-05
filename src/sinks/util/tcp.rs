@@ -100,7 +100,7 @@ impl TcpConnector {
         }
     }
 
-    pub async fn connect(&self) -> Result<MaybeTlsStream<TcpStream>, TcpError> {
+    pub async fn connect(&self) -> Result<TcpOrTlsStream, TcpError> {
         let ip = self
             .resolver
             .lookup_ip(self.host.clone())
@@ -109,11 +109,13 @@ impl TcpConnector {
             .next()
             .ok_or(TcpError::NoAddresses)?;
         let addr = SocketAddr::new(ip, self.port);
-        self.tls
+        let stream = self
+            .tls
             .clone()
             .connect(self.host.clone(), addr)
             .await
-            .context(ConnectError)
+            .context(ConnectError)?;
+        Ok(CompatSink::new(FramedWrite::new(stream, BytesCodec::new())))
     }
 
     pub fn into_sink(self) -> TcpSink {
@@ -198,7 +200,6 @@ impl TcpSink {
         loop {
             self.state = match self.state {
                 TcpSinkState::Disconnected => {
-                    debug!(message = "resolving DNS.", host = %self.host);
                     let fut = self.resolver.lookup_ip_01(self.host.clone());
 
                     TcpSinkState::ResolvingDns(fut)
