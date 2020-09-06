@@ -143,7 +143,7 @@ impl HttpSink for InfluxDBLogsSink {
         let mut event = event.into_log();
 
         // Measurement
-        let measurement = encode_namespace(&self.namespace, &"vector");
+        let measurement = encode_namespace(Some(&self.namespace), '.', "vector");
 
         // Timestamp
         let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {

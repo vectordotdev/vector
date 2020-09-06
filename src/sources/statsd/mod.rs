@@ -135,7 +135,7 @@ mod test {
             &["in"],
             PrometheusSinkConfig {
                 address: out_addr,
-                namespace: "vector".into(),
+                namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
                 flush_period_secs: 1,
             },
