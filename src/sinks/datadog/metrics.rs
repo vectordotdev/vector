@@ -4,10 +4,13 @@ use crate::{
         metric::{Metric, MetricKind, MetricValue, StatisticKind},
         Event,
     },
-    sinks::util::{
-        http::{HttpBatchService, HttpClient, HttpRetryLogic},
-        BatchConfig, BatchSettings, MetricBuffer, PartitionBatchSink, PartitionBuffer,
-        PartitionInnerBuffer, TowerRequestConfig,
+    sinks::{
+        util::{
+            http::{HttpBatchService, HttpClient, HttpRetryLogic},
+            BatchConfig, BatchSettings, MetricBuffer, PartitionBatchSink, PartitionBuffer,
+            PartitionInnerBuffer, TowerRequestConfig,
+        },
+        Healthcheck, HealthcheckError, UriParseError, VectorSink,
     },
 };
 use chrono::{DateTime, Utc};
@@ -176,7 +179,10 @@ impl SinkConfig for DatadogConfig {
                 iter_ok(Some(PartitionInnerBuffer::new(event, ep)))
             });
 
-        Ok((Box::new(svc_sink), Box::new(healthcheck)))
+        Ok((
+            VectorSink::Futures01Sink(Box::new(svc_sink)),
+            Box::new(healthcheck),
+        ))
     }
 
     fn input_type(&self) -> DataType {
