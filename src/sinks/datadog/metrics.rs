@@ -1,20 +1,18 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{
-        metric::{Metric, MetricKind, MetricValue},
+        metric::{Metric, MetricKind, MetricValue, StatisticKind},
         Event,
     },
-    sinks::{
-        util::{
-            http::{BatchedHttpSink, HttpClient, HttpSink},
-            BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
-        },
-        Healthcheck, HealthcheckError, UriParseError, VectorSink,
+    sinks::util::{
+        http::{HttpBatchService, HttpClient, HttpRetryLogic},
+        BatchConfig, BatchSettings, MetricBuffer, PartitionBatchSink, PartitionBuffer,
+        PartitionInnerBuffer, TowerRequestConfig,
     },
 };
 use chrono::{DateTime, Utc};
-use futures::{FutureExt, TryFutureExt};
-use futures01::Sink;
+use futures::{future, FutureExt, TryFutureExt};
+use futures01::{stream::iter_ok, Sink};
 use http::{uri::InvalidUri, Request, StatusCode, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -50,8 +48,8 @@ pub struct DatadogConfig {
 
 struct DatadogSink {
     config: DatadogConfig,
-    last_sent_timestamp: AtomicI64,
-    uri: Uri,
+    last_sent_timestamp: [AtomicI64; 2],
+    uri: [Uri; 2],
 }
 
 lazy_static! {
@@ -118,29 +116,41 @@ impl SinkConfig for DatadogConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        let uri = build_uri(&self.endpoint)?;
+        let uri = [
+            build_uri(&self.endpoint, "/api/v1/series")?,
+            build_uri(&self.endpoint, "/api/v1/distribution_points")?,
+        ];
         let timestamp = Utc::now().timestamp();
 
         let sink = DatadogSink {
             config: self.clone(),
             uri,
-            last_sent_timestamp: AtomicI64::new(timestamp),
+            last_sent_timestamp: [AtomicI64::new(timestamp), AtomicI64::new(timestamp)],
         };
 
-        let sink = BatchedHttpSink::new(
-            sink,
-            MetricBuffer::new(batch.size),
-            request,
-            batch.timeout,
-            client,
-            cx.acker(),
-        )
-        .sink_map_err(|e| error!("Fatal datadog error: {}", e));
+        let svc = request.service(
+            HttpRetryLogic,
+            HttpBatchService::new(client, move |request| {
+                future::ready(sink.build_request(request))
+            }),
+        );
 
-        Ok((
-            VectorSink::Futures01Sink(Box::new(sink)),
-            Box::new(healthcheck),
-        ))
+        let buffer = PartitionBuffer::new(MetricBuffer::new(batch.size));
+
+        let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+            .sink_map_err(|e| error!("Fatal datadog metric sink error: {}", e))
+            .with_flat_map(move |event: Event| {
+                let kind = match event.as_metric().value {
+                    MetricValue::Distribution {
+                        statistic: StatisticKind::Summary,
+                        ..
+                    } => 1,
+                    _ => 0,
+                };
+                iter_ok(Some(PartitionInnerBuffer::new(event, kind)))
+            });
+
+        Ok((Box::new(svc_sink), Box::new(healthcheck)))
     }
 
     fn input_type(&self) -> DataType {
@@ -152,24 +162,20 @@ impl SinkConfig for DatadogConfig {
     }
 }
 
-#[async_trait::async_trait]
-impl HttpSink for DatadogSink {
-    type Input = Event;
-    type Output = Vec<Metric>;
-
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
-        Some(event)
-    }
-
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
+impl DatadogSink {
+    fn build_request(
+        &self,
+        events: PartitionInnerBuffer<Vec<Metric>, usize>,
+    ) -> crate::Result<Request<Vec<u8>>> {
+        let (events, kind) = events.into_parts();
         let now = Utc::now().timestamp();
-        let interval = now - self.last_sent_timestamp.load(SeqCst);
-        self.last_sent_timestamp.store(now, SeqCst);
+        let interval = now - self.last_sent_timestamp[kind].load(SeqCst);
+        self.last_sent_timestamp[kind].store(now, SeqCst);
 
         let input = encode_events(events, interval, &self.config.namespace);
         let body = serde_json::to_vec(&input).unwrap();
 
-        Request::post(self.uri.clone())
+        Request::post(self.uri[kind].clone())
             .header("Content-Type", "application/json")
             .header("DD-API-KEY", self.config.api_key.clone())
             .body(body)
@@ -177,8 +183,8 @@ impl HttpSink for DatadogSink {
     }
 }
 
-fn build_uri(host: &str) -> crate::Result<Uri> {
-    let uri = format!("{}/api/v1/series", host)
+fn build_uri(host: &str, endpoint: &'static str) -> crate::Result<Uri> {
+    let uri = format!("{}{}", host, endpoint)
         .parse::<Uri>()
         .context(UriParseError)?;
 
