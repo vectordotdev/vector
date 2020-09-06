@@ -692,4 +692,34 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn response_time_summary() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "summary"
+            field = "response_time"
+            "#,
+        );
+
+        let event = create_event("response_time", "2.5");
+        let mut transform = LogToMetric::new(config);
+        let metric = transform.transform(event).unwrap();
+
+        assert_eq!(
+            metric.into_metric(),
+            Metric {
+                name: "response_time".into(),
+                timestamp: Some(ts()),
+                tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![2.5],
+                    sample_rates: vec![1],
+                    statistic: StatisticKind::Summary
+                },
+            }
+        );
+    }
 }
