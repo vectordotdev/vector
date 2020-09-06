@@ -58,11 +58,20 @@ pub struct HistogramConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
+pub struct SummaryConfig {
+    field: Atom,
+    name: Option<Atom>,
+    tags: Option<IndexMap<Atom, String>>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum MetricConfig {
     Counter(CounterConfig),
     Histogram(HistogramConfig),
     Gauge(GaugeConfig),
     Set(SetConfig),
+    Summary(SummaryConfig),
 }
 
 fn default_increment_by_value() -> bool {
@@ -198,6 +207,32 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                     values: vec![value],
                     sample_rates: vec![1],
                     statistic: StatisticKind::Histogram,
+                },
+            })
+        }
+        MetricConfig::Summary(summary) => {
+            let value = log
+                .get(&summary.field)
+                .ok_or(TransformError::FieldNotFound)?;
+            let value = value
+                .to_string_lossy()
+                .parse()
+                .map_err(|_| TransformError::ParseError("summary value"))?;
+
+            let name = summary.name.as_ref().unwrap_or(&summary.field);
+            let name = render_template(&name, &event)?;
+
+            let tags = render_tags(&summary.tags, &event);
+
+            Ok(Metric {
+                name,
+                timestamp,
+                tags,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![value],
+                    sample_rates: vec![1],
+                    statistic: StatisticKind::Summary,
                 },
             })
         }
