@@ -143,7 +143,7 @@ impl Service<Vec<Metric>> for InfluxDBSvc {
         let input = encode_events(
             self.protocol_version,
             items,
-            self.config.namespace.as_ref().map(|s| s.as_str()),
+            self.config.namespace.as_deref(),
         );
         let body: Vec<u8> = input.into_bytes();
 
@@ -785,7 +785,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let config = InfluxDBConfig {
-            namespace: "ns".to_string(),
+            namespace: Some("ns".to_string()),
             endpoint: "http://localhost:9999".to_string(),
             influxdb1_settings: None,
             influxdb2_settings: Some(InfluxDB2Settings {

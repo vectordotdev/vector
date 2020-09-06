@@ -350,15 +350,7 @@ impl PrometheusSink {
                         method = field::debug(req.method()),
                         path = field::debug(req.uri().path()),
                     )
-                    .in_scope(|| {
-                        handle(
-                            req,
-                            namespace.as_ref().map(|s| s.as_str()),
-                            &buckets,
-                            expired,
-                            &metrics,
-                        )
-                    })
+                    .in_scope(|| handle(req, namespace.as_deref(), &buckets, expired, &metrics))
                     .compat()
                 }))
             }

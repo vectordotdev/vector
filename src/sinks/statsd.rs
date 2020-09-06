@@ -106,9 +106,7 @@ impl StatsdSvc {
             acker,
         )
         .sink_map_err(|e| error!("Fatal statsd sink error: {}", e))
-        .with_flat_map(move |event| {
-            stream::iter_ok(encode_event(event, namespace.as_ref().map(|s| s.as_str())))
-        });
+        .with_flat_map(move |event| stream::iter_ok(encode_event(event, namespace.as_deref())));
 
         Ok(super::VectorSink::Futures01Sink(Box::new(sink)))
     }

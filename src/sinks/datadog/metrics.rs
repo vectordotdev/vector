@@ -5,8 +5,8 @@ use crate::{
         Event,
     },
     sinks::{
-        encode_namespace,
         util::{
+            encode_namespace,
             http::{BatchedHttpSink, HttpClient, HttpSink},
             BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
         },
@@ -167,11 +167,7 @@ impl HttpSink for DatadogSink {
         let interval = now - self.last_sent_timestamp.load(SeqCst);
         self.last_sent_timestamp.store(now, SeqCst);
 
-        let input = encode_events(
-            events,
-            interval,
-            self.config.namespace.as_ref().map(|s| s.as_str()),
-        );
+        let input = encode_events(events, interval, self.config.namespace.as_deref());
         let body = serde_json::to_vec(&input).unwrap();
 
         Request::post(self.uri.clone())
