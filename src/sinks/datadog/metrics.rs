@@ -74,7 +74,7 @@ pub fn default_endpoint() -> String {
 struct DatadogDistributionMetric {
     metric: String,
     interval: Option<i64>,
-    points: DatadogPoint<Vec<f64>>,
+    points: Vec<DatadogPoint<Vec<f64>>>,
     tags: Option<Vec<String>>,
 }
 
@@ -325,6 +325,7 @@ fn encode_events(
     interval: i64,
     namespace: &str,
 ) -> DatadogRequest<DatadogMetric> {
+    debug!(message = "series", count = events.len());
     let series = events
         .into_iter()
         .filter_map(|event| {
@@ -434,6 +435,7 @@ fn encode_distribution_events(
     interval: i64,
     namespace: &str,
 ) -> DatadogRequest<DatadogDistributionMetric> {
+    debug!(message = "distribution", count = events.len());
     let series = events
         .into_iter()
         .filter_map(|event| {
@@ -460,7 +462,7 @@ fn encode_distribution_events(
                             Some(DatadogDistributionMetric {
                                 metric: fullname,
                                 interval: Some(interval),
-                                points: DatadogPoint(ts, samples),
+                                points: vec![DatadogPoint(ts, samples)],
                                 tags,
                             })
                         }
@@ -777,7 +779,7 @@ mod tests {
 
         assert_eq!(
             json,
-            r#"{"series":[{"metric":"requests","interval":60,"points":[1542182950,[1.0,1.0,1.0,2.0,2.0,2.0,3.0,3.0]],"tags":null}]}"#
+            r#"{"series":[{"metric":"requests","interval":60,"points":[[1542182950,[1.0,1.0,1.0,2.0,2.0,2.0,3.0,3.0]]],"tags":null}]}"#
         );
     }
 }
