@@ -480,7 +480,7 @@ mod tests {
     use super::*;
     use crate::{
         event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-        sinks::util::{http::HttpSink, test::load_sink},
+        sinks::util::test::load_sink,
     };
     use chrono::{offset::TimeZone, Utc};
     use http::{Method, Uri};
@@ -512,7 +512,7 @@ mod tests {
         .unwrap();
 
         let timestamp = Utc::now().timestamp();
-        let uri = DatadogEndpoint::build_uri(&default_endpoint());
+        let uri = DatadogEndpoint::build_uri(&default_endpoint()).unwrap();
         let sink = DatadogSink {
             config: sink,
             last_sent_timestamp: uri.iter().map(|_| AtomicI64::new(timestamp)).collect(),
@@ -541,11 +541,10 @@ mod tests {
                 kind: MetricKind::Absolute,
                 value: MetricValue::Counter { value: 1.0 },
             },
-        ]
-        .into_iter()
-        .map(|metric| PartitionInnerBuffer::new(metric, DatadogEndpoint::Series))
-        .collect();
-        let req = sink.build_request(events).unwrap();
+        ];
+        let req = sink
+            .build_request(PartitionInnerBuffer::new(events, DatadogEndpoint::Series))
+            .unwrap();
 
         assert_eq!(req.method(), Method::POST);
         assert_eq!(
@@ -756,6 +755,29 @@ mod tests {
         assert_eq!(
             json,
             r#"{"series":[{"metric":"requests.min","type":"gauge","interval":60,"points":[[1542182950,1.0]],"tags":null},{"metric":"requests.avg","type":"gauge","interval":60,"points":[[1542182950,1.875]],"tags":null},{"metric":"requests.count","type":"rate","interval":60,"points":[[1542182950,8.0]],"tags":null},{"metric":"requests.median","type":"gauge","interval":60,"points":[[1542182950,2.0]],"tags":null},{"metric":"requests.max","type":"gauge","interval":60,"points":[[1542182950,3.0]],"tags":null},{"metric":"requests.95percentile","type":"gauge","interval":60,"points":[[1542182950,3.0]],"tags":null}]}"#
+        );
+    }
+
+    #[test]
+    fn encode_datadog_distribution() {
+        // https://docs.datadoghq.com/developers/metrics/types/?tab=distribution#definition
+        let events = vec![Metric {
+            name: "requests".into(),
+            timestamp: Some(ts()),
+            tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Distribution {
+                values: vec![1.0, 2.0, 3.0],
+                sample_rates: vec![3, 3, 2],
+                statistic: StatisticKind::Summary,
+            },
+        }];
+        let input = encode_distribution_events(events, 60, "");
+        let json = serde_json::to_string(&input).unwrap();
+
+        assert_eq!(
+            json,
+            r#"{"series":[{"metric":"requests","interval":60,"points":[1542182950,[1.0,1.0,1.0,2.0,2.0,2.0,3.0,3.0]],"tags":null}]}"#
         );
     }
 }
