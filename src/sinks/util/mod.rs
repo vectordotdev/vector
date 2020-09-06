@@ -90,7 +90,11 @@ pub fn encode_namespace<'a>(
 ) -> String {
     let name = name.into();
     match namespace {
-        Some(namespace) if !namespace.is_empty() => format!("{}{}{}", namespace, delimiter, name),
+        Some(namespace) if namespace.is_empty() => {
+            warn!("Dropping empty namespace. This feature has been deprecated, and could be removed in the future.");
+            name.into_owned()
+        }
+        Some(namespace) => format!("{}{}{}", namespace, delimiter, name),
         _ => name.into_owned(),
     }
 }
