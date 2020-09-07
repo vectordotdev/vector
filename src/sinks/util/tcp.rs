@@ -63,6 +63,9 @@ pub enum TcpError {
     SendError {
         source: tokio::io::Error,
     },
+    FlushError {
+        source: tokio::io::Error,
+    },
 }
 
 impl TcpSinkConfig {
@@ -160,8 +163,9 @@ impl tower::Service<Bytes> for TcpService {
         use futures::SinkExt;
         let connector = self.connector.clone();
         async move {
-            let sink = connector.connect().await?;
-            sink.send(msg).await.context(SendError)?;
+            let connection = connector.connect().await?;
+            connection.send(msg).await.context(SendError)?;
+            connection.flush().await.context(FlushError)?;
             Ok(())
         }
         .boxed()
