@@ -155,3 +155,22 @@
       "bar.equals" = 20
       "baz.equals" = 30.3
       "bev.equals" = true
+
+[transforms.remap_quoted_path]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a."b.c" = ."d.e"
+  """
+[[tests]]
+  name = "remap_quoted_path"
+  [tests.input]
+    insert_at = "remap_quoted_path"
+    type = "log"
+    [tests.input.log_fields]
+      "a.b\\.c" = "bar"
+      "d\\.e" = "baz"
+  [[tests.outputs]]
+    extract_from = "remap_quoted_path"
+    [[tests.outputs.conditions]]
+      "a.b\\.c.equals" = "baz"
