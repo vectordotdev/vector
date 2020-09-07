@@ -133,13 +133,7 @@ impl TcpConnector {
     }
 
     fn healthcheck(&self) -> BoxFuture<'static, crate::Result<()>> {
-        tcp_healthcheck(
-            self.host.clone(),
-            self.port,
-            self.resolver,
-            self.tls.clone(),
-        )
-        .boxed()
+        self.connect().map_ok(|_| ()).map_err(|e| e.into()).boxed()
     }
 }
 
@@ -342,25 +336,4 @@ impl Sink for TcpSink {
             Ok(ok) => Ok(ok),
         }
     }
-}
-
-async fn tcp_healthcheck(
-    host: String,
-    port: u16,
-    resolver: Resolver,
-    tls: MaybeTlsSettings,
-) -> crate::Result<()> {
-    let ip = resolver
-        .lookup_ip(host.clone())
-        .await
-        .context(DnsError)?
-        .next()
-        .ok_or_else(|| TcpError::NoAddresses)?;
-
-    let _ = tls
-        .connect(host, SocketAddr::new(ip, port))
-        .await
-        .context(ConnectError)?;
-
-    Ok(())
 }
