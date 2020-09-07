@@ -1,8 +1,8 @@
 use crate::Event;
 use futures::{
-    compat::{Compat, Future01CompatExt},
+    compat::{Sink01CompatExt, Stream01CompatExt},
     future::BoxFuture,
-    StreamExt, TryFutureExt,
+    StreamExt,
 };
 use snafu::Snafu;
 use std::fmt;
@@ -68,7 +68,7 @@ pub mod statsd;
 pub mod vector;
 
 pub enum VectorSink {
-    Futures01Sink(Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + 'static + Send>),
+    Futures01Sink(Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + Send + 'static>),
 }
 
 pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
@@ -96,23 +96,23 @@ pub enum HealthcheckError {
 impl VectorSink {
     pub async fn run01<S>(self, input: S) -> Result<(), ()>
     where
-        S: futures01::Stream<Item = Event, Error = ()>,
+        S: futures01::Stream<Item = Event, Error = ()> + Send,
     {
-        match self {
-            Self::Futures01Sink(sink) => input.forward(sink).compat().map_ok(|_| ()).await,
-        }
+        self.run(input.compat()).await
     }
 
     pub async fn run<S>(self, input: S) -> Result<(), ()>
     where
         S: futures::Stream<Item = Result<Event, ()>> + Send,
     {
-        self.run01(Compat::new(input.boxed())).await
+        match self {
+            Self::Futures01Sink(sink) => input.forward(sink.sink_compat()).await,
+        }
     }
 
     pub fn into_futures01sink(
         self,
-    ) -> Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + 'static + Send> {
+    ) -> Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + Send + 'static> {
         match self {
             Self::Futures01Sink(sink) => sink,
             // _ => panic!("Failed type coercion, {:?} is not a Futures01Sink", self),
