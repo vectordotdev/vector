@@ -214,7 +214,6 @@ impl Service<Vec<u8>> for StatsdSvc {
     }
 }
 
-/*
 #[cfg(test)]
 mod test {
     use super::*;
@@ -418,4 +417,3 @@ mod test {
         );
     }
 }
-*/

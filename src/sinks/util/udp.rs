@@ -110,7 +110,7 @@ impl UdpConnector {
             let bind_address = find_bind_address(&addr);
 
             let socket = UdpSocket::bind(bind_address).context(BindError)?;
-            socket.connect(bind_address).context(ConnectError)?;
+            socket.connect(addr).context(ConnectError)?;
 
             Ok(socket)
         }
