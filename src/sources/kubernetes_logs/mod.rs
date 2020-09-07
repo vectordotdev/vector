@@ -82,13 +82,13 @@ impl SourceConfig for Config {
         let source = Source::new(self, Resolver, globals, name)?;
 
         // TODO: this is a workaround for the legacy futures 0.1.
-        // When the core is updated to futures 0.3 this should be simplied
+        // When the core is updated to futures 0.3 this should be simplified
         // significantly.
         let out = futures::compat::Compat01As03Sink::new(out);
         let fut = source.run(out, shutdown);
         let fut = fut.map(|result| {
             result.map_err(|error| {
-                error!(message = "source future failed", ?error);
+                error!(message = "Source future failed", ?error);
             })
         });
         let fut = Box::pin(fut);
@@ -288,12 +288,13 @@ fn create_event(line: Bytes, file: &str) -> Event {
     let mut event = Event::from(line);
 
     // Add source type.
-    event
-        .as_mut_log()
-        .insert(event::log_schema().source_type_key(), COMPONENT_NAME);
+    event.as_mut_log().insert(
+        event::log_schema().source_type_key(),
+        COMPONENT_NAME.to_owned(),
+    );
 
     // Add file.
-    event.as_mut_log().insert(FILE_KEY, file);
+    event.as_mut_log().insert(FILE_KEY, file.to_owned());
 
     event
 }
@@ -301,5 +302,5 @@ fn create_event(line: Bytes, file: &str) -> Event {
 /// This function returns the default value for `self_node_name` variable
 /// as it should be at the generated config file.
 fn default_self_node_name_env_template() -> String {
-    format!("${{{}}}", SELF_NODE_NAME_ENV_KEY)
+    format!("${{{}}}", SELF_NODE_NAME_ENV_KEY.to_owned())
 }

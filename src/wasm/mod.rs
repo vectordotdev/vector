@@ -9,15 +9,9 @@ use crate::{internal_events, Event, Result};
 use lucet_runtime::{DlModule, InstanceHandle, Limits, MmapRegion, Region};
 use lucet_wasi::WasiCtxBuilder;
 use lucetc::{Bindings, Lucetc, LucetcOpts};
-use serde::{Deserialize, Serialize};
 use std::collections::LinkedList;
-use std::{
-    collections::HashMap,
-    fmt::Debug,
-    fs,
-    path::{Path, PathBuf},
-};
-use vector_wasm::{Registration, Role};
+use std::{fmt::Debug, fs, path::Path};
+use vector_wasm::{Registration, Role, WasmModuleConfig};
 mod artifact_cache;
 mod fingerprint;
 pub use artifact_cache::ArtifactCache;
@@ -26,61 +20,6 @@ pub use fingerprint::Fingerprint;
 mod context;
 
 pub mod hostcall; // Pub is required for lucet.
-
-pub mod defaults {
-    pub(super) const ARTIFACT_CACHE: &str = "cache";
-    pub(super) const HEAP_MEMORY_SIZE: usize = 16 * 64 * 1024 * 10; // 10MB
-}
-
-/// The base configuration required for a WasmModule.
-///
-/// If you're designing a module around the WasmModule type, you need to build it with one of these.
-#[derive(Derivative, Clone, Debug, Deserialize, Serialize)]
-#[derivative(Default)]
-pub struct WasmModuleConfig {
-    /// The role which the module will play.
-    #[derivative(Default(value = "Role::Transform"))]
-    pub role: Role,
-    /// The path to the module's `wasm` file.
-    pub path: PathBuf,
-    /// The cache location where an optimized `so` file shall be placed.
-    ///
-    /// This folder also stores a `.fingerprints` file that is formatted as a JSON map, matching file paths
-    /// to fingerprints.
-    #[derivative(Default(value = "defaults::ARTIFACT_CACHE.into()"))]
-    pub artifact_cache: PathBuf,
-    /// The maximum size of the heap the module may grow to.
-    // TODO: The module may also declare it's minimum heap size, and they will be compared before
-    //       the module begins processing.
-    #[derivative(Default(value = "defaults::HEAP_MEMORY_SIZE"))]
-    pub max_heap_memory_size: usize,
-    pub options: HashMap<String, serde_json::Value>,
-}
-
-impl WasmModuleConfig {
-    /// Build a new configuration with the required options set.
-    pub fn new(
-        role: Role,
-        path: impl Into<PathBuf>,
-        artifact_cache: impl Into<PathBuf>,
-        options: HashMap<String, serde_json::Value>,
-    ) -> Self {
-        Self {
-            role,
-            path: path.into(),
-            artifact_cache: artifact_cache.into(),
-            // The rest should be configured via setters below...
-            max_heap_memory_size: defaults::HEAP_MEMORY_SIZE,
-            options,
-        }
-    }
-
-    /// Set the maximum heap size of the transform to the given value. See `defaults::HEAP_MEMORY_SIZE`.
-    pub fn set_max_heap_memory_size(&mut self, max_heap_memory_size: usize) -> &mut Self {
-        self.max_heap_memory_size = max_heap_memory_size;
-        self
-    }
-}
 
 /// Compiles a WASM module located at `input` and writes an optimized shared object to `output`.
 fn compile(
@@ -134,7 +73,8 @@ impl WasmModule {
 
         let artifact_cache = ArtifactCache::new(config.artifact_cache.clone())?;
 
-        let internal_event_compilation = internal_events::WasmCompilation::begin(config.role);
+        let internal_event_compilation =
+            internal_events::WasmCompilationProgress::begin(config.role);
         if artifact_cache.has_fresh(&config.path)? {
             // We can be lazy and do nothing! How wonderful.
             internal_event_compilation.cached();
@@ -188,7 +128,7 @@ impl WasmModule {
     }
 
     pub fn process(&mut self, mut data: Event) -> Result<LinkedList<Event>> {
-        let internal_event_processing = internal_events::EventProcessing::begin(self.role);
+        let internal_event_processing = internal_events::EventProcessingProgress::begin(self.role);
 
         self.instance.insert_embed_ctx(context::EventBuffer::new());
         self.instance
@@ -215,29 +155,35 @@ impl WasmModule {
                 (guest_data_size as u32).into(),
             ],
         ) {
-            Ok(_num_events) => (),
-            Err(lucet_runtime::Error::RuntimeFault(fault)) => {
-                error!(
-                    "WASM instance faulted, resetting: {:?}",
-                    fault.clone().rip_addr_details.and_then(|v| v.file_name),
-                );
-                self.instance.reset()?;
+            Ok(_num_events) => {
+                let context::EventBuffer { events: out } = self
+                    .instance
+                    .remove_embed_ctx()
+                    .ok_or("Could not retrieve context after processing.")?;
+
+                if let Some(context::RaisedError { error: Some(error) }) =
+                    self.instance.remove_embed_ctx()
+                {
+                    internal_event_processing.error(error);
+                } else {
+                    internal_event_processing.complete()
+                }
+                Ok(out)
             }
-            Err(e) => error!("WASM processing errored: {:?}", e,),
+            Err(lucet_runtime::Error::RuntimeFault(fault)) => {
+                let error = format!(
+                    "WASM instance faulted, resetting: {:?}",
+                    fault.clone().rip_addr_details.and_then(|v| v.file_name)
+                );
+                internal_event_processing.error(error);
+                self.instance.reset()?;
+                Ok(Default::default())
+            }
+            Err(e) => {
+                internal_event_processing.error(format!("{:?}", e));
+                Ok(Default::default())
+            }
         }
-
-        let context::EventBuffer { events: out } = self
-            .instance
-            .remove_embed_ctx()
-            .ok_or("Could not retrieve context after processing.")?;
-
-        if let Some(context::RaisedError { error: Some(error) }) = self.instance.remove_embed_ctx()
-        {
-            error!("WASM plugin errored: {}", error);
-        };
-
-        internal_event_processing.complete();
-        Ok(out)
     }
 
     pub fn shutdown(&mut self) -> Result<()> {
@@ -249,7 +195,10 @@ impl WasmModule {
 #[test]
 fn protobuf() -> Result<()> {
     use serde_json::json;
-    use std::io::{Read, Write};
+    use std::{
+        collections::HashMap,
+        io::{Read, Write},
+    };
     use string_cache::DefaultAtom as Atom;
     crate::test_util::trace_init();
 
@@ -271,6 +220,7 @@ fn protobuf() -> Result<()> {
         "target/wasm32-wasi/release/protobuf.wasm",
         "target/artifacts",
         HashMap::new(),
+        16 * 64 * 1024 * 10, // 10MB
     ))?;
     let out = module.process(event.clone())?;
     module.shutdown()?;

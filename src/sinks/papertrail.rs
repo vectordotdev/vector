@@ -4,11 +4,12 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSink,
-        Encoding, UriSerde,
+        Encoding, StreamSink, UriSerde,
     },
     tls::{MaybeTlsSettings, TlsSettings},
 };
 use bytes::Bytes;
+use futures::TryFutureExt;
 use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
@@ -26,16 +27,16 @@ inventory::submit! {
 
 #[typetag::serde(name = "papertrail")]
 impl SinkConfig for PapertrailConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let host = self
             .endpoint
             .host()
             .map(str::to_string)
-            .ok_or_else(|| "A host is required for endpoints".to_string())?;
+            .ok_or_else(|| "A host is required for endpoint".to_string())?;
         let port = self
             .endpoint
             .port_u16()
-            .ok_or_else(|| "A port is required for endpoints".to_string())?;
+            .ok_or_else(|| "A port is required for endpoint".to_string())?;
 
         let sink = TcpSink::new(
             host,
@@ -49,9 +50,13 @@ impl SinkConfig for PapertrailConfig {
 
         let encoding = self.encoding.clone();
 
-        let sink = sink.with_flat_map(move |e| iter_ok(encode_event(e, pid, &encoding)));
+        let sink = StreamSink::new(sink, cx.acker())
+            .with_flat_map(move |e| iter_ok(encode_event(e, pid, &encoding)));
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(healthcheck.compat()),
+        ))
     }
 
     fn input_type(&self) -> DataType {

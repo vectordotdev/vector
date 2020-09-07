@@ -6,6 +6,7 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
+use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{
     compat::{Compat, Future01CompatExt},
@@ -130,7 +131,7 @@ fn kafka_source(
                             let mut event = Event::new_empty_log();
                             let log = event.as_mut_log();
 
-                            log.insert(event::log_schema().message_key().clone(), payload);
+                            log.insert(event::log_schema().message_key().clone(), payload.to_vec());
 
                             // Extract timestamp from kafka message
                             let timestamp = msg
@@ -141,13 +142,13 @@ fn kafka_source(
                             log.insert(event::log_schema().timestamp_key().clone(), timestamp);
 
                             // Add source type
-                            log.insert(event::log_schema().source_type_key(), "kafka");
+                            log.insert(event::log_schema().source_type_key(), Bytes::from("kafka"));
 
                             if let Some(key_field) = &key_field {
                                 match msg.key() {
                                     None => (),
                                     Some(key) => {
-                                        log.insert(key_field.clone(), key);
+                                        log.insert(key_field.clone(), key.to_vec());
                                     }
                                 }
                             }
@@ -260,10 +261,11 @@ mod integration_test {
     use crate::{
         event,
         shutdown::ShutdownSignal,
-        test_util::{collect_n, random_string, runtime},
+        test_util::{collect_n, random_string},
         Pipeline,
     };
     use chrono::Utc;
+    use futures::compat::Future01CompatExt;
     use rdkafka::{
         config::ClientConfig,
         producer::{FutureProducer, FutureRecord},
@@ -291,9 +293,9 @@ mod integration_test {
         }
     }
 
-    #[test]
     #[ignore]
-    fn kafka_source_consume_event() {
+    #[tokio::test]
+    async fn kafka_source_consume_event() {
         let topic = format!("test-topic-{}", random_string(10));
         println!("Test topic name: {}", topic);
         let group_id = format!("test-group-{}", random_string(10));
@@ -312,18 +314,24 @@ mod integration_test {
             ..Default::default()
         };
 
-        let mut rt = runtime();
         println!("Sending event...");
-        rt.block_on_std(send_event(
+        send_event(
             topic.clone(),
             "my key",
             "my message",
             now.timestamp_millis(),
-        ));
+        )
+        .await;
+
         println!("Receiving event...");
         let (tx, rx) = Pipeline::new_test();
-        rt.spawn(kafka_source(&config, ShutdownSignal::noop(), tx).unwrap());
-        let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
+        tokio::spawn(
+            kafka_source(&config, ShutdownSignal::noop(), tx)
+                .unwrap()
+                .compat(),
+        );
+        let events = collect_n(rx, 1).await.unwrap();
+
         assert_eq!(
             events[0].as_log()[&event::log_schema().message_key()],
             "my message".into()

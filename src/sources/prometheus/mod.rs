@@ -1,8 +1,8 @@
 use crate::{
     config::{self, GlobalOptions},
     internal_events::{
-        PrometheusEventReceived, PrometheusHttpError, PrometheusParseError,
-        PrometheusRequestCompleted,
+        PrometheusErrorResponse, PrometheusEventReceived, PrometheusHttpError,
+        PrometheusParseError, PrometheusRequestCompleted,
     },
     shutdown::ShutdownSignal,
     Event, Pipeline,
@@ -12,7 +12,7 @@ use futures::{
     future, stream, FutureExt, StreamExt, TryFutureExt,
 };
 use futures01::Sink;
-use hyper::{body::to_bytes as body_to_bytes, Body, Client, Request};
+use hyper::{Body, Client, Request};
 use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -22,7 +22,9 @@ pub mod parser;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 struct PrometheusConfig {
-    hosts: Vec<String>,
+    // Deprecated name
+    #[serde(alias = "hosts")]
+    endpoints: Vec<String>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
 }
@@ -41,7 +43,7 @@ impl crate::config::SourceConfig for PrometheusConfig {
         out: Pipeline,
     ) -> crate::Result<super::Source> {
         let mut urls = Vec::new();
-        for host in self.hosts.iter() {
+        for host in self.endpoints.iter() {
             let base_uri = host.parse::<http::Uri>().context(super::UriParseError)?;
             urls.push(format!("{}metrics", base_uri));
         }
@@ -63,6 +65,9 @@ fn prometheus(
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
+    let out = out
+        .sink_map_err(|e| error!("error sending metric: {:?}", e))
+        .sink_compat();
     let task = tokio::time::interval(Duration::from_secs(interval))
         .take_until(shutdown.compat())
         .map(move |_| stream::iter(urls.clone()))
@@ -78,35 +83,53 @@ fn prometheus(
             let start = Instant::now();
             client
                 .request(request)
-                .and_then(|response| body_to_bytes(response.into_body()))
+                .and_then(|response| async move {
+                    let (header, body) = response.into_parts();
+                    let body = hyper::body::to_bytes(body).await?;
+                    Ok((header, body))
+                })
                 .into_stream()
                 .filter_map(move |response| {
                     future::ready(match response {
-                        Ok(body) => {
+                        Ok((header, body)) if header.status == hyper::StatusCode::OK => {
                             emit!(PrometheusRequestCompleted {
                                 start,
                                 end: Instant::now()
                             });
 
                             let byte_size = body.len();
-                            let packet = String::from_utf8_lossy(&body);
-                            let metrics = parser::parse(&packet)
-                                .map_err(|error| {
-                                    emit!(PrometheusParseError { error });
-                                })
-                                .unwrap_or_default();
+                            let body = String::from_utf8_lossy(&body);
 
-                            if !metrics.is_empty() {
-                                emit!(PrometheusEventReceived {
-                                    byte_size,
-                                    count: metrics.len()
-                                });
+                            match parser::parse(&body) {
+                                Ok(metrics) => {
+                                    emit!(PrometheusEventReceived {
+                                        byte_size,
+                                        count: metrics.len(),
+                                    });
+                                    Some(stream::iter(metrics).map(Event::Metric).map(Ok))
+                                }
+                                Err(error) => {
+                                    emit!(PrometheusParseError {
+                                        error,
+                                        url: url.clone(),
+                                        body,
+                                    });
+                                    None
+                                }
                             }
-
-                            Some(stream::iter(metrics).map(Event::Metric).map(Ok))
+                        }
+                        Ok((header, _)) => {
+                            emit!(PrometheusErrorResponse {
+                                code: header.status,
+                                url: url.clone(),
+                            });
+                            None
                         }
                         Err(error) => {
-                            emit!(PrometheusHttpError { error });
+                            emit!(PrometheusHttpError {
+                                error,
+                                url: url.clone(),
+                            });
                             None
                         }
                     })
@@ -114,10 +137,7 @@ fn prometheus(
                 .flatten()
         })
         .flatten()
-        .forward(
-            out.sink_map_err(|e| error!("error sending metric: {:?}", e))
-                .sink_compat(),
-        )
+        .forward(out)
         .inspect(|_| info!("finished sending"));
 
     Box::new(task.boxed().compat())
@@ -134,8 +154,10 @@ mod test {
         Error,
     };
     use futures::compat::Future01CompatExt;
-    use hyper::service::{make_service_fn, service_fn};
-    use hyper::{Body, Client, Response, Server};
+    use hyper::{
+        service::{make_service_fn, service_fn},
+        {Body, Client, Response, Server},
+    };
     use pretty_assertions::assert_eq;
     use tokio::time::{delay_for, Duration};
 
@@ -185,11 +207,11 @@ mod test {
             }
         });
 
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source(
             "in",
             PrometheusConfig {
-                hosts: vec![format!("http://{}", in_addr)],
+                endpoints: vec![format!("http://{}", in_addr)],
                 scrape_interval_secs: 1,
             },
         );
@@ -198,13 +220,13 @@ mod test {
             &["in"],
             PrometheusSinkConfig {
                 address: out_addr,
-                namespace: "vector".into(),
+                namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
                 flush_period_secs: 1,
             },
         );
 
-        let (topology, _crash) = start_topology(config, false).await;
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
         delay_for(Duration::from_secs(1)).await;
 
         let response = Client::new()
@@ -213,7 +235,7 @@ mod test {
             .unwrap();
         assert!(response.status().is_success());
 
-        let body = body_to_bytes(response.into_body()).await.unwrap();
+        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
         let lines = std::str::from_utf8(&body)
             .unwrap()
             .lines()

@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 use tokio::time::{delay_for, Delay};
-use tower03::{retry::Policy, timeout::error::Elapsed};
+use tower::{retry::Policy, timeout::error::Elapsed};
 
 pub enum RetryAction {
     /// Indicate that this request should be retried with a reason
@@ -97,18 +97,18 @@ where
         match result {
             Ok(response) => {
                 if self.remaining_attempts == 0 {
-                    error!("retries exhausted");
+                    error!("Retries exhausted");
                     return None;
                 }
 
                 match self.logic.should_retry_response(response) {
                     RetryAction::Retry(reason) => {
-                        warn!(message = "retrying after response.", %reason);
+                        warn!(message = "Retrying after response.", %reason);
                         Some(self.build_retry())
                     }
 
                     RetryAction::DontRetry(reason) => {
-                        error!(message = "request is not retryable; dropping the request.", %reason);
+                        error!(message = "Request is not retryable; dropping the request.", %reason);
                         None
                     }
 
@@ -179,13 +179,14 @@ mod tests {
     use std::{fmt, time::Duration};
     use tokio::time;
     use tokio_test::{assert_pending, assert_ready_err, assert_ready_ok, task};
-    use tower03::retry::RetryLayer;
-    use tower_test03::{assert_request_eq, mock};
+    use tower::retry::RetryLayer;
+    use tower_test::{assert_request_eq, mock};
 
     #[tokio::test]
     async fn service_error_retry() {
-        time::pause();
         trace_init();
+
+        time::pause();
 
         let policy = FixedRetryPolicy::new(
             5,
@@ -234,8 +235,9 @@ mod tests {
 
     #[tokio::test]
     async fn timeout_error() {
-        time::pause();
         trace_init();
+
+        time::pause();
 
         let policy = FixedRetryPolicy::new(
             5,
@@ -249,7 +251,7 @@ mod tests {
         assert_ready_ok!(svc.poll_ready());
 
         let mut fut = task::spawn(svc.call("hello"));
-        assert_request_eq!(handle, "hello").send_error(tower03::timeout::error::Elapsed::new());
+        assert_request_eq!(handle, "hello").send_error(Elapsed::new());
         assert_pending!(fut.poll());
 
         time::advance(Duration::from_secs(2)).await;

@@ -27,7 +27,7 @@ impl Transform for Picker {
                 let bytes = if let Value::Bytes(bytes) = message {
                     bytes
                 } else {
-                    panic!("message value must be Bytes");
+                    panic!("Message value must be in Bytes");
                 };
                 if bytes.len() > 1 && bytes[0] == b'{' {
                     *self = Picker::Docker(Docker)

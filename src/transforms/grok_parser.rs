@@ -2,6 +2,10 @@ use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{self, Event, PathComponent, PathIter},
+    internal_events::{
+        GrokParserConversionFailed, GrokParserEventProcessed, GrokParserFailedMatch,
+        GrokParserMissingField,
+    },
     types::{parse_conversion_map_no_atoms, Conversion},
 };
 use grok::Pattern;
@@ -83,30 +87,24 @@ impl Transform for GrokParser {
     fn transform(&mut self, event: Event) -> Option<Event> {
         let mut event = event.into_log();
         let value = event.get(&self.field).map(|s| s.to_string_lossy());
+        emit!(GrokParserEventProcessed);
 
         if let Some(value) = value {
             if let Some(matches) = self.pattern.match_against(&value) {
                 let drop_field = self.drop_field && matches.get(&self.field).is_none();
                 for (name, value) in matches.iter() {
                     let conv = self.types.get(name).unwrap_or(&Conversion::Bytes);
-                    match conv.convert(value.into()) {
+                    match conv.convert(value.to_string().into()) {
                         Ok(value) => {
                             if let Some(path) = self.paths.get(name) {
-                                event.insert_path(path.to_vec(), value);
+                                event.insert_path(path.to_vec(), value.clone());
                             } else {
                                 let path = PathIter::new(name).collect::<Vec<_>>();
                                 self.paths.insert(name.to_string(), path.clone());
                                 event.insert_path(path, value);
                             }
                         }
-                        Err(error) => {
-                            debug!(
-                                message = "Could not convert types.",
-                                %name,
-                                %error,
-                                rate_limit_secs = 30,
-                            );
-                        }
+                        Err(error) => emit!(GrokParserConversionFailed { name, error }),
                     }
                 }
 
@@ -114,14 +112,14 @@ impl Transform for GrokParser {
                     event.remove(&self.field);
                 }
             } else {
-                debug!(message = "No fields captured from grok pattern.");
+                emit!(GrokParserFailedMatch {
+                    value: value.as_ref()
+                });
             }
         } else {
-            debug!(
-                message = "Field does not exist.",
-                field = self.field.as_ref(),
-                rate_limit_secs = 30,
-            );
+            emit!(GrokParserMissingField {
+                field: self.field.as_ref()
+            });
         }
 
         Some(Event::Log(event))
@@ -187,7 +185,7 @@ mod tests {
     #[test]
     fn grok_parser_does_nothing_on_no_match() {
         let event = parse_log(
-            r#"help i'm stuck in an http server"#,
+            r#"Help I'm stuck in an HTTP server"#,
             "%{HTTPD_COMMONLOG}",
             None,
             true,
@@ -196,7 +194,7 @@ mod tests {
 
         assert_eq!(2, event.keys().count());
         assert_eq!(
-            event::Value::from("help i'm stuck in an http server"),
+            event::Value::from("Help I'm stuck in an HTTP server"),
             event[&event::log_schema().message_key()]
         );
         assert!(!event[&event::log_schema().timestamp_key()]

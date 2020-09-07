@@ -131,7 +131,7 @@ Time metric was created/ingested.\
 type = "float"
 examples = [1]
 description = """\
-The bucket/distribution the metric is a part of.\
+The bucket/distribution which contains the metric.\
 """
 
 [tests.children.inputs.children.metric.children.direction]

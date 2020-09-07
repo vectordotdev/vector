@@ -1,15 +1,19 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{log_schema, Event},
-    sinks::util::{
-        self,
-        encoding::{EncodingConfig, EncodingConfiguration},
-        tcp::TcpSink,
-        Encoding, UriSerde,
+    sinks::{
+        util::{
+            self,
+            encoding::{EncodingConfig, EncodingConfiguration},
+            tcp::TcpSink,
+            Encoding, StreamSink, UriSerde,
+        },
+        Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsConfig},
 };
 use bytes::Bytes;
+use futures::TryFutureExt;
 use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
 
@@ -28,14 +32,14 @@ inventory::submit! {
 
 #[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let (host, port, tls) = if let Some(uri) = &self.endpoint {
             let host = uri
                 .host()
-                .ok_or_else(|| "A host is required for endpoints".to_string())?;
+                .ok_or_else(|| "A host is required for endpoint".to_string())?;
             let port = uri
                 .port_u16()
-                .ok_or_else(|| "A port is required for endpoints".to_string())?;
+                .ok_or_else(|| "A port is required for endpoint".to_string())?;
 
             (host.to_string(), port, self.tls.clone())
         } else {
@@ -56,9 +60,13 @@ impl SinkConfig for DatadogLogsConfig {
         let encoding = self.encoding.clone();
         let api_key = self.api_key.clone();
 
-        let sink = sink.with_flat_map(move |e| iter_ok(encode_event(e, &api_key, &encoding)));
+        let sink = StreamSink::new(sink, cx.acker())
+            .with_flat_map(move |e| iter_ok(encode_event(e, &api_key, &encoding)));
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(healthcheck.compat()),
+        ))
     }
 
     fn input_type(&self) -> DataType {

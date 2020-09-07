@@ -1,4 +1,6 @@
-use super::auto_concurrency::{AutoConcurrencyLimit, AutoConcurrencyLimitLayer};
+use super::auto_concurrency::{
+    AutoConcurrencyLimit, AutoConcurrencyLimitLayer, AutoConcurrencySettings,
+};
 use super::retries::{FixedRetryPolicy, RetryLogic};
 use super::sink::Response;
 use super::{Batch, BatchSink};
@@ -12,7 +14,7 @@ use std::fmt;
 use std::sync::Arc;
 use std::task::Poll;
 use std::time::Duration;
-use tower03::{
+use tower::{
     layer::{util::Stack, Layer},
     limit::RateLimit,
     retry::Retry,
@@ -21,10 +23,8 @@ use tower03::{
     Service, ServiceBuilder,
 };
 
-pub use compat::TowerCompat;
-
 pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, AutoConcurrencyLimit<Timeout<S>, L>>>;
-pub type TowerBatchedSink<S, B, L, Request> = BatchSink<TowerCompat<Svc<S, L>>, B, Request>;
+pub type TowerBatchedSink<S, B, L, Request> = BatchSink<Svc<S, L>, B, Request>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -127,27 +127,51 @@ impl<'de> Deserialize<'de> for InFlightLimit {
     }
 }
 
+pub trait InFlightLimitOption {
+    fn parse_in_flight_limit(&self, default: &Self) -> Option<usize>;
+}
+
+impl InFlightLimitOption for Option<usize> {
+    fn parse_in_flight_limit(&self, default: &Self) -> Option<usize> {
+        let limit = match self {
+            None => *default,
+            Some(x) => Some(*x),
+        };
+        limit.or(Some(5))
+    }
+}
+
+impl InFlightLimitOption for InFlightLimit {
+    fn parse_in_flight_limit(&self, default: &Self) -> Option<usize> {
+        match self.if_none(*default) {
+            InFlightLimit::None => Some(5),
+            InFlightLimit::Auto => None,
+            InFlightLimit::Fixed(limit) => Some(limit),
+        }
+    }
+}
+
 /// Tower Request based configuration
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-pub struct TowerRequestConfig {
+pub struct TowerRequestConfig<T = InFlightLimit> {
     #[serde(default)]
-    pub in_flight_limit: InFlightLimit, // 5
+    pub in_flight_limit: T, // 5
     pub timeout_secs: Option<u64>,             // 60
     pub rate_limit_duration_secs: Option<u64>, // 1
     pub rate_limit_num: Option<u64>,           // 5
     pub retry_attempts: Option<usize>,         // max_value()
     pub retry_max_duration_secs: Option<u64>,
     pub retry_initial_backoff_secs: Option<u64>, // 1
+    #[serde(default)]
+    pub auto_concurrency: AutoConcurrencySettings,
 }
 
-impl TowerRequestConfig {
-    pub fn unwrap_with(&self, defaults: &TowerRequestConfig) -> TowerRequestSettings {
+impl<T: InFlightLimitOption> TowerRequestConfig<T> {
+    pub fn unwrap_with(&self, defaults: &Self) -> TowerRequestSettings {
         TowerRequestSettings {
-            in_flight_limit: match self.in_flight_limit.if_none(defaults.in_flight_limit) {
-                InFlightLimit::None => Some(5),
-                InFlightLimit::Auto => None,
-                InFlightLimit::Fixed(limit) => Some(limit),
-            },
+            in_flight_limit: self
+                .in_flight_limit
+                .parse_in_flight_limit(&defaults.in_flight_limit),
             timeout: Duration::from_secs(self.timeout_secs.or(defaults.timeout_secs).unwrap_or(60)),
             rate_limit_duration: Duration::from_secs(
                 self.rate_limit_duration_secs
@@ -169,6 +193,7 @@ impl TowerRequestConfig {
                     .or(defaults.retry_initial_backoff_secs)
                     .unwrap_or(1),
             ),
+            auto_concurrency: self.auto_concurrency,
         }
     }
 }
@@ -182,6 +207,7 @@ pub struct TowerRequestSettings {
     pub retry_attempts: usize,
     pub retry_max_duration_secs: Duration,
     pub retry_initial_backoff_secs: Duration,
+    pub auto_concurrency: AutoConcurrencySettings,
 }
 
 impl TowerRequestSettings {
@@ -221,12 +247,12 @@ impl TowerRequestSettings {
             .retry(policy)
             .layer(AutoConcurrencyLimitLayer::new(
                 self.in_flight_limit,
+                self.auto_concurrency,
                 retry_logic,
             ))
             .timeout(self.timeout)
             .service(service);
 
-        let service = TowerCompat::new(service);
         BatchSink::new(service, batch, batch_timeout, acker)
     }
 }
@@ -321,69 +347,32 @@ impl<S: Clone, R1, R2> Clone for Map<S, R1, R2> {
     }
 }
 
-mod compat {
-    use futures::compat::Compat;
-    use futures01::Poll;
-    use std::pin::Pin;
-    use tower::Service as Service01;
-    use tower03::Service as Service03;
-
-    pub struct TowerCompat<S> {
-        inner: S,
-    }
-
-    impl<S> TowerCompat<S> {
-        pub fn new(inner: S) -> Self {
-            Self { inner }
-        }
-
-        pub fn get_ref(&self) -> &S {
-            &self.inner
-        }
-
-        pub fn get_mut(&mut self) -> &S {
-            &mut self.inner
-        }
-    }
-
-    impl<S, Request> Service01<Request> for TowerCompat<S>
-    where
-        S: Service03<Request>,
-    {
-        type Response = S::Response;
-        type Error = S::Error;
-        type Future = Compat<Pin<Box<S::Future>>>;
-
-        fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-            let p = task_compat::with_context(|cx| self.inner.poll_ready(cx));
-            task_compat::poll_03_to_01(p)
-        }
-
-        fn call(&mut self, req: Request) -> Self::Future {
-            Compat::new(Box::pin(self.inner.call(req)))
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn in_flight_limit_works() {
-        let cfg = toml::from_str::<TowerRequestConfig>("").expect("Empty config failed");
+        type TowerRequestConfigTest = TowerRequestConfig<InFlightLimit>;
+
+        let cfg = toml::from_str::<TowerRequestConfigTest>("").expect("Empty config failed");
         assert_eq!(cfg.in_flight_limit, InFlightLimit::None);
-        let cfg = toml::from_str::<TowerRequestConfig>("in_flight_limit = 10")
+
+        let cfg = toml::from_str::<TowerRequestConfigTest>("in_flight_limit = 10")
             .expect("Fixed in_flight_limit failed");
         assert_eq!(cfg.in_flight_limit, InFlightLimit::Fixed(10));
-        let cfg = toml::from_str::<TowerRequestConfig>(r#"in_flight_limit = "auto""#)
+
+        let cfg = toml::from_str::<TowerRequestConfigTest>(r#"in_flight_limit = "auto""#)
             .expect("Auto in_flight_limit failed");
         assert_eq!(cfg.in_flight_limit, InFlightLimit::Auto);
-        toml::from_str::<TowerRequestConfig>(r#"in_flight_limit = "broken""#)
+
+        toml::from_str::<TowerRequestConfigTest>(r#"in_flight_limit = "broken""#)
             .expect_err("Invalid in_flight_limit didn't fail");
-        toml::from_str::<TowerRequestConfig>(r#"in_flight_limit = 0"#)
+
+        toml::from_str::<TowerRequestConfigTest>(r#"in_flight_limit = 0"#)
             .expect_err("Invalid in_flight_limit didn't fail on zero");
-        toml::from_str::<TowerRequestConfig>(r#"in_flight_limit = -9"#)
+
+        toml::from_str::<TowerRequestConfigTest>(r#"in_flight_limit = -9"#)
             .expect_err("Invalid in_flight_limit didn't fail on negative number");
     }
 }

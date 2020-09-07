@@ -26,11 +26,11 @@ inventory::submit! {
 
 #[typetag::serde(name = "blackhole")]
 impl SinkConfig for BlackholeConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = Box::new(BlackholeSink::new(self.clone(), cx.acker()));
         let healthcheck = Box::new(healthcheck());
 
-        Ok((sink, healthcheck))
+        Ok((super::VectorSink::Futures01Sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -97,16 +97,16 @@ impl Sink for BlackholeSink {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::buffers::Acker;
-    use crate::test_util::random_events_with_stream;
+    use crate::{buffers::Acker, test_util::random_events_with_stream};
+    use futures::{compat::Sink01CompatExt, SinkExt};
 
-    #[test]
-    fn blackhole() {
+    #[tokio::test]
+    async fn blackhole() {
         let config = BlackholeConfig { print_amount: 10 };
         let sink = BlackholeSink::new(config, Acker::Null);
 
-        let (_input_lines, events) = random_events_with_stream(100, 10);
+        let (_input_lines, mut events) = random_events_with_stream(100, 10);
 
-        let _ = sink.send_all(events).wait().unwrap();
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
     }
 }

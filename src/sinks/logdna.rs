@@ -23,7 +23,9 @@ const PATH: &str = "/logs/ingest";
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LogdnaConfig {
     api_key: String,
-    host: Option<UriSerde>,
+    // Deprecated name
+    #[serde(alias = "host")]
+    endpoint: Option<UriSerde>,
 
     hostname: String,
     mac: Option<String>,
@@ -59,7 +61,7 @@ pub enum Encoding {
 
 #[typetag::serde(name = "logdna")]
 impl SinkConfig for LogdnaConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch_settings = BatchSettings::default()
             .bytes(bytesize::mib(10u64))
@@ -79,7 +81,10 @@ impl SinkConfig for LogdnaConfig {
 
         let healthcheck = healthcheck(self.clone(), client).boxed().compat();
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(healthcheck),
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -101,7 +106,7 @@ impl HttpSink for LogdnaConfig {
 
         let line = log
             .remove(&event::log_schema().message_key())
-            .unwrap_or_else(|| "".into());
+            .unwrap_or_else(|| String::from("").into());
         let timestamp = log
             .remove(&event::log_schema().timestamp_key())
             .unwrap_or_else(|| chrono::Utc::now().into());
@@ -187,7 +192,7 @@ impl HttpSink for LogdnaConfig {
 
 impl LogdnaConfig {
     fn build_uri(&self, query: &str) -> Uri {
-        let host: Uri = self.host.clone().unwrap_or_else(|| HOST.clone()).into();
+        let host: Uri = self.endpoint.clone().unwrap_or_else(|| HOST.clone()).into();
 
         let uri = format!("{}{}?{}", host, PATH, query);
 
@@ -217,12 +222,13 @@ async fn healthcheck(config: LogdnaConfig, mut client: HttpClient) -> crate::Res
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::SinkConfig;
-    use crate::event::Event;
-    use crate::sinks::util::test::{build_test_server, load_sink};
-    use crate::test_util;
-    use futures::compat::Future01CompatExt;
-    use futures01::{Sink, Stream};
+    use crate::{
+        config::SinkConfig,
+        event::Event,
+        sinks::util::test::{build_test_server, load_sink},
+        test_util::{next_addr, random_lines, trace_init},
+    };
+    use futures::{stream, StreamExt};
     use serde_json::json;
 
     #[test]
@@ -257,7 +263,8 @@ mod tests {
 
     #[tokio::test]
     async fn smoke() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let (mut config, cx) = load_sink::<LogdnaConfig>(
             r#"
             api_key = "mylogtoken"
@@ -272,18 +279,18 @@ mod tests {
         // Make sure we can build the config
         let _ = config.build(cx.clone()).unwrap();
 
-        let addr = test_util::next_addr();
+        let addr = next_addr();
         // Swap out the host so we can force send it
         // to our local server
-        let host = format!("http://{}", addr).parse::<http::Uri>().unwrap();
-        config.host = Some(host.into());
+        let endpoint = format!("http://{}", addr).parse::<http::Uri>().unwrap();
+        config.endpoint = Some(endpoint.into());
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let (rx, _trigger, server) = build_test_server(addr);
+        let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
-        let lines = test_util::random_lines(100).take(10).collect::<Vec<_>>();
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
         let mut events = Vec::new();
 
         // Create 10 events where the first one contains custom
@@ -300,13 +307,12 @@ mod tests {
             events.push(event);
         }
 
-        let pump = sink.send_all(futures01::stream::iter_ok(events));
-        let _ = pump.compat().await.unwrap();
+        sink.run(stream::iter(events).map(Ok)).await.unwrap();
 
-        let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();
+        let output = rx.next().await.unwrap();
 
-        let request = &output[0].0;
-        let body: serde_json::Value = serde_json::from_slice(&output[0].1[..]).unwrap();
+        let request = &output.0;
+        let body: serde_json::Value = serde_json::from_slice(&output.1[..]).unwrap();
 
         let query = request.uri.query().unwrap();
         assert!(query.contains("hostname=vector"));

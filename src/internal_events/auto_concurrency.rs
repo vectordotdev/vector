@@ -7,14 +7,14 @@ pub struct AutoConcurrencyLimit {
     pub concurrency: u64,
     pub reached_limit: bool,
     pub had_back_pressure: bool,
-    pub current_rtt: Duration,
+    pub current_rtt: Option<Duration>,
     pub past_rtt: Duration,
 }
 
 impl InternalEvent for AutoConcurrencyLimit {
     fn emit_logs(&self) {
         trace!(
-            message = "changed concurrency.",
+            message = "Changed concurrency.",
             concurrency = %self.concurrency,
             reached_limit = %self.reached_limit,
             had_back_pressure = %self.had_back_pressure,

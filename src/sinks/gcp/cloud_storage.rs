@@ -9,10 +9,9 @@ use crate::{
             http::{HttpClient, HttpClientFuture},
             retries::{RetryAction, RetryLogic},
             BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
-            PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerCompat,
-            TowerRequestConfig,
+            PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
-        Healthcheck, RouterSink,
+        Healthcheck, VectorSink,
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
@@ -32,7 +31,7 @@ use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::task::Poll;
-use tower03::{Service, ServiceBuilder};
+use tower::{Service, ServiceBuilder};
 use tracing::field;
 use uuid::Uuid;
 
@@ -124,7 +123,7 @@ enum GcsStorageClass {
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
         in_flight_limit: InFlightLimit::Fixed(25),
-        rate_limit_num: Some(25),
+        rate_limit_num: Some(1000),
         ..Default::default()
     };
 }
@@ -152,11 +151,11 @@ inventory::submit! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
-    fn build(&self, _cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         unimplemented!()
     }
 
-    async fn build_async(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    async fn build_async(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = GcsSink::new(self, &cx).await?;
         let healthcheck = sink.clone().healthcheck().boxed().compat();
         let service = sink.service(self, &cx)?;
@@ -203,7 +202,7 @@ impl GcsSink {
         })
     }
 
-    fn service(self, config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<RouterSink> {
+    fn service(self, config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<VectorSink> {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
@@ -224,12 +223,11 @@ impl GcsSink {
 
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, config.compression));
 
-        let sink =
-            PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch.timeout, cx.acker())
-                .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
-                .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
+        let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+            .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
+            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
-        Ok(Box::new(sink))
+        Ok(VectorSink::Futures01Sink(Box::new(sink)))
     }
 
     async fn healthcheck(mut self) -> crate::Result<()> {
@@ -409,7 +407,7 @@ fn encode_event(
         .render_string(&event)
         .map_err(|missing_keys| {
             warn!(
-                message = "Keys do not exist on the event. Dropping event.",
+                message = "Keys do not exist on the event; dropping event.",
                 ?missing_keys,
                 rate_limit_secs = 30,
             );

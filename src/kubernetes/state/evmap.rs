@@ -44,8 +44,8 @@ where
     /// Debounced `flush`.
     /// When a number of flush events arrive un a row, we buffer them such that
     /// only the last one in the chain is propagated.
-    /// This is intended to improve the state behaivor at resync - by delaying
-    /// the `flush` proparagion, we maximize the time `evmap` remains populated,
+    /// This is intended to improve the state behavior at re-sync - by delaying
+    /// the `flush` propagation, we maximize the time `evmap` remains populated,
     /// ideally allowing a single transition from non-populated to populated
     /// state.
     fn debounced_flush(&mut self) {
@@ -86,7 +86,7 @@ where
     }
 
     async fn resync(&mut self) {
-        // By omiting the flush here, we cache the results from the
+        // By omitting the flush here, we cache the results from the
         // previous run until flush is issued when the new events
         // begin arriving, reducing the time during which the state
         // has no data.

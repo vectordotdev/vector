@@ -4,9 +4,13 @@ use crate::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
     },
-    sinks::util::{
-        http::{BatchedHttpSink, HttpClient, HttpSink},
-        BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
+    sinks::{
+        util::{
+            encode_namespace,
+            http::{BatchedHttpSink, HttpClient, HttpSink},
+            BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
+        },
+        Healthcheck, HealthcheckError, UriParseError, VectorSink,
     },
 };
 use chrono::{DateTime, Utc};
@@ -34,9 +38,10 @@ struct DatadogState {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogConfig {
-    pub namespace: String,
-    #[serde(default = "default_host")]
-    pub host: String,
+    pub namespace: Option<String>,
+    // Deprecated name
+    #[serde(alias = "host", default = "default_endpoint")]
+    pub endpoint: String,
     pub api_key: String,
     #[serde(default)]
     pub batch: BatchConfig,
@@ -63,7 +68,7 @@ struct DatadogRequest {
     series: Vec<DatadogMetric>,
 }
 
-pub fn default_host() -> String {
+pub fn default_endpoint() -> String {
     String::from("https://api.datadoghq.com")
 }
 
@@ -104,7 +109,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = HttpClient::new(cx.resolver(), None)?;
         let healthcheck = healthcheck(self.clone(), client.clone()).boxed().compat();
 
@@ -114,7 +119,7 @@ impl SinkConfig for DatadogConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        let uri = build_uri(&self.host)?;
+        let uri = build_uri(&self.endpoint)?;
         let timestamp = Utc::now().timestamp();
 
         let sink = DatadogSink {
@@ -133,7 +138,10 @@ impl SinkConfig for DatadogConfig {
         )
         .sink_map_err(|e| error!("Fatal datadog error: {}", e));
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(healthcheck),
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -159,7 +167,7 @@ impl HttpSink for DatadogSink {
         let interval = now - self.last_sent_timestamp.load(SeqCst);
         self.last_sent_timestamp.store(now, SeqCst);
 
-        let input = encode_events(events, interval, &self.config.namespace);
+        let input = encode_events(events, interval, self.config.namespace.as_deref());
         let body = serde_json::to_vec(&input).unwrap();
 
         Request::post(self.uri.clone())
@@ -173,15 +181,15 @@ impl HttpSink for DatadogSink {
 fn build_uri(host: &str) -> crate::Result<Uri> {
     let uri = format!("{}/api/v1/series", host)
         .parse::<Uri>()
-        .context(super::UriParseError)?;
+        .context(UriParseError)?;
 
     Ok(uri)
 }
 
 async fn healthcheck(config: DatadogConfig, mut client: HttpClient) -> crate::Result<()> {
-    let uri = format!("{}/api/v1/validate", config.host)
+    let uri = format!("{}/api/v1/validate", config.endpoint)
         .parse::<Uri>()
-        .context(super::UriParseError)?;
+        .context(UriParseError)?;
 
     let request = Request::get(uri)
         .header("DD-API-KEY", config.api_key)
@@ -192,7 +200,7 @@ async fn healthcheck(config: DatadogConfig, mut client: HttpClient) -> crate::Re
 
     match response.status() {
         StatusCode::OK => Ok(()),
-        other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
+        other => Err(HealthcheckError::UnexpectedStatus { status: other }.into()),
     }
 }
 
@@ -210,14 +218,6 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
         ts.timestamp()
     } else {
         Utc::now().timestamp()
-    }
-}
-
-fn encode_namespace(namespace: &str, name: &str) -> String {
-    if !namespace.is_empty() {
-        format!("{}.{}", namespace, name)
-    } else {
-        name.to_string()
     }
 }
 
@@ -273,11 +273,11 @@ fn stats(values: &[f64], counts: &[u32]) -> Option<DatadogStats> {
     })
 }
 
-fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> DatadogRequest {
+fn encode_events(events: Vec<Metric>, interval: i64, namespace: Option<&str>) -> DatadogRequest {
     let series = events
         .into_iter()
         .filter_map(|event| {
-            let fullname = encode_namespace(namespace, &event.name);
+            let fullname = encode_namespace(namespace, '.', &event.name);
             let ts = encode_timestamp(event.timestamp);
             let tags = event.tags.clone().map(encode_tags);
             match event.kind {
@@ -381,11 +381,11 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: &str) -> Datadog
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
-    use crate::sinks::util::{http::HttpSink, test::load_sink};
-    use crate::test_util::runtime;
-    use chrono::offset::TimeZone;
-    use chrono::Utc;
+    use crate::{
+        event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
+        sinks::util::{http::HttpSink, test::load_sink},
+    };
+    use chrono::{offset::TimeZone, Utc};
     use http::{Method, Uri};
     use pretty_assertions::assert_eq;
     use std::sync::atomic::AtomicI64;
@@ -404,8 +404,8 @@ mod tests {
         .collect()
     }
 
-    #[test]
-    fn test_request() {
+    #[tokio::test]
+    async fn test_request() {
         let (sink, _cx) = load_sink::<DatadogConfig>(
             r#"
             namespace = "test"
@@ -417,7 +417,7 @@ mod tests {
         let timestamp = Utc::now().timestamp();
         let sink = DatadogSink {
             config: sink,
-            uri: build_uri(&default_host()).unwrap(),
+            uri: build_uri(&default_endpoint()).unwrap(),
             last_sent_timestamp: AtomicI64::new(timestamp),
         };
 
@@ -444,11 +444,7 @@ mod tests {
                 value: MetricValue::Counter { value: 1.0 },
             },
         ];
-
-        let mut rt = runtime();
-        let req = rt
-            .block_on_std(async move { sink.build_request(events).await })
-            .unwrap();
+        let req = sink.build_request(events).await.unwrap();
 
         assert_eq!(req.method(), Method::POST);
         assert_eq!(
@@ -498,7 +494,7 @@ mod tests {
                 value: MetricValue::Counter { value: 1.0 },
             },
         ];
-        let input = encode_events(events, interval, "ns");
+        let input = encode_events(events, interval, Some("ns"));
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(
@@ -525,7 +521,7 @@ mod tests {
                 value: MetricValue::Gauge { value: -1.1 },
             },
         ];
-        let input = encode_events(events, 60, "");
+        let input = encode_events(events, 60, Some(""));
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(
@@ -545,7 +541,7 @@ mod tests {
                 values: vec!["alice".into(), "bob".into()].into_iter().collect(),
             },
         }];
-        let input = encode_events(events, 60, "");
+        let input = encode_events(events, 60, Some(""));
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(
@@ -653,7 +649,7 @@ mod tests {
                 statistic: StatisticKind::Histogram,
             },
         }];
-        let input = encode_events(events, 60, "");
+        let input = encode_events(events, 60, Some(""));
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(

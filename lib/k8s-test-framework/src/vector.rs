@@ -23,7 +23,7 @@ impl up_down::CommandBuilder for CommandBuilder {
             })
             .arg(&self.namespace)
             .env(
-                "CUSTOM_RESOURCE_CONIFGS_FILE",
+                "CUSTOM_RESOURCE_CONFIGS_FILE",
                 self.custom_resource_file.path(),
             )
             .stdin(Stdio::null());

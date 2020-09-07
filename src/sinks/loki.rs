@@ -15,7 +15,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
-    runtime::FutureExt,
     sinks::util::{
         buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -26,6 +25,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use derivative::Derivative;
+use futures::{FutureExt, TryFutureExt};
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -71,7 +71,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "loki")]
 impl SinkConfig for LokiConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         if self.labels.is_empty() {
             return Err("`labels` must include at least one label.".into());
         }
@@ -95,9 +95,12 @@ impl SinkConfig for LokiConfig {
         )
         .sink_map_err(|e| error!("Fatal loki sink error: {}", e));
 
-        let healthcheck = healthcheck(self.clone(), client).boxed_compat();
+        let healthcheck = healthcheck(self.clone(), client).boxed().compat();
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(healthcheck),
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -248,10 +251,10 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::config::SinkConfig;
-    use crate::sinks::util::test::load_sink;
-    use crate::template::Template;
-    use crate::Event;
+    use crate::{
+        config::SinkConfig, sinks::util::test::load_sink, template::Template,
+        test_util::random_lines, Event,
+    };
     use bytes::Bytes;
     use futures::compat::Future01CompatExt;
     use futures01::Sink;
@@ -277,9 +280,7 @@ mod integration_tests {
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let lines = crate::test_util::random_lines(100)
-            .take(10)
-            .collect::<Vec<_>>();
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
 
         let events = lines.clone().into_iter().map(Event::from);
         let _ = sink
@@ -315,7 +316,7 @@ mod integration_tests {
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let events = crate::test_util::random_lines(100)
+        let events = random_lines(100)
             .take(10)
             .map(Event::from)
             .collect::<Vec<_>>();
@@ -348,9 +349,7 @@ mod integration_tests {
 
         let (sink, _) = config.build(cx).unwrap();
 
-        let lines = crate::test_util::random_lines(100)
-            .take(10)
-            .collect::<Vec<_>>();
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
 
         let mut events = lines
             .clone()

@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate tracing;
+#[macro_use]
+extern crate vector;
 
 mod cli;
 
@@ -8,12 +10,16 @@ use futures::{
     compat::{Future01CompatExt, Stream01CompatExt},
     StreamExt,
 };
-use futures01::Future;
 use std::cmp::max;
-use tokio::select;
+use tokio::{runtime, select};
 use vector::{
-    config::{self, Config, ConfigDiff},
-    event, generate, list, metrics, runtime,
+    config::{self, ConfigDiff},
+    generate, heartbeat,
+    internal_events::{
+        VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed,
+        VectorReloaded, VectorStarted, VectorStopped,
+    },
+    list, metrics,
     signal::{self, SignalTo},
     topology, trace, unit_test, validate,
 };
@@ -71,10 +77,15 @@ fn main() {
 
     let mut rt = {
         let threads = opts.threads.unwrap_or_else(|| max(1, num_cpus::get()));
-        runtime::Runtime::with_thread_count(threads).expect("Unable to create async runtime")
+        runtime::Builder::new()
+            .threaded_scheduler()
+            .enable_all()
+            .core_threads(threads)
+            .build()
+            .expect("Unable to create async runtime")
     };
 
-    rt.block_on_std(async move {
+    rt.block_on(async move {
         if let Some(s) = sub_command {
             std::process::exit(match s {
                 SubCommand::Validate(v) => validate::validate(&v, color).await,
@@ -101,32 +112,29 @@ fn main() {
             path = ?config_paths
         );
 
-        let read_config = config::read_configs(&config_paths);
-        let maybe_config = handle_config_errors(read_config);
-        let config = maybe_config.unwrap_or_else(|| {
-            std::process::exit(exitcode::CONFIG);
-        });
-        event::LOG_SCHEMA
+        let config = config::load_from_paths(&config_paths)
+            .map_err(handle_config_errors)
+            .unwrap_or_else(|()| {
+                std::process::exit(exitcode::CONFIG);
+            });
+
+        vector::event::LOG_SCHEMA
             .set(config.global.log_schema.clone())
             .expect("Couldn't set schema");
 
-        info!(
-            message = "Vector is starting.",
-            version = built_info::PKG_VERSION,
-            git_version = built_info::GIT_VERSION.unwrap_or(""),
-            released = built_info::BUILT_TIME_UTC,
-            arch = built_info::CFG_TARGET_ARCH
-        );
-
         let diff = ConfigDiff::initial(&config);
-        let pieces = topology::validate(&config, &diff).await.unwrap_or_else(|| {
+        let pieces = topology::build_or_log_errors(&config, &diff).await.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });
 
-        let result = topology::start_validated(config, diff, pieces, opts.require_healthy).await;
+        let result =
+            topology::start_validated(config, diff, pieces, opts.require_healthy).await;
         let (mut topology, graceful_crash) = result.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });
+
+        emit!(VectorStarted);
+        tokio::spawn(heartbeat::heartbeat());
 
         let mut signals = signal::signals();
         let mut sources_finished = topology.sources_finished().compat();
@@ -137,26 +145,24 @@ fn main() {
                 Some(signal) = signals.next() => {
                     if signal == SignalTo::Reload {
                         // Reload config
-                        info!(
-                            message = "Reloading configs.",
-                            path = ?config_paths
-                        );
-                        let new_config = config::read_configs(&config_paths);
+                        let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
 
-                        trace!("Parsing config");
-                        let new_config = handle_config_errors(new_config);
                         if let Some(new_config) = new_config {
                             match topology
                                 .reload_config_and_respawn(new_config, opts.require_healthy)
                                 .await
                             {
-                                Ok(true) => (),
-                                Ok(false) => error!("Reload was not successful."),
+                                Ok(true) =>  emit!(VectorReloaded { config_paths: &config_paths }),
+                                Ok(false) => emit!(VectorReloadFailed),
                                 // Trigger graceful shutdown for what remains of the topology
-                                Err(()) => break SignalTo::Shutdown,
+                                Err(()) => {
+                                    emit!(VectorReloadFailed);
+                                    emit!(VectorRecoveryFailed);
+                                    break SignalTo::Shutdown;
+                                }
                             }
                         } else {
-                            error!("Reload aborted.");
+                            emit!(VectorConfigLoadFailed);
                         }
                     } else {
                         break signal;
@@ -171,39 +177,28 @@ fn main() {
 
         match signal {
             SignalTo::Shutdown => {
-                info!("Shutting down.");
+                emit!(VectorStopped);
                 select! {
                     _ = topology.stop().compat() => (), // Graceful shutdown finished
                     _ = signals.next() => {
-                        info!("Shutting down immediately.");
+                        // It is highly unlikely that this event will exit from topology.
+                        emit!(VectorQuit);
                         // Dropping the shutdown future will immediately shut the server down
                     }
                 }
             }
             SignalTo::Quit => {
-                info!("Shutting down immediately");
+                // It is highly unlikely that this event will exit from topology.
+                emit!(VectorQuit);
                 drop(topology);
             }
             SignalTo::Reload => unreachable!(),
         }
     });
-
-    rt.shutdown_now().wait().unwrap();
 }
 
-fn handle_config_errors(config: Result<Config, Vec<String>>) -> Option<Config> {
-    match config {
-        Err(errors) => {
-            for error in errors {
-                error!("Configuration error: {}", error);
-            }
-            None
-        }
-        Ok(config) => Some(config),
+fn handle_config_errors(errors: Vec<String>) {
+    for error in errors {
+        error!("Configuration error: {}", error);
     }
-}
-
-#[allow(unused)]
-mod built_info {
-    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }

@@ -9,9 +9,9 @@ pub struct TcpConnectionEstablished {
 impl InternalEvent for TcpConnectionEstablished {
     fn emit_logs(&self) {
         if let Some(peer_addr) = self.peer_addr {
-            debug!(message = "connected", %peer_addr);
+            debug!(message = "Connected", %peer_addr);
         } else {
-            debug!(message = "connected", peer_addr = "unknown");
+            debug!(message = "Connected", peer_addr = "unknown");
         }
     }
 
@@ -29,7 +29,7 @@ pub struct TcpConnectionFailed {
 
 impl InternalEvent for TcpConnectionFailed {
     fn emit_logs(&self) {
-        error!(message = "unable to connect.", error = %self.error);
+        error!(message = "Unable to connect.", error = %self.error);
     }
 
     fn emit_metrics(&self) {
@@ -123,30 +123,6 @@ impl InternalEvent for TcpEventSent {
         );
         counter!("bytes_processed", self.byte_size as u64,
             "component_kind" => "sink",
-        );
-    }
-}
-
-#[derive(Debug)]
-pub struct TcpEventReceived {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for TcpEventReceived {
-    fn emit_logs(&self) {
-        trace!(message = "received event.", byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "source",
-            "component_type" => "socket",
-            "mode" => "tcp",
-        );
-        counter!("bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "socket",
-            "mode" => "tcp",
         );
     }
 }

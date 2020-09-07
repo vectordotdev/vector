@@ -1,20 +1,23 @@
 use super::{
-    AddCertToStore, AddExtraChainCert, DerExportError, FileOpenFailed, FileReadFailed, MaybeTls,
-    NewStoreBuilder, ParsePkcs12, Pkcs12Error, PrivateKeyParseError, Result, SetCertificate,
-    SetPrivateKey, SetVerifyCert, TlsError, TlsIdentityError, X509ParseError,
+    AddCertToStore, AddExtraChainCert, CaStackPush, DerExportError, FileOpenFailed, FileReadFailed,
+    MaybeTls, NewCaStack, NewStoreBuilder, ParsePkcs12, Pkcs12Error, PrivateKeyParseError, Result,
+    SetCertificate, SetPrivateKey, SetVerifyCert, TlsError, TlsIdentityError, X509ParseError,
 };
 use openssl::{
     pkcs12::{ParsedPkcs12, Pkcs12},
     pkey::{PKey, Private},
     ssl::{ConnectConfiguration, SslContextBuilder, SslVerifyMode},
+    stack::Stack,
     x509::{store::X509StoreBuilder, X509},
 };
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::fmt::{self, Debug, Formatter};
-use std::fs::File;
-use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::{
+    fmt,
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 const PEM_START_MARKER: &str = "-----BEGIN ";
 
@@ -186,12 +189,23 @@ impl TlsOptions {
             None => Err(TlsError::MissingKey),
             Some(key_file) => {
                 let name = crt_file.to_string_lossy().to_string();
-                let crt = X509::from_pem(pem.as_bytes())
-                    .with_context(|| X509ParseError { filename: crt_file })?;
+                let mut crt_stack = X509::stack_from_pem(pem.as_bytes())
+                    .with_context(|| X509ParseError { filename: crt_file })?
+                    .into_iter();
+
+                let crt = crt_stack
+                    .next()
+                    .ok_or_else(|| TlsError::MissingCertificate)?;
                 let key = load_key(&key_file, &self.key_pass)?;
-                let pkcs12 = Pkcs12::builder()
-                    .build("", &name, &key, &crt)
-                    .context(Pkcs12Error)?;
+
+                let mut ca_stack = Stack::new().context(NewCaStack)?;
+                for intermediate in crt_stack {
+                    ca_stack.push(intermediate).context(CaStackPush)?;
+                }
+
+                let mut builder = Pkcs12::builder();
+                builder.ca(ca_stack);
+                let pkcs12 = builder.build("", &name, &key, &crt).context(Pkcs12Error)?;
                 let identity = pkcs12.to_der().context(DerExportError)?;
 
                 // Build the resulting parsed PKCS#12 archive,
@@ -298,8 +312,8 @@ fn load_mac_certs(builder: &mut SslContextBuilder) -> Result<()> {
     Ok(())
 }
 
-impl Debug for TlsSettings {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+impl fmt::Debug for TlsSettings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TlsSettings")
             .field("verify_certificate", &self.verify_certificate)
             .field("verify_hostname", &self.verify_hostname)
@@ -476,6 +490,18 @@ mod test {
             .expect("Failed to load authority certificate");
         assert!(settings.identity.is_none());
         assert_eq!(settings.authorities.len(), 1);
+    }
+
+    #[test]
+    fn from_options_intermediate_ca() {
+        let options = TlsOptions {
+            ca_file: Some("tests/data/Chain_with_intermediate.crt".into()),
+            ..Default::default()
+        };
+        let settings = TlsSettings::from_options(&Some(options))
+            .expect("Failed to load authority certificate");
+        assert!(settings.identity.is_none());
+        assert_eq!(settings.authorities.len(), 3);
     }
 
     #[test]

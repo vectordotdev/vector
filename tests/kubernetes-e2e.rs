@@ -202,7 +202,7 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
         if got_marker {
             // We've already seen one marker! This is not good, we only emitted
             // one.
-            panic!("marker seen more than once");
+            panic!("Marker seen more than once");
         }
 
         // If we did, remember it.
@@ -271,7 +271,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
         if got_expected_line {
             // We've already seen our expected line once! This is not good, we
             // only emitted one.
-            panic!("test message seen more than once");
+            panic!("Test message seen more than once");
         }
 
         // If we did, remember it.
@@ -342,7 +342,7 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
         if got_marker {
             // We've already seen one marker! This is not good, we only emitted
             // one.
-            panic!("marker seen more than once");
+            panic!("Marker seen more than once");
         }
 
         // If we did, remember it.
@@ -408,7 +408,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
         // Take the next marker.
         let current_marker = test_messages_iter
             .next()
-            .expect("expected no more lines since the test messages iter is exausted");
+            .expect("expected no more lines since the test messages iter is exhausted");
 
         // Ensure we got the marker.
         assert_eq!(val["message"], current_marker);
@@ -480,7 +480,7 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         if got_marker {
             // We've already seen one marker! This is not good, we only emitted
             // one.
-            panic!("marker seen more than once");
+            panic!("Marker seen more than once");
         }
 
         // If we did, remember it.
@@ -558,9 +558,9 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
     smoke_check_first_line(&mut log_reader).await;
 
-    // Read the log lines until the reasoable amount of time passes for us
-    // to be confident that vector shoud've picked up the excluded message
-    // if it wasn't fitlering it.
+    // Read the log lines until the reasonable amount of time passes for us
+    // to be confident that vector should've picked up the excluded message
+    // if it wasn't filtering it.
     let mut got_control_marker = false;
     let mut lines_till_we_give_up: usize = 10000;
     let (stop_tx, mut stop_rx) = futures::channel::mpsc::channel(0);
@@ -609,7 +609,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         if got_control_marker {
             // We've already seen one control marker! This is not good, we only
             // emitted one.
-            panic!("control marker seen more than once");
+            panic!("Control marker seen more than once");
         }
 
         // Remember that we've seen a control marker.

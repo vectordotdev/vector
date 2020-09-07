@@ -72,7 +72,7 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::LogValueUnexpectedType),
     };
-    // Here we apply out heuristics to detect if messge is partial.
+    // Here we apply out heuristics to detect if message is partial.
     // Partial messages are only split in docker at the maximum message length
     // (`DOCKER_MESSAGE_SPLIT_THRESHOLD`).
     // Thus, for a message to be partial it also has to have exactly that
