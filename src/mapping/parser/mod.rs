@@ -20,6 +20,8 @@ use pest::{
     Parser,
 };
 
+static TOKEN_ERR: &str = "unexpected token sequence";
+
 #[derive(Parser)]
 #[grammar = "./mapping/parser/grammar.pest"]
 struct MappingParser;
@@ -39,9 +41,9 @@ fn target_path_from_pair(pair: Pair<Rule>) -> Result<String> {
 }
 
 fn quoted_path_from_pair(pair: Pair<Rule>) -> Result<String> {
-    let mut pairs = pair.into_inner();
-    let base = inner_quoted_string_escaped_from_pair(pairs.next().unwrap())?;
-    Ok(if let Some(pair) = pairs.next() {
+    let (first, mut other) = split_inner_rules_from_pair(pair)?;
+    let base = inner_quoted_string_escaped_from_pair(first)?;
+    Ok(if let Some(pair) = other.next() {
         base + pair.as_str()
     } else {
         base
@@ -74,7 +76,8 @@ fn path_segments_from_pair(pair: Pair<Rule>) -> Result<Vec<Vec<String>>> {
 }
 
 fn query_arithmetic_product_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
-    let mut left = query_from_pair(pairs.next().unwrap())?;
+    let pair = pairs.next().ok_or(TOKEN_ERR)?;
+    let mut left = query_from_pair(pair)?;
     let mut op = Operator::Multiply;
 
     for pair in pairs {
@@ -97,7 +100,8 @@ fn query_arithmetic_product_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn
 }
 
 fn query_arithmetic_sum_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
-    let mut left = query_arithmetic_product_from_pairs(pairs.next().unwrap().into_inner())?;
+    let inner_pairs = pairs.next().ok_or(TOKEN_ERR)?.into_inner();
+    let mut left = query_arithmetic_product_from_pairs(inner_pairs)?;
     let mut op = Operator::Add;
 
     for pair in pairs {
@@ -123,7 +127,8 @@ fn query_arithmetic_sum_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn que
 }
 
 fn query_arithmetic_compare_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
-    let mut left = query_arithmetic_sum_from_pairs(pairs.next().unwrap().into_inner())?;
+    let inner_pairs = pairs.next().ok_or(TOKEN_ERR)?.into_inner();
+    let mut left = query_arithmetic_sum_from_pairs(inner_pairs)?;
     let mut op = Operator::Equal;
 
     for pair in pairs {
@@ -153,7 +158,8 @@ fn query_arithmetic_compare_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn
 }
 
 fn query_arithmetic_boolean_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
-    let mut left = query_arithmetic_compare_from_pairs(pairs.next().unwrap().into_inner())?;
+    let inner_pairs = pairs.next().ok_or(TOKEN_ERR)?.into_inner();
+    let mut left = query_arithmetic_compare_from_pairs(inner_pairs)?;
     let mut op = Operator::And;
 
     for pair in pairs {
@@ -185,12 +191,12 @@ fn query_arithmetic_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Functio
 fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
     match pair.as_rule() {
         Rule::to_string => {
-            let mut inner_rules = pair.into_inner();
-            let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
-            let default = if let Some(r) = inner_rules.next() {
+            let (first, mut other) = split_inner_rules_from_pair(pair)?;
+            let query = query_arithmetic_from_pair(first)?;
+            let default = if let Some(r) = other.next() {
                 Some(match r.as_rule() {
                     Rule::string => Value::from(inner_quoted_string_escaped_from_pair(
-                        r.into_inner().next().unwrap(),
+                        r.into_inner().next().ok_or(TOKEN_ERR)?,
                     )?),
                     Rule::null => Value::Null,
                     _ => unreachable!(
@@ -203,9 +209,9 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
             Ok(Box::new(ToStringFn::new(query, default)))
         }
         Rule::to_int => {
-            let mut inner_rules = pair.into_inner();
-            let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
-            let default = inner_rules.next().map(|r| match r.as_rule() {
+            let (first, mut other) = split_inner_rules_from_pair(pair)?;
+            let query = query_arithmetic_from_pair(first)?;
+            let default = other.next().map(|r| match r.as_rule() {
                 // TODO: Try parsing directly into int first. Maybe return error
                 // if the string is not a valid int.
                 Rule::number => Value::Integer(r.as_str().parse::<f64>().unwrap() as i64),
@@ -217,9 +223,9 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
             Ok(Box::new(ToIntegerFn::new(query, default)))
         }
         Rule::to_float => {
-            let mut inner_rules = pair.into_inner();
-            let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
-            let default = inner_rules.next().map(|r| match r.as_rule() {
+            let (first, mut other) = split_inner_rules_from_pair(pair)?;
+            let query = query_arithmetic_from_pair(first)?;
+            let default = other.next().map(|r| match r.as_rule() {
                 Rule::number => Value::Float(r.as_str().parse::<f64>().unwrap()),
                 Rule::null => Value::Null,
                 _ => unreachable!(
@@ -229,9 +235,9 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
             Ok(Box::new(ToFloatFn::new(query, default)))
         }
         Rule::to_bool => {
-            let mut inner_rules = pair.into_inner();
-            let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
-            let default = inner_rules.next().map(|r| match r.as_rule() {
+            let (first, mut other) = split_inner_rules_from_pair(pair)?;
+            let query = query_arithmetic_from_pair(first)?;
+            let default = other.next().map(|r| match r.as_rule() {
                 Rule::boolean => Value::Boolean(r.as_str() == "true"),
                 Rule::null => Value::Null,
                 _ => unreachable!(
@@ -241,10 +247,15 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
             Ok(Box::new(ToBooleanFn::new(query, default)))
         }
         Rule::to_timestamp => {
-            let mut inner_rules = pair.into_inner();
-            let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
+            let (first, mut other) = split_inner_rules_from_pair(pair)?;
+            let query = query_arithmetic_from_pair(first)?;
             let format = inner_quoted_string_escaped_from_pair(
-                inner_rules.next().unwrap().into_inner().next().unwrap(),
+                other
+                    .next()
+                    .ok_or(TOKEN_ERR)?
+                    .into_inner()
+                    .next()
+                    .ok_or(TOKEN_ERR)?,
             )?;
             Ok(Box::new(ToTimestampFn::new(&format, query, None)?))
         }
@@ -288,11 +299,11 @@ fn inner_quoted_string_escaped_from_pair(pair: Pair<Rule>) -> Result<String> {
 fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
     Ok(match pair.as_rule() {
         Rule::not_operator => {
-            let inner_query = query_from_pair(pair.into_inner().next().unwrap())?;
+            let inner_query = query_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?;
             Box::new(NotFn::new(inner_query))
         }
         Rule::string => Box::new(Literal::from(Value::from(
-            inner_quoted_string_escaped_from_pair(pair.into_inner().next().unwrap())?,
+            inner_quoted_string_escaped_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?,
         ))),
         Rule::null => Box::new(Literal::from(Value::Null)),
         Rule::number => Box::new(Literal::from(Value::from(
@@ -303,16 +314,18 @@ fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
             Box::new(Literal::from(Value::from(v)))
         }
         Rule::dot_path => Box::new(QueryPath::from(path_segments_from_pair(pair)?)),
-        Rule::group => query_arithmetic_from_pair(pair.into_inner().next().unwrap())?,
-        Rule::query_function => query_function_from_pair(pair.into_inner().next().unwrap())?,
+        Rule::group => query_arithmetic_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?,
+        Rule::query_function => {
+            query_function_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?
+        }
         _ => unreachable!("parser should not allow other query child rules here"),
     })
 }
 
 fn if_statement_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn Function>> {
-    let query = query_arithmetic_from_pair(pairs.next().unwrap())?;
+    let query = query_arithmetic_from_pair(pairs.next().ok_or(TOKEN_ERR)?)?;
 
-    let first = statement_from_pair(pairs.next().unwrap())?;
+    let first = statement_from_pair(pairs.next().ok_or(TOKEN_ERR)?)?;
 
     let second = match pairs.next() {
         Some(pair) => statement_from_pair(pair)?,
@@ -346,14 +359,21 @@ fn statement_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
         Rule::assignment => {
             let mut inner_rules = pair.into_inner();
-            let path = target_path_from_pair(inner_rules.next().unwrap())?;
-            let query = query_arithmetic_from_pair(inner_rules.next().unwrap())?;
+            let path = target_path_from_pair(inner_rules.next().ok_or(TOKEN_ERR)?)?;
+            let query = query_arithmetic_from_pair(inner_rules.next().ok_or(TOKEN_ERR)?)?;
             Ok(Box::new(Assignment::new(path, query)))
         }
-        Rule::function => function_from_pair(pair.into_inner().next().unwrap()),
+        Rule::function => function_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?),
         Rule::if_statement => if_statement_from_pairs(pair.into_inner()),
         _ => unreachable!("parser should not allow other statement child rules here"),
     }
+}
+
+fn split_inner_rules_from_pair(pair: Pair<Rule>) -> Result<(Pair<Rule>, Pairs<Rule>)> {
+    let mut inner = pair.into_inner();
+    let first = inner.next().ok_or(TOKEN_ERR)?;
+
+    Ok((first, inner))
 }
 
 fn mapping_from_pairs(pairs: Pairs<Rule>) -> Result<Mapping> {
