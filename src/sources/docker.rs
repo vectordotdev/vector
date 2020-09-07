@@ -31,6 +31,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Duration;
 use std::{collections::HashMap, convert::TryFrom, env};
 use string_cache::DefaultAtom as Atom;
 use tokio::sync::mpsc;
@@ -367,7 +368,7 @@ impl DockerSource {
                 }
 
                 let id = ContainerId::new(id);
-                self.containers.insert(id.clone(), self.esb.start(id));
+                self.containers.insert(id.clone(), self.esb.start(id, None));
             });
 
         Ok(self)
@@ -379,8 +380,8 @@ impl DockerSource {
                 value = self.main_recv.next() => {
                     match value {
                         Some(message) => {
-                            match message{
-                                Ok(info)=> {
+                            match message {
+                                Ok(info) => {
                                     let state = self
                                         .containers
                                         .get_mut(&info.id)
@@ -389,13 +390,13 @@ impl DockerSource {
                                         self.esb.restart(state);
                                     }
                                 },
-                                Err(id)=> {
+                                Err(id) => {
                                     let state = self
                                         .containers
                                         .remove(&id)
                                         .expect("Every started ContainerId has it's ContainerState");
-                                    if state.is_running(){
-                                        self.containers.insert(id.clone(), self.esb.start(id));
+                                    if state.is_running() {
+                                        self.containers.insert(id.clone(), self.esb.start(id, Some(Duration::from_secs(5))));
                                     }
                                 }
                             }
@@ -443,7 +444,7 @@ impl DockerSource {
                                         );
 
                                         if include_name && self_check {
-                                            self.containers.insert(id.clone(), self.esb.start(id));
+                                            self.containers.insert(id.clone(), self.esb.start(id, None));
                                         }
                                     }
                                 }
@@ -499,10 +500,13 @@ struct EventStreamBuilder {
 }
 
 impl EventStreamBuilder {
-    /// Constructs and runs event stream until shutdown.
-    fn start(&self, id: ContainerId) -> ContainerState {
+    /// Spawn a task to runs event stream until shutdown.
+    fn start(&self, id: ContainerId, backoff: Option<Duration>) -> ContainerState {
         let this = self.clone();
         tokio::spawn(async move {
+            if let Some(duration) = backoff {
+                tokio::time::delay_for(duration).await;
+            }
             match this
                 .core
                 .docker
@@ -512,7 +516,7 @@ impl EventStreamBuilder {
                 Ok(details) => match ContainerMetadata::from_details(details) {
                     Ok(metadata) => {
                         let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
-                        this.start_event_stream(info).await;
+                        this.run_event_stream(info).await;
                         return;
                     }
                     Err(error) => emit!(DockerTimestampParseFailed {
@@ -538,11 +542,11 @@ impl EventStreamBuilder {
     fn restart(&self, container: &mut ContainerState) {
         if let Some(info) = container.take_info() {
             let this = self.clone();
-            tokio::spawn(async move { this.start_event_stream(info).await });
+            tokio::spawn(async move { this.run_event_stream(info).await });
         }
     }
 
-    async fn start_event_stream(&self, mut info: ContainerLogInfo) {
+    async fn run_event_stream(&self, mut info: ContainerLogInfo) {
         // Establish connection
         let options = Some(LogsOptions::<String> {
             follow: true,
@@ -605,10 +609,9 @@ impl EventStreamBuilder {
                 Box::new(events_stream)
             };
 
-        events_stream
+        let result = events_stream
             .map(Ok)
             .forward(self.out.clone().sink_compat().sink_map_err(|_| ()))
-            .map(|_| {})
             .await;
 
         // End of stream
@@ -616,7 +619,11 @@ impl EventStreamBuilder {
             container_id: info.id.as_str()
         });
 
-        if let Err(error) = self.main_send.send(Ok(info)) {
+        let result = match result {
+            Ok(()) => Ok(info),
+            Err(()) => Err(info.id),
+        };
+        if let Err(error) = self.main_send.send(result) {
             error!(message = "unable to return ContainerLogInfo to main.", %error);
         }
     }
