@@ -17,7 +17,7 @@ mod dnstap_proto {
 
 use dnstap_proto::{
     dnstap::Type as DnstapDataType, message::Type as DnstapMessageType, Dnstap,
-    Message as DnstapMessage,
+    Message as DnstapMessage, SocketFamily, SocketProtocol,
 };
 
 use super::dns_message::{
@@ -48,12 +48,12 @@ impl<'a> DnstapParser<'a> {
         }
     }
 
-    fn insert<V>(&mut self, key: &String, value: V) -> Option<Value>
+    fn insert<V>(&mut self, key: &'static str, value: V) -> Option<Value>
     where
         V: Into<Value>,
     {
         let mut node_path = self.parent_key_path.clone();
-        node_path.push(PathComponent::Key(key.clone()));
+        node_path.push(PathComponent::Key(String::from(key)));
         self.log_event.insert_path(node_path, value)
     }
 
@@ -63,50 +63,58 @@ impl<'a> DnstapParser<'a> {
 
         if let Some(server_id) = proto_msg.identity {
             self.insert(
-                &self.event_schema.dnstap_root_data_schema.server_identity,
+                self.event_schema.dnstap_root_data_schema.server_identity,
                 String::from_utf8(server_id).unwrap_or_default(),
             );
         }
 
         if let Some(version) = proto_msg.version {
             self.insert(
-                &self.event_schema.dnstap_root_data_schema.server_version,
+                self.event_schema.dnstap_root_data_schema.server_version,
                 String::from_utf8(version).unwrap_or_default(),
             );
         }
 
         if let Some(extra) = proto_msg.extra {
             self.insert(
-                &self.event_schema.dnstap_root_data_schema.extra,
+                self.event_schema.dnstap_root_data_schema.extra,
                 String::from_utf8(extra).unwrap_or_default(),
             );
         }
 
-        let dnstap_data_type: i32 = proto_msg.r#type;
-        // the raw value is reserved intentionally to ensure forward-compatibility
+        let dnstap_data_type_id: i32 = proto_msg.r#type;
         let mut need_raw_data = false;
         self.insert(
-            &self.event_schema.dnstap_root_data_schema.data_type,
-            dnstap_data_type,
+            self.event_schema.dnstap_root_data_schema.data_type_id,
+            dnstap_data_type_id,
         );
-        if dnstap_data_type == DnstapDataType::Message as i32 {
-            if let Some(message) = proto_msg.message {
-                if let Err(err) = self.parse_dnstap_message(message) {
-                    error!(target: "dnstap event", "failed to parse dnstap message: {}", err.to_string());
-                    need_raw_data = true;
-                    self.insert(
-                        &self.event_schema.dnstap_root_data_schema.error,
-                        err.to_string(),
-                    );
+
+        if let Some(dnstap_data_type) = to_dnstap_data_type(dnstap_data_type_id) {
+            self.insert(
+                self.event_schema.dnstap_root_data_schema.data_type,
+                format!("{:?}", dnstap_data_type),
+            );
+
+            if dnstap_data_type == DnstapDataType::Message {
+                if let Some(message) = proto_msg.message {
+                    if let Err(err) = self.parse_dnstap_message(message) {
+                        error!(target: "dnstap event", "failed to parse dnstap message: {}", err.to_string());
+                        need_raw_data = true;
+                        self.insert(
+                            self.event_schema.dnstap_root_data_schema.error,
+                            err.to_string(),
+                        );
+                    }
                 }
             }
         } else {
+            error!(target: "dnstap event", "Unknown dnstap data type: {}", dnstap_data_type_id);
             need_raw_data = true;
         }
 
         if need_raw_data {
             self.insert(
-                &self.event_schema.dnstap_root_data_schema.raw_data,
+                self.event_schema.dnstap_root_data_schema.raw_data,
                 base64::encode(&frame.to_vec()),
             );
         }
@@ -116,17 +124,15 @@ impl<'a> DnstapParser<'a> {
 
     fn parse_dnstap_message(&mut self, dnstap_message: DnstapMessage) -> Result<()> {
         if let Some(socket_family) = dnstap_message.socket_family {
-            // the raw value is reserved intentionally to ensure forward-compatibility
             self.insert(
-                &self.event_schema.dnstap_message_schema.socket_family,
-                socket_family,
+                self.event_schema.dnstap_message_schema.socket_family,
+                to_socket_family_name(socket_family)?,
             );
 
             if let Some(socket_protocol) = dnstap_message.socket_protocol {
-                // the raw value is reserved intentionally to ensure forward-compatibility
                 self.insert(
-                    &self.event_schema.dnstap_message_schema.socket_protocol,
-                    socket_protocol,
+                    self.event_schema.dnstap_message_schema.socket_protocol,
+                    to_socket_protocol_name(socket_protocol)?,
                 );
             }
 
@@ -140,14 +146,14 @@ impl<'a> DnstapParser<'a> {
                 };
 
                 self.insert(
-                    &self.event_schema.dnstap_message_schema.query_address,
+                    self.event_schema.dnstap_message_schema.query_address,
                     source_address.to_string(),
                 );
             }
 
             if let Some(query_port) = dnstap_message.query_port {
                 self.insert(
-                    &self.event_schema.dnstap_message_schema.query_port,
+                    self.event_schema.dnstap_message_schema.query_port,
                     query_port as i64,
                 );
             }
@@ -162,14 +168,14 @@ impl<'a> DnstapParser<'a> {
                 };
 
                 self.insert(
-                    &self.event_schema.dnstap_message_schema.response_address,
+                    self.event_schema.dnstap_message_schema.response_address,
                     response_addr.to_string(),
                 );
             }
 
             if let Some(response_port) = dnstap_message.response_port {
                 self.insert(
-                    &self.event_schema.dnstap_message_schema.response_port,
+                    self.event_schema.dnstap_message_schema.response_port,
                     response_port as i64,
                 );
             }
@@ -180,7 +186,7 @@ impl<'a> DnstapParser<'a> {
             match Name::read(&mut decoder) {
                 Ok(raw_data) => {
                     self.insert(
-                        &self.event_schema.dnstap_message_schema.query_zone,
+                        self.event_schema.dnstap_message_schema.query_zone,
                         raw_data.to_utf8(),
                     );
                 }
@@ -188,7 +194,6 @@ impl<'a> DnstapParser<'a> {
             }
         }
 
-        // the raw value is reserved intentionally to ensure forward-compatibility
         let dnstap_message_type_id = dnstap_message.r#type;
         self.insert(
             &self
@@ -198,33 +203,20 @@ impl<'a> DnstapParser<'a> {
             dnstap_message_type_id as i64,
         );
 
-        if let Some(dnstap_message_type) = to_dnstap_message_type(dnstap_message_type_id) {
-            self.insert(
-                &self.event_schema.dnstap_message_schema.dnstap_message_type,
-                format!("{:?}", dnstap_message_type),
-            );
-        }
+        self.insert(
+            self.event_schema.dnstap_message_schema.dnstap_message_type,
+            format!("{:?}", to_dnstap_message_type(dnstap_message_type_id)?),
+        );
 
-        let query_message_key = self
+        let request_message_key = self
             .event_schema
             .dnstap_message_schema
-            .query_message
+            .request_message
             .to_string();
         let response_message_key = self
             .event_schema
             .dnstap_message_schema
             .response_message
-            .to_string();
-
-        let update_request_message_key = self
-            .event_schema
-            .dnstap_message_schema
-            .update_request_message
-            .to_string();
-        let update_response_message_key = self
-            .event_schema
-            .dnstap_message_schema
-            .update_response_message
             .to_string();
 
         if let Some(query_time_sec) = dnstap_message.query_time_sec {
@@ -236,32 +228,27 @@ impl<'a> DnstapParser<'a> {
 
             if [1, 3, 5, 7, 9, 11, 13].contains(&dnstap_message_type_id) {
                 self.log_timestamp(
-                    &self.event_schema.dnstap_root_data_schema.timestamp,
+                    self.event_schema.dnstap_root_data_schema.timestamp,
                     timestamp_nanosec,
-                    &self.event_schema.dnstap_root_data_schema.time_precision,
+                    self.event_schema.dnstap_root_data_schema.time_precision,
                     "ns",
                 );
             }
 
             if dnstap_message.query_message != None {
-                if dnstap_message_type_id <= 12 {
-                    self.parent_key_path
-                        .push(PathComponent::Key(query_message_key.clone()));
-                } else {
-                    self.parent_key_path
-                        .push(PathComponent::Key(update_request_message_key.clone()));
-                };
+                self.parent_key_path
+                    .push(PathComponent::Key(request_message_key.clone()));
 
                 let timestamp_key_name = if dnstap_message_type_id <= 12 {
-                    &self.event_schema.dns_query_message_schema.timestamp
+                    self.event_schema.dns_query_message_schema.timestamp
                 } else {
-                    &self.event_schema.dns_update_message_schema.timestamp
+                    self.event_schema.dns_update_message_schema.timestamp
                 };
 
                 let time_precision_key_name = if dnstap_message_type_id <= 12 {
-                    &self.event_schema.dns_query_message_schema.time_precision
+                    self.event_schema.dns_query_message_schema.time_precision
                 } else {
-                    &self.event_schema.dns_update_message_schema.time_precision
+                    self.event_schema.dns_update_message_schema.time_precision
                 };
 
                 self.log_timestamp(
@@ -284,32 +271,27 @@ impl<'a> DnstapParser<'a> {
 
             if [2, 4, 6, 8, 10, 12, 14].contains(&dnstap_message_type_id) {
                 self.log_timestamp(
-                    &self.event_schema.dnstap_root_data_schema.timestamp,
+                    self.event_schema.dnstap_root_data_schema.timestamp,
                     timestamp_nanosec,
-                    &self.event_schema.dnstap_root_data_schema.time_precision,
+                    self.event_schema.dnstap_root_data_schema.time_precision,
                     "ns",
                 );
             }
 
             if dnstap_message.response_message != None {
-                if dnstap_message_type_id <= 12 {
-                    self.parent_key_path
-                        .push(PathComponent::Key(response_message_key.clone()));
-                } else {
-                    self.parent_key_path
-                        .push(PathComponent::Key(update_response_message_key.clone()));
-                };
+                self.parent_key_path
+                    .push(PathComponent::Key(response_message_key.clone()));
 
                 let timestamp_key_name = if dnstap_message_type_id <= 12 {
-                    &self.event_schema.dns_query_message_schema.timestamp
+                    self.event_schema.dns_query_message_schema.timestamp
                 } else {
-                    &self.event_schema.dns_update_message_schema.timestamp
+                    self.event_schema.dns_update_message_schema.timestamp
                 };
 
                 let time_precision_key_name = if dnstap_message_type_id <= 12 {
-                    &self.event_schema.dns_query_message_schema.time_precision
+                    self.event_schema.dns_query_message_schema.time_precision
                 } else {
-                    &self.event_schema.dns_update_message_schema.time_precision
+                    self.event_schema.dns_update_message_schema.time_precision
                 };
 
                 self.log_timestamp(
@@ -328,10 +310,10 @@ impl<'a> DnstapParser<'a> {
                 if let Some(query_message) = dnstap_message.query_message {
                     let mut query_message_parser = DnsMessageParser::new(query_message);
                     if let Err(error) =
-                        self.parse_dns_query_message(&query_message_key, &mut query_message_parser)
+                        self.parse_dns_query_message(&request_message_key, &mut query_message_parser)
                     {
                         self.log_raw_dns_message(
-                            &query_message_key,
+                            &request_message_key,
                             query_message_parser.raw_message(),
                         );
 
@@ -359,11 +341,11 @@ impl<'a> DnstapParser<'a> {
                     let mut update_request_message_parser =
                         DnsMessageParser::new(update_request_message);
                     if let Err(error) = self.parse_dns_update_message(
-                        &update_request_message_key,
+                        &request_message_key,
                         &mut update_request_message_parser,
                     ) {
                         self.log_raw_dns_message(
-                            &update_request_message_key,
+                            &request_message_key,
                             update_request_message_parser.raw_message(),
                         );
 
@@ -375,11 +357,11 @@ impl<'a> DnstapParser<'a> {
                     let mut update_response_message_parser =
                         DnsMessageParser::new(udpate_response_message);
                     if let Err(error) = self.parse_dns_update_message(
-                        &update_response_message_key,
+                        &response_message_key,
                         &mut update_response_message_parser,
                     ) {
                         self.log_raw_dns_message(
-                            &update_response_message_key,
+                            &response_message_key,
                             update_response_message_parser.raw_message(),
                         );
 
@@ -401,14 +383,14 @@ impl<'a> DnstapParser<'a> {
 
     fn log_timestamp(
         &mut self,
-        timestamp_key: &str,
+        timestamp_key: &'static str,
         timestamp: i64,
-        time_precision_key: &str,
+        time_precision_key: &'static str,
         time_precision: &str,
     ) {
-        self.insert(&String::from(timestamp_key), timestamp);
+        self.insert(timestamp_key, timestamp);
 
-        self.insert(&String::from(time_precision_key), time_precision);
+        self.insert(time_precision_key, time_precision);
     }
 
     fn log_raw_dns_message(&mut self, key_prefix: &str, raw_dns_message: &[u8]) {
@@ -416,7 +398,7 @@ impl<'a> DnstapParser<'a> {
             .push(PathComponent::Key(String::from(key_prefix)));
 
         self.insert(
-            &self.event_schema.dns_query_message_schema.raw_data,
+            self.event_schema.dns_query_message_schema.raw_data,
             base64::encode(raw_dns_message),
         );
 
@@ -434,34 +416,34 @@ impl<'a> DnstapParser<'a> {
             .push(PathComponent::Key(String::from(key_prefix)));
 
         self.insert(
-            &self.event_schema.dns_query_message_schema.response_code,
+            self.event_schema.dns_query_message_schema.response_code,
             msg.response_code as i64,
         );
 
         if let Some(response) = msg.response {
             self.insert(
-                &self.event_schema.dns_query_message_schema.response,
+                self.event_schema.dns_query_message_schema.response,
                 response,
             );
         }
 
         self.log_dns_query_message_header(
-            &self.event_schema.dns_query_message_schema.header,
+            self.event_schema.dns_query_message_schema.header,
             &msg.header,
         );
 
         self.log_dns_query_message_query_section(
-            &self.event_schema.dns_query_message_schema.question_section,
+            self.event_schema.dns_query_message_schema.question_section,
             &msg.question_section,
         );
 
         self.log_dns_message_record_section(
-            &self.event_schema.dns_query_message_schema.answer_section,
+            self.event_schema.dns_query_message_schema.answer_section,
             &msg.answer_section,
         );
 
         self.log_dns_message_record_section(
-            &self.event_schema.dns_query_message_schema.authority_section,
+            self.event_schema.dns_query_message_schema.authority_section,
             &msg.authority_section,
         );
 
@@ -490,72 +472,72 @@ impl<'a> DnstapParser<'a> {
             .push(PathComponent::Key(String::from(parent_key)));
 
         self.insert(
-            &self.event_schema.dns_query_header_schema.id,
+            self.event_schema.dns_query_header_schema.id,
             header.id as i64,
         );
 
         self.insert(
-            &self.event_schema.dns_query_header_schema.opcode,
+            self.event_schema.dns_query_header_schema.opcode,
             header.opcode as i64,
         );
 
         self.insert(
-            &self.event_schema.dns_query_header_schema.rcode,
+            self.event_schema.dns_query_header_schema.rcode,
             header.rcode as i64,
         );
 
         self.insert(
-            &self.event_schema.dns_query_header_schema.qr,
+            self.event_schema.dns_query_header_schema.qr,
             header.qr as i64,
         );
 
         self.insert(
-            &self.event_schema.dns_query_header_schema.aa,
+            self.event_schema.dns_query_header_schema.aa,
             header.aa as bool,
         );
 
         self.insert(
-            &self.event_schema.dns_query_header_schema.tc,
+            self.event_schema.dns_query_header_schema.tc,
             header.tc as bool,
         );
 
         self.insert(
-            &self.event_schema.dns_query_header_schema.rd,
+            self.event_schema.dns_query_header_schema.rd,
             header.rd as bool,
         );
 
         self.insert(
-            &self.event_schema.dns_query_header_schema.ra,
+            self.event_schema.dns_query_header_schema.ra,
             header.ra as bool,
         );
 
         self.insert(
-            &self.event_schema.dns_query_header_schema.ad,
+            self.event_schema.dns_query_header_schema.ad,
             header.ad as bool,
         );
 
         self.insert(
-            &self.event_schema.dns_query_header_schema.cd,
+            self.event_schema.dns_query_header_schema.cd,
             header.cd as bool,
         );
 
         self.insert(
-            &self.event_schema.dns_query_header_schema.question_count,
+            self.event_schema.dns_query_header_schema.question_count,
             header.question_count as i64,
         );
 
         self.insert(
-            &self.event_schema.dns_query_header_schema.answer_count,
+            self.event_schema.dns_query_header_schema.answer_count,
             header.answer_count as i64,
         );
 
         self.insert(
-            &self.event_schema.dns_query_header_schema.authority_count,
+            self.event_schema.dns_query_header_schema.authority_count,
             header.authority_count as i64,
         );
 
         self.insert(
-            &self.event_schema.dns_query_header_schema.additional_count,
+            self.event_schema.dns_query_header_schema.additional_count,
             header.additional_count as i64,
         );
 
@@ -577,21 +559,21 @@ impl<'a> DnstapParser<'a> {
 
     fn log_dns_query_question(&mut self, question: &QueryQuestion) {
         self.insert(
-            &self.event_schema.dns_record_schema.name,
+            self.event_schema.dns_query_question_schema.name,
             question.name.clone(),
         );
         if let Some(record_type) = question.record_type.clone() {
             self.insert(
-                &self.event_schema.dns_record_schema.record_type,
+                self.event_schema.dns_query_question_schema.question_type,
                 record_type,
             );
         }
         self.insert(
-            &self.event_schema.dns_record_schema.record_type_id,
+            self.event_schema.dns_query_question_schema.question_type_id,
             question.record_type_id as i64,
         );
         self.insert(
-            &self.event_schema.dns_record_schema.class,
+            self.event_schema.dns_query_question_schema.class,
             question.class.clone(),
         );
     }
@@ -607,24 +589,24 @@ impl<'a> DnstapParser<'a> {
             .push(PathComponent::Key(String::from(key_prefix)));
 
         self.insert(
-            &self.event_schema.dns_update_message_schema.response_code,
+            self.event_schema.dns_update_message_schema.response_code,
             msg.response_code as i64,
         );
 
         if let Some(response) = msg.response {
             self.insert(
-                &self.event_schema.dns_update_message_schema.response,
+                self.event_schema.dns_update_message_schema.response,
                 response,
             );
         }
 
         self.log_dns_update_message_header(
-            &self.event_schema.dns_update_message_schema.header,
+            self.event_schema.dns_update_message_schema.header,
             &msg.header,
         );
 
         self.log_dns_update_message_zone_section(
-            &self.event_schema.dns_update_message_schema.zone_section,
+            self.event_schema.dns_update_message_schema.zone_section,
             &msg.zone_to_update,
         );
 
@@ -637,7 +619,7 @@ impl<'a> DnstapParser<'a> {
         );
 
         self.log_dns_message_record_section(
-            &self.event_schema.dns_update_message_schema.update_section,
+            self.event_schema.dns_update_message_schema.update_section,
             &msg.update_section,
         );
 
@@ -649,14 +631,6 @@ impl<'a> DnstapParser<'a> {
             &msg.additional_section,
         );
 
-        self.log_edns(
-            &self
-                .event_schema
-                .dns_update_message_schema
-                .opt_pseudo_section,
-            &msg.opt_pserdo_section,
-        );
-
         self.parent_key_path.pop();
         Ok(())
     }
@@ -666,45 +640,44 @@ impl<'a> DnstapParser<'a> {
             .push(PathComponent::Key(String::from(key_prefix)));
 
         self.insert(
-            &self.event_schema.dns_update_header_schema.id,
+            self.event_schema.dns_update_header_schema.id,
             header.id as i64,
         );
 
         self.insert(
-            &self.event_schema.dns_update_header_schema.opcode,
+            self.event_schema.dns_update_header_schema.opcode,
             header.opcode as i64,
         );
 
         self.insert(
-            &self.event_schema.dns_update_header_schema.rcode,
+            self.event_schema.dns_update_header_schema.rcode,
             header.rcode as i64,
         );
 
         self.insert(
-            &self.event_schema.dns_update_header_schema.qr,
+            self.event_schema.dns_update_header_schema.qr,
             header.qr as i64,
         );
 
         self.insert(
-            &self.event_schema.dns_update_header_schema.zone_count,
+            self.event_schema.dns_update_header_schema.zone_count,
             header.zone_count as i64,
         );
 
         self.insert(
-            &self
-                .event_schema
+            self.event_schema
                 .dns_update_header_schema
                 .prerequisite_count,
             header.prerequisite_count as i64,
         );
 
         self.insert(
-            &self.event_schema.dns_update_header_schema.udpate_count,
+            self.event_schema.dns_update_header_schema.udpate_count,
             header.update_count as i64,
         );
 
         self.insert(
-            &self.event_schema.dns_update_header_schema.additional_count,
+            self.event_schema.dns_update_header_schema.additional_count,
             header.additional_count as i64,
         );
 
@@ -715,16 +688,22 @@ impl<'a> DnstapParser<'a> {
         self.parent_key_path
             .push(PathComponent::Key(String::from(key_path)));
 
-        self.insert(&self.event_schema.dns_record_schema.name, zone.name.clone());
+        self.insert(
+            self.event_schema.dns_update_zone_info_schema.zone_name,
+            zone.name.clone(),
+        );
         if let Some(zone_type) = zone.zone_type.clone() {
-            self.insert(&self.event_schema.dns_record_schema.record_type, zone_type);
+            self.insert(
+                self.event_schema.dns_update_zone_info_schema.zone_type,
+                zone_type,
+            );
         }
         self.insert(
-            &self.event_schema.dns_record_schema.record_type_id,
+            self.event_schema.dns_update_zone_info_schema.zone_type_id,
             zone.zone_type_id as i64,
         );
         self.insert(
-            &self.event_schema.dns_record_schema.class,
+            self.event_schema.dns_update_zone_info_schema.zone_class,
             zone.class.clone(),
         );
 
@@ -737,36 +716,31 @@ impl<'a> DnstapParser<'a> {
 
         if let Some(edns) = opt_section {
             self.insert(
-                &self
-                    .event_schema
+                self.event_schema
                     .dns_message_opt_pseudo_section_schema
                     .extended_rcode,
                 edns.extended_rcode as i64,
             );
             self.insert(
-                &self
-                    .event_schema
+                self.event_schema
                     .dns_message_opt_pseudo_section_schema
                     .version,
                 edns.version as i64,
             );
             self.insert(
-                &self
-                    .event_schema
+                self.event_schema
                     .dns_message_opt_pseudo_section_schema
                     .do_flag,
                 edns.dnssec_ok as bool,
             );
             self.insert(
-                &self
-                    .event_schema
+                self.event_schema
                     .dns_message_opt_pseudo_section_schema
                     .udp_max_payload_size,
                 edns.udp_max_payload_size as i64,
             );
             self.log_edns_options(
-                &self
-                    .event_schema
+                self.event_schema
                     .dns_message_opt_pseudo_section_schema
                     .options,
                 &edns.options,
@@ -791,15 +765,15 @@ impl<'a> DnstapParser<'a> {
 
     fn log_edns_opt(&mut self, opt: &EdnsOptionEntry) {
         self.insert(
-            &self.event_schema.dns_message_option_schema.opt_code,
+            self.event_schema.dns_message_option_schema.opt_code,
             opt.opt_code as i64,
         );
         self.insert(
-            &self.event_schema.dns_message_option_schema.opt_name,
+            self.event_schema.dns_message_option_schema.opt_name,
             opt.opt_name.clone(),
         );
         self.insert(
-            &self.event_schema.dns_message_option_schema.opt_data,
+            self.event_schema.dns_message_option_schema.opt_data,
             opt.opt_data.clone(),
         );
     }
@@ -819,53 +793,86 @@ impl<'a> DnstapParser<'a> {
 
     fn log_dns_record(&mut self, record: &DnsRecord) {
         self.insert(
-            &self.event_schema.dns_record_schema.name,
+            self.event_schema.dns_record_schema.name,
             record.name.clone(),
         );
         if let Some(record_type) = record.record_type.clone() {
-            self.insert(
-                &self.event_schema.dns_record_schema.record_type,
-                record_type,
-            );
+            self.insert(self.event_schema.dns_record_schema.record_type, record_type);
         }
         self.insert(
-            &self.event_schema.dns_record_schema.record_type_id,
+            self.event_schema.dns_record_schema.record_type_id,
             record.record_type_id as i64,
         );
-        self.insert(&self.event_schema.dns_record_schema.ttl, record.ttl as i64);
+        self.insert(self.event_schema.dns_record_schema.ttl, record.ttl as i64);
         self.insert(
-            &self.event_schema.dns_record_schema.class,
+            self.event_schema.dns_record_schema.class,
             record.class.clone(),
         );
         if let Some(rdata) = &record.rdata {
-            self.insert(&self.event_schema.dns_record_schema.rdata, rdata);
+            self.insert(self.event_schema.dns_record_schema.rdata, rdata);
         };
         if let Some(rdata_bytes) = &record.rdata_bytes {
             self.insert(
-                &self.event_schema.dns_record_schema.rdata,
+                self.event_schema.dns_record_schema.rdata_bytes,
                 base64::encode(rdata_bytes),
             );
         };
     }
 }
 
-fn to_dnstap_message_type(type_id: i32) -> Option<DnstapMessageType> {
-    match type_id {
-        1 => Some(DnstapMessageType::AuthQuery),
-        2 => Some(DnstapMessageType::AuthResponse),
-        3 => Some(DnstapMessageType::ResolverQuery),
-        4 => Some(DnstapMessageType::ResolverResponse),
-        5 => Some(DnstapMessageType::ClientQuery),
-        6 => Some(DnstapMessageType::ClientResponse),
-        7 => Some(DnstapMessageType::ForwarderQuery),
-        8 => Some(DnstapMessageType::ForwarderResponse),
-        9 => Some(DnstapMessageType::StubQuery),
-        10 => Some(DnstapMessageType::StubResponse),
-        11 => Some(DnstapMessageType::ToolQuery),
-        12 => Some(DnstapMessageType::ToolResponse),
-        13 => Some(DnstapMessageType::UpdateQuery),
-        14 => Some(DnstapMessageType::UpdateResponse),
+fn to_socket_family_name(socket_family: i32) -> Result<&'static str> {
+    if socket_family == SocketFamily::Inet as i32 {
+        Ok("INET")
+    } else if socket_family == SocketFamily::Inet6 as i32 {
+        Ok("INET6")
+    } else {
+        Err(Error::from(format!(
+            "Unknown socket family: {}",
+            socket_family
+        )))
+    }
+}
+
+fn to_socket_protocol_name(socket_protocol: i32) -> Result<&'static str> {
+    if socket_protocol == SocketProtocol::Udp as i32 {
+        Ok("UDP")
+    } else if socket_protocol == SocketProtocol::Tcp as i32 {
+        Ok("TCP")
+    } else {
+        Err(Error::from(format!(
+            "Unknown socket protocol: {}",
+            socket_protocol
+        )))
+    }
+}
+
+fn to_dnstap_data_type(data_type_id: i32) -> Option<DnstapDataType> {
+    match data_type_id {
+        1 => Some(DnstapDataType::Message),
         _ => None,
+    }
+}
+
+fn to_dnstap_message_type(type_id: i32) -> Result<DnstapMessageType> {
+    match type_id {
+        1 => Ok(DnstapMessageType::AuthQuery),
+        2 => Ok(DnstapMessageType::AuthResponse),
+        3 => Ok(DnstapMessageType::ResolverQuery),
+        4 => Ok(DnstapMessageType::ResolverResponse),
+        5 => Ok(DnstapMessageType::ClientQuery),
+        6 => Ok(DnstapMessageType::ClientResponse),
+        7 => Ok(DnstapMessageType::ForwarderQuery),
+        8 => Ok(DnstapMessageType::ForwarderResponse),
+        9 => Ok(DnstapMessageType::StubQuery),
+        10 => Ok(DnstapMessageType::StubResponse),
+        11 => Ok(DnstapMessageType::ToolQuery),
+        12 => Ok(DnstapMessageType::ToolResponse),
+        13 => Ok(DnstapMessageType::UpdateQuery),
+        14 => Ok(DnstapMessageType::UpdateResponse),
+        _ => Err(Error::from(format!(
+            "Unknown dnstap message type: {}",
+            type_id
+        ))),
     }
 }
 
@@ -972,6 +979,20 @@ mod tests {
         } else {
             error!("Expected TrustDnsError");
         }
+    }
+
+    #[test]
+    fn test_get_socket_family_name() {
+        assert_eq!("INET", to_socket_family_name(1).unwrap());
+        assert_eq!("INET6", to_socket_family_name(2).unwrap());
+        assert!(to_socket_family_name(3).is_err());
+    }
+
+    #[test]
+    fn test_get_socket_protocol_name() {
+        assert_eq!("UDP", to_socket_protocol_name(1).unwrap());
+        assert_eq!("TCP", to_socket_protocol_name(2).unwrap());
+        assert!(to_socket_protocol_name(3).is_err());
     }
 
     #[test]

@@ -100,7 +100,6 @@ pub struct DnsUpdateMessage {
     pub prerequisite_section: Vec<DnsRecord>,
     pub update_section: Vec<DnsRecord>,
     pub additional_section: Vec<DnsRecord>,
-    pub opt_pserdo_section: Option<OptPseudoSection>,
 }
 
 impl DnsUpdateMessage {
@@ -112,7 +111,6 @@ impl DnsUpdateMessage {
         prerequisite_section: Vec<DnsRecord>,
         update_section: Vec<DnsRecord>,
         additional_section: Vec<DnsRecord>,
-        opt_pserdo_section: Option<OptPseudoSection>,
     ) -> Self {
         Self {
             response_code,
@@ -122,7 +120,6 @@ impl DnsUpdateMessage {
             prerequisite_section,
             update_section,
             additional_section,
-            opt_pserdo_section,
         }
     }
 }

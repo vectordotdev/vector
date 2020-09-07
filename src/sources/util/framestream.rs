@@ -357,8 +357,7 @@ pub trait FrameHandler {
  * Functions similarly, but uses the FrameStreamReader to deal with
  * framestream control packets, and responds appropriately.
  **/
-pub fn 
-build_framestream_unix_source(
+pub fn build_framestream_unix_source(
     frame_handler: impl FrameHandler + Send + Sync + Clone + 'static,
     shutdown: ShutdownSignal,
     out: Pipeline,
@@ -661,7 +660,7 @@ mod test {
         let join_handle = tokio::spawn(server);
 
         // Wait for server to accept traffic
-        while let Err(_) = std::os::unix::net::UnixStream::connect(&socket_path) {
+        while std::os::unix::net::UnixStream::connect(&socket_path).is_err() {
             thread::sleep(Duration::from_millis(2));
         }
 
@@ -969,12 +968,12 @@ mod test {
     async fn test_spawn_event_handling_tasks() {
         let max_frame_handling_tasks = 100;
         let task_counter = Arc::new(AtomicI32::new(0));
-        let task_counter_copy = task_counter.clone();
+        let task_counter_copy = Arc::clone(&task_counter);
         let max_task_counter_value = Arc::new(Mutex::new(0));
-        let max_task_counter_value_copy = max_task_counter_value.clone();
+        let max_task_counter_value_copy = Arc::clone(&max_task_counter_value);
 
         let mut handles = vec![];
-        let task_counter_copy_2 = task_counter_copy.clone();
+        let task_counter_copy_2 = Arc::clone(&task_counter_copy);
         let mock_event_handler = move || {
             info!("{}", "mock event handler");
             let current_task_counter = task_counter_copy_2.load(Ordering::Relaxed);
@@ -987,7 +986,7 @@ mod test {
         for _ in 0..max_frame_handling_tasks * 10 {
             handles.push(spawn_event_handling_tasks(
                 mock_event_handler.clone(),
-                task_counter_copy.clone(),
+                Arc::clone(&task_counter_copy),
                 max_frame_handling_tasks,
             ));
         }

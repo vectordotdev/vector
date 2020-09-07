@@ -84,15 +84,7 @@ impl DnsMessageParser {
         match TrustDnsMessage::from_vec(&self.raw_message) {
             Ok(msg) => {
                 let header = parse_dns_update_message_header(&msg);
-                let edns_section = parse_edns(&msg);
-                let rcode_high = if let Some(edns) = edns_section.clone() {
-                    edns.extended_rcode
-                } else {
-                    0
-                };
-                let response_code =
-                    (u16::from(rcode_high) << 4) | ((u16::from(header.rcode)) & 0x000F);
-
+                let response_code = (u16::from(header.rcode)) & 0x000F;
                 Ok(DnsUpdateMessage::new(
                     response_code,
                     parse_response_code(response_code),
@@ -101,7 +93,6 @@ impl DnsMessageParser {
                     self.parse_dns_message_section(msg.answers())?,
                     self.parse_dns_message_section(&msg.name_servers())?,
                     self.parse_dns_message_section(&msg.additionals())?,
-                    edns_section,
                 ))
             }
             Err(e) => Err(DnsMessageParserError::TrustDnsError { failure_source: e }),
@@ -946,7 +937,7 @@ fn parse_response_code(rcode: u16) -> Option<&'static str> {
 fn parse_dns_query_message_header(dns_message: &TrustDnsMessage) -> QueryHeader {
     QueryHeader::new(
         dns_message.header().id(),
-        dns_message.header().op_code() as u8,
+        dns_message.header().op_code().into(),
         dns_message.header().response_code(),
         dns_message.header().message_type() as u8,
         dns_message.header().authoritative(),
@@ -965,7 +956,7 @@ fn parse_dns_query_message_header(dns_message: &TrustDnsMessage) -> QueryHeader 
 fn parse_dns_update_message_header(dns_message: &TrustDnsMessage) -> UpdateHeader {
     UpdateHeader::new(
         dns_message.header().id(),
-        dns_message.header().op_code() as u8,
+        dns_message.header().op_code().into(),
         dns_message.header().response_code(),
         dns_message.header().message_type() as u8,
         dns_message.header().query_count(),
@@ -1046,7 +1037,7 @@ fn parse_loc_rdata_size(data: u8) -> Result<f64, DnsMessageParserError> {
 }
 
 fn parse_loc_rdata_coordinates(coordinates: u32, dir: &str) -> String {
-    let degree = (coordinates as i64 - 0x8000_0000) as f64 /3_600_000.00;
+    let degree = (coordinates as i64 - 0x8000_0000) as f64 / 3_600_000.00;
     let minute = degree.fract() * 60.0;
     let second = minute.fract() * 60.0;
 
@@ -1395,7 +1386,7 @@ mod tests {
     fn test_format_bytes_as_hex_string() {
         assert_eq!(
             "01.02.03.AB.CD.EF",
-            &format_bytes_as_hex_string(&vec![1, 2, 3, 0xab, 0xcd, 0xef])
+            &format_bytes_as_hex_string(&[1, 2, 3, 0xab, 0xcd, 0xef])
         );
     }
 
