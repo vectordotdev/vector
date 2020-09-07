@@ -51,11 +51,18 @@ pub struct TcpConnector {
 #[derive(Debug, Snafu)]
 pub enum TcpError {
     #[snafu(display("Connect error: {}", source))]
-    ConnectError { source: TlsError },
+    ConnectError {
+        source: TlsError,
+    },
     #[snafu(display("Unable to resolve DNS: {}", source))]
-    DnsError { source: crate::dns::DnsError },
+    DnsError {
+        source: crate::dns::DnsError,
+    },
     #[snafu(display("No addresses returned."))]
     NoAddresses,
+    SendError {
+        source: tokio::io::Error,
+    },
 }
 
 impl TcpSinkConfig {
@@ -132,6 +139,31 @@ impl TcpConnector {
             self.resolver,
             self.tls.clone(),
         )
+        .boxed()
+    }
+}
+
+pub struct TcpService {
+    connector: TcpConnector,
+}
+
+impl tower::Service<Bytes> for TcpService {
+    type Response = ();
+    type Error = TcpError;
+    type Future = BoxFuture<'static, Result<(), Self::Error>>;
+
+    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, msg: Bytes) -> Self::Future {
+        use futures::SinkExt;
+        let connector = self.connector.clone();
+        async move {
+            let sink = connector.connect().await?;
+            sink.send(msg).await.context(SendError)?;
+            Ok(())
+        }
         .boxed()
     }
 }
