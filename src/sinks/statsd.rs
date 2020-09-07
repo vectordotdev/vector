@@ -6,14 +6,14 @@ use crate::{
     event::Event,
     sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
     sinks::util::{
-        tcp::{IntoTcpSink, TcpSinkConfig},
+        tcp::{TcpError, TcpService, TcpSinkConfig},
         udp::{IntoUdpSink, UdpBuildError, UdpSinkConfig},
     },
 };
 use futures::{future, FutureExt};
 use futures01::{stream, Sink};
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
+use snafu::{futures::TryFutureExt, Snafu};
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::task::{Context, Poll};
@@ -25,19 +25,17 @@ pub enum StatsdError {
         #[snafu(source)]
         source: UdpBuildError,
     },
-    SendError,
+    Tcp {
+        source: TcpError,
+    },
 }
 
 pub struct StatsdSvc {
     client: Client,
 }
 
-#[derive(Clone)]
 enum Client {
-    Tcp(IntoTcpSink),
-    Udp(IntoUdpSink),
-    #[cfg(unix)]
-    Unix(IntoUnixSink),
+    Tcp(TcpService),
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -53,9 +51,6 @@ pub struct StatsdSinkConfig {
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
     Tcp(TcpSinkConfig),
-    Udp(UdpSinkConfig),
-    #[cfg(unix)]
-    Unix(UnixSinkConfig),
 }
 
 inventory::submit! {
@@ -79,17 +74,8 @@ impl SinkConfig for StatsdSinkConfig {
 
         let (client, healthcheck) = match &self.mode {
             Mode::Tcp(config) => {
-                let (inner, healthcheck) = config.prepare(cx.clone())?;
-                (Client::Tcp(inner), healthcheck)
-            }
-            Mode::Udp(config) => {
-                let (inner, healthcheck) = config.prepare(cx.clone())?;
-                (Client::Udp(inner), healthcheck)
-            }
-            #[cfg(unix)]
-            Mode::Unix(config) => {
-                let (inner, healthcheck) = config.prepare()?;
-                (Client::Unix(inner), healthcheck)
+                let (service, healthcheck) = config.build_service(cx.clone())?;
+                (Client::Tcp(service), healthcheck)
             }
         };
         let service = StatsdSvc { client };
@@ -213,33 +199,20 @@ impl Service<Vec<u8>> for StatsdSvc {
     }
 
     fn call(&mut self, mut frame: Vec<u8>) -> Self::Future {
-        use futures::compat::Sink01CompatExt;
-        use futures::Sink;
-        use futures::SinkExt;
-        use std::pin::Pin;
-
-        type ByteSink = Pin<Box<dyn Sink<bytes::Bytes, Error = ()> + 'static + Send>>;
-
+        use futures::TryFutureExt;
         if let Some(b'\n') = frame.last() {
             frame.pop();
         }
-        let client = self.client.clone();
-        async move {
-            let mut sink: ByteSink = match client {
-                Client::Udp(inner) => Box::pin(inner.into_sink().context(UdpError)?.sink_compat()),
-                Client::Tcp(inner) => Box::pin(inner.into_sink().sink_compat()),
-                #[cfg(unix)]
-                Client::Unix(inner) => Box::pin(inner.into_sink().sink_compat()),
-            };
-            sink.send(frame.into())
-                .await
-                .map_err(|_| StatsdError::SendError)?;
-            Ok(())
+        match &mut self.client {
+            Client::Tcp(service) => service
+                .call(frame.into())
+                .context(Tcp)
+                .boxed(),
         }
-        .boxed()
     }
 }
 
+/*
 #[cfg(test)]
 mod test {
     use super::*;
@@ -443,3 +416,4 @@ mod test {
         );
     }
 }
+*/

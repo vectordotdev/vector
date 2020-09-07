@@ -78,10 +78,15 @@ impl TcpSinkConfig {
 
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
-        let tcp = TcpConnector::new(host, port, cx.resolver(), tls);
-        let healthcheck = Box::new(tcp.healthcheck().compat());
+        let connector = TcpConnector::new(host, port, cx.resolver(), tls);
+        let healthcheck = Box::new(connector.healthcheck().compat());
 
-        Ok((tcp, healthcheck))
+        Ok((connector, healthcheck))
+    }
+
+    pub fn build_service(&self, cx: SinkContext) -> crate::Result<(TcpService, Healthcheck)> {
+        let (connector, healthcheck) = self.prepare(cx.clone())?;
+        Ok((connector.into_service(), healthcheck))
     }
 
     pub fn build(
@@ -89,8 +94,8 @@ impl TcpSinkConfig {
         cx: SinkContext,
         encoding: EncodingConfig<Encoding>,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let (tcp, healthcheck) = self.prepare(cx.clone())?;
-        let sink = StreamSink::new(tcp.into_sink(), cx.acker())
+        let (connector, healthcheck) = self.prepare(cx.clone())?;
+        let sink = StreamSink::new(connector.into_sink(), cx.acker())
             .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
@@ -132,6 +137,10 @@ impl TcpConnector {
         TcpSink::new(self.host, self.port, self.resolver, self.tls)
     }
 
+    pub fn into_service(self) -> TcpService {
+        TcpService { connector: self }
+    }
+
     fn healthcheck(&self) -> BoxFuture<'static, crate::Result<()>> {
         self.connect().map_ok(|_| ()).map_err(|e| e.into()).boxed()
     }
@@ -154,7 +163,7 @@ impl tower::Service<Bytes> for TcpService {
         use futures::SinkExt;
         let connector = self.connector.clone();
         async move {
-            let connection = connector.connect().await?;
+            let mut connection = connector.connect().await?;
             connection.send(msg).await.context(SendError)?;
             Ok(())
         }
@@ -224,7 +233,7 @@ impl TcpSink {
                 }
                 TcpSinkState::Connecting(ref mut connect_future) => match connect_future.poll() {
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
-                    Ok(Async::Ready(connection)) => {
+                    Ok(Async::Ready(mut connection)) => {
                         emit!(TcpConnectionEstablished {
                             peer_addr: connection.get_mut().peer_addr().ok(),
                         });
@@ -335,5 +344,39 @@ impl Sink for TcpSink {
             }
             Ok(ok) => Ok(ok),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::test_util::*;
+    use tokio::net::TcpListener;
+
+    #[tokio::test]
+    async fn healthcheck() {
+        trace_init();
+
+        let addr = next_addr();
+        let resolver = crate::dns::Resolver;
+
+        let _listener = TcpListener::bind(&addr).await.unwrap();
+
+        let healthcheck =
+            TcpConnector::new(addr.ip().to_string(), addr.port(), resolver, None.into())
+                .healthcheck();
+
+        assert!(healthcheck.await.is_ok());
+
+        let bad_addr = next_addr();
+        let bad_healthcheck = TcpConnector::new(
+            bad_addr.ip().to_string(),
+            bad_addr.port(),
+            resolver,
+            None.into(),
+        )
+        .healthcheck();
+
+        assert!(bad_healthcheck.await.is_err());
     }
 }
