@@ -1,14 +1,12 @@
 use super::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSink};
 use crate::{
     config::SinkContext,
-    dns::{Resolver, ResolverFuture},
+    dns::Resolver,
     sinks::{Healthcheck, VectorSink},
 };
 use bytes::Bytes;
 use futures::{future::BoxFuture, FutureExt, TryFutureExt};
-use futures01::{
-    future, stream::iter_ok, Async, AsyncSink, Future, Poll as Poll01, Sink, StartSend,
-};
+use futures01::{stream::iter_ok, Async, AsyncSink, Future, Poll as Poll01, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket};

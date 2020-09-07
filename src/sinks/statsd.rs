@@ -1,5 +1,4 @@
 #[cfg(unix)]
-use crate::sinks::util::unix::{IntoUnixSink, UnixSinkConfig};
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
@@ -205,7 +204,6 @@ impl Service<Vec<u8>> for StatsdSvc {
     }
 
     fn call(&mut self, mut frame: Vec<u8>) -> Self::Future {
-        use futures::TryFutureExt;
         if let Some(b'\n') = frame.last() {
             frame.pop();
         }
