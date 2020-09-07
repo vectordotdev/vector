@@ -57,8 +57,11 @@ impl Transform for Remap {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         emit!(RemapEventProcessed);
 
-        if let Err(err) = self.mapping.execute(&mut event) {
-            emit!(RemapFailedMapping { error: err });
+        if let Err(error) = self.mapping.execute(&mut event) {
+            emit!(RemapFailedMapping {
+                event_dropped: self.drop_on_err,
+                error
+            });
 
             if self.drop_on_err {
                 return None;

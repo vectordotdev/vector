@@ -15,13 +15,22 @@ impl InternalEvent for RemapEventProcessed {
 
 #[derive(Debug)]
 pub struct RemapFailedMapping {
+    /// If set to true, the remap transform has dropped the event after a failed
+    /// mapping. This internal event will reflect that in its messaging.
+    pub event_dropped: bool,
     pub error: String,
 }
 
 impl InternalEvent for RemapFailedMapping {
     fn emit_logs(&self) {
+        let message = if self.event_dropped {
+            "Mapping failed with event; discarding event."
+        } else {
+            "Mapping failed with event."
+        };
+
         warn!(
-            message = "Mapping failed with event",
+            message,
             %self.error,
             rate_limit_secs = 30
         )
