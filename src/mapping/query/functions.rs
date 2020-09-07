@@ -216,7 +216,7 @@ impl Function for ToTimestampFn {
 //------------------------------------------------------------------------------
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use crate::mapping::query::{path::Path, Literal};
     use chrono::{DateTime, Utc};

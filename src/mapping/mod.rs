@@ -162,7 +162,7 @@ impl Mapping {
 //------------------------------------------------------------------------------
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::query::{
         arithmetic::Arithmetic, arithmetic::Operator as ArithmeticOperator,
         path::Path as QueryPath, Literal,

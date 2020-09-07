@@ -102,7 +102,7 @@ impl Function for Path {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use serde_json::json;
 
@@ -133,6 +133,15 @@ mod test {
                 },
                 Ok(Value::Integer(20)),
                 Path::from(vec![vec!["foo.bar"], vec!["baz"]]),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo bar.baz", Value::Integer(20));
+                    event
+                },
+                Ok(Value::Integer(20)),
+                Path::from(vec![vec!["foo bar"], vec!["baz"]]),
             ),
             (
                 {

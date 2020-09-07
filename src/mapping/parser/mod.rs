@@ -429,7 +429,7 @@ pub fn parse(input: &str) -> Result<Mapping> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]
