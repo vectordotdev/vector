@@ -6,7 +6,6 @@
 
 use approx::assert_relative_eq;
 use futures::compat::Future01CompatExt;
-use tokio::net::TcpListener;
 use vector::{
     config, sinks, sources,
     test_util::{

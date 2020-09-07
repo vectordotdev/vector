@@ -114,8 +114,8 @@ impl TcpConnector {
 
     pub fn connect(&self) -> BoxFuture<'static, Result<TcpOrTlsStream, TcpError>> {
         let host = self.host.clone();
-        let resolver = self.resolver.clone();
         let port = self.port;
+        let resolver = self.resolver.clone();
         let tls = self.tls.clone();
 
         async move {

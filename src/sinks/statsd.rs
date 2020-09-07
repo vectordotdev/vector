@@ -7,7 +7,7 @@ use crate::{
     sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
     sinks::util::{
         tcp::{TcpError, TcpService, TcpSinkConfig},
-        udp::{IntoUdpSink, UdpBuildError, UdpSinkConfig},
+        udp::{UdpError, UdpService, UdpSinkConfig},
     },
 };
 use futures::{future, FutureExt};
@@ -21,9 +21,9 @@ use tower::{Service, ServiceBuilder};
 
 #[derive(Debug, Snafu)]
 pub enum StatsdError {
-    UdpError {
+    Udp {
         #[snafu(source)]
-        source: UdpBuildError,
+        source: UdpError,
     },
     Tcp {
         source: TcpError,
@@ -36,6 +36,7 @@ pub struct StatsdSvc {
 
 enum Client {
     Tcp(TcpService),
+    Udp(UdpService),
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -51,6 +52,7 @@ pub struct StatsdSinkConfig {
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
     Tcp(TcpSinkConfig),
+    Udp(UdpSinkConfig),
 }
 
 inventory::submit! {
@@ -76,6 +78,10 @@ impl SinkConfig for StatsdSinkConfig {
             Mode::Tcp(config) => {
                 let (service, healthcheck) = config.build_service(cx.clone())?;
                 (Client::Tcp(service), healthcheck)
+            }
+            Mode::Udp(config) => {
+                let (service, healthcheck) = config.build_service(cx.clone())?;
+                (Client::Udp(service), healthcheck)
             }
         };
         let service = StatsdSvc { client };
@@ -204,10 +210,8 @@ impl Service<Vec<u8>> for StatsdSvc {
             frame.pop();
         }
         match &mut self.client {
-            Client::Tcp(service) => service
-                .call(frame.into())
-                .context(Tcp)
-                .boxed(),
+            Client::Tcp(service) => service.call(frame.into()).context(Tcp).boxed(),
+            Client::Udp(service) => service.call(frame.into()).context(Udp).boxed(),
         }
     }
 }
