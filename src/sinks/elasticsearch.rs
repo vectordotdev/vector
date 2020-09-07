@@ -14,7 +14,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::Sink;
 use http::{
     header::{HeaderName, HeaderValue},
@@ -104,7 +104,7 @@ impl SinkConfig for ElasticSearchConfig {
         let common = ElasticSearchCommon::parse_config(&self)?;
         let client = HttpClient::new(cx.resolver(), common.tls_settings.clone())?;
 
-        let healthcheck = healthcheck(client.clone(), common).boxed().compat();
+        let healthcheck = healthcheck(client.clone(), common).boxed();
 
         let common = ElasticSearchCommon::parse_config(&self)?;
         let compression = common.compression;
@@ -127,7 +127,7 @@ impl SinkConfig for ElasticSearchConfig {
 
         Ok((
             super::VectorSink::Futures01Sink(Box::new(sink)),
-            Box::new(healthcheck),
+            healthcheck,
         ))
     }
 

@@ -25,7 +25,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use derivative::Derivative;
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -95,11 +95,11 @@ impl SinkConfig for LokiConfig {
         )
         .sink_map_err(|e| error!("Fatal loki sink error: {}", e));
 
-        let healthcheck = healthcheck(self.clone(), client).boxed().compat();
+        let healthcheck = healthcheck(self.clone(), client).boxed();
 
         Ok((
             super::VectorSink::Futures01Sink(Box::new(sink)),
-            Box::new(healthcheck),
+            healthcheck,
         ))
     }
 

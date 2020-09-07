@@ -11,9 +11,7 @@ use crate::{
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
 };
 use bytes::Bytes;
-use futures::{
-    compat::CompatSink, future::BoxFuture, task::noop_waker_ref, FutureExt, TryFutureExt,
-};
+use futures::{compat::CompatSink, task::noop_waker_ref, FutureExt, TryFutureExt};
 use futures01::{
     stream::iter_ok, try_ready, Async, AsyncSink, Future, Poll as Poll01, Sink, StartSend,
 };
@@ -67,10 +65,7 @@ impl TcpSinkConfig {
                 .with_flat_map(move |event| iter_ok(encode_event(event, &encoding))),
         );
 
-        Ok((
-            VectorSink::Futures01Sink(sink),
-            Box::new(healthcheck.compat()),
-        ))
+        Ok((VectorSink::Futures01Sink(sink), healthcheck))
     }
 }
 
@@ -108,7 +103,7 @@ impl TcpSink {
         }
     }
 
-    pub fn healthcheck(&self) -> BoxFuture<'static, crate::Result<()>> {
+    pub fn healthcheck(&self) -> Healthcheck {
         tcp_healthcheck(
             self.host.clone(),
             self.port,

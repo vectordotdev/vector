@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use chrono::{DateTime, SecondsFormat, Utc};
-use futures::{future::BoxFuture, FutureExt, TryFutureExt};
+use futures::{future::BoxFuture, FutureExt};
 use futures01::Sink;
 use lazy_static::lazy_static;
 use rusoto_cloudwatch::{
@@ -59,9 +59,9 @@ inventory::submit! {
 impl SinkConfig for CloudWatchMetricsSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(cx.resolver())?;
-        let healthcheck = self.clone().healthcheck(client.clone()).boxed().compat();
+        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = CloudWatchMetricsSvc::new(self.clone(), client, cx)?;
-        Ok((sink, Box::new(healthcheck)))
+        Ok((sink, healthcheck))
     }
 
     fn input_type(&self) -> DataType {

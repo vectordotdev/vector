@@ -41,9 +41,9 @@ impl UnixSinkConfig {
         let sink = Box::new(
             sink.with_flat_map(move |event| stream::iter_ok(encode_event(event, &encoding))),
         );
-        let healthcheck = healthcheck(self.path.clone()).boxed().compat();
+        let healthcheck = healthcheck(self.path.clone()).boxed();
 
-        Ok((VectorSink::Futures01Sink(sink), Box::new(healthcheck)))
+        Ok((VectorSink::Futures01Sink(sink), healthcheck))
     }
 }
 
