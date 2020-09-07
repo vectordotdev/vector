@@ -4,11 +4,11 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::Event,
+    sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
     sinks::util::{
         tcp::{IntoTcpSink, TcpSinkConfig},
         udp::{IntoUdpSink, UdpBuildError, UdpSinkConfig},
     },
-    sinks::util::{BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
 };
 use futures::{future, FutureExt};
 use futures01::{stream, Sink};
@@ -43,7 +43,7 @@ enum Client {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct StatsdSinkConfig {
-    pub namespace: String,
+    pub namespace: Option<String>,
     pub mode: Mode,
     #[serde(default)]
     pub batch: BatchConfig,
@@ -101,9 +101,12 @@ impl SinkConfig for StatsdSinkConfig {
             cx.acker(),
         )
         .sink_map_err(|e| error!("Fatal statsd sink error: {}", e))
-        .with_flat_map(move |event| stream::iter_ok(encode_event(event, &namespace)));
+        .with_flat_map(move |event| stream::iter_ok(encode_event(event, namespace.as_deref())));
 
-        Ok((super::VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -150,7 +153,7 @@ fn push_event<V: Display>(
     };
 }
 
-fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
+fn encode_event(event: Event, namespace: Option<&str>) -> Option<Vec<u8>> {
     let mut buf = Vec::new();
 
     let metric = event.as_metric();
@@ -192,10 +195,7 @@ fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
         }
     };
 
-    let mut message: String = buf.join("|");
-    if !namespace.is_empty() {
-        message = format!("{}.{}", namespace, message);
-    };
+    let message = encode_namespace(namespace, '.', buf.join("|"));
 
     let mut body: Vec<u8> = message.into_bytes();
     body.push(b'\n');
@@ -286,7 +286,7 @@ mod test {
             value: MetricValue::Counter { value: 1.5 },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, "").unwrap();
+        let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
@@ -302,7 +302,7 @@ mod test {
             value: MetricValue::Counter { value: 1.5 },
         };
         let event = Event::Metric(metric1);
-        let frame = &encode_event(event, "").unwrap();
+        let frame = &encode_event(event, None).unwrap();
         // The statsd parser will parse the counter as Incremental,
         // so we can't compare it with the parsed value.
         assert_eq!("counter:1.5|c\n", from_utf8(&frame).unwrap());
@@ -319,7 +319,7 @@ mod test {
             value: MetricValue::Gauge { value: -1.5 },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, "").unwrap();
+        let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
@@ -335,7 +335,7 @@ mod test {
             value: MetricValue::Gauge { value: 1.5 },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, "").unwrap();
+        let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
@@ -355,7 +355,7 @@ mod test {
             },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, "").unwrap();
+        let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
@@ -373,7 +373,7 @@ mod test {
             },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, "").unwrap();
+        let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
@@ -385,7 +385,7 @@ mod test {
         let addr = next_addr();
 
         let config = StatsdSinkConfig {
-            namespace: "vector".into(),
+            namespace: Some("vector".into()),
             batch: BatchConfig {
                 max_bytes: Some(512),
                 timeout_secs: Some(1),
