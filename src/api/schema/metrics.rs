@@ -6,6 +6,30 @@ use chrono::{DateTime, Utc};
 use tokio::stream::{Stream, StreamExt};
 use tokio::time::Duration;
 
+pub struct Uptime(Metric);
+
+#[Object]
+impl Uptime {
+    /// Metric timestamp
+    async fn timestamp(&self) -> Option<DateTime<Utc>> {
+        self.0.timestamp
+    }
+
+    /// Number of seconds the Vector instance has been alive
+    async fn seconds(&self) -> f64 {
+        match self.0.value {
+            MetricValue::Gauge { value } => value,
+            _ => 0.00,
+        }
+    }
+}
+
+impl From<Metric> for Uptime {
+    fn from(m: Metric) -> Self {
+        Self(m)
+    }
+}
+
 pub struct EventsProcessed(Metric);
 
 #[Object]
@@ -24,9 +48,9 @@ impl EventsProcessed {
     }
 }
 
-impl Into<EventsProcessed> for Metric {
-    fn into(self) -> EventsProcessed {
-        EventsProcessed(self)
+impl From<Metric> for EventsProcessed {
+    fn from(m: Metric) -> Self {
+        Self(m)
     }
 }
 
@@ -48,8 +72,15 @@ impl BytesProcessed {
     }
 }
 
+impl From<Metric> for BytesProcessed {
+    fn from(m: Metric) -> Self {
+        Self(m)
+    }
+}
+
 #[Interface(field(name = "timestamp", type = "Option<DateTime<Utc>>"))]
 pub enum MetricType {
+    Uptime(Uptime),
     EventsProcessed(EventsProcessed),
     BytesProcessed(BytesProcessed),
 }
@@ -65,7 +96,9 @@ impl MetricsSubscription {
         #[arg(validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = MetricType> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
+            "uptime_seconds" => Some(MetricType::Uptime(m.into())),
             "events_processed" => Some(MetricType::EventsProcessed(m.into())),
+            "bytes_processed" => Some(MetricType::BytesProcessed(m.into())),
             _ => None,
         })
     }
