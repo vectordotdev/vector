@@ -5,8 +5,8 @@ use crate::{
     sinks::{Healthcheck, VectorSink},
 };
 use bytes::Bytes;
-use futures::{FutureExt, TryFutureExt};
-use futures01::{future, stream::iter_ok, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use futures::{future, FutureExt, TryFutureExt};
+use futures01::{stream::iter_ok, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::io;
@@ -61,7 +61,7 @@ pub fn raw_udp(
 }
 
 fn udp_healthcheck() -> Healthcheck {
-    Box::new(future::ok(()))
+    future::ok(()).boxed()
 }
 
 pub struct UdpSink {
