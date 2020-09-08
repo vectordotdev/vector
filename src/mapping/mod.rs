@@ -124,16 +124,33 @@ impl Function for Upcase {
     }
 }
 
-fn mutate_bytes<F>(value: Option<&mut Value>, f: F)
-where
-    F: Fn(BytesMut) -> Bytes,
-{
-    if let Some(value) = value {
-        if let Value::Bytes(ref mut bytes) = value {
-            let mut buf = BytesMut::with_capacity(bytes.len());
-            buf.extend_from_slice(bytes);
-            *bytes = f(buf);
+//------------------------------------------------------------------------------
+
+#[derive(Debug)]
+pub(self) struct Downcase {
+    // TODO: Switch to String once Event API is cleaned up.
+    paths: Vec<Atom>,
+}
+
+impl Downcase {
+    pub(self) fn new(mut paths: Vec<String>) -> Self {
+        Self {
+            paths: paths.drain(..).map(Atom::from).collect(),
         }
+    }
+}
+
+impl Function for Downcase {
+    fn apply(&self, target: &mut Event) -> Result<()> {
+        let target_log = target.as_mut_log();
+
+        for path in &self.paths {
+            mutate_bytes(target_log.get_mut(path), |mut buf| {
+                buf.iter_mut().for_each(|c| c.make_ascii_lowercase());
+                buf.freeze()
+            })
+        }
+        Ok(())
     }
 }
 
@@ -204,6 +221,19 @@ impl Mapping {
 }
 
 //------------------------------------------------------------------------------
+
+fn mutate_bytes<F>(value: Option<&mut Value>, f: F)
+where
+    F: Fn(BytesMut) -> Bytes,
+{
+    if let Some(value) = value {
+        if let Value::Bytes(ref mut bytes) = value {
+            let mut buf = BytesMut::with_capacity(bytes.len());
+            buf.extend_from_slice(bytes);
+            *bytes = f(buf);
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

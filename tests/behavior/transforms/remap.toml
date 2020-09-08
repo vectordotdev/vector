@@ -202,3 +202,31 @@
       "c.c.equals" = "C.C"
       "d.equals" = 1
       "e.equals" = false
+
+[transforms.remap_function_downcase]
+  inputs = []
+  type = "remap"
+  mapping = """
+    downcase(.a)
+    downcase(.b, .c.c)
+    downcase(.d, .e)
+  """
+[[tests]]
+  name = "remap_function_downcase"
+  [tests.input]
+    insert_at = "remap_function_downcase"
+    type = "log"
+    [tests.input.log_fields]
+      a = "A"
+      b = "BBB BB"
+      "c.c" = "C.C"
+      d = 1
+      e = false
+  [[tests.outputs]]
+    extract_from = "remap_function_downcase"
+    [[tests.outputs.conditions]]
+      "a.equals" = "a"
+      "b.equals" = "bbb bb"
+      "c.c.equals" = "c.c"
+      "d.equals" = 1
+      "e.equals" = false

@@ -11,7 +11,8 @@ use crate::{
             path::Path as QueryPath,
             Literal,
         },
-        Assignment, Deletion, Function, IfStatement, Mapping, Noop, OnlyFields, Result, Upcase,
+        Assignment, Deletion, Downcase, Function, IfStatement, Mapping, Noop, OnlyFields, Result,
+        Upcase,
     },
 };
 use pest::{
@@ -345,6 +346,7 @@ fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
         Rule::deletion => Ok(Box::new(Deletion::new(paths_from_pair(pair)?))),
         Rule::only_fields => Ok(Box::new(OnlyFields::new(paths_from_pair(pair)?))),
         Rule::upcase => Ok(Box::new(Upcase::new(paths_from_pair(pair)?))),
+        Rule::downcase => Ok(Box::new(Downcase::new(paths_from_pair(pair)?))),
         _ => unreachable!("parser should not allow other function child rules here"),
     }
 }
@@ -790,6 +792,29 @@ mod tests {
             (
                 "upcase(.foo, .bar.baz)",
                 Mapping::new(vec![Box::new(Upcase::new(vec![
+                    "foo".to_string(),
+                    "bar.baz".to_string(),
+                ]))]),
+            ),
+            // function: downcase
+            (
+                "downcase(.foo)",
+                Mapping::new(vec![Box::new(Downcase::new(vec!["foo".to_string()]))]),
+            ),
+            (
+                "downcase(.\"foo bar\")",
+                Mapping::new(vec![Box::new(Downcase::new(vec!["foo bar".to_string()]))]),
+            ),
+            (
+                "downcase(.foo)\nupcase(.bar.baz)",
+                Mapping::new(vec![
+                    Box::new(Downcase::new(vec!["foo".to_string()])),
+                    Box::new(Downcase::new(vec!["bar.baz".to_string()])),
+                ]),
+            ),
+            (
+                "downcase(.foo, .bar.baz)",
+                Mapping::new(vec![Box::new(Downcase::new(vec![
                     "foo".to_string(),
                     "bar.baz".to_string(),
                 ]))]),
