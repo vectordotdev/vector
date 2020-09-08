@@ -20,10 +20,22 @@ quoted_path_segment = ${ "\"" ~ inner_quoted_string ~ "\"" ~ path_index? }
 target_path = @{ ("." ~ (path_segment | quoted_path_segment))+ }
 
 // Functions
-function = { deletion | only_fields }
+function = {
+    deletion |
+    only_fields
+}
 
-deletion = { "del(" ~ target_path ~ ("," ~ target_path)* ~ ")" }
-only_fields = { "only_fields(" ~ target_path ~ ("," ~ target_path)* ~ ")" }
+deletion = { "del(" ~ path_args ~ ")" }
+only_fields = { "only_fields(" ~ path_args ~ ")" }
+
+// One or more path arguments for a given function.
+//
+// Can be used to parse functions that take one or more paths, e.g.:
+//
+// my_func = { "my_func(" ~ path_args ~ ")" }
+// => my_func(.bar, .baz)
+//
+path_args = _{ target_path ~ ("," ~ target_path)* }
 
 // Queries
 path_coalesce = !{ "(" ~ (path_segment | quoted_path_segment) ~ ("|" ~ (path_segment | quoted_path_segment))+ ~ ")" }

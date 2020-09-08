@@ -34,7 +34,10 @@ fn target_path_from_pair(pair: Pair<Rule>) -> Result<String> {
             Rule::quoted_path_segment => {
                 segments.push(quoted_path_from_pair(segment)?.replace(".", "\\."))
             }
-            _ => unreachable!("parser should not allow other target_path child rules here"),
+            rule => unreachable!(
+                "parser should not allow other target_path child rules here: {:?}",
+                rule
+            ),
         }
     }
     Ok(segments.join("."))
