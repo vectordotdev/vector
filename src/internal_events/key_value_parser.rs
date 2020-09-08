@@ -40,16 +40,38 @@ impl InternalEvent for KeyValueParseFailed {
 }
 
 #[derive(Debug)]
+pub(crate) struct KeyValueTargetExists<'a> {
+    pub target_field: &'a Atom,
+}
+
+impl<'a> InternalEvent for KeyValueTargetExists<'a> {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Target field already exists.",
+            target_field = %self.target_field,
+            rate_limit_secs = 30
+        )
+    }
+
+    fn emit_metrics(&self) {
+        counter!("processing_error", 1,
+            "component_kind" => "transform",
+            "component_type" => "key_value_parser",
+            "error_type" => "target_field_exists",
+        );
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct KeyValueFieldDoesNotExist {
     pub field: Atom,
 }
 
-impl InternalEvent for KeyValueEventFailed {
+impl InternalEvent for KeyValueFieldDoesNotExist {
     fn emit_logs(&self) {
         warn!(
-            message = "Event failed to parse as KeyValue",
+            message = "Record failed to parse as KeyValue.",
             field = %self.field,
-            error = %self.error,
             rate_limit_secs = 30
         )
     }

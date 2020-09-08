@@ -2,13 +2,14 @@ use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{self, Event},
-    internal_events::{KeyFailedParse, KeyValueEventFailed, KeyValueEventProcessed},
+    internal_events::{KeyValueFieldDoesNotExist, KeyValueEventProcessed, KeyValueTargetExists},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 use string_cache::DefaultAtom as Atom;
+use crate::internal_events::KeyValueParseFailed;
 
 #[derive(Debug, Default, Derivative, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -140,7 +141,7 @@ impl Transform for KeyValue {
                     if self.overwrite_target {
                         log.remove(target_field);
                     } else {
-                        error!(message = "target field already exists", %target_field, rate_limit_secs = 30);
+                        emit!(KeyValueTargetExists { target_field });
                         return Some(event);
                     }
                 }
@@ -159,7 +160,7 @@ impl Transform for KeyValue {
                             log.insert(key, value);
                         },
                         Err(error) => {
-                            emit!(KeyFailedParse { key, error });
+                            emit!(KeyValueParseFailed { key, error });
                         }
                     }
                 } else {
@@ -171,10 +172,7 @@ impl Transform for KeyValue {
                 log.remove(&self.field);
             }
         } else {
-            emit!(KeyValueEventFailed {
-                error: "Field does not exist.".into(),
-                field: self.field.as_ref().into(),
-            });
+            emit!(KeyValueFieldDoesNotExist {field: self.field.as_ref().into()});
         };
 
         Some(event)
