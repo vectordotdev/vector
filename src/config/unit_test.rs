@@ -28,6 +28,7 @@ fn build_unit_tests(builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>
     // Don't let this escape since it's not validated
     let mut config = Config {
         global: builder.global,
+        #[cfg(feature = "api")]
         api: builder.api,
         sources: builder.sources,
         sinks: builder.sinks,
