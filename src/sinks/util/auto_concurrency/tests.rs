@@ -34,7 +34,7 @@ use std::{
     collections::HashMap,
     fs::{read_dir, File},
     io::Read,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
     task::Poll,
     time::{Duration, Instant},
@@ -322,24 +322,33 @@ async fn run_test(params: TestParams) -> TestResults {
 struct Range(f64, f64);
 
 impl Range {
-    fn assert_usize(&self, value: usize, name1: &str, name2: &str, results: &TestResults) {
+    fn assert_usize(
+        &self,
+        value: usize,
+        file: &Path,
+        name1: &str,
+        name2: &str,
+        results: &TestResults,
+    ) {
         assert_within!(
             value,
             self.0 as usize,
             self.1 as usize,
-            "Value: {} {}\n{:#?}",
+            "File: {:?} Value: {} {}\n{:#?}",
+            file,
             name1,
             name2,
             results
         );
     }
 
-    fn assert_f64(&self, value: f64, name1: &str, name2: &str, results: &TestResults) {
+    fn assert_f64(&self, value: f64, file: &Path, name1: &str, name2: &str, results: &TestResults) {
         assert_within!(
             value,
             self.0,
             self.1,
-            "Value: {} {}\n{:#?}",
+            "File: {:?} Value: {} {}\n{:#?}",
+            file,
             name1,
             name2,
             results
@@ -356,30 +365,42 @@ struct ResultTest {
 }
 
 impl ResultTest {
-    fn compare_histogram(&self, stat: HistogramStats, name: &str, results: &TestResults) {
+    fn compare_histogram(
+        &self,
+        stat: HistogramStats,
+        file: &Path,
+        name: &str,
+        results: &TestResults,
+    ) {
         if let Some(range) = self.min {
-            range.assert_usize(stat.min, name, "min", results);
+            range.assert_usize(stat.min, file, name, "min", results);
         }
         if let Some(range) = self.max {
-            range.assert_usize(stat.max, name, "max", results);
+            range.assert_usize(stat.max, file, name, "max", results);
         }
         if let Some(range) = self.mean {
-            range.assert_f64(stat.mean, name, "mean", results);
+            range.assert_f64(stat.mean, file, name, "mean", results);
         }
         if let Some(range) = self.mode {
-            range.assert_usize(stat.mode, name, "mode", results);
+            range.assert_usize(stat.mode, file, name, "mode", results);
         }
     }
 
-    fn compare_weighted_sum(&self, stat: WeightedSumStats, name: &str, results: &TestResults) {
+    fn compare_weighted_sum(
+        &self,
+        stat: WeightedSumStats,
+        file: &Path,
+        name: &str,
+        results: &TestResults,
+    ) {
         if let Some(range) = self.min {
-            range.assert_f64(stat.min, name, "min", results);
+            range.assert_f64(stat.min, file, name, "min", results);
         }
         if let Some(range) = self.max {
-            range.assert_f64(stat.max, name, "max", results);
+            range.assert_f64(stat.max, file, name, "max", results);
         }
         if let Some(range) = self.mean {
-            range.assert_f64(stat.mean, name, "mean", results);
+            range.assert_f64(stat.mean, file, name, "mean", results);
         }
     }
 }
@@ -405,33 +426,50 @@ struct TestInput {
 }
 
 async fn run_compare(file_path: PathBuf, input: TestInput) {
-    eprintln!("Running test in {:?}", file_path);
+    eprintln!("Starting test in {:?}", file_path);
 
     let results = run_test(input.params).await;
 
+    eprintln!("Finished running {:?}", file_path);
+
     if let Some(test) = input.stats.in_flight {
         let in_flight = results.stats.in_flight.stats().unwrap();
-        test.compare_histogram(in_flight, "stats in_flight", &results);
+        test.compare_histogram(in_flight, &file_path, "stats in_flight", &results);
     }
 
     if let Some(test) = input.controller.in_flight {
         let in_flight = results.cstats.in_flight.stats().unwrap();
-        test.compare_histogram(in_flight, "controller in_flight", &results);
+        test.compare_histogram(in_flight, &file_path, "controller in_flight", &results);
     }
 
     if let Some(test) = input.controller.concurrency_limit {
         let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
-        test.compare_histogram(concurrency_limit, "controller concurrency_limit", &results);
+        test.compare_histogram(
+            concurrency_limit,
+            &file_path,
+            "controller concurrency_limit",
+            &results,
+        );
     }
 
     if let Some(test) = input.controller.observed_rtt {
         let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
-        test.compare_weighted_sum(observed_rtt, "controller observed_rtt", &results);
+        test.compare_weighted_sum(
+            observed_rtt,
+            &file_path,
+            "controller observed_rtt",
+            &results,
+        );
     }
 
     if let Some(test) = input.controller.averaged_rtt {
         let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
-        test.compare_weighted_sum(averaged_rtt, "controller averaged_rtt", &results);
+        test.compare_weighted_sum(
+            averaged_rtt,
+            &file_path,
+            "controller averaged_rtt",
+            &results,
+        );
     }
 }
 
@@ -459,8 +497,10 @@ async fn all_tests() {
         })
         .collect::<Vec<_>>();
 
-    // Then run all the tests
-    for (file_path, input) in entries {
-        run_compare(file_path, input).await;
-    }
+    // Then run all the tests at once
+    let tests = entries
+        .into_iter()
+        .map(|(file_path, input)| run_compare(file_path, input))
+        .collect::<Vec<_>>();
+    futures::future::join_all(tests).await;
 }
