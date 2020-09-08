@@ -179,11 +179,15 @@
   inputs = []
   type = "remap"
   mapping = """
-    upcase(.a)
-    upcase(.b)
-    upcase(.c.c)
-    upcase(.d)
-    upcase(.e)
+    .a = upcase(.a)
+    .b = upcase(.b)
+    .c.c = upcase(.c.c)
+    .d = upcase(.d)
+    .e = upcase(.e)
+
+    if upcase(.f) == "F" {
+        .f = "ff"
+    }
   """
 [[tests]]
   name = "remap_function_upcase"
@@ -196,6 +200,7 @@
       "c.c" = "c.c"
       d = 1
       e = false
+      f = "f"
   [[tests.outputs]]
     extract_from = "remap_function_upcase"
     [[tests.outputs.conditions]]
@@ -204,6 +209,7 @@
       "c.c.equals" = "C.C"
       "d.equals" = 1
       "e.equals" = false
+      "f.equals" = "ff"
 
 [transforms.remap_function_downcase]
   inputs = []

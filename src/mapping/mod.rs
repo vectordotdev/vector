@@ -97,33 +97,6 @@ impl Function for OnlyFields {
 //------------------------------------------------------------------------------
 
 #[derive(Debug)]
-pub(self) struct Upcase {
-    // TODO: Switch to String once Event API is cleaned up.
-    path: Atom,
-}
-
-impl Upcase {
-    pub(self) fn new(path: impl Into<Atom>) -> Self {
-        Self { path: path.into() }
-    }
-}
-
-impl Function for Upcase {
-    fn apply(&self, target: &mut Event) -> Result<()> {
-        let target_log = target.as_mut_log();
-
-        mutate_bytes(target_log.get_mut(&self.path), |mut buf| {
-            buf.iter_mut().for_each(|c| c.make_ascii_uppercase());
-            buf.freeze()
-        });
-
-        Ok(())
-    }
-}
-
-//------------------------------------------------------------------------------
-
-#[derive(Debug)]
 pub(self) struct Downcase {
     // TODO: Switch to String once Event API is cleaned up.
     path: Atom,

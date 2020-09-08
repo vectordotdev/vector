@@ -4,6 +4,7 @@ use crate::{
     mapping::Result,
     types::Conversion,
 };
+use bytes::BytesMut;
 
 #[derive(Debug)]
 pub(in crate::mapping) struct NotFn {
@@ -205,6 +206,36 @@ impl Function for ToTimestampFn {
             }
         }
         result
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug)]
+pub(in crate::mapping) struct UpcaseFn {
+    query: Box<dyn Function>,
+}
+
+impl UpcaseFn {
+    pub(in crate::mapping) fn new(query: Box<dyn Function>) -> Self {
+        Self { query }
+    }
+}
+
+impl Function for UpcaseFn {
+    fn execute(&self, ctx: &Event) -> Result<Value> {
+        let value = self.query.execute(ctx)?;
+
+        if let Value::Bytes(bytes) = value {
+            let mut buf = BytesMut::with_capacity(bytes.len());
+
+            buf.extend_from_slice(&bytes);
+            buf.iter_mut().for_each(|c| c.make_ascii_uppercase());
+
+            return Ok(Value::Bytes(buf.freeze()));
+        }
+
+        Ok(value)
     }
 }
 
@@ -477,6 +508,48 @@ mod tests {
                     None,
                 )
                 .unwrap(),
+            ),
+        ];
+
+        for (input_event, exp, query) in cases {
+            assert_eq!(query.execute(&input_event), exp);
+        }
+    }
+
+    #[test]
+    fn check_upcase() {
+        let cases = vec![
+            (
+                Event::from(""),
+                Err("path .foo not found in event".to_string()),
+                UpcaseFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::from("foo 2 bar"));
+                    event
+                },
+                Ok(Value::from("FOO 2 BAR")),
+                UpcaseFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::Integer(20));
+                    event
+                },
+                Ok(Value::Integer(20)),
+                UpcaseFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::Boolean(true));
+                    event
+                },
+                Ok(Value::Boolean(true)),
+                UpcaseFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
         ];
 

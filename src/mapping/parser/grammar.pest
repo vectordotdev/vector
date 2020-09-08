@@ -23,13 +23,11 @@ target_path = @{ ("." ~ (path_segment | quoted_path_segment))+ }
 function = {
     deletion |
     only_fields |
-    upcase |
     downcase
 }
 
 deletion = { "del(" ~ target_paths ~ ")" }
 only_fields = { "only_fields(" ~ target_paths ~ ")" }
-upcase = { "upcase(" ~ target_path ~ ")" }
 downcase = { "downcase(" ~ target_path ~ ")" }
 
 // One or more path arguments for a given function.
@@ -50,13 +48,21 @@ dot_path = ${ ("." ~ (path_segment | quoted_path_segment | path_coalesce))+ }
 //
 // NOTE: Not including delete here yet, but there's no reason we can't slot it
 // in at some point and get `.nested = del(.foo)`, same with `only_fields`.
-query_function = { to_string | to_int | to_float | to_bool | to_timestamp }
+query_function = {
+    to_string |
+    to_int |
+    to_float |
+    to_bool |
+    to_timestamp |
+    upcase
+}
 
 to_string = { "string(" ~ query_arithmetic ~ ("," ~ (string | null) )? ~ ")"}
 to_int = { "int(" ~ query_arithmetic ~ ("," ~ (number | null) )? ~ ")"}
 to_float = { "float(" ~ query_arithmetic ~ ("," ~ (number | null) )? ~ ")"}
 to_bool = { "bool(" ~ query_arithmetic ~ ("," ~ (boolean | null) )? ~ ")"}
 to_timestamp = { "timestamp(" ~ query_arithmetic ~ "," ~ string ~ ")"}
+upcase = { "upcase(" ~ query_arithmetic ~ ")"}
 
 group = { "(" ~ query_arithmetic ~ ")" }
 
