@@ -1,6 +1,6 @@
 .PHONY: $(MAKECMDGOALS) all
 .DEFAULT_GOAL := help
-RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/scripts/run.sh)
+RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/scripts/docker-compose-run.sh)
 
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
@@ -574,10 +574,7 @@ ifeq ($(AUTODESPAWN), true)
 endif
 
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
-ifeq ($(CONTAINER_TOOL),podman)
-	@echo "Sorry - you can't run e2e Kubernetes tests with podman currently, defaulting to docker."
-	PACKAGE_DEB_USE_CONTAINER="docker" scripts/test-e2e-kubernetes.sh
-endif
+	@scripts/test-e2e-kubernetes.sh
 
 test-shutdown: ## Runs shutdown tests
 ifeq ($(AUTOSPAWN), true)
@@ -673,7 +670,7 @@ package-aarch64-unknown-linux-musl-all: package-archive-aarch64-unknown-linux-mu
 # archives
 
 package-archive: build ## Build the Vector archive
-	$(RUN) package-archive
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/package-archive.sh
 
 package-archive-all: package-archive-x86_64-unknown-linux-musl package-archive-x86_64-unknown-linux-gnu package-archive-aarch64-unknown-linux-musl ## Build all archives
 
