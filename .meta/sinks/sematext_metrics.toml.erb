@@ -47,12 +47,14 @@ write_to_description = "[Sematext][urls.sematext] via the [InfluxDB API v1][urls
 type = "string"
 required = false
 examples = ["na", "eu"]
+relevant_when = {host = ""}
 description = "The region destination to send metrics to. This option is required if `host` is not set."
 
 [sinks.sematext_metrics.options.host]
 type = "string"
 required = false
 examples = ["http://127.0.0.1", "http://example.com"]
+relevant_when = {region = ""}
 description = "The host that will be used to send metrics to. This option is required if `region` is not set."
 
 [sinks.sematext_metrics.options.token]
