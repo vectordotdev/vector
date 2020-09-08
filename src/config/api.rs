@@ -1,4 +1,4 @@
-use super::Config;
+use super::ConfigBuilder;
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, SocketAddr};
 
@@ -28,6 +28,6 @@ fn default_playground() -> bool {
 }
 
 /// Updates the configuration to take into account API changes
-pub fn update_config(old_config: &mut Config, new_config: &Config) {
+pub fn update_config(old_config: &mut ConfigBuilder, new_config: &ConfigBuilder) {
     old_config.api = new_config.api; // copy
 }

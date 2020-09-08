@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 pub fn compile(raw: ConfigBuilder) -> Result<Config, Vec<String>> {
     let mut config = Config {
         global: raw.global,
+        api: raw.api,
         sources: raw.sources,
         sinks: raw.sinks,
         transforms: raw.transforms,

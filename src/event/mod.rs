@@ -2,7 +2,6 @@ use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricPro
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
-use metric::{MetricKind, MetricValue};
 use serde::{Serialize, Serializer};
 use serde_json::Value as JsonValue;
 use std::{collections::BTreeMap, iter::FromIterator};
@@ -16,7 +15,7 @@ pub mod metric;
 mod util;
 
 pub use log_schema::{log_schema, LogSchema, LOG_SCHEMA};
-pub use metric::{Metric, StatisticKind};
+pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 pub(crate) use util::log::PathComponent;
 pub(crate) use util::log::PathIter;
 

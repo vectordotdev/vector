@@ -35,9 +35,7 @@ pub use validation::warnings;
 pub struct Config {
     pub global: GlobalOptions,
     #[cfg(feature = "api")]
-    #[serde(default)]
     pub api: api::Options,
-    #[serde(default)]
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
     pub sinks: IndexMap<String, SinkOuter>,
     pub transforms: IndexMap<String, TransformOuter>,
