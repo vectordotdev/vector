@@ -7,7 +7,7 @@ use crate::{
             influxdb_settings, Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
         },
         util::{
-            encoding::EncodingConfigWithDefault,
+            encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpClient, HttpSink},
             BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
         },
@@ -49,6 +49,7 @@ struct InfluxDBLogsSink {
     protocol_version: ProtocolVersion,
     namespace: String,
     tags: HashSet<String>,
+    encoding: EncodingConfig<Encoding>,
 }
 
 lazy_static! {
@@ -106,6 +107,7 @@ impl SinkConfig for InfluxDBLogsConfig {
             protocol_version,
             namespace,
             tags,
+            encoding: self.encoding.clone().into(),
         };
 
         let sink = BatchedHttpSink::new(
@@ -138,8 +140,10 @@ impl HttpSink for InfluxDBLogsSink {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let mut output = String::new();
+
+        self.encoding.apply_rules(&mut event);
         let mut event = event.into_log();
 
         // Measurement

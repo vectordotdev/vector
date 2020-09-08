@@ -190,7 +190,8 @@ impl Sink for PulsarSink {
     }
 }
 
-fn encode_event(item: Event, encoding: &EncodingConfig<Encoding>) -> crate::Result<Vec<u8>> {
+fn encode_event(mut item: Event, encoding: &EncodingConfig<Encoding>) -> crate::Result<Vec<u8>> {
+    encoding.apply_rules(&mut item);
     let log = item.into_log();
 
     Ok(match encoding.codec() {
