@@ -90,14 +90,34 @@ pub struct MetricsSubscription;
 
 #[Subscription]
 impl MetricsSubscription {
-    /// Returns all Vector metrics, aggregated at the provided millisecond interval
-    async fn metrics(
+    /// Metrics for how long the Vector instance has been running
+    async fn uptime_metrics(
         &self,
-        #[arg(validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = MetricType> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
             "uptime_seconds" => Some(MetricType::Uptime(m.into())),
+            _ => None,
+        })
+    }
+
+    /// Events processed metrics
+    async fn events_processed_metrics(
+        &self,
+        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = MetricType> {
+        get_metrics(interval).filter_map(|m| match m.name.as_str() {
             "events_processed" => Some(MetricType::EventsProcessed(m.into())),
+            _ => None,
+        })
+    }
+
+    /// Bytes processed metrics
+    async fn bytes_processed_metrics(
+        &self,
+        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = MetricType> {
+        get_metrics(interval).filter_map(|m| match m.name.as_str() {
             "bytes_processed" => Some(MetricType::BytesProcessed(m.into())),
             _ => None,
         })
