@@ -42,6 +42,14 @@ export WASM_MODULES = $(patsubst tests/data/wasm/%/,%,$(wildcard tests/data/wasm
 # The same WASM modules, by output path.
 export WASM_MODULE_OUTPUTS = $(patsubst %,/target/wasm32-wasi/%,$(WASM_MODULES))
 
+
+# # We also like static packages!
+export PKG_CONFIG_ALL_STATIC ?= true
+# # In case they didn't get the memo
+export LIBZ_SYS_STATIC ?= 1
+export OPENSSL_STATIC ?= 1
+export SASL2_STATIC ?= 1
+
  # Deprecated.
 export USE_CONTAINER ?= $(CONTAINER_TOOL)
 
