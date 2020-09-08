@@ -239,7 +239,7 @@ fn encode_events(token: &str, events: Vec<Metric>) -> String {
     output
 }
 
-pub fn to_fields(label: String, value: f64) -> HashMap<String, Field> {
+fn to_fields(label: String, value: f64) -> HashMap<String, Field> {
     let mut result = HashMap::new();
     result.insert(label, Field::Float(value));
     result
