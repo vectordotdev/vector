@@ -341,17 +341,20 @@ fn if_statement_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn Function>> 
 }
 
 fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
-    let rule = pair.as_rule();
-    let paths = pair
-        .into_inner()
-        .map(target_path_from_pair)
-        .collect::<Result<Vec<_>>>();
-
-    match rule {
-        Rule::deletion => Ok(Box::new(Deletion::new(paths?))),
-        Rule::only_fields => Ok(Box::new(OnlyFields::new(paths?))),
+    match pair.as_rule() {
+        Rule::deletion => Ok(Box::new(Deletion::new(paths_from_pair(pair)?))),
+        Rule::only_fields => Ok(Box::new(OnlyFields::new(paths_from_pair(pair)?))),
         _ => unreachable!("parser should not allow other function child rules here"),
     }
+}
+
+fn paths_from_pair(pair: Pair<Rule>) -> Result<Vec<String>> {
+    let mut paths = Vec::new();
+    for pair in pair.into_inner() {
+        paths.push(target_path_from_pair(pair)?);
+    }
+
+    Ok(paths)
 }
 
 fn statement_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
