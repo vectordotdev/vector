@@ -127,7 +127,7 @@ jobs:
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
-      - run: make build-x86_64-unknown-linux-gnu
+      - run: make build-x86_64-unknown-linux-musl
 
   # TODO: Upgrade to test once the tz issues are solved.
   build-aarch64-unknown-linux-musl:
@@ -146,7 +146,7 @@ jobs:
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
-      - run: make build-x86_64-unknown-linux-gnu
+      - run: make build-aarch64-unknown-linux-musl
 
   test-mac:
     name: Unit - Mac
