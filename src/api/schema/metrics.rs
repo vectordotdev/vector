@@ -96,7 +96,7 @@ impl MetricsSubscription {
         #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Uptime> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
-            "uptime_seconds" => Some(Uptime(m.into())),
+            "uptime_seconds" => Some(Uptime(m)),
             _ => None,
         })
     }
@@ -107,7 +107,7 @@ impl MetricsSubscription {
         #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = EventsProcessed> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
-            "events_processed" => Some(EventsProcessed(m.into())),
+            "events_processed" => Some(EventsProcessed(m)),
             _ => None,
         })
     }
@@ -118,7 +118,7 @@ impl MetricsSubscription {
         #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = BytesProcessed> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
-            "bytes_processed" => Some(BytesProcessed(m.into())),
+            "bytes_processed" => Some(BytesProcessed(m)),
             _ => None,
         })
     }
