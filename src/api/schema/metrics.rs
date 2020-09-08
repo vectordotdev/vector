@@ -94,9 +94,9 @@ impl MetricsSubscription {
     async fn uptime_metrics(
         &self,
         #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
-    ) -> impl Stream<Item = MetricType> {
+    ) -> impl Stream<Item = Uptime> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
-            "uptime_seconds" => Some(MetricType::Uptime(m.into())),
+            "uptime_seconds" => Some(Uptime(m.into())),
             _ => None,
         })
     }
@@ -105,9 +105,9 @@ impl MetricsSubscription {
     async fn events_processed_metrics(
         &self,
         #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
-    ) -> impl Stream<Item = MetricType> {
+    ) -> impl Stream<Item = EventsProcessed> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
-            "events_processed" => Some(MetricType::EventsProcessed(m.into())),
+            "events_processed" => Some(EventsProcessed(m.into())),
             _ => None,
         })
     }
@@ -116,8 +116,21 @@ impl MetricsSubscription {
     async fn bytes_processed_metrics(
         &self,
         #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = BytesProcessed> {
+        get_metrics(interval).filter_map(|m| match m.name.as_str() {
+            "bytes_processed" => Some(BytesProcessed(m.into())),
+            _ => None,
+        })
+    }
+
+    /// All metrics
+    async fn metrics(
+        &self,
+        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = MetricType> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
+            "uptime_seconds" => Some(MetricType::Uptime(m.into())),
+            "events_processed" => Some(MetricType::EventsProcessed(m.into())),
             "bytes_processed" => Some(MetricType::BytesProcessed(m.into())),
             _ => None,
         })
