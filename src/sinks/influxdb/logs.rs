@@ -592,6 +592,7 @@ mod tests {
             protocol_version,
             namespace,
             tags,
+            encoding: EncodingConfigWithDefault::default().into(),
         }
     }
 }
