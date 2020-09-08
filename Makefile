@@ -23,8 +23,12 @@ export AUTODESPAWN ?= ${AUTOSPAWN}
 export VERBOSE ?= false
 # Override to set a different Rust toolchain
 export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
-# Override the container tool.
-export CONTAINER_TOOL ?= docker
+# Override the container tool. Tries podman first and then tries docker.
+export CONTAINER_TOOL = auto
+ifeq ($(CONTAINER_TOOL),auto)
+	override CONTAINER_TOOL = $(shell podman version >/dev/null 2>&1 && echo podman || echo docker)
+endif
+
 # Override this to automatically enter a container containing the correct, full, official build environment for Vector, ready for development
 export ENVIRONMENT ?= false
 # The upstream container we publish artifacts to on a successful master build.
@@ -139,6 +143,10 @@ define ENVIRONMENT_PREPARE
 	$(CONTAINER_TOOL) pull $(ENVIRONMENT_UPSTREAM)
 endef
 endif
+
+check-container-tool:
+	@echo -n "Checking if $(CONTAINER_TOOL) is available..." && \
+	$(CONTAINER_TOOL) version 1>/dev/null && echo "yes"
 
 environment: export ENVIRONMENT_TTY = true ## Enter a full Vector dev shell in $CONTAINER_TOOL, binding this folder to the container.
 environment:
