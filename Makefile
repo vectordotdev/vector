@@ -193,6 +193,7 @@ cross-image-%:
 	docker build \
 		--tag vector-cross-env:${TRIPLE} \
 		--file scripts/cross/${TRIPLE}.dockerfile \
+		$(if $(findstring true,$(VERBOSE)),,--quiet) \
 		scripts/cross
 
 # This is basically a shorthand for folks.
