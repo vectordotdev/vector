@@ -503,6 +503,21 @@ mod tests {
         assert_eq!(map["key"], "value".to_string());
     }
 
+    #[test]
+    fn gcs_encode_event_apply_rules() {
+        crate::test_util::trace_init();
+
+        let message = "hello world".to_string();
+        let mut event = Event::from(message);
+        event.as_mut_log().insert("key", "value");
+
+        let key_format = Template::try_from("key: {{ key }}").unwrap();
+        let bytes = encode_event(event, &key_format, &Encoding::Text.into()).unwrap();
+
+        let (_, key) = bytes.into_parts();
+        assert_eq!(key, "key: value");
+    }
+
     fn request_settings(
         extension: Option<&str>,
         uuid: bool,
