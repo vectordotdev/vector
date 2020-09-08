@@ -73,6 +73,7 @@ jobs:
       - run: make test
 
   # TODO: Upgrade to test once the tz issues are solved.
+  # https://github.com/timberio/vector/issues/3771
   build-x86_64-unknown-linux-gnu:
     name: Unit - x86_64-unknown-linux-gnu
     runs-on: ubuntu-20.04
@@ -92,6 +93,7 @@ jobs:
       - run: make build-x86_64-unknown-linux-gnu
 
   # TODO: Upgrade to test once the tz issues are solved.
+  # https://github.com/timberio/vector/issues/3771
   build-aarch64-unknown-linux-gnu:
     name: Unit - aarch64-unknown-linux-gnu
     runs-on: ubuntu-20.04
@@ -108,7 +110,7 @@ jobs:
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
-      - run: make build-x86_64-unknown-linux-gnu
+      - run: make build-aarch64-unknown-linux-gnu
 
   # TODO: Upgrade to test once the tz issues are solved.
   build-x86_64-unknown-linux-musl:
