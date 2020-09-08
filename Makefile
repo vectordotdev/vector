@@ -53,9 +53,6 @@ export WASM_MODULE_OUTPUTS = $(patsubst %,/target/wasm32-wasi/%,$(WASM_MODULES))
 export AWS_ACCESS_KEY_ID ?= "dummy"
 export AWS_SECRET_ACCESS_KEY ?= "dummy"
 
-# Deprecated.
-export USE_CONTAINER ?= $(CONTAINER_TOOL)
-
 FORMATTING_BEGIN_YELLOW = \033[0;33m
 FORMATTING_BEGIN_BLUE = \033[36m
 FORMATTING_END = \033[0m
@@ -576,9 +573,11 @@ ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-splunk
 endif
 
-PACKAGE_DEB_USE_CONTAINER ?= $(USE_CONTAINER)
 test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` support)
-	PACKAGE_DEB_USE_CONTAINER="$(PACKAGE_DEB_USE_CONTAINER)" scripts/test-e2e-kubernetes.sh
+ifeq ($(CONTAINER_TOOL),podman)
+	@echo "Sorry - you can't run e2e Kubernetes tests with podman currently, defaulting to docker."
+	PACKAGE_DEB_USE_CONTAINER="docker" scripts/test-e2e-kubernetes.sh
+endif
 
 test-shutdown: ## Runs shutdown tests
 ifeq ($(AUTOSPAWN), true)
