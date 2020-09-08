@@ -402,7 +402,7 @@ impl DockerSource {
                                         .remove(&id)
                                         .expect("Every started ContainerId has it's ContainerState");
                                     if state.is_running() {
-                                        let backoff = Some(self.backoff_duration.clone());
+                                        let backoff = Some(self.backoff_duration);
                                         self.containers.insert(id.clone(), self.esb.start(id, backoff));
                                     }
                                 }
