@@ -11,7 +11,7 @@ use crate::{
             path::Path as QueryPath,
             Literal,
         },
-        Assignment, Deletion, Function, IfStatement, Mapping, Noop, OnlyFields, Result,
+        Assignment, Deletion, Function, IfStatement, Mapping, Noop, OnlyFields, Result, Upcase,
     },
 };
 use pest::{
@@ -344,6 +344,7 @@ fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
         Rule::deletion => Ok(Box::new(Deletion::new(paths_from_pair(pair)?))),
         Rule::only_fields => Ok(Box::new(OnlyFields::new(paths_from_pair(pair)?))),
+        Rule::upcase => Ok(Box::new(Upcase::new(paths_from_pair(pair)?))),
         _ => unreachable!("parser should not allow other function child rules here"),
     }
 }
@@ -747,6 +748,7 @@ mod tests {
                     )),
                 ))]),
             ),
+            // function: del
             (
                 "del(.foo)",
                 Mapping::new(vec![Box::new(Deletion::new(vec!["foo".to_string()]))]),
@@ -769,6 +771,30 @@ mod tests {
                     "bar.baz".to_string(),
                 ]))]),
             ),
+            // function: upcase
+            (
+                "upcase(.foo)",
+                Mapping::new(vec![Box::new(Upcase::new(vec!["foo".to_string()]))]),
+            ),
+            (
+                "upcase(.\"foo bar\")",
+                Mapping::new(vec![Box::new(Upcase::new(vec!["foo bar".to_string()]))]),
+            ),
+            (
+                "upcase(.foo)\nupcase(.bar.baz)",
+                Mapping::new(vec![
+                    Box::new(Upcase::new(vec!["foo".to_string()])),
+                    Box::new(Upcase::new(vec!["bar.baz".to_string()])),
+                ]),
+            ),
+            (
+                "upcase(.foo, .bar.baz)",
+                Mapping::new(vec![Box::new(Upcase::new(vec![
+                    "foo".to_string(),
+                    "bar.baz".to_string(),
+                ]))]),
+            ),
+            //
             (
                 r#"if .foo == 5 {
                     .foo = .bar
@@ -803,6 +829,7 @@ mod tests {
                     Box::new(Noop {}),
                 ))]),
             ),
+            // function: only_fields
             (
                 "only_fields(.foo)",
                 Mapping::new(vec![Box::new(OnlyFields::new(vec!["foo".to_string()]))]),
@@ -814,6 +841,7 @@ mod tests {
                     "baz".to_string(),
                 ]))]),
             ),
+            // function: string
             (
                 ".foo = string(.foo, \"bar\")",
                 Mapping::new(vec![Box::new(Assignment::new(

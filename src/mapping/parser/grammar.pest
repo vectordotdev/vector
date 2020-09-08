@@ -22,11 +22,13 @@ target_path = @{ ("." ~ (path_segment | quoted_path_segment))+ }
 // Functions
 function = {
     deletion |
-    only_fields
+    only_fields |
+    upcase
 }
 
 deletion = { "del(" ~ path_args ~ ")" }
 only_fields = { "only_fields(" ~ path_args ~ ")" }
+upcase = { "upcase(" ~ path_args ~ ")" }
 
 // One or more path arguments for a given function.
 //

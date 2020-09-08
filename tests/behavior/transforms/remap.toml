@@ -174,3 +174,31 @@
     extract_from = "remap_quoted_path"
     [[tests.outputs.conditions]]
       "a.b\\.c.equals" = "baz"
+
+[transforms.remap_function_upcase]
+  inputs = []
+  type = "remap"
+  mapping = """
+    upcase(.a)
+    upcase(.b, .c.c)
+    upcase(.d, .e)
+  """
+[[tests]]
+  name = "remap_function_upcase"
+  [tests.input]
+    insert_at = "remap_function_upcase"
+    type = "log"
+    [tests.input.log_fields]
+      a = "a"
+      b = "bbb bb"
+      "c.c" = "c.c"
+      d = 1
+      e = false
+  [[tests.outputs]]
+    extract_from = "remap_function_upcase"
+    [[tests.outputs.conditions]]
+      "a.equals" = "A"
+      "b.equals" = "BBB BB"
+      "c.c.equals" = "C.C"
+      "d.equals" = 1
+      "e.equals" = false
