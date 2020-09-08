@@ -1,7 +1,7 @@
 #![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
 
-use futures::compat::Future01CompatExt;
-use futures01::{future, Async, AsyncSink, Sink, Stream};
+use futures::{compat::Future01CompatExt, future, FutureExt};
+use futures01::{Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use tokio::time::{delay_for, Duration};
 use vector::{
@@ -23,7 +23,7 @@ impl config::SinkConfig for PanicSink {
     fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         Ok((
             VectorSink::Futures01Sink(Box::new(PanicSink)),
-            Box::new(future::ok(())),
+            future::ok(()).boxed(),
         ))
     }
 
@@ -104,7 +104,7 @@ impl config::SinkConfig for ErrorSink {
     fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         Ok((
             VectorSink::Futures01Sink(Box::new(ErrorSink)),
-            Box::new(future::ok(())),
+            future::ok(()).boxed(),
         ))
     }
 
@@ -187,7 +187,7 @@ impl config::SourceConfig for ErrorSourceConfig {
         _shutdown: ShutdownSignal,
         _out: Pipeline,
     ) -> Result<sources::Source, vector::Error> {
-        Ok(Box::new(future::err(())))
+        Ok(Box::new(futures01::future::err(())))
     }
 
     fn output_type(&self) -> config::DataType {
@@ -253,9 +253,10 @@ impl config::SourceConfig for PanicSourceConfig {
         _shutdown: ShutdownSignal,
         _out: Pipeline,
     ) -> Result<sources::Source, vector::Error> {
-        Ok(Box::new(future::lazy::<_, future::FutureResult<(), ()>>(
-            || panic!(),
-        )))
+        Ok(Box::new(futures01::future::lazy::<
+            _,
+            futures01::future::FutureResult<(), ()>,
+        >(|| panic!())))
     }
 
     fn output_type(&self) -> config::DataType {

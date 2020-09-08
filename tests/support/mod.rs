@@ -3,7 +3,8 @@
 // all over the place.
 #![allow(dead_code)]
 
-use futures01::{future, sink::Sink, stream, sync::mpsc::Receiver, Async, Future, Stream};
+use futures::{future, FutureExt};
+use futures01::{sink::Sink, stream, sync::mpsc::Receiver, Async, Future, Stream};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::sync::{
@@ -106,7 +107,7 @@ impl SourceConfig for MockSourceConfig {
         let mut recv = wrapped.lock().unwrap().take().unwrap();
         let mut shutdown = Some(shutdown);
         let mut _token = None;
-        let source = future::lazy(move || {
+        let source = futures01::future::lazy(move || {
             stream::poll_fn(move || {
                 if let Some(until) = shutdown.as_mut() {
                     match until.poll() {
@@ -285,7 +286,7 @@ where
         };
         Ok((
             VectorSink::Futures01Sink(Box::new(sink)),
-            Box::new(healthcheck),
+            healthcheck.boxed(),
         ))
     }
 

@@ -16,7 +16,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{future::BoxFuture, FutureExt, TryFutureExt};
+use futures::{future::BoxFuture, FutureExt};
 use futures01::{stream::iter_ok, Sink};
 use http::StatusCode;
 use lazy_static::lazy_static;
@@ -143,9 +143,9 @@ inventory::submit! {
 impl SinkConfig for S3SinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(cx.resolver())?;
-        let healthcheck = self.clone().healthcheck(client.clone()).boxed().compat();
+        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = self.new(client, cx)?;
-        Ok((sink, Box::new(healthcheck)))
+        Ok((sink, healthcheck))
     }
 
     fn input_type(&self) -> DataType {

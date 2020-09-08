@@ -87,10 +87,10 @@ impl SinkConfig for PulsarSinkConfig {
             .create_pulsar_producer()
             .await
             .context(CreatePulsarSink)?;
-        let hc = healthcheck(producer);
+        let healthcheck = healthcheck(producer).boxed();
         Ok((
             super::VectorSink::Futures01Sink(Box::new(sink)),
-            Box::new(hc.boxed().compat()),
+            healthcheck,
         ))
     }
 

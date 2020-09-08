@@ -118,10 +118,7 @@ impl SinkConfig for InfluxDBLogsConfig {
         )
         .sink_map_err(|e| error!("Fatal influxdb_logs sink error: {}", e));
 
-        Ok((
-            VectorSink::Futures01Sink(Box::new(sink)),
-            Box::new(healthcheck),
-        ))
+        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -195,7 +192,7 @@ impl InfluxDBLogsConfig {
             client,
         )?;
 
-        Ok(Box::new(healthcheck))
+        Ok(healthcheck)
     }
 }
 

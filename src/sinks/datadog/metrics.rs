@@ -14,7 +14,7 @@ use crate::{
     },
 };
 use chrono::{DateTime, Utc};
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::Sink;
 use http::{uri::InvalidUri, Request, StatusCode, Uri};
 use lazy_static::lazy_static;
@@ -111,7 +111,7 @@ inventory::submit! {
 impl SinkConfig for DatadogConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = HttpClient::new(cx.resolver(), None)?;
-        let healthcheck = healthcheck(self.clone(), client.clone()).boxed().compat();
+        let healthcheck = healthcheck(self.clone(), client.clone()).boxed();
 
         let batch = BatchSettings::default()
             .events(20)
@@ -138,10 +138,7 @@ impl SinkConfig for DatadogConfig {
         )
         .sink_map_err(|e| error!("Fatal datadog error: {}", e));
 
-        Ok((
-            VectorSink::Futures01Sink(Box::new(sink)),
-            Box::new(healthcheck),
-        ))
+        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

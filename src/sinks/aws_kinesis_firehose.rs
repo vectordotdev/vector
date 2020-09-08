@@ -12,7 +12,7 @@ use crate::{
     },
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, FutureExt, TryFutureExt};
+use futures::{future::BoxFuture, FutureExt};
 use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::RusotoError;
@@ -74,11 +74,11 @@ inventory::submit! {
 impl SinkConfig for KinesisFirehoseSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(cx.resolver())?;
-        let healthcheck = self.clone().healthcheck(client.clone()).boxed().compat();
+        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = KinesisFirehoseService::new(self.clone(), client, cx)?;
         Ok((
             super::VectorSink::Futures01Sink(Box::new(sink)),
-            Box::new(healthcheck),
+            healthcheck,
         ))
     }
 

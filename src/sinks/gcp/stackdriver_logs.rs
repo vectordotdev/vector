@@ -12,7 +12,7 @@ use crate::{
     },
     tls::{TlsOptions, TlsSettings},
 };
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::Sink;
 use http::{Request, Uri};
 use hyper::Body;
@@ -133,7 +133,7 @@ impl SinkConfig for StackdriverConfig {
                 .map(|key| Atom::from(key.as_str())),
         };
 
-        let healthcheck = healthcheck(client.clone(), sink.clone()).boxed().compat();
+        let healthcheck = healthcheck(client.clone(), sink.clone()).boxed();
 
         let sink = BatchedHttpSink::new(
             sink,
@@ -145,10 +145,7 @@ impl SinkConfig for StackdriverConfig {
         )
         .sink_map_err(|e| error!("Fatal stackdriver sink error: {}", e));
 
-        Ok((
-            VectorSink::Futures01Sink(Box::new(sink)),
-            Box::new(healthcheck),
-        ))
+        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

@@ -9,8 +9,8 @@ use crate::{
     },
     tls::{TlsOptions, TlsSettings},
 };
-use futures::{FutureExt, TryFutureExt};
-use futures01::{future, Sink};
+use futures::{future, FutureExt};
+use futures01::Sink;
 use http::{
     header::{self, HeaderName, HeaderValue},
     Method, Request, StatusCode, Uri,
@@ -130,12 +130,10 @@ impl SinkConfig for HttpSinkConfig {
 
         match self.healthcheck_uri.clone() {
             Some(healthcheck_uri) => {
-                let healthcheck = healthcheck(healthcheck_uri, self.auth.clone(), client)
-                    .boxed()
-                    .compat();
-                Ok((sink, Box::new(healthcheck)))
+                let healthcheck = healthcheck(healthcheck_uri, self.auth.clone(), client).boxed();
+                Ok((sink, healthcheck))
             }
-            None => Ok((sink, Box::new(future::ok(())))),
+            None => Ok((sink, future::ok(()).boxed())),
         }
     }
 

@@ -6,8 +6,8 @@ use crate::{
     Event,
 };
 use chrono::Utc;
-use futures::{compat::Future01CompatExt, future::FutureExt, TryFutureExt};
-use futures01::{future, Async, AsyncSink, Future, Sink};
+use futures::{compat::Future01CompatExt, future, FutureExt, TryFutureExt};
+use futures01::{Async, AsyncSink, Future, Sink};
 use hyper::{
     header::HeaderValue,
     service::{make_service_fn, service_fn},
@@ -74,7 +74,7 @@ impl SinkConfig for PrometheusSinkConfig {
         }
 
         let sink = Box::new(PrometheusSink::new(self.clone(), cx.acker()));
-        let healthcheck = Box::new(future::ok(()));
+        let healthcheck = future::ok(()).boxed();
 
         Ok((super::VectorSink::Futures01Sink(sink), healthcheck))
     }
@@ -307,7 +307,7 @@ fn handle(
         message = "Request complete",
         response_code = field::debug(response.status())
     );
-    Box::new(future::ok(response))
+    Box::new(futures01::future::ok(response))
 }
 
 impl PrometheusSink {

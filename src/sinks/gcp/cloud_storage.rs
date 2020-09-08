@@ -18,7 +18,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::{stream::iter_ok, Sink};
 use http::{StatusCode, Uri};
 use hyper::{
@@ -157,10 +157,10 @@ impl SinkConfig for GcsSinkConfig {
 
     async fn build_async(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = GcsSink::new(self, &cx).await?;
-        let healthcheck = sink.clone().healthcheck().boxed().compat();
+        let healthcheck = sink.clone().healthcheck().boxed();
         let service = sink.service(self, &cx)?;
 
-        Ok((service, Box::new(healthcheck)))
+        Ok((service, healthcheck))
     }
 
     fn input_type(&self) -> DataType {

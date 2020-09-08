@@ -12,7 +12,7 @@ use crate::{
     },
     tls::{TlsOptions, TlsSettings},
 };
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::Sink;
 use http::{Request, Uri};
 use hyper::Body;
@@ -85,9 +85,7 @@ impl SinkConfig for PubsubConfig {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(cx.resolver(), tls_settings)?;
 
-        let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.creds.clone())
-            .boxed()
-            .compat();
+        let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.creds.clone()).boxed();
 
         let sink = BatchedHttpSink::new(
             sink,
@@ -99,10 +97,7 @@ impl SinkConfig for PubsubConfig {
         )
         .sink_map_err(|e| error!("Fatal gcp pubsub sink error: {}", e));
 
-        Ok((
-            VectorSink::Futures01Sink(Box::new(sink)),
-            Box::new(healthcheck),
-        ))
+        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

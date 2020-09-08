@@ -3,8 +3,7 @@ pub mod metrics;
 
 use crate::sinks::util::{encode_namespace, http::HttpClient};
 use chrono::{DateTime, Utc};
-use futures::TryFutureExt;
-use futures01::Future;
+use futures::FutureExt;
 use http::{StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -154,17 +153,18 @@ fn healthcheck(
 
     let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
-    let healthcheck = client
-        .call(request)
-        .compat()
-        .map_err(|err| err.into())
-        .and_then(|response| match response.status() {
-            StatusCode::OK => Ok(()),
-            StatusCode::NO_CONTENT => Ok(()),
-            other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
-        });
-
-    Ok(Box::new(healthcheck))
+    Ok(async move {
+        client
+            .call(request)
+            .await
+            .map_err(|err| err.into())
+            .and_then(|response| match response.status() {
+                StatusCode::OK => Ok(()),
+                StatusCode::NO_CONTENT => Ok(()),
+                other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
+            })
+    }
+    .boxed())
 }
 
 // https://v2.docs.influxdata.com/v2.0/reference/syntax/line-protocol/
@@ -716,7 +716,6 @@ mod integration_tests {
         },
         sinks::util::http::HttpClient,
     };
-    use futures::compat::Future01CompatExt;
 
     #[tokio::test]
     async fn influxdb2_healthchecks_ok() {
@@ -734,7 +733,6 @@ mod integration_tests {
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
-            .compat()
             .await
             .unwrap();
     }
@@ -755,7 +753,6 @@ mod integration_tests {
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
-            .compat()
             .await
             .unwrap_err();
     }
@@ -776,7 +773,6 @@ mod integration_tests {
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
-            .compat()
             .await
             .unwrap();
     }
@@ -797,7 +793,6 @@ mod integration_tests {
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
-            .compat()
             .await
             .unwrap_err();
     }

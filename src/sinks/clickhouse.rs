@@ -10,7 +10,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::Sink;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
@@ -80,11 +80,11 @@ impl SinkConfig for ClickhouseConfig {
         )
         .sink_map_err(|e| error!("Fatal clickhouse sink error: {}", e));
 
-        let healthcheck = healthcheck(client, self.clone()).boxed().compat();
+        let healthcheck = healthcheck(client, self.clone()).boxed();
 
         Ok((
             super::VectorSink::Futures01Sink(Box::new(sink)),
-            Box::new(healthcheck),
+            healthcheck,
         ))
     }
 

@@ -164,7 +164,7 @@ pub async fn build_pieces(
         let healthcheck_task = async move {
             if enable_healthcheck {
                 let duration = Duration::from_secs(10);
-                timeout(duration, healthcheck.compat())
+                timeout(duration, healthcheck)
                     .map(|result| match result {
                         Ok(Ok(_)) => {
                             info!("Healthcheck: Passed.");

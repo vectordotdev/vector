@@ -9,7 +9,6 @@ use crate::{
     tls::{MaybeTlsSettings, TlsSettings},
 };
 use bytes::Bytes;
-use futures::TryFutureExt;
 use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
@@ -55,7 +54,7 @@ impl SinkConfig for PapertrailConfig {
 
         Ok((
             super::VectorSink::Futures01Sink(Box::new(sink)),
-            Box::new(healthcheck.compat()),
+            healthcheck,
         ))
     }
 

@@ -7,7 +7,7 @@ use crate::{
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
     },
 };
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::Sink;
 use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
@@ -79,11 +79,11 @@ impl SinkConfig for LogdnaConfig {
         )
         .sink_map_err(|e| error!("Fatal logdna sink error: {}", e));
 
-        let healthcheck = healthcheck(self.clone(), client).boxed().compat();
+        let healthcheck = healthcheck(self.clone(), client).boxed();
 
         Ok((
             super::VectorSink::Futures01Sink(Box::new(sink)),
-            Box::new(healthcheck),
+            healthcheck,
         ))
     }
 
