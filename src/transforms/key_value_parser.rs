@@ -1,15 +1,15 @@
 use super::Transform;
+use crate::internal_events::KeyValueParseFailed;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{self, Event},
-    internal_events::{KeyValueFieldDoesNotExist, KeyValueEventProcessed, KeyValueTargetExists},
+    internal_events::{KeyValueEventProcessed, KeyValueFieldDoesNotExist, KeyValueTargetExists},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 use string_cache::DefaultAtom as Atom;
-use crate::internal_events::KeyValueParseFailed;
 
 #[derive(Debug, Default, Derivative, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -35,14 +35,22 @@ inventory::submit! {
 impl TransformConfig for KeyValueConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let conversions = parse_conversion_map(&self.types)?;
-        let field = self.field.as_ref().unwrap_or(&event::log_schema().message_key());
+        let field = self
+            .field
+            .as_ref()
+            .unwrap_or(&event::log_schema().message_key());
         let field_split = self.field_split.clone().unwrap_or_else(|| "=".to_string());
         let separator = self.separator.clone().unwrap_or_else(|| " ".to_string());
         let trim_key = self.trim_key.as_ref().map(|key| key.chars().collect());
         let trim_value = self.trim_value.as_ref().map(|key| key.chars().collect());
 
         // Ensure the field being dropped is not the target field.
-        let drop_field = self.drop_field && self.target_field.as_ref().map(|target_field| field != target_field).unwrap_or(true);
+        let drop_field = self.drop_field
+            && self
+                .target_field
+                .as_ref()
+                .map(|target_field| field != target_field)
+                .unwrap_or(true);
 
         Ok(Box::new(KeyValue {
             conversions,
@@ -158,7 +166,7 @@ impl Transform for KeyValue {
                     match conv.convert(val.to_string().into()) {
                         Ok(value) => {
                             log.insert(key, value);
-                        },
+                        }
                         Err(error) => {
                             emit!(KeyValueParseFailed { key, error });
                         }
@@ -172,7 +180,9 @@ impl Transform for KeyValue {
                 log.remove(&self.field);
             }
         } else {
-            emit!(KeyValueFieldDoesNotExist {field: self.field.as_ref().into()});
+            emit!(KeyValueFieldDoesNotExist {
+                field: self.field.as_ref().into()
+            });
         };
 
         Some(event)
@@ -220,16 +230,7 @@ mod tests {
 
     #[test]
     fn it_separates_whitespace() {
-        let log = parse_log(
-            "foo=bar beep=bop",
-            None,
-            None,
-            true,
-            &[],
-            None,
-            None,
-            None,
-        );
+        let log = parse_log("foo=bar beep=bop", None, None, true, &[], None, None, None);
         assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
         assert_eq!(log[&"beep".into()], Value::Bytes("bop".into()));
     }
