@@ -180,8 +180,10 @@
   type = "remap"
   mapping = """
     upcase(.a)
-    upcase(.b, .c.c)
-    upcase(.d, .e)
+    upcase(.b)
+    upcase(.c.c)
+    upcase(.d)
+    upcase(.e)
   """
 [[tests]]
   name = "remap_function_upcase"
@@ -208,8 +210,10 @@
   type = "remap"
   mapping = """
     downcase(.a)
-    downcase(.b, .c.c)
-    downcase(.d, .e)
+    downcase(.b)
+    downcase(.c.c)
+    downcase(.d)
+    downcase(.e)
   """
 [[tests]]
   name = "remap_function_downcase"

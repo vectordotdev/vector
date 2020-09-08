@@ -35,6 +35,7 @@ fn target_path_from_pair(pair: Pair<Rule>) -> Result<String> {
             Rule::quoted_path_segment => {
                 segments.push(quoted_path_from_pair(segment)?.replace(".", "\\."))
             }
+            Rule::target_path => return target_path_from_pair(segment),
             rule => unreachable!(
                 "parser should not allow other target_path child rules here: {:?}",
                 rule
@@ -345,8 +346,8 @@ fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
         Rule::deletion => Ok(Box::new(Deletion::new(paths_from_pair(pair)?))),
         Rule::only_fields => Ok(Box::new(OnlyFields::new(paths_from_pair(pair)?))),
-        Rule::upcase => Ok(Box::new(Upcase::new(paths_from_pair(pair)?))),
-        Rule::downcase => Ok(Box::new(Downcase::new(paths_from_pair(pair)?))),
+        Rule::upcase => Ok(Box::new(Upcase::new(target_path_from_pair(pair)?))),
+        Rule::downcase => Ok(Box::new(Downcase::new(target_path_from_pair(pair)?))),
         _ => unreachable!("parser should not allow other function child rules here"),
     }
 }
@@ -776,48 +777,34 @@ mod tests {
             // function: upcase
             (
                 "upcase(.foo)",
-                Mapping::new(vec![Box::new(Upcase::new(vec!["foo".to_string()]))]),
+                Mapping::new(vec![Box::new(Upcase::new("foo".to_string()))]),
             ),
             (
                 "upcase(.\"foo bar\")",
-                Mapping::new(vec![Box::new(Upcase::new(vec!["foo bar".to_string()]))]),
+                Mapping::new(vec![Box::new(Upcase::new("foo bar".to_string()))]),
             ),
             (
                 "upcase(.foo)\nupcase(.bar.baz)",
                 Mapping::new(vec![
-                    Box::new(Upcase::new(vec!["foo".to_string()])),
-                    Box::new(Upcase::new(vec!["bar.baz".to_string()])),
+                    Box::new(Upcase::new("foo".to_string())),
+                    Box::new(Upcase::new("bar.baz".to_string())),
                 ]),
-            ),
-            (
-                "upcase(.foo, .bar.baz)",
-                Mapping::new(vec![Box::new(Upcase::new(vec![
-                    "foo".to_string(),
-                    "bar.baz".to_string(),
-                ]))]),
             ),
             // function: downcase
             (
                 "downcase(.foo)",
-                Mapping::new(vec![Box::new(Downcase::new(vec!["foo".to_string()]))]),
+                Mapping::new(vec![Box::new(Downcase::new("foo".to_string()))]),
             ),
             (
                 "downcase(.\"foo bar\")",
-                Mapping::new(vec![Box::new(Downcase::new(vec!["foo bar".to_string()]))]),
+                Mapping::new(vec![Box::new(Downcase::new("foo bar".to_string()))]),
             ),
             (
-                "downcase(.foo)\nupcase(.bar.baz)",
+                "downcase(.foo)\ndowncase(.bar.baz)",
                 Mapping::new(vec![
-                    Box::new(Downcase::new(vec!["foo".to_string()])),
-                    Box::new(Downcase::new(vec!["bar.baz".to_string()])),
+                    Box::new(Downcase::new("foo".to_string())),
+                    Box::new(Downcase::new("bar.baz".to_string())),
                 ]),
-            ),
-            (
-                "downcase(.foo, .bar.baz)",
-                Mapping::new(vec![Box::new(Downcase::new(vec![
-                    "foo".to_string(),
-                    "bar.baz".to_string(),
-                ]))]),
             ),
             //
             (

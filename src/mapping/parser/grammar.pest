@@ -27,19 +27,19 @@ function = {
     downcase
 }
 
-deletion = { "del(" ~ path_args ~ ")" }
-only_fields = { "only_fields(" ~ path_args ~ ")" }
-upcase = { "upcase(" ~ path_args ~ ")" }
-downcase = { "downcase(" ~ path_args ~ ")" }
+deletion = { "del(" ~ target_paths ~ ")" }
+only_fields = { "only_fields(" ~ target_paths ~ ")" }
+upcase = { "upcase(" ~ target_path ~ ")" }
+downcase = { "downcase(" ~ target_path ~ ")" }
 
 // One or more path arguments for a given function.
 //
 // Can be used to parse functions that take one or more paths, e.g.:
 //
-// my_func = { "my_func(" ~ path_args ~ ")" }
+// my_func = { "my_func(" ~ target_paths ~ ")" }
 // => my_func(.bar, .baz)
 //
-path_args = _{ target_path ~ ("," ~ target_path)* }
+target_paths = _{ target_path ~ ("," ~ target_path)* }
 
 // Queries
 path_coalesce = !{ "(" ~ (path_segment | quoted_path_segment) ~ ("|" ~ (path_segment | quoted_path_segment))+ ~ ")" }
