@@ -1,7 +1,13 @@
-use futures01::{Future, Sink};
+use crate::Event;
+use futures::{
+    compat::{Compat, Future01CompatExt},
+    StreamExt, TryFutureExt,
+};
 use snafu::Snafu;
+use std::fmt;
 
 pub mod streaming_sink;
+pub mod util;
 
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
 pub mod aws_cloudwatch_logs;
@@ -60,13 +66,11 @@ pub mod statsd;
 #[cfg(feature = "sinks-vector")]
 pub mod vector;
 
-pub mod util;
+pub enum VectorSink {
+    Futures01Sink(Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + 'static + Send>),
+}
 
-use crate::Event;
-
-pub type RouterSink = Box<dyn Sink<SinkItem = Event, SinkError = ()> + 'static + Send>;
-
-pub type Healthcheck = Box<dyn Future<Item = (), Error = crate::Error> + Send>;
+pub type Healthcheck = Box<dyn futures01::Future<Item = (), Error = crate::Error> + Send>;
 
 /// Common build errors
 #[derive(Debug, Snafu)]
@@ -86,4 +90,37 @@ pub enum BuildError {
 pub enum HealthcheckError {
     #[snafu(display("Unexpected status: {}", status))]
     UnexpectedStatus { status: ::http::StatusCode },
+}
+
+impl VectorSink {
+    pub async fn run01<S>(self, input: S) -> Result<(), ()>
+    where
+        S: futures01::Stream<Item = Event, Error = ()>,
+    {
+        match self {
+            Self::Futures01Sink(sink) => input.forward(sink).compat().map_ok(|_| ()).await,
+        }
+    }
+
+    pub async fn run<S>(self, input: S) -> Result<(), ()>
+    where
+        S: futures::Stream<Item = Result<Event, ()>> + Send,
+    {
+        self.run01(Compat::new(input.boxed())).await
+    }
+
+    pub fn into_futures01sink(
+        self,
+    ) -> Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + 'static + Send> {
+        match self {
+            Self::Futures01Sink(sink) => sink,
+            // _ => panic!("Failed type coercion, {:?} is not a Futures01Sink", self),
+        }
+    }
+}
+
+impl fmt::Debug for VectorSink {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("VectorSink").finish()
+    }
 }

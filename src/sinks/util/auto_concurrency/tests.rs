@@ -14,7 +14,7 @@ use crate::{
             retries::RetryLogic, BatchSettings, EncodedLength, InFlightLimit, TowerRequestConfig,
             VecBuffer,
         },
-        Healthcheck, RouterSink,
+        Healthcheck, VectorSink,
     },
     sources::generator::GeneratorConfig,
     test_util::{start_topology, stats::LevelTimeHistogram},
@@ -80,7 +80,7 @@ struct TestConfig {
 
 #[typetag::serialize(name = "test")]
 impl SinkConfig for TestConfig {
-    fn build(&self, cx: SinkContext) -> Result<(RouterSink, Healthcheck), crate::Error> {
+    fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
         let batch = BatchSettings::default().events(1).bytes(9999).timeout(9999);
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let sink = request
@@ -106,7 +106,10 @@ impl SinkConfig for TestConfig {
         );
         *self.controller_stats.lock().unwrap() = stats;
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            VectorSink::Futures01Sink(Box::new(sink)),
+            Box::new(healthcheck),
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -250,12 +253,12 @@ async fn run_test4(
     let stats = Arc::clone(&test_config.stats);
     let cstats = Arc::clone(&test_config.controller_stats);
 
-    let mut config = config::Config::empty();
+    let mut config = config::Config::builder();
     let generator = GeneratorConfig::repeat(vec!["line 1".into()], lines, interval);
     config.add_source("in", generator);
     config.add_sink("out", &["in"], test_config);
 
-    let (topology, _crash) = start_topology(config, false).await;
+    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
     let controller = get_controller().unwrap();
 

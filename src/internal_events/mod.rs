@@ -56,6 +56,8 @@ mod splunk_hec;
 #[cfg(feature = "sources-statsd")]
 mod statsd;
 mod stdin;
+#[cfg(feature = "transforms-swimlanes")]
+mod swimlanes;
 mod syslog;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 mod tag_cardinality_limit;
@@ -124,6 +126,8 @@ pub(crate) use self::splunk_hec::*;
 #[cfg(feature = "sources-statsd")]
 pub use self::statsd::*;
 pub use self::stdin::*;
+#[cfg(feature = "transforms-swimlanes")]
+pub use self::swimlanes::*;
 pub use self::syslog::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub(crate) use self::tag_cardinality_limit::*;

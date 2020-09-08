@@ -2,7 +2,7 @@ use super::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, St
 use crate::{
     config::SinkContext,
     dns::{Resolver, ResolverFuture},
-    sinks::{Healthcheck, RouterSink},
+    sinks::{Healthcheck, VectorSink},
 };
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
@@ -34,7 +34,7 @@ impl UdpSinkConfig {
         Self { address, encoding }
     }
 
-    pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    pub fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -52,12 +52,12 @@ pub fn raw_udp(
     port: u16,
     encoding: EncodingConfig<Encoding>,
     cx: SinkContext,
-) -> Result<RouterSink, UdpBuildError> {
+) -> Result<VectorSink, UdpBuildError> {
     let sink = UdpSink::new(host, port, cx.resolver())?;
     let sink = StreamSink::new(sink, cx.acker());
-    Ok(Box::new(sink.with_flat_map(move |event| {
-        iter_ok(encode_event(event, &encoding))
-    })))
+    Ok(VectorSink::Futures01Sink(Box::new(sink.with_flat_map(
+        move |event| iter_ok(encode_event(event, &encoding)),
+    ))))
 }
 
 fn udp_healthcheck() -> Healthcheck {

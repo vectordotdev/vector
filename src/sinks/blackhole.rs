@@ -26,11 +26,11 @@ inventory::submit! {
 
 #[typetag::serde(name = "blackhole")]
 impl SinkConfig for BlackholeConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = Box::new(BlackholeSink::new(self.clone(), cx.acker()));
         let healthcheck = Box::new(healthcheck());
 
-        Ok((sink, healthcheck))
+        Ok((super::VectorSink::Futures01Sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

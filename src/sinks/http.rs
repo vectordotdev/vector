@@ -101,7 +101,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         validate_headers(&self.headers, &self.auth)?;
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(cx.resolver(), tls)?;
@@ -126,7 +126,7 @@ impl SinkConfig for HttpSinkConfig {
         )
         .sink_map_err(|e| error!("Fatal HTTP sink error: {}", e));
 
-        let sink = Box::new(sink);
+        let sink = super::VectorSink::Futures01Sink(Box::new(sink));
 
         match self.healthcheck_uri.clone() {
             Some(healthcheck_uri) => {
@@ -299,7 +299,7 @@ mod tests {
     };
     use bytes::buf::BufExt;
     use flate2::read::GzDecoder;
-    use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt};
+    use futures::{stream, StreamExt};
     use headers::{Authorization, HeaderMapExt};
     use hyper::Method;
     use serde::Deserialize;
@@ -411,15 +411,14 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).unwrap();
-        let mut sink = sink.sink_compat();
         let (rx, trigger, server) = build_test_server(in_addr);
 
-        let (input_lines, mut events) = random_lines_with_stream(100, num_lines);
-        let pump = sink.send_all(&mut events);
+        let (input_lines, events) = random_lines_with_stream(100, num_lines);
+        let pump = sink.run(events);
 
         tokio::spawn(server);
 
-        let _ = pump.await.unwrap();
+        pump.await.unwrap();
         drop(trigger);
 
         let output_lines = rx
@@ -467,15 +466,14 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).unwrap();
-        let mut sink = sink.sink_compat();
         let (rx, trigger, server) = build_test_server(in_addr);
 
-        let (input_lines, mut events) = random_lines_with_stream(100, num_lines);
-        let pump = sink.send_all(&mut events);
+        let (input_lines, events) = random_lines_with_stream(100, num_lines);
+        let pump = sink.run(events);
 
         tokio::spawn(server);
 
-        let _ = pump.await.unwrap();
+        pump.await.unwrap();
         drop(trigger);
 
         let output_lines = rx
@@ -520,15 +518,14 @@ mod tests {
         let cx = SinkContext::new_test();
 
         let (sink, _) = config.build(cx).unwrap();
-        let mut sink = sink.sink_compat();
         let (rx, trigger, server) = build_test_server(in_addr);
 
-        let (input_lines, mut events) = random_lines_with_stream(100, num_lines);
-        let pump = sink.send_all(&mut events);
+        let (input_lines, events) = random_lines_with_stream(100, num_lines);
+        let pump = sink.run(events);
 
         tokio::spawn(server);
 
-        let _ = pump.await.unwrap();
+        pump.await.unwrap();
         drop(trigger);
 
         let output_lines = rx

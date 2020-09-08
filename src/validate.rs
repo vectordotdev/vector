@@ -11,20 +11,9 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Opts {
-    /// Disables topology check
-    #[structopt(long)]
-    no_topology: bool,
-
     /// Disables environment checks. That includes component checks and health checks.
     #[structopt(long)]
     no_environment: bool,
-
-    /// Shorthand for `--no-topology` and `--no-environment` flags. Just `-n` won't disable anything,
-    /// it needs to be used with `t` for `--no-topology`, and or `e` for `--no-environment` in any order.
-    /// Example:
-    /// `-nte` and `-net` both mean `--no-topology` and `--no-environment`
-    #[structopt(short, parse(from_str = NoCheck::from_str), possible_values = &["","t", "e","et","te"], default_value="")]
-    no: NoCheck,
 
     /// Fail validation on warnings
     #[structopt(short, long)]
@@ -33,21 +22,6 @@ pub struct Opts {
     /// Any number of Vector config files to validate. If none are specified the
     /// default config path `/etc/vector/vector.toml` will be targeted.
     paths: Vec<PathBuf>,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct NoCheck {
-    topology: bool,
-    environment: bool,
-}
-
-impl NoCheck {
-    fn from_str(s: &str) -> Self {
-        Self {
-            topology: s.find('t').is_some(),
-            environment: s.find('e').is_some(),
-        }
-    }
 }
 
 /// Performs topology, component, and health checks.
@@ -61,11 +35,7 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
         None => return exitcode::CONFIG,
     };
 
-    if !(opts.no_topology || opts.no.topology) {
-        validated &= validate_topology(opts, &config, &mut fmt);
-    }
-
-    if !(opts.no_environment || opts.no.environment) {
+    if !opts.no_environment {
         validated &= validate_environment(&config, &mut fmt).await;
     }
 
@@ -97,31 +67,6 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
             fmt.title(format!("Failed to load {:?}", paths));
             fmt.sub_error(errors);
             None
-        }
-    }
-}
-
-fn validate_topology(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool {
-    match config::check(config) {
-        Ok(warnings) => {
-            if warnings.is_empty() {
-                fmt.success("Configuration topology");
-                true
-            } else if opts.deny_warnings {
-                fmt.title("Topology errors");
-                fmt.sub_error(warnings);
-                false
-            } else {
-                fmt.title("Topology warnings");
-                fmt.sub_warning(warnings);
-                fmt.success("Configuration topology");
-                true
-            }
-        }
-        Err(errors) => {
-            fmt.title("Topology errors");
-            fmt.sub_error(errors);
-            false
         }
     }
 }
@@ -287,14 +232,6 @@ impl Formatter {
         I::Item: fmt::Display,
     {
         self.sub(self.error_intro.clone(), errors)
-    }
-
-    /// A list of warnings that go with a title.
-    fn sub_warning<I: IntoIterator>(&mut self, warnings: I)
-    where
-        I::Item: fmt::Display,
-    {
-        self.sub(self.warning_intro.clone(), warnings)
     }
 
     fn sub<I: IntoIterator>(&mut self, intro: impl AsRef<str>, msgs: I)
