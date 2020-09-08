@@ -2,7 +2,7 @@ use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{self, Event},
-    internal_events::{KeyValueEventProcessed, KeyFailedParse, KeyValueEventFailed},
+    internal_events::{KeyFailedParse, KeyValueEventFailed, KeyValueEventProcessed},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -16,12 +16,10 @@ pub struct KeyValueConfig {
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
     pub field: Option<Atom>,
-    #[derivative(Default(value = "="))]
-    pub field_split: String,
+    pub field_split: Option<String>,
     #[derivative(Default(value = "true"))]
     pub overwrite_target: bool,
-    #[derivative(Default(value = " "))]
-    pub separator: String,
+    pub separator: Option<String>,
     pub target_field: Option<Atom>,
     pub trim_key: Option<String>,
     pub trim_value: Option<String>,
@@ -35,12 +33,13 @@ inventory::submit! {
 #[typetag::serde(name = "key_value_parser")]
 impl TransformConfig for KeyValueConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+        let conversions = parse_conversion_map(&self.types)?;
         let field = self
             .field
             .as_ref()
             .unwrap_or(&event::log_schema().message_key());
-
-        let conversions = parse_conversion_map(&self.types)?;
+        let field_split = self.field_split.clone().unwrap_or_else(|| "=".to_string());
+        let separator = self.separator.clone().unwrap_or_else(|| " ".to_string());
         let trim_key = self.trim_key.as_ref().map(|key| key.chars().collect());
         let trim_value = self.trim_value.as_ref().map(|key| key.chars().collect());
 
@@ -48,9 +47,9 @@ impl TransformConfig for KeyValueConfig {
             conversions,
             drop_field: self.drop_field,
             field: field.clone(),
-            field_split: Option::from(self.field_split.clone()),
+            field_split,
             overwrite_target: self.overwrite_target,
-            separator: self.separator.clone(),
+            separator,
             target_field: self.target_field.clone(),
             trim_key,
             trim_value,
@@ -74,7 +73,7 @@ pub struct KeyValue {
     conversions: HashMap<Atom, Conversion>,
     drop_field: bool,
     field: Atom,
-    field_split: Option<String>,
+    field_split: String,
     overwrite_target: bool,
     separator: String,
     target_field: Option<Atom>,
@@ -83,13 +82,9 @@ pub struct KeyValue {
 }
 
 impl KeyValue {
-    pub fn parse_pair(&self, pair: &str) -> Option<(Atom, String)> {
+    fn parse_pair(&self, pair: &str) -> Option<(Atom, String)> {
         let pair = pair.trim();
-        let field_split = self
-            .field_split
-            .as_ref()
-            .ok_or_else(|| Some("".to_string()))
-            .unwrap();
+        let field_split = &self.field_split;
 
         let fields = if field_split.is_empty() {
             let mut kv_pair = pair.split_whitespace();
@@ -108,11 +103,10 @@ impl KeyValue {
             let split_index = pair.find(field_split).unwrap_or(0);
             let (key, _val) = pair.split_at(split_index);
             let key = key.trim();
-            let val = pair[split_index + field_split.len()..].trim();
-
             if key.is_empty() {
                 return None;
             }
+            let val = pair[split_index + field_split.len()..].trim();
 
             (key, val)
         };
@@ -160,15 +154,12 @@ impl Transform for KeyValue {
                 }
 
                 if let Some(conv) = self.conversions.get(&key) {
-                    match conv.convert(val.as_bytes().to_vec().into()) {
+                    match conv.convert(val.to_string().into()) {
                         Ok(value) => {
                             log.insert(key, value);
-                        }
+                        },
                         Err(error) => {
-                            emit!(KeyFailedParse {
-                                key,
-                                error
-                            });
+                            emit!(KeyFailedParse { key, error });
                         }
                     }
                 } else {
@@ -202,8 +193,8 @@ mod tests {
 
     fn parse_log(
         text: &str,
-        separator: String,
-        field_split: String,
+        separator: Option<String>,
+        field_split: Option<String>,
         drop_field: bool,
         types: &[(&str, &str)],
         target_field: Option<Atom>,
@@ -233,8 +224,8 @@ mod tests {
     fn it_separates_whitespace() {
         let log = parse_log(
             "foo=bar beep=bop",
-            " ".to_string(),
-            "=".to_string(),
+            None,
+            None,
             true,
             &[],
             None,
@@ -249,8 +240,8 @@ mod tests {
     fn it_separates_csv_kv() {
         let log = parse_log(
             "foo=bar, beep=bop, score=10",
-            ",".to_string(),
-            "=".to_string(),
+            Some(",".to_string()),
+            None,
             false,
             &[],
             None,
@@ -265,8 +256,8 @@ mod tests {
     fn it_splits_whitespace() {
         let log = parse_log(
             "foo bar, beep bop, score 10",
-            ",".to_string(),
-            " ".to_string(),
+            Some(",".to_string()),
+            Some(" ".to_string()),
             false,
             &[],
             None,
@@ -281,8 +272,8 @@ mod tests {
     fn it_handles_whitespace_in_fields() {
         let log = parse_log(
             "foo:bar, beep : bop, score :10",
-            ",".to_string(),
-            ":".to_string(),
+            Some(",".to_string()),
+            Some(":".to_string()),
             false,
             &[("score", "integer")],
             None,
@@ -298,8 +289,8 @@ mod tests {
     fn it_handles_multi_char_splitters() {
         let log = parse_log(
             "foo=>bar || beep => bop || score=>10",
-            "||".to_string(),
-            "=>".to_string(),
+            Some("||".to_string()),
+            Some("=>".to_string()),
             false,
             &[("score", "integer")],
             None,
@@ -316,8 +307,8 @@ mod tests {
     fn it_handles_splitters_in_value() {
         let log = parse_log(
             "foo==bar, beep=bop=bap , score=10",
-            ",".to_string(),
-            "=".to_string(),
+            Some(",".to_string()),
+            None,
             false,
             &[("score", "integer")],
             None,
@@ -333,8 +324,8 @@ mod tests {
     fn it_handles_empty_values() {
         let log = parse_log(
             "foo::0, bop::beep, score::",
-            ",".to_string(),
-            "::".to_string(),
+            Some(",".to_string()),
+            Some("::".to_string()),
             false,
             &[],
             None,
@@ -349,8 +340,8 @@ mod tests {
     fn it_handles_empty_keys() {
         let log = parse_log(
             "foo::0, ::beep, score::12",
-            ",".to_string(),
-            "::".to_string(),
+            Some(",".to_string()),
+            Some("::".to_string()),
             false,
             &[],
             None,
@@ -366,8 +357,8 @@ mod tests {
     fn it_accepts_brackets() {
         let log = parse_log(
             r#"{"foo"}:0, ""bop":[beep], [score]:78"#,
-            ",".to_string(),
-            ":".to_string(),
+            Some(",".to_string()),
+            Some(":".to_string()),
             false,
             &[],
             None,
@@ -381,8 +372,8 @@ mod tests {
     fn it_trims_keys() {
         let log = parse_log(
             "{\"foo\"}:0, \"\"bop\":beep, {({score})}:78",
-            ",".to_string(),
-            ":".to_string(),
+            Some(",".to_string()),
+            Some(":".to_string()),
             false,
             &[],
             None,
@@ -398,8 +389,8 @@ mod tests {
     fn it_trims_values() {
         let log = parse_log(
             "foo:{\"0\"}, bop:\"beep\", score:{78}",
-            ",".to_string(),
-            ":".to_string(),
+            Some(",".to_string()),
+            Some(":".to_string()),
             false,
             &[("foo", "integer"), ("score", "integer")],
             None,
