@@ -35,18 +35,18 @@ inventory::submit! {
 impl TransformConfig for KeyValueConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let conversions = parse_conversion_map(&self.types)?;
-        let field = self
-            .field
-            .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+        let field = self.field.as_ref().unwrap_or(&event::log_schema().message_key());
         let field_split = self.field_split.clone().unwrap_or_else(|| "=".to_string());
         let separator = self.separator.clone().unwrap_or_else(|| " ".to_string());
         let trim_key = self.trim_key.as_ref().map(|key| key.chars().collect());
         let trim_value = self.trim_value.as_ref().map(|key| key.chars().collect());
 
+        // Ensure the field being dropped is not the target field.
+        let drop_field = self.drop_field && self.target_field.as_ref().map(|target_field| field != target_field).unwrap_or(true);
+
         Ok(Box::new(KeyValue {
             conversions,
-            drop_field: self.drop_field,
+            drop_field,
             field: field.clone(),
             field_split,
             overwrite_target: self.overwrite_target,
