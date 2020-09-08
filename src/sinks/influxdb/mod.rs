@@ -716,7 +716,6 @@ mod integration_tests {
         },
         sinks::util::http::HttpClient,
     };
-    use futures::compat::Future01CompatExt;
 
     #[tokio::test]
     async fn influxdb2_healthchecks_ok() {
@@ -734,7 +733,6 @@ mod integration_tests {
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
-            .compat()
             .await
             .unwrap();
     }
@@ -755,7 +753,6 @@ mod integration_tests {
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
-            .compat()
             .await
             .unwrap_err();
     }
@@ -776,7 +773,6 @@ mod integration_tests {
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
-            .compat()
             .await
             .unwrap();
     }
@@ -797,7 +793,6 @@ mod integration_tests {
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
-            .compat()
             .await
             .unwrap_err();
     }

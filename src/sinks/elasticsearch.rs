@@ -602,7 +602,7 @@ mod integration_tests {
         tls::TlsOptions,
         Event,
     };
-    use futures::{compat::Future01CompatExt, future, stream, TryStreamExt};
+    use futures::{future, stream, TryStreamExt};
     use http::{Request, StatusCode};
     use hyper::Body;
     use serde_json::{json, Value};
@@ -758,7 +758,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
         let (sink, healthcheck) = config.build(cx.clone()).expect("Building config failed");
 
-        healthcheck.compat().await.expect("Health check failed");
+        healthcheck.await.expect("Health check failed");
 
         let (input, events) = random_events_with_stream(100, 100);
         match break_events {
