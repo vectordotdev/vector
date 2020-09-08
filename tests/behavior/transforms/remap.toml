@@ -215,11 +215,15 @@
   inputs = []
   type = "remap"
   mapping = """
-    downcase(.a)
-    downcase(.b)
-    downcase(.c.c)
-    downcase(.d)
-    downcase(.e)
+    .a = downcase(.a)
+    .b = downcase(.b)
+    .c.c = downcase(.c.c)
+    .d = downcase(.d)
+    .e = downcase(.e)
+
+    if downcase(.f) == "f" {
+        .f = "FF"
+    }
   """
 [[tests]]
   name = "remap_function_downcase"
@@ -232,6 +236,7 @@
       "c.c" = "C.C"
       d = 1
       e = false
+      f = "F"
   [[tests.outputs]]
     extract_from = "remap_function_downcase"
     [[tests.outputs.conditions]]
@@ -240,3 +245,4 @@
       "c.c.equals" = "c.c"
       "d.equals" = 1
       "e.equals" = false
+      "f.equals" = "FF"

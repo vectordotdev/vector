@@ -8,12 +8,13 @@ use crate::{
             arithmetic::Arithmetic,
             arithmetic::Operator,
             functions::{
-                NotFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn, UpcaseFn,
+                DowncaseFn, NotFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn,
+                UpcaseFn,
             },
             path::Path as QueryPath,
             Literal,
         },
-        Assignment, Deletion, Downcase, Function, IfStatement, Mapping, Noop, OnlyFields, Result,
+        Assignment, Deletion, Function, IfStatement, Mapping, Noop, OnlyFields, Result,
     },
 };
 use pest::{
@@ -272,6 +273,11 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
             let query = query_arithmetic_from_pair(pair)?;
             Ok(Box::new(UpcaseFn::new(query)))
         }
+        Rule::downcase => {
+            let pair = pair.into_inner().next().ok_or(TOKEN_ERR)?;
+            let query = query_arithmetic_from_pair(pair)?;
+            Ok(Box::new(DowncaseFn::new(query)))
+        }
         _ => unreachable!("parser should not allow other query_function child rules here"),
     }
 }
@@ -352,7 +358,6 @@ fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
         Rule::deletion => Ok(Box::new(Deletion::new(paths_from_pair(pair)?))),
         Rule::only_fields => Ok(Box::new(OnlyFields::new(paths_from_pair(pair)?))),
-        Rule::downcase => Ok(Box::new(Downcase::new(target_path_from_pair(pair)?))),
         _ => unreachable!("parser should not allow other function child rules here"),
     }
 }
@@ -779,22 +784,6 @@ mod tests {
                     "bar.baz".to_string(),
                 ]))]),
             ),
-            // function: downcase
-            (
-                "downcase(.foo)",
-                Mapping::new(vec![Box::new(Downcase::new("foo".to_string()))]),
-            ),
-            (
-                "downcase(.\"foo bar\")",
-                Mapping::new(vec![Box::new(Downcase::new("foo bar".to_string()))]),
-            ),
-            (
-                "downcase(.foo)\ndowncase(.bar.baz)",
-                Mapping::new(vec![
-                    Box::new(Downcase::new("foo".to_string())),
-                    Box::new(Downcase::new("bar.baz".to_string())),
-                ]),
-            ),
             //
             (
                 r#"if .foo == 5 {
@@ -936,6 +925,13 @@ mod tests {
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(UpcaseFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                ".foo = downcase(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(DowncaseFn::new(Box::new(QueryPath::from("foo")))),
                 ))]),
             ),
         ];

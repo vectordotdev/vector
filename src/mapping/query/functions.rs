@@ -241,6 +241,36 @@ impl Function for UpcaseFn {
 
 //------------------------------------------------------------------------------
 
+#[derive(Debug)]
+pub(in crate::mapping) struct DowncaseFn {
+    query: Box<dyn Function>,
+}
+
+impl DowncaseFn {
+    pub(in crate::mapping) fn new(query: Box<dyn Function>) -> Self {
+        Self { query }
+    }
+}
+
+impl Function for DowncaseFn {
+    fn execute(&self, ctx: &Event) -> Result<Value> {
+        let value = self.query.execute(ctx)?;
+
+        if let Value::Bytes(bytes) = value {
+            let mut buf = BytesMut::with_capacity(bytes.len());
+
+            buf.extend_from_slice(&bytes);
+            buf.iter_mut().for_each(|c| c.make_ascii_lowercase());
+
+            return Ok(Value::Bytes(buf.freeze()));
+        }
+
+        Ok(value)
+    }
+}
+
+//------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -550,6 +580,48 @@ mod tests {
                 },
                 Ok(Value::Boolean(true)),
                 UpcaseFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+        ];
+
+        for (input_event, exp, query) in cases {
+            assert_eq!(query.execute(&input_event), exp);
+        }
+    }
+
+    #[test]
+    fn check_downcase() {
+        let cases = vec![
+            (
+                Event::from(""),
+                Err("path .foo not found in event".to_string()),
+                DowncaseFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::from("FOO 2 bar"));
+                    event
+                },
+                Ok(Value::from("foo 2 bar")),
+                DowncaseFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::Integer(20));
+                    event
+                },
+                Ok(Value::Integer(20)),
+                DowncaseFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::Boolean(true));
+                    event
+                },
+                Ok(Value::Boolean(true)),
+                DowncaseFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
         ];
 

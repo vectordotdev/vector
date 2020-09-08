@@ -22,13 +22,11 @@ target_path = @{ ("." ~ (path_segment | quoted_path_segment))+ }
 // Functions
 function = {
     deletion |
-    only_fields |
-    downcase
+    only_fields
 }
 
 deletion = { "del(" ~ target_paths ~ ")" }
 only_fields = { "only_fields(" ~ target_paths ~ ")" }
-downcase = { "downcase(" ~ target_path ~ ")" }
 
 // One or more path arguments for a given function.
 //
@@ -54,7 +52,8 @@ query_function = {
     to_float |
     to_bool |
     to_timestamp |
-    upcase
+    upcase |
+    downcase
 }
 
 to_string = { "string(" ~ query_arithmetic ~ ("," ~ (string | null) )? ~ ")"}
@@ -63,6 +62,7 @@ to_float = { "float(" ~ query_arithmetic ~ ("," ~ (number | null) )? ~ ")"}
 to_bool = { "bool(" ~ query_arithmetic ~ ("," ~ (boolean | null) )? ~ ")"}
 to_timestamp = { "timestamp(" ~ query_arithmetic ~ "," ~ string ~ ")"}
 upcase = { "upcase(" ~ query_arithmetic ~ ")"}
+downcase = { "downcase(" ~ query_arithmetic ~ ")"}
 
 group = { "(" ~ query_arithmetic ~ ")" }
 

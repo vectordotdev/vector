@@ -97,33 +97,6 @@ impl Function for OnlyFields {
 //------------------------------------------------------------------------------
 
 #[derive(Debug)]
-pub(self) struct Downcase {
-    // TODO: Switch to String once Event API is cleaned up.
-    path: Atom,
-}
-
-impl Downcase {
-    pub(self) fn new(path: impl Into<Atom>) -> Self {
-        Self { path: path.into() }
-    }
-}
-
-impl Function for Downcase {
-    fn apply(&self, target: &mut Event) -> Result<()> {
-        let target_log = target.as_mut_log();
-
-        mutate_bytes(target_log.get_mut(&self.path), |mut buf| {
-            buf.iter_mut().for_each(|c| c.make_ascii_lowercase());
-            buf.freeze()
-        });
-
-        Ok(())
-    }
-}
-
-//------------------------------------------------------------------------------
-
-#[derive(Debug)]
 pub(self) struct IfStatement {
     query: Box<dyn query::Function>,
     true_statement: Box<dyn Function>,
@@ -188,19 +161,6 @@ impl Mapping {
 }
 
 //------------------------------------------------------------------------------
-
-fn mutate_bytes<F>(value: Option<&mut Value>, f: F)
-where
-    F: Fn(BytesMut) -> Bytes,
-{
-    if let Some(value) = value {
-        if let Value::Bytes(ref mut bytes) = value {
-            let mut buf = BytesMut::with_capacity(bytes.len());
-            buf.extend_from_slice(bytes);
-            *bytes = f(buf);
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {
