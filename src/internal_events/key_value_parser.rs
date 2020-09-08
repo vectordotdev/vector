@@ -40,9 +40,8 @@ impl InternalEvent for KeyValueParseFailed {
 }
 
 #[derive(Debug)]
-pub(crate) struct KeyValueEventFailed {
+pub(crate) struct KeyValueFieldDoesNotExist {
     pub field: Atom,
-    pub error: Atom,
 }
 
 impl InternalEvent for KeyValueEventFailed {
