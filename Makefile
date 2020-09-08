@@ -266,6 +266,7 @@ ifeq ($(CONTAINER_TOOL),podman)
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name test-integration-clickhouse 2>/dev/null; true
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm test-integration-clickhouse 2>/dev/null; true
+endif
 
 test-integration-clickhouse: ## Runs Clickhouse integration tests
 ifeq ($(AUTOSPAWN), true)
@@ -337,7 +338,7 @@ ifeq ($(CONTAINER_TOOL),podman)
 	 -e PUBSUB_PROJECT1=testproject,topic1:subscription1 messagebird/gcloud-pubsub-emulator
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create test-integration-gcp
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)==test-integration-gcp -p 8681-8682:8681-8682 --name cloud-pubsub \
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-gcp -p 8681-8682:8681-8682 --name cloud-pubsub \
 	 -e PUBSUB_PROJECT1=testproject,topic1:subscription1 messagebird/gcloud-pubsub-emulator
 endif
 
