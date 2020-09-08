@@ -59,6 +59,7 @@ pub struct DockerConfig {
     partial_event_marker_field: Option<Atom>,
     auto_partial_merge: bool,
     multiline: Option<MultilineConfig>,
+    retry_backoff_secs: u64,
 }
 
 impl Default for DockerConfig {
@@ -70,6 +71,7 @@ impl Default for DockerConfig {
             partial_event_marker_field: Some(event::PARTIAL.clone()),
             auto_partial_merge: true,
             multiline: None,
+            retry_backoff_secs: 2,
         }
     }
 }
@@ -256,6 +258,7 @@ struct DockerSource {
     hostname: Option<String>,
     /// True if self needs to be excluded
     exclude_self: bool,
+    backoff_duration: Duration,
 }
 
 impl DockerSource {
@@ -276,6 +279,8 @@ impl DockerSource {
             .unwrap_or_default()
             .is_empty()
             && config.include_labels.clone().unwrap_or_default().is_empty();
+
+        let backoff_secs = config.retry_backoff_secs;
 
         // Only logs created at, or after this moment are logged.
         let core = DockerSourceCore::new(config)?;
@@ -310,6 +315,7 @@ impl DockerSource {
             main_recv,
             hostname: env::var("HOSTNAME").ok(),
             exclude_self,
+            backoff_duration: Duration::from_secs(backoff_secs),
         })
     }
 
@@ -396,7 +402,8 @@ impl DockerSource {
                                         .remove(&id)
                                         .expect("Every started ContainerId has it's ContainerState");
                                     if state.is_running() {
-                                        self.containers.insert(id.clone(), self.esb.start(id, Some(Duration::from_secs(5))));
+                                        let backoff = Some(self.backoff_duration.clone());
+                                        self.containers.insert(id.clone(), self.esb.start(id, backoff));
                                     }
                                 }
                             }
