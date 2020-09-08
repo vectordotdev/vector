@@ -9,6 +9,13 @@ set -euo pipefail
 
 SERVICE="$1"
 
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+# A workaround to prevent docker from creating directories at `./target` as
+# root.
+# Ran unconditionally for consistency between docker and bare execution.
+scripts/prepare-target-dir.sh
+
 USER="$(id -u):$(id -g)"
 export USER
 
