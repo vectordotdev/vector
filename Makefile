@@ -199,6 +199,11 @@ test-integration: test-integration-aws test-integration-clickhouse test-integrat
 test-integration: test-integration-gcp test-integration-influxdb test-integration-kafka test-integration-loki
 test-integration: test-integration-pulsar test-integration-splunk
 
+start-test-integration: ## Starts all integration test infrastructure
+start-test-integration: start-integration-aws start-integration-clickhouse start-integration-elasticsearch
+start-test-integration: start-integration-gcp start-integration-influxdb start-integration-kafka start-integration-loki
+start-test-integration: start-integration-pulsar start-integration-splunk
+
 stop-test-integration: ## Stops all integration test infrastructure
 stop-test-integration: stop-integration-aws stop-integration-clickhouse stop-integration-elasticsearch
 stop-test-integration: stop-integration-gcp stop-integration-influxdb stop-integration-kafka stop-integration-loki
