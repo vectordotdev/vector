@@ -238,12 +238,14 @@ mod tests {
             r#"
             api_key = "mylogtoken"
             hostname = "vector"
+            codec.except_fields = ["magic"]
         "#,
         )
         .unwrap();
 
         let mut event1 = Event::from("hello world");
         event1.as_mut_log().insert("app", "notvector");
+        event1.as_mut_log().insert("magic", "vector");
 
         let mut event2 = Event::from("hello world");
         event2.as_mut_log().insert("file", "log.txt");
