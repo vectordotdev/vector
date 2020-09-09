@@ -335,10 +335,10 @@ fn if_statement_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn Function>> 
 fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
         Rule::deletion => {
-            let mut paths = Vec::new();
-            for pair in pair.into_inner() {
-                paths.push(target_path_from_pair(pair)?);
-            }
+            let paths = pair.into_inner()
+                .into_iter()
+                .map(target_path_from_pair)
+                .collect::<Result<Vec<_>, _>()?;
             Ok(Box::new(Deletion::new(paths)))
         }
         Rule::only_fields => {
