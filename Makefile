@@ -211,33 +211,33 @@ stop-test-integration: stop-integration-pulsar stop-integration-splunk
 
 start-integration-aws:
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name test-integration-aws -p 8111:8111 -p 4568:4568 -p 4572:4572 -p 4582:4582 -p 4571:4571 -p 4573:4573 -p 6000:6000
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-aws --name ec2_metadata \
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-aws -p 8111:8111 -p 4568:4568 -p 4572:4572 -p 4582:4582 -p 4571:4571 -p 4573:4573 -p 6000:6000
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_ec2_metadata \
 	 timberiodev/mock-ec2-metadata:latest
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-aws --name localstack \
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_localstack \
 	 -e SERVICES=kinesis:4568,s3:4572,cloudwatch:4582,elasticsearch:4571,firehose:4573 \
 	 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-aws --name mockwatchlogs \
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_mockwatchlogs \
 	 -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create test-integration-aws
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-aws -p 8111:8111 --name ec2_metadata \
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-aws
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws -p 8111:8111 --name vector_ec2_metadata \
 	 timberiodev/mock-ec2-metadata:latest
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-aws -p 4568:4568 -p 4572:4572 \
-	 -p 4582:4582 -p 4571:4571 -p 4573:4573 --name localstack \
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws -p 4568:4568 -p 4572:4572 \
+	 -p 4582:4582 -p 4571:4571 -p 4573:4573 --name vector_localstack \
 	 -e SERVICES=kinesis:4568,s3:4572,cloudwatch:4582,elasticsearch:4571,firehose:4573 \
 	 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-aws -p 6000:6000 --name mockwatchlogs \
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws -p 6000:6000 --name vector_mockwatchlogs \
 	 -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
 endif
 
 stop-integration-aws:
-	$(CONTAINER_TOOL) rm --force ec2_metadata mockwatchlogs localstack 2>/dev/null; true
+	$(CONTAINER_TOOL) rm --force vector_ec2_metadata vector_mockwatchlogs vector_localstack 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=test-integration-aws 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name=test-integration-aws 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-aws 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name=vector-test-integration-aws 2>/dev/null; true
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm test-integration-aws 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-aws 2>/dev/null; true
 endif
 
 test-integration-aws: ## Runs AWS integration tests
@@ -254,20 +254,20 @@ endif
 
 start-integration-clickhouse:
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name test-integration-clickhouse -p 8123:8123
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-clickhouse --name clickhouse yandex/clickhouse-server:19
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-clickhouse -p 8123:8123
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-clickhouse --name vector_clickhouse yandex/clickhouse-server:19
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create test-integration-clickhouse
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-clickhouse -p 8123:8123 --name clickhouse yandex/clickhouse-server:19
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-clickhouse
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-clickhouse -p 8123:8123 --name vector_clickhouse yandex/clickhouse-server:19
 endif
 
 stop-integration-clickhouse:
-	$(CONTAINER_TOOL) rm --force clickhouse 2>/dev/null; true
+	$(CONTAINER_TOOL) rm --force vector_clickhouse 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=test-integration-clickhouse 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name test-integration-clickhouse 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-clickhouse 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-clickhouse 2>/dev/null; true
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm test-integration-clickhouse 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-clickhouse 2>/dev/null; true
 endif
 
 test-integration-clickhouse: ## Runs Clickhouse integration tests
@@ -287,25 +287,25 @@ test-integration-docker: ## Runs Docker integration tests
 
 start-integration-elasticsearch:
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name test-integration-elasticsearch -p 4571:4571 -p 9200:9200 -p 9300:9300 -p 9201:9200 -p 9301:9300
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-elasticsearch --name localstack \
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-elasticsearch -p 4571:4571 -p 9200:9200 -p 9300:9300 -p 9201:9200 -p 9301:9300
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-elasticsearch --name vector_localstack \
 	 -e SERVICES=elasticsearch:4571 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-elasticsearch \
-	 --name elasticsearch -e discovery.type=single-node -e ES_JAVA_OPTS="-Xms400m -Xmx400m" elasticsearch:6.6.2
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-elasticsearch \
-	 --name elasticsearch-tls -e discovery.type=single-node -e xpack.security.enabled=true \
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-elasticsearch \
+	 --name vector_elasticsearch -e discovery.type=single-node -e ES_JAVA_OPTS="-Xms400m -Xmx400m" elasticsearch:6.6.2
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-elasticsearch \
+	 --name vector_elasticsearch-tls -e discovery.type=single-node -e xpack.security.enabled=true \
 	 -e xpack.security.http.ssl.enabled=true -e xpack.security.transport.ssl.enabled=true \
 	 -e xpack.ssl.certificate=certs/localhost.crt -e xpack.ssl.key=certs/localhost.key \
 	 -e ES_JAVA_OPTS="-Xms400m -Xmx400m" \
 	 -v $(PWD)/tests/data:/usr/share/elasticsearch/config/certs:ro elasticsearch:6.6.2
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create test-integration-elasticsearch
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-elasticsearch -p 4571:4571 --name localstack \
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-elasticsearch
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-elasticsearch -p 4571:4571 --name vector_localstack \
 	 -e SERVICES=elasticsearch:4571 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-elasticsearch -p 9200:9200 -p 9300:9300 \
-	 --name elasticsearch -e discovery.type=single-node -e ES_JAVA_OPTS="-Xms400m -Xmx400m" elasticsearch:6.6.2
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-elasticsearch -p 9201:9200 -p 9301:9300 \
-	 --name elasticsearch-tls -e discovery.type=single-node -e xpack.security.enabled=true \
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-elasticsearch -p 9200:9200 -p 9300:9300 \
+	 --name vector_elasticsearch -e discovery.type=single-node -e ES_JAVA_OPTS="-Xms400m -Xmx400m" elasticsearch:6.6.2
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-elasticsearch -p 9201:9200 -p 9301:9300 \
+	 --name vector_elasticsearch-tls -e discovery.type=single-node -e xpack.security.enabled=true \
 	 -e xpack.security.http.ssl.enabled=true -e xpack.security.transport.ssl.enabled=true \
 	 -e xpack.ssl.certificate=certs/localhost.crt -e xpack.ssl.key=certs/localhost.key \
 	 -e ES_JAVA_OPTS="-Xms400m -Xmx400m" \
@@ -313,12 +313,12 @@ else
 endif
 
 stop-integration-elasticsearch:
-	$(CONTAINER_TOOL) rm --force localstack elasticsearch elasticsearch-tls 2>/dev/null; true
+	$(CONTAINER_TOOL) rm --force vector_localstack vector_elasticsearch vector_elasticsearch-tls 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=test-integration-elasticsearch 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm test-integration-elasticsearch 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-elasticsearch 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-elasticsearch 2>/dev/null; true
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm test-integration-elasticsearch 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-elasticsearch 2>/dev/null; true
 endif
 
 test-integration-elasticsearch: ## Runs Elasticsearch integration tests
@@ -335,22 +335,22 @@ endif
 
 start-integration-gcp:
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name test-integration-gcp -p 8681-8682:8681-8682
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-gcp --name cloud-pubsub \
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-gcp -p 8681-8682:8681-8682
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-gcp --name vector_cloud-pubsub \
 	 -e PUBSUB_PROJECT1=testproject,topic1:subscription1 messagebird/gcloud-pubsub-emulator
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create test-integration-gcp
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-gcp -p 8681-8682:8681-8682 --name cloud-pubsub \
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-gcp
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-gcp -p 8681-8682:8681-8682 --name vector_cloud-pubsub \
 	 -e PUBSUB_PROJECT1=testproject,topic1:subscription1 messagebird/gcloud-pubsub-emulator
 endif
 
 stop-integration-gcp:
-	$(CONTAINER_TOOL) rm --force cloud-pubsub 2>/dev/null; true
+	$(CONTAINER_TOOL) rm --force vector_cloud-pubsub 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=test-integration-gcp 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name test-integration-gcp 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-gcp 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-gcp 2>/dev/null; true
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm test-integration-gcp 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-gcp 2>/dev/null; true
 endif
 
 test-integration-gcp: ## Runs GCP integration tests
@@ -367,20 +367,20 @@ endif
 
 start-integration-humio:
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name test-integration-humio -p 8080:8080
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-humio --name humio humio/humio:1.13.1
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-humio -p 8080:8080
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-humio --name vector_humio humio/humio:1.13.1
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create test-integration-humio
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-humio -p 8080:8080 --name humio humio/humio:1.13.1
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-humio
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-humio -p 8080:8080 --name vector_humio humio/humio:1.13.1
 endif
 
 stop-integration-humio:
-	$(CONTAINER_TOOL) rm --force humio 2>/dev/null; true
+	$(CONTAINER_TOOL) rm --force vector_humio 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=test-integration-humio 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name test-integration-humio 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-humio 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-humio 2>/dev/null; true
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm test-integration-humio 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-humio 2>/dev/null; true
 endif
 
 test-integration-humio: ## Runs Humio integration tests
@@ -397,26 +397,26 @@ endif
 
 start-integration-influxdb:
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name test-integration-influxdb -p 8086:8086 -p 9999:9999
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-influxdb --name influxdb_v1 \
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-influxdb -p 8086:8086 -p 9999:9999
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb --name vector_influxdb_v1 \
 	 -e INFLUXDB_REPORTING_DISABLED=true influxdb:1.7
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-influxdb --name influxdb_v2 \
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb --name vector_influxdb_v2 \
 	 -e INFLUXDB_REPORTING_DISABLED=true  quay.io/influxdb/influxdb:2.0.0-beta influxd --reporting-disabled
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create test-integration-influxdb
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-influxdb -p 8086:8086 --name influxdb_v1 \
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-influxdb
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb -p 8086:8086 --name vector_influxdb_v1 \
 	 -e INFLUXDB_REPORTING_DISABLED=true influxdb:1.7
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-influxdb -p 9999:9999 --name influxdb_v2 \
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb -p 9999:9999 --name vector_influxdb_v2 \
 	 -e INFLUXDB_REPORTING_DISABLED=true  quay.io/influxdb/influxdb:2.0.0-beta influxd --reporting-disabled
 endif
 
 stop-integration-influxdb:
-	$(CONTAINER_TOOL) rm --force influxdb_v1 influxdb_v2 2>/dev/null; true
+	$(CONTAINER_TOOL) rm --force vector_influxdb_v1 vector_influxdb_v2 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=test-integration-influxdb 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name test-integration-influxdb 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-influxdb 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-influxdb 2>/dev/null; true
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm test-integration-influxdb 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-influxdb 2>/dev/null; true
 endif
 
 test-integration-influxdb: ## Runs InfluxDB integration tests
@@ -433,9 +433,9 @@ endif
 
 start-integration-kafka:
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name test-integration-kafka -p 2181:2181 -p 9091-9093:9091-9093
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-kafka --name zookeeper wurstmeister/zookeeper
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-kafka -e KAFKA_BROKER_ID=1 \
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-kafka -p 2181:2181 -p 9091-9093:9091-9093
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-kafka --name vector_zookeeper wurstmeister/zookeeper
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-kafka -e KAFKA_BROKER_ID=1 \
 	 -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 -e KAFKA_LISTENERS=PLAINTEXT://:9091,SSL://:9092,SASL_PLAINTEXT://:9093 \
 	 -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9091,SSL://localhost:9092,SASL_PLAINTEXT://localhost:9093 \
 	 -e KAFKA_SSL_KEYSTORE_LOCATION=/certs/localhost.p12 -e KAFKA_SSL_KEYSTORE_PASSWORD=NOPASS \
@@ -444,11 +444,11 @@ ifeq ($(CONTAINER_TOOL),podman)
 	 -e KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf" \
 	 -e KAFKA_INTER_BROKER_LISTENER_NAME=SASL_PLAINTEXT -e KAFKA_SASL_ENABLED_MECHANISMS=PLAIN \
 	 -e KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL=PLAIN -v $(PWD)/tests/data/localhost.p12:/certs/localhost.p12:ro \
-	 -v $(PWD)/tests/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf --name kafka wurstmeister/kafka
+	 -v $(PWD)/tests/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf --name vector_kafka wurstmeister/kafka
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create test-integration-kafka
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-kafka -p 2181:2181 --name zookeeper wurstmeister/zookeeper
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-kafka -p 9091-9093:9091-9093 -e KAFKA_BROKER_ID=1 \
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-kafka
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-kafka -p 2181:2181 --name vector_zookeeper wurstmeister/zookeeper
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-kafka -p 9091-9093:9091-9093 -e KAFKA_BROKER_ID=1 \
 	 -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 -e KAFKA_LISTENERS=PLAINTEXT://:9091,SSL://:9092,SASL_PLAINTEXT://:9093 \
 	 -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9091,SSL://localhost:9092,SASL_PLAINTEXT://localhost:9093 \
 	 -e KAFKA_SSL_KEYSTORE_LOCATION=/certs/localhost.p12 -e KAFKA_SSL_KEYSTORE_PASSWORD=NOPASS \
@@ -457,16 +457,16 @@ else
 	 -e KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf" \
 	 -e KAFKA_INTER_BROKER_LISTENER_NAME=SASL_PLAINTEXT -e KAFKA_SASL_ENABLED_MECHANISMS=PLAIN \
 	 -e KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL=PLAIN -v $(PWD)/tests/data/localhost.p12:/certs/localhost.p12:ro \
-	 -v $(PWD)/tests/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf --name kafka wurstmeister/kafka
+	 -v $(PWD)/tests/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf --name vector_kafka wurstmeister/kafka
 endif
 
 stop-integration-kafka:
-	$(CONTAINER_TOOL) rm --force kafka zookeeper 2>/dev/null; true
+	$(CONTAINER_TOOL) rm --force vector_kafka vector_zookeeper 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=test-integration-kafka 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name test-integration-kafka 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-kafka 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-kafka 2>/dev/null; true
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm test-integration-kafka 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-kafka 2>/dev/null; true
 endif
 
 test-integration-kafka: ## Runs Kafka integration tests
@@ -483,22 +483,22 @@ endif
 
 start-integration-loki:
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name test-integration-loki -p 3100:3100
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-loki -v $(PWD)/tests/data:/etc/loki \
-	 --name loki grafana/loki:master -config.file=/etc/loki/loki-config.yaml
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-loki -p 3100:3100
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-loki -v $(PWD)/tests/data:/etc/loki \
+	 --name vector_loki grafana/loki:master -config.file=/etc/loki/loki-config.yaml
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create test-integration-loki
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-loki -p 3100:3100 -v $(PWD)/tests/data:/etc/loki \
-	 --name loki grafana/loki:master -config.file=/etc/loki/loki-config.yaml
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-loki
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-loki -p 3100:3100 -v $(PWD)/tests/data:/etc/loki \
+	 --name vector_loki grafana/loki:master -config.file=/etc/loki/loki-config.yaml
 endif
 
 stop-integration-loki:
-	$(CONTAINER_TOOL) rm --force loki 2>/dev/null; true
+	$(CONTAINER_TOOL) rm --force vector_loki 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=test-integration-loki 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name test-integration-loki 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-loki 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-loki 2>/dev/null; true
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm test-integration-loki 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-loki 2>/dev/null; true
 endif
 
 test-integration-loki: ## Runs Loki integration tests
@@ -515,22 +515,22 @@ endif
 
 start-integration-pulsar:
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name test-integration-pulsar -p 6650:6650
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-pulsar  --name pulsar \
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-pulsar -p 6650:6650
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-pulsar  --name vector_pulsar \
 	 apachepulsar/pulsar bin/pulsar standalone
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create test-integration-pulsar
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-pulsar -p 6650:6650 --name pulsar \
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-pulsar
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-pulsar -p 6650:6650 --name vector_pulsar \
 	 apachepulsar/pulsar bin/pulsar standalone
 endif
 
 stop-integration-pulsar:
-	$(CONTAINER_TOOL) rm --force pulsar 2>/dev/null; true
+	$(CONTAINER_TOOL) rm --force vector_pulsar 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=test-integration-pulsar 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name test-integration-pulsar 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-pulsar 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-pulsar 2>/dev/null; true
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm test-integration-pulsar 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-pulsar 2>/dev/null; true
 endif
 
 test-integration-pulsar: ## Runs Pulsar integration tests
@@ -548,22 +548,22 @@ endif
 start-integration-splunk:
 # TODO Replace  timberio/splunk-hec-test:minus_compose image with production image once merged
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name test-integration-splunk -p 8088:8088 -p 8000:8000 -p 8089:8089
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-splunk \
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-splunk -p 8088:8088 -p 8000:8000 -p 8089:8089
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-splunk \
      --name splunk timberio/splunk-hec-test:minus_compose
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create test-integration-splunk
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=test-integration-splunk -p 8088:8088 -p 8000:8000 -p 8089:8089 \
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-splunk
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-splunk -p 8088:8088 -p 8000:8000 -p 8089:8089 \
      --name splunk timberio/splunk-hec-test:minus_compose
 endif
 
 stop-integration-splunk:
 	$(CONTAINER_TOOL) rm --force splunk 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=test-integration-splunk 2>/dev/null; true
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name test-integration-splunk 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-splunk 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-splunk 2>/dev/null; true
 else
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm test-integration-splunk 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-splunk 2>/dev/null; true
 endif
 
 test-integration-splunk: ## Runs Splunk integration tests
