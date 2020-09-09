@@ -1,4 +1,3 @@
-#[cfg(unix)]
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},

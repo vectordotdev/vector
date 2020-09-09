@@ -34,9 +34,9 @@ impl UnixSinkConfig {
 
     pub fn prepare(&self) -> crate::Result<(IntoUnixSink, Healthcheck)> {
         let unix = IntoUnixSink::new(self.path.clone());
-        let healthcheck = healthcheck(self.path.clone()).boxed().compat();
+        let healthcheck = healthcheck(self.path.clone()).boxed();
 
-        Ok((unix, Box::new(healthcheck)))
+        Ok((unix, healthcheck))
     }
 
     pub fn build(

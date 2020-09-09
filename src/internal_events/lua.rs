@@ -1,5 +1,4 @@
 use super::InternalEvent;
-use crate::transforms::lua::v1::format_error;
 use metrics::{counter, gauge};
 
 #[derive(Debug)]
@@ -35,8 +34,25 @@ pub struct LuaScriptError {
 
 impl InternalEvent for LuaScriptError {
     fn emit_logs(&self) {
-        let error = format_error(&self.error);
-        error!(message = "Error in lua script; discarding event.", %error, rate_limit_secs = 30);
+        error!(message = "Error in lua script; discarding event.", error = %self.error, rate_limit_secs = 30);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("processing_errors", 1,
+            "component_kind" => "transform",
+            "component_type" => "lua",
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct LuaBuildError {
+    pub error: crate::transforms::lua::v2::BuildError,
+}
+
+impl InternalEvent for LuaBuildError {
+    fn emit_logs(&self) {
+        error!(message = "Error in lua script; discarding event.", error = %self.error, rate_limit_secs = 30);
     }
 
     fn emit_metrics(&self) {

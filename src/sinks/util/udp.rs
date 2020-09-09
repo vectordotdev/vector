@@ -56,7 +56,7 @@ impl UdpSinkConfig {
         let connector = UdpConnector::new(host, port, cx.resolver());
         let healthcheck = connector.healthcheck();
 
-        Ok((connector, Box::new(healthcheck.compat())))
+        Ok((connector, healthcheck))
     }
 
     pub fn build_service(&self, cx: SinkContext) -> crate::Result<(UdpService, Healthcheck)> {
@@ -241,8 +241,9 @@ impl Sink for UdpSink {
                 );
                 match socket.send(&line) {
                     Err(error) => {
+                        self.state = State::Backoff(self.next_delay01());
                         error!(message = "send failed", %error);
-                        Err(())
+                        Ok(AsyncSink::NotReady(line))
                     }
                     Ok(_) => Ok(AsyncSink::Ready),
                 }

@@ -79,7 +79,7 @@ impl TcpSinkConfig {
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
         let connector = TcpConnector::new(host, port, cx.resolver(), tls);
-        let healthcheck = Box::new(connector.healthcheck().compat());
+        let healthcheck = connector.healthcheck();
 
         Ok((connector, healthcheck))
     }
