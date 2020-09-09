@@ -25,6 +25,7 @@ generate() {
 EOF
 
   # Generate template.
+  # TODO: use app-version when https://github.com/helm/helm/issues/8670 is solved
   helm template \
     vector \
     distribution/helm/vector \
