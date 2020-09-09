@@ -207,6 +207,7 @@ fn encode_event(mut item: Event, encoding: &EncodingConfig<Encoding>) -> crate::
 mod tests {
     use super::*;
     use std::collections::HashMap;
+    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn pulsar_event_json() {
@@ -223,6 +224,27 @@ mod tests {
         let msg = "hello_world".to_owned();
         let evt = Event::from(msg.clone());
         let event = encode_event(evt, &EncodingConfig::from(Encoding::Text)).unwrap();
+
+        assert_eq!(&event[..], msg.as_bytes());
+    }
+
+    #[test]
+    fn pulsar_encode_event() {
+        let msg = "hello_world";
+
+        let mut evt = Event::from(msg);
+        evt.as_mut_log().insert("key", "value");
+
+        let event = encode_event(
+            evt,
+            &EncodingConfigWithDefault {
+                codec: Encoding::Text,
+                except_fields: Some(vec![Atom::from("key")]),
+                ..Default::default()
+            }
+            .into(),
+        )
+        .unwrap();
 
         assert_eq!(&event[..], msg.as_bytes());
     }
