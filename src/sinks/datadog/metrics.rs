@@ -455,12 +455,12 @@ fn encode_distribution_events(
                         sample_rates,
                         statistic: StatisticKind::Summary,
                     } => {
-                        let mut samples = Vec::new();
-                        for (v, c) in values.iter().zip(sample_rates.iter()) {
-                            for _ in 0..*c {
-                                samples.push(*v);
-                            }
-                        }
+                        let samples = values
+                            .iter()
+                            .zip(samples_rates.iter())
+                            .map(|(value, rate)| (0..*rate).iter().map(|_| value))
+                            .flatten()
+                            .collect::<Vec<_>>();
 
                         if samples.is_empty() {
                             None
