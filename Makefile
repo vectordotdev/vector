@@ -24,7 +24,7 @@ export VERBOSE ?= false
 # Override to set a different Rust toolchain
 export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
 # Override the container tool. Tries podman first and then tries docker.
-export CONTAINER_TOOL = docker
+export CONTAINER_TOOL ?= auto
 ifeq ($(CONTAINER_TOOL),auto)
 	override CONTAINER_TOOL = $(shell podman version >/dev/null 2>&1 && echo podman || echo docker)
 endif
