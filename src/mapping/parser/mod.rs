@@ -43,10 +43,9 @@ fn target_path_from_pair(pair: Pair<Rule>) -> Result<String> {
 fn quoted_path_from_pair(pair: Pair<Rule>) -> Result<String> {
     let (first, mut other) = split_inner_rules_from_pair(pair)?;
     let base = inner_quoted_string_escaped_from_pair(first)?;
-    Ok(if let Some(pair) = other.next() {
-        base + pair.as_str()
-    } else {
-        base
+    Ok(match other.next() {
+        Some(pair) => base + pair.as_str(),
+        None => base,
     })
 }
 
