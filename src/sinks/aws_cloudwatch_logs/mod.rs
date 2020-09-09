@@ -164,7 +164,7 @@ impl CloudwatchLogsSinkConfig {
 
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let batch = BatchSettings::default()
             .bytes(1_048_576)
             .events(10_000)
@@ -194,9 +194,9 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             Box::new(svc_sink)
         };
 
-        let healthcheck = healthcheck(self.clone(), client).boxed().compat();
+        let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((sink, Box::new(healthcheck)))
+        Ok((super::VectorSink::Futures01Sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -845,11 +845,7 @@ mod integration_tests {
         region::RegionOrEndpoint,
         test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
     };
-    use futures::{
-        compat::{Future01CompatExt, Sink01CompatExt},
-        SinkExt, TryStreamExt,
-    };
-    use futures01::{stream, Sink};
+    use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt, TryStreamExt};
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_logs::{CloudWatchLogs, CreateLogGroupRequest, GetLogEventsRequest};
@@ -881,9 +877,8 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, mut events) = random_lines_with_stream(100, 11);
-
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let (input_lines, events) = random_lines_with_stream(100, 11);
+        sink.run(events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -931,22 +926,19 @@ mod integration_tests {
         // add a historical timestamp to all but the first event, to simulate
         // out-of-order timestamps.
         let mut doit = false;
-        let _ = sink
-            .sink_compat()
-            .send_all(&mut events.map_ok(move |mut event| {
-                if doit {
-                    let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
+        let events = events.map_ok(move |mut event| {
+            if doit {
+                let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
 
                     event
                         .as_mut_log()
                         .insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
-                }
-                doit = true;
+            }
+            doit = true;
 
-                event
-            }))
-            .await
-            .unwrap();
+            event
+        });
+        let _ = sink.run(events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -1018,10 +1010,7 @@ mod integration_tests {
         lines.push(add_event(Duration::days(-1)));
         lines.push(add_event(Duration::days(-13)));
 
-        let pump = sink.send_all(stream::iter_ok(events));
-        let (sink, _) = pump.compat().await.unwrap();
-        // drop the sink so it closes all its connections
-        drop(sink);
+        sink.run(stream::iter(events).map(Ok)).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -1064,9 +1053,8 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, mut events) = random_lines_with_stream(100, 11);
-
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let (input_lines, events) = random_lines_with_stream(100, 11);
+        sink.run(events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -1115,8 +1103,12 @@ mod integration_tests {
         let timestamp = chrono::Utc::now();
 
         let (input_lines, mut events) = random_lines_with_stream(100, 11);
-
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let _ = sink
+            .into_futures01sink()
+            .sink_compat()
+            .send_all(&mut events)
+            .await
+            .unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -1169,15 +1161,10 @@ mod integration_tests {
                 let mut event = Event::from(e);
                 let stream = format!("{}", (i % 2));
                 event.as_mut_log().insert("key", stream);
-                event
+                Ok(event)
             })
             .collect::<Vec<_>>();
-
-        let pump = sink.send_all(iter_ok(events));
-        let (sink, _) = pump.compat().await.unwrap();
-        let sink = sink.flush().compat().await.unwrap();
-        // drop the sink so it closes all its connections
-        drop(sink);
+        sink.run(stream::iter(events)).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = format!("{}-0", stream_name);

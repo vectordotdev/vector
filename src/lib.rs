@@ -14,6 +14,8 @@
 extern crate tracing;
 #[macro_use]
 extern crate derivative;
+#[macro_use]
+extern crate pest_derive;
 
 #[cfg(feature = "jemallocator")]
 #[global_allocator]
@@ -37,6 +39,7 @@ pub mod kafka;
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
+pub mod mapping;
 pub mod metrics;
 pub(crate) mod pipeline;
 pub mod region;

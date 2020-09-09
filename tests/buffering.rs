@@ -49,7 +49,7 @@ fn test_buffering() {
     let (in_tx, source_config, source_event_counter) = support::source_with_event_counter();
     let sink_config = support::sink_dead();
     let config = {
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source("in", source_config);
         config.add_sink("out", &["in"], sink_config);
         config.sinks["out"].buffer = BufferConfig::Disk {
@@ -57,7 +57,7 @@ fn test_buffering() {
             when_full: Default::default(),
         };
         config.global.data_dir = Some(data_dir.clone());
-        config
+        config.build().unwrap()
     };
 
     let mut rt = runtime();
@@ -98,7 +98,7 @@ fn test_buffering() {
     let (in_tx, source_config) = support::source();
     let (out_rx, sink_config) = support::sink(10);
     let config = {
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source("in", source_config);
         config.add_sink("out", &["in"], sink_config);
         config.sinks["out"].buffer = BufferConfig::Disk {
@@ -106,7 +106,7 @@ fn test_buffering() {
             when_full: Default::default(),
         };
         config.global.data_dir = Some(data_dir);
-        config
+        config.build().unwrap()
     };
 
     let mut rt = runtime();
@@ -160,7 +160,7 @@ fn test_max_size() {
     let (in_tx, source_config, source_event_counter) = support::source_with_event_counter();
     let sink_config = support::sink_dead();
     let config = {
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source("in", source_config);
         config.add_sink("out", &["in"], sink_config);
         config.sinks["out"].buffer = BufferConfig::Disk {
@@ -168,7 +168,7 @@ fn test_max_size() {
             when_full: Default::default(),
         };
         config.global.data_dir = Some(data_dir.clone());
-        config
+        config.build().unwrap()
     };
 
     let mut rt = runtime();
@@ -208,7 +208,7 @@ fn test_max_size() {
     let (_in_tx, source_config) = support::source();
     let (out_rx, sink_config) = support::sink(10);
     let config = {
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source("in", source_config);
         config.add_sink("out", &["in"], sink_config);
         config.sinks["out"].buffer = BufferConfig::Disk {
@@ -216,7 +216,7 @@ fn test_max_size() {
             when_full: Default::default(),
         };
         config.global.data_dir = Some(data_dir);
-        config
+        config.build().unwrap()
     };
 
     let mut rt = runtime();

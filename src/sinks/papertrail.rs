@@ -8,7 +8,6 @@ use crate::{
     tls::{MaybeTlsSettings, TlsSettings},
 };
 use bytes::Bytes;
-use futures::TryFutureExt;
 use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
@@ -26,7 +25,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "papertrail")]
 impl SinkConfig for PapertrailConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let host = self
             .endpoint
             .host()
@@ -52,7 +51,10 @@ impl SinkConfig for PapertrailConfig {
         let sink = StreamSink::new(sink, cx.acker())
             .with_flat_map(move |e| iter_ok(encode_event(e, pid, &encoding)));
 
-        Ok((Box::new(sink), Box::new(healthcheck.compat())))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {
