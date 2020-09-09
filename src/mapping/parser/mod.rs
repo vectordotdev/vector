@@ -192,19 +192,17 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
         Rule::to_string => {
             let (first, mut other) = split_inner_rules_from_pair(pair)?;
             let query = query_arithmetic_from_pair(first)?;
-            let default = if let Some(r) = other.next() {
-                Some(match r.as_rule() {
-                    Rule::string => Value::from(inner_quoted_string_escaped_from_pair(
-                        r.into_inner().next().ok_or(TOKEN_ERR)?,
-                    )?),
-                    Rule::null => Value::Null,
-                    _ => unreachable!(
-                        "parser should not allow other to_string default arg child rules here"
-                    ),
-                })
-            } else {
-                None
-            };
+            let default = other.next().map(|r| match r.as_rule() {
+                Rule::string => r.into_inner()
+                    .next()
+                    .ok_or(TOKEN_ERR)
+                    .and_then(inner_quoted_string_escaped_from_pair)
+                    .map(|v| Value::from(v)),
+                Rule::null => Ok(Value::Null),
+                _ => unreachable!(
+                    "parser should not allow other to_string default arg child rules here"
+                ),
+            })?;
             Ok(Box::new(ToStringFn::new(query, default)))
         }
         Rule::to_int => {
