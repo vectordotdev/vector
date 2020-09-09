@@ -120,9 +120,10 @@ pub fn next_addr() -> SocketAddr {
 }
 
 pub fn next_addr_v6() -> SocketAddr {
+    use portpicker::pick_unused_port;
     use std::net::{IpAddr, Ipv6Addr};
 
-    let port = NEXT_PORT.fetch_add(1, Ordering::AcqRel) as u16;
+    let port = pick_unused_port().unwrap();
     SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port)
 }
 
