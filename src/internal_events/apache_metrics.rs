@@ -96,12 +96,12 @@ impl InternalEvent for ApacheMetricsErrorResponse {
 }
 
 #[derive(Debug)]
-pub struct ApacheMetricsHttpError<'a> {
+pub struct ApacheMetricsHttpError {
     pub error: hyper::Error,
-    pub url: &'a Uri,
+    pub url: Uri,
 }
 
-impl<'a> InternalEvent for ApacheMetricsHttpError<'a> {
+impl InternalEvent for ApacheMetricsHttpError {
     fn emit_logs(&self) {
         error!(message = "HTTP request processing error.", url = %self.url, error = %self.error);
     }

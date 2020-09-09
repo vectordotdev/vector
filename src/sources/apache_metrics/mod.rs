@@ -165,7 +165,10 @@ fn apache_metrics(
                             )
                         }
                         Err(error) => {
-                            emit!(ApacheMetricsHttpError { error, url: &url });
+                            emit!(ApacheMetricsHttpError {
+                                error,
+                                url: url.clone()
+                            });
                             Some(
                                 stream::iter(vec![Metric {
                                     name: "apache_up".into(),
