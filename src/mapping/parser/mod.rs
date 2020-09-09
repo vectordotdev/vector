@@ -1000,6 +1000,13 @@ mod tests {
                     Box::new(DowncaseFn::new(Box::new(QueryPath::from("foo")))),
                 ))]),
             ),
+            (
+                ".foo = strip_whitespace(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(StripWhitespaceFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
         ];
 
         for (mapping, exp) in cases {
