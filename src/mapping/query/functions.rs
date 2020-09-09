@@ -989,11 +989,11 @@ mod tests {
                     let mut event = Event::from("");
                     event.as_mut_log().insert(
                         "foo",
-                        Value::from(" \u{3000}\u{205F}\u{202F}\u{A0}\u{9} ❤❤hi there ❤❤  \u{9}\u{A0}\u{202F}\u{205F}\u{3000} "),
+                        Value::from(" \u{3000}\u{205F}\u{202F}\u{A0}\u{9} ❤❤ hi there ❤❤  \u{9}\u{A0}\u{202F}\u{205F}\u{3000} "),
                     );
                     event
                 },
-                Ok(Value::Bytes("❤❤hi there ❤❤".into())),
+                Ok(Value::Bytes("❤❤ hi there ❤❤".into())),
                 StripWhitespaceFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
         ];
