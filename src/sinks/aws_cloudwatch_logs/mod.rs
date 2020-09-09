@@ -930,9 +930,9 @@ mod integration_tests {
             if doit {
                 let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
 
-                    event
-                        .as_mut_log()
-                        .insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
+                event
+                    .as_mut_log()
+                    .insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
             }
             doit = true;
 

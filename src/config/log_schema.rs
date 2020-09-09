@@ -37,10 +37,10 @@ pub struct LogSchema {
 impl Default for LogSchema {
     fn default() -> Self {
         LogSchema {
-            message_key: DefaultAtom::from("message"),
-            timestamp_key: DefaultAtom::from("timestamp"),
-            host_key: DefaultAtom::from("host"),
-            source_type_key: DefaultAtom::from("source_type"),
+            message_key: Self::default_message_key(),
+            timestamp_key: Self::default_timestamp_key(),
+            host_key: Self::default_host_key(),
+            source_type_key: Self::default_source_type_key(),
         }
     }
 }
