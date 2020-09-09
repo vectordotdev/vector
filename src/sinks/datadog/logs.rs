@@ -79,8 +79,6 @@ fn encode_event(
     api_key: &str,
     encoding: &EncodingConfig<Encoding>,
 ) -> Option<Bytes> {
-    encoding.apply_rules(&mut event);
-
     let log = event.as_mut_log();
 
     if let Some(message) = log.remove(&log_schema().message_key()) {
