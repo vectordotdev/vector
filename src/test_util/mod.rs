@@ -120,6 +120,13 @@ pub fn next_addr() -> SocketAddr {
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
 }
 
+pub fn next_addr_v6() -> SocketAddr {
+    use std::net::{IpAddr, Ipv6Addr};
+
+    let port = NEXT_PORT.fetch_add(1, Ordering::AcqRel) as u16;
+    SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port)
+}
+
 pub fn trace_init() {
     #[cfg(unix)]
     let color = atty::is(atty::Stream::Stdout);
