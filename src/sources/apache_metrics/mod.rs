@@ -150,7 +150,7 @@ fn apache_metrics(
                         Ok((header, _)) => {
                             emit!(ApacheMetricsErrorResponse {
                                 code: header.status,
-                                url: &url,
+                                url: url.clone(),
                             });
                             Some(
                                 stream::iter(vec![Metric {

@@ -77,12 +77,12 @@ impl InternalEvent for ApacheMetricsParseError {
 }
 
 #[derive(Debug)]
-pub struct ApacheMetricsErrorResponse<'a> {
+pub struct ApacheMetricsErrorResponse {
     pub code: hyper::StatusCode,
-    pub url: &'a Uri,
+    pub url: Uri,
 }
 
-impl<'a> InternalEvent for ApacheMetricsErrorResponse<'a> {
+impl InternalEvent for ApacheMetricsErrorResponse {
     fn emit_logs(&self) {
         error!(message = "HTTP error response.", url = %self.url, code = %self.code);
     }
