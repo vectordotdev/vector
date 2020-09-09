@@ -134,6 +134,14 @@ data_dir = "/home/user/vector/"
   # * type: string
   partial_event_marker_field = "_partial"
 
+  # The amount of time to wait before retrying after an error.
+  #
+  # * optional
+  # * default: 2
+  # * type: uint
+  # * unit: seconds
+  retry_backoff_secs = 2
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
