@@ -368,6 +368,9 @@ check-examples: ## Check that the config/examples files are valid
 check-scripts: ## Check that scipts do not have common mistakes
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-scripts.sh
 
+check-helm: ## Check that the Helm Chart passes helm lint
+	${MAYBE_ENVIRONMENT_EXEC} helm lint distribution/helm/vector
+
 ##@ Packaging
 
 package-all: package-archive-all package-deb-all package-rpm-all ## Build all packages

@@ -43,6 +43,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
+      - run: scripts/ci-setup-helm.sh
       - run: make slim-builds
       - run: make check-markdown
       - run: make check-meta
@@ -50,6 +51,7 @@ jobs:
       - run: make check-clippy
       - run: make check-version
       - run: make check-scripts
+      - run: make check-helm
       - uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check advisories
