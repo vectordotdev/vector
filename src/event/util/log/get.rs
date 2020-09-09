@@ -14,7 +14,8 @@ pub fn get<'a>(fields: &'a BTreeMap<String, Value>, path: &str) -> Option<&'a Va
     }
 }
 
-fn get_value<I>(mut value: &Value, mut path_iter: I) -> Option<&Value>
+/// Returns a reference to a field value specified by a path iter.
+pub fn get_value<I>(mut value: &Value, mut path_iter: I) -> Option<&Value>
 where
     I: Iterator<Item = PathComponent>,
 {
