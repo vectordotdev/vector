@@ -2,12 +2,7 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{log_schema, Event},
     sinks::{
-        util::{
-            self,
-            encoding::{EncodingConfig, EncodingConfiguration},
-            tcp::TcpSink,
-            Encoding, StreamSink, UriSerde,
-        },
+        util::{self, encoding::EncodingConfig, tcp::TcpSink, Encoding, StreamSink, UriSerde},
         Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsConfig},
