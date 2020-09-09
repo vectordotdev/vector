@@ -243,7 +243,7 @@ mod integration_tests {
         sinks::util::encoding::TimestampFormat,
         test_util::{random_string, trace_init},
     };
-    use futures::{compat::Future01CompatExt, future, stream};
+    use futures::{future, stream};
     use serde_json::Value;
     use tokio::time::{timeout, Duration};
 
