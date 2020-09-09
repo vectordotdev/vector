@@ -58,11 +58,20 @@ pub struct HistogramConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
+pub struct SummaryConfig {
+    field: Atom,
+    name: Option<Atom>,
+    tags: Option<IndexMap<Atom, String>>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum MetricConfig {
     Counter(CounterConfig),
     Histogram(HistogramConfig),
     Gauge(GaugeConfig),
     Set(SetConfig),
+    Summary(SummaryConfig),
 }
 
 fn default_increment_by_value() -> bool {
@@ -198,6 +207,32 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                     values: vec![value],
                     sample_rates: vec![1],
                     statistic: StatisticKind::Histogram,
+                },
+            })
+        }
+        MetricConfig::Summary(summary) => {
+            let value = log
+                .get(&summary.field)
+                .ok_or(TransformError::FieldNotFound)?;
+            let value = value
+                .to_string_lossy()
+                .parse()
+                .map_err(|_| TransformError::ParseError("summary value"))?;
+
+            let name = summary.name.as_ref().unwrap_or(&summary.field);
+            let name = render_template(&name, &event)?;
+
+            let tags = render_tags(&summary.tags, &event);
+
+            Ok(Metric {
+                name,
+                timestamp,
+                tags,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![value],
+                    sample_rates: vec![1],
+                    statistic: StatisticKind::Summary,
                 },
             })
         }
@@ -653,6 +688,36 @@ mod tests {
                     values: vec![2.5],
                     sample_rates: vec![1],
                     statistic: StatisticKind::Histogram
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn response_time_summary() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "summary"
+            field = "response_time"
+            "#,
+        );
+
+        let event = create_event("response_time", "2.5");
+        let mut transform = LogToMetric::new(config);
+        let metric = transform.transform(event).unwrap();
+
+        assert_eq!(
+            metric.into_metric(),
+            Metric {
+                name: "response_time".into(),
+                timestamp: Some(ts()),
+                tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![2.5],
+                    sample_rates: vec![1],
+                    statistic: StatisticKind::Summary
                 },
             }
         );
