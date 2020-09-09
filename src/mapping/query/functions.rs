@@ -151,12 +151,10 @@ impl Function for ToBooleanFn {
                 _ => Err("unable to convert array or object into bool".to_string()),
             },
             Err(err) => Err(err),
-        };
-        if result.is_err() {
-            if let Some(v) = &self.default {
-                return Ok(v.clone());
-            }
-        }
+        }.or_else(|err| match &self.default {
+            Some(v) => Ok(v.clone()),
+            None => Err(err),
+        })
         result
     }
 }
