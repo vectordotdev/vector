@@ -5,6 +5,7 @@ use crate::{
         PrometheusParseError, PrometheusRequestCompleted,
     },
     shutdown::ShutdownSignal,
+    tls::{tls_connector_builder, TlsOptions, TlsSettings},
     Event, Pipeline,
 };
 use futures::{
@@ -12,10 +13,15 @@ use futures::{
     future, stream, FutureExt, StreamExt, TryFutureExt,
 };
 use futures01::Sink;
+use hyper::client::HttpConnector;
 use hyper::{Body, Client, Request};
 use hyper_openssl::HttpsConnector;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
+use std::fs::File;
+use std::io::Read;
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 pub mod parser;
@@ -27,6 +33,8 @@ struct PrometheusConfig {
     endpoints: Vec<String>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+    tls: Option<TlsOptions>,
+    bearer_token_file: Option<PathBuf>,
 }
 
 pub fn default_scrape_interval_secs() -> u64 {
@@ -47,7 +55,47 @@ impl crate::config::SourceConfig for PrometheusConfig {
             let base_uri = host.parse::<http::Uri>().context(super::UriParseError)?;
             urls.push(format!("{}metrics", base_uri));
         }
-        Ok(prometheus(urls, self.scrape_interval_secs, shutdown, out))
+
+        let mut headers = IndexMap::new();
+        if let Some(bearer_token_file) = &self.bearer_token_file {
+            let mut text = Vec::<u8>::new();
+            File::open(bearer_token_file)
+                .expect("unable to open file")
+                .read_to_end(&mut text)
+                .expect("unable to read file");
+            let bearer_token = String::from_utf8(text).unwrap();
+            headers.insert(
+                String::from("Authorization"),
+                format!("Bearer {}", bearer_token),
+            );
+        }
+
+        let mut http = HttpConnector::new();
+        http.enforce_http(false);
+
+        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let settings = tls_settings.into();
+        let tls = tls_connector_builder(&settings)?;
+        let mut https = HttpsConnector::with_connector(http, tls)?;
+
+        let settings = settings.tls().cloned();
+        https.set_callback(move |c, _uri| {
+            if let Some(settings) = &settings {
+                settings.apply_connect_configuration(c);
+            }
+
+            Ok(())
+        });
+        let client = Client::builder().build(https);
+
+        Ok(prometheus(
+            urls,
+            self.scrape_interval_secs,
+            client,
+            headers,
+            shutdown,
+            out,
+        ))
     }
 
     fn output_type(&self) -> crate::config::DataType {
@@ -62,6 +110,8 @@ impl crate::config::SourceConfig for PrometheusConfig {
 fn prometheus(
     urls: Vec<String>,
     interval: u64,
+    client: Client<HttpsConnector<HttpConnector>, Body>,
+    headers: IndexMap<String, String>,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
@@ -73,12 +123,13 @@ fn prometheus(
         .map(move |_| stream::iter(urls.clone()))
         .flatten()
         .map(move |url| {
-            let https = HttpsConnector::new().expect("TLS initialization failed");
-            let client = Client::builder().build(https);
+            let mut builder = Request::get(&url);
 
-            let request = Request::get(&url)
-                .body(Body::empty())
-                .expect("error creating request");
+            for (header, value) in headers.iter() {
+                builder = builder.header(header.as_str(), value.as_str());
+            }
+
+            let request = builder.body(Body::empty()).expect("error creating request");
 
             let start = Instant::now();
             client
@@ -213,6 +264,8 @@ mod test {
             PrometheusConfig {
                 endpoints: vec![format!("http://{}", in_addr)],
                 scrape_interval_secs: 1,
+                tls: Default::default(),
+                bearer_token_file: Default::default(),
             },
         );
         config.add_sink(
