@@ -18,13 +18,10 @@ impl NotFn {
 
 impl Function for NotFn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
-        match self.query.execute(ctx) {
-            Ok(v) => match v {
-                Value::Boolean(b) => Ok(Value::Boolean(!b)),
-                _ => Err(format!("unable to perform NOT on {:?} value", v)),
-            },
-            Err(err) => Err(err),
-        }
+        self.query.execute(ctx).map(|v| match v {
+            Value::Boolean(b) => Ok(Value::Boolean(!b)),
+            _ => Err(format!("unable to perform NOT on {:?} value", v)),
+        })
     }
 }
 
