@@ -18,7 +18,7 @@ impl NotFn {
 
 impl Function for NotFn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
-        self.query.execute(ctx).map(|v| match v {
+        self.query.execute(ctx).and_then(|v| match v {
             Value::Boolean(b) => Ok(Value::Boolean(!b)),
             _ => Err(format!("unable to perform NOT on {:?} value", v)),
         })
@@ -140,7 +140,7 @@ impl ToBooleanFn {
 
 impl Function for ToBooleanFn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
-        let result = match self.query.execute(ctx) {
+        match self.query.execute(ctx) {
             Ok(v) => match v {
                 Value::Boolean(_) => Ok(v),
                 Value::Float(f) => Ok(Value::Boolean(f != 0.0)),
@@ -151,11 +151,11 @@ impl Function for ToBooleanFn {
                 _ => Err("unable to convert array or object into bool".to_string()),
             },
             Err(err) => Err(err),
-        }.or_else(|err| match &self.default {
+        }
+        .or_else(|err| match &self.default {
             Some(v) => Ok(v.clone()),
             None => Err(err),
         })
-        result
     }
 }
 

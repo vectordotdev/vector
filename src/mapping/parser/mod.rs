@@ -192,17 +192,22 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
         Rule::to_string => {
             let (first, mut other) = split_inner_rules_from_pair(pair)?;
             let query = query_arithmetic_from_pair(first)?;
-            let default = other.next().map(|r| match r.as_rule() {
-                Rule::string => r.into_inner()
-                    .next()
-                    .ok_or(TOKEN_ERR)
-                    .and_then(inner_quoted_string_escaped_from_pair)
-                    .map(|v| Value::from(v)),
-                Rule::null => Ok(Value::Null),
-                _ => unreachable!(
-                    "parser should not allow other to_string default arg child rules here"
-                ),
-            })?;
+            let default = other
+                .next()
+                .map(|r| match r.as_rule() {
+                    Rule::string => r
+                        .into_inner()
+                        .next()
+                        .ok_or(TOKEN_ERR)
+                        .map_err(str::to_owned)
+                        .and_then(inner_quoted_string_escaped_from_pair)
+                        .map(Value::from),
+                    Rule::null => Ok(Value::Null),
+                    _ => unreachable!(
+                        "parser should not allow other to_string default arg child rules here"
+                    ),
+                })
+                .transpose()?;
             Ok(Box::new(ToStringFn::new(query, default)))
         }
         Rule::to_int => {
@@ -333,21 +338,15 @@ fn if_statement_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn Function>> 
 }
 
 fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
-    match pair.as_rule() {
-        Rule::deletion => {
-            let paths = pair.into_inner()
-                .into_iter()
-                .map(target_path_from_pair)
-                .collect::<Result<Vec<_>, _>()?;
-            Ok(Box::new(Deletion::new(paths)))
-        }
-        Rule::only_fields => {
-            let mut paths = Vec::new();
-            for pair in pair.into_inner() {
-                paths.push(target_path_from_pair(pair)?);
-            }
-            Ok(Box::new(OnlyFields::new(paths)))
-        }
+    let rule = pair.as_rule();
+    let paths = pair
+        .into_inner()
+        .map(target_path_from_pair)
+        .collect::<Result<Vec<_>>>();
+
+    match rule {
+        Rule::deletion => Ok(Box::new(Deletion::new(paths?))),
+        Rule::only_fields => Ok(Box::new(OnlyFields::new(paths?))),
         _ => unreachable!("parser should not allow other function child rules here"),
     }
 }
