@@ -68,6 +68,8 @@ mod tests {
         let addr = config.api.bind.unwrap();
         let url = format!("http://{}:{}/graphql", addr.ip(), addr.port());
 
+        start_api_server(addr, false);
+
         let client = reqwest::Client::new();
 
         retry_until(
