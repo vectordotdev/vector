@@ -8,6 +8,11 @@ homepage = "https://vector.dev"
 license-file = "LICENSE"
 readme = "README.md"
 publish = false
+default-run = "vector"
+
+[[bin]]
+name = "graphql-schema"
+path = "src/api/schema/gen.rs"
 
 [profile.bench]
 debug = true
@@ -93,6 +98,7 @@ smpl_jwt = { version = "0.5.0", optional = true }
 # API
 async-graphql = { version = "1.17.21", optional = true }
 async-graphql-warp = { version = "1.17.18", optional = true }
+graphql_client = { version = "0.9.0", optional = true }
 
 # External libs
 derivative = "1.0"
@@ -234,7 +240,7 @@ wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm", "anyhow"]
 kubernetes = ["k8s-openapi", "evmap"]
 
 # This enables the API
-api = ["async-graphql", "async-graphql-warp"]
+api = ["async-graphql", "async-graphql-warp", "graphql_client"]
 
 # Sources
 sources = [
