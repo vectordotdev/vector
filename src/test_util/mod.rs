@@ -10,6 +10,7 @@ use futures::{
 };
 use futures01::{sync::mpsc, Stream as Stream01};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
+use portpicker::pick_unused_port;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::{
     collections::HashMap,
@@ -18,7 +19,7 @@ use std::{
     future::Future,
     io::Read,
     iter,
-    net::{Shutdown, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr},
     path::{Path, PathBuf},
     pin::Pin,
     sync::{
@@ -112,17 +113,12 @@ high: `{:?}`
 }
 
 pub fn next_addr() -> SocketAddr {
-    use portpicker::pick_unused_port;
-    use std::net::{IpAddr, Ipv4Addr};
-
     let port = pick_unused_port().unwrap();
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
 }
 
 pub fn next_addr_v6() -> SocketAddr {
-    use std::net::{IpAddr, Ipv6Addr};
-
-    let port = NEXT_PORT.fetch_add(1, Ordering::AcqRel) as u16;
+    let port = pick_unused_port().unwrap();
     SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port)
 }
 
