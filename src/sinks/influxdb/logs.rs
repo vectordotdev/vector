@@ -225,6 +225,7 @@ mod tests {
     };
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
+    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn test_config_without_tags() {
@@ -237,6 +238,31 @@ mod tests {
         "#;
 
         toml::from_str::<InfluxDBLogsConfig>(&config).unwrap();
+    }
+
+    #[test]
+    fn test_encode_event_apply_rules() {
+        let mut event = Event::from("hello");
+        event.as_mut_log().insert("host", "aws.cloud.eur");
+        event.as_mut_log().insert("timestamp", ts());
+
+        let mut sink = create_sink(
+            "http://localhost:9999",
+            "my-token",
+            ProtocolVersion::V1,
+            "ns",
+            vec![],
+        );
+        sink.encoding.except_fields = Some(vec![Atom::from("host")]);
+
+        let bytes = sink.encode_event(event).unwrap();
+        let string = std::str::from_utf8(&bytes).unwrap();
+
+        let line_protocol = split_line_protocol(&string);
+        assert_eq!("ns.vector", line_protocol.0);
+        assert_eq!("metric_type=logs", line_protocol.1);
+        assert_fields(line_protocol.2.to_string(), ["message=\"hello\""].to_vec());
+        assert_eq!("1542182950000000011\n", line_protocol.3);
     }
 
     #[test]
