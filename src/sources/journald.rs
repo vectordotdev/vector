@@ -38,6 +38,8 @@ use tracing::{dispatcher, field};
 
 const DEFAULT_BATCH_SIZE: usize = 16;
 
+const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
+
 lazy_static! {
     static ref CURSOR: Atom = Atom::from("__CURSOR");
     static ref HOSTNAME: Atom = Atom::from("_HOSTNAME");
@@ -113,8 +115,11 @@ impl SourceConfig for JournaldConfig {
             return Err(BuildError::DuplicatedUnit { unit }.into());
         }
 
-        let checkpointer = Checkpointer::new(data_dir)
-            .map_err(|err| format!("Unable to open checkpoint file: {}", err))?;
+        let mut checkpoint = data_dir;
+        checkpoint.push(CHECKPOINT_FILENAME);
+        let checkpointer = Checkpointer::new(checkpoint.clone()).map_err(|error| {
+            format!("Unable to open checkpoint file {:?}: {}", checkpoint, error)
+        })?;
 
         self.source::<Journalctl>(
             out,
@@ -188,7 +193,7 @@ impl JournaldConfig {
             })
             .boxed()
             .compat()
-            .map_err(|error| error!(message="Journald server unexpectedly stopped.",%error))
+            .map_err(|error| error!(message = "Journald server unexpectedly stopped.", %error))
             .select(shutdown.map(move |_| close()))
             .map(|_| ())
             .map_err(|_| ())
@@ -389,7 +394,8 @@ where
                     if let Err(err) = self.checkpointer.set(&cursor) {
                         error!(
                             message = "Could not set journald checkpoint.",
-                            error = field::display(&err)
+                            error = field::display(&err),
+                            filename = ?self.checkpointer.filename,
                         );
                     }
                 }
@@ -474,21 +480,19 @@ fn filter_unit(
     }
 }
 
-const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
-
 struct Checkpointer {
     file: File,
+    filename: PathBuf,
 }
 
 impl Checkpointer {
-    fn new(mut filename: PathBuf) -> Result<Self, io::Error> {
-        filename.push(CHECKPOINT_FILENAME);
+    fn new(filename: PathBuf) -> Result<Self, io::Error> {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
-            .open(filename)?;
-        Ok(Checkpointer { file })
+            .open(&filename)?;
+        Ok(Checkpointer { file, filename })
     }
 
     fn set(&mut self, token: &str) -> Result<(), io::Error> {
