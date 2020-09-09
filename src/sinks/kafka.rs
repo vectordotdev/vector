@@ -7,7 +7,7 @@ use crate::{
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
     template::{Template, TemplateError},
 };
-use futures::{compat::Compat, FutureExt, TryFutureExt};
+use futures::{compat::Compat, FutureExt};
 use futures01::{
     future as future01, stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend,
     Stream,
@@ -88,11 +88,8 @@ inventory::submit! {
 impl SinkConfig for KafkaSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = KafkaSink::new(self.clone(), cx.acker())?;
-        let hc = healthcheck(self.clone()).boxed().compat();
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            Box::new(hc),
-        ))
+        let hc = healthcheck(self.clone()).boxed();
+        Ok((super::VectorSink::Futures01Sink(Box::new(sink)), hc))
     }
 
     fn input_type(&self) -> DataType {

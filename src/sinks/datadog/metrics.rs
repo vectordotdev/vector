@@ -6,6 +6,7 @@ use crate::{
     },
     sinks::{
         util::{
+            encode_namespace,
             http::{HttpBatchService, HttpClient, HttpRetryLogic},
             BatchConfig, BatchSettings, MetricBuffer, PartitionBatchSink, PartitionBuffer,
             PartitionInnerBuffer, TowerRequestConfig,
@@ -38,7 +39,7 @@ struct DatadogState {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogConfig {
-    pub namespace: String,
+    pub namespace: Option<String>,
     // Deprecated name
     #[serde(alias = "host", default = "default_endpoint")]
     pub endpoint: String,
@@ -146,7 +147,7 @@ inventory::submit! {
 impl SinkConfig for DatadogConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = HttpClient::new(cx.resolver(), None)?;
-        let healthcheck = healthcheck(self.clone(), client.clone()).boxed().compat();
+        let healthcheck = healthcheck(self.clone(), client.clone()).boxed();
 
         let batch = BatchSettings::default()
             .events(20)
@@ -206,11 +207,12 @@ impl DatadogSink {
 
         let body = match ep {
             DatadogEndpoint::Series => {
-                let input = encode_events(events, interval, &self.config.namespace);
+                let input = encode_events(events, interval, self.config.namespace.as_deref());
                 serde_json::to_vec(&input).unwrap()
             }
             DatadogEndpoint::Distribution => {
-                let input = encode_distribution_events(events, interval, &self.config.namespace);
+                let input =
+                    encode_distribution_events(events, interval, self.config.namespace.as_deref());
                 serde_json::to_vec(&input).unwrap()
             }
         };
@@ -263,14 +265,6 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
         ts.timestamp()
     } else {
         Utc::now().timestamp()
-    }
-}
-
-fn encode_namespace(namespace: &str, name: &str) -> String {
-    if !namespace.is_empty() {
-        format!("{}.{}", namespace, name)
-    } else {
-        name.to_string()
     }
 }
 
@@ -329,13 +323,13 @@ fn stats(values: &[f64], counts: &[u32]) -> Option<DatadogStats> {
 fn encode_events(
     events: Vec<Metric>,
     interval: i64,
-    namespace: &str,
+    namespace: Option<&str>,
 ) -> DatadogRequest<DatadogMetric> {
     debug!(message = "series", count = events.len());
     let series = events
         .into_iter()
         .filter_map(|event| {
-            let fullname = encode_namespace(namespace, &event.name);
+            let fullname = encode_namespace(namespace, '.', &event.name);
             let ts = encode_timestamp(event.timestamp);
             let tags = event.tags.clone().map(encode_tags);
             match event.kind {
@@ -439,7 +433,7 @@ fn encode_events(
 fn encode_distribution_events(
     events: Vec<Metric>,
     interval: i64,
-    namespace: &str,
+    namespace: Option<&str>,
 ) -> DatadogRequest<DatadogDistributionMetric> {
     debug!(message = "distribution", count = events.len());
     let series = events
@@ -602,7 +596,7 @@ mod tests {
                 value: MetricValue::Counter { value: 1.0 },
             },
         ];
-        let input = encode_events(events, interval, "ns");
+        let input = encode_events(events, interval, Some("ns"));
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(
@@ -629,7 +623,7 @@ mod tests {
                 value: MetricValue::Gauge { value: -1.1 },
             },
         ];
-        let input = encode_events(events, 60, "");
+        let input = encode_events(events, 60, Some(""));
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(
@@ -649,7 +643,7 @@ mod tests {
                 values: vec!["alice".into(), "bob".into()].into_iter().collect(),
             },
         }];
-        let input = encode_events(events, 60, "");
+        let input = encode_events(events, 60, Some(""));
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(
@@ -757,7 +751,7 @@ mod tests {
                 statistic: StatisticKind::Histogram,
             },
         }];
-        let input = encode_events(events, 60, "");
+        let input = encode_events(events, 60, Some(""));
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(

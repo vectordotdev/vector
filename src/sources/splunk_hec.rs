@@ -834,7 +834,7 @@ mod tests {
     ) -> (VectorSink, mpsc::Receiver<Event>) {
         let (source, address) = source().await;
         let (sink, health) = sink(address, encoding, compression);
-        assert!(health.compat().await.is_ok());
+        assert!(health.await.is_ok());
         (sink, source)
     }
 
@@ -1093,7 +1093,7 @@ mod tests {
         let message = "no_authorization";
         let (source, address) = source_with(None).await;
         let (sink, health) = sink(address, Encoding::Text, Compression::Gzip);
-        assert!(health.compat().await.is_ok());
+        assert!(health.await.is_ok());
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 

@@ -7,7 +7,6 @@ use crate::{
     Event,
 };
 use bytes::{BufMut, Bytes, BytesMut};
-use futures::TryFutureExt;
 use futures01::{stream::iter_ok, Sink};
 use prost::Message;
 use serde::{Deserialize, Serialize};
@@ -55,7 +54,7 @@ impl SinkConfig for VectorSinkConfig {
 
         Ok((
             super::VectorSink::Futures01Sink(Box::new(sink)),
-            Box::new(healthcheck.compat()),
+            healthcheck,
         ))
     }
 
