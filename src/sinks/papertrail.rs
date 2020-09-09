@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::log_schema,
+    event::{log_schema, Event},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSink,
@@ -67,13 +67,7 @@ impl SinkConfig for PapertrailConfig {
     }
 }
 
-fn encode_event(
-    mut event: crate::Event,
-    pid: u32,
-    encoding: &EncodingConfig<Encoding>,
-) -> Option<Bytes> {
-    encoding.apply_rules(&mut event);
-
+fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {
     let host = if let Some(host) = event.as_mut_log().remove(log_schema().host_key()) {
         Some(host.to_string_lossy())
     } else {
@@ -89,6 +83,7 @@ fn encode_event(
 
     let mut s: Vec<u8> = Vec::new();
 
+    encoding.apply_rules(&mut event);
     let log = event.into_log();
 
     let message = match encoding.codec() {
@@ -106,4 +101,34 @@ fn encode_event(
     s.push(b'\n');
 
     Some(Bytes::from(s))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn encode_event_apply_rules() {
+        let mut evt = Event::from("vector");
+        evt.as_mut_log().insert("magic", "key");
+
+        let bytes = encode_event(
+            evt,
+            0,
+            &EncodingConfig {
+                codec: Encoding::Json,
+                only_fields: None,
+                except_fields: Some(vec![Atom::from("magic")]),
+                // except_fields: None,
+                timestamp_format: None,
+            },
+        )
+        .unwrap();
+
+        let msg =
+            bytes.slice(String::from_utf8_lossy(&bytes).find(": ").unwrap() + 2..bytes.len() - 1);
+        let value: serde_json::Value = serde_json::from_slice(&msg).unwrap();
+        assert!(!value.as_object().unwrap().contains_key("magic"));
+    }
 }
