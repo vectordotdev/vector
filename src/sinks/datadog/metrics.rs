@@ -22,7 +22,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicI64, Ordering::SeqCst};
 
 #[derive(Debug, Snafu)]
@@ -52,8 +52,8 @@ pub struct DatadogConfig {
 
 struct DatadogSink {
     config: DatadogConfig,
-    last_sent_timestamp: Vec<AtomicI64>,
-    uri: Vec<Uri>,
+    /// Endpoint -> (uri_path, last_sent_timestamp)
+    endpoint_data: HashMap<DatadogEndpoint, (Uri, AtomicI64)>,
 }
 
 lazy_static! {
@@ -115,16 +115,18 @@ struct DatadogStats {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum DatadogEndpoint {
-    Series = 0,
-    Distribution = 1,
+    Series,
+    Distribution,
 }
 
 impl DatadogEndpoint {
-    fn build_uri(host: &str) -> crate::Result<Vec<Uri>> {
-        // Ordering must correspond to enum variant values.
+    fn build_uri(host: &str) -> crate::Result<Vec<(Self, Uri)>> {
         Ok(vec![
-            build_uri(host, "/api/v1/series")?,
-            build_uri(host, "/api/v1/distribution_points")?,
+            (DatadogEndpoint::Series, build_uri(host, "/api/v1/series")?),
+            (
+                DatadogEndpoint::Distribution,
+                build_uri(host, "/api/v1/distribution_points")?,
+            ),
         ])
     }
 
@@ -160,8 +162,10 @@ impl SinkConfig for DatadogConfig {
 
         let sink = DatadogSink {
             config: self.clone(),
-            last_sent_timestamp: uri.iter().map(|_| AtomicI64::new(timestamp)).collect(),
-            uri,
+            endpoint_data: uri
+                .into_iter()
+                .map(|(endpoint, uri)| (endpoint, (uri, AtomicI64::new(timestamp))))
+                .collect(),
         };
 
         let svc = request.service(
@@ -197,12 +201,17 @@ impl DatadogSink {
         &self,
         events: PartitionInnerBuffer<Vec<Metric>, DatadogEndpoint>,
     ) -> crate::Result<Request<Vec<u8>>> {
-        let (events, ep) = events.into_parts();
-        let now = Utc::now().timestamp();
-        let interval = now - self.last_sent_timestamp[ep as usize].load(SeqCst);
-        self.last_sent_timestamp[ep as usize].store(now, SeqCst);
+        let (events, endpoint) = events.into_parts();
+        let endpoint_data = self
+            .endpoint_data
+            .get(&endpoint)
+            .expect("The endpoint doesn't have data.");
 
-        let body = match ep {
+        let now = Utc::now().timestamp();
+        let interval = now - endpoint_data.1.load(SeqCst);
+        endpoint_data.1.store(now, SeqCst);
+
+        let body = match endpoint {
             DatadogEndpoint::Series => {
                 let input = encode_events(events, interval, self.config.namespace.as_deref());
                 serde_json::to_vec(&input).unwrap()
@@ -214,7 +223,7 @@ impl DatadogSink {
             }
         };
 
-        Request::post(self.uri[ep as usize].clone())
+        Request::post(endpoint_data.0.clone())
             .header("Content-Type", "application/json")
             .header("DD-API-KEY", self.config.api_key.clone())
             .body(body)
