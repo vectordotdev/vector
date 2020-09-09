@@ -261,7 +261,7 @@ mod tests {
     fn test_encode_counter_event() {
         let events = vec![Metric {
             name: "jvm.pool.used".into(),
-            timestamp: Some(Utc.ymd(2020, 08, 18).and_hms_nano(21, 0, 0, 0)),
+            timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)),
             tags: None,
             kind: MetricKind::Incremental,
             value: MetricValue::Counter { value: 42.0 },
@@ -277,7 +277,7 @@ mod tests {
     fn test_encode_counter_event_no_namespace() {
         let events = vec![Metric {
             name: "used".into(),
-            timestamp: Some(Utc.ymd(2020, 08, 18).and_hms_nano(21, 0, 0, 0)),
+            timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)),
             tags: None,
             kind: MetricKind::Incremental,
             value: MetricValue::Counter { value: 42.0 },
@@ -294,14 +294,14 @@ mod tests {
         let events = vec![
             Metric {
                 name: "jvm.pool.used".into(),
-                timestamp: Some(Utc.ymd(2020, 08, 18).and_hms_nano(21, 0, 0, 0)),
+                timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)),
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Counter { value: 42.0 },
             },
             Metric {
                 name: "jvm.pool.committed".into(),
-                timestamp: Some(Utc.ymd(2020, 08, 18).and_hms_nano(21, 0, 0, 1)),
+                timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 1)),
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Counter { value: 18874368.0 },
@@ -354,18 +354,17 @@ mod tests {
         ];
 
         let mut events = Vec::new();
-        for i in 0..metrics.len() {
-            let (metric, val) = metrics[i];
+        for (i, (metric, val)) in metrics.iter().enumerate() {
             let event = Event::from(Metric {
                 name: metric.to_string(),
-                timestamp: Some(Utc.ymd(2020, 08, 18).and_hms_nano(21, 0, 0, i as u32)),
+                timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, i as u32)),
                 tags: Some(
                     vec![("os.host".to_owned(), "somehost".to_owned())]
                         .into_iter()
                         .collect(),
                 ),
                 kind: MetricKind::Incremental,
-                value: MetricValue::Counter { value: val as f64 },
+                value: MetricValue::Counter { value: *val as f64 },
             });
             events.push(event);
         }
