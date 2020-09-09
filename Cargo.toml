@@ -13,6 +13,7 @@ default-run = "vector"
 [[bin]]
 name = "graphql-schema"
 path = "src/api/schema/gen.rs"
+required-features = ["api"]
 
 [profile.bench]
 debug = true

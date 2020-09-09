@@ -1,3 +1,4 @@
+#[cfg(feature = "api")]
 #[macro_use]
 extern crate matches;
 
