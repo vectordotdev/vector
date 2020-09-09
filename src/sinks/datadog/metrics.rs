@@ -15,7 +15,7 @@ use crate::{
     },
 };
 use chrono::{DateTime, Utc};
-use futures::{future, FutureExt, TryFutureExt};
+use futures::{future, FutureExt};
 use futures01::{stream::iter_ok, Sink};
 use http::{uri::InvalidUri, Request, StatusCode, Uri};
 use lazy_static::lazy_static;
@@ -180,10 +180,7 @@ impl SinkConfig for DatadogConfig {
                 iter_ok(Some(PartitionInnerBuffer::new(event, ep)))
             });
 
-        Ok((
-            VectorSink::Futures01Sink(Box::new(svc_sink)),
-            Box::new(healthcheck),
-        ))
+        Ok((VectorSink::Futures01Sink(Box::new(svc_sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -439,7 +436,7 @@ fn encode_distribution_events(
     let series = events
         .into_iter()
         .filter_map(|event| {
-            let fullname = encode_namespace(namespace, &event.name);
+            let fullname = encode_namespace(namespace, '.', &event.name);
             let ts = encode_timestamp(event.timestamp);
             let tags = event.tags.clone().map(encode_tags);
             match event.kind {
@@ -451,8 +448,8 @@ fn encode_distribution_events(
                     } => {
                         let samples = values
                             .iter()
-                            .zip(samples_rates.iter())
-                            .map(|(value, rate)| (0..*rate).iter().map(|_| value))
+                            .zip(sample_rates.iter())
+                            .map(|(&value, &rate)| (0..rate).into_iter().map(move |_| value))
                             .flatten()
                             .collect::<Vec<_>>();
 
