@@ -17,6 +17,7 @@ use futures::{
 use futures01::Sink as Sink01;
 use std::convert::TryInto;
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::marker::{Send, Sync};
 use std::{
     path::PathBuf,
@@ -348,6 +349,7 @@ pub trait FrameHandler {
     fn socket_path(&self) -> PathBuf;
     fn multithreaded(&self) -> bool;
     fn max_frame_handling_tasks(&self) -> i32;
+    fn socket_file_mode(&self) -> Option<u32>;
 }
 
 /**
@@ -378,6 +380,20 @@ build_framestream_unix_source(
 
     let fut = async move {
         let mut listener = UnixListener::bind(&path).expect("failed to bind to listener socket");
+        
+        // the permissions to unix socket are restricted from 0o700 to 0o777, which are 448 and 511 in decimal
+        if let Some(socket_permission) = frame_handler.socket_file_mode() {
+            if socket_permission < 448 || socket_permission > 511 { 
+                panic!("Invalid Socket permission");
+            }
+            match fs::set_permissions(&path, fs::Permissions::from_mode(socket_permission)) {
+                Ok(_) => {
+                    info!("socket permissions updated to {:o}", socket_permission);
+                }
+                Err(e) => error!("failed to update listener socket permissions; error = {:?}", e),
+            };
+        };
+
         let parsing_task_counter = Arc::new(AtomicI32::new(0));
 
         info!(message = "listening...", ?path, r#type = "unix");
@@ -566,6 +582,8 @@ mod test {
         socket_path: PathBuf,
         multithreaded: bool,
         max_frame_handling_tasks: i32,
+        socket_file_mode: Option<u32>,
+        
     }
 
     impl MockFrameHandler {
@@ -577,6 +595,7 @@ mod test {
                 socket_path: tempfile::tempdir().unwrap().into_path().join("unix_test"),
                 multithreaded: false,
                 max_frame_handling_tasks: 0,
+                socket_file_mode: None,
             }
         }
     }
@@ -611,6 +630,10 @@ mod test {
         }
         fn max_frame_handling_tasks(&self) -> i32 {
             self.max_frame_handling_tasks
+        }
+
+        fn socket_file_mode(&self) -> Option<u32> {
+            self.socket_file_mode
         }
     }
 

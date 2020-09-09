@@ -13,6 +13,7 @@ use trust_dns_proto::{
         dnssec::{rdata::DNSSECRData, Algorithm, SupportedAlgorithms},
         rdata::{
             a, aaaa,
+            caa::Value,
             opt::{EdnsCode, EdnsOption},
             NULL,
         },
@@ -736,39 +737,33 @@ fn format_rdata(rdata: &RData) -> Result<(Option<String>, Option<Vec<u8>>), DnsM
                 .join(" ");
             Ok((Some(txt_rdata), None))
         }
-        // RData::CAA(caa) => {
-        //     let caa_rdata = format!(
-        //         "{} {} \"{}\"",
-        //         caa.issuer_critical().to_string(),
-        //         // caa.tag().as_str(),
-        //         match caa.tag() {
-        //             Property::Issue => "issue",
-        //             Property::IssueWild => "issuewild",
-        //             Property::Iodef => "iodef",
-        //             Property::Unknown(ref property) => property,
-        //         },
-        //         match caa.value() {
-        //             Value::Url(url) => { url.as_str().to_string()}
-        //             Value::Issuer(option_name, vec_keyvalue) => {
-        //                 let mut final_issuer = String::new();
-        //                 if let Some(name) = option_name {
-        //                     final_issuer.push_str(&name.to_utf8());
-        //                     for keyvalue in vec_keyvalue.into_iter() {
-        //                         final_issuer.push(';');
-        //                         final_issuer.push_str(&keyvalue.key);
-        //                         final_issuer.push_str("=");
-        //                         final_issuer.push_str(&keyvalue.value);
-        //                     }
-        //                 }
-        //                 //raise error ?
-        //                 final_issuer
-        //             }
-        //             Value::Unknown(unknown) => std::str::from_utf8(unknown).context(Utf8ParsingError)?.to_string()
+        RData::CAA(caa) => {
+            let caa_rdata = format!(
+                "{} {} \"{}\"",
+                caa.issuer_critical() as u8,
+                caa.tag().as_str(),
+                match caa.value() {
+                    Value::Url(url) => { url.as_str().to_string()}
+                    Value::Issuer(option_name, vec_keyvalue) => {
+                        let mut final_issuer = String::new();
+                        if let Some(name) = option_name {
+                            final_issuer.push_str(&name.to_utf8());
+                            for keyvalue in vec_keyvalue.into_iter() {
+                                final_issuer.push_str("; ");
+                                final_issuer.push_str(&keyvalue.key());
+                                final_issuer.push_str("=");
+                                final_issuer.push_str(&keyvalue.value());
+                            }
+                        }
+                        final_issuer.trim_end().to_string()
+                    }
+                    Value::Unknown(unknown) => std::str::from_utf8(unknown).context(Utf8ParsingError)?.to_string()
 
-        //         }
-        //     );
-        //     Ok((Some(caa_rdata), None))
-        // }
+                }
+            );
+            Ok((Some(caa_rdata), None))
+        }
+
         RData::TLSA(tlsa) => {
             let tlsa_rdata = format!(
                 "{} {} {} {}",
@@ -1292,10 +1287,11 @@ mod tests {
                 Algorithm as DNSSEC_Algorithm, DigestType, Nsec3HashAlgorithm,
             },
             domain::Name,
-            rdata::{null, NAPTR, SSHFP, TLSA, TXT},
+            rdata::{null, NAPTR, SSHFP, TLSA, TXT, CAA},
             rdata::{
                 sshfp::{Algorithm, FingerprintType},
                 tlsa::{CertUsage, Matching, Selector},
+                caa::KeyValue,
             },
         },
         serialize::binary::Restrict,
@@ -1532,6 +1528,35 @@ mod tests {
         if let Ok((parsed, raw_rdata)) = rdata_text {
             assert!(raw_rdata.is_none());
             assert_eq!(r#""abc\"def" "gh\\i" "" "j""#, parsed.unwrap());
+        }
+    }
+
+    #[test]
+    fn test_format_rdata_for_caa_type() {
+        let rdata1 = RData::CAA(CAA::new_issue(
+            true,
+            Some(Name::parse("example.com", None).unwrap()),
+            vec![],
+        ));
+        let rdata2 = RData::CAA(CAA::new_issue(
+            true,
+            Some(Name::parse("example.com", None).unwrap()),
+            vec![KeyValue::new("key", "value")],
+        ));
+        let rdata_text1 = format_rdata(&rdata1);
+        let rdata_text2 = format_rdata(&rdata2);
+        
+        assert!(rdata_text1.is_ok());
+        assert!(rdata_text2.is_ok());
+
+        if let Ok((parsed, raw_rdata)) = rdata_text1 {
+            assert!(raw_rdata.is_none());
+            assert_eq!("1 issue \"example.com\"", parsed.unwrap());
+        }
+
+        if let Ok((parsed, raw_rdata)) = rdata_text2 {
+            assert!(raw_rdata.is_none());
+            assert_eq!("1 issue \"example.com; key=value\"", parsed.unwrap());
         }
     }
 

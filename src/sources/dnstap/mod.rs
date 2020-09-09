@@ -28,6 +28,7 @@ pub struct DnstapConfig {
     pub raw_data_only: Option<bool>,
     pub multithreaded: Option<bool>,
     pub max_frame_handling_tasks: Option<i32>,
+    pub socket_file_mode: Option<u32>,
 }
 
 fn default_max_length() -> usize {
@@ -57,6 +58,7 @@ impl Default for DnstapConfig {
             raw_data_only: None,
             multithreaded: None,
             max_frame_handling_tasks: None,
+            socket_file_mode: None,
         }
     }
 }
@@ -99,6 +101,12 @@ impl SourceConfig for DnstapConfig {
             } else {
                 1000
             },
+            self.socket_file_mode
+            // if let Some(v) = self.socket_file_mode {
+            //     v
+            // } else {
+            //     0o755
+            // },
         );
         Ok(build_framestream_unix_source(frame_handler, shutdown, out))
     }
@@ -122,6 +130,7 @@ pub struct DnstapFrameHandler {
     raw_data_only: bool,
     multithreaded: bool,
     max_frame_handling_tasks: i32,
+    socket_file_mode: Option<u32>,
 }
 
 impl DnstapFrameHandler {
@@ -133,6 +142,7 @@ impl DnstapFrameHandler {
         raw_data_only: bool,
         multithreaded: bool,
         max_frame_handling_tasks: i32,
+        socket_file_mode: Option<u32>,
     ) -> Self {
         Self {
             max_length,
@@ -143,6 +153,7 @@ impl DnstapFrameHandler {
             raw_data_only,
             multithreaded,
             max_frame_handling_tasks,
+            socket_file_mode,
         }
     }
 }
@@ -200,5 +211,9 @@ impl FrameHandler for DnstapFrameHandler {
 
     fn max_frame_handling_tasks(&self) -> i32 {
         self.max_frame_handling_tasks
+    }
+
+    fn socket_file_mode(&self) -> Option<u32> {
+        self.socket_file_mode
     }
 }
