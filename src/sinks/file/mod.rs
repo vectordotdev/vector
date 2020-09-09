@@ -11,8 +11,11 @@ use crate::{
 use async_compression::tokio_02::write::GzipEncoder;
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::pin_mut;
-use futures::stream::{Stream, StreamExt};
+use futures::{
+    future, pin_mut,
+    stream::{Stream, StreamExt},
+    FutureExt,
+};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tokio::{
@@ -122,7 +125,7 @@ impl SinkConfig for FileSinkConfig {
         let sink = StreamSink::new(sink.into_futures01sink(), cx.acker());
         Ok((
             super::VectorSink::Futures01Sink(Box::new(sink)),
-            Box::new(futures01::future::ok(())),
+            future::ok(()).boxed(),
         ))
     }
 

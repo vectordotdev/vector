@@ -25,7 +25,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use derivative::Derivative;
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -95,11 +95,11 @@ impl SinkConfig for LokiConfig {
         )
         .sink_map_err(|e| error!("Fatal loki sink error: {}", e));
 
-        let healthcheck = healthcheck(self.clone(), client).boxed().compat();
+        let healthcheck = healthcheck(self.clone(), client).boxed();
 
         Ok((
             super::VectorSink::Futures01Sink(Box::new(sink)),
-            Box::new(healthcheck),
+            healthcheck,
         ))
     }
 
@@ -118,7 +118,6 @@ impl HttpSink for LokiConfig {
     type Output = serde_json::Value;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-        self.encoding.apply_rules(&mut event);
         let mut labels = Vec::new();
 
         for (key, template) in &self.labels {
@@ -146,6 +145,7 @@ impl HttpSink for LokiConfig {
                 .remove(&event::log_schema().timestamp_key());
         }
 
+        self.encoding.apply_rules(&mut event);
         let event = match &self.encoding.codec() {
             Encoding::Json => serde_json::to_string(&event.as_log().all_fields())
                 .expect("json encoding should never fail"),
@@ -244,6 +244,34 @@ mod tests {
             record.labels[1],
             ("label2".to_string(), "some-static-label".to_string())
         );
+    }
+
+    #[test]
+    fn use_label_from_dropped_fields() {
+        let (config, _cx) = load_sink::<LokiConfig>(
+            r#"
+            endpoint = "http://localhost:3100"
+            labels.bar = "{{ foo }}"
+            encoding.codec = "json"
+            encoding.except_fields = ["foo"]
+        "#,
+        )
+        .unwrap();
+
+        let mut e1 = Event::from("hello world");
+
+        e1.as_mut_log().insert("foo", "bar");
+
+        let record = config.encode_event(e1).unwrap();
+
+        let expected_line = serde_json::to_string(&serde_json::json!({
+            "message": "hello world",
+        }))
+        .unwrap();
+
+        assert_eq!(record.event.event, expected_line);
+
+        assert_eq!(record.labels[0], ("bar".to_string(), "bar".to_string()));
     }
 }
 

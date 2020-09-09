@@ -5,7 +5,8 @@ use crate::{
     event::{self, Event},
     internal_events::BlackholeEventReceived,
 };
-use futures01::{future, AsyncSink, Future, Poll, Sink, StartSend};
+use futures::{future, FutureExt};
+use futures01::{AsyncSink, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 
 pub struct BlackholeSink {
@@ -28,7 +29,7 @@ inventory::submit! {
 impl SinkConfig for BlackholeConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = Box::new(BlackholeSink::new(self.clone(), cx.acker()));
-        let healthcheck = Box::new(healthcheck());
+        let healthcheck = future::ok(()).boxed();
 
         Ok((super::VectorSink::Futures01Sink(sink), healthcheck))
     }
@@ -40,10 +41,6 @@ impl SinkConfig for BlackholeConfig {
     fn sink_type(&self) -> &'static str {
         "blackhole"
     }
-}
-
-fn healthcheck() -> impl Future<Item = (), Error = crate::Error> {
-    future::ok(())
 }
 
 impl BlackholeSink {
