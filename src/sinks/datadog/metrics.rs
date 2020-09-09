@@ -523,8 +523,10 @@ mod tests {
         let uri = DatadogEndpoint::build_uri(&default_endpoint()).unwrap();
         let sink = DatadogSink {
             config: sink,
-            last_sent_timestamp: uri.iter().map(|_| AtomicI64::new(timestamp)).collect(),
-            uri,
+            endpoint_data: uri
+                .into_iter()
+                .map(|(endpoint, uri)| (endpoint, (uri, AtomicI64::new(timestamp))))
+                .collect(),
         };
 
         let events = vec![
@@ -780,7 +782,7 @@ mod tests {
                 statistic: StatisticKind::Summary,
             },
         }];
-        let input = encode_distribution_events(events, 60, "");
+        let input = encode_distribution_events(events, 60, None);
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(
