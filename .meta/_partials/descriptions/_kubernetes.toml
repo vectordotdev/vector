@@ -1,9 +1,9 @@
 description = """\
-[Kubernetes][urls.kubernetes] is a system for managing containerized \
-applications across a cluster of nodes. In simple terms, you have a group of \
-machines (e.g. VMs) and containerized applications (e.g. Dockerized \
-applications), and Kubernetes will help you to easily manage those apps across \
-those machines. Because Kubernetes is very abstract it is critically important \
-that you collect the appropriate logs and metrics to monitor and observe \
-Kubernetes activity.\
+[Kubernetes][urls.kubernetes] is a production-grade container orchestration \
+platform. It allows you to manage containerized (Dockerized) applications and \
+services across a cluster of nodes. It automates resource management, helping \
+you to manage and deploy applicationd and services across a variable number \
+of machines. Because Kubernetes is abstract, it is critically important that \
+you collects, logs, metrics, traces, and other observability data to properly \
+monitor the Kubernetes platform.\
 """

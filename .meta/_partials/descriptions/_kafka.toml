@@ -1,8 +1,8 @@
 description = """\
-[Apache Kafka][urls.kafka] is an open-source project for a distributed \
-publish-subscribe messaging system rethought as a distributed commit log. \
-Kafka stores messages in topics that are partitioned and replicated across \
-multiple brokers in a cluster. Producers send messages to topics from which \
-consumers read. These features make it an excellent candidate for durably \
-storing logs and metrics data.\
+[Apache Kafka][urls.kafka] is an open-source project for streaming data. It \
+a distributed commit log, similar to publish-subscribe messaging systems. \
+Messages are streamed into Kafka topics and split across 1 or more partitions. \
+Data is replicated across multiple brokers ensuring high durability. This \
+makes it an excellent candidate for durabily streaming logs, metrics, traces, \
+and other observability data.\
 """

@@ -1,6 +1,6 @@
 description = """\
-The [Splunk HTTP Event Collector (HEC)][urls.splunk_hec] is a fast and \
-efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, \
-HEC enables you to send data over HTTP (or HTTPS) directly to Splunk \
-Enterprise or Splunk Cloud from your application.\
+The [Splunk HTTP Event Collector (HEC)][urls.splunk_hec] is a simple and \
+efficient way to ingest data into your Splunk Enterprise or Splunk Cloud \
+account. As noted in the name, the underlying protocol uses HTTP (or HTTPS), \
+a familiar protocol that makes it easy to send data to your Splunk account.\
 """

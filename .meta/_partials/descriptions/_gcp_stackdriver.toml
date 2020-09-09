@@ -1,6 +1,6 @@
 description = """\
-[Stackdriver][urls.gcp_stackdriver] is Google Cloud's embedded observability \
-suite designed to monitor, troubleshoot, and improve cloud infrastructure, \
-software and application performance. Stackdriver enables you to efficiently \
-build and run workloads, keeping applications available and performing well.\
+[Stackdriver][urls.gcp_stackdriver], also know as Operations, is Google \
+Cloud's embedded monitoring suite designed to monitor cloud infrastructure, \
+services, and applications by collecting logs, metrics, traces, and other \
+operational data.\
 """
