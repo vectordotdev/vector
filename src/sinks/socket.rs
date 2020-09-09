@@ -91,7 +91,7 @@ mod test {
         event::Event,
         test_util::{next_addr, next_addr_v6, random_lines_with_stream, trace_init, CountReceiver},
     };
-    use futures::{compat::Sink01CompatExt, future, stream, SinkExt};
+    use futures::{future, stream};
     use serde_json::Value;
     use std::net::{SocketAddr, UdpSocket};
 
@@ -183,7 +183,7 @@ mod test {
     #[tokio::test]
     async fn tcp_stream_detects_disconnect() {
         use crate::tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
-        use futures::{future, FutureExt, StreamExt};
+        use futures::{compat::Sink01CompatExt, future, FutureExt, SinkExt, StreamExt};
         use std::{
             net::Shutdown,
             pin::Pin,
