@@ -58,7 +58,8 @@ query_function = {
     uuid_v4 |
     sha1 |
     md5 |
-    now
+    now |
+    strip_whitespace 
 }
 
 to_string = { "to_string(" ~ query_arithmetic ~ ("," ~ (string | null) )? ~ ")"}
@@ -73,6 +74,7 @@ uuid_v4 = { "uuid_v4()" }
 sha1 = { "sha1(" ~ query_arithmetic ~ ")" }
 md5 = { "md5(" ~ query_arithmetic ~ ")" }
 now = { "now(" ~ query_arithmetic ~ ")" }
+strip_whitespace = { "strip_whitespace(" ~ query_arithmetic ~ ")"}
 
 group = { "(" ~ query_arithmetic ~ ")" }
 

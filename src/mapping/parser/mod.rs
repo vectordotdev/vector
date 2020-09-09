@@ -8,8 +8,8 @@ use crate::{
             arithmetic::Arithmetic,
             arithmetic::Operator,
             functions::{
-                DowncaseFn, Md5Fn, NotFn, NowFn, ParseTimestampFn, Sha1Fn, ToBooleanFn, ToFloatFn,
-                ToIntegerFn, ToStringFn, ToTimestampFn, UpcaseFn, UuidV4Fn,
+                DowncaseFn, Md5Fn, NotFn, NowFn, ParseTimestampFn, Sha1Fn, StripWhitespaceFn,
+                ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn, UpcaseFn, UuidV4Fn,
             },
             path::Path as QueryPath,
             Literal,
@@ -314,6 +314,11 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
             let pair = pair.into_inner().next().ok_or(TOKEN_ERR)?;
             let query = query_arithmetic_from_pair(pair)?;
             Ok(Box::new(NowFn::new(query)))
+        }
+        Rule::strip_whitespace => {
+            let param = pair.into_inner().next().ok_or(TOKEN_ERR)?;
+            let query = query_arithmetic_from_pair(param)?;
+            Ok(Box::new(StripWhitespaceFn::new(query)))
         }
         _ => unreachable!("parser should not allow other query_function child rules here"),
     }

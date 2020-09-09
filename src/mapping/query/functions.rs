@@ -252,6 +252,36 @@ impl Function for ParseTimestampFn {
     }
 }
 
+#[derive(Debug)]
+pub(in crate::mapping) struct StripWhitespaceFn {
+    query: Box<dyn Function>,
+}
+
+impl StripWhitespaceFn {
+    pub(in crate::mapping) fn new(query: Box<dyn Function>) -> Self {
+        Self { query }
+    }
+}
+
+impl Function for StripWhitespaceFn {
+    fn execute(&self, ctx: &Event) -> Result<Value> {
+        let value = self.query.execute(ctx)?;
+        if let Value::Bytes(bytes) = value {
+            // Convert it to a str which will validate that it is valid utf8,
+            // and will give us a trim function.
+            // This does not need to allocate any additional memory.
+            if let Ok(s) = std::str::from_utf8(&bytes) {
+                return Ok(Value::Bytes(bytes.slice_ref(s.trim().as_bytes())));
+            } else {
+                // Not a valid unicode string.
+                return Ok(Value::Bytes(bytes));
+            }
+        }
+
+        Ok(value)
+    }
+}
+
 //------------------------------------------------------------------------------
 
 #[derive(Debug)]
@@ -901,6 +931,70 @@ mod tests {
                 },
                 Err(r#"unable to apply "md5" to non-string types"#.to_string()),
                 Md5Fn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+        ];
+
+        for (input_event, exp, query) in cases {
+            assert_eq!(query.execute(&input_event), exp);
+        }
+    }
+
+    fn check_strip_whitespace() {
+        let cases = vec![
+            (
+                Event::from(""),
+                Err("path .foo not found in event".to_string()),
+                StripWhitespaceFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::from(""));
+                    event
+                },
+                Ok(Value::Bytes("".into())),
+                StripWhitespaceFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::from("    "));
+                    event
+                },
+                Ok(Value::Bytes("".into())),
+                StripWhitespaceFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::from("hi there"));
+                    event
+                },
+                Ok(Value::Bytes("hi there".into())),
+                StripWhitespaceFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event
+                        .as_mut_log()
+                        .insert("foo", Value::from("     hi there    "));
+                    event
+                },
+                Ok(Value::Bytes("hi there".into())),
+                StripWhitespaceFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert(
+                        "foo",
+                        Value::from(" \u{3000}\u{205F}\u{202F}\u{A0}\u{9} ❤❤hi there ❤❤  \u{9}\u{A0}\u{202F}\u{205F}\u{3000} "),
+                    );
+                    event
+                },
+                Ok(Value::Bytes("❤❤hi there ❤❤".into())),
+                StripWhitespaceFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
         ];
 
