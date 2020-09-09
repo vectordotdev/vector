@@ -112,11 +112,7 @@ pub use self::remove_tags::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub use self::rename_fields::*;
 pub use self::sampler::*;
-#[cfg(any(
-    feature = "sources-socket",
-    feature = "sources-syslog",
-    feature = "sources-vector"
-))]
+#[cfg(any(feature = "sources-socket", feature = "sources-syslog"))]
 pub(crate) use self::socket::*;
 pub use self::split::*;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
