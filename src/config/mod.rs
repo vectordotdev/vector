@@ -23,8 +23,8 @@ pub mod watcher;
 pub use builder::ConfigBuilder;
 pub use diff::ConfigDiff;
 pub use loading::{load_from_paths, load_from_str, process_paths, CONFIG_PATHS};
-pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use log_schema::{log_schema, LogSchema, LOG_SCHEMA};
+pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use validation::warnings;
 
 #[derive(Debug, Default)]
