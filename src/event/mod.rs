@@ -8,11 +8,12 @@ use std::collections::{BTreeMap, HashMap};
 use string_cache::DefaultAtom as Atom;
 
 pub mod discriminant;
-mod log_event;
 pub mod merge;
 pub mod merge_state;
 pub mod metric;
-mod util;
+pub mod util;
+
+mod log_event;
 mod value;
 
 pub use log_event::LogEvent;
@@ -287,8 +288,7 @@ impl From<Event> for proto::EventWrapper {
     fn from(event: Event) -> Self {
         match event {
             Event::Log(log_event) => {
-                let fields: BTreeMap<_, _> = log_event.into();
-                let fields = fields
+                let fields = log_event
                     .into_iter()
                     .map(|(k, v)| (k, encode_value(v)))
                     .collect::<BTreeMap<_, _>>();

@@ -7,9 +7,11 @@ use crate::{
     },
 };
 use async_trait::async_trait;
-use futures::pin_mut;
-use futures::stream::{Stream, StreamExt};
-use futures01::future;
+use futures::{
+    future, pin_mut,
+    stream::{Stream, StreamExt},
+    FutureExt,
+};
 use serde::{Deserialize, Serialize};
 use tokio::io::{self, AsyncWriteExt};
 
@@ -45,7 +47,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let encoding = self.encoding.clone();
 
         let output: Box<dyn io::AsyncWrite + Send + Sync + Unpin> = match self.target {
@@ -55,9 +57,12 @@ impl SinkConfig for ConsoleSinkConfig {
 
         let sink = WriterSink { output, encoding };
         let sink = streaming_sink::compat::adapt_to_topology(sink);
-        let sink = StreamSink::new(sink, cx.acker());
+        let sink = StreamSink::new(sink.into_futures01sink(), cx.acker());
 
-        Ok((Box::new(sink), Box::new(future::ok(()))))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            future::ok(()).boxed(),
+        ))
     }
 
     fn input_type(&self) -> DataType {

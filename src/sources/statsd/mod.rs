@@ -128,20 +128,20 @@ mod test {
         let in_addr = next_addr();
         let out_addr = next_addr();
 
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source("in", StatsdConfig { address: in_addr });
         config.add_sink(
             "out",
             &["in"],
             PrometheusSinkConfig {
                 address: out_addr,
-                namespace: "vector".into(),
+                namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
                 flush_period_secs: 1,
             },
         );
 
-        let (topology, _crash) = start_topology(config, false).await;
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
         let bind_addr = next_addr();
         let socket = std::net::UdpSocket::bind(&bind_addr).unwrap();

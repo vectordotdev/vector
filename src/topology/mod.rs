@@ -9,11 +9,10 @@
 pub mod builder;
 mod fanout;
 mod task;
-pub mod unit_test;
 
 use crate::{
     buffers,
-    config::{self, Config, ConfigDiff},
+    config::{Config, ConfigDiff},
     shutdown::SourceShutdownCoordinator,
     topology::{builder::Pieces, task::Task},
 };
@@ -51,7 +50,7 @@ pub async fn start_validated(
     let mut running_topology = RunningTopology {
         inputs: HashMap::new(),
         outputs: HashMap::new(),
-        config: Config::empty(),
+        config: Config::default(),
         shutdown_coordinator: SourceShutdownCoordinator::default(),
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
@@ -71,29 +70,15 @@ pub async fn start_validated(
     Some((running_topology, abort_rx))
 }
 
-pub async fn validate(config: &Config, diff: &ConfigDiff) -> Option<Pieces> {
-    let check_build_result = match (
-        config::check(config),
-        builder::build_pieces(config, diff).await,
-    ) {
-        (Ok(warnings), Ok(new_pieces)) => Ok((new_pieces, warnings)),
-        (Err(t_errors), Err(p_errors)) => Err(t_errors.into_iter().chain(p_errors).collect()),
-        (Err(errors), Ok(_)) | (Ok(_), Err(errors)) => Err(errors),
-    };
-
-    match check_build_result {
+pub async fn build_or_log_errors(config: &Config, diff: &ConfigDiff) -> Option<Pieces> {
+    match builder::build_pieces(config, diff).await {
         Err(errors) => {
             for error in errors {
                 error!("Configuration error: {}", error);
             }
             None
         }
-        Ok((new_pieces, warnings)) => {
-            for warning in warnings {
-                warn!("Configuration warning: {}", warning);
-            }
-            Some(new_pieces)
-        }
+        Ok(new_pieces) => Some(new_pieces),
     }
 }
 
@@ -229,20 +214,13 @@ impl RunningTopology {
             return Ok(false);
         }
 
-        if let Err(errors) = config::check(&new_config) {
-            for error in errors {
-                error!("Configuration error: {}", error);
-            }
-            return Ok(false);
-        }
-
         let diff = ConfigDiff::new(&self.config, &new_config);
 
         // Checks passed so let's shutdown the difference.
         self.shutdown_diff(&diff).await;
 
         // Now let's actually build the new pieces.
-        if let Some(mut new_pieces) = validate(&new_config, &diff).await {
+        if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff).await {
             if self
                 .run_healthchecks(&diff, &mut new_pieces, require_healthy)
                 .await
@@ -258,7 +236,7 @@ impl RunningTopology {
         // We need to rebuild the removed.
         info!("Rebuilding old configuration.");
         let diff = diff.flip();
-        if let Some(mut new_pieces) = validate(&self.config, &diff).await {
+        if let Some(mut new_pieces) = build_or_log_errors(&self.config, &diff).await {
             if self
                 .run_healthchecks(&diff, &mut new_pieces, require_healthy)
                 .await
@@ -637,7 +615,7 @@ mod tests {
 
     #[tokio::test]
     async fn topology_doesnt_reload_new_data_dir() {
-        let mut old_config = Config::empty();
+        let mut old_config = Config::builder();
         old_config.add_source("in", SocketConfig::make_tcp_config(next_addr()));
         old_config.add_sink(
             "out",
@@ -650,12 +628,12 @@ mod tests {
         old_config.global.data_dir = Some(Path::new("/asdf").to_path_buf());
         let mut new_config = old_config.clone();
 
-        let (mut topology, _crash) = start_topology(old_config, false).await;
+        let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
 
         new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
         topology
-            .reload_config_and_respawn(new_config, false)
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
             .await
             .unwrap();
 
@@ -680,7 +658,7 @@ mod reload_tests {
     async fn topology_reuse_old_port() {
         let address = next_addr();
 
-        let mut old_config = Config::empty();
+        let mut old_config = Config::builder();
         old_config.add_source("in1", SplunkConfig::on(address));
         old_config.add_sink(
             "out",
@@ -691,7 +669,7 @@ mod reload_tests {
             },
         );
 
-        let mut new_config = Config::empty();
+        let mut new_config = Config::builder();
         new_config.add_source("in2", SplunkConfig::on(address));
         new_config.add_sink(
             "out",
@@ -702,9 +680,9 @@ mod reload_tests {
             },
         );
 
-        let (mut topology, _crash) = start_topology(old_config, false).await;
+        let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(new_config, false)
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
             .await
             .unwrap());
     }
@@ -713,7 +691,7 @@ mod reload_tests {
     async fn topology_rebuild_old() {
         let address = next_addr();
 
-        let mut old_config = Config::empty();
+        let mut old_config = Config::builder();
         old_config.add_source("in1", SplunkConfig::on(address));
         old_config.add_sink(
             "out",
@@ -724,8 +702,8 @@ mod reload_tests {
             },
         );
 
-        let mut new_config = Config::empty();
-        old_config.add_source("in1", SplunkConfig::on(address));
+        let mut new_config = Config::builder();
+        new_config.add_source("in1", SplunkConfig::on(address));
         new_config.add_source("in2", SplunkConfig::on(address));
         new_config.add_sink(
             "out",
@@ -736,9 +714,9 @@ mod reload_tests {
             },
         );
 
-        let (mut topology, _crash) = start_topology(old_config, false).await;
+        let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(!topology
-            .reload_config_and_respawn(new_config, false)
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
             .await
             .unwrap());
     }
@@ -747,7 +725,7 @@ mod reload_tests {
     async fn topology_old() {
         let address = next_addr();
 
-        let mut old_config = Config::empty();
+        let mut old_config = Config::builder();
         old_config.add_source("in1", SplunkConfig::on(address));
         old_config.add_sink(
             "out",
@@ -758,9 +736,10 @@ mod reload_tests {
             },
         );
 
-        let (mut topology, _crash) = start_topology(old_config.clone(), false).await;
+        let (mut topology, _crash) =
+            start_topology(old_config.clone().build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(old_config, false)
+            .reload_config_and_respawn(old_config.build().unwrap(), false)
             .await
             .unwrap());
     }
@@ -779,7 +758,7 @@ mod source_finished_tests {
 
     #[tokio::test]
     async fn sources_finished() {
-        let mut old_config = Config::empty();
+        let mut old_config = Config::builder();
         let generator = GeneratorConfig::repeat(vec!["text".to_owned()], 1, None);
         old_config.add_source("in", generator);
         old_config.add_sink(
@@ -791,7 +770,7 @@ mod source_finished_tests {
             },
         );
 
-        let (topology, _crash) = start_topology(old_config, false).await;
+        let (topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
 
         timeout(Duration::from_secs(2), topology.sources_finished().compat())
             .await
@@ -868,7 +847,7 @@ mod transient_state_tests {
 
     #[tokio::test]
     async fn closed_source() {
-        let mut old_config = Config::empty();
+        let mut old_config = Config::builder();
         let (trigger_old, source) = MockSourceConfig::new();
         old_config.add_source("in", source);
         old_config.add_transform(
@@ -882,7 +861,7 @@ mod transient_state_tests {
         old_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
         old_config.add_sink("out2", &["trans"], BlackholeConfig { print_amount: 1000 });
 
-        let mut new_config = Config::empty();
+        let mut new_config = Config::builder();
         let (_trigger_new, source) = MockSourceConfig::new();
         new_config.add_source("in", source);
         new_config.add_transform(
@@ -895,7 +874,7 @@ mod transient_state_tests {
         );
         new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
 
-        let (mut topology, _crash) = start_topology(old_config, false).await;
+        let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
 
         trigger_old.cancel();
 
@@ -903,7 +882,7 @@ mod transient_state_tests {
         finished.compat().await.unwrap();
 
         assert!(topology
-            .reload_config_and_respawn(new_config, false)
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
             .await
             .unwrap());
     }
@@ -912,7 +891,7 @@ mod transient_state_tests {
     async fn remove_sink() {
         trace_init();
 
-        let mut old_config = Config::empty();
+        let mut old_config = Config::builder();
         old_config.add_source("in", StdinConfig::default());
         old_config.add_transform(
             "trans",
@@ -925,7 +904,7 @@ mod transient_state_tests {
         old_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
         old_config.add_sink("out2", &["trans"], BlackholeConfig { print_amount: 1000 });
 
-        let mut new_config = Config::empty();
+        let mut new_config = Config::builder();
         new_config.add_source("in", StdinConfig::default());
         new_config.add_transform(
             "trans",
@@ -937,9 +916,9 @@ mod transient_state_tests {
         );
         new_config.add_sink("out1", &["trans"], BlackholeConfig { print_amount: 1000 });
 
-        let (mut topology, _crash) = start_topology(old_config, false).await;
+        let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(new_config, false)
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
             .await
             .unwrap());
     }
@@ -948,7 +927,7 @@ mod transient_state_tests {
     async fn remove_transform() {
         trace_init();
 
-        let mut old_config = Config::empty();
+        let mut old_config = Config::builder();
         old_config.add_source("in", StdinConfig::default());
         old_config.add_transform(
             "trans1",
@@ -969,7 +948,7 @@ mod transient_state_tests {
         old_config.add_sink("out1", &["trans1"], BlackholeConfig { print_amount: 1000 });
         old_config.add_sink("out2", &["trans2"], BlackholeConfig { print_amount: 1000 });
 
-        let mut new_config = Config::empty();
+        let mut new_config = Config::builder();
         new_config.add_source("in", StdinConfig::default());
         new_config.add_transform(
             "trans1",
@@ -981,9 +960,9 @@ mod transient_state_tests {
         );
         new_config.add_sink("out1", &["trans1"], BlackholeConfig { print_amount: 1000 });
 
-        let (mut topology, _crash) = start_topology(old_config, false).await;
+        let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(new_config, false)
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
             .await
             .unwrap());
     }

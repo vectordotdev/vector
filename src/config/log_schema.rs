@@ -58,6 +58,41 @@ impl LogSchema {
     fn default_source_type_key() -> DefaultAtom {
         DefaultAtom::from("source_type")
     }
+
+    pub fn merge(&mut self, other: LogSchema) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+
+        if other != *LOG_SCHEMA_DEFAULT {
+            // If the set value is the default, override it. If it's already overridden, error.
+            if self.host_key() != LOG_SCHEMA_DEFAULT.host_key()
+                && self.host_key() != other.host_key()
+            {
+                errors.push("conflicting values for 'log_schema.host_key' found".to_owned());
+            } else {
+                self.set_host_key(other.host_key().clone());
+            }
+            if self.message_key() != LOG_SCHEMA_DEFAULT.message_key()
+                && self.message_key() != other.message_key()
+            {
+                errors.push("conflicting values for 'log_schema.message_key' found".to_owned());
+            } else {
+                self.set_message_key(other.message_key().clone());
+            }
+            if self.timestamp_key() != LOG_SCHEMA_DEFAULT.timestamp_key()
+                && self.timestamp_key() != other.timestamp_key()
+            {
+                errors.push("conflicting values for 'log_schema.timestamp_key' found".to_owned());
+            } else {
+                self.set_timestamp_key(other.timestamp_key().clone());
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
 }
 
 #[cfg(test)]

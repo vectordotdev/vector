@@ -2060,20 +2060,18 @@ version = "0.8.4"
 source = "git+https://github.com/timberio/leveldb#64265815bcf1b69f30e6cb35bf687fbd6dd64afb"
 dependencies = [
  "db-key",
- "leveldb-sys 2.0.6",
+ "leveldb-sys 2.0.5",
  "leveldb-sys 3.0.0",
  "libc",
 ]
 
 [[package]]
 name = "leveldb-sys"
-version = "2.0.6"
+version = "2.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f4abc211bb716f076618bca48aaae128f6feb326195608f40f41a9cdbedc502"
+checksum = "71f46429bb70612c3e939aaeed27ffd31a24a773d21728a1a426e4089d6778d2"
 dependencies = [
- "cmake",
  "libc",
- "num_cpus",
 ]
 
 [[package]]
@@ -2139,9 +2137,9 @@ dependencies = [
 
 [[package]]
 name = "libz-sys"
-version = "1.1.0"
+version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af67924b8dd885cccea261866c8ce5b74d239d272e154053ff927dae839f5ae9"
+checksum = "602113192b08db8f38796c4e85c39e960c145965140e918018bcde1952429655"
 dependencies = [
  "cc",
  "libc",
@@ -2382,6 +2380,12 @@ dependencies = [
  "wasmparser 0.58.0",
  "witx",
 ]
+
+[[package]]
+name = "maplit"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
 
 [[package]]
 name = "matchers"
@@ -3041,6 +3045,49 @@ name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
+
+[[package]]
+name = "pest"
+version = "2.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10f4872ae94d7b90ae48754df22fd42ad52ce740b8f370b03da4835417403e53"
+dependencies = [
+ "ucd-trie",
+]
+
+[[package]]
+name = "pest_derive"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "833d1ae558dc601e9a60366421196a8d94bc0ac980476d0b67e1d0988d72b2d0"
+dependencies = [
+ "pest",
+ "pest_generator",
+]
+
+[[package]]
+name = "pest_generator"
+version = "2.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99b8db626e31e5b81787b9783425769681b347011cc59471e33ea46d2ea0cf55"
+dependencies = [
+ "pest",
+ "pest_meta",
+ "proc-macro2 1.0.19",
+ "quote 1.0.7",
+ "syn 1.0.39",
+]
+
+[[package]]
+name = "pest_meta"
+version = "2.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54be6e404f5317079812fc8f9f5279de376d8856929e21c184ecf6bbd692a11d"
+dependencies = [
+ "maplit",
+ "pest",
+ "sha-1",
+]
 
 [[package]]
 name = "petgraph"
@@ -5252,6 +5299,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ucd-trie"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56dee185309b50d1f11bfedef0fe6d036842e3fb77413abef29f8f8d1c5d4c1c"
+
+[[package]]
 name = "unicase"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5461,6 +5514,8 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-probe",
+ "pest",
+ "pest_derive",
  "pin-project",
  "pretty_assertions",
  "prometheus-parser",
@@ -5614,8 +5669,9 @@ dependencies = [
 
 [[package]]
 name = "warp"
-version = "0.2.4"
-source = "git+https://github.com/seanmonstar/warp?rev=6777564d18b04c3d5b616a79907cfa175663c350#6777564d18b04c3d5b616a79907cfa175663c350"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f41be6df54c97904af01aa23e613d4521eed7ab23537cede692d4058f6449407"
 dependencies = [
  "bytes 0.5.6",
  "futures 0.3.5",
