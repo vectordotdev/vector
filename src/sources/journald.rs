@@ -541,7 +541,7 @@ mod checkpointer_tests {
         let mut filename = tempdir.path().to_path_buf();
         filename.push(CHECKPOINT_FILENAME);
         let mut checkpointer =
-            Checkpointer::new(tempdir.path().to_path_buf()).expect("Creating checkpointer failed!");
+            Checkpointer::new(filename.clone()).expect("Creating checkpointer failed!");
 
         assert!(checkpointer.get().unwrap().is_none());
 
@@ -624,8 +624,9 @@ mod tests {
         let (tx, rx) = Pipeline::new_test();
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
         let tempdir = tempdir().unwrap();
-        let mut checkpointer =
-            Checkpointer::new(tempdir.path().to_path_buf()).expect("Creating checkpointer failed!");
+        let mut filename = tempdir.path().to_path_buf();
+        filename.push(CHECKPOINT_FILENAME);
+        let mut checkpointer = Checkpointer::new(filename).expect("Creating checkpointer failed!");
         let include_units = HashSet::<String>::from_iter(iunits.iter().map(|&s| s.into()));
         let exclude_units = HashSet::<String>::from_iter(xunits.iter().map(|&s| s.into()));
 
