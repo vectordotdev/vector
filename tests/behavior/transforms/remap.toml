@@ -277,7 +277,7 @@
     .a = sha1(.a)
 
     if sha1(.b) == "62cdb7020ff920e5aa642c3d4066950dd1f01f4d" {
-        .b = "baz"
+        .b = sha1(.a + .b + "baz")
     }
   """
 [[tests]]
@@ -292,4 +292,4 @@
     extract_from = "remap_function_sha1"
     [[tests.outputs.conditions]]
       "a.equals" = "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"
-      "b.equals" = "baz"
+      "b.equals" = "6f74c252bb7f19f553115af5e49a733b9ff17138"
