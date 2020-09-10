@@ -1,6 +1,7 @@
 use crate::Event;
 use futures::{
     compat::{Compat, Future01CompatExt},
+    future::BoxFuture,
     StreamExt, TryFutureExt,
 };
 use snafu::Snafu;
@@ -70,7 +71,7 @@ pub enum VectorSink {
     Futures01Sink(Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + 'static + Send>),
 }
 
-pub type Healthcheck = Box<dyn futures01::Future<Item = (), Error = crate::Error> + Send>;
+pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
 
 /// Common build errors
 #[derive(Debug, Snafu)]

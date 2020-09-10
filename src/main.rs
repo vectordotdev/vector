@@ -18,7 +18,7 @@ use vector::{
     config::{self, ConfigDiff},
     generate, heartbeat,
     internal_events::{
-        VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed,
+        self, VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed,
         VectorReloaded, VectorStarted, VectorStopped,
     },
     list, metrics,
@@ -132,17 +132,11 @@ fn main() {
         // API
         #[cfg(feature = "api")]
         if config.api.enabled {
-            let opt = config.api; // copy to move to spawn
-            tokio::spawn(async move {
-                let addr = opt.bind.unwrap();
-                let playground = &*format!("http://{}:{}/playground", addr.ip(), addr.port());
+            let _ = api::Server::start(config.api);
 
-                info!(
-                    message="API server running",
-                    bind = ?addr,
-                    playground = %if opt.playground { playground } else { "off" });
-
-                let _ = api::make_server(addr, opt.playground).await;
+            emit!(internal_events::ApiStarted{
+                addr: config.api.bind.unwrap(),
+                playground: config.api.playground
             });
         }
 

@@ -12,7 +12,7 @@ mod log_schema;
 pub mod merge;
 pub mod merge_state;
 pub mod metric;
-mod util;
+pub mod util;
 
 pub use log_schema::{log_schema, LogSchema, LOG_SCHEMA};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};

@@ -14,7 +14,7 @@ use std::fs::DirBuilder;
 use std::path::PathBuf;
 
 #[cfg(feature = "api")]
-mod api;
+pub mod api;
 mod builder;
 mod compiler;
 pub mod component;

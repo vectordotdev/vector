@@ -3,6 +3,8 @@ use std::borrow::Cow;
 mod add_fields;
 mod add_tags;
 mod ansi_stripper;
+#[cfg(feature = "api")]
+mod api;
 mod auto_concurrency;
 mod aws_kinesis_streams;
 mod blackhole;
@@ -37,6 +39,7 @@ mod process;
 mod prometheus;
 #[cfg(feature = "transforms-regex_parser")]
 mod regex_parser;
+mod remap;
 #[cfg(feature = "transforms-remove_fields")]
 mod remove_fields;
 #[cfg(feature = "transforms-remove_tags")]
@@ -72,6 +75,8 @@ pub mod kubernetes;
 pub use self::add_fields::*;
 pub use self::add_tags::*;
 pub use self::ansi_stripper::*;
+#[cfg(feature = "api")]
+pub use self::api::*;
 pub use self::auto_concurrency::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
@@ -107,6 +112,7 @@ pub use self::process::*;
 pub use self::prometheus::*;
 #[cfg(feature = "transforms-regex_parser")]
 pub(crate) use self::regex_parser::*;
+pub use self::remap::*;
 #[cfg(feature = "transforms-remove_fields")]
 pub use self::remove_fields::*;
 #[cfg(feature = "transforms-remove_tags")]
@@ -114,11 +120,7 @@ pub use self::remove_tags::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub use self::rename_fields::*;
 pub use self::sampler::*;
-#[cfg(any(
-    feature = "sources-socket",
-    feature = "sources-syslog",
-    feature = "sources-vector"
-))]
+#[cfg(any(feature = "sources-socket", feature = "sources-syslog"))]
 pub(crate) use self::socket::*;
 pub use self::split::*;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]

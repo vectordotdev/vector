@@ -13,7 +13,7 @@ use crate::{
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::Sink;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
@@ -106,11 +106,11 @@ impl SinkConfig for HecSinkConfig {
         )
         .sink_map_err(|e| error!("Fatal splunk_hec sink error: {}", e));
 
-        let healthcheck = healthcheck(self.clone(), client).boxed().compat();
+        let healthcheck = healthcheck(self.clone(), client).boxed();
 
         Ok((
             super::VectorSink::Futures01Sink(Box::new(sink)),
-            Box::new(healthcheck),
+            healthcheck,
         ))
     }
 
