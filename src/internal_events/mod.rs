@@ -63,14 +63,14 @@ mod remove_tags;
 #[cfg(feature = "transforms-rename_fields")]
 mod rename_fields;
 mod sampler;
+#[cfg(feature = "sinks-sematext")]
+mod sematext_metrics;
 #[cfg(any(
     feature = "sources-socket",
     feature = "sources-syslog",
     feature = "sources-vector"
 ))]
 mod socket;
-#[cfg(feature = "sinks-sematext")]
-mod sematext_metrics;
 mod split;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 mod splunk_hec;
@@ -159,9 +159,9 @@ pub use self::remove_fields::*;
 pub use self::remove_tags::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub use self::rename_fields::*;
+pub use self::sampler::*;
 #[cfg(feature = "sinks-sematext")]
 pub use self::sematext_metrics::*;
-pub use self::sampler::*;
 #[cfg(any(feature = "sources-socket", feature = "sources-syslog"))]
 pub(crate) use self::socket::*;
 pub use self::split::*;

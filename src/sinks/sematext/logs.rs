@@ -5,7 +5,7 @@ use crate::{
     sinks::util::{
         encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
     },
-    sinks::{Healthcheck, RouterSink},
+    sinks::{Healthcheck, VectorSink},
     Event,
 };
 use futures01::{Future, Sink};
@@ -71,7 +71,7 @@ impl SinkConfig for SematextLogsConfig {
 
         let sink = Box::new(sink.into_futures01sink().with(map_timestamp));
 
-        Ok((super::VectorSink::Futures01Sink(sink), healthcheck))
+        Ok((VectorSink::Futures01Sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

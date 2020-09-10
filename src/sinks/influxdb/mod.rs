@@ -282,14 +282,6 @@ pub(in crate::sinks) fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i6
     }
 }
 
-fn encode_namespace(namespace: &str, name: &str) -> String {
-    if !namespace.is_empty() {
-        format!("{}.{}", namespace, name)
-    } else {
-        name.to_string()
-    }
-}
-
 pub(in crate::sinks) fn encode_uri(
     endpoint: &str,
     path: &str,

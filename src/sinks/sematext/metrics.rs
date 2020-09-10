@@ -8,11 +8,11 @@ use crate::{
         http::{HttpBatchService, HttpClient, HttpRetryLogic},
         BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
     },
-    sinks::{Healthcheck, HealthcheckError, RouterSink},
+    sinks::{Healthcheck, HealthcheckError, VectorSink},
     vector_version,
 };
 use futures::future::{ready, BoxFuture};
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::Sink;
 use http::{StatusCode, Uri};
 use lazy_static::lazy_static;
@@ -64,7 +64,7 @@ async fn healthcheck(endpoint: String, mut client: HttpClient) -> crate::Result<
 
 #[typetag::serde(name = "sematext_metrics")]
 impl SinkConfig for SematextMetricsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = HttpClient::new(cx.resolver(), None)?;
 
         let host = match (&self.host, &self.region) {
@@ -79,10 +79,10 @@ impl SinkConfig for SematextMetricsConfig {
             }
         };
 
-        let healthcheck = healthcheck(host.clone(), client.clone()).boxed().compat();
+        let healthcheck = healthcheck(host.clone(), client.clone()).boxed();
         let sink = SematextMetricsSvc::new(self.clone(), write_uri(&host)?, cx, client)?;
 
-        Ok((sink, Box::new(healthcheck)))
+        Ok((sink, healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -119,7 +119,7 @@ impl SematextMetricsSvc {
         host: http::Uri,
         cx: SinkContext,
         client: HttpClient,
-    ) -> crate::Result<RouterSink> {
+    ) -> crate::Result<VectorSink> {
         let batch = BatchSettings::default()
             .events(20)
             .timeout(1)
@@ -141,7 +141,7 @@ impl SematextMetricsSvc {
             )
             .sink_map_err(|e| error!("Fatal sematext metrics sink error: {}", e));
 
-        Ok(Box::new(sink))
+        Ok(VectorSink::Futures01Sink(Box::new(sink)))
     }
 }
 
@@ -255,7 +255,7 @@ mod tests {
     use crate::sinks::util::test::{build_test_server, load_sink};
     use crate::test_util;
     use chrono::{offset::TimeZone, Utc};
-    use futures::{compat::Future01CompatExt, StreamExt};
+    use futures::{stream, StreamExt};
 
     #[test]
     fn test_encode_counter_event() {
@@ -366,14 +366,10 @@ mod tests {
                 kind: MetricKind::Incremental,
                 value: MetricValue::Counter { value: *val as f64 },
             });
-            events.push(event);
+            events.push(Ok(event));
         }
 
-        let _ = sink
-            .send_all(futures01::stream::iter_ok(events.clone()))
-            .compat()
-            .await
-            .unwrap();
+        let _ = sink.run(stream::iter(events)).await.unwrap();
 
         let output = rx.take(metrics.len()).collect::<Vec<_>>().await;
         assert_eq!("os,metric_type=counter,os.host=somehost,token=atoken swap.size=324292 1597784400000000000", output[0].1);
