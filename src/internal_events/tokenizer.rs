@@ -3,7 +3,7 @@ use metrics::counter;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug)]
-pub struct TokenizerEventProcessed;
+pub(crate) struct TokenizerEventProcessed;
 
 impl InternalEvent for TokenizerEventProcessed {
     fn emit_metrics(&self) {
@@ -15,7 +15,7 @@ impl InternalEvent for TokenizerEventProcessed {
 }
 
 #[derive(Debug)]
-pub struct TokenizerFieldMissing<'a> {
+pub(crate) struct TokenizerFieldMissing<'a> {
     pub field: &'a Atom,
 }
 
@@ -38,7 +38,7 @@ impl<'a> InternalEvent for TokenizerFieldMissing<'a> {
 }
 
 #[derive(Debug)]
-pub struct TokenizerConvertFailed<'a> {
+pub(crate) struct TokenizerConvertFailed<'a> {
     pub field: &'a Atom,
     pub error: crate::types::Error,
 }
