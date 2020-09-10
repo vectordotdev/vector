@@ -27,10 +27,16 @@ struct PrometheusConfig {
     endpoints: Vec<String>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+    #[serde(default = "default_metrics_path")]
+    metrics_path: String,
 }
 
 pub fn default_scrape_interval_secs() -> u64 {
     15
+}
+
+pub fn default_metrics_path() -> String {
+    String::from("metrics")
 }
 
 #[typetag::serde(name = "prometheus")]
@@ -45,7 +51,7 @@ impl crate::config::SourceConfig for PrometheusConfig {
         let mut urls = Vec::new();
         for host in self.endpoints.iter() {
             let base_uri = host.parse::<http::Uri>().context(super::UriParseError)?;
-            urls.push(format!("{}metrics", base_uri));
+            urls.push(format!("{}{}", base_uri, self.metrics_path));
         }
         Ok(prometheus(urls, self.scrape_interval_secs, shutdown, out))
     }
@@ -167,37 +173,41 @@ mod test {
         let out_addr = next_addr();
 
         let make_svc = make_service_fn(|_| async {
-            Ok::<_, Error>(service_fn(|_| async {
-                Ok::<_, Error>(Response::new(Body::from(
-                    r##"
-                    # HELP promhttp_metric_handler_requests_total Total number of scrapes by HTTP status code.
-                    # TYPE promhttp_metric_handler_requests_total counter
-                    promhttp_metric_handler_requests_total{code="200"} 100
-                    promhttp_metric_handler_requests_total{code="404"} 7
-                    prometheus_remote_storage_samples_in_total 57011636
-                    # A histogram, which has a pretty complex representation in the text format:
-                    # HELP http_request_duration_seconds A histogram of the request duration.
-                    # TYPE http_request_duration_seconds histogram
-                    http_request_duration_seconds_bucket{le="0.05"} 24054
-                    http_request_duration_seconds_bucket{le="0.1"} 33444
-                    http_request_duration_seconds_bucket{le="0.2"} 100392
-                    http_request_duration_seconds_bucket{le="0.5"} 129389
-                    http_request_duration_seconds_bucket{le="1"} 133988
-                    http_request_duration_seconds_bucket{le="+Inf"} 144320
-                    http_request_duration_seconds_sum 53423
-                    http_request_duration_seconds_count 144320
-                    # Finally a summary, which has a complex representation, too:
-                    # HELP rpc_duration_seconds A summary of the RPC duration in seconds.
-                    # TYPE rpc_duration_seconds summary
-                    rpc_duration_seconds{code="200",quantile="0.01"} 3102
-                    rpc_duration_seconds{code="200",quantile="0.05"} 3272
-                    rpc_duration_seconds{code="200",quantile="0.5"} 4773
-                    rpc_duration_seconds{code="200",quantile="0.9"} 9001
-                    rpc_duration_seconds{code="200",quantile="0.99"} 76656
-                    rpc_duration_seconds_sum{code="200"} 1.7560473e+07
-                    rpc_duration_seconds_count{code="200"} 2693
-                    "##,
-                )))
+            Ok::<_, Error>(service_fn(|req: Request<Body>| async move {
+                if req.uri().path() == "custom" {
+                    Ok(Response::new(Body::from(
+                        r##"
+                        # HELP promhttp_metric_handler_requests_total Total number of scrapes by HTTP status code.
+                        # TYPE promhttp_metric_handler_requests_total counter
+                        promhttp_metric_handler_requests_total{code="200"} 100
+                        promhttp_metric_handler_requests_total{code="404"} 7
+                        prometheus_remote_storage_samples_in_total 57011636
+                        # A histogram, which has a pretty complex representation in the text format:
+                        # HELP http_request_duration_seconds A histogram of the request duration.
+                        # TYPE http_request_duration_seconds histogram
+                        http_request_duration_seconds_bucket{le="0.05"} 24054
+                        http_request_duration_seconds_bucket{le="0.1"} 33444
+                        http_request_duration_seconds_bucket{le="0.2"} 100392
+                        http_request_duration_seconds_bucket{le="0.5"} 129389
+                        http_request_duration_seconds_bucket{le="1"} 133988
+                        http_request_duration_seconds_bucket{le="+Inf"} 144320
+                        http_request_duration_seconds_sum 53423
+                        http_request_duration_seconds_count 144320
+                        # Finally a summary, which has a complex representation, too:
+                        # HELP rpc_duration_seconds A summary of the RPC duration in seconds.
+                        # TYPE rpc_duration_seconds summary
+                        rpc_duration_seconds{code="200",quantile="0.01"} 3102
+                        rpc_duration_seconds{code="200",quantile="0.05"} 3272
+                        rpc_duration_seconds{code="200",quantile="0.5"} 4773
+                        rpc_duration_seconds{code="200",quantile="0.9"} 9001
+                        rpc_duration_seconds{code="200",quantile="0.99"} 76656
+                        rpc_duration_seconds_sum{code="200"} 1.7560473e+07
+                        rpc_duration_seconds_count{code="200"} 2693
+                        "##,
+                    )))
+                } else {
+                    Err("Unsupported path")
+                }
             }))
         });
 
@@ -213,6 +223,7 @@ mod test {
             PrometheusConfig {
                 endpoints: vec![format!("http://{}", in_addr)],
                 scrape_interval_secs: 1,
+                metrics_path: String::from("custom"),
             },
         );
         config.add_sink(

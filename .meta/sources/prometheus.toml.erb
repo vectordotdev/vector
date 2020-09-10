@@ -32,6 +32,12 @@ default = 15
 unit = "seconds"
 description = "The interval between scrapes, in seconds."
 
+[sources.prometheus.options.metrics_path]
+type = "string"
+common = false
+default = "metrics"
+description = "The path of the endpoint"
+
 [[sources.prometheus.examples]]
 label = "Counter"
 body = """\
