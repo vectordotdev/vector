@@ -70,23 +70,7 @@ impl crate::config::SourceConfig for PrometheusConfig {
             );
         }
 
-        let mut http = HttpConnector::new();
-        http.enforce_http(false);
-
-        let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let settings = tls_settings.into();
-        let tls = tls_connector_builder(&settings)?;
-        let mut https = HttpsConnector::with_connector(http, tls)?;
-
-        let settings = settings.tls().cloned();
-        https.set_callback(move |c, _uri| {
-            if let Some(settings) = &settings {
-                settings.apply_connect_configuration(c);
-            }
-
-            Ok(())
-        });
-        let client = Client::builder().build(https);
+        let client = create_client(&self.tls).expect("error creating client");
 
         Ok(prometheus(
             urls,
@@ -105,6 +89,29 @@ impl crate::config::SourceConfig for PrometheusConfig {
     fn source_type(&self) -> &'static str {
         "prometheus"
     }
+}
+
+fn create_client(
+    tls_options: &Option<TlsOptions>,
+) -> crate::Result<Client<HttpsConnector<HttpConnector>, Body>> {
+    let mut http = HttpConnector::new();
+    http.enforce_http(false);
+
+    let tls_settings = TlsSettings::from_options(tls_options)?;
+    let settings = tls_settings.into();
+    let tls = tls_connector_builder(&settings)?;
+    let mut https = HttpsConnector::with_connector(http, tls)?;
+
+    let settings = settings.tls().cloned();
+    https.set_callback(move |c, _uri| {
+        if let Some(settings) = &settings {
+            settings.apply_connect_configuration(c);
+        }
+
+        Ok(())
+    });
+
+    Ok(Client::builder().build(https))
 }
 
 fn prometheus(
