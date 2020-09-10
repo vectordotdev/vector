@@ -71,7 +71,6 @@ jobs:
       - name: "Build archive"
         env:
           TARGET: "x86_64-apple-darwin"
-          USE_CONTAINER: none
           NATIVE_BUILD: true
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
@@ -95,7 +94,6 @@ jobs:
           export RUST_LTO=""
           export TARGET="x86_64-pc-windows-msvc"
           export NATIVE_BUILD="true"
-          export USE_CONTAINER="none"
           make package-archive
       - name: "Build package"
         shell: bash
@@ -138,7 +136,6 @@ jobs:
           DOCKER_USERNAME: "${{ secrets.CI_DOCKER_USERNAME }}"
           DOCKER_PASSWORD: "${{ secrets.CI_DOCKER_PASSWORD }}"
           PLATFORM: "linux/amd64,linux/arm64,linux/arm"
-          USE_CONTAINER: none
         run: |
           ./scripts/upgrade-docker.sh
           export VERSION=$(make version)
@@ -197,7 +194,6 @@ jobs:
       - env:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
-          USE_CONTAINER: none
         run: make release-s3
 
   release-github:
@@ -329,5 +325,4 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
-          USE_CONTAINER: none
         run: make release-helm
