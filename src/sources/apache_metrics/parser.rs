@@ -148,7 +148,7 @@ fn line_to_metrics(
                 name: encode_namespace(namespace, "cpu_seconds_total"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or(BTreeMap::new());
+                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
                     tags.insert("type".to_string(), "user".to_string());
                     Some(tags)
                 },
@@ -165,7 +165,7 @@ fn line_to_metrics(
                 name: encode_namespace(namespace, "cpu_seconds_total"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or(BTreeMap::new());
+                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
                     tags.insert("type".to_string(), "system".to_string());
                     Some(tags)
                 },
@@ -182,7 +182,7 @@ fn line_to_metrics(
                 name: encode_namespace(namespace, "cpu_seconds_total"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or(BTreeMap::new());
+                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
                     tags.insert("type".to_string(), "children_user".to_string());
                     Some(tags)
                 },
@@ -199,7 +199,7 @@ fn line_to_metrics(
                 name: encode_namespace(namespace, "cpu_seconds_total"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or(BTreeMap::new());
+                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
                     tags.insert("type".to_string(), "children_system".to_string());
                     Some(tags)
                 },
@@ -229,7 +229,7 @@ fn line_to_metrics(
                 name: encode_namespace(namespace, "workers"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or(BTreeMap::new());
+                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
                     tags.insert("state".to_string(), "idle".to_string());
                     Some(tags)
                 },
@@ -246,7 +246,7 @@ fn line_to_metrics(
                 name: encode_namespace(namespace, "workers"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or(BTreeMap::new());
+                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
                     tags.insert("state".to_string(), "busy".to_string());
                     Some(tags)
                 },
@@ -263,7 +263,7 @@ fn line_to_metrics(
                 name: encode_namespace(namespace, "connections"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or(BTreeMap::new());
+                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
                     tags.insert("state".to_string(), "total".to_string());
                     Some(tags)
                 },
@@ -280,7 +280,7 @@ fn line_to_metrics(
                 name: encode_namespace(namespace, "connections"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or(BTreeMap::new());
+                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
                     tags.insert("state".to_string(), "writing".to_string());
                     Some(tags)
                 },
@@ -297,7 +297,7 @@ fn line_to_metrics(
                 name: encode_namespace(namespace, "connections"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or(BTreeMap::new());
+                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
                     tags.insert("state".to_string(), "closing".to_string());
                     Some(tags)
                 },
@@ -314,7 +314,7 @@ fn line_to_metrics(
                 name: encode_namespace(namespace, "connections"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or(BTreeMap::new());
+                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
                     tags.insert("state".to_string(), "keepalive".to_string());
                     Some(tags)
                 },
@@ -331,7 +331,7 @@ fn line_to_metrics(
                 name: encode_namespace(namespace, "scoreboard"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or(BTreeMap::new());
+                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
                     tags.insert("state".to_string(), state.to_string());
                     Some(tags)
                 },
