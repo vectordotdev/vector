@@ -510,7 +510,7 @@ mod tests {
             ),
             (
                 ".foo = to_string(\"bar\",)",
-                vec![" 1:21\n", "= expected null or string"],
+                vec![" 1:24\n", "= expected null or string"],
             ),
             (
                 // Due to the explicit list of allowed escape chars our grammar
