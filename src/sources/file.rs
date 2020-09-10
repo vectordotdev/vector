@@ -1,7 +1,7 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::{self, Event},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    event::Event,
     internal_events::{FileEventReceived, FileSourceInternalEventsEmitter},
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -205,7 +205,7 @@ pub fn file_source(
     let host_key = config
         .host_key
         .clone()
-        .unwrap_or_else(|| event::log_schema().host_key().to_string());
+        .unwrap_or_else(|| log_schema().host_key().to_string());
     let hostname = hostname::get_hostname();
 
     let include = config.include.clone();
@@ -297,7 +297,7 @@ fn create_event(
     // Add source type
     event
         .as_mut_log()
-        .insert(event::log_schema().source_type_key(), Bytes::from("file"));
+        .insert(log_schema().source_type_key(), Bytes::from("file"));
 
     if let Some(file_key) = &file_key {
         event.as_mut_log().insert(file_key.clone(), file);
@@ -313,9 +313,7 @@ fn create_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        config::Config, event, shutdown::ShutdownSignal, sources::file, test_util::trace_init,
-    };
+    use crate::{config::Config, shutdown::ShutdownSignal, sources::file, test_util::trace_init};
     use futures01::Stream;
     use pretty_assertions::assert_eq;
     use std::{
@@ -433,11 +431,8 @@ mod tests {
 
         assert_eq!(log[&"file".into()], "some_file.rs".into());
         assert_eq!(log[&"host".into()], "Some.Machine".into());
-        assert_eq!(
-            log[&event::log_schema().message_key()],
-            "hello world".into()
-        );
-        assert_eq!(log[event::log_schema().source_type_key()], "file".into());
+        assert_eq!(log[&log_schema().message_key()], "hello world".into());
+        assert_eq!(log[log_schema().source_type_key()], "file".into());
     }
 
     #[tokio::test]
@@ -477,7 +472,7 @@ mod tests {
         let mut goodbye_i = 0;
 
         for event in received {
-            let line = event.as_log()[&event::log_schema().message_key()].to_string_lossy();
+            let line = event.as_log()[&log_schema().message_key()].to_string_lossy();
             if line.starts_with("hello") {
                 assert_eq!(line, format!("hello {}", hello_i));
                 assert_eq!(
@@ -547,7 +542,7 @@ mod tests {
                 path.to_str().unwrap()
             );
 
-            let line = event.as_log()[&event::log_schema().message_key()].to_string_lossy();
+            let line = event.as_log()[&log_schema().message_key()].to_string_lossy();
 
             if pre_trunc {
                 assert_eq!(line, format!("pretrunc {}", i));
@@ -613,7 +608,7 @@ mod tests {
                 path.to_str().unwrap()
             );
 
-            let line = event.as_log()[&event::log_schema().message_key()].to_string_lossy();
+            let line = event.as_log()[&log_schema().message_key()].to_string_lossy();
 
             if pre_rot {
                 assert_eq!(line, format!("prerot {}", i));
@@ -672,7 +667,7 @@ mod tests {
         let mut is = [0; 3];
 
         for event in received {
-            let line = event.as_log()[&event::log_schema().message_key()].to_string_lossy();
+            let line = event.as_log()[&log_schema().message_key()].to_string_lossy();
             let mut split = line.split(' ');
             let file = split.next().unwrap().parse::<usize>().unwrap();
             assert_ne!(file, 4);
@@ -794,10 +789,10 @@ mod tests {
             assert_eq!(
                 received.as_log().keys().collect::<HashSet<_>>(),
                 vec![
-                    event::log_schema().host_key().to_string(),
-                    event::log_schema().message_key().to_string(),
-                    event::log_schema().timestamp_key().to_string(),
-                    event::log_schema().source_type_key().to_string()
+                    log_schema().host_key().to_string(),
+                    log_schema().message_key().to_string(),
+                    log_schema().timestamp_key().to_string(),
+                    log_schema().source_type_key().to_string()
                 ]
                 .into_iter()
                 .collect::<HashSet<_>>()
@@ -835,7 +830,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
+                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["zeroth line", "first line"]);
         }
@@ -856,7 +851,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
+                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["second line"]);
         }
@@ -882,7 +877,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
+                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(
                 lines,
@@ -919,7 +914,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
+                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["first line"]);
         }
@@ -944,7 +939,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
+                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["second line"]);
         }
@@ -1022,7 +1017,7 @@ mod tests {
                     .to_string_lossy()
                     .ends_with("before")
             })
-            .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
+            .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
             .collect::<Vec<_>>();
         let after_lines = received
             .iter()
@@ -1031,7 +1026,7 @@ mod tests {
                     .to_string_lossy()
                     .ends_with("after")
             })
-            .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
+            .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(before_lines, vec!["second line"]);
         assert_eq!(after_lines, vec!["_first line", "_second line"]);
@@ -1080,7 +1075,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&event::log_schema().message_key())
+                    .get(&log_schema().message_key())
                     .unwrap()
                     .clone()
             })
@@ -1142,7 +1137,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&event::log_schema().message_key())
+                    .get(&log_schema().message_key())
                     .unwrap()
                     .clone()
             })
@@ -1217,7 +1212,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&event::log_schema().message_key())
+                    .get(&log_schema().message_key())
                     .unwrap()
                     .clone()
             })
@@ -1284,7 +1279,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&event::log_schema().message_key())
+                    .get(&log_schema().message_key())
                     .unwrap()
                     .clone()
             })
@@ -1349,7 +1344,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&event::log_schema().message_key())
+                    .get(&log_schema().message_key())
                     .unwrap()
                     .clone()
             })
@@ -1393,7 +1388,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&event::log_schema().message_key())
+                    .get(&log_schema().message_key())
                     .unwrap()
                     .clone()
             })

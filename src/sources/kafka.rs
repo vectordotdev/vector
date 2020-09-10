@@ -1,6 +1,6 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::{self, Event},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    event::Event,
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::KafkaAuthConfig,
     shutdown::ShutdownSignal,
@@ -131,7 +131,7 @@ fn kafka_source(
                             let mut event = Event::new_empty_log();
                             let log = event.as_mut_log();
 
-                            log.insert(event::log_schema().message_key().clone(), payload.to_vec());
+                            log.insert(log_schema().message_key().clone(), payload.to_vec());
 
                             // Extract timestamp from kafka message
                             let timestamp = msg
@@ -139,10 +139,10 @@ fn kafka_source(
                                 .to_millis()
                                 .and_then(|millis| Utc.timestamp_millis_opt(millis).latest())
                                 .unwrap_or_else(Utc::now);
-                            log.insert(event::log_schema().timestamp_key().clone(), timestamp);
+                            log.insert(log_schema().timestamp_key().clone(), timestamp);
 
                             // Add source type
-                            log.insert(event::log_schema().source_type_key(), Bytes::from("kafka"));
+                            log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
 
                             if let Some(key_field) = &key_field {
                                 match msg.key() {
@@ -257,9 +257,8 @@ mod test {
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use super::{kafka_source, KafkaSourceConfig};
+    use super::*;
     use crate::{
-        event,
         shutdown::ShutdownSignal,
         test_util::{collect_n, random_string},
         Pipeline,
@@ -333,7 +332,7 @@ mod integration_test {
         let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&log_schema().message_key()],
             "my message".into()
         );
         assert_eq!(
@@ -341,12 +340,9 @@ mod integration_test {
             "my key".into()
         );
         assert_eq!(
-            events[0].as_log()[event::log_schema().source_type_key()],
+            events[0].as_log()[log_schema().source_type_key()],
             "kafka".into()
         );
-        assert_eq!(
-            events[0].as_log()[event::log_schema().timestamp_key()],
-            now.into()
-        );
+        assert_eq!(events[0].as_log()[log_schema().timestamp_key()], now.into());
     }
 }

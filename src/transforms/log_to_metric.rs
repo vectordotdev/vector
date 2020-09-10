@@ -1,8 +1,8 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-    event::{self, Value},
+    event::Value,
     internal_events::{
         LogToMetricEventProcessed, LogToMetricFieldNotFound, LogToMetricParseError,
         LogToMetricRenderError, LogToMetricTemplateError,
@@ -155,7 +155,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
     let log = event.as_log();
 
     let timestamp = log
-        .get(&event::log_schema().timestamp_key())
+        .get(&log_schema().timestamp_key())
         .and_then(Value::as_timestamp)
         .cloned();
 
@@ -308,8 +308,9 @@ impl Transform for LogToMetric {
 mod tests {
     use super::{LogToMetric, LogToMetricConfig};
     use crate::{
+        config::log_schema,
         event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-        event::{self, Event},
+        event::Event,
         transforms::Transform,
     };
     use chrono::{offset::TimeZone, DateTime, Utc};
@@ -326,7 +327,7 @@ mod tests {
         let mut log = Event::from("i am a log");
         log.as_mut_log().insert(key, value);
         log.as_mut_log()
-            .insert(event::log_schema().timestamp_key().clone(), ts());
+            .insert(log_schema().timestamp_key().clone(), ts());
         log
     }
 
@@ -548,7 +549,7 @@ mod tests {
         let mut event = Event::from("i am a log");
         event
             .as_mut_log()
-            .insert(event::log_schema().timestamp_key().clone(), ts());
+            .insert(log_schema().timestamp_key().clone(), ts());
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
 
@@ -598,7 +599,7 @@ mod tests {
         let mut event = Event::from("i am a log");
         event
             .as_mut_log()
-            .insert(event::log_schema().timestamp_key().clone(), ts());
+            .insert(log_schema().timestamp_key().clone(), ts());
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
         event.as_mut_log().insert("host", "local");

@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{self, Event},
+    event::Event,
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -27,7 +27,7 @@ impl TransformConfig for LogfmtConfig {
         let field = self
             .field
             .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+            .unwrap_or(&crate::config::log_schema().message_key());
         let conversions = parse_conversion_map(&self.types)?;
 
         Ok(Box::new(Logfmt {

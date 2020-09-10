@@ -13,7 +13,7 @@
 //! does not match, we will add a default label `{agent="vector"}`.
 
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
     sinks::util::{
         buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
@@ -134,15 +134,13 @@ impl HttpSink for LokiConfig {
             }
         }
 
-        let timestamp = match event.as_log().get(&event::log_schema().timestamp_key()) {
+        let timestamp = match event.as_log().get(&log_schema().timestamp_key()) {
             Some(event::Value::Timestamp(ts)) => ts.timestamp_nanos(),
             _ => chrono::Utc::now().timestamp_nanos(),
         };
 
         if self.remove_timestamp {
-            event
-                .as_mut_log()
-                .remove(&event::log_schema().timestamp_key());
+            event.as_mut_log().remove(&log_schema().timestamp_key());
         }
 
         self.encoding.apply_rules(&mut event);
@@ -152,7 +150,7 @@ impl HttpSink for LokiConfig {
 
             Encoding::Text => event
                 .as_log()
-                .get(&event::log_schema().message_key())
+                .get(&log_schema().message_key())
                 .map(Value::to_string_lossy)
                 .unwrap_or_default(),
         };

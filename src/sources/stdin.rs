@@ -1,6 +1,6 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::{self, Event},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    event::Event,
     internal_events::{StdinEventReceived, StdinReadFailed},
     shutdown::ShutdownSignal,
     Pipeline,
@@ -72,7 +72,7 @@ where
 {
     let host_key = config
         .host_key
-        .unwrap_or_else(|| event::log_schema().host_key().to_string());
+        .unwrap_or_else(|| log_schema().host_key().to_string());
     let hostname = hostname::get_hostname();
 
     let (mut sender, receiver) = channel(1024);
@@ -113,7 +113,7 @@ fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event
     // Add source type
     event
         .as_mut_log()
-        .insert(event::log_schema().source_type_key(), Bytes::from("stdin"));
+        .insert(log_schema().source_type_key(), Bytes::from("stdin"));
 
     if let Some(hostname) = &hostname {
         event.as_mut_log().insert(host_key, hostname.clone());
@@ -125,7 +125,7 @@ fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event, test_util::trace_init, Pipeline};
+    use crate::{test_util::trace_init, Pipeline};
     use futures::compat::Future01CompatExt;
     use futures01::{Async::*, Stream};
     use std::io::Cursor;
@@ -140,11 +140,8 @@ mod tests {
         let log = event.into_log();
 
         assert_eq!(log[&"host".into()], "Some.Machine".into());
-        assert_eq!(
-            log[&event::log_schema().message_key()],
-            "hello world".into()
-        );
-        assert_eq!(log[event::log_schema().source_type_key()], "stdin".into());
+        assert_eq!(log[&log_schema().message_key()], "hello world".into());
+        assert_eq!(log[log_schema().source_type_key()], "stdin".into());
     }
 
     #[tokio::test]
@@ -167,7 +164,7 @@ mod tests {
         assert_eq!(
             Ready(Some("hello world".into())),
             event.map(|event| event
-                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy()))
+                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy()))
         );
 
         let event = rx.poll().unwrap();
@@ -175,7 +172,7 @@ mod tests {
         assert_eq!(
             Ready(Some("hello world again".into())),
             event.map(|event| event
-                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy()))
+                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy()))
         );
 
         let event = rx.poll().unwrap();

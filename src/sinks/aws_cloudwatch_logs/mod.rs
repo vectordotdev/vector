@@ -1,9 +1,9 @@
 mod request;
 
 use crate::{
-    config::{DataType, SinkConfig, SinkContext},
+    config::{log_schema, DataType, SinkConfig, SinkContext},
     dns::Resolver,
-    event::{self, Event, LogEvent, Value},
+    event::{Event, LogEvent, Value},
     region::RegionOrEndpoint,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -407,7 +407,7 @@ fn encode_log(
     mut log: LogEvent,
     encoding: &EncodingConfig<Encoding>,
 ) -> Result<InputLogEvent, CloudwatchLogsError> {
-    let timestamp = match log.remove(&event::log_schema().timestamp_key()) {
+    let timestamp = match log.remove(&log_schema().timestamp_key()) {
         Some(Value::Timestamp(ts)) => ts.timestamp_millis(),
         _ => Utc::now().timestamp_millis(),
     };
@@ -415,7 +415,7 @@ fn encode_log(
     let message = match encoding.codec() {
         Encoding::Json => serde_json::to_string(&log).unwrap(),
         Encoding::Text => log
-            .get(&event::log_schema().message_key())
+            .get(&log_schema().message_key())
             .map(|v| v.to_string_lossy())
             .unwrap_or_else(|| "".into()),
     };
@@ -661,7 +661,7 @@ mod tests {
     use super::*;
     use crate::{
         dns::Resolver,
-        event::{self, Event, Value},
+        event::{Event, Value},
         region::RegionOrEndpoint,
     };
     use std::collections::HashMap;
@@ -785,7 +785,7 @@ mod tests {
         event.insert("key", "value");
         let encoded = encode_log(event.clone(), &Encoding::Json.into()).unwrap();
 
-        let ts = if let Value::Timestamp(ts) = event[&event::log_schema().timestamp_key()] {
+        let ts = if let Value::Timestamp(ts) = event[&log_schema().timestamp_key()] {
             ts.timestamp_millis()
         } else {
             panic!()
@@ -800,7 +800,7 @@ mod tests {
         event.insert("key", "value");
         let encoded = encode_log(event, &Encoding::Json.into()).unwrap();
         let map: HashMap<Atom, String> = serde_json::from_str(&encoded.message[..]).unwrap();
-        assert!(map.get(&event::log_schema().timestamp_key()).is_none());
+        assert!(map.get(&log_schema().timestamp_key()).is_none());
     }
 
     #[test]
@@ -820,7 +820,7 @@ mod tests {
                 let mut event = Event::new_empty_log();
                 event
                     .as_mut_log()
-                    .insert(&event::log_schema().timestamp_key(), timestamp);
+                    .insert(&log_schema().timestamp_key(), timestamp);
                 encode_log(event.into_log(), &Encoding::Text.into()).unwrap()
             })
             .collect();
@@ -851,7 +851,7 @@ mod integration_tests {
     use rusoto_logs::{CloudWatchLogs, CreateLogGroupRequest, GetLogEventsRequest};
     use std::convert::TryFrom;
 
-    const GROUP_NAME: &'static str = "vector-cw";
+    const GROUP_NAME: &str = "vector-cw";
 
     #[tokio::test]
     async fn cloudwatch_insert_log_event() {
@@ -930,10 +930,9 @@ mod integration_tests {
             if doit {
                 let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
 
-                event.as_mut_log().insert(
-                    event::log_schema().timestamp_key(),
-                    Value::Timestamp(timestamp),
-                );
+                event
+                    .as_mut_log()
+                    .insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
             }
             doit = true;
 
@@ -994,7 +993,7 @@ mod integration_tests {
             let mut event = Event::from(line.clone());
             event
                 .as_mut_log()
-                .insert(event::log_schema().timestamp_key(), now + offset);
+                .insert(log_schema().timestamp_key(), now + offset);
             events.push(event);
             line
         };

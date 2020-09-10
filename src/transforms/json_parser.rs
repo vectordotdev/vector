@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{self, Event},
+    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    event::Event,
     internal_events::{JsonParserEventProcessed, JsonParserFailedParse, JsonParserTargetExists},
 };
 use serde::{Deserialize, Serialize};
@@ -57,7 +57,7 @@ impl From<JsonParserConfig> for JsonParser {
         let field = if let Some(field) = &config.field {
             field
         } else {
-            &event::log_schema().message_key()
+            &log_schema().message_key()
         };
 
         JsonParser {
@@ -132,8 +132,7 @@ impl Transform for JsonParser {
 #[cfg(test)]
 mod test {
     use super::{JsonParser, JsonParserConfig};
-    use crate::event::{self, Event};
-    use crate::transforms::Transform;
+    use crate::{config::log_schema, event::Event, transforms::Transform};
     use serde_json::json;
     use string_cache::DefaultAtom as Atom;
 
@@ -145,10 +144,7 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert!(event
-            .as_log()
-            .get(&event::log_schema().message_key())
-            .is_none());
+        assert!(event.as_log().get(&log_schema().message_key()).is_none());
     }
 
     #[test]
@@ -162,10 +158,7 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert!(event
-            .as_log()
-            .get(&event::log_schema().message_key())
-            .is_some());
+        assert!(event.as_log().get(&log_schema().message_key()).is_some());
     }
 
     #[test]
@@ -182,7 +175,7 @@ mod test {
         assert_eq!(event.as_log()[&Atom::from("greeting")], "hello".into());
         assert_eq!(event.as_log()[&Atom::from("name")], "bob".into());
         assert_eq!(
-            event.as_log()[&event::log_schema().message_key()],
+            event.as_log()[&log_schema().message_key()],
             r#"{"greeting": "hello", "name": "bob"}"#.into()
         );
     }
@@ -229,7 +222,7 @@ mod test {
         assert_eq!(event.as_log()[&Atom::from("greeting")], "hello".into());
         assert_eq!(event.as_log()[&Atom::from("name")], "bob".into());
         assert_eq!(
-            event.as_log()[&event::log_schema().message_key()],
+            event.as_log()[&log_schema().message_key()],
             r#" {"greeting": "hello", "name": "bob"}    "#.into()
         );
     }
@@ -310,10 +303,7 @@ mod test {
         let parsed = parser.transform(event.clone()).unwrap();
 
         assert_eq!(event, parsed);
-        assert_eq!(
-            event.as_log()[&event::log_schema().message_key()],
-            invalid.into()
-        );
+        assert_eq!(event.as_log()[&log_schema().message_key()], invalid.into());
 
         // Field
         let mut parser = JsonParser::from(JsonParserConfig {

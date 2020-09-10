@@ -1,24 +1,26 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
+use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
 use metric::{MetricKind, MetricValue};
-use serde::{Serialize, Serializer};
-use serde_json::Value as JsonValue;
-use std::{collections::BTreeMap, iter::FromIterator};
+use std::collections::BTreeMap;
 use string_cache::DefaultAtom as Atom;
 
 pub mod discriminant;
-mod log_schema;
 pub mod merge;
 pub mod merge_state;
 pub mod metric;
 pub mod util;
 
-pub use log_schema::{log_schema, LogSchema, LOG_SCHEMA};
+mod log_event;
+mod value;
+
+pub use log_event::LogEvent;
 pub use metric::{Metric, StatisticKind};
 pub(crate) use util::log::PathComponent;
 pub(crate) use util::log::PathIter;
+pub use value::Value;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
@@ -34,11 +36,6 @@ lazy_static! {
 pub enum Event {
     Log(LogEvent),
     Metric(Metric),
-}
-
-#[derive(PartialEq, Debug, Clone, Default)]
-pub struct LogEvent {
-    fields: BTreeMap<String, Value>,
 }
 
 impl Event {
@@ -85,298 +82,6 @@ impl Event {
         match self {
             Event::Metric(metric) => metric,
             _ => panic!("Failed type coercion, {:?} is not a metric", self),
-        }
-    }
-}
-
-impl LogEvent {
-    pub fn get(&self, key: &Atom) -> Option<&Value> {
-        util::log::get(&self.fields, key)
-    }
-
-    pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.fields.get(key.as_ref())
-    }
-
-    pub fn get_mut(&mut self, key: &Atom) -> Option<&mut Value> {
-        util::log::get_mut(&mut self.fields, key)
-    }
-
-    pub fn contains(&self, key: &Atom) -> bool {
-        util::log::contains(&self.fields, key)
-    }
-
-    pub fn insert<K, V>(&mut self, key: K, value: V) -> Option<Value>
-    where
-        K: AsRef<str>,
-        V: Into<Value>,
-    {
-        util::log::insert(&mut self.fields, key.as_ref(), value.into())
-    }
-
-    pub fn insert_path<V>(&mut self, key: Vec<PathComponent>, value: V) -> Option<Value>
-    where
-        V: Into<Value>,
-    {
-        util::log::insert_path(&mut self.fields, key, value.into())
-    }
-
-    pub fn insert_flat<K, V>(&mut self, key: K, value: V)
-    where
-        K: Into<String>,
-        V: Into<Value>,
-    {
-        self.fields.insert(key.into(), value.into());
-    }
-
-    pub fn try_insert<V>(&mut self, key: &Atom, value: V)
-    where
-        V: Into<Value>,
-    {
-        if !self.contains(key) {
-            self.insert(key.clone(), value);
-        }
-    }
-
-    pub fn remove(&mut self, key: &Atom) -> Option<Value> {
-        util::log::remove(&mut self.fields, &key, false)
-    }
-
-    pub fn remove_prune(&mut self, key: &Atom, prune: bool) -> Option<Value> {
-        util::log::remove(&mut self.fields, &key, prune)
-    }
-
-    pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
-        util::log::keys(&self.fields)
-    }
-
-    pub fn all_fields(&self) -> impl Iterator<Item = (String, &Value)> + Serialize {
-        util::log::all_fields(&self.fields)
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.fields.is_empty()
-    }
-}
-
-impl std::ops::Index<&Atom> for LogEvent {
-    type Output = Value;
-
-    fn index(&self, key: &Atom) -> &Value {
-        self.get(key).expect("Key is not found")
-    }
-}
-
-impl<K: Into<Atom>, V: Into<Value>> Extend<(K, V)> for LogEvent {
-    fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
-        for (k, v) in iter {
-            self.insert(k.into(), v.into());
-        }
-    }
-}
-
-// Allow converting any kind of appropriate key/value iterator directly into a LogEvent.
-impl<K: Into<Atom>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
-    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let mut log_event = LogEvent::default();
-        log_event.extend(iter);
-        log_event
-    }
-}
-
-/// Converts event into an iterator over top-level key/value pairs.
-impl IntoIterator for LogEvent {
-    type Item = (String, Value);
-    type IntoIter = std::collections::btree_map::IntoIter<String, Value>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.fields.into_iter()
-    }
-}
-
-impl Serialize for LogEvent {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.collect_map(self.fields.iter())
-    }
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub enum Value {
-    Bytes(Bytes),
-    Integer(i64),
-    Float(f64),
-    Boolean(bool),
-    Timestamp(DateTime<Utc>),
-    Map(BTreeMap<String, Value>),
-    Array(Vec<Value>),
-    Null,
-}
-
-impl Serialize for Value {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match &self {
-            Value::Integer(i) => serializer.serialize_i64(*i),
-            Value::Float(f) => serializer.serialize_f64(*f),
-            Value::Boolean(b) => serializer.serialize_bool(*b),
-            Value::Bytes(_) | Value::Timestamp(_) => {
-                serializer.serialize_str(&self.to_string_lossy())
-            }
-            Value::Map(m) => serializer.collect_map(m),
-            Value::Array(a) => serializer.collect_seq(a),
-            Value::Null => serializer.serialize_none(),
-        }
-    }
-}
-
-impl From<Bytes> for Value {
-    fn from(bytes: Bytes) -> Self {
-        Value::Bytes(bytes)
-    }
-}
-
-impl From<Vec<u8>> for Value {
-    fn from(bytes: Vec<u8>) -> Self {
-        Value::Bytes(bytes.into())
-    }
-}
-
-impl From<String> for Value {
-    fn from(string: String) -> Self {
-        Value::Bytes(string.into())
-    }
-}
-
-// We only enable this in testing for convenience, since `"foo"` is a `&str`.
-// In normal operation, it's better to let the caller decide where to clone and when, rather than
-// hiding this from them.
-#[cfg(test)]
-impl From<&str> for Value {
-    fn from(s: &str) -> Self {
-        Value::Bytes(Vec::from(s.as_bytes()).into())
-    }
-}
-
-impl From<DateTime<Utc>> for Value {
-    fn from(timestamp: DateTime<Utc>) -> Self {
-        Value::Timestamp(timestamp)
-    }
-}
-
-impl From<f32> for Value {
-    fn from(value: f32) -> Self {
-        Value::Float(f64::from(value))
-    }
-}
-
-impl From<f64> for Value {
-    fn from(value: f64) -> Self {
-        Value::Float(value)
-    }
-}
-
-impl From<BTreeMap<String, Value>> for Value {
-    fn from(value: BTreeMap<String, Value>) -> Self {
-        Value::Map(value)
-    }
-}
-
-impl From<Vec<Value>> for Value {
-    fn from(value: Vec<Value>) -> Self {
-        Value::Array(value)
-    }
-}
-
-macro_rules! impl_valuekind_from_integer {
-    ($t:ty) => {
-        impl From<$t> for Value {
-            fn from(value: $t) -> Self {
-                Value::Integer(value as i64)
-            }
-        }
-    };
-}
-
-impl_valuekind_from_integer!(i64);
-impl_valuekind_from_integer!(i32);
-impl_valuekind_from_integer!(i16);
-impl_valuekind_from_integer!(i8);
-impl_valuekind_from_integer!(isize);
-
-impl From<bool> for Value {
-    fn from(value: bool) -> Self {
-        Value::Boolean(value)
-    }
-}
-
-impl From<JsonValue> for Value {
-    fn from(json_value: JsonValue) -> Self {
-        match json_value {
-            JsonValue::Bool(b) => Value::Boolean(b),
-            JsonValue::Number(n) => {
-                if let Some(i) = n.as_i64() {
-                    Value::Integer(i)
-                } else if let Some(f) = n.as_f64() {
-                    Value::Float(f)
-                } else {
-                    Value::Bytes(n.to_string().into())
-                }
-            }
-            JsonValue::String(s) => Value::Bytes(Bytes::from(s)),
-            JsonValue::Object(obj) => Value::Map(
-                obj.into_iter()
-                    .map(|(key, value)| (key, Value::from(value)))
-                    .collect(),
-            ),
-            JsonValue::Array(arr) => Value::Array(arr.into_iter().map(Value::from).collect()),
-            JsonValue::Null => Value::Null,
-        }
-    }
-}
-
-impl Value {
-    // TODO: return Cow
-    pub fn to_string_lossy(&self) -> String {
-        match self {
-            Value::Bytes(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
-            Value::Timestamp(timestamp) => timestamp_to_string(timestamp),
-            Value::Integer(num) => format!("{}", num),
-            Value::Float(num) => format!("{}", num),
-            Value::Boolean(b) => format!("{}", b),
-            Value::Map(map) => serde_json::to_string(map).expect("Cannot serialize map"),
-            Value::Array(arr) => serde_json::to_string(arr).expect("Cannot serialize array"),
-            Value::Null => "<null>".to_string(),
-        }
-    }
-
-    pub fn as_bytes(&self) -> Bytes {
-        match self {
-            Value::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
-            Value::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
-            Value::Integer(num) => Bytes::from(format!("{}", num)),
-            Value::Float(num) => Bytes::from(format!("{}", num)),
-            Value::Boolean(b) => Bytes::from(format!("{}", b)),
-            Value::Map(map) => Bytes::from(serde_json::to_vec(map).expect("Cannot serialize map")),
-            Value::Array(arr) => {
-                Bytes::from(serde_json::to_vec(arr).expect("Cannot serialize array"))
-            }
-            Value::Null => Bytes::from("<null>"),
-        }
-    }
-
-    pub fn into_bytes(self) -> Bytes {
-        self.as_bytes()
-    }
-
-    pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
-        match &self {
-            Value::Timestamp(ts) => Some(ts),
-            _ => None,
         }
     }
 }
@@ -440,7 +145,7 @@ impl From<proto::EventWrapper> for Event {
                     .filter_map(|(k, v)| decode_value(v).map(|value| (k, value)))
                     .collect::<BTreeMap<_, _>>();
 
-                Event::Log(LogEvent { fields })
+                Event::Log(LogEvent::from(fields))
             }
             EventProto::Metric(proto) => {
                 let kind = match proto.kind() {
@@ -540,8 +245,8 @@ fn encode_array(items: Vec<Value>) -> proto::ValueArray {
 impl From<Event> for proto::EventWrapper {
     fn from(event: Event) -> Self {
         match event {
-            Event::Log(LogEvent { fields }) => {
-                let fields = fields
+            Event::Log(log_event) => {
+                let fields = log_event
                     .into_iter()
                     .map(|(k, v)| (k, encode_value(v)))
                     .collect::<BTreeMap<_, _>>();
@@ -645,16 +350,14 @@ impl From<Event> for Vec<u8> {
 
 impl From<Bytes> for Event {
     fn from(message: Bytes) -> Self {
-        let mut event = Event::Log(LogEvent {
-            fields: BTreeMap::new(),
-        });
+        let mut event = Event::Log(LogEvent::from(BTreeMap::new()));
 
         event
             .as_mut_log()
-            .insert(log_schema().message_key().clone(), message);
+            .insert(log_schema().message_key(), message);
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), Utc::now());
+            .insert(log_schema().timestamp_key(), Utc::now());
 
         event
     }
@@ -686,7 +389,7 @@ impl From<Metric> for Event {
 
 #[cfg(test)]
 mod test {
-    use super::{Atom, Event, LogSchema, Value};
+    use super::*;
     use regex::Regex;
     use std::collections::HashSet;
 
@@ -700,7 +403,7 @@ mod test {
             "message": "raw log line",
             "foo": "bar",
             "bar": "baz",
-            "timestamp": event.as_log().get(&super::log_schema().timestamp_key()),
+            "timestamp": event.as_log().get(&log_schema().timestamp_key()),
         });
 
         let actual_all = serde_json::to_value(event.as_log().all_fields()).unwrap();
@@ -777,14 +480,5 @@ mod test {
                 (String::from("o9amkaRY"), &Value::from("pGsfG7Nr")),
             ]
         );
-    }
-
-    #[test]
-    fn partial_log_schema() {
-        let toml = r#"
-message_key = "message"
-timestamp_key = "timestamp"
-"#;
-        let _ = toml::from_str::<LogSchema>(toml).unwrap();
     }
 }

@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{self, Event},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
 };
 use futures::{lock::Mutex, FutureExt, TryFutureExt};
@@ -196,7 +196,7 @@ fn encode_event(item: Event, encoding: &EncodingConfig<Encoding>) -> crate::Resu
     Ok(match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&log)?,
         Encoding::Text => log
-            .get(&event::log_schema().message_key())
+            .get(&log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     })
@@ -214,7 +214,7 @@ mod tests {
         evt.as_mut_log().insert("key", "value");
         let result = encode_event(evt, &EncodingConfig::from(Encoding::Json)).unwrap();
         let map: HashMap<String, String> = serde_json::from_slice(&result[..]).unwrap();
-        assert_eq!(msg, map[&event::log_schema().message_key().to_string()]);
+        assert_eq!(msg, map[&log_schema().message_key().to_string()]);
     }
 
     #[test]

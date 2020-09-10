@@ -14,7 +14,7 @@ pub fn build_unit_tests_main(path: PathBuf) -> Result<Vec<UnitTest>, Vec<String>
     let config = super::loading::load_builder_from_paths(&[path])?;
 
     // Ignore failures on calls other than the first
-    crate::event::LOG_SCHEMA
+    crate::config::LOG_SCHEMA
         .set(config.global.log_schema.clone())
         .ok();
 

@@ -1,6 +1,6 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{self, Event, LogEvent, Value},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    event::{Event, LogEvent, Value},
     internal_events::{
         SplunkEventEncodeError, SplunkEventSent, SplunkSourceMissingKeys,
         SplunkSourceTypeMissingKeys,
@@ -76,7 +76,7 @@ pub enum Encoding {
 }
 
 fn default_host_key() -> Atom {
-    event::LogSchema::default().host_key().clone()
+    crate::config::LogSchema::default().host_key().clone()
 }
 
 inventory::submit! {
@@ -153,7 +153,7 @@ impl HttpSink for HecSinkConfig {
 
         let host = event.get(&self.host_key).cloned();
 
-        let timestamp = match event.remove(&event::log_schema().timestamp_key()) {
+        let timestamp = match event.remove(&log_schema().timestamp_key()) {
             Some(Value::Timestamp(ts)) => ts,
             _ => chrono::Utc::now(),
         };
@@ -168,7 +168,7 @@ impl HttpSink for HecSinkConfig {
         let event = match self.encoding.codec() {
             Encoding::Json => json!(event),
             Encoding::Text => json!(event
-                .get(&event::log_schema().message_key())
+                .get(&log_schema().message_key())
                 .map(|v| v.to_string_lossy())
                 .unwrap_or_else(|| "".into())),
         };
@@ -315,11 +315,11 @@ mod tests {
 
         assert_eq!(kv, &"value".to_string());
         assert_eq!(
-            event[&event::log_schema().message_key().to_string()],
+            event[&log_schema().message_key().to_string()],
             "hello world".to_string()
         );
         assert!(event
-            .get(&event::log_schema().timestamp_key().to_string())
+            .get(&log_schema().timestamp_key().to_string())
             .is_none());
 
         assert_eq!(

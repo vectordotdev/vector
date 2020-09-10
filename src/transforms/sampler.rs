@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{self, Event},
+    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    event::Event,
     internal_events::{SamplerEventDiscarded, SamplerEventProcessed},
 };
 use regex::RegexSet; // TODO: use regex::bytes
@@ -53,7 +53,7 @@ pub struct Sampler {
 
 impl Sampler {
     pub fn new(rate: u64, key_field: Option<Atom>, pass_list: RegexSet) -> Self {
-        let key_field = key_field.unwrap_or_else(|| event::log_schema().message_key().clone());
+        let key_field = key_field.unwrap_or_else(|| log_schema().message_key().clone());
         Self {
             rate,
             key_field,
@@ -91,8 +91,8 @@ impl Transform for Sampler {
 
 #[cfg(test)]
 mod tests {
-    use super::Sampler;
-    use crate::event::{self, Event};
+    use super::*;
+    use crate::event::Event;
     use crate::transforms::Transform;
     use approx::assert_relative_eq;
     use regex::RegexSet;
@@ -170,7 +170,7 @@ mod tests {
         let passing = events
             .into_iter()
             .filter(|s| {
-                !s.as_log()[&event::log_schema().message_key()]
+                !s.as_log()[&log_schema().message_key()]
                     .to_string_lossy()
                     .contains("na")
             })
@@ -183,7 +183,7 @@ mod tests {
         let passing = events
             .into_iter()
             .filter(|s| {
-                !s.as_log()[&event::log_schema().message_key()]
+                !s.as_log()[&log_schema().message_key()]
                     .to_string_lossy()
                     .contains("na")
             })

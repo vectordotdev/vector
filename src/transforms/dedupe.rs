@@ -1,7 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event,
+    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
 };
 use bytes::Bytes;
@@ -53,9 +52,9 @@ impl DedupeConfig {
             FieldMatchConfig::MatchFields(x) => FieldMatchConfig::MatchFields(x.clone()),
             FieldMatchConfig::IgnoreFields(y) => FieldMatchConfig::IgnoreFields(y.clone()),
             FieldMatchConfig::Default => FieldMatchConfig::MatchFields(vec![
-                event::log_schema().timestamp_key().into(),
-                event::log_schema().host_key().into(),
-                event::log_schema().message_key().into(),
+                log_schema().timestamp_key().into(),
+                log_schema().host_key().into(),
+                log_schema().message_key().into(),
             ]),
         };
         Self {

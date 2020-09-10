@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{self, Event, PathComponent, PathIter},
+    event::{Event, PathComponent, PathIter},
     types::{parse_check_conversion_map, Conversion},
 };
 use nom::{
@@ -36,7 +36,7 @@ impl TransformConfig for TokenizerConfig {
         let field = self
             .field
             .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+            .unwrap_or(&crate::config::log_schema().message_key());
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)?;
 

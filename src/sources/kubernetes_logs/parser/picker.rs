@@ -1,6 +1,6 @@
 use super::{cri::Cri, docker::Docker};
 use crate::{
-    event::{self, Event, Value},
+    event::{Event, Value},
     transforms::Transform,
 };
 
@@ -22,7 +22,7 @@ impl Transform for Picker {
             Picker::Init => {
                 let message = event
                     .as_log()
-                    .get(event::log_schema().message_key())
+                    .get(crate::config::log_schema().message_key())
                     .expect("message key must be present");
                 let bytes = if let Value::Bytes(bytes) = message {
                     bytes
