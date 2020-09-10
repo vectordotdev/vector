@@ -3,7 +3,6 @@ use crate::event::{Event, Value};
 pub mod parser;
 pub mod query;
 
-use bytes::{Bytes, BytesMut};
 use string_cache::DefaultAtom as Atom;
 
 pub type Result<T> = std::result::Result<T, String>;

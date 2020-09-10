@@ -707,7 +707,9 @@ mod tests {
     #[test]
     fn check_uuid_v4() {
         match UuidV4Fn::new().execute(&Event::from("")).unwrap() {
-            Value::Bytes(value) => uuid::Uuid::from_slice(&value).expect("valid UUID V4"),
+            Value::Bytes(value) => {
+                uuid::Uuid::parse_str(std::str::from_utf8(&value).unwrap()).expect("valid UUID V4")
+            }
             _ => panic!("unexpected uuid_v4 output"),
         };
     }
