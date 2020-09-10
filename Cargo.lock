@@ -1635,7 +1635,7 @@ dependencies = [
  "headers-core",
  "http 0.2.1",
  "mime",
- "sha-1",
+ "sha-1 0.8.2",
  "time 0.1.43",
 ]
 
@@ -3116,7 +3116,7 @@ checksum = "54be6e404f5317079812fc8f9f5279de376d8856929e21c184ecf6bbd692a11d"
 dependencies = [
  "maplit",
  "pest",
- "sha-1",
+ "sha-1 0.8.2",
 ]
 
 [[package]]
@@ -4349,6 +4349,19 @@ dependencies = [
  "digest 0.8.1",
  "fake-simd",
  "opaque-debug 0.2.3",
+]
+
+[[package]]
+name = "sha-1"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "170a36ea86c864a3f16dd2687712dd6646f7019f301e57537c7f4dc9f5916770"
+dependencies = [
+ "block-buffer 0.9.0",
+ "cfg-if",
+ "cpuid-bool",
+ "digest 0.9.0",
+ "opaque-debug 0.3.0",
 ]
 
 [[package]]
@@ -5586,7 +5599,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "sha1",
+ "sha-1 0.9.1",
  "smpl_jwt",
  "snafu",
  "stream-cancel",

@@ -304,11 +304,13 @@ impl Sha1Fn {
 
 impl Function for Sha1Fn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
+        use sha1::{Digest, Sha1};
+
         let value = self.query.execute(ctx)?;
 
         if let Value::Bytes(bytes) = value {
-            let sha = sha1::Sha1::from(bytes).hexdigest();
-            return Ok(Value::Bytes(sha.into()));
+            let sha1 = hex::encode(Sha1::digest(&bytes));
+            return Ok(Value::Bytes(sha1.into()));
         }
 
         Ok(value)
