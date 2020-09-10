@@ -1,14 +1,43 @@
 use super::{handler, schema};
+use crate::config::api::Options;
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig},
     QueryBuilder,
 };
 use async_graphql_warp::{graphql_subscription, GQLResponse};
 use std::convert::Infallible;
-use std::net::SocketAddr;
-use warp::{http::Response, Filter};
+use tokio::sync::oneshot;
+use warp::filters::BoxedFilter;
+use warp::{http::Response, Filter, Reply};
 
-pub async fn make_server(address: SocketAddr, playground: bool) {
+pub struct Server {
+    shutdown: oneshot::Sender<()>,
+}
+
+impl Server {
+    /// Start the API server. This creates the routes, spawns a Warp server, and stores a
+    /// shutdown signal which can fired with self.stop()
+    pub fn start(config: Options) -> Self {
+        let bind = config.bind.expect("Invalid socket address");
+        let routes = make_routes(config.playground);
+
+        let (shutdown, rx) = oneshot::channel();
+        let (_, server) = warp::serve(routes).bind_with_graceful_shutdown(bind, async {
+            rx.await.ok();
+        });
+
+        tokio::task::spawn(server);
+
+        Self { shutdown }
+    }
+
+    /// Stop the API server by sending a termination signal
+    pub async fn stop(self) -> Result<(), ()> {
+        self.shutdown.send(())
+    }
+}
+
+fn make_routes(playground: bool) -> BoxedFilter<(impl Reply,)> {
     // Build the GraphQL schema
     let schema = schema::build_schema().finish();
 
@@ -45,7 +74,7 @@ pub async fn make_server(address: SocketAddr, playground: bool) {
         not_found.boxed()
     };
 
-    let routes = health
+    health
         .or(graphql_handler)
         .or(graphql_playground)
         .or(not_found)
@@ -68,7 +97,6 @@ pub async fn make_server(address: SocketAddr, playground: bool) {
                     "Cache-Control",
                 ])
                 .allow_methods(vec!["POST", "GET"]),
-        );
-
-    warp::serve(routes).run(address).await
+        )
+        .boxed()
 }

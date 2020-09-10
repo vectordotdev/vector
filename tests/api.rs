@@ -4,7 +4,6 @@ mod support;
 mod tests {
     use crate::support::{sink, source};
     use reqwest::Response;
-    use std::net::SocketAddr;
     use std::time::Duration;
     use vector::api;
     use vector::config::Config;
@@ -22,32 +21,28 @@ mod tests {
         config.build().unwrap()
     }
 
-    // spawns the API server on the provided port; optionally enables playground
-    fn start_api_server(addr: SocketAddr, playground: bool) {
-        tokio::spawn(async move {
-            let _ = api::make_server(addr, playground).await;
-        });
-    }
-
     // returns the result of a URL test against the API. Wraps the test in retry_until
     // to guard against the race condition of the TCP listener not being ready
     async fn url_test(config: Config, url: &'static str) -> Response {
         let addr = config.api.bind.unwrap();
         let url = format!("http://{}:{}/{}", addr.ip(), addr.port(), url);
 
-        // Spawn the API server via tokio. Note: This may be spawned multiple times
-        // across numerous tests, on different ports
-        start_api_server(addr, config.api.playground);
+        let server = api::Server::start(config.api);
 
         // Build the request
         let client = reqwest::Client::new();
 
-        retry_until(
+        let res = retry_until(
             || client.get(&url).send(),
             Duration::from_millis(100),
             Duration::from_secs(10),
         )
-        .await
+        .await;
+
+        // shut down server
+        let _ = server.stop().await.expect("Server failed to shutdown");
+
+        res
     }
 
     #[tokio::test]
