@@ -1,0 +1,36 @@
+use super::InternalEvent;
+use metrics::counter;
+
+#[derive(Debug)]
+pub struct DedupeEventProcessed;
+
+impl InternalEvent for DedupeEventProcessed {
+    fn emit_metrics(&self) {
+        counter!("events_processed", 1,
+            "component_kind" => "transform",
+            "component_type" => "dedupe",
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct DedupeEventDiscarded {
+    pub event: crate::Event,
+}
+
+impl InternalEvent for DedupeEventDiscarded {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Encountered duplicate event; discarding.",
+            rate_limit_secs = 30
+        );
+        trace!(message = "Encountered duplicate event; discarding.", event = ?self.event);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("duplicate_event_discarded", 1,
+            "component_kind" => "transform",
+            "component_type" => "dedupe",
+        );
+    }
+}
