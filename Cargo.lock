@@ -3169,6 +3169,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "portpicker"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b497d05c16fe00939445c00a4fe2fa4f3d3dfc9c0401a3ab5c577afda2debb9"
+dependencies = [
+ "rand 0.6.5",
+]
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5517,6 +5526,7 @@ dependencies = [
  "pest",
  "pest_derive",
  "pin-project",
+ "portpicker",
  "pretty_assertions",
  "prometheus-parser",
  "prost",
