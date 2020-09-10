@@ -5,7 +5,7 @@ use crate::{
     event::Event,
     sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
 };
-use futures::{future, FutureExt, TryFutureExt};
+use futures::{future, FutureExt};
 use futures01::{stream, Sink};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -67,8 +67,7 @@ inventory::submit! {
 impl SinkConfig for StatsdSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = StatsdSvc::new(self.clone(), cx.acker())?;
-        let healthcheck = StatsdSvc::healthcheck(self.clone()).boxed().compat();
-        Ok((sink, Box::new(healthcheck)))
+        Ok((sink, future::ok(()).boxed()))
     }
 
     fn input_type(&self) -> DataType {
@@ -109,10 +108,6 @@ impl StatsdSvc {
         .with_flat_map(move |event| stream::iter_ok(encode_event(event, namespace.as_deref())));
 
         Ok(super::VectorSink::Futures01Sink(Box::new(sink)))
-    }
-
-    async fn healthcheck(_config: StatsdSinkConfig) -> crate::Result<()> {
-        Ok(())
     }
 }
 
