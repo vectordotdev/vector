@@ -269,3 +269,27 @@
     [[tests.outputs.conditions]]
       "a.regex" = "(?i)^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
       "b.equals" = "bar"
+
+[transforms.remap_function_sha1]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = sha1(.a)
+
+    if sha1(.b) == "62cdb7020ff920e5aa642c3d4066950dd1f01f4d" {
+        .b = "baz"
+    }
+  """
+[[tests]]
+  name = "remap_function_sha1"
+  [tests.input]
+    insert_at = "remap_function_sha1"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_sha1"
+    [[tests.outputs.conditions]]
+      "a.equals" = "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"
+      "b.equals" = "baz"

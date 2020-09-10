@@ -8,7 +8,7 @@ use crate::{
             arithmetic::Arithmetic,
             arithmetic::Operator,
             functions::{
-                DowncaseFn, NotFn, ParseTimestampFn, ToBooleanFn, ToFloatFn, ToIntegerFn,
+                DowncaseFn, NotFn, ParseTimestampFn, Sha1Fn, ToBooleanFn, ToFloatFn, ToIntegerFn,
                 ToStringFn, UpcaseFn, UuidV4Fn,
             },
             path::Path as QueryPath,
@@ -279,6 +279,11 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
             Ok(Box::new(DowncaseFn::new(query)))
         }
         Rule::uuid_v4 => Ok(Box::new(UuidV4Fn::new())),
+        Rule::sha1 => {
+            let pair = pair.into_inner().next().ok_or(TOKEN_ERR)?;
+            let query = query_arithmetic_from_pair(pair)?;
+            Ok(Box::new(Sha1Fn::new(query)))
+        }
         _ => unreachable!("parser should not allow other query_function child rules here"),
     }
 }

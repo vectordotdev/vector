@@ -153,6 +153,7 @@ cidr-utils = "0.4.2"
 pin-project = "0.4.23"
 k8s-openapi = { version = "0.9", features = ["v1_15"], optional = true }
 portpicker = "0.1.0"
+sha1 = { version = "0.6.0", features = ["std"], optional = true }
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -317,7 +318,7 @@ transforms-logfmt_parser = ["logfmt"]
 transforms-lua = ["rlua"]
 transforms-merge = []
 transforms-regex_parser = []
-transforms-remap = []
+transforms-remap = ["sha1"]
 transforms-remove_fields = []
 transforms-remove_tags = []
 transforms-rename_fields = []
