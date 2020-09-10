@@ -399,6 +399,50 @@ impl CheckFieldsPredicate for NegatePredicate {
 
 //------------------------------------------------------------------------------
 
+#[derive(Debug, Clone)]
+struct LenPredicate {
+    target: Atom,
+    arg: i64,
+}
+
+impl LenPredicate {
+    pub fn new(
+        target: String,
+        arg: &CheckFieldsPredicateArg,
+    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+        match arg {
+            CheckFieldsPredicateArg::Integer(i) => {
+                if *i < 0 {
+                    return Err("len predicate integer cannot be negative".to_owned());
+                }
+
+                Ok(Box::new(Self {
+                    target: target.into(),
+                    arg: *i,
+                }))
+            }
+            _ => Err("len predicate requires an integer argument".to_owned()),
+        }
+    }
+}
+
+impl CheckFieldsPredicate for LenPredicate {
+    fn check(&self, event: &Event) -> bool {
+        match event {
+            Event::Log(l) => l.get(&self.target).map_or(false, |v| {
+                // FIXME(jean): Should probably explicitly support strings and
+                // arrays.
+                let v = v.to_string_lossy();
+
+                v.len() as i64 == self.arg
+            }),
+            _ => false,
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
 fn build_predicate(
     predicate: &str,
     target: String,
@@ -420,6 +464,7 @@ fn build_predicate(
         "exists" => ExistsPredicate::new(target, arg),
         "regex" => RegexPredicate::new(target, arg),
         "ip_cidr_contains" => IpCidrPredicate::new(target, arg),
+        "len" => LenPredicate::new(target, arg),
         _ if predicate.starts_with("not_") => NegatePredicate::new(&predicate[4..], target, arg),
         _ => Err(format!("predicate type '{}' not recognized", predicate)),
     }
