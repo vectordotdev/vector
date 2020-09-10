@@ -50,7 +50,7 @@ mod tests {
         let addr = config.api.bind.unwrap();
         let url = format!("http://{}:{}/{}", addr.ip(), addr.port(), url);
 
-        let server = api::Server::start(config.api);
+        let _server = api::Server::start(config.api);
 
         // Build the request
         let client = reqwest::Client::new();
