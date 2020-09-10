@@ -28,7 +28,7 @@ impl InternalEvent for DedupeEventDiscarded {
     }
 
     fn emit_metrics(&self) {
-        counter!("duplicate_event_discarded", 1,
+        counter!("duplicate_events_discarded", 1,
             "component_kind" => "transform",
             "component_type" => "dedupe",
         );
