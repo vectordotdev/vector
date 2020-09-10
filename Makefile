@@ -242,8 +242,7 @@ endif
 
 test-integration-aws: ## Runs AWS integration tests
 ifeq ($(AUTOSPAWN), true)
-	$(MAKE) -k stop-integration-aws \
-    ; rc=$$? \
+	-$(MAKE) -k stop-integration-aws
 	$(MAKE) start-integration-aws
 	sleep 5 # Many services are very slow... Give them a sec...
 endif
@@ -272,8 +271,7 @@ endif
 
 test-integration-clickhouse: ## Runs Clickhouse integration tests
 ifeq ($(AUTOSPAWN), true)
-	$(MAKE) -k stop-integration-clickhouse \
-    ; rc=$$? \
+	-$(MAKE) -k stop-integration-clickhouse
 	$(MAKE) start-integration-clickhouse
 	sleep 5 # Many services are very slow... Give them a sec...
 endif
@@ -323,8 +321,7 @@ endif
 
 test-integration-elasticsearch: ## Runs Elasticsearch integration tests
 ifeq ($(AUTOSPAWN), true)
-	$(MAKE) -k stop-integration-elasticsearch \
-    ; rc=$$? \
+	-$(MAKE) -k stop-integration-elasticsearch
 	$(MAKE) start-integration-elasticsearch
 	sleep 60 # Many services are very slow... Give them a sec...
 endif
@@ -355,8 +352,7 @@ endif
 
 test-integration-gcp: ## Runs GCP integration tests
 ifeq ($(AUTOSPAWN), true)
-	$(MAKE) -k stop-integration-gcp \
-    ; rc=$$? \
+	-$(MAKE) -k stop-integration-gcp
 	$(MAKE) start-integration-gcp
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
@@ -385,8 +381,7 @@ endif
 
 test-integration-humio: ## Runs Humio integration tests
 ifeq ($(AUTOSPAWN), true)
-	$(MAKE) -k stop-integration-humio \
-    ; rc=$$? \
+	-$(MAKE) -k stop-integration-humio
 	$(MAKE) start-integration-humio
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
@@ -421,8 +416,7 @@ endif
 
 test-integration-influxdb: ## Runs InfluxDB integration tests
 ifeq ($(AUTOSPAWN), true)
-	$(MAKE) -k stop-integration-influxdb \
-    ; rc=$$? \
+	-$(MAKE) -k stop-integration-influxdb
 	$(MAKE) start-integration-influxdb
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
@@ -471,8 +465,7 @@ endif
 
 test-integration-kafka: ## Runs Kafka integration tests
 ifeq ($(AUTOSPAWN), true)
-	$(MAKE) -k stop-integration-kafka \
-    ; rc=$$? \
+	-$(MAKE) -k stop-integration-kafka
 	$(MAKE) start-integration-kafka
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
@@ -503,8 +496,7 @@ endif
 
 test-integration-loki: ## Runs Loki integration tests
 ifeq ($(AUTOSPAWN), true)
-	$(MAKE) -k stop-integration-loki \
-    ; rc=$$? \
+	-$(MAKE) -k stop-integration-loki
 	$(MAKE) start-integration-loki
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
@@ -535,8 +527,7 @@ endif
 
 test-integration-pulsar: ## Runs Pulsar integration tests
 ifeq ($(AUTOSPAWN), true)
-	$(MAKE) -k stop-integration-pulsar \
-    ; rc=$$? \
+	-$(MAKE) -k stop-integration-pulsar
 	$(MAKE) start-integration-pulsar
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
@@ -568,8 +559,7 @@ endif
 
 test-integration-splunk: ## Runs Splunk integration tests
 ifeq ($(AUTOSPAWN), true)
-	$(MAKE) -k stop-integration-splunk \
-    ; rc=$$? \
+	-$(MAKE) -k stop-integration-splunk
 	$(MAKE) start-integration-splunk
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
@@ -583,8 +573,7 @@ test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` 
 
 test-shutdown: ## Runs shutdown tests
 ifeq ($(AUTOSPAWN), true)
-	$(MAKE) -k stop-integration-kafka \
-    ; rc=$$? \
+	-$(MAKE) -k stop-integration-kafka
 	$(MAKE) start-integration-kafka
 	sleep 30 # Many services are very slow... Give them a sec..
 endif
