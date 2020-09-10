@@ -232,10 +232,10 @@ where
         // It would be better to avoid generating the string in Retry(_)
         // just to throw it away here, but it's probably not worth the
         // effort.
-        let response = response
+        let response_action = response
             .as_ref()
             .map(|resp| self.logic.should_retry_response(resp));
-        let is_back_pressure = match &response {
+        let is_back_pressure = match &response_action {
             Ok(action) => matches!(action, RetryAction::Retry(_)),
             Err(err) => {
                 if let Some(err) = err.downcast_ref::<L::Error>() {
@@ -248,7 +248,7 @@ where
             }
         };
         // Only adjust to the RTT when the request was successfully processed.
-        let use_rtt = matches!(response, Ok(RetryAction::Successful));
+        let use_rtt = matches!(response_action, Ok(RetryAction::Successful));
         self.adjust_to_response_inner(start, is_back_pressure, use_rtt)
     }
 }
