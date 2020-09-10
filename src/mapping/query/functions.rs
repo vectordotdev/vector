@@ -4,7 +4,7 @@ use crate::{
     mapping::Result,
     types::Conversion,
 };
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 
 #[derive(Debug)]
 pub(in crate::mapping) struct NotFn {
@@ -266,6 +266,26 @@ impl Function for DowncaseFn {
         }
 
         Ok(value)
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug)]
+pub(in crate::mapping) struct UuidV4Fn {}
+
+impl UuidV4Fn {
+    pub(in crate::mapping) fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Function for UuidV4Fn {
+    fn execute(&self, _: &Event) -> Result<Value> {
+        let mut buf = [0; 36];
+        let uuid = uuid::Uuid::new_v4().to_hyphenated().encode_lower(&mut buf);
+
+        Ok(Value::Bytes(Bytes::copy_from_slice(uuid.as_bytes())))
     }
 }
 
@@ -628,5 +648,13 @@ mod tests {
         for (input_event, exp, query) in cases {
             assert_eq!(query.execute(&input_event), exp);
         }
+    }
+
+    #[test]
+    fn check_uuid_v4() {
+        match UuidV4Fn::new().execute(&Event::from("")).unwrap() {
+            Value::Bytes(value) => uuid::Uuid::from_slice(&value).expect("valid UUID V4"),
+            _ => panic!("unexpected uuid_v4 output"),
+        };
     }
 }

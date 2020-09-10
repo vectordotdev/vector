@@ -246,3 +246,26 @@
       "d.equals" = 1
       "e.equals" = false
       "f.equals" = "FF"
+
+[transforms.remap_function_uuid_v4]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = uuid_v4()
+
+    if uuid_v4() != "" {
+        .b = "bar"
+    }
+  """
+[[tests]]
+  name = "remap_function_uuid_v4"
+  [tests.input]
+    insert_at = "remap_function_uuid_v4"
+    type = "log"
+    [tests.input.log_fields]
+      b = "foo"
+  [[tests.outputs]]
+    extract_from = "remap_function_uuid_v4"
+    [[tests.outputs.conditions]]
+      "a.regex" = "(?i)^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      "b.equals" = "bar"

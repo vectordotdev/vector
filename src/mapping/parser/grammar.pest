@@ -53,7 +53,8 @@ query_function = {
     to_bool |
     parse_timestamp |
     upcase |
-    downcase
+    downcase |
+    uuid_v4
 }
 
 to_string = { "to_string(" ~ query_arithmetic ~ ("," ~ (string | null) )? ~ ")"}
@@ -63,6 +64,7 @@ to_bool = { "to_bool(" ~ query_arithmetic ~ ("," ~ (boolean | null) )? ~ ")"}
 parse_timestamp = { "parse_timestamp(" ~ query_arithmetic ~ "," ~ string ~ ")"}
 upcase = { "upcase(" ~ query_arithmetic ~ ")"}
 downcase = { "downcase(" ~ query_arithmetic ~ ")"}
+uuid_v4 = { "uuid_v4()" }
 
 group = { "(" ~ query_arithmetic ~ ")" }
 
