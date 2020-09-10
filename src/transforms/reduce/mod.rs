@@ -4,6 +4,7 @@ use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::discriminant::Discriminant,
     event::{Event, LogEvent},
+    internal_events::{ReduceEventProcessed, ReduceStaleEventFlushed},
 };
 use async_stream::stream;
 use futures::{
@@ -180,6 +181,7 @@ impl Reduce {
         }
         for k in &flush_discriminants {
             if let Some(t) = self.reduce_merge_states.remove(k) {
+                emit!(ReduceStaleEventFlushed);
                 output.push(Event::from(t.flush()));
             }
         }
@@ -229,6 +231,8 @@ impl Transform for Reduce {
                 }
             }
         }
+
+        emit!(ReduceEventProcessed);
 
         self.flush_into(output);
     }
