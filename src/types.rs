@@ -21,7 +21,7 @@ pub enum ConversionError {
 /// `Conversion` is a place-holder for a type conversion operation, to
 /// convert from a plain (`Bytes`) `Value` into another type. Every
 /// variant of `Value` is represented here.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Conversion {
     Bytes,
     Integer,
