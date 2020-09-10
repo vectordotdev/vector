@@ -410,7 +410,7 @@ async fn defers_at_high_concurrency() {
     // Since the concurrency will drop down by half each time, the
     // average will be below this maximum.
     assert_within!(in_flight.mode, 2, 4, "{:#?}", results);
-    assert_within!(in_flight.mean, 2.0, 4.0, "{:#?}", results);
+    assert_within!(in_flight.mean, 2.0, 5.0, "{:#?}", results);
 
     let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
     assert_within!(observed_rtt.min, 0.090, 0.120, "{:#?}", results);
@@ -427,7 +427,7 @@ async fn defers_at_high_concurrency() {
     let c_in_flight = results.cstats.in_flight.stats().unwrap();
     assert_within!(c_in_flight.max, 5, 6, "{:#?}", results);
     assert_within!(c_in_flight.mode, 2, 4, "{:#?}", results);
-    assert_within!(c_in_flight.mean, 2.0, 4.0, "{:#?}", results);
+    assert_within!(c_in_flight.mean, 2.0, 5.0, "{:#?}", results);
 }
 
 #[tokio::test]

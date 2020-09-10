@@ -5,7 +5,7 @@ use crate::internal_events::{
     AutoConcurrencyAveragedRtt, AutoConcurrencyInFlight, AutoConcurrencyLimit,
     AutoConcurrencyObservedRtt,
 };
-use crate::sinks::util::retries::RetryLogic;
+use crate::sinks::util::retries::{RetryAction, RetryLogic};
 #[cfg(test)]
 use crate::test_util::stats::{TimeHistogram, TimeWeightedSum};
 use std::future::Future;
@@ -229,8 +229,14 @@ where
         start: Instant,
         response: &Result<L::Response, crate::Error>,
     ) {
-        let is_back_pressure = match response {
-            Ok(_) => false,
+        // It would be better to avoid generating the string in Retry(_)
+        // just to throw it away here, but it's probably not worth the
+        // effort.
+        let response_action = response
+            .as_ref()
+            .map(|resp| self.logic.should_retry_response(resp));
+        let is_back_pressure = match &response_action {
+            Ok(action) => matches!(action, RetryAction::Retry(_)),
             Err(err) => {
                 if let Some(err) = err.downcast_ref::<L::Error>() {
                     self.logic.is_retriable_error(err)
@@ -242,7 +248,7 @@ where
             }
         };
         // Only adjust to the RTT when the request was successfully processed.
-        let use_rtt = response.is_ok();
+        let use_rtt = matches!(response_action, Ok(RetryAction::Successful));
         self.adjust_to_response_inner(start, is_back_pressure, use_rtt)
     }
 }
