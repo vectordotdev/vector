@@ -8,8 +8,8 @@ use crate::{
             arithmetic::Arithmetic,
             arithmetic::Operator,
             functions::{
-                DowncaseFn, NotFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn,
-                UpcaseFn,
+                DowncaseFn, NotFn, ParseTimestampFn, ToBooleanFn, ToFloatFn, ToIntegerFn,
+                ToStringFn, UpcaseFn,
             },
             path::Path as QueryPath,
             Literal,
@@ -255,7 +255,7 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
             });
             Ok(Box::new(ToBooleanFn::new(query, default)))
         }
-        Rule::to_timestamp => {
+        Rule::parse_timestamp => {
             let (first, mut other) = split_inner_rules_from_pair(pair)?;
             let query = query_arithmetic_from_pair(first)?;
             let format = inner_quoted_string_escaped_from_pair(
@@ -266,7 +266,7 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
                     .next()
                     .ok_or(TOKEN_ERR)?,
             )?;
-            Ok(Box::new(ToTimestampFn::new(&format, query, None)?))
+            Ok(Box::new(ParseTimestampFn::new(&format, query, None)?))
         }
         Rule::upcase => {
             let pair = pair.into_inner().next().ok_or(TOKEN_ERR)?;
@@ -509,7 +509,7 @@ mod tests {
                 vec![" 1:13\n", "= expected target_path"],
             ),
             (
-                ".foo = string(\"bar\",)",
+                ".foo = to_string(\"bar\",)",
                 vec![" 1:21\n", "= expected null or string"],
             ),
             (
@@ -833,7 +833,7 @@ mod tests {
             ),
             // function: string
             (
-                ".foo = string(.foo, \"bar\")",
+                ".foo = to_string(.foo, \"bar\")",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToStringFn::new(
@@ -843,14 +843,14 @@ mod tests {
                 ))]),
             ),
             (
-                ".foo = string(.bar)",
+                ".foo = to_string(.bar)",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToStringFn::new(Box::new(QueryPath::from("bar")), None)),
                 ))]),
             ),
             (
-                ".foo = int(.foo, 5)",
+                ".foo = to_int(.foo, 5)",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToIntegerFn::new(
@@ -860,7 +860,7 @@ mod tests {
                 ))]),
             ),
             (
-                ".foo = int(.foo, 5.0)",
+                ".foo = to_int(.foo, 5.0)",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToIntegerFn::new(
@@ -870,14 +870,14 @@ mod tests {
                 ))]),
             ),
             (
-                ".foo = int(.bar)",
+                ".foo = to_int(.bar)",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToIntegerFn::new(Box::new(QueryPath::from("bar")), None)),
                 ))]),
             ),
             (
-                ".foo = float(.foo, 5.5)",
+                ".foo = to_float(.foo, 5.5)",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToFloatFn::new(
@@ -887,14 +887,14 @@ mod tests {
                 ))]),
             ),
             (
-                ".foo = float(.bar)",
+                ".foo = to_float(.bar)",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToFloatFn::new(Box::new(QueryPath::from("bar")), None)),
                 ))]),
             ),
             (
-                ".foo = bool(.foo, true)",
+                ".foo = to_bool(.foo, true)",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToBooleanFn::new(
@@ -904,18 +904,18 @@ mod tests {
                 ))]),
             ),
             (
-                ".foo = bool(.bar)",
+                ".foo = to_bool(.bar)",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToBooleanFn::new(Box::new(QueryPath::from("bar")), None)),
                 ))]),
             ),
             (
-                ".foo = timestamp(.foo, \"%d %m %Y\")",
+                ".foo = parse_timestamp(.foo, \"%d %m %Y\")",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(
-                        ToTimestampFn::new("%d %m %Y", Box::new(QueryPath::from("foo")), None)
+                        ParseTimestampFn::new("%d %m %Y", Box::new(QueryPath::from("foo")), None)
                             .unwrap(),
                     ),
                 ))]),

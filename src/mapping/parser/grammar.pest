@@ -51,16 +51,16 @@ query_function = {
     to_int |
     to_float |
     to_bool |
-    to_timestamp |
+    parse_timestamp |
     upcase |
     downcase
 }
 
-to_string = { "string(" ~ query_arithmetic ~ ("," ~ (string | null) )? ~ ")"}
-to_int = { "int(" ~ query_arithmetic ~ ("," ~ (number | null) )? ~ ")"}
-to_float = { "float(" ~ query_arithmetic ~ ("," ~ (number | null) )? ~ ")"}
-to_bool = { "bool(" ~ query_arithmetic ~ ("," ~ (boolean | null) )? ~ ")"}
-to_timestamp = { "timestamp(" ~ query_arithmetic ~ "," ~ string ~ ")"}
+to_string = { "to_string(" ~ query_arithmetic ~ ("," ~ (string | null) )? ~ ")"}
+to_int = { "to_int(" ~ query_arithmetic ~ ("," ~ (number | null) )? ~ ")"}
+to_float = { "to_float(" ~ query_arithmetic ~ ("," ~ (number | null) )? ~ ")"}
+to_bool = { "to_bool(" ~ query_arithmetic ~ ("," ~ (boolean | null) )? ~ ")"}
+parse_timestamp = { "parse_timestamp(" ~ query_arithmetic ~ "," ~ string ~ ")"}
 upcase = { "upcase(" ~ query_arithmetic ~ ")"}
 downcase = { "downcase(" ~ query_arithmetic ~ ")"}
 

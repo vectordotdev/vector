@@ -163,13 +163,13 @@ impl Function for ToBooleanFn {
 //------------------------------------------------------------------------------
 
 #[derive(Debug)]
-pub(in crate::mapping) struct ToTimestampFn {
+pub(in crate::mapping) struct ParseTimestampFn {
     conversion: Conversion,
     query: Box<dyn Function>,
     default: Option<Value>,
 }
 
-impl ToTimestampFn {
+impl ParseTimestampFn {
     pub(in crate::mapping) fn new(
         format: &str,
         query: Box<dyn Function>,
@@ -186,7 +186,7 @@ impl ToTimestampFn {
     }
 }
 
-impl Function for ToTimestampFn {
+impl Function for ParseTimestampFn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
         let result = match self.query.execute(ctx) {
             Ok(v) => match v {
@@ -477,7 +477,7 @@ mod tests {
             (
                 Event::from(""),
                 Err("path .foo not found in event".to_string()),
-                ToTimestampFn::new(
+                ParseTimestampFn::new(
                     "%a %b %e %T %Y",
                     Box::new(Path::from(vec![vec!["foo"]])),
                     None,
@@ -487,7 +487,7 @@ mod tests {
             (
                 Event::from(""),
                 Ok(Value::from("foobar")),
-                ToTimestampFn::new(
+                ParseTimestampFn::new(
                     "%a %b %e %T %Y",
                     Box::new(Path::from(vec![vec!["foo"]])),
                     Some(Value::from("foobar")),
@@ -512,7 +512,7 @@ mod tests {
                         .unwrap()
                         .with_timezone(&Utc),
                 )),
-                ToTimestampFn::new(
+                ParseTimestampFn::new(
                     "%d/%m/%Y:%H:%M:%S %z",
                     Box::new(Path::from(vec![vec!["foo"]])),
                     None,
@@ -532,7 +532,7 @@ mod tests {
                         .unwrap()
                         .with_timezone(&Utc),
                 )),
-                ToTimestampFn::new(
+                ParseTimestampFn::new(
                     "%d/%m/%Y:%H:%M:%S %z",
                     Box::new(Path::from(vec![vec!["foo"]])),
                     None,

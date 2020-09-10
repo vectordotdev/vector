@@ -133,10 +133,10 @@
   inputs = []
   type = "remap"
   mapping = """
-    .foo = string(.foo)
-    .bar = int(.bar)
-    .baz = float(.baz)
-    .bev = bool(.bev)
+    .foo = to_string(.foo)
+    .bar = to_int(.bar)
+    .baz = to_float(.baz)
+    .bev = to_bool(.bev)
   """
 [[tests]]
   name = "remap_coercion"
