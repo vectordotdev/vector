@@ -2,7 +2,7 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct ReduceEventProcessed;
+pub(crate) struct ReduceEventProcessed;
 
 impl InternalEvent for ReduceEventProcessed {
     fn emit_metrics(&self) {
@@ -14,7 +14,7 @@ impl InternalEvent for ReduceEventProcessed {
 }
 
 #[derive(Debug)]
-pub struct ReduceStaleEventFlushed;
+pub(crate) struct ReduceStaleEventFlushed;
 
 impl InternalEvent for ReduceStaleEventFlushed {
     fn emit_metrics(&self) {
