@@ -11,29 +11,24 @@ use warp::filters::BoxedFilter;
 use warp::{http::Response, Filter, Reply};
 
 pub struct Server {
-    shutdown: oneshot::Sender<()>,
+    _shutdown: oneshot::Sender<()>,
 }
 
 impl Server {
-    /// Start the API server. This creates the routes, spawns a Warp server, and stores a
-    /// shutdown signal which can fired with self.stop()
+    /// Start the API server. This creates the routes and spawns a Warp server. The server is
+    /// gracefully shut down when Self falls out of scope by way of the oneshot sender closing
     pub fn start(config: Options) -> Self {
         let bind = config.bind.expect("Invalid socket address");
         let routes = make_routes(config.playground);
 
-        let (shutdown, rx) = oneshot::channel();
+        let (_shutdown, rx) = oneshot::channel();
         let (_, server) = warp::serve(routes).bind_with_graceful_shutdown(bind, async {
             rx.await.ok();
         });
 
-        tokio::task::spawn(server);
+        tokio::spawn(server);
 
-        Self { shutdown }
-    }
-
-    /// Stop the API server by sending a termination signal
-    pub async fn stop(self) -> Result<(), ()> {
-        self.shutdown.send(())
+        Self { _shutdown }
     }
 }
 

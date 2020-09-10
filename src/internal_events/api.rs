@@ -23,3 +23,19 @@ impl InternalEvent for ApiStarted {
         counter!("api_started_total", 1);
     }
 }
+
+#[derive(Debug)]
+pub struct ApiStopped;
+
+impl InternalEvent for ApiStopped {
+    fn emit_logs(&self) {
+        info!(
+            target: "api",
+            message = "API server has stopped"
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("api_stopped_total", 1);
+    }
+}

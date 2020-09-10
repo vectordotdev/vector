@@ -7,11 +7,12 @@ mod support;
 #[cfg(feature = "api")]
 mod tests {
     use crate::support::{sink, source};
-    use graphql_client::GraphQLQuery;
+    use graphql_client::*;
     use std::time::Duration;
     use vector::api;
     use vector::config::Config;
     use vector::test_util::{next_addr, retry_until};
+    use websocket;
 
     #[derive(GraphQLQuery)]
     #[graphql(
@@ -20,6 +21,16 @@ mod tests {
         response_derives = "Debug"
     )]
     struct HealthQuery;
+
+    type DateTime = chrono::NaiveDateTime;
+
+    #[derive(GraphQLQuery)]
+    #[graphql(
+        schema_path = "graphql/schema.json",
+        query_path = "graphql/subscriptions/heartbeat.graphql",
+        response_derives = "Debug"
+    )]
+    struct HeartbeatSubscription;
 
     // provides a config that enables the API server, assigned to a random port. Implicitly
     // tests that the config shape matches expectations
@@ -51,9 +62,6 @@ mod tests {
         )
         .await;
 
-        // shut down server
-        let _ = server.stop().await.expect("Server failed to shutdown");
-
         res
     }
 
@@ -64,11 +72,10 @@ mod tests {
         let addr = config.api.bind.unwrap();
         let url = format!("http://{}:{}/graphql", addr.ip(), addr.port());
 
-        start_api_server(addr, false);
-
+        let server = api::Server::start(config.api);
         let client = reqwest::Client::new();
 
-        retry_until(
+        let res = retry_until(
             || client.post(&url).json(&request_body).send(),
             Duration::from_millis(100),
             Duration::from_secs(10),
@@ -76,7 +83,9 @@ mod tests {
         .await
         .json()
         .await
-        .unwrap()
+        .unwrap();
+
+        res
     }
 
     #[tokio::test]
@@ -122,5 +131,24 @@ mod tests {
                 errors: None,
             }
         );
+    }
+
+    #[tokio::test]
+    async fn api_graphql_heartbeat() {
+        let config = api_enabled_config();
+        let server = api::Server::start(config.api);
+        let bind = config.api.bind.unwrap();
+
+        let url = &*format!("ws://{}:{}/graphql", bind.ip(), bind.port());
+
+        let (rx, mut tx) = websocket::ClientBuilder::new(url)
+            .unwrap()
+            .connect_insecure()
+            .unwrap()
+            .split()
+            .unwrap();
+
+        let request_body =
+            HeartbeatSubscription::build_query(heartbeat_subscription::Variables { interval: 500 });
     }
 }

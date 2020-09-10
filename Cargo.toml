@@ -100,6 +100,7 @@ smpl_jwt = { version = "0.5.0", optional = true }
 async-graphql = { version = "1.17.21", optional = true }
 async-graphql-warp = { version = "1.17.18", optional = true }
 graphql_client = { version = "0.9.0", optional = true }
+websocket = {version = "0.26.2", optional = true }
 
 # External libs
 derivative = "1.0"
@@ -244,7 +245,7 @@ wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm", "anyhow"]
 kubernetes = ["k8s-openapi", "evmap"]
 
 # This enables the API
-api = ["async-graphql", "async-graphql-warp", "graphql_client"]
+api = ["async-graphql", "async-graphql-warp", "graphql_client", "websocket"]
 
 # Sources
 sources = [
