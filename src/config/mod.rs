@@ -1,10 +1,6 @@
 use crate::{
-    buffers::Acker,
-    conditions,
-    dns::Resolver,
-    event::{self, Metric},
-    shutdown::ShutdownSignal,
-    sinks, sources, transforms, Pipeline,
+    buffers::Acker, conditions, dns::Resolver, event::Metric, shutdown::ShutdownSignal, sinks,
+    sources, transforms, Pipeline,
 };
 use component::ComponentDescription;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
@@ -18,6 +14,7 @@ mod compiler;
 pub mod component;
 mod diff;
 mod loading;
+mod log_schema;
 mod unit_test;
 mod validation;
 mod vars;
@@ -26,6 +23,7 @@ pub mod watcher;
 pub use builder::ConfigBuilder;
 pub use diff::ConfigDiff;
 pub use loading::{load_from_paths, load_from_str, process_paths, CONFIG_PATHS};
+pub use log_schema::{log_schema, LogSchema, LOG_SCHEMA};
 pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use validation::warnings;
 
@@ -47,7 +45,7 @@ pub struct GlobalOptions {
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub log_schema: event::LogSchema,
+    pub log_schema: LogSchema,
 }
 
 pub fn default_data_dir() -> Option<PathBuf> {
