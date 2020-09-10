@@ -174,7 +174,7 @@ mod test {
 
         let make_svc = make_service_fn(|_| async {
             Ok::<_, Error>(service_fn(|req: Request<Body>| async move {
-                if req.uri().path() == "custom" {
+                if req.uri().path() == "/custom" {
                     Ok(Response::new(Body::from(
                         r##"
                         # HELP promhttp_metric_handler_requests_total Total number of scrapes by HTTP status code.
