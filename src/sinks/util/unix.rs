@@ -1,17 +1,17 @@
 use crate::{
     config::SinkContext,
     internal_events::{
-        UnixSocketConnectionEstablished, UnixSocketConnectionFailure, UnixSocketError,
-        UnixSocketEventSent,
+        UnixSocketConnectionEstablished, UnixSocketConnectionFailure, UnixSocketEventSent,
+        UnixSocketFlushFailed, UnixSocketSendFailed,
     },
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, StreamSink},
     sinks::{Healthcheck, VectorSink},
 };
 use bytes::Bytes;
-use futures::{compat::CompatSink, FutureExt, TryFutureExt};
+use futures::{compat::CompatSink, future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
+use snafu::{futures::TryFutureExt as SnafuTryFutureExt, Snafu};
 use std::{path::PathBuf, time::Duration};
 use tokio::{
     net::UnixStream,
@@ -32,11 +32,11 @@ impl UnixSinkConfig {
         Self { path }
     }
 
-    pub fn prepare(&self) -> crate::Result<(IntoUnixSink, Healthcheck)> {
-        let unix = IntoUnixSink::new(self.path.clone());
-        let healthcheck = healthcheck(self.path.clone()).boxed();
+    pub fn prepare(&self) -> crate::Result<(UnixConnector, Healthcheck)> {
+        let connector = UnixConnector::new(self.path.clone());
+        let healthcheck = connector.healthcheck().boxed();
 
-        Ok((unix, healthcheck))
+        Ok((connector, healthcheck))
     }
 
     pub fn build(
@@ -53,13 +53,24 @@ impl UnixSinkConfig {
 }
 
 #[derive(Clone)]
-pub struct IntoUnixSink {
+pub struct UnixConnector {
     path: PathBuf,
 }
 
-impl IntoUnixSink {
+impl UnixConnector {
     fn new(path: PathBuf) -> Self {
-        IntoUnixSink { path }
+        Self { path }
+    }
+
+    pub fn connect(&self) -> BoxFuture<'static, Result<UnixSocket, UnixSocketError>> {
+        let path = self.path.clone();
+
+        async move {
+        }.boxed()
+    }
+
+    pub fn healthcheck(&self) -> BoxFuture<'static, crate::Result<()>> {
+        self.connect().map_ok(|_| ()).map_err(|e| e.into()).boxed()
     }
 
     pub fn into_sink(self) -> UnixSink {
@@ -68,35 +79,32 @@ impl IntoUnixSink {
 }
 
 #[derive(Debug, Snafu)]
-enum HealthcheckError {
+pub enum UnixSocketError {
     #[snafu(display("Connect error: {}", source))]
     ConnectError { source: tokio::io::Error },
 }
 
-async fn healthcheck(path: PathBuf) -> crate::Result<()> {
-    match UnixStream::connect(&path).await {
-        Ok(_) => Ok(()),
-        Err(source) => Err(HealthcheckError::ConnectError { source }.into()),
-    }
-}
-
 pub struct UnixSink {
-    path: PathBuf,
+    connector: UnixConnector,
     state: UnixSinkState,
     backoff: ExponentialBackoff,
 }
 
+type UnixSocket = FramedWrite<UnixStream, BytesCodec>;
+type UnixSocket01 = CompatSink<UnixSocket, Bytes>;
+
 enum UnixSinkState {
     Disconnected,
-    Creating(Box<dyn Future<Item = UnixStream, Error = tokio::io::Error> + Send + 'static>),
-    Open(CompatSink<FramedWrite<UnixStream, BytesCodec>, Bytes>),
+    Creating(Box<dyn Future<Item = UnixSocket, Error = UnixSocketError> + Send>),
+    Open(UnixSocket01),
     Backoff(Box<dyn Future<Item = (), Error = ()> + Send>),
 }
 
 impl UnixSink {
     pub fn new(path: PathBuf) -> Self {
+        let connector = UnixConnector { path };
         Self {
-            path,
+            connector,
             state: UnixSinkState::Disconnected,
             backoff: Self::fresh_backoff(),
         }
@@ -113,35 +121,33 @@ impl UnixSink {
         delay_for(self.backoff.next().unwrap())
     }
 
+    fn next_delay01(&mut self) -> Box<dyn Future<Item = (), Error = ()> + Send> {
+        let delay = self.next_delay();
+        Box::new(async move { Ok(delay.await) }.boxed().compat())
+    }
+
     /**
      * Polls for whether the underlying UnixStream is connected and ready to receive writes.
      **/
-    fn poll_connection(
-        &mut self,
-    ) -> Poll<&mut CompatSink<FramedWrite<UnixStream, BytesCodec>, Bytes>, ()> {
+    fn poll_connection(&mut self) -> Poll<&mut UnixSocket01, ()> {
         loop {
             self.state = match self.state {
-                UnixSinkState::Open(ref mut stream) => {
-                    return Ok(Async::Ready(stream));
-                }
+                UnixSinkState::Open(ref mut stream) => return Ok(Async::Ready(stream)),
                 UnixSinkState::Creating(ref mut connect_future) => match connect_future.poll() {
-                    Ok(Async::NotReady) => {
-                        return Ok(Async::NotReady);
-                    }
+                    Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Err(error) => {
                         emit!(UnixSocketConnectionFailure {
                             error,
-                            path: &self.path
+                            path: &self.connector.path,
                         });
-                        let delay = self.next_delay();
-                        let delay = Box::new(async move { Ok(delay.await) }.boxed().compat());
-                        UnixSinkState::Backoff(delay)
+                        UnixSinkState::Backoff(self.next_delay01())
                     }
-                    Ok(Async::Ready(stream)) => {
-                        emit!(UnixSocketConnectionEstablished { path: &self.path });
+                    Ok(Async::Ready(socket)) => {
+                        emit!(UnixSocketConnectionEstablished {
+                            path: &self.connector.path,
+                        });
                         self.backoff = Self::fresh_backoff();
-                        let out = FramedWrite::new(stream, BytesCodec::new());
-                        UnixSinkState::Open(CompatSink::new(out))
+                        UnixSinkState::Open(CompatSink::new(socket))
                     }
                 },
                 UnixSinkState::Backoff(ref mut delay) => match delay.poll() {
@@ -152,10 +158,10 @@ impl UnixSink {
                 UnixSinkState::Disconnected => {
                     debug!(
                         message = "Connecting",
-                        path = &field::display(self.path.to_str().unwrap())
+                        path = &field::display(self.connector.path.to_str().unwrap())
                     );
-                    let connect_future = UnixStream::connect(self.path.clone()).boxed().compat();
-                    UnixSinkState::Creating(Box::new(connect_future))
+                    let fut = self.connector.connect();
+                    UnixSinkState::Creating(Box::new(fut.compat()))
                 }
             }
         }
@@ -169,15 +175,11 @@ impl Sink for UnixSink {
     fn start_send(&mut self, line: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let byte_size = line.len();
         match self.poll_connection() {
-            Ok(Async::NotReady) => Ok(AsyncSink::NotReady(line)),
-            Err(_) => {
-                unreachable!(); // poll_ready() should never return an error
-            }
             Ok(Async::Ready(connection)) => match connection.start_send(line) {
                 Err(error) => {
-                    emit!(UnixSocketError {
+                    emit!(UnixSocketSendFailed {
                         error,
-                        path: &self.path
+                        path: &self.connector.path,
                     });
                     self.state = UnixSinkState::Disconnected;
                     Ok(AsyncSink::Ready)
@@ -187,6 +189,8 @@ impl Sink for UnixSink {
                     Ok(res)
                 }
             },
+            Ok(Async::NotReady) => Ok(AsyncSink::NotReady(line)),
+            Err(_) => unreachable!(),
         }
     }
 
@@ -201,9 +205,9 @@ impl Sink for UnixSink {
 
         match connection.poll_complete() {
             Err(error) => {
-                emit!(UnixSocketError {
+                emit!(UnixSocketFlushFailed {
                     error,
-                    path: &self.path
+                    path: &self.connector.path,
                 });
                 self.state = UnixSinkState::Disconnected;
                 Ok(Async::Ready(()))
@@ -227,10 +231,10 @@ mod tests {
     async fn unix_sink_healthcheck() {
         let good_path = temp_uds_path("valid_uds");
         let _listener = UnixListener::bind(&good_path).unwrap();
-        assert!(healthcheck(good_path).await.is_ok());
+        assert!(UnixConnector::new(good_path).healthcheck().await.is_ok());
 
         let bad_path = temp_uds_path("no_one_listening");
-        assert!(healthcheck(bad_path).await.is_err());
+        assert!(UnixConnector::new(bad_path).healthcheck().await.is_err());
     }
 
     #[tokio::test]
