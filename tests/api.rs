@@ -27,7 +27,7 @@ mod tests {
         let addr = config.api.bind.unwrap();
         let url = format!("http://{}:{}/{}", addr.ip(), addr.port(), url);
 
-        let server = api::Server::start(config.api);
+        let _server = api::Server::start(config.api);
 
         // Build the request
         let client = reqwest::Client::new();
@@ -38,9 +38,6 @@ mod tests {
             Duration::from_secs(10),
         )
         .await;
-
-        // shut down server
-        let _ = server.stop().await.expect("Server failed to shutdown");
 
         res
     }

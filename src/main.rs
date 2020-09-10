@@ -129,16 +129,18 @@ fn main() {
             std::process::exit(exitcode::CONFIG);
         });
 
-        // API
         #[cfg(feature = "api")]
-        if config.api.enabled {
-            let _ = api::Server::start(config.api);
-
+        // assigned to prevent the API terminating when falling out of scope
+        let _api = if config.api.enabled {
             emit!(internal_events::ApiStarted{
                 addr: config.api.bind.unwrap(),
                 playground: config.api.playground
             });
-        }
+
+            Some(api::Server::start(config.api))
+        } else {
+            None
+        };
 
         let result =
             topology::start_validated(config, diff, pieces, opts.require_healthy).await;
