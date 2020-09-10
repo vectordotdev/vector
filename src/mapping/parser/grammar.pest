@@ -56,7 +56,8 @@ query_function = {
     downcase |
     uuid_v4 |
     sha1 |
-    md5
+    md5 |
+    now
 }
 
 to_string = { "to_string(" ~ query_arithmetic ~ ("," ~ (string | null) )? ~ ")"}
@@ -69,6 +70,7 @@ downcase = { "downcase(" ~ query_arithmetic ~ ")"}
 uuid_v4 = { "uuid_v4()" }
 sha1 = { "sha1(" ~ query_arithmetic ~ ")" }
 md5 = { "md5(" ~ query_arithmetic ~ ")" }
+now = { "now(" ~ query_arithmetic ~ ")" }
 
 group = { "(" ~ query_arithmetic ~ ")" }
 

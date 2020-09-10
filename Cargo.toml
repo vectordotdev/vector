@@ -156,6 +156,7 @@ portpicker = "0.1.0"
 sha1 = { version = "0.6.0", features = ["std"], optional = true }
 md-5 = { version = "0.9.1", optional = true }
 hex = { version = "0.4.2", optional = true }
+chrono-tz = { version = "0.5.3", optional = true }
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -320,7 +321,7 @@ transforms-logfmt_parser = ["logfmt"]
 transforms-lua = ["rlua"]
 transforms-merge = []
 transforms-regex_parser = []
-transforms-remap = ["sha1", "md-5", "hex"]
+transforms-remap = ["sha1", "md-5", "hex", "chrono-tz"]
 transforms-remove_fields = []
 transforms-remove_tags = []
 transforms-rename_fields = []

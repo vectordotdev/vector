@@ -317,3 +317,30 @@
     [[tests.outputs.conditions]]
       "a.equals" = "acbd18db4cc2f85cedef654fccc4a4d8"
       "b.equals" = "223cfa6567e4c0599c9a23628bf7a234"
+
+[transforms.remap_function_now]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = now(.a)
+    .b = now(.b)
+    .c = now(.c)
+    .d = now(.d)
+  """
+[[tests]]
+  name = "remap_function_now"
+  [tests.input]
+    insert_at = "remap_function_now"
+    type = "log"
+    [tests.input.log_fields]
+      a = "UTC"
+      b = "America/Argentina/Rio_Gallegos"
+      c = "foo"
+      d = 1
+  [[tests.outputs]]
+    extract_from = "remap_function_now"
+    [[tests.outputs.conditions]]
+      "a.ends_with" = "Z"
+      "b.ends_with" = "-03:00"
+      "c.equals" = "foo"
+      "d.equals" = 1

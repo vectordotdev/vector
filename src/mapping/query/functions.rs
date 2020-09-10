@@ -342,6 +342,40 @@ impl Function for Md5Fn {
         Ok(value)
     }
 }
+//------------------------------------------------------------------------------
+
+#[derive(Debug)]
+pub(in crate::mapping) struct NowFn {
+    query: Box<dyn Function>,
+}
+
+impl NowFn {
+    pub(in crate::mapping) fn new(query: Box<dyn Function>) -> Self {
+        Self { query }
+    }
+}
+
+impl Function for NowFn {
+    fn execute(&self, ctx: &Event) -> Result<Value> {
+        use chrono::{SecondsFormat, TimeZone, Utc};
+        use chrono_tz::Tz;
+
+        let value = self.query.execute(ctx)?;
+
+        if let Value::Bytes(bytes) = value {
+            let utc = Utc::now().naive_utc();
+            let dt = std::str::from_utf8(&bytes)
+                .map_err(|e| e.to_string())
+                .and_then(str::parse::<Tz>)?
+                .from_utc_datetime(&utc)
+                .to_rfc3339_opts(SecondsFormat::Nanos, true);
+
+            return Ok(Value::Bytes(dt.into()));
+        }
+
+        Ok(value)
+    }
+}
 
 //------------------------------------------------------------------------------
 
