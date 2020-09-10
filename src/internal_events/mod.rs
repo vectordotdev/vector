@@ -129,7 +129,7 @@ pub use self::syslog::*;
 pub(crate) use self::tag_cardinality_limit::*;
 pub use self::tcp::*;
 #[cfg(feature = "transforms-tokenizer")]
-pub use self::tokenizer::*;
+pub(crate) use self::tokenizer::*;
 pub use self::unix::*;
 pub use self::vector::*;
 #[cfg(feature = "wasm")]
