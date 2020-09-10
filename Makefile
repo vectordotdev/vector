@@ -186,10 +186,10 @@ build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in rel
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
-test: ## Run the test suite
+test: ## Run the unit test suite
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
 
-test-all: test-behavior test-integration test-unit ## Runs all tests, unit, behaviorial, and integration.
+test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.
 
 test-behavior: ## Runs behaviorial test
 	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/**/*.toml
