@@ -293,3 +293,27 @@
     [[tests.outputs.conditions]]
       "a.equals" = "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"
       "b.equals" = "6f74c252bb7f19f553115af5e49a733b9ff17138"
+
+[transforms.remap_function_md5]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = md5(.a)
+
+    if md5(.b) == "37b51d194a7513e45b56f6524f2d51f2" {
+        .b = md5(.a + .b + "baz")
+    }
+  """
+[[tests]]
+  name = "remap_function_md5"
+  [tests.input]
+    insert_at = "remap_function_md5"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_md5"
+    [[tests.outputs.conditions]]
+      "a.equals" = "acbd18db4cc2f85cedef654fccc4a4d8"
+      "b.equals" = "223cfa6567e4c0599c9a23628bf7a234"
