@@ -1,3 +1,5 @@
+#[cfg(unix)]
+use crate::sinks::util::unix::{UnixService, UnixSinkConfig, UnixSocketError};
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
@@ -26,6 +28,10 @@ pub enum StatsdError {
     Tcp {
         source: TcpError,
     },
+    #[cfg(unix)]
+    Unix {
+        source: UnixSocketError,
+    },
 }
 
 pub struct StatsdSvc {
@@ -35,6 +41,8 @@ pub struct StatsdSvc {
 enum Client {
     Tcp(TcpService),
     Udp(UdpService),
+    #[cfg(unix)]
+    Unix(UnixService),
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -51,6 +59,8 @@ pub struct StatsdSinkConfig {
 pub enum Mode {
     Tcp(TcpSinkConfig),
     Udp(UdpSinkConfig),
+    #[cfg(unix)]
+    Unix(UnixSinkConfig),
 }
 
 inventory::submit! {
@@ -80,6 +90,11 @@ impl SinkConfig for StatsdSinkConfig {
             Mode::Udp(config) => {
                 let (service, healthcheck) = config.build_service(cx.clone())?;
                 (Client::Udp(service), healthcheck)
+            }
+            #[cfg(unix)]
+            Mode::Unix(config) => {
+                let (service, healthcheck) = config.build_service()?;
+                (Client::Unix(service), healthcheck)
             }
         };
         let service = StatsdSvc { client };
@@ -209,6 +224,8 @@ impl Service<Vec<u8>> for StatsdSvc {
         match &mut self.client {
             Client::Tcp(service) => service.call(frame.into()).context(Tcp).boxed(),
             Client::Udp(service) => service.call(frame.into()).context(Udp).boxed(),
+            #[cfg(unix)]
+            Client::Unix(service) => service.call(frame.into()).context(Unix).boxed(),
         }
     }
 }
