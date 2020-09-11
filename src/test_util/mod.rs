@@ -50,68 +50,6 @@ macro_rules! assert_downcast_matches {
     }};
 }
 
-#[macro_export]
-macro_rules! assert_within {
-    // Adapted from std::assert_eq
-    ($expr:expr, $low:expr, $high:expr) => ({
-        match (&$expr, &$low, &$high) {
-            (expr, low, high) => {
-                if *expr < *low {
-                    panic!(
-                        r#"assertion failed: `(expr < low)`
-expr: {} = `{:?}`,
- low: `{:?}`"#,
-                        stringify!($expr),
-                        &*expr,
-                        &*low
-                    );
-                }
-                if *expr > *high {
-                    panic!(
-                        r#"assertion failed: `(expr > high)`
-expr: {} = `{:?}`,
-high: `{:?}`"#,
-                        stringify!($expr),
-                        &*expr,
-                        &*high
-                    );
-                }
-            }
-        }
-    });
-    ($expr:expr, $low:expr, $high:expr, $($arg:tt)+) => ({
-        match (&$expr, &$low, &$high) {
-            (expr, low, high) => {
-                if *expr < *low {
-                    panic!(
-                        r#"assertion failed: `(expr < low)`
-expr: {} = `{:?}`,
- low: `{:?}`
-{}"#,
-                        stringify!($expr),
-                        &*expr,
-                        &*low,
-                        format_args!($($arg)+)
-                    );
-                }
-                if *expr > *high {
-                    panic!(
-                        r#"assertion failed: `(expr > high)`
-expr: {} = `{:?}`,
-high: `{:?}`
-{}"#,
-                        stringify!($expr),
-                        &*expr,
-                        &*high,
-                        format_args!($($arg)+)
-                    );
-                }
-            }
-        }
-    });
-
-}
-
 pub fn next_addr() -> SocketAddr {
     let port = pick_unused_port().unwrap();
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
