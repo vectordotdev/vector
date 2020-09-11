@@ -69,6 +69,7 @@ pub mod vector;
 
 pub enum VectorSink {
     Futures01Sink(Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + Send + 'static>),
+    Stream(Box<dyn util::StreamSink2 + Send>),
 }
 
 pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
@@ -96,17 +97,18 @@ pub enum HealthcheckError {
 impl VectorSink {
     pub async fn run01<S>(self, input: S) -> Result<(), ()>
     where
-        S: futures01::Stream<Item = Event, Error = ()> + Send,
+        S: futures01::Stream<Item = Event, Error = ()> + Send + 'static,
     {
         self.run(input.compat()).await
     }
 
-    pub async fn run<S>(self, input: S) -> Result<(), ()>
+    pub async fn run<S>(mut self, input: S) -> Result<(), ()>
     where
-        S: futures::Stream<Item = Result<Event, ()>> + Send,
+        S: futures::Stream<Item = Result<Event, ()>> + Send + 'static,
     {
         match self {
             Self::Futures01Sink(sink) => input.forward(sink.sink_compat()).await,
+            Self::Stream(ref mut s) => s.run(Box::new(input)).await,
         }
     }
 
@@ -115,7 +117,7 @@ impl VectorSink {
     ) -> Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + Send + 'static> {
         match self {
             Self::Futures01Sink(sink) => sink,
-            // _ => panic!("Failed type coercion, {:?} is not a Futures01Sink", self),
+            _ => panic!("Failed type coercion, {:?} is not a Futures01Sink", self),
         }
     }
 }
