@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{self, Event},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
 };
 use futures::{lock::Mutex, FutureExt, TryFutureExt};
@@ -69,14 +69,14 @@ inventory::submit! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "pulsar")]
 impl SinkConfig for PulsarSinkConfig {
-    fn build(&self, _cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, _cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         unimplemented!()
     }
 
     async fn build_async(
         &self,
         cx: SinkContext,
-    ) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let producer = self
             .create_pulsar_producer()
             .await
@@ -87,8 +87,11 @@ impl SinkConfig for PulsarSinkConfig {
             .create_pulsar_producer()
             .await
             .context(CreatePulsarSink)?;
-        let hc = healthcheck(producer);
-        Ok((Box::new(sink), Box::new(hc.boxed().compat())))
+        let healthcheck = healthcheck(producer).boxed();
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -193,7 +196,7 @@ fn encode_event(item: Event, encoding: &EncodingConfig<Encoding>) -> crate::Resu
     Ok(match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&log)?,
         Encoding::Text => log
-            .get(&event::log_schema().message_key())
+            .get(&log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     })
@@ -211,7 +214,7 @@ mod tests {
         evt.as_mut_log().insert("key", "value");
         let result = encode_event(evt, &EncodingConfig::from(Encoding::Json)).unwrap();
         let map: HashMap<String, String> = serde_json::from_slice(&result[..]).unwrap();
-        assert_eq!(msg, map[&event::log_schema().message_key().to_string()]);
+        assert_eq!(msg, map[&log_schema().message_key().to_string()]);
     }
 
     #[test]

@@ -1,13 +1,13 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{self, Event},
+    event::Event,
     sinks::util::{
         encoding::EncodingConfigWithDefault,
         http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
     },
 };
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::Sink;
 use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
@@ -61,7 +61,7 @@ pub enum Encoding {
 
 #[typetag::serde(name = "logdna")]
 impl SinkConfig for LogdnaConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch_settings = BatchSettings::default()
             .bytes(bytesize::mib(10u64))
@@ -79,9 +79,12 @@ impl SinkConfig for LogdnaConfig {
         )
         .sink_map_err(|e| error!("Fatal logdna sink error: {}", e));
 
-        let healthcheck = healthcheck(self.clone(), client).boxed().compat();
+        let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -102,10 +105,10 @@ impl HttpSink for LogdnaConfig {
         let mut log = event.into_log();
 
         let line = log
-            .remove(&event::log_schema().message_key())
+            .remove(&crate::config::log_schema().message_key())
             .unwrap_or_else(|| String::from("").into());
         let timestamp = log
-            .remove(&event::log_schema().timestamp_key())
+            .remove(&crate::config::log_schema().timestamp_key())
             .unwrap_or_else(|| chrono::Utc::now().into());
 
         let mut map = serde_json::map::Map::new();
@@ -225,8 +228,7 @@ mod tests {
         sinks::util::test::{build_test_server, load_sink},
         test_util::{next_addr, random_lines, trace_init},
     };
-    use futures::{compat::Future01CompatExt, StreamExt};
-    use futures01::Sink;
+    use futures::{stream, StreamExt};
     use serde_json::json;
 
     #[test]
@@ -305,8 +307,7 @@ mod tests {
             events.push(event);
         }
 
-        let pump = sink.send_all(futures01::stream::iter_ok(events));
-        let _ = pump.compat().await.unwrap();
+        sink.run(stream::iter(events).map(Ok)).await.unwrap();
 
         let output = rx.next().await.unwrap();
 

@@ -13,7 +13,7 @@ use crate::{
             retries::RetryLogic, BatchSettings, EncodedLength, InFlightLimit, TowerRequestConfig,
             VecBuffer,
         },
-        Healthcheck, RouterSink,
+        Healthcheck, VectorSink,
     },
     sources::generator::GeneratorConfig,
     test_util::{
@@ -24,9 +24,10 @@ use crate::{
 use core::task::Context;
 use futures::{
     compat::Future01CompatExt,
-    future::{pending, BoxFuture},
+    future::{self, pending, BoxFuture},
+    FutureExt,
 };
-use futures01::{future, Sink};
+use futures01::Sink;
 use rand::{distributions::Exp1, prelude::*};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -98,7 +99,7 @@ struct TestConfig {
 
 #[typetag::serialize(name = "test")]
 impl SinkConfig for TestConfig {
-    fn build(&self, cx: SinkContext) -> Result<(RouterSink, Healthcheck), crate::Error> {
+    fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
         let batch = BatchSettings::default().events(1).bytes(9999).timeout(9999);
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let sink = request
@@ -110,7 +111,7 @@ impl SinkConfig for TestConfig {
                 cx.acker(),
             )
             .sink_map_err(|e| panic!("Fatal test sink error: {}", e));
-        let healthcheck = future::ok(());
+        let healthcheck = future::ok(()).boxed();
 
         // Dig deep to get at the internal controller statistics
         let stats = Arc::clone(
@@ -124,7 +125,7 @@ impl SinkConfig for TestConfig {
         );
         *self.controller_stats.lock().unwrap() = stats;
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

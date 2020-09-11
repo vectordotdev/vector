@@ -33,8 +33,11 @@ mod lua;
 mod process;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
+#[cfg(feature = "transforms-reduce")]
+mod reduce;
 #[cfg(feature = "transforms-regex_parser")]
 mod regex_parser;
+mod remap;
 #[cfg(feature = "transforms-remove_fields")]
 mod remove_fields;
 #[cfg(feature = "transforms-remove_tags")]
@@ -54,6 +57,8 @@ mod splunk_hec;
 #[cfg(feature = "sources-statsd")]
 mod statsd;
 mod stdin;
+#[cfg(feature = "transforms-swimlanes")]
+mod swimlanes;
 mod syslog;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 mod tag_cardinality_limit;
@@ -99,8 +104,11 @@ pub use self::lua::*;
 pub use self::process::*;
 #[cfg(feature = "sources-prometheus")]
 pub use self::prometheus::*;
+#[cfg(feature = "transforms-reduce")]
+pub(crate) use self::reduce::*;
 #[cfg(feature = "transforms-regex_parser")]
 pub(crate) use self::regex_parser::*;
+pub use self::remap::*;
 #[cfg(feature = "transforms-remove_fields")]
 pub use self::remove_fields::*;
 #[cfg(feature = "transforms-remove_tags")]
@@ -108,11 +116,7 @@ pub use self::remove_tags::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub use self::rename_fields::*;
 pub use self::sampler::*;
-#[cfg(any(
-    feature = "sources-socket",
-    feature = "sources-syslog",
-    feature = "sources-vector"
-))]
+#[cfg(any(feature = "sources-socket", feature = "sources-syslog"))]
 pub(crate) use self::socket::*;
 pub use self::split::*;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
@@ -120,6 +124,8 @@ pub(crate) use self::splunk_hec::*;
 #[cfg(feature = "sources-statsd")]
 pub use self::statsd::*;
 pub use self::stdin::*;
+#[cfg(feature = "transforms-swimlanes")]
+pub use self::swimlanes::*;
 pub use self::syslog::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub(crate) use self::tag_cardinality_limit::*;

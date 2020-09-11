@@ -1,7 +1,7 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{self, Event},
+    event::Event,
     serde::to_string,
     sinks::{
         util::{
@@ -11,14 +11,14 @@ use crate::{
             BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
             PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
-        Healthcheck, RouterSink,
+        Healthcheck, VectorSink,
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::{stream::iter_ok, Sink};
 use http::{StatusCode, Uri};
 use hyper::{
@@ -151,16 +151,16 @@ inventory::submit! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
-    fn build(&self, _cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         unimplemented!()
     }
 
-    async fn build_async(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    async fn build_async(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = GcsSink::new(self, &cx).await?;
-        let healthcheck = sink.clone().healthcheck().boxed().compat();
+        let healthcheck = sink.clone().healthcheck().boxed();
         let service = sink.service(self, &cx)?;
 
-        Ok((service, Box::new(healthcheck)))
+        Ok((service, healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -202,7 +202,7 @@ impl GcsSink {
         })
     }
 
-    fn service(self, config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<RouterSink> {
+    fn service(self, config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<VectorSink> {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
@@ -227,7 +227,7 @@ impl GcsSink {
             .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
-        Ok(Box::new(sink))
+        Ok(VectorSink::Futures01Sink(Box::new(sink)))
     }
 
     async fn healthcheck(mut self) -> crate::Result<()> {
@@ -402,7 +402,6 @@ fn encode_event(
     key_prefix: &Template,
     encoding: &EncodingConfig<Encoding>,
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
-    encoding.apply_rules(&mut event);
     let key = key_prefix
         .render_string(&event)
         .map_err(|missing_keys| {
@@ -413,6 +412,7 @@ fn encode_event(
             );
         })
         .ok()?;
+    encoding.apply_rules(&mut event);
     let log = event.into_log();
     let bytes = match encoding.codec() {
         Encoding::Ndjson => serde_json::to_vec(&log)
@@ -423,7 +423,7 @@ fn encode_event(
             .expect("Failed to encode event as json, this is a bug!"),
         Encoding::Text => {
             let mut bytes = log
-                .get(&event::log_schema().message_key())
+                .get(&crate::config::log_schema().message_key())
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             bytes.push(b'\n');
@@ -464,7 +464,7 @@ impl RetryLogic for GcsRetryLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{self, Event};
+    use crate::event::Event;
 
     use std::collections::HashMap;
 
@@ -497,10 +497,25 @@ mod tests {
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(
-            map.get(&event::log_schema().message_key().to_string()),
+            map.get(&crate::config::log_schema().message_key().to_string()),
             Some(&message)
         );
         assert_eq!(map["key"], "value".to_string());
+    }
+
+    #[test]
+    fn gcs_encode_event_apply_rules() {
+        crate::test_util::trace_init();
+
+        let message = "hello world".to_string();
+        let mut event = Event::from(message);
+        event.as_mut_log().insert("key", "value");
+
+        let key_format = Template::try_from("key: {{ key }}").unwrap();
+        let bytes = encode_event(event, &key_format, &Encoding::Text.into()).unwrap();
+
+        let (_, key) = bytes.into_parts();
+        assert_eq!(key, "key: value");
     }
 
     fn request_settings(

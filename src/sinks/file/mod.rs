@@ -1,7 +1,7 @@
 use crate::expiring_hash_map::ExpiringHashMap;
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{self, Event},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         StreamSink,
@@ -11,8 +11,11 @@ use crate::{
 use async_compression::tokio_02::write::GzipEncoder;
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::pin_mut;
-use futures::stream::{Stream, StreamExt};
+use futures::{
+    future, pin_mut,
+    stream::{Stream, StreamExt},
+    FutureExt,
+};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tokio::{
@@ -116,11 +119,14 @@ impl OutFile {
 
 #[typetag::serde(name = "file")]
 impl SinkConfig for FileSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = FileSink::new(&self);
         let sink = streaming_sink::compat::adapt_to_topology(sink);
-        let sink = StreamSink::new(sink, cx.acker());
-        Ok((Box::new(sink), Box::new(futures01::future::ok(()))))
+        let sink = StreamSink::new(sink.into_futures01sink(), cx.acker());
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            future::ok(()).boxed(),
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -290,7 +296,7 @@ pub fn encode_event(encoding: &EncodingConfigWithDefault<Encoding>, mut event: E
     match encoding.codec() {
         Encoding::Ndjson => serde_json::to_vec(&log).expect("Unable to encode event as JSON."),
         Encoding::Text => log
-            .get(&event::log_schema().message_key())
+            .get(&log_schema().message_key())
             .map(|v| v.to_string_lossy().into_bytes())
             .unwrap_or_default(),
     }
@@ -319,12 +325,9 @@ impl StreamingSink for FileSink {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        event,
-        test_util::{
-            lines_from_file, lines_from_gzip_file, random_events_with_stream,
-            random_lines_with_stream, temp_dir, temp_file, trace_init,
-        },
+    use crate::test_util::{
+        lines_from_file, lines_from_gzip_file, random_events_with_stream, random_lines_with_stream,
+        temp_dir, temp_file, trace_init,
     };
     use futures::stream;
     use std::convert::TryInto;
@@ -431,35 +434,35 @@ mod tests {
         ];
 
         assert_eq!(
-            input[0].as_log()[&event::log_schema().message_key()],
+            input[0].as_log()[&log_schema().message_key()],
             From::<&str>::from(&output[0][0])
         );
         assert_eq!(
-            input[1].as_log()[&event::log_schema().message_key()],
+            input[1].as_log()[&log_schema().message_key()],
             From::<&str>::from(&output[1][0])
         );
         assert_eq!(
-            input[2].as_log()[&event::log_schema().message_key()],
+            input[2].as_log()[&log_schema().message_key()],
             From::<&str>::from(&output[0][1])
         );
         assert_eq!(
-            input[3].as_log()[&event::log_schema().message_key()],
+            input[3].as_log()[&log_schema().message_key()],
             From::<&str>::from(&output[3][0])
         );
         assert_eq!(
-            input[4].as_log()[&event::log_schema().message_key()],
+            input[4].as_log()[&log_schema().message_key()],
             From::<&str>::from(&output[2][0])
         );
         assert_eq!(
-            input[5].as_log()[&event::log_schema().message_key()],
+            input[5].as_log()[&log_schema().message_key()],
             From::<&str>::from(&output[2][1])
         );
         assert_eq!(
-            input[6].as_log()[&event::log_schema().message_key()],
+            input[6].as_log()[&log_schema().message_key()],
             From::<&str>::from(&output[4][0])
         );
         assert_eq!(
-            input[7].as_log()[&event::log_schema().message_key()],
+            input[7].as_log()[&log_schema().message_key()],
             From::<&str>::from(&output[5][0])
         );
     }

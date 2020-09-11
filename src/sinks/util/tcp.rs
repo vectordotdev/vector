@@ -7,13 +7,11 @@ use crate::{
         TcpConnectionShutdown, TcpEventSent, TcpFlushError,
     },
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSink},
-    sinks::{Healthcheck, RouterSink},
+    sinks::{Healthcheck, VectorSink},
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
 };
 use bytes::Bytes;
-use futures::{
-    compat::CompatSink, future::BoxFuture, task::noop_waker_ref, FutureExt, TryFutureExt,
-};
+use futures::{compat::CompatSink, task::noop_waker_ref, FutureExt, TryFutureExt};
 use futures01::{
     stream::iter_ok, try_ready, Async, AsyncSink, Future, Poll as Poll01, Sink, StartSend,
 };
@@ -50,7 +48,7 @@ impl TcpSinkConfig {
         }
     }
 
-    pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    pub fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -67,7 +65,7 @@ impl TcpSinkConfig {
                 .with_flat_map(move |event| iter_ok(encode_event(event, &encoding))),
         );
 
-        Ok((sink, Box::new(healthcheck.compat())))
+        Ok((VectorSink::Futures01Sink(sink), healthcheck))
     }
 }
 
@@ -105,7 +103,7 @@ impl TcpSink {
         }
     }
 
-    pub fn healthcheck(&self) -> BoxFuture<'static, crate::Result<()>> {
+    pub fn healthcheck(&self) -> Healthcheck {
         tcp_healthcheck(
             self.host.clone(),
             self.port,
@@ -236,16 +234,18 @@ impl Sink for TcpSink {
                         Ok(AsyncSink::NotReady(line))
                     }
                     _ => {
-                        emit!(TcpEventSent {
-                            byte_size: line.len()
-                        });
+                        let byte_size = line.len();
                         match connection.start_send(line) {
+                            Ok(AsyncSink::NotReady(line)) => Ok(AsyncSink::NotReady(line)),
                             Err(error) => {
                                 error!(message = "connection disconnected.", %error);
                                 self.state = TcpSinkState::Disconnected;
                                 Ok(AsyncSink::Ready)
                             }
-                            Ok(res) => Ok(res),
+                            Ok(AsyncSink::Ready) => {
+                                emit!(TcpEventSent { byte_size });
+                                Ok(AsyncSink::Ready)
+                            }
                         }
                     }
                 }
