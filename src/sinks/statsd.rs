@@ -3,9 +3,8 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::Event,
-    sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
     internal_events::StatsdInvalidMetric,
-    sinks::util::{BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
+    sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
 };
 use futures::{future, FutureExt};
 use futures01::{stream, Sink};
