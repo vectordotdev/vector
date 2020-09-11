@@ -129,7 +129,7 @@ fn apache_metrics(
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,
-                                    value: MetricValue::Gauge { value: 0.0 },
+                                    value: MetricValue::Gauge { value: 1.0 },
                                 })]);
 
                             let metrics = results
