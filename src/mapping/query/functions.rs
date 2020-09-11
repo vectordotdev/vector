@@ -274,7 +274,7 @@ impl Function for StripWhitespaceFn {
                 return Ok(Value::Bytes(bytes.slice_ref(s.trim().as_bytes())));
             } else {
                 // Not a valid unicode string.
-                return Ok(Value::Bytes(bytes));
+                Err("unable to strip white_space from non-unicode string types".to_string())
             }
         } else {
             Err("unable to strip white_space from non-string types".to_string())
@@ -501,7 +501,7 @@ impl Function for TruncateFn {
                 }
             } else {
                 // Not a valid utf8 string.
-                Ok(Value::Bytes(bytes))
+                Err("unable to truncate from non-unicode string types".to_string())
             }
         } else {
             Err("unable to truncate non-string types".to_string())
