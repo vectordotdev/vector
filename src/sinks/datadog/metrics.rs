@@ -458,7 +458,7 @@ fn encode_distribution_events(
                         let samples = values
                             .iter()
                             .zip(sample_rates.iter())
-                            .map(|(&value, &rate)| (0..rate).into_iter().map(move |_| value))
+                            .map(|(&value, &rate)| (0..rate).map(move |_| value))
                             .flatten()
                             .collect::<Vec<_>>();
 
