@@ -1,12 +1,12 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{log_schema, Event},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSink,
         Encoding, StreamSink, UriSerde,
     },
     tls::{MaybeTlsSettings, TlsSettings},
+    Event,
 };
 use bytes::Bytes;
 use futures01::{stream::iter_ok, Sink};

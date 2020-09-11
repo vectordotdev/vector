@@ -1,6 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event,
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{JournaldEventReceived, JournaldInvalidRecord},
     shutdown::ShutdownSignal,
@@ -205,10 +204,10 @@ fn create_event(record: Record) -> Event {
     let mut log = LogEvent::from_iter(record);
     // Convert some journald-specific field names into Vector standard ones.
     if let Some(message) = log.remove(&MESSAGE) {
-        log.insert(event::log_schema().message_key().clone(), message);
+        log.insert(log_schema().message_key().clone(), message);
     }
     if let Some(host) = log.remove(&HOSTNAME) {
-        log.insert(event::log_schema().host_key().clone(), host);
+        log.insert(log_schema().host_key().clone(), host);
     }
     // Translate the timestamp, and so leave both old and new names.
     if let Some(timestamp) = log
@@ -222,17 +221,14 @@ fn create_event(record: Record) -> Event {
                     (timestamp % 1_000_000) as u32 * 1_000,
                 );
                 log.insert(
-                    event::log_schema().timestamp_key().clone(),
+                    log_schema().timestamp_key().clone(),
                     Value::Timestamp(timestamp),
                 );
             }
         }
     }
     // Add source type
-    log.try_insert(
-        event::log_schema().source_type_key(),
-        Bytes::from("journald"),
-    );
+    log.try_insert(log_schema().source_type_key(), Bytes::from("journald"));
 
     log.into()
 }
@@ -541,7 +537,7 @@ mod checkpointer_tests {
         let mut filename = tempdir.path().to_path_buf();
         filename.push(CHECKPOINT_FILENAME);
         let mut checkpointer =
-            Checkpointer::new(tempdir.path().to_path_buf()).expect("Creating checkpointer failed!");
+            Checkpointer::new(filename.clone()).expect("Creating checkpointer failed!");
 
         assert!(checkpointer.get().unwrap().is_none());
 
@@ -624,8 +620,9 @@ mod tests {
         let (tx, rx) = Pipeline::new_test();
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
         let tempdir = tempdir().unwrap();
-        let mut checkpointer =
-            Checkpointer::new(tempdir.path().to_path_buf()).expect("Creating checkpointer failed!");
+        let mut filename = tempdir.path().to_path_buf();
+        filename.push(CHECKPOINT_FILENAME);
+        let mut checkpointer = Checkpointer::new(filename).expect("Creating checkpointer failed!");
         let include_units = HashSet::<String>::from_iter(iunits.iter().map(|&s| s.into()));
         let exclude_units = HashSet::<String>::from_iter(xunits.iter().map(|&s| s.into()));
 
@@ -665,7 +662,7 @@ mod tests {
             Value::Bytes("System Initialization".into())
         );
         assert_eq!(
-            received[0].as_log()[event::log_schema().source_type_key()],
+            received[0].as_log()[log_schema().source_type_key()],
             "journald".into()
         );
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140001000));
@@ -747,11 +744,11 @@ mod tests {
     }
 
     fn message(event: &Event) -> Value {
-        event.as_log()[&event::log_schema().message_key()].clone()
+        event.as_log()[&log_schema().message_key()].clone()
     }
 
     fn timestamp(event: &Event) -> Value {
-        event.as_log()[&event::log_schema().timestamp_key()].clone()
+        event.as_log()[&log_schema().timestamp_key()].clone()
     }
 
     fn value_ts(secs: i64, usecs: u32) -> Value {
