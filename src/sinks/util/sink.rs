@@ -136,7 +136,7 @@ impl<T: Sink> Sink for StreamSink<T> {
 // === StreamSink2 ===
 
 #[async_trait]
-pub trait StreamSink2: Send {
+pub trait StreamSink2 {
     async fn run(
         &mut self,
         input: Pin<Box<dyn futures::Stream<Item = Result<Event, ()>> + Send>>,
