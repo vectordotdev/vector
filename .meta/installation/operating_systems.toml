@@ -113,3 +113,15 @@ os = "Windows"
 strategies = [
   {name = "daemon", source = "file"},
 ]
+
+[installation.operating_systems.freebsd]
+title = "FreeBSD"
+interfaces = [
+  "vector-cli",
+  "docker-cli",
+  "docker-compose",
+]
+os = "BSD"
+strategies = [
+  {name = "daemon", source = "file"},
+]
