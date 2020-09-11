@@ -38,6 +38,8 @@
 /scripts/release-helm.sh @MOZGIII
 /scripts/deploy-kubernetes-test.sh @MOZGIII @JeanMertz
 /scripts/test-e2e-kubernetes.sh @MOZGIII @JeanMertz
+/scripts/kubernetes-yaml.sh @MOZGIII
+/scripts/kubernetes-yaml/ @MOZGIII
 
 /src/metrics.rs @lukesteensen
 /src/main.rs @lukesteensen

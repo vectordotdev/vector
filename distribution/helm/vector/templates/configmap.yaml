@@ -6,7 +6,13 @@ metadata:
   labels:
     {{- include "vector.labels" . | nindent 4 }}
 data:
-  vector.toml: |
+  # We leave `vector.toml` file name available to let externally managed config
+  # maps to provide it.
+  managed.toml: |
+    # Configuration for vector.
+    # Docs: https://vector.dev/docs/
+
+    # Data dir is location controlled at the `DaemonSet`.
     data_dir = "{{ .Values.globalOptions.dataDir }}"
 
     {{- with .Values.logSchema }}
@@ -18,6 +24,7 @@ data:
     {{- end }}
 
     {{- if .Values.kubernetesLogsSource.enabled }}
+    # Ingest logs from Kubernetes.
     [sources.{{ .Values.kubernetesLogsSource.sourceId }}]
       type = "kubernetes_logs"
 
