@@ -1,11 +1,15 @@
-use super::{CreateAcceptor, MaybeTlsSettings, MaybeTlsStream, TcpBind, TlsError, TlsSettings};
+use super::{
+    CreateAcceptor, IncomingListener, MaybeTlsSettings, MaybeTlsStream, TcpBind, TlsError,
+    TlsSettings,
+};
 #[cfg(feature = "listenfd")]
-use super::{Handshake, MaybeTls, PeerAddress};
+use super::{Handshake, MaybeTls};
 use bytes::{Buf, BufMut};
-use futures::{future::BoxFuture, FutureExt, Stream, StreamExt};
+use futures::{future::BoxFuture, stream, FutureExt, Stream};
 use openssl::ssl::{SslAcceptor, SslMethod};
 use snafu::ResultExt;
 use std::{
+    future::Future,
     mem::MaybeUninit,
     net::SocketAddr,
     pin::Pin,
@@ -50,16 +54,33 @@ pub(crate) struct MaybeTlsListener {
 }
 
 impl MaybeTlsListener {
-    pub(crate) fn incoming(
-        &mut self,
-    ) -> impl Stream<Item = crate::tls::Result<MaybeTlsIncomingStream<TcpStream>>> + '_ {
-        let acceptor = self.acceptor.clone();
+    pub(crate) async fn accept(&mut self) -> crate::tls::Result<MaybeTlsIncomingStream<TcpStream>> {
         self.listener
-            .incoming()
-            .map(move |connection| match connection {
-                Ok(stream) => MaybeTlsIncomingStream::new(stream, acceptor.clone()),
-                Err(source) => Err(TlsError::IncomingListener { source }),
+            .accept()
+            .await
+            .map(|(stream, peer_addr)| {
+                MaybeTlsIncomingStream::new(stream, peer_addr, self.acceptor.clone())
             })
+            .context(IncomingListener)
+    }
+
+    async fn into_accept(
+        mut self,
+    ) -> (crate::tls::Result<MaybeTlsIncomingStream<TcpStream>>, Self) {
+        (self.accept().await, self)
+    }
+
+    pub(crate) fn accept_stream(
+        self,
+    ) -> impl Stream<Item = crate::tls::Result<MaybeTlsIncomingStream<TcpStream>>> {
+        let mut accept = Box::pin(self.into_accept());
+        stream::poll_fn(move |context| match accept.as_mut().poll(context) {
+            Poll::Ready((item, this)) => {
+                accept.set(this.into_accept());
+                Poll::Ready(Some(item))
+            }
+            Poll::Pending => Poll::Pending,
+        })
     }
 
     #[cfg(feature = "listenfd")]
@@ -115,16 +136,16 @@ impl MaybeTlsIncomingStream<TcpStream> {
     #[cfg(feature = "listenfd")]
     pub(super) fn new(
         stream: TcpStream,
+        peer_addr: SocketAddr,
         acceptor: Option<SslAcceptor>,
-    ) -> crate::tls::Result<Self> {
-        let peer_addr = stream.peer_addr().context(PeerAddress)?;
+    ) -> Self {
         let state = match acceptor {
             Some(acceptor) => StreamState::Accepting(
                 async move { tokio_openssl::accept(&acceptor, stream).await }.boxed(),
             ),
             None => StreamState::Accepted(MaybeTlsStream::Raw(stream)),
         };
-        Ok(Self { peer_addr, state })
+        Self { peer_addr, state }
     }
 
     #[cfg(not(feature = "listenfd"))]
