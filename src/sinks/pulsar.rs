@@ -238,7 +238,7 @@ mod tests {
         let event = encode_event(
             evt,
             &EncodingConfigWithDefault {
-                codec: Encoding::Text,
+                codec: Encoding::Json,
                 except_fields: Some(vec![Atom::from("key")]),
                 ..Default::default()
             }
@@ -246,7 +246,8 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(&event[..], msg.as_bytes());
+        let map: HashMap<String, String> = serde_json::from_slice(&event[..]).unwrap();
+        assert!(!map.contains_key("key"));
     }
 }
 
