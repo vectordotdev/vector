@@ -9,7 +9,8 @@ use crate::{
             arithmetic::Operator,
             functions::{
                 DowncaseFn, Md5Fn, NotFn, NowFn, ParseTimestampFn, Sha1Fn, StripWhitespaceFn,
-                ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn, UpcaseFn, UuidV4Fn,
+                ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn, TruncateFn,
+                UpcaseFn, UuidV4Fn,
             },
             path::Path as QueryPath,
             Literal,
@@ -319,6 +320,21 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
             let param = pair.into_inner().next().ok_or(TOKEN_ERR)?;
             let query = query_arithmetic_from_pair(param)?;
             Ok(Box::new(StripWhitespaceFn::new(query)))
+        }
+        Rule::truncate => {
+            let (first, mut other) = split_inner_rules_from_pair(pair)?;
+            let query = query_arithmetic_from_pair(first)?;
+            let limit = query_arithmetic_from_pair(other.next().ok_or(TOKEN_ERR)?)?;
+
+            let ellipsis = other.next().map(|r| match r.as_rule() {
+                Rule::boolean => Value::Boolean(r.as_str() == "true"),
+                Rule::null => Value::Null,
+                _ => unreachable!(
+                    "parser should not allow other to_bool default arg child rules here"
+                ),
+            });
+
+            Ok(Box::new(TruncateFn::new(query, limit, ellipsis)))
         }
         _ => unreachable!("parser should not allow other query_function child rules here"),
     }
@@ -1005,6 +1021,35 @@ mod tests {
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(StripWhitespaceFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                ".foo = strip_whitespace(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(StripWhitespaceFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                ".foo = truncate(.foo, .limit)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(TruncateFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Box::new(QueryPath::from("limit")),
+                        None,
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = truncate(.foo, 5, true)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(TruncateFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Box::new(Literal::from(Value::Float(5.0))),
+                        Some(Value::Boolean(true)),
+                    )),
                 ))]),
             ),
         ];
