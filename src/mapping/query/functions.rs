@@ -271,7 +271,7 @@ impl Function for StripWhitespaceFn {
             // and will give us a trim function.
             // This does not need to allocate any additional memory.
             if let Ok(s) = std::str::from_utf8(&bytes) {
-                return Ok(Value::Bytes(bytes.slice_ref(s.trim().as_bytes())));
+                Ok(Value::Bytes(bytes.slice_ref(s.trim().as_bytes())))
             } else {
                 // Not a valid unicode string.
                 Err("unable to strip white_space from non-unicode string types".to_string())
