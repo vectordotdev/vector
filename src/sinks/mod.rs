@@ -7,7 +7,6 @@ use futures::{
 use snafu::Snafu;
 use std::fmt;
 
-pub mod streaming_sink;
 pub mod util;
 
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
@@ -108,7 +107,7 @@ impl VectorSink {
     {
         match self {
             Self::Futures01Sink(sink) => input.forward(sink.sink_compat()).await,
-            Self::Stream(ref mut s) => s.run(Box::new(input)).await,
+            Self::Stream(ref mut s) => s.run(Box::pin(input)).await,
         }
     }
 

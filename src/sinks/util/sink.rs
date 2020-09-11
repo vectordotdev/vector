@@ -32,7 +32,10 @@
 //! driven independently from the sink. A oneshot channel is used to tie them back into
 //! the sink to allow it to notify the consumer that the request has succeeded.
 
-use super::{batch::{Batch, PushResult, StatefulBatch}, buffer::partition::Partition};
+use super::{
+    batch::{Batch, PushResult, StatefulBatch},
+    buffer::partition::Partition,
+};
 use crate::{buffers::Acker, Event};
 use async_trait::async_trait;
 use futures::{
@@ -49,6 +52,7 @@ use std::{
     fmt,
     hash::Hash,
     marker::PhantomData,
+    pin::Pin,
 };
 use tokio::time::{delay_for, Duration};
 use tower::Service;
@@ -135,7 +139,7 @@ impl<T: Sink> Sink for StreamSink<T> {
 pub trait StreamSink2: Send {
     async fn run(
         &mut self,
-        input: Box<dyn futures::Stream<Item = Result<Event, ()>> + Send>,
+        input: Pin<Box<dyn futures::Stream<Item = Result<Event, ()>> + Send>>,
     ) -> Result<(), ()>;
 }
 

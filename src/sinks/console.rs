@@ -1,21 +1,21 @@
 use crate::{
+    buffers::Acker,
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        StreamSink,
+        StreamSink2,
     },
 };
 use async_trait::async_trait;
 use futures::{
-    future, pin_mut,
+    future,
     stream::{Stream, StreamExt},
     FutureExt,
 };
 use serde::{Deserialize, Serialize};
+use std::pin::Pin;
 use tokio::io::{self, AsyncWriteExt};
-
-use super::streaming_sink::{self, StreamingSink};
 
 #[derive(Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
@@ -55,12 +55,14 @@ impl SinkConfig for ConsoleSinkConfig {
             Target::Stderr => Box::new(io::stderr()),
         };
 
-        let sink = WriterSink { output, encoding };
-        let sink = streaming_sink::compat::adapt_to_topology(sink);
-        let sink = StreamSink::new(sink.into_futures01sink(), cx.acker());
+        let sink = WriterSink {
+            acker: cx.acker(),
+            output,
+            encoding,
+        };
 
         Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
+            super::VectorSink::Stream(Box::new(sink)),
             future::ok(()).boxed(),
         ))
     }
@@ -110,21 +112,24 @@ async fn write_event_to_output(
 }
 
 struct WriterSink {
+    acker: Acker,
     output: Box<dyn io::AsyncWrite + Send + Sync + Unpin>,
     encoding: EncodingConfig<Encoding>,
 }
 
 #[async_trait]
-impl StreamingSink for WriterSink {
+impl StreamSink2 for WriterSink {
     async fn run(
         &mut self,
-        input: impl Stream<Item = Event> + Send + Sync + 'static,
-    ) -> crate::Result<()> {
-        let output = &mut self.output;
-        pin_mut!(output);
-        pin_mut!(input);
+        mut input: Pin<Box<dyn Stream<Item = Result<Event, ()>> + Send>>,
+    ) -> Result<(), ()> {
         while let Some(event) = input.next().await {
-            write_event_to_output(&mut output, event, &self.encoding).await?
+            if let Ok(event) = event {
+                write_event_to_output(&mut self.output, event, &self.encoding)
+                    .await
+                    .expect("console sink error");
+                self.acker.ack(1);
+            }
         }
         Ok(())
     }

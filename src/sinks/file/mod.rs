@@ -1,10 +1,11 @@
 use crate::expiring_hash_map::ExpiringHashMap;
 use crate::{
+    buffers::Acker,
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        StreamSink,
+        StreamSink2,
     },
     template::Template,
 };
@@ -12,12 +13,15 @@ use async_compression::tokio_02::write::GzipEncoder;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{
-    future, pin_mut,
+    future,
     stream::{Stream, StreamExt},
     FutureExt,
 };
 use serde::{Deserialize, Serialize};
-use std::time::{Duration, Instant};
+use std::{
+    pin::Pin,
+    time::{Duration, Instant},
+};
 use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
@@ -25,8 +29,6 @@ use tokio::{
 
 mod bytes_path;
 use bytes_path::BytesPath;
-
-use super::streaming_sink::{self, StreamingSink};
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -120,11 +122,9 @@ impl OutFile {
 #[typetag::serde(name = "file")]
 impl SinkConfig for FileSinkConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = FileSink::new(&self);
-        let sink = streaming_sink::compat::adapt_to_topology(sink);
-        let sink = StreamSink::new(sink.into_futures01sink(), cx.acker());
+        let sink = FileSink::new(&self, cx.acker());
         Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
+            super::VectorSink::Stream(Box::new(sink)),
             future::ok(()).boxed(),
         ))
     }
@@ -140,6 +140,7 @@ impl SinkConfig for FileSinkConfig {
 
 #[derive(Debug)]
 pub struct FileSink {
+    acker: Acker,
     path: Template,
     encoding: EncodingConfigWithDefault<Encoding>,
     idle_timeout: Duration,
@@ -148,8 +149,9 @@ pub struct FileSink {
 }
 
 impl FileSink {
-    pub fn new(config: &FileSinkConfig) -> Self {
+    pub fn new(config: &FileSinkConfig, acker: Acker) -> Self {
         Self {
+            acker,
             path: config.path.clone(),
             encoding: config.encoding.clone(),
             idle_timeout: Duration::from_secs(config.idle_timeout_secs.unwrap_or(30)),
@@ -181,12 +183,19 @@ impl FileSink {
             .expect("unable to compute next deadline")
     }
 
-    async fn run(&mut self, input: impl Stream<Item = Event> + Send + Sync) -> crate::Result<()> {
-        pin_mut!(input);
+    async fn run(
+        &mut self,
+        mut input: Pin<Box<dyn Stream<Item = Result<Event, ()>> + Send>>,
+    ) -> crate::Result<()> {
         loop {
             tokio::select! {
                 event = input.next() => {
                     match event {
+                        Some(Err(())) => {},
+                        Some(Ok(event)) => {
+                            self.process_event(event).await;
+                            self.acker.ack(1);
+                        },
                         None => {
                             // If we got `None` - terminate the processing.
                             debug!(message = "Receiver exhausted, terminating the processing loop.");
@@ -203,7 +212,6 @@ impl FileSink {
 
                             break;
                         }
-                        Some(event) => self.process_event(event).await,
                     }
                 }
                 result = self.files.next_expired(), if !self.files.is_empty() => {
@@ -313,12 +321,13 @@ async fn write_event_to_file(
 }
 
 #[async_trait]
-impl StreamingSink for FileSink {
+impl StreamSink2 for FileSink {
     async fn run(
         &mut self,
-        input: impl Stream<Item = Event> + Send + Sync + 'static,
-    ) -> crate::Result<()> {
-        FileSink::run(self, input).await
+        input: Pin<Box<dyn futures::Stream<Item = Result<Event, ()>> + Send>>,
+    ) -> Result<(), ()> {
+        FileSink::run(self, input).await.expect("file sink error");
+        Ok(())
     }
 }
 
@@ -345,10 +354,10 @@ mod tests {
             compression: Compression::None,
         };
 
-        let mut sink = FileSink::new(&config);
+        let mut sink = FileSink::new(&config, Acker::Null);
         let (input, _events) = random_lines_with_stream(100, 64);
 
-        let events = stream::iter(input.clone().into_iter().map(Event::from));
+        let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)).map(Ok));
         sink.run(events).await.unwrap();
 
         let output = lines_from_file(template);
@@ -370,11 +379,10 @@ mod tests {
             compression: Compression::Gzip,
         };
 
-        let mut sink = FileSink::new(&config);
+        let mut sink = FileSink::new(&config, Acker::Null);
         let (input, _) = random_lines_with_stream(100, 64);
 
-        let events = stream::iter(input.clone().into_iter().map(Event::from));
-
+        let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)).map(Ok));
         sink.run(events).await.unwrap();
 
         let output = lines_from_gzip_file(template);
@@ -401,7 +409,7 @@ mod tests {
             compression: Compression::None,
         };
 
-        let mut sink = FileSink::new(&config);
+        let mut sink = FileSink::new(&config, Acker::Null);
 
         let (mut input, _events) = random_events_with_stream(32, 8);
         input[0].as_mut_log().insert("date", "2019-26-07");
@@ -421,7 +429,7 @@ mod tests {
         input[7].as_mut_log().insert("date", "2019-29-07");
         input[7].as_mut_log().insert("level", "error");
 
-        let events = stream::iter(input.clone().into_iter());
+        let events = Box::pin(stream::iter(input.clone().into_iter()).map(Ok));
         sink.run(events).await.unwrap();
 
         let output = vec![
@@ -482,16 +490,16 @@ mod tests {
             compression: Compression::None,
         };
 
-        let mut sink = FileSink::new(&config);
+        let mut sink = FileSink::new(&config, Acker::Null);
         let (mut input, _events) = random_lines_with_stream(10, 64);
 
         let (mut tx, rx) = tokio::sync::mpsc::channel(1);
 
-        let _ = tokio::spawn(async move { sink.run(rx).await });
+        let _ = tokio::spawn(async move { sink.run(Box::pin(rx)).await });
 
         // send initial payload
         for line in input.clone() {
-            tx.send(Event::from(line)).await.unwrap();
+            tx.send(Ok(Event::from(line))).await.unwrap();
         }
 
         // wait for file to go idle and be closed
@@ -499,7 +507,7 @@ mod tests {
 
         // trigger another write
         let last_line = "i should go at the end";
-        tx.send(Event::from(last_line)).await.unwrap();
+        tx.send(Ok(Event::from(last_line))).await.unwrap();
         input.push(String::from(last_line));
 
         // wait for another flush
