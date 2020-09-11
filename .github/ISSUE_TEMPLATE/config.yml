@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: Chat
+    url: https://chat.vector.dev
+    about: Get help! Chat with the Vector team and other community members.
+
+  - name: Twitter
+    url: https://twitter.com/vectordotdev
+    about: Follow us and stay up to date with Vector.
+

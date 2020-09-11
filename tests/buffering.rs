@@ -4,13 +4,13 @@ use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     SinkExt,
 };
-use futures01::Future;
 use prost::Message;
 use tempfile::tempdir;
+use tokio::runtime::Runtime;
 use tracing::trace;
 use vector::{
     buffers::BufferConfig,
-    config, event, runtime,
+    config, event,
     test_util::{
         random_events_with_stream, runtime, start_topology, trace_init, wait_for_atomic_usize,
         CountReceiver,
@@ -20,8 +20,8 @@ use vector::{
 
 mod support;
 
-fn terminate_abruptly(rt: runtime::Runtime, topology: topology::RunningTopology) {
-    rt.shutdown_now().wait().unwrap();
+fn terminate_abruptly(rt: Runtime, topology: topology::RunningTopology) {
+    drop(rt);
     drop(topology);
 }
 
@@ -49,7 +49,7 @@ fn test_buffering() {
     let (in_tx, source_config, source_event_counter) = support::source_with_event_counter();
     let sink_config = support::sink_dead();
     let config = {
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source("in", source_config);
         config.add_sink("out", &["in"], sink_config);
         config.sinks["out"].buffer = BufferConfig::Disk {
@@ -57,11 +57,11 @@ fn test_buffering() {
             when_full: Default::default(),
         };
         config.global.data_dir = Some(data_dir.clone());
-        config
+        config.build().unwrap()
     };
 
     let mut rt = runtime();
-    let (topology, input_events) = rt.block_on_std(async move {
+    let (topology, input_events) = rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
         let (input_events, mut input_events_stream) =
             random_events_with_stream(line_length, num_events);
@@ -98,7 +98,7 @@ fn test_buffering() {
     let (in_tx, source_config) = support::source();
     let (out_rx, sink_config) = support::sink(10);
     let config = {
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source("in", source_config);
         config.add_sink("out", &["in"], sink_config);
         config.sinks["out"].buffer = BufferConfig::Disk {
@@ -106,11 +106,11 @@ fn test_buffering() {
             when_full: Default::default(),
         };
         config.global.data_dir = Some(data_dir);
-        config
+        config.build().unwrap()
     };
 
     let mut rt = runtime();
-    rt.block_on_std(async move {
+    rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
 
         let (input_events2, mut input_events_stream) =
@@ -160,7 +160,7 @@ fn test_max_size() {
     let (in_tx, source_config, source_event_counter) = support::source_with_event_counter();
     let sink_config = support::sink_dead();
     let config = {
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source("in", source_config);
         config.add_sink("out", &["in"], sink_config);
         config.sinks["out"].buffer = BufferConfig::Disk {
@@ -168,11 +168,11 @@ fn test_max_size() {
             when_full: Default::default(),
         };
         config.global.data_dir = Some(data_dir.clone());
-        config
+        config.build().unwrap()
     };
 
     let mut rt = runtime();
-    let topology = rt.block_on_std(async move {
+    let topology = rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
 
         let _ = in_tx
@@ -208,7 +208,7 @@ fn test_max_size() {
     let (_in_tx, source_config) = support::source();
     let (out_rx, sink_config) = support::sink(10);
     let config = {
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source("in", source_config);
         config.add_sink("out", &["in"], sink_config);
         config.sinks["out"].buffer = BufferConfig::Disk {
@@ -216,11 +216,11 @@ fn test_max_size() {
             when_full: Default::default(),
         };
         config.global.data_dir = Some(data_dir);
-        config
+        config.build().unwrap()
     };
 
     let mut rt = runtime();
-    rt.block_on_std(async move {
+    rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
 
         let output_events = CountReceiver::receive_events(out_rx);

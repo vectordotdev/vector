@@ -5,7 +5,7 @@
 
 #![deny(missing_docs)]
 
-use crate::event::{self, Event};
+use crate::event::Event;
 use crate::internal_events::{
     FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
     KubernetesLogsEventReceived,
@@ -82,7 +82,7 @@ impl SourceConfig for Config {
         let source = Source::new(self, Resolver, globals, name)?;
 
         // TODO: this is a workaround for the legacy futures 0.1.
-        // When the core is updated to futures 0.3 this should be simplied
+        // When the core is updated to futures 0.3 this should be simplified
         // significantly.
         let out = futures::compat::Compat01As03Sink::new(out);
         let fut = source.run(out, shutdown);
@@ -289,7 +289,7 @@ fn create_event(line: Bytes, file: &str) -> Event {
 
     // Add source type.
     event.as_mut_log().insert(
-        event::log_schema().source_type_key(),
+        crate::config::log_schema().source_type_key(),
         COMPONENT_NAME.to_owned(),
     );
 

@@ -5,6 +5,6 @@ set -euo pipefail
 #
 # SUMMARY
 #
-#   Run behaviorial tests
+#   Run behavioral tests
 
 $(find target -type f -executable -name vector | head -n1) test tests/behavior/**/*.toml

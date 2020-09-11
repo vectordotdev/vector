@@ -156,16 +156,15 @@ pub async fn build_pieces(
             Ok((sink, healthcheck)) => (sink, healthcheck),
         };
 
-        let sink = filter_event_type(rx, input_type)
-            .forward(sink)
-            .map(|_| debug!("Finished"))
-            .compat();
+        let sink = sink
+            .run01(filter_event_type(rx, input_type))
+            .inspect(|_| debug!("Finished"));
         let task = Task::new(name, typetag, sink);
 
         let healthcheck_task = async move {
             if enable_healthcheck {
                 let duration = Duration::from_secs(10);
-                timeout(duration, healthcheck.compat())
+                timeout(duration, healthcheck)
                     .map(|result| match result {
                         Ok(Ok(_)) => {
                             info!("Healthcheck: Passed.");

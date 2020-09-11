@@ -9,6 +9,7 @@ expanding into more specifics.
 
 1. [Assumptions](#assumptions)
 1. [Your First Contribution](#your-first-contribution)
+   1. [New sources, sinks, and transforms](#new-sources-sinks-and-transforms)
 1. [Change Control](#change-control)
    1. [Git Branches](#git-branches)
    1. [Git Commits](#git-commits)
@@ -31,6 +32,7 @@ expanding into more specifics.
       1. [Dependencies](#dependencies)
    1. [Guidelines](#guidelines)
       1. [Sink Healthchecks](#sink-healthchecks)
+      1. [Metric naming convention](#metric-naming-convention)
    1. [Testing](#testing)
       1. [Sample Logs](#sample-logs)
       1. [Tips and Tricks](#tips-and-tricks)
@@ -85,6 +87,17 @@ expanding into more specifics.
    repo. A Vector team member should comment and/or review your pull request
    with a few days. Although, depending on the circumstances, it may take
    longer.
+
+### New sources, sinks, and transforms
+
+If you're contributing a new source, sink, or transform to Vector, thank you that's way cool! There's a few steps you need think about if you want to make sure we can merge your contribution. We're here to help you along with these steps but they are a blocker to getting a new integration released.
+
+To merge a new source, sink, or transform, you need to:
+
+- [ ] Add tests, especially integration tests if your contribution connects to an external service.
+- [ ] Add instrumentation so folks using your integration can get insight into how it's working and performing. You can see some [example of instrumentation in existing integrations](https://github.com/timberio/vector/tree/master/src/internal_events).
+- [ ] Add internal documentation of options and fields. You can see [examples in the `.meta` directory](https://github.com/timberio/vector/blob/master/.meta/sources/kafka.toml.erb).
+- [ ] Update [`.github/CODEOWNERS`](https://github.com/timberio/vector/blob/master/.github/CODEOWNERS) or talk to us about identifying someone on the team to help look after the new integration.
 
 ## Change Control
 
@@ -152,18 +165,28 @@ docs: fix typos
 
 #### Reviews & Approvals
 
-All pull requests must be reviewed and approved by at least one Vector team
-member. The review process is outlined in the [Review guide](REVIEWING.md).
+All pull requests should be reviewed by:
+
+- No review required for cosmetic changes like whitespace, typos, and spelling
+  by a maintainer
+- One Vector team member for minor changes or trivial changes from contributors
+- Two Vector team members for major changes
+- Three Vector team members for RFCs
+
+If there are any CODEOWNERs automatically assigned, you should also wait for
+their review.
+
+The review process is outlined in the [Review guide](REVIEWING.md).
 
 #### Merge Style
 
 All pull requests are squashed and merged. We generally discourage large pull
-requests that are over 300-500 lines of diff. If you would like to propose
-a change that is larger we suggest coming onto our gitter channel and
-discuss it with one of our engineers. This way we can talk through the
-solution and discuss if a change that large is even needed! This overall
-will produce a quicker response to the change and likely produce code that
-aligns better with our process.
+requests that are over 300-500 lines of diff. If you would like to propose a
+change that is larger we suggest coming onto our gitter channel and discuss it
+with one of our engineers. This way we can talk through the solution and
+discuss if a change that large is even needed! This will produce a quicker
+response to the change and likely produce code that aligns better with our
+process.
 
 ### CI
 
@@ -427,6 +450,31 @@ that fall into a false negative circumstance. Our goal should be to minimize the
 likelihood of users needing to pull that lever while still making a good effort
 to detect common problems.
 
+#### Metric naming convention
+
+For metrics naming, Vector broadly follows the [Prometheus metric naming standards](https://prometheus.io/docs/practices/naming/). Hence, a metric name:
+
+- Must only contain valid characters, which are ASCII letters and digits, as well as underscores. It should match the regular expression: `[a-z_][a-z0-9_]*`.
+- Metrics have a broad template:
+
+  `<namespace>_<name>_<unit>_[total]`
+
+  - The `namespace` is a single word prefix that groups metrics from a specific source, for example host-based metrics like CPU, disk, and memory are prefixed with `host`, Apache metrics are prefixed with `apache`, etc.
+  - The `name` describes what the metric measures.
+  - The `unit` is a [single base unit](https://en.wikipedia.org/wiki/SI_base_unit), for example seconds, bytes, metrics.
+  - The suffix should describe the unit in plural form: seconds, bytes. Accumulating counts, both with units or without, should end in `total`, for example `disk_written_bytes_total` and `http_requests_total`.
+
+- Where required, use tags to differentiate the characteristic of the measurement. For example, whilst `host_cpu_seconds_total` is name of the metric, we also record the `mode` that is being used for each CPU. The `mode` and the specific CPU then become tags on the metric:
+
+```text
+host_cpu_seconds_total{cpu="0",mode="idle"}
+host_cpu_seconds_total{cpu="0",mode="idle"}
+host_cpu_seconds_total{cpu="0",mode="nice"}
+host_cpu_seconds_total{cpu="0",mode="system"}
+host_cpu_seconds_total{cpu="0",mode="user"}
+host_cpu_seconds_total
+```
+
 ### Testing
 
 You can run Vector's tests via the `make test` command. Our tests use Docker
@@ -588,7 +636,7 @@ Once you have the requirements, use the `scripts/skaffold.sh dev` command.
 
 That's it, just one command should take care of everything!
 
-It will
+It will:
 
 1. build the `vector` binary in development mode,
 2. build a docker image from this binary via `skaffold/docker/Dockerfile`,
@@ -755,7 +803,7 @@ by the use of [conventional commit](#title) titles.
 
 It should offer meaningful value to users. This is inherently subjective and
 it is impossible to define exact rules for this distinction. But we should be
-cautious not to dillute the meaning of a highlight by producing low values
+cautious not to dilute the meaning of a highlight by producing low values
 highlights.
 
 #### How is a highlight different from a blog post?
@@ -768,7 +816,7 @@ For example, [this performance increase announcement][urls.performance_highlight
 is noteworthy, but also deserves an in-depth blog post covering the work that
 resulted in the performance benefit. Notice that the highlight alludes to an
 upcoming blog post. This allows us to communicate a high-value performance
-improvment without being blocked by an in-depth blog post.
+improvement without being blocked by an in-depth blog post.
 
 ## Security
 
@@ -784,7 +832,7 @@ Vector requires all contributors to agree to the DCO. DCO stands for Developer
 Certificate of Origin and is maintained by the
 [Linux Foundation](https://www.linuxfoundation.org). It is an attestation
 attached to every commit made by every developer. It ensures that all committed
-code adheres to the [Vector license](LICENSE.md) (Apache 2.0).
+code adheres to the [Vector license](LICENSE.md).
 
 #### Trivial changes
 
@@ -793,16 +841,9 @@ Trivial changes, such as spelling fixes, do not need to be signed.
 ### Granted rights and copyright assignment
 
 It is important to note that the DCO is not a license. The license of the
-project – in our case the Apache License – is the license under which the
-contribution is made. However, the DCO in conjunction with the Apache License
-may be considered an alternate CLA.
-
-The existence of section 5 of the Apache License is proof that the Apache
-License is intended to be usable without CLAs. Users need for the code to be
-open-source, with all the legal rights that imply, but it is the open source
-license that provides this. The Apache License provides very generous
-copyright permissions from contributors, and contributors explicitly grant
-patent licenses as well. These rights are granted to everyone.
+project is the license under which the contribution is made. However, the DCO
+in conjunction with the Vector License may be considered an alternate
+Contributor License Agreement (CLA).
 
 ## FAQ
 

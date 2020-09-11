@@ -3,9 +3,9 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::Event,
-    sinks::util::{BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
+    sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
 };
-use futures::{future, FutureExt, TryFutureExt};
+use futures::{future, FutureExt};
 use futures01::{stream, Sink};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -48,7 +48,7 @@ impl Client {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct StatsdSinkConfig {
-    pub namespace: String,
+    pub namespace: Option<String>,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
     #[serde(default)]
@@ -65,10 +65,9 @@ inventory::submit! {
 
 #[typetag::serde(name = "statsd")]
 impl SinkConfig for StatsdSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = StatsdSvc::new(self.clone(), cx.acker())?;
-        let healthcheck = StatsdSvc::healthcheck(self.clone()).boxed().compat();
-        Ok((sink, Box::new(healthcheck)))
+        Ok((sink, future::ok(()).boxed()))
     }
 
     fn input_type(&self) -> DataType {
@@ -81,7 +80,7 @@ impl SinkConfig for StatsdSinkConfig {
 }
 
 impl StatsdSvc {
-    pub fn new(config: StatsdSinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {
+    pub fn new(config: StatsdSinkConfig, acker: Acker) -> crate::Result<super::VectorSink> {
         // 1432 bytes is a recommended packet size to fit into MTU
         // https://github.com/statsd/statsd/blob/master/docs/metric_types.md#multi-metric-packets
         // However we need to leave some space for +1 extra trailing event in the buffer.
@@ -106,13 +105,9 @@ impl StatsdSvc {
             acker,
         )
         .sink_map_err(|e| error!("Fatal statsd sink error: {}", e))
-        .with_flat_map(move |event| stream::iter_ok(encode_event(event, &namespace)));
+        .with_flat_map(move |event| stream::iter_ok(encode_event(event, namespace.as_deref())));
 
-        Ok(Box::new(sink))
-    }
-
-    async fn healthcheck(_config: StatsdSinkConfig) -> crate::Result<()> {
-        Ok(())
+        Ok(super::VectorSink::Futures01Sink(Box::new(sink)))
     }
 }
 
@@ -151,7 +146,7 @@ fn push_event<V: Display>(
     };
 }
 
-fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
+fn encode_event(event: Event, namespace: Option<&str>) -> Option<Vec<u8>> {
     let mut buf = Vec::new();
 
     let metric = event.as_metric();
@@ -193,10 +188,7 @@ fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
         }
     };
 
-    let mut message: String = buf.join("|");
-    if !namespace.is_empty() {
-        message = format!("{}.{}", namespace, message);
-    };
+    let message = encode_namespace(namespace, '.', buf.join("|"));
 
     let mut body: Vec<u8> = message.into_bytes();
     body.push(b'\n');
@@ -233,11 +225,8 @@ mod test {
         Event,
     };
     use bytes::Bytes;
-    use futures::{
-        compat::{Future01CompatExt, Sink01CompatExt},
-        {SinkExt, StreamExt, TryStreamExt},
-    };
-    use futures01::{sync::mpsc, Sink};
+    use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt, TryStreamExt};
+    use futures01::sync::mpsc;
     use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
     #[cfg(feature = "sources-statsd")]
@@ -272,7 +261,7 @@ mod test {
             value: MetricValue::Counter { value: 1.5 },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, "").unwrap();
+        let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
@@ -288,7 +277,7 @@ mod test {
             value: MetricValue::Counter { value: 1.5 },
         };
         let event = Event::Metric(metric1);
-        let frame = &encode_event(event, "").unwrap();
+        let frame = &encode_event(event, None).unwrap();
         // The statsd parser will parse the counter as Incremental,
         // so we can't compare it with the parsed value.
         assert_eq!("counter:1.5|c\n", from_utf8(&frame).unwrap());
@@ -305,7 +294,7 @@ mod test {
             value: MetricValue::Gauge { value: -1.5 },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, "").unwrap();
+        let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
@@ -321,7 +310,7 @@ mod test {
             value: MetricValue::Gauge { value: 1.5 },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, "").unwrap();
+        let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
@@ -341,7 +330,7 @@ mod test {
             },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, "").unwrap();
+        let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
@@ -359,7 +348,7 @@ mod test {
             },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, "").unwrap();
+        let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
@@ -369,7 +358,7 @@ mod test {
         trace_init();
 
         let config = StatsdSinkConfig {
-            namespace: "vector".into(),
+            namespace: Some("vector".into()),
             address: default_address(),
             batch: BatchConfig {
                 max_bytes: Some(512),
@@ -414,8 +403,7 @@ mod test {
                 .unwrap()
         });
 
-        let stream = stream::iter_ok(events);
-        let _ = sink.send_all(stream).compat().await.unwrap();
+        sink.run(stream::iter(events).map(Ok)).await.unwrap();
 
         let messages = collect_n(rx, 1).await.unwrap();
         assert_eq!(

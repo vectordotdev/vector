@@ -33,7 +33,7 @@ impl Debounce {
     /// This function resolves after a debounce timeout since the first signal
     /// in sequence expires.
     /// If there hasn't been a signal, or the debounce timeout isn't yet
-    /// exausted - the future will be in a pending state.
+    /// exhausted - the future will be in a pending state.
     pub async fn debounced(&mut self) {
         let sequence_start = match self.sequence_start {
             Some(val) => val,
@@ -79,7 +79,7 @@ mod tests {
             // Shouldn't be available immediately.
             assert!(poll!(&mut fut).is_pending());
 
-            // Simulate that we waited for some time, but no long enouh for the
+            // Simulate that we waited for some time, but not long enough for the
             // debounce to happen.
             tokio::time::advance(TEST_DELAY_FRACTION).await;
 

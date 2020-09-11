@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# sync-isntall.sh
+# sync-install.sh
 #
 # SUMMARY
 #

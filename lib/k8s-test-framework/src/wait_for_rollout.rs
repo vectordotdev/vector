@@ -6,7 +6,7 @@ use std::{ffi::OsStr, process::Stdio};
 use tokio::process::Command;
 
 /// Wait for a rollout of a `resource` within a `namespace` to complete via
-/// the specifed `kubectl_command`.
+/// the specified `kubectl_command`.
 /// Use `extra` to pass additional arguments to `kubectl`.
 pub async fn run<Cmd, NS, R, Ex>(
     kubectl_command: Cmd,

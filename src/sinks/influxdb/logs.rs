@@ -1,6 +1,6 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{log_schema, Event, Value},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    event::{Event, Value},
     sinks::{
         influxdb::{
             encode_namespace, encode_timestamp, healthcheck, influx_line_protocol,
@@ -11,7 +11,7 @@ use crate::{
             http::{BatchedHttpSink, HttpClient, HttpSink},
             BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
         },
-        Healthcheck,
+        Healthcheck, VectorSink,
     },
 };
 use futures01::Sink;
@@ -72,7 +72,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "influxdb_logs")]
 impl SinkConfig for InfluxDBLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         // let mut config = self.clone();
         let mut tags: HashSet<String> = self.tags.clone().into_iter().collect();
         tags.insert(log_schema().host_key().to_string());
@@ -118,7 +118,7 @@ impl SinkConfig for InfluxDBLogsConfig {
         )
         .sink_map_err(|e| error!("Fatal influxdb_logs sink error: {}", e));
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -140,7 +140,7 @@ impl HttpSink for InfluxDBLogsSink {
         let mut event = event.into_log();
 
         // Measurement
-        let measurement = encode_namespace(&self.namespace, &"vector");
+        let measurement = encode_namespace(Some(&self.namespace), '.', "vector");
 
         // Timestamp
         let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
@@ -192,7 +192,7 @@ impl InfluxDBLogsConfig {
             client,
         )?;
 
-        Ok(Box::new(healthcheck))
+        Ok(healthcheck)
     }
 }
 
@@ -220,8 +220,7 @@ mod tests {
         test_util::next_addr,
     };
     use chrono::{offset::TimeZone, Utc};
-    use futures::{compat::Future01CompatExt, StreamExt};
-    use futures01::Sink;
+    use futures::{stream, StreamExt};
 
     #[test]
     fn test_config_without_tags() {
@@ -472,8 +471,7 @@ mod tests {
             events.push(event);
         }
 
-        let pump = sink.send_all(futures01::stream::iter_ok(events));
-        let _ = pump.compat().await.unwrap();
+        sink.run(stream::iter(events).map(Ok)).await.unwrap();
 
         let output = rx.next().await.unwrap();
 
@@ -536,8 +534,7 @@ mod tests {
             events.push(event);
         }
 
-        let pump = sink.send_all(futures01::stream::iter_ok(events));
-        let _ = pump.compat().await.unwrap();
+        sink.run(stream::iter(events).map(Ok)).await.unwrap();
 
         let output = rx.next().await.unwrap();
 
@@ -605,8 +602,7 @@ mod integration_tests {
         },
     };
     use chrono::Utc;
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
+    use futures::{stream, StreamExt};
 
     #[tokio::test]
     async fn influxdb2_logs_put_data() {
@@ -646,11 +642,7 @@ mod integration_tests {
         events.push(event1);
         events.push(event2);
 
-        let _ = sink
-            .send_all(futures01::stream::iter_ok(events))
-            .compat()
-            .await
-            .unwrap();
+        sink.run(stream::iter(events).map(Ok)).await.unwrap();
 
         let mut body = std::collections::HashMap::new();
         body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"{}.vector\")", ns.clone()));

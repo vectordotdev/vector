@@ -5,8 +5,7 @@ mod unix;
 
 use super::util::TcpSource;
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event,
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
     shutdown::ShutdownSignal,
     tls::MaybeTlsSettings,
     Pipeline,
@@ -93,7 +92,7 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .clone()
-                    .unwrap_or_else(|| event::log_schema().host_key().clone());
+                    .unwrap_or_else(|| log_schema().host_key().clone());
                 Ok(udp::udp(
                     config.address,
                     config.max_length,
@@ -107,7 +106,7 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .clone()
-                    .unwrap_or_else(|| event::log_schema().host_key().to_string());
+                    .unwrap_or_else(|| log_schema().host_key().to_string());
                 Ok(unix::unix(
                     config.path,
                     config.max_length,
@@ -132,9 +131,8 @@ impl SourceConfig for SocketConfig {
 mod test {
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
-        config::{GlobalOptions, SourceConfig},
+        config::{log_schema, GlobalOptions, SourceConfig},
         dns::Resolver,
-        event,
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSink,
         test_util::{
@@ -192,10 +190,7 @@ mod test {
             .unwrap();
 
         let event = rx.compat().next().await.unwrap().unwrap();
-        assert_eq!(
-            event.as_log()[&event::log_schema().host_key()],
-            "127.0.0.1".into()
-        );
+        assert_eq!(event.as_log()[&log_schema().host_key()], "127.0.0.1".into());
     }
 
     #[tokio::test]
@@ -221,7 +216,7 @@ mod test {
 
         let event = rx.compat().next().await.unwrap().unwrap();
         assert_eq!(
-            event.as_log()[event::log_schema().source_type_key()],
+            event.as_log()[log_schema().source_type_key()],
             "socket".into()
         );
     }
@@ -256,14 +251,11 @@ mod test {
         send_lines(addr, lines.into_iter()).await.unwrap();
 
         let event = rx.next().await.unwrap().unwrap();
-        assert_eq!(
-            event.as_log()[&event::log_schema().message_key()],
-            "short".into()
-        );
+        assert_eq!(event.as_log()[&log_schema().message_key()], "short".into());
 
         let event = rx.next().await.unwrap().unwrap();
         assert_eq!(
-            event.as_log()[&event::log_schema().message_key()],
+            event.as_log()[&log_schema().message_key()],
             "more short".into()
         );
     }
@@ -303,19 +295,73 @@ mod test {
         ];
 
         wait_for_tcp(addr).await;
-        send_lines_tls(addr, "localhost".into(), lines.into_iter())
+        send_lines_tls(addr, "localhost".into(), lines.into_iter(), None)
             .await
             .unwrap();
 
         let event = rx.next().await.unwrap().unwrap();
+        assert_eq!(event.as_log()[&log_schema().message_key()], "short".into());
+
+        let event = rx.next().await.unwrap().unwrap();
         assert_eq!(
-            event.as_log()[&event::log_schema().message_key()],
+            event.as_log()[&log_schema().message_key()],
+            "more short".into()
+        );
+    }
+
+    #[tokio::test]
+    async fn tcp_with_tls_intermediate_ca() {
+        let (tx, rx) = Pipeline::new_test();
+        let mut rx = rx.compat();
+        let addr = next_addr();
+
+        let mut config = TcpConfig::new(addr.into());
+        config.max_length = 10;
+        config.tls = Some(TlsConfig {
+            enabled: Some(true),
+            options: TlsOptions {
+                crt_file: Some("tests/data/Chain_with_intermediate.crt".into()),
+                key_file: Some("tests/data/Crt_from_intermediate.key".into()),
+                ..Default::default()
+            },
+        });
+
+        let server = SocketConfig::from(config)
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                tx,
+            )
+            .unwrap()
+            .compat();
+        tokio::spawn(server);
+
+        let lines = vec![
+            "short".to_owned(),
+            "this is too long".to_owned(),
+            "more short".to_owned(),
+        ];
+
+        wait_for_tcp(addr).await;
+        send_lines_tls(
+            addr,
+            "localhost".into(),
+            lines.into_iter(),
+            std::path::Path::new("tests/data/Vector_CA.crt"),
+        )
+        .await
+        .unwrap();
+
+        let event = rx.next().await.unwrap().unwrap();
+        assert_eq!(
+            event.as_log()[&crate::config::log_schema().message_key()],
             "short".into()
         );
 
         let event = rx.next().await.unwrap().unwrap();
         assert_eq!(
-            event.as_log()[&event::log_schema().message_key()],
+            event.as_log()[&crate::config::log_schema().message_key()],
             "more short".into()
         );
     }
@@ -343,10 +389,7 @@ mod test {
             .unwrap();
 
         let event = rx.compat().next().await.unwrap().unwrap();
-        assert_eq!(
-            event.as_log()[&event::log_schema().message_key()],
-            "test".into()
-        );
+        assert_eq!(event.as_log()[&log_schema().message_key()], "test".into());
 
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
@@ -404,7 +447,7 @@ mod test {
         assert_eq!(100, events.len());
         for event in events {
             assert_eq!(
-                event.as_log()[&event::log_schema().message_key()],
+                event.as_log()[&log_schema().message_key()],
                 message.clone().into()
             );
         }
@@ -493,7 +536,7 @@ mod test {
         let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&log_schema().message_key()],
             "test".into()
         );
     }
@@ -507,11 +550,11 @@ mod test {
         let events = collect_n(rx, 2).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&log_schema().message_key()],
             "test".into()
         );
         assert_eq!(
-            events[1].as_log()[&event::log_schema().message_key()],
+            events[1].as_log()[&log_schema().message_key()],
             "test2".into()
         );
     }
@@ -525,11 +568,11 @@ mod test {
         let events = collect_n(rx, 2).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&log_schema().message_key()],
             "test".into()
         );
         assert_eq!(
-            events[1].as_log()[&event::log_schema().message_key()],
+            events[1].as_log()[&log_schema().message_key()],
             "test2".into()
         );
     }
@@ -543,7 +586,7 @@ mod test {
         let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().host_key()],
+            events[0].as_log()[&log_schema().host_key()],
             format!("{}", from).into()
         );
     }
@@ -557,7 +600,7 @@ mod test {
         let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[event::log_schema().source_type_key()],
+            events[0].as_log()[log_schema().source_type_key()],
             "socket".into()
         );
     }
@@ -574,7 +617,7 @@ mod test {
         let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&log_schema().message_key()],
             "test".into()
         );
 
@@ -611,10 +654,7 @@ mod test {
         let events = collect_n(rx, 100).await.unwrap();
         assert_eq!(100, events.len());
         for event in events {
-            assert_eq!(
-                event.as_log()[&event::log_schema().message_key()],
-                "test".into()
-            );
+            assert_eq!(event.as_log()[&log_schema().message_key()], "test".into());
         }
 
         let deadline = Instant::now() + Duration::from_secs(10);
@@ -679,11 +719,11 @@ mod test {
 
         assert_eq!(1, events.len());
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&log_schema().message_key()],
             "test".into()
         );
         assert_eq!(
-            events[0].as_log()[event::log_schema().source_type_key()],
+            events[0].as_log()[log_schema().source_type_key()],
             "socket".into()
         );
     }
@@ -699,11 +739,11 @@ mod test {
 
         assert_eq!(2, events.len());
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&log_schema().message_key()],
             "test".into()
         );
         assert_eq!(
-            events[1].as_log()[&event::log_schema().message_key()],
+            events[1].as_log()[&log_schema().message_key()],
             "test2".into()
         );
     }
@@ -719,11 +759,11 @@ mod test {
 
         assert_eq!(2, events.len());
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&log_schema().message_key()],
             "test".into()
         );
         assert_eq!(
-            events[1].as_log()[&event::log_schema().message_key()],
+            events[1].as_log()[&log_schema().message_key()],
             "test2".into()
         );
     }

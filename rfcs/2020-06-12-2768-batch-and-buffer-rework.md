@@ -77,7 +77,7 @@ struct BatchConfig {
 }
 ```
 
-### Failible Batch Insertion
+### Failable Batch Insertion
 
 The current batch buffers always allow events to be inserted, and then
 check separately if the buffer is "big enough" to be sent. This will be
@@ -98,7 +98,7 @@ trait Batch {
 
 This will require all the buffers to know their maximum size. This will
 not be encoded into the trait directly, as each buffer will implement
-their own creation method to accomodate additional creation parameters,
+their own creation method to accommodate additional creation parameters,
 such as the compression mode or partition key.
 
 ## Outstanding Questions
