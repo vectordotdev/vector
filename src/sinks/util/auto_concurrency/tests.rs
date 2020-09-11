@@ -188,7 +188,6 @@ impl Service<Vec<Event>> for TestSink {
                     + (in_flight - 1) as f64 * params.concurrency_scale
                     + thread_rng().sample(Exp1) * params.jitter),
         );
-        let delay = delay_until((now + delay).into());
 
         if params.concurrency_drop > 0 && in_flight >= params.concurrency_drop {
             stats.in_flight.adjust(-1, now.into());
@@ -196,7 +195,7 @@ impl Service<Vec<Event>> for TestSink {
         } else {
             let stats2 = Arc::clone(&self.stats);
             Box::pin(async move {
-                delay.await;
+                delay_until(now + delay).await;
                 let mut stats = stats2.lock().expect("Poisoned stats lock");
                 let in_flight = stats.in_flight.level();
                 stats.in_flight.adjust(-1, Instant::now().into());
