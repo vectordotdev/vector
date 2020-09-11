@@ -117,7 +117,7 @@ impl<'a> InternalEvent for StatsdInvalidMetric<'a> {
         counter!(
             "processing_errors", 1,
             "component_kind" => "sink",
-            "component_type" => "statsd_metrics",
+            "component_type" => "statsd",
             "error_type" => "invalid_metric",
         );
     }
