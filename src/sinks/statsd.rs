@@ -187,6 +187,8 @@ fn encode_event(event: Event, namespace: Option<&str>) -> Option<Vec<u8>> {
                 value: &metric.value,
                 kind: &metric.kind,
             });
+
+            return None;
         }
     };
 
