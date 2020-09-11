@@ -103,8 +103,7 @@ impl From<HashMap<String, Value>> for LogEvent {
 
 impl Into<HashMap<String, Value>> for LogEvent {
     fn into(self) -> HashMap<String, Value> {
-        let Self { fields } = self;
-        fields.into_iter().collect()
+        self.fields.into_iter().collect()
     }
 }
 
