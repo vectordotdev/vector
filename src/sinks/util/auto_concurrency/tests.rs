@@ -363,14 +363,14 @@ impl Range {
             Some(Failure {
                 stat_name: format!("{} {}", name1, name2),
                 mode: FailureMode::ExceededMinimum,
-                value: value,
+                value,
                 reference: self.0,
             })
         } else if value > self.1 {
             Some(Failure {
                 stat_name: format!("{} {}", name1, name2),
                 mode: FailureMode::ExceededMaximum,
-                value: value,
+                value,
                 reference: self.1,
             })
         } else {
