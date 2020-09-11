@@ -2,6 +2,7 @@ use super::Transform;
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
+    internal_events::{DedupeEventDiscarded, DedupeEventProcessed},
 };
 use bytes::Bytes;
 use lru::LruCache;
@@ -182,13 +183,10 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
 
 impl Transform for Dedupe {
     fn transform(&mut self, event: Event) -> Option<Event> {
+        emit!(DedupeEventProcessed);
         let cache_entry = build_cache_entry(&event, &self.config.fields);
         if self.cache.put(cache_entry, true).is_some() {
-            warn!(
-                message = "Encountered duplicate event; discarding",
-                rate_limit_secs = 30
-            );
-            trace!(message = "Encountered duplicate event; discarding", ?event);
+            emit!(DedupeEventDiscarded { event });
             None
         } else {
             Some(event)
