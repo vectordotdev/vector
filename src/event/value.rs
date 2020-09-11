@@ -3,7 +3,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use serde::{Serialize, Serializer};
 use std::collections::BTreeMap;
-use std::convert::{TryInto};
+use std::convert::TryInto;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Value {
@@ -161,6 +161,48 @@ impl TryInto<serde_json::Value> for Value {
 }
 
 impl Value {
+    pub fn is_boolean(&self) -> bool {
+        match self {
+            Value::Boolean(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_integer(&self) -> bool {
+        match self {
+            Value::Integer(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_float(&self) -> bool {
+        match self {
+            Value::Float(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_map(&self) -> bool {
+        match self {
+            Value::Map(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_array(&self) -> bool {
+        match self {
+            Value::Array(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        match self {
+            Value::Null => true,
+            _ => false,
+        }
+    }
+
     // TODO: return Cow
     pub fn to_string_lossy(&self) -> String {
         match self {
@@ -172,6 +214,13 @@ impl Value {
             Value::Map(map) => serde_json::to_string(map).expect("Cannot serialize map"),
             Value::Array(arr) => serde_json::to_string(arr).expect("Cannot serialize array"),
             Value::Null => "<null>".to_string(),
+        }
+    }
+
+    pub fn is_bytes(&self) -> bool {
+        match self {
+            Value::Bytes(_) => true,
+            _ => false,
         }
     }
 
@@ -194,6 +243,13 @@ impl Value {
         self.as_bytes()
     }
 
+    pub fn is_timestamp(&self) -> bool {
+        match self {
+            Value::Timestamp(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
         match &self {
             Value::Timestamp(ts) => Some(ts),
@@ -202,15 +258,10 @@ impl Value {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::{
-        io::Read,
-        fs,
-        path::Path,
-    };
+    use std::{fs, io::Read, path::Path};
 
     fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<Vec<u8>> {
         let mut test_file = match fs::File::open(path) {
@@ -226,13 +277,15 @@ mod test {
 
     // This test iterates over the `tests/data/fixtures/value` folder and:
     //   * Ensures the parsed folder name matches the parsed type of the `Value`.
-    //   * Ensures the EventLog parsed from bytes and turned into a serde_json::Value are equal to the
-    //     item being just plain parsed as json.
+    //   * Ensures the `serde_json::Value` to `vector::Value` conversions are harmless. (Think UTF-8 errors)
+    //
+    // Basically: This test makes sure we aren't mutilating any content users might be sending.
     #[test]
     fn json_value_to_vector_value_to_json_value() {
         crate::test_util::trace_init();
         const FIXTURE_ROOT: &str = "tests/data/fixtures/value";
 
+        tracing::trace!(?FIXTURE_ROOT, "Opening");
         std::fs::read_dir(FIXTURE_ROOT).unwrap().for_each(|type_dir| match type_dir {
             Ok(type_name) => {
                 let path = type_name.path();
@@ -244,6 +297,19 @@ mod test {
 
                         let serde_value: serde_json::Value = serde_json::from_slice(&*buf).unwrap();
                         let vector_value = Value::from(serde_value.clone());
+
+                        // Validate type
+                        let expected_type = type_name.path().file_name().unwrap().to_string_lossy().to_string();
+                        assert!(match &*expected_type {
+                            "boolean" => vector_value.is_boolean(),
+                            "integer" => vector_value.is_integer(),
+                            "bytes" => vector_value.is_bytes(),
+                            "array" => vector_value.is_array(),
+                            "map" => vector_value.is_map(),
+                            "null" => vector_value.is_null(),
+                            _ => unreachable!("You need to add a new type handler here."),
+                        }, "Typecheck failure. Wanted {}, got {:?}.", expected_type, vector_value);
+
                         let serde_value_again: serde_json::Value = vector_value.clone().try_into().unwrap();
 
                         tracing::trace!(?path, ?serde_value, ?vector_value, ?serde_value_again, "Asserting equal.");
