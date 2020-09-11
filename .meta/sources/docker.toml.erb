@@ -81,6 +81,14 @@ incomplete message (i.e. partial events). If set to `""`, no field will be \
 added to partial event. This allows to opt-out of partial event detection.\
 """
 
+[sources.docker.options.retry_backoff_secs]
+type = "uint"
+common = false
+default = 1
+description = """\
+The amount of time to wait before retrying after an error.\
+"""
+
 [sources.docker.fields.log.fields.container_created_at]
 type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
