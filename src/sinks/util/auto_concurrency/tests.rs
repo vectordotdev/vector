@@ -1,10 +1,9 @@
 // Only run the test suite on unix systems, as the timings on especially
-// MacOS are too variable to produce reliable results in these tests.
+// MacOS are too variable to produce reliable  in these tests.
 #![cfg(all(test, not(target_os = "macos"), feature = "sources-generator"))]
 
 use super::controller::ControllerStatistics;
 use crate::{
-    assert_within,
     config::{self, DataType, SinkConfig, SinkContext},
     event::{metric::MetricValue, Event},
     metrics::{self, capture_metrics, get_controller},
@@ -240,12 +239,11 @@ struct Statistics {
 
 #[derive(Debug)]
 struct TestResults {
-    file_path: PathBuf,
     stats: Statistics,
     cstats: ControllerStatistics,
 }
 
-async fn run_test(params: TestParams, file_path: PathBuf) -> TestResults {
+async fn run_test(params: TestParams) -> TestResults {
     let _ = metrics::init();
 
     let test_config = TestConfig {
@@ -321,41 +319,65 @@ async fn run_test(params: TestParams, file_path: PathBuf) -> TestResults {
                  MetricValue::Distribution { .. })
     );
 
-    TestResults {
-        file_path,
-        stats,
-        cstats,
-    }
+    TestResults { stats, cstats }
+}
+
+#[derive(Debug)]
+enum FailureMode {
+    ExceededMinimum,
+    ExceededMaximum,
+}
+
+#[derive(Debug)]
+struct Failure {
+    stat_name: String,
+    mode: FailureMode,
+    value: f64,
+    reference: f64,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
 struct Range(f64, f64);
 
 impl Range {
-    fn assert_usize(&self, value: usize, name1: &str, name2: &str, results: &TestResults) {
-        assert_within!(
-            value,
-            self.0 as usize,
-            self.1 as usize,
-            "File: {:?} Value: {} {}\n{:#?}",
-            results.file_path,
-            name1,
-            name2,
-            results
-        );
+    fn assert_usize(&self, value: usize, name1: &str, name2: &str) -> Option<Failure> {
+        if value < self.0 as usize {
+            Some(Failure {
+                stat_name: format!("{} {}", name1, name2),
+                mode: FailureMode::ExceededMinimum,
+                value: value as f64,
+                reference: self.0,
+            })
+        } else if value > self.1 as usize {
+            Some(Failure {
+                stat_name: format!("{} {}", name1, name2),
+                mode: FailureMode::ExceededMaximum,
+                value: value as f64,
+                reference: self.1,
+            })
+        } else {
+            None
+        }
     }
 
-    fn assert_f64(&self, value: f64, name1: &str, name2: &str, results: &TestResults) {
-        assert_within!(
-            value,
-            self.0,
-            self.1,
-            "File: {:?} Value: {} {}\n{:#?}",
-            results.file_path,
-            name1,
-            name2,
-            results
-        );
+    fn assert_f64(&self, value: f64, name1: &str, name2: &str) -> Option<Failure> {
+        if value < self.0 {
+            Some(Failure {
+                stat_name: format!("{} {}", name1, name2),
+                mode: FailureMode::ExceededMinimum,
+                value: value,
+                reference: self.0,
+            })
+        } else if value > self.1 {
+            Some(Failure {
+                stat_name: format!("{} {}", name1, name2),
+                mode: FailureMode::ExceededMaximum,
+                value: value,
+                reference: self.1,
+            })
+        } else {
+            None
+        }
     }
 }
 
@@ -368,31 +390,34 @@ struct ResultTest {
 }
 
 impl ResultTest {
-    fn compare_histogram(&self, stat: HistogramStats, name: &str, results: &TestResults) {
-        if let Some(range) = self.min {
-            range.assert_usize(stat.min, name, "min", results);
-        }
-        if let Some(range) = self.max {
-            range.assert_usize(stat.max, name, "max", results);
-        }
-        if let Some(range) = self.mean {
-            range.assert_f64(stat.mean, name, "mean", results);
-        }
-        if let Some(range) = self.mode {
-            range.assert_usize(stat.mode, name, "mode", results);
-        }
+    fn compare_histogram(&self, stat: HistogramStats, name: &str) -> Vec<Failure> {
+        vec![
+            self.min
+                .and_then(|range| range.assert_usize(stat.min, name, "min")),
+            self.max
+                .and_then(|range| range.assert_usize(stat.max, name, "max")),
+            self.mean
+                .and_then(|range| range.assert_f64(stat.mean, name, "mean")),
+            self.mode
+                .and_then(|range| range.assert_usize(stat.mode, name, "mode")),
+        ]
+        .into_iter()
+        .filter_map(|f| f)
+        .collect::<Vec<_>>()
     }
 
-    fn compare_weighted_sum(&self, stat: WeightedSumStats, name: &str, results: &TestResults) {
-        if let Some(range) = self.min {
-            range.assert_f64(stat.min, name, "min", results);
-        }
-        if let Some(range) = self.max {
-            range.assert_f64(stat.max, name, "max", results);
-        }
-        if let Some(range) = self.mean {
-            range.assert_f64(stat.mean, name, "mean", results);
-        }
+    fn compare_weighted_sum(&self, stat: WeightedSumStats, name: &str) -> Vec<Failure> {
+        vec![
+            self.min
+                .and_then(|range| range.assert_f64(stat.min, name, "min")),
+            self.max
+                .and_then(|range| range.assert_f64(stat.max, name, "max")),
+            self.mean
+                .and_then(|range| range.assert_f64(stat.mean, name, "mean")),
+        ]
+        .into_iter()
+        .filter_map(|f| f)
+        .collect::<Vec<_>>()
     }
 }
 
@@ -419,32 +444,46 @@ struct TestInput {
 async fn run_compare(file_path: PathBuf, input: TestInput) {
     eprintln!("Running test in {:?}", file_path);
 
-    let results = run_test(input.params, file_path.clone()).await;
+    let results = run_test(input.params).await;
+
+    let mut failures = Vec::new();
 
     if let Some(test) = input.stats.in_flight {
         let in_flight = results.stats.in_flight.stats().unwrap();
-        test.compare_histogram(in_flight, "stats in_flight", &results);
+        failures.extend(test.compare_histogram(in_flight, "stats in_flight"));
     }
 
     if let Some(test) = input.controller.in_flight {
         let in_flight = results.cstats.in_flight.stats().unwrap();
-        test.compare_histogram(in_flight, "controller in_flight", &results);
+        failures.extend(test.compare_histogram(in_flight, "controller in_flight"));
     }
 
     if let Some(test) = input.controller.concurrency_limit {
         let concurrency_limit = results.cstats.concurrency_limit.stats().unwrap();
-        test.compare_histogram(concurrency_limit, "controller concurrency_limit", &results);
+        failures.extend(test.compare_histogram(concurrency_limit, "controller concurrency_limit"));
     }
 
     if let Some(test) = input.controller.observed_rtt {
         let observed_rtt = results.cstats.observed_rtt.stats().unwrap();
-        test.compare_weighted_sum(observed_rtt, "controller observed_rtt", &results);
+        failures.extend(test.compare_weighted_sum(observed_rtt, "controller observed_rtt"));
     }
 
     if let Some(test) = input.controller.averaged_rtt {
         let averaged_rtt = results.cstats.averaged_rtt.stats().unwrap();
-        test.compare_weighted_sum(averaged_rtt, "controller averaged_rtt", &results);
+        failures.extend(test.compare_weighted_sum(averaged_rtt, "controller averaged_rtt"));
     }
+
+    for failure in &failures {
+        let mode = match failure.mode {
+            FailureMode::ExceededMinimum => "minimum",
+            FailureMode::ExceededMaximum => "maximum",
+        };
+        eprintln!(
+            "Comparison failed: {} = {}; {} = {}",
+            failure.stat_name, failure.value, mode, failure.reference
+        );
+    }
+    assert!(failures.is_empty(), "{:#?}", results);
 }
 
 #[tokio::test]
