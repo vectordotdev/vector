@@ -120,7 +120,6 @@ mod tests {
                 codec: Encoding::Json,
                 only_fields: None,
                 except_fields: Some(vec![Atom::from("magic")]),
-                // except_fields: None,
                 timestamp_format: None,
             },
         )
