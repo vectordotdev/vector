@@ -183,3 +183,37 @@ impl Value {
         }
     }
 }
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::{
+        io::Read,
+        fs,
+        path::Path,
+    };
+
+    fn parse_artifact(path: impl AsRef<Path>) -> crate::Result<Option<Value>> {
+        let mut test_file = match fs::File::open(path) {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(e) => Err(e)?,
+        };
+
+        let mut buf = String::new();
+        test_file.read_to_string(&mut buf)?;
+        let value = Value::from(&buf)?;
+
+        Ok(Some(value))
+    }
+
+    // This test iterates over the `tests/data/fixtures/value` folder and:
+    //   * Ensures the parsed folder name matches the parsed type of the `Value`.
+    //   * Ensures the EventLog parsed from bytes and turned into a serde_json::Value are equal to the
+    //     item being just plain parsed as json.
+    #[test]
+    fn fixtures() {
+
+    }
+}
