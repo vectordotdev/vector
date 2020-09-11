@@ -1,6 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event,
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{JournaldEventReceived, JournaldInvalidRecord},
     shutdown::ShutdownSignal,
@@ -37,6 +36,8 @@ use tokio::{
 use tracing::{dispatcher, field};
 
 const DEFAULT_BATCH_SIZE: usize = 16;
+
+const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
 
 lazy_static! {
     static ref CURSOR: Atom = Atom::from("__CURSOR");
@@ -113,8 +114,11 @@ impl SourceConfig for JournaldConfig {
             return Err(BuildError::DuplicatedUnit { unit }.into());
         }
 
-        let checkpointer = Checkpointer::new(data_dir)
-            .map_err(|err| format!("Unable to open checkpoint file: {}", err))?;
+        let mut checkpoint = data_dir;
+        checkpoint.push(CHECKPOINT_FILENAME);
+        let checkpointer = Checkpointer::new(checkpoint.clone()).map_err(|error| {
+            format!("Unable to open checkpoint file {:?}: {}", checkpoint, error)
+        })?;
 
         self.source::<Journalctl>(
             out,
@@ -188,7 +192,7 @@ impl JournaldConfig {
             })
             .boxed()
             .compat()
-            .map_err(|error| error!(message="Journald server unexpectedly stopped.",%error))
+            .map_err(|error| error!(message = "Journald server unexpectedly stopped.", %error))
             .select(shutdown.map(move |_| close()))
             .map(|_| ())
             .map_err(|_| ())
@@ -200,10 +204,10 @@ fn create_event(record: Record) -> Event {
     let mut log = LogEvent::from_iter(record);
     // Convert some journald-specific field names into Vector standard ones.
     if let Some(message) = log.remove(&MESSAGE) {
-        log.insert(event::log_schema().message_key().clone(), message);
+        log.insert(log_schema().message_key().clone(), message);
     }
     if let Some(host) = log.remove(&HOSTNAME) {
-        log.insert(event::log_schema().host_key().clone(), host);
+        log.insert(log_schema().host_key().clone(), host);
     }
     // Translate the timestamp, and so leave both old and new names.
     if let Some(timestamp) = log
@@ -217,17 +221,14 @@ fn create_event(record: Record) -> Event {
                     (timestamp % 1_000_000) as u32 * 1_000,
                 );
                 log.insert(
-                    event::log_schema().timestamp_key().clone(),
+                    log_schema().timestamp_key().clone(),
                     Value::Timestamp(timestamp),
                 );
             }
         }
     }
     // Add source type
-    log.try_insert(
-        event::log_schema().source_type_key(),
-        Bytes::from("journald"),
-    );
+    log.try_insert(log_schema().source_type_key(), Bytes::from("journald"));
 
     log.into()
 }
@@ -389,7 +390,8 @@ where
                     if let Err(err) = self.checkpointer.set(&cursor) {
                         error!(
                             message = "Could not set journald checkpoint.",
-                            error = field::display(&err)
+                            error = field::display(&err),
+                            filename = ?self.checkpointer.filename,
                         );
                     }
                 }
@@ -474,21 +476,19 @@ fn filter_unit(
     }
 }
 
-const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
-
 struct Checkpointer {
     file: File,
+    filename: PathBuf,
 }
 
 impl Checkpointer {
-    fn new(mut filename: PathBuf) -> Result<Self, io::Error> {
-        filename.push(CHECKPOINT_FILENAME);
+    fn new(filename: PathBuf) -> Result<Self, io::Error> {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
-            .open(filename)?;
-        Ok(Checkpointer { file })
+            .open(&filename)?;
+        Ok(Checkpointer { file, filename })
     }
 
     fn set(&mut self, token: &str) -> Result<(), io::Error> {
@@ -537,7 +537,7 @@ mod checkpointer_tests {
         let mut filename = tempdir.path().to_path_buf();
         filename.push(CHECKPOINT_FILENAME);
         let mut checkpointer =
-            Checkpointer::new(tempdir.path().to_path_buf()).expect("Creating checkpointer failed!");
+            Checkpointer::new(filename.clone()).expect("Creating checkpointer failed!");
 
         assert!(checkpointer.get().unwrap().is_none());
 
@@ -620,8 +620,9 @@ mod tests {
         let (tx, rx) = Pipeline::new_test();
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
         let tempdir = tempdir().unwrap();
-        let mut checkpointer =
-            Checkpointer::new(tempdir.path().to_path_buf()).expect("Creating checkpointer failed!");
+        let mut filename = tempdir.path().to_path_buf();
+        filename.push(CHECKPOINT_FILENAME);
+        let mut checkpointer = Checkpointer::new(filename).expect("Creating checkpointer failed!");
         let include_units = HashSet::<String>::from_iter(iunits.iter().map(|&s| s.into()));
         let exclude_units = HashSet::<String>::from_iter(xunits.iter().map(|&s| s.into()));
 
@@ -661,7 +662,7 @@ mod tests {
             Value::Bytes("System Initialization".into())
         );
         assert_eq!(
-            received[0].as_log()[event::log_schema().source_type_key()],
+            received[0].as_log()[log_schema().source_type_key()],
             "journald".into()
         );
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140001000));
@@ -743,11 +744,11 @@ mod tests {
     }
 
     fn message(event: &Event) -> Value {
-        event.as_log()[&event::log_schema().message_key()].clone()
+        event.as_log()[&log_schema().message_key()].clone()
     }
 
     fn timestamp(event: &Event) -> Value {
-        event.as_log()[&event::log_schema().timestamp_key()].clone()
+        event.as_log()[&log_schema().timestamp_key()].clone()
     }
 
     fn value_ts(secs: i64, usecs: u32) -> Value {

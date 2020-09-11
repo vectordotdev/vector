@@ -152,6 +152,7 @@ task-compat = "0.1"
 cidr-utils = "0.4.2"
 pin-project = "0.4.23"
 k8s-openapi = { version = "0.9", features = ["v1_15"], optional = true }
+portpicker = "0.1.0"
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }

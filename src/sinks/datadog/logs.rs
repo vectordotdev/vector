@@ -1,6 +1,6 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{log_schema, Event},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
     sinks::{
         util::{
             self,

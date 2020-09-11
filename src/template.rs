@@ -1,7 +1,4 @@
-use crate::{
-    event::{self, Value},
-    Event,
-};
+use crate::{config::log_schema, event::Value, Event};
 use bytes::Bytes;
 use chrono::{
     format::{strftime::StrftimeItems, Item},
@@ -164,7 +161,7 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<Atom>> {
 fn render_timestamp(src: &str, event: &Event) -> String {
     let timestamp = match event {
         Event::Log(log) => log
-            .get(&event::log_schema().timestamp_key())
+            .get(&log_schema().timestamp_key())
             .and_then(Value::as_timestamp),
         _ => None,
     };
@@ -339,7 +336,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
-            .insert(crate::event::log_schema().timestamp_key().clone(), ts);
+            .insert(log_schema().timestamp_key().clone(), ts);
 
         let template = Template::try_from("abcd-%F").unwrap();
 
@@ -353,7 +350,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
-            .insert(crate::event::log_schema().timestamp_key().clone(), ts);
+            .insert(log_schema().timestamp_key().clone(), ts);
 
         let template = Template::try_from("abcd-%F_%T").unwrap();
 
@@ -371,7 +368,7 @@ mod tests {
         event.as_mut_log().insert("foo", "butts");
         event
             .as_mut_log()
-            .insert(crate::event::log_schema().timestamp_key().clone(), ts);
+            .insert(log_schema().timestamp_key().clone(), ts);
 
         let template = Template::try_from("{{ foo }}-%F_%T").unwrap();
 
@@ -389,7 +386,7 @@ mod tests {
         event.as_mut_log().insert("format", "%F");
         event
             .as_mut_log()
-            .insert(crate::event::log_schema().timestamp_key().clone(), ts);
+            .insert(log_schema().timestamp_key().clone(), ts);
 
         let template = Template::try_from("nested {{ format }} %T").unwrap();
 
@@ -407,7 +404,7 @@ mod tests {
         event.as_mut_log().insert("%F", "foo");
         event
             .as_mut_log()
-            .insert(crate::event::log_schema().timestamp_key().clone(), ts);
+            .insert(log_schema().timestamp_key().clone(), ts);
 
         let template = Template::try_from("nested {{ %F }} %T").unwrap();
 
