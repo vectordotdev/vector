@@ -1,6 +1,4 @@
-// Only run the test suite on unix systems, as the timings on especially
-// MacOS are too variable to produce reliable  in these tests.
-#![cfg(all(test, not(target_os = "macos"), feature = "sources-generator"))]
+#![cfg(all(test, feature = "sources-generator"))]
 
 use super::controller::ControllerStatistics;
 use crate::{
