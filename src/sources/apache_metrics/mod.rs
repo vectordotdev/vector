@@ -123,23 +123,27 @@ fn apache_metrics(
                             let byte_size = body.len();
                             let body = String::from_utf8_lossy(&body);
 
-                            let (mut metrics, errors) =
-                                parser::parse(&body, &namespace, Utc::now(), Some(&tags));
+                            let results = parser::parse(&body, &namespace, Utc::now(), Some(&tags))
+                                .chain(vec![Ok(Metric {
+                                    name: "apache_up".into(),
+                                    timestamp: Some(Utc::now()),
+                                    tags: Some(tags.clone()),
+                                    kind: MetricKind::Absolute,
+                                    value: MetricValue::Gauge { value: 0.0 },
+                                })]);
 
-                            for err in errors {
-                                emit!(ApacheMetricsParseError {
-                                    error: err.into(),
-                                    url: url.clone(),
-                                });
-                            }
-
-                            metrics.push(Metric {
-                                name: "apache_up".into(),
-                                timestamp: Some(Utc::now()),
-                                tags: Some(tags.clone()),
-                                kind: MetricKind::Absolute,
-                                value: MetricValue::Gauge { value: 0.0 },
-                            });
+                            let metrics = results
+                                .filter_map(|res| match res {
+                                    Ok(metric) => Some(metric),
+                                    Err(e) => {
+                                        emit!(ApacheMetricsParseError {
+                                            error: e.into(),
+                                            url: url.clone(),
+                                        });
+                                        None
+                                    }
+                                })
+                                .collect::<Vec<_>>();
 
                             emit!(ApacheMetricsEventReceived {
                                 byte_size,
@@ -192,7 +196,6 @@ fn apache_metrics(
     Box::new(task.boxed().compat())
 }
 
-#[cfg(feature = "sources-apache_metrics")]
 #[cfg(test)]
 mod test {
     use super::*;

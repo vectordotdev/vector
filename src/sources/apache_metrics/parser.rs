@@ -1,9 +1,166 @@
 use crate::event::metric::{Metric, MetricKind, MetricValue};
 use chrono::{DateTime, Utc};
+use lazy_static::lazy_static;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
+
+lazy_static! {
+    static ref SCOREBOARD: HashMap<char, &'static str> = vec![
+        ('_', "waiting"),
+        ('S', "starting"),
+        ('R', "reading"),
+        ('W', "sending"),
+        ('K', "keepalive"),
+        ('D', "dnslookup"),
+        ('C', "closing"),
+        ('L', "logging"),
+        ('G', "finishing"),
+        ('I', "idle_cleanup"),
+        ('.', "open"),
+    ]
+    .into_iter()
+    .collect();
+}
+
+/// enum of mod_status fields we care about
+enum StatusFieldStatistic<'a> {
+    ServerUptimeSeconds(f64),
+    TotalAccesses(f64),
+    TotalKBytes(f64),
+    TotalDuration(f64),
+    CPUUser(f64),
+    CPUSystem(f64),
+    CPUChildrenUser(f64),
+    CPUChildrenSystem(f64),
+    CPULoad(f64),
+    IdleWorkers(f64),
+    BusyWorkers(f64),
+    ConnsTotal(f64),
+    ConnsAsyncWriting(f64),
+    ConnsAsyncKeepAlive(f64),
+    ConnsAsyncClosing(f64),
+    Scoreboard(&'a str),
+}
+
+impl<'a> StatusFieldStatistic<'a> {
+    fn from_key_value(
+        key: &str,
+        value: &'a str,
+    ) -> Option<Result<StatusFieldStatistic<'a>, ParseError>> {
+        match key {
+            "ServerUptimeSeconds" => match value.parse::<f64>() {
+                Ok(value) => Some(Ok(StatusFieldStatistic::ServerUptimeSeconds(value))),
+                Err(err) => Some(Err(ParseError {
+                    key: key.to_string(),
+                    err: err.into(),
+                })),
+            },
+            "Total Accesses" => match value.parse::<f64>() {
+                Ok(value) => Some(Ok(StatusFieldStatistic::TotalAccesses(value))),
+                Err(err) => Some(Err(ParseError {
+                    key: key.to_string(),
+                    err: err.into(),
+                })),
+            },
+            "Total kBytes" => match value.parse::<f64>() {
+                Ok(value) => Some(Ok(StatusFieldStatistic::TotalKBytes(value))),
+                Err(err) => Some(Err(ParseError {
+                    key: key.to_string(),
+                    err: err.into(),
+                })),
+            },
+            "Total Duration" => match value.parse::<f64>() {
+                Ok(value) => Some(Ok(StatusFieldStatistic::TotalDuration(value))),
+                Err(err) => Some(Err(ParseError {
+                    key: key.to_string(),
+                    err: err.into(),
+                })),
+            },
+            "CPUUser" => match value.parse::<f64>() {
+                Ok(value) => Some(Ok(StatusFieldStatistic::CPUUser(value))),
+                Err(err) => Some(Err(ParseError {
+                    key: key.to_string(),
+                    err: err.into(),
+                })),
+            },
+            "CPUSystem" => match value.parse::<f64>() {
+                Ok(value) => Some(Ok(StatusFieldStatistic::CPUSystem(value))),
+                Err(err) => Some(Err(ParseError {
+                    key: key.to_string(),
+                    err: err.into(),
+                })),
+            },
+            "CPUChildrenUser" => match value.parse::<f64>() {
+                Ok(value) => Some(Ok(StatusFieldStatistic::CPUChildrenUser(value))),
+                Err(err) => Some(Err(ParseError {
+                    key: key.to_string(),
+                    err: err.into(),
+                })),
+            },
+            "CPUChildrenSystem" => match value.parse::<f64>() {
+                Ok(value) => Some(Ok(StatusFieldStatistic::CPUChildrenSystem(value))),
+                Err(err) => Some(Err(ParseError {
+                    key: key.to_string(),
+                    err: err.into(),
+                })),
+            },
+            "CPULoad" => match value.parse::<f64>() {
+                Ok(value) => Some(Ok(StatusFieldStatistic::CPULoad(value))),
+                Err(err) => Some(Err(ParseError {
+                    key: key.to_string(),
+                    err: err.into(),
+                })),
+            },
+            "IdleWorkers" => match value.parse::<f64>() {
+                Ok(value) => Some(Ok(StatusFieldStatistic::IdleWorkers(value))),
+                Err(err) => Some(Err(ParseError {
+                    key: key.to_string(),
+                    err: err.into(),
+                })),
+            },
+            "BusyWorkers" => match value.parse::<f64>() {
+                Ok(value) => Some(Ok(StatusFieldStatistic::BusyWorkers(value))),
+                Err(err) => Some(Err(ParseError {
+                    key: key.to_string(),
+                    err: err.into(),
+                })),
+            },
+            "ConnsTotal" => match value.parse::<f64>() {
+                Ok(value) => Some(Ok(StatusFieldStatistic::ConnsTotal(value))),
+                Err(err) => Some(Err(ParseError {
+                    key: key.to_string(),
+                    err: err.into(),
+                })),
+            },
+            "ConnsAsyncWriting" => match value.parse::<f64>() {
+                Ok(value) => Some(Ok(StatusFieldStatistic::ConnsAsyncWriting(value))),
+                Err(err) => Some(Err(ParseError {
+                    key: key.to_string(),
+                    err: err.into(),
+                })),
+            },
+            "ConnsAsyncClosing" => match value.parse::<f64>() {
+                Ok(value) => Some(Ok(StatusFieldStatistic::ConnsAsyncClosing(value))),
+                Err(err) => Some(Err(ParseError {
+                    key: key.to_string(),
+                    err: err.into(),
+                })),
+            },
+            "ConnsAsyncKeepAlive" => match value.parse::<f64>() {
+                Ok(value) => Some(Ok(StatusFieldStatistic::ConnsAsyncKeepAlive(value))),
+                Err(err) => Some(Err(ParseError {
+                    key: key.to_string(),
+                    err: err.into(),
+                })),
+            },
+            "Scoreboard" => Some(Ok(StatusFieldStatistic::Scoreboard(value))),
+
+            _ => None,
+        }
+    }
+}
 
 /// Parses the text output from Apache's mod_status and returns:
 ///
@@ -21,7 +178,7 @@ pub fn parse(
     namespace: &str,
     now: DateTime<Utc>,
     tags: Option<&BTreeMap<String, String>>,
-) -> (Vec<Metric>, Vec<ParseError>) {
+) -> impl Iterator<Item = Result<Metric, ParseError>> {
     let mut parsed = payload
         .lines()
         .into_iter()
@@ -37,24 +194,22 @@ pub fn parse(
         .collect::<Vec<_>>();
 
     // mod_status has BusyWorkers/IdleWorkers repeated
+    // https://bz.apache.org/bugzilla/show_bug.cgi?id=63300
     // TODO better way to do this without .collect()ing? Do we care?
     parsed.sort();
     parsed.dedup();
 
     parsed
         .iter()
-        .map(|(key, value)| line_to_metrics(key, value, namespace, now, tags))
-        .fold(
-            (Vec::new(), Vec::new()),
-            |(mut metrics, mut errs), current| {
-                match current {
-                    LineResult::Metrics(m) => metrics.extend(m),
-                    LineResult::Error(err) => errs.push(err),
-                    LineResult::None => {}
-                }
-                (metrics, errs)
-            },
-        )
+        .filter_map(|(key, value)| line_to_metrics(key, value, namespace, now, tags))
+        .fold(vec![], |mut acc, v| {
+            match v {
+                Ok(metrics) => metrics.into_iter().for_each(|v| acc.push(Ok(v))),
+                Err(err) => acc.push(Err(err)),
+            };
+            acc
+        })
+        .into_iter()
 }
 
 #[derive(Debug)]
@@ -75,76 +230,46 @@ impl Error for ParseError {
     }
 }
 
-enum LineResult {
-    Metrics(Vec<Metric>),
-    Error(ParseError),
-    None,
-}
-
 fn line_to_metrics(
     key: &str,
     value: &str,
     namespace: &str,
     now: DateTime<Utc>,
     tags: Option<&BTreeMap<String, String>>,
-) -> LineResult {
-    match key {
-        "ServerUptimeSeconds" => match value.parse::<f64>() {
-            Ok(value) => LineResult::Metrics(vec![Metric {
+) -> Option<Result<Vec<Metric>, ParseError>> {
+    StatusFieldStatistic::from_key_value(key, value).map(|result| {
+        result.map(|statistic| match statistic {
+            StatusFieldStatistic::ServerUptimeSeconds(value) => vec![Metric {
                 name: encode_namespace(namespace, "uptime_seconds_total"),
                 timestamp: Some(now),
                 tags: tags.map(|tags| tags.clone()),
                 kind: MetricKind::Absolute,
                 value: MetricValue::Counter { value },
-            }]),
-            Err(err) => LineResult::Error(ParseError {
-                key: key.to_string(),
-                err: err.into(),
-            }),
-        },
-        "Total Accesses" => match value.parse::<f64>() {
-            Ok(value) => LineResult::Metrics(vec![Metric {
+            }],
+            StatusFieldStatistic::TotalAccesses(value) => vec![Metric {
                 name: encode_namespace(namespace, "access_total"),
                 timestamp: Some(now),
                 tags: tags.map(|tags| tags.clone()),
                 kind: MetricKind::Absolute,
                 value: MetricValue::Counter { value },
-            }]),
-            Err(err) => LineResult::Error(ParseError {
-                key: key.to_string(),
-                err: err.into(),
-            }),
-        },
-        "Total kBytes" => match value.parse::<u32>().map(|v| v * 1024) {
-            Ok(value) => LineResult::Metrics(vec![Metric {
+            }],
+            StatusFieldStatistic::TotalKBytes(value) => vec![Metric {
                 name: encode_namespace(namespace, "sent_bytes_total"),
                 timestamp: Some(now),
                 tags: tags.map(|tags| tags.clone()),
                 kind: MetricKind::Absolute,
                 value: MetricValue::Counter {
-                    value: value.into(),
+                    value: value * 1024.0,
                 },
-            }]),
-            Err(err) => LineResult::Error(ParseError {
-                key: key.to_string(),
-                err: err.into(),
-            }),
-        },
-        "Total Duration" => match value.parse::<f64>() {
-            Ok(value) => LineResult::Metrics(vec![Metric {
+            }],
+            StatusFieldStatistic::TotalDuration(value) => vec![Metric {
                 name: encode_namespace(namespace, "duration_seconds_total"),
                 timestamp: Some(now),
                 tags: tags.map(|tags| tags.clone()),
                 kind: MetricKind::Absolute,
-                value: MetricValue::Counter { value }, // TODO verify unit
-            }]),
-            Err(err) => LineResult::Error(ParseError {
-                key: key.to_string(),
-                err: err.into(),
-            }),
-        },
-        "CPUUser" => match value.parse::<f64>() {
-            Ok(value) => LineResult::Metrics(vec![Metric {
+                value: MetricValue::Counter { value },
+            }],
+            StatusFieldStatistic::CPUUser(value) => vec![Metric {
                 name: encode_namespace(namespace, "cpu_seconds_total"),
                 timestamp: Some(now),
                 tags: {
@@ -154,14 +279,8 @@ fn line_to_metrics(
                 },
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value },
-            }]),
-            Err(err) => LineResult::Error(ParseError {
-                key: key.to_string(),
-                err: err.into(),
-            }),
-        },
-        "CPUSystem" => match value.parse::<f64>() {
-            Ok(value) => LineResult::Metrics(vec![Metric {
+            }],
+            StatusFieldStatistic::CPUSystem(value) => vec![Metric {
                 name: encode_namespace(namespace, "cpu_seconds_total"),
                 timestamp: Some(now),
                 tags: {
@@ -171,14 +290,8 @@ fn line_to_metrics(
                 },
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value },
-            }]),
-            Err(err) => LineResult::Error(ParseError {
-                key: key.to_string(),
-                err: err.into(),
-            }),
-        },
-        "CPUChildrenUser" => match value.parse::<f64>() {
-            Ok(value) => LineResult::Metrics(vec![Metric {
+            }],
+            StatusFieldStatistic::CPUChildrenUser(value) => vec![Metric {
                 name: encode_namespace(namespace, "cpu_seconds_total"),
                 timestamp: Some(now),
                 tags: {
@@ -188,14 +301,8 @@ fn line_to_metrics(
                 },
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value },
-            }]),
-            Err(err) => LineResult::Error(ParseError {
-                key: key.to_string(),
-                err: err.into(),
-            }),
-        },
-        "CPUChildrenSystem" => match value.parse::<f64>() {
-            Ok(value) => LineResult::Metrics(vec![Metric {
+            }],
+            StatusFieldStatistic::CPUChildrenSystem(value) => vec![Metric {
                 name: encode_namespace(namespace, "cpu_seconds_total"),
                 timestamp: Some(now),
                 tags: {
@@ -205,27 +312,15 @@ fn line_to_metrics(
                 },
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value },
-            }]),
-            Err(err) => LineResult::Error(ParseError {
-                key: key.to_string(),
-                err: err.into(),
-            }),
-        },
-        "CPULoad" => match value.parse::<f64>() {
-            Ok(value) => LineResult::Metrics(vec![Metric {
+            }],
+            StatusFieldStatistic::CPULoad(value) => vec![Metric {
                 name: encode_namespace(namespace, "cpu_load"),
                 timestamp: Some(now),
                 tags: tags.map(|tags| tags.clone()),
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value },
-            }]),
-            Err(err) => LineResult::Error(ParseError {
-                key: key.to_string(),
-                err: err.into(),
-            }),
-        },
-        "IdleWorkers" => match value.parse::<f64>() {
-            Ok(value) => LineResult::Metrics(vec![Metric {
+            }],
+            StatusFieldStatistic::IdleWorkers(value) => vec![Metric {
                 name: encode_namespace(namespace, "workers"),
                 timestamp: Some(now),
                 tags: {
@@ -235,14 +330,8 @@ fn line_to_metrics(
                 },
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value },
-            }]),
-            Err(err) => LineResult::Error(ParseError {
-                key: key.to_string(),
-                err: err.into(),
-            }),
-        },
-        "BusyWorkers" => match value.parse::<f64>() {
-            Ok(value) => LineResult::Metrics(vec![Metric {
+            }],
+            StatusFieldStatistic::BusyWorkers(value) => vec![Metric {
                 name: encode_namespace(namespace, "workers"),
                 timestamp: Some(now),
                 tags: {
@@ -252,14 +341,8 @@ fn line_to_metrics(
                 },
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value },
-            }]),
-            Err(err) => LineResult::Error(ParseError {
-                key: key.to_string(),
-                err: err.into(),
-            }),
-        },
-        "ConnsTotal" => match value.parse::<f64>() {
-            Ok(value) => LineResult::Metrics(vec![Metric {
+            }],
+            StatusFieldStatistic::ConnsTotal(value) => vec![Metric {
                 name: encode_namespace(namespace, "connections"),
                 timestamp: Some(now),
                 tags: {
@@ -269,14 +352,8 @@ fn line_to_metrics(
                 },
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value },
-            }]),
-            Err(err) => LineResult::Error(ParseError {
-                key: key.to_string(),
-                err: err.into(),
-            }),
-        },
-        "ConnsAsyncWriting" => match value.parse::<f64>() {
-            Ok(value) => LineResult::Metrics(vec![Metric {
+            }],
+            StatusFieldStatistic::ConnsAsyncWriting(value) => vec![Metric {
                 name: encode_namespace(namespace, "connections"),
                 timestamp: Some(now),
                 tags: {
@@ -286,14 +363,8 @@ fn line_to_metrics(
                 },
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value },
-            }]),
-            Err(err) => LineResult::Error(ParseError {
-                key: key.to_string(),
-                err: err.into(),
-            }),
-        },
-        "ConnsAsyncClosing" => match value.parse::<f64>() {
-            Ok(value) => LineResult::Metrics(vec![Metric {
+            }],
+            StatusFieldStatistic::ConnsAsyncClosing(value) => vec![Metric {
                 name: encode_namespace(namespace, "connections"),
                 timestamp: Some(now),
                 tags: {
@@ -303,14 +374,8 @@ fn line_to_metrics(
                 },
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value },
-            }]),
-            Err(err) => LineResult::Error(ParseError {
-                key: key.to_string(),
-                err: err.into(),
-            }),
-        },
-        "ConnsAsyncKeepAlive" => match value.parse::<f64>() {
-            Ok(value) => LineResult::Metrics(vec![Metric {
+            }],
+            StatusFieldStatistic::ConnsAsyncKeepAlive(value) => vec![Metric {
                 name: encode_namespace(namespace, "connections"),
                 timestamp: Some(now),
                 tags: {
@@ -320,64 +385,57 @@ fn line_to_metrics(
                 },
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value },
-            }]),
-            Err(err) => LineResult::Error(ParseError {
-                key: key.to_string(),
-                err: err.into(),
-            }),
-        },
-        "Scoreboard" => {
-            let to_metric = |state: &str, count: &u32| Metric {
-                name: encode_namespace(namespace, "scoreboard"),
-                timestamp: Some(now),
-                tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
-                    tags.insert("state".to_string(), state.to_string());
-                    Some(tags)
-                },
-                kind: MetricKind::Absolute,
-                value: MetricValue::Gauge {
-                    value: (*count).into(),
-                },
-            };
+            }],
+            StatusFieldStatistic::Scoreboard(value) => {
+                let scores = value.chars().fold(HashMap::new(), |mut m, c| {
+                    *m.entry(c).or_insert(0u32) += 1;
+                    m
+                });
 
-            let scores = value.chars().fold(HashMap::new(), |mut m, c| {
-                *m.entry(c).or_insert(0u32) += 1;
-                m
-            });
-
-            let scoreboard: HashMap<char, &str> = vec![
-                ('_', "waiting"),
-                ('S', "starting"),
-                ('R', "reading"),
-                ('W', "sending"),
-                ('K', "keepalive"),
-                ('D', "dnslookup"),
-                ('C', "closing"),
-                ('L', "logging"),
-                ('G', "finishing"),
-                ('I', "idle_cleanup"),
-                ('.', "open"),
-            ]
-            .into_iter()
-            .collect();
-
-            LineResult::Metrics(
-                scoreboard
+                SCOREBOARD
                     .iter()
-                    .map(|(c, name)| to_metric(name, scores.get(c).unwrap_or(&0u32)))
-                    .collect::<Vec<_>>(),
-            )
-        }
-        _ => LineResult::None,
+                    .map(|(c, name)| {
+                        score_to_metric(
+                            namespace,
+                            now,
+                            tags,
+                            name,
+                            scores.get(c).copied().unwrap_or_default(),
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            }
+        })
+    })
+}
+
+fn score_to_metric(
+    namespace: &str,
+    now: DateTime<Utc>,
+    tags: Option<&BTreeMap<String, String>>,
+    state: &str,
+    count: u32,
+) -> Metric {
+    Metric {
+        name: encode_namespace(namespace, "scoreboard"),
+        timestamp: Some(now),
+        tags: {
+            let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
+            tags.insert("state".to_string(), state.to_string());
+            Some(tags)
+        },
+        kind: MetricKind::Absolute,
+        value: MetricValue::Gauge {
+            value: count.into(),
+        },
     }
 }
 
 fn encode_namespace(namespace: &str, name: &str) -> String {
-    if !namespace.is_empty() {
-        format!("{}_{}", namespace, name)
-    } else {
+    if namespace.is_empty() {
         name.to_string()
+    } else {
+        format!("{}_{}", namespace, name)
     }
 }
 
@@ -434,7 +492,16 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         let now: DateTime<Utc> = Utc::now();
 
-        let (mut metrics, errors) = parse(payload, "apache", now, None);
+        let (mut metrics, errors) = parse(payload, "apache", now, None).fold(
+            (vec![], vec![]),
+            |(mut metrics, mut errors), v| {
+                match v {
+                    Ok(m) => metrics.push(m),
+                    Err(e) => errors.push(e),
+                }
+                (metrics, errors)
+            },
+        );
         metrics.sort_by(|a, b| (&a.name, &a.tags).cmp(&(&b.name, &b.tags)));
 
         assert_eq!(
@@ -617,7 +684,16 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         let now: DateTime<Utc> = Utc::now();
 
-        let (mut metrics, errors) = parse(payload, "apache", now, None);
+        let (mut metrics, errors) = parse(payload, "apache", now, None).fold(
+            (vec![], vec![]),
+            |(mut metrics, mut errors), v| {
+                match v {
+                    Ok(m) => metrics.push(m),
+                    Err(e) => errors.push(e),
+                }
+                (metrics, errors)
+            },
+        );
         metrics.sort_by(|a, b| (&a.name, &a.tags).cmp(&(&b.name, &b.tags)));
 
         assert_eq!(
@@ -819,7 +895,16 @@ ConnsTotal: 1
 
         let now: DateTime<Utc> = Utc::now();
 
-        let (mut metrics, errors) = parse(payload, "apache", now, None);
+        let (mut metrics, errors) = parse(payload, "apache", now, None).fold(
+            (vec![], vec![]),
+            |(mut metrics, mut errors), v| {
+                match v {
+                    Ok(m) => metrics.push(m),
+                    Err(e) => errors.push(e),
+                }
+                (metrics, errors)
+            },
+        );
         metrics.sort_by(|a, b| (&a.name, &a.tags).cmp(&(&b.name, &b.tags)));
 
         assert_eq!(
