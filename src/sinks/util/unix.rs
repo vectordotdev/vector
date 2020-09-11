@@ -33,7 +33,7 @@ impl UnixSinkConfig {
         Self { path }
     }
 
-    pub fn prepare(&self) -> crate::Result<(UnixConnector, Healthcheck)> {
+    fn build_connector(&self) -> crate::Result<(UnixConnector, Healthcheck)> {
         let connector = UnixConnector::new(self.path.clone());
         let healthcheck = connector.healthcheck().boxed();
 
@@ -41,8 +41,8 @@ impl UnixSinkConfig {
     }
 
     pub fn build_service(&self) -> crate::Result<(UnixService, Healthcheck)> {
-        let (connector, healthcheck) = self.prepare()?;
-        Ok((connector.into_service(), healthcheck))
+        let (connector, healthcheck) = self.build_connector()?;
+        Ok((connector.into(), healthcheck))
     }
 
     pub fn build(
@@ -50,8 +50,9 @@ impl UnixSinkConfig {
         cx: SinkContext,
         encoding: EncodingConfig<Encoding>,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let (unix, healthcheck) = self.prepare()?;
-        let sink = StreamSink::new(unix.into_sink(), cx.acker())
+        let (connector, healthcheck) = self.build_connector()?;
+        let sink: UnixSink = connector.into();
+        let sink = StreamSink::new(sink, cx.acker())
             .with_flat_map(move |event| stream::iter_ok(encode_event(event, &encoding)));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
@@ -59,7 +60,7 @@ impl UnixSinkConfig {
 }
 
 #[derive(Clone)]
-pub struct UnixConnector {
+struct UnixConnector {
     path: PathBuf,
 }
 
@@ -68,7 +69,7 @@ impl UnixConnector {
         Self { path }
     }
 
-    pub fn connect(&self) -> BoxFuture<'static, Result<UnixSocket, UnixSocketError>> {
+    fn connect(&self) -> BoxFuture<'static, Result<UnixSocket, UnixSocketError>> {
         let path = self.path.clone();
 
         async move {
@@ -78,15 +79,19 @@ impl UnixConnector {
         .boxed()
     }
 
-    pub fn healthcheck(&self) -> BoxFuture<'static, crate::Result<()>> {
+    fn healthcheck(&self) -> BoxFuture<'static, crate::Result<()>> {
         self.connect().map_ok(|_| ()).map_err(|e| e.into()).boxed()
     }
+}
 
-    pub fn into_sink(self) -> UnixSink {
+impl Into<UnixSink> for UnixConnector {
+    fn into(self) -> UnixSink {
         UnixSink::new(self.path)
     }
+}
 
-    pub fn into_service(self) -> UnixService {
+impl Into<UnixService> for UnixConnector {
+    fn into(self) -> UnixService {
         UnixService { connector: self }
     }
 }

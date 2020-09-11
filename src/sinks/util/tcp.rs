@@ -41,7 +41,7 @@ pub struct TcpSinkConfig {
 }
 
 #[derive(Clone)]
-pub struct TcpConnector {
+struct TcpConnector {
     host: String,
     port: u16,
     resolver: Resolver,
@@ -70,7 +70,7 @@ impl TcpSinkConfig {
         Self { address, tls: None }
     }
 
-    pub fn prepare(&self, cx: SinkContext) -> crate::Result<(TcpConnector, Healthcheck)> {
+    fn build_connector(&self, cx: SinkContext) -> crate::Result<TcpConnector> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -79,14 +79,14 @@ impl TcpSinkConfig {
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
         let connector = TcpConnector::new(host, port, cx.resolver(), tls);
-        let healthcheck = connector.healthcheck();
 
-        Ok((connector, healthcheck))
+        Ok(connector)
     }
 
     pub fn build_service(&self, cx: SinkContext) -> crate::Result<(TcpService, Healthcheck)> {
-        let (connector, healthcheck) = self.prepare(cx.clone())?;
-        Ok((connector.into_service(), healthcheck))
+        let connector = self.build_connector(cx.clone())?;
+        let healthcheck = connector.healthcheck();
+        Ok((connector.into(), healthcheck))
     }
 
     pub fn build(
@@ -94,8 +94,10 @@ impl TcpSinkConfig {
         cx: SinkContext,
         encoding: EncodingConfig<Encoding>,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let (connector, healthcheck) = self.prepare(cx.clone())?;
-        let sink = StreamSink::new(connector.into_sink(), cx.acker())
+        let connector = self.build_connector(cx.clone())?;
+        let healthcheck = connector.healthcheck();
+        let sink: TcpSink = connector.into();
+        let sink = StreamSink::new(sink, cx.acker())
             .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
@@ -112,7 +114,7 @@ impl TcpConnector {
         }
     }
 
-    pub fn connect(&self) -> BoxFuture<'static, Result<TcpOrTlsStream, TcpError>> {
+    fn connect(&self) -> BoxFuture<'static, Result<TcpOrTlsStream, TcpError>> {
         let host = self.host.clone();
         let port = self.port;
         let resolver = self.resolver.clone();
@@ -133,16 +135,20 @@ impl TcpConnector {
         .boxed()
     }
 
-    pub fn into_sink(self) -> TcpSink {
-        TcpSink::new(self.host, self.port, self.resolver, self.tls)
-    }
-
-    pub fn into_service(self) -> TcpService {
-        TcpService { connector: self }
-    }
-
     fn healthcheck(&self) -> BoxFuture<'static, crate::Result<()>> {
         self.connect().map_ok(|_| ()).map_err(|e| e.into()).boxed()
+    }
+}
+
+impl Into<TcpSink> for TcpConnector {
+    fn into(self) -> TcpSink {
+        TcpSink::new(self.host, self.port, self.resolver, self.tls)
+    }
+}
+
+impl Into<TcpService> for TcpConnector {
+    fn into(self) -> TcpService {
+        TcpService { connector: self }
     }
 }
 

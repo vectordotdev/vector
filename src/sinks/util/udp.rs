@@ -47,7 +47,7 @@ impl UdpSinkConfig {
         Self { address }
     }
 
-    pub fn prepare(&self, cx: SinkContext) -> crate::Result<(UdpConnector, Healthcheck)> {
+    fn build_connector(&self, cx: SinkContext) -> crate::Result<(UdpConnector, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -60,8 +60,8 @@ impl UdpSinkConfig {
     }
 
     pub fn build_service(&self, cx: SinkContext) -> crate::Result<(UdpService, Healthcheck)> {
-        let (connector, healthcheck) = self.prepare(cx.clone())?;
-        Ok((connector.into_service(), healthcheck))
+        let (connector, healthcheck) = self.build_connector(cx.clone())?;
+        Ok((connector.into(), healthcheck))
     }
 
     pub fn build(
@@ -69,8 +69,9 @@ impl UdpSinkConfig {
         cx: SinkContext,
         encoding: EncodingConfig<Encoding>,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let (udp, healthcheck) = self.prepare(cx.clone())?;
-        let sink = StreamSink::new(udp.into_sink(), cx.acker())
+        let (connector, healthcheck) = self.build_connector(cx.clone())?;
+        let sink: UdpSink = connector.into();
+        let sink = StreamSink::new(sink, cx.acker())
             .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
@@ -78,7 +79,7 @@ impl UdpSinkConfig {
 }
 
 #[derive(Clone)]
-pub struct UdpConnector {
+struct UdpConnector {
     host: String,
     port: u16,
     resolver: Resolver,
@@ -93,7 +94,7 @@ impl UdpConnector {
         }
     }
 
-    pub fn connect(&self) -> BoxFuture<'static, Result<UdpSocket, UdpError>> {
+    fn connect(&self) -> BoxFuture<'static, Result<UdpSocket, UdpError>> {
         let host = self.host.clone();
         let port = self.port;
         let resolver = self.resolver.clone();
@@ -120,12 +121,16 @@ impl UdpConnector {
     fn healthcheck(&self) -> BoxFuture<'static, crate::Result<()>> {
         self.connect().map_ok(|_| ()).map_err(|e| e.into()).boxed()
     }
+}
 
-    pub fn into_sink(self) -> UdpSink {
+impl Into<UdpSink> for UdpConnector {
+    fn into(self) -> UdpSink {
         UdpSink::new(self.host, self.port, self.resolver)
     }
+}
 
-    pub fn into_service(self) -> UdpService {
+impl Into<UdpService> for UdpConnector {
+    fn into(self) -> UdpService {
         UdpService { connector: self }
     }
 }
