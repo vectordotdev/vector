@@ -2,13 +2,20 @@ use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughpu
 
 use approx::assert_relative_eq;
 use futures::{compat::Future01CompatExt, future, stream, StreamExt};
+use indexmap::IndexMap;
 use rand::{
     distributions::{Alphanumeric, Uniform},
     prelude::*,
 };
 use std::convert::TryFrom;
+use string_cache::DefaultAtom as Atom;
+use vector::transforms::{
+    add_fields::AddFields,
+    remap::{Remap, RemapConfig},
+    Transform,
+};
 use vector::{
-    config::{self, TransformConfig, TransformContext},
+    config::{self, log_schema, TransformConfig, TransformContext},
     event::Event,
     sinks, sources,
     test_util::{next_addr, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver},
@@ -33,6 +40,7 @@ criterion_group!(
     benchmark_complex,
     bench_elasticsearch_index,
     benchmark_regex,
+    benchmark_remap,
 );
 criterion_main!(
     benches,
@@ -630,7 +638,7 @@ fn benchmark_complex(c: &mut Criterion) {
 
 fn bench_elasticsearch_index(c: &mut Criterion) {
     use chrono::Utc;
-    use vector::{event, template::Template};
+    use vector::template::Template;
 
     c.bench(
         "elasticsearch_indexes",
@@ -640,7 +648,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
                     let mut event = Event::from("hello world");
                     event
                         .as_mut_log()
-                        .insert(event::log_schema().timestamp_key().clone(), Utc::now());
+                        .insert(log_schema().timestamp_key().clone(), Utc::now());
 
                     (Template::try_from("index-%Y.%m.%d").unwrap(), event)
                 },
@@ -657,7 +665,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
                     let mut event = Event::from("hello world");
                     event
                         .as_mut_log()
-                        .insert(event::log_schema().timestamp_key().clone(), Utc::now());
+                        .insert(log_schema().timestamp_key().clone(), Utc::now());
 
                     (Template::try_from("index").unwrap(), event)
                 },
@@ -665,6 +673,90 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
             )
         }),
     );
+}
+
+fn benchmark_remap(c: &mut Criterion) {
+    let event = {
+        let mut event = Event::from("augment me");
+        event.as_mut_log().insert("copy_from", "buz".to_owned());
+        event
+    };
+
+    c.bench_function("add fields with remap", |b| {
+        let conf = RemapConfig {
+            mapping: r#".foo = "bar"
+            .bar = "baz"
+            .copy = .copy_from"#
+                .to_string(),
+            drop_on_err: true,
+        };
+        let mut tform = Remap::new(conf).unwrap();
+
+        b.iter(|| {
+            let result = tform.transform(event.clone()).unwrap();
+            assert_eq!(
+                result
+                    .as_log()
+                    .get(&Atom::from("foo"))
+                    .unwrap()
+                    .to_string_lossy(),
+                "bar"
+            );
+            assert_eq!(
+                result
+                    .as_log()
+                    .get(&Atom::from("bar"))
+                    .unwrap()
+                    .to_string_lossy(),
+                "baz"
+            );
+            assert_eq!(
+                result
+                    .as_log()
+                    .get(&Atom::from("copy"))
+                    .unwrap()
+                    .to_string_lossy(),
+                "buz"
+            );
+        })
+    });
+
+    c.bench_function("add fields with add_fields", |b| {
+        let mut fields = IndexMap::new();
+        fields.insert("foo".into(), "bar".into());
+        fields.insert("bar".into(), "baz".into());
+        fields.insert("copy".into(), "{{ copy_from }}".into());
+
+        let mut tform = AddFields::new(fields, true);
+
+        b.iter(|| {
+            let result = tform.transform(event.clone()).unwrap();
+            assert_eq!(
+                result
+                    .as_log()
+                    .get(&Atom::from("foo"))
+                    .unwrap()
+                    .to_string_lossy(),
+                "bar"
+            );
+            assert_eq!(
+                result
+                    .as_log()
+                    .get(&Atom::from("bar"))
+                    .unwrap()
+                    .to_string_lossy(),
+                "baz"
+            );
+            assert_eq!(
+                result
+                    .as_log()
+                    .get(&Atom::from("copy"))
+                    .unwrap()
+                    .to_string_lossy(),
+                "buz"
+            );
+        })
+    });
 }
 
 fn random_lines(size: usize) -> impl Iterator<Item = String> {

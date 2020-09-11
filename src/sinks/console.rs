@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{self, Event},
+    event::Event,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
@@ -84,7 +84,7 @@ fn encode_event(
             Encoding::Json => serde_json::to_string(&log),
             Encoding::Text => {
                 let s = log
-                    .get(&event::log_schema().message_key())
+                    .get(&crate::config::log_schema().message_key())
                     .map(|v| v.to_string_lossy())
                     .unwrap_or_else(|| "".into());
                 Ok(s)

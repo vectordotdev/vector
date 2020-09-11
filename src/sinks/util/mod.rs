@@ -16,7 +16,7 @@ pub mod udp;
 pub mod unix;
 pub mod uri;
 
-use crate::event::{self, Event};
+use crate::event::Event;
 use bytes::Bytes;
 use encoding::{EncodingConfig, EncodingConfiguration};
 use serde::{Deserialize, Serialize};
@@ -67,7 +67,7 @@ pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Op
         Encoding::Json => serde_json::to_vec(&log),
         Encoding::Text => {
             let bytes = log
-                .get(&event::log_schema().message_key())
+                .get(&crate::config::log_schema().message_key())
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             Ok(bytes)
