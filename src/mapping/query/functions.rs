@@ -224,18 +224,17 @@ impl UpcaseFn {
 
 impl Function for UpcaseFn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
-        let value = self.query.execute(ctx)?;
+        match self.query.execute(ctx)? {
+            Value::Bytes(bytes) => {
+                let mut buf = BytesMut::with_capacity(bytes.len());
 
-        if let Value::Bytes(bytes) = value {
-            let mut buf = BytesMut::with_capacity(bytes.len());
+                buf.extend_from_slice(&bytes);
+                buf.iter_mut().for_each(|c| c.make_ascii_uppercase());
 
-            buf.extend_from_slice(&bytes);
-            buf.iter_mut().for_each(|c| c.make_ascii_uppercase());
-
-            return Ok(Value::Bytes(buf.freeze()));
+                Ok(Value::Bytes(buf.freeze()))
+            }
+            _ => Err("unable to upcase non-string types".to_string()),
         }
-
-        Ok(value)
     }
 }
 
@@ -254,18 +253,17 @@ impl DowncaseFn {
 
 impl Function for DowncaseFn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
-        let value = self.query.execute(ctx)?;
+        match self.query.execute(ctx)? {
+            Value::Bytes(bytes) => {
+                let mut buf = BytesMut::with_capacity(bytes.len());
 
-        if let Value::Bytes(bytes) = value {
-            let mut buf = BytesMut::with_capacity(bytes.len());
+                buf.extend_from_slice(&bytes);
+                buf.iter_mut().for_each(|c| c.make_ascii_lowercase());
 
-            buf.extend_from_slice(&bytes);
-            buf.iter_mut().for_each(|c| c.make_ascii_lowercase());
-
-            return Ok(Value::Bytes(buf.freeze()));
+                Ok(Value::Bytes(buf.freeze()))
+            }
+            _ => Err("unable to downcase non-string types".to_string()),
         }
-
-        Ok(value)
     }
 }
 
@@ -306,14 +304,13 @@ impl Function for Sha1Fn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
         use sha1::{Digest, Sha1};
 
-        let value = self.query.execute(ctx)?;
-
-        if let Value::Bytes(bytes) = value {
-            let sha1 = hex::encode(Sha1::digest(&bytes));
-            return Ok(Value::Bytes(sha1.into()));
+        match self.query.execute(ctx)? {
+            Value::Bytes(bytes) => {
+                let sha1 = hex::encode(Sha1::digest(&bytes));
+                Ok(Value::Bytes(sha1.into()))
+            }
+            _ => Err("unable to sha1 encode non-string types".to_string()),
         }
-
-        Ok(value)
     }
 }
 
@@ -334,14 +331,13 @@ impl Function for Md5Fn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
         use md5::{Digest, Md5};
 
-        let value = self.query.execute(ctx)?;
-
-        if let Value::Bytes(bytes) = value {
-            let md5 = hex::encode(Md5::digest(&bytes));
-            return Ok(Value::Bytes(md5.into()));
+        match self.query.execute(ctx)? {
+            Value::Bytes(bytes) => {
+                let md5 = hex::encode(Md5::digest(&bytes));
+                Ok(Value::Bytes(md5.into()))
+            }
+            _ => Err("unable to md5 encode non-string types".to_string()),
         }
-
-        Ok(value)
     }
 }
 //------------------------------------------------------------------------------
@@ -362,20 +358,19 @@ impl Function for NowFn {
         use chrono::{SecondsFormat, TimeZone, Utc};
         use chrono_tz::Tz;
 
-        let value = self.query.execute(ctx)?;
+        match self.query.execute(ctx)? {
+            Value::Bytes(bytes) => {
+                let utc = Utc::now().naive_utc();
+                let dt = std::str::from_utf8(&bytes)
+                    .map_err(|e| e.to_string())
+                    .and_then(str::parse::<Tz>)?
+                    .from_utc_datetime(&utc)
+                    .to_rfc3339_opts(SecondsFormat::Nanos, true);
 
-        if let Value::Bytes(bytes) = value {
-            let utc = Utc::now().naive_utc();
-            let dt = std::str::from_utf8(&bytes)
-                .map_err(|e| e.to_string())
-                .and_then(str::parse::<Tz>)?
-                .from_utc_datetime(&utc)
-                .to_rfc3339_opts(SecondsFormat::Nanos, true);
-
-            return Ok(Value::Bytes(dt.into()));
+                Ok(Value::Bytes(dt.into()))
+            }
+            _ => Err("unable to use non-string type as timezone".to_string()),
         }
-
-        Ok(value)
     }
 }
 
@@ -679,7 +674,7 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::Integer(20));
                     event
                 },
-                Ok(Value::Integer(20)),
+                Err("unable to upcase non-string types".to_owned()),
                 UpcaseFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
             (
@@ -688,7 +683,7 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::Boolean(true));
                     event
                 },
-                Ok(Value::Boolean(true)),
+                Err("unable to upcase non-string types".to_owned()),
                 UpcaseFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
         ];
@@ -721,7 +716,7 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::Integer(20));
                     event
                 },
-                Ok(Value::Integer(20)),
+                Err("unable to downcase non-string types".to_owned()),
                 DowncaseFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
             (
@@ -730,7 +725,7 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::Boolean(true));
                     event
                 },
-                Ok(Value::Boolean(true)),
+                Err("unable to downcase non-string types".to_owned()),
                 DowncaseFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
         ];
@@ -773,7 +768,7 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::Integer(20));
                     event
                 },
-                Ok(Value::Integer(20)),
+                Err("unable to sha1 encode non-string types".to_owned()),
                 Sha1Fn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
             (
@@ -782,7 +777,7 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::Boolean(true));
                     event
                 },
-                Ok(Value::Boolean(true)),
+                Err("unable to sha1 encode non-string types".to_owned()),
                 Sha1Fn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
         ];
@@ -815,7 +810,7 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::Integer(20));
                     event
                 },
-                Ok(Value::Integer(20)),
+                Err("unable to md5 encode non-string types".to_owned()),
                 Md5Fn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
             (
@@ -824,7 +819,7 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::Boolean(true));
                     event
                 },
-                Ok(Value::Boolean(true)),
+                Err("unable to md5 encode non-string types".to_owned()),
                 Md5Fn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
         ];
