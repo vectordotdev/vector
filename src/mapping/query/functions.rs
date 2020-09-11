@@ -276,9 +276,9 @@ impl Function for StripWhitespaceFn {
                 // Not a valid unicode string.
                 return Ok(Value::Bytes(bytes));
             }
+        } else {
+            Err("unable to strip white_space from non-string types".to_string())
         }
-
-        Ok(value)
     }
 }
 
