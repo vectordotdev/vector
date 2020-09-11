@@ -11,7 +11,7 @@ use bytes::Bytes;
 use futures::{compat::CompatSink, future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
-use snafu::{futures::TryFutureExt as SnafuTryFutureExt, Snafu};
+use snafu::{ResultExt, Snafu};
 use std::{path::PathBuf, time::Duration};
 use tokio::{
     net::UnixStream,
@@ -66,7 +66,10 @@ impl UnixConnector {
         let path = self.path.clone();
 
         async move {
-        }.boxed()
+            let stream = UnixStream::connect(&path).await.context(ConnectError)?;
+            Ok(FramedWrite::new(stream, BytesCodec::new()))
+        }
+        .boxed()
     }
 
     pub fn healthcheck(&self) -> BoxFuture<'static, crate::Result<()>> {
