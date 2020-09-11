@@ -182,8 +182,6 @@
     .a = upcase(.a)
     .b = upcase(.b)
     .c.c = upcase(.c.c)
-    .d = upcase(.d)
-    .e = upcase(.e)
 
     if upcase(.f) == "F" {
         .f = "ff"
@@ -198,8 +196,6 @@
       a = "a"
       b = "bbb bb"
       "c.c" = "c.c"
-      d = 1
-      e = false
       f = "f"
   [[tests.outputs]]
     extract_from = "remap_function_upcase"
@@ -207,19 +203,34 @@
       "a.equals" = "A"
       "b.equals" = "BBB BB"
       "c.c.equals" = "C.C"
-      "d.equals" = 1
-      "e.equals" = false
       "f.equals" = "ff"
+
+[transforms.remap_function_upcase_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  mapping = """
+    .a = upcase(.a)
+    .b = upcase(.b)
+  """
+[[tests]]
+  name = "remap_function_upcase_error"
+  no_outputs_from = ["remap_function_upcase_error"]
+  [tests.input]
+    insert_at = "remap_function_upcase_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "a"
+      b = true
 
 [transforms.remap_function_downcase]
   inputs = []
   type = "remap"
+  drop_on_err = true
   mapping = """
     .a = downcase(.a)
     .b = downcase(.b)
     .c.c = downcase(.c.c)
-    .d = downcase(.d)
-    .e = downcase(.e)
 
     if downcase(.f) == "f" {
         .f = "FF"
@@ -234,8 +245,6 @@
       a = "A"
       b = "BBB BB"
       "c.c" = "C.C"
-      d = 1
-      e = false
       f = "F"
   [[tests.outputs]]
     extract_from = "remap_function_downcase"
@@ -243,9 +252,25 @@
       "a.equals" = "a"
       "b.equals" = "bbb bb"
       "c.c.equals" = "c.c"
-      "d.equals" = 1
-      "e.equals" = false
       "f.equals" = "FF"
+
+[transforms.remap_function_downcase_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  mapping = """
+    .a = downcase(.a)
+    .b = downcase(.b)
+  """
+[[tests]]
+  name = "remap_function_downcase_error"
+  no_outputs_from = ["remap_function_downcase_error"]
+  [tests.input]
+    insert_at = "remap_function_downcase_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "A"
+      b = 10
 
 [transforms.remap_function_uuid_v4]
   inputs = []
@@ -294,6 +319,24 @@
       "a.equals" = "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"
       "b.equals" = "6f74c252bb7f19f553115af5e49a733b9ff17138"
 
+[transforms.remap_function_sha1_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  mapping = """
+    .a = sha1(.a)
+    .b = sha1(.b)
+  """
+[[tests]]
+  name = "remap_function_sha1_error"
+  no_outputs_from = ["remap_function_sha1_error"]
+  [tests.input]
+    insert_at = "remap_function_sha1_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = true
+
 [transforms.remap_function_md5]
   inputs = []
   type = "remap"
@@ -318,6 +361,24 @@
       "a.equals" = "acbd18db4cc2f85cedef654fccc4a4d8"
       "b.equals" = "223cfa6567e4c0599c9a23628bf7a234"
 
+[transforms.remap_function_md5_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  mapping = """
+    .a = md5(.a)
+    .b = md5(.b)
+  """
+[[tests]]
+  name = "remap_function_md5_error"
+  no_outputs_from = ["remap_function_md5_error"]
+  [tests.input]
+    insert_at = "remap_function_md5_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = true
+
 [transforms.remap_function_now]
   inputs = []
   type = "remap"
@@ -336,7 +397,6 @@
       a = "UTC"
       b = "America/Argentina/Rio_Gallegos"
       c = "foo"
-      d = 1
   [[tests.outputs]]
     extract_from = "remap_function_now"
     [[tests.outputs.conditions]]
@@ -345,4 +405,21 @@
       "b.ends_with" = "-03:00"
       "b.len" = 35
       "c.equals" = "foo"
-      "d.equals" = 1
+
+[transforms.remap_function_now_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  mapping = """
+    .a = now(.a)
+    .b = now(.b)
+  """
+[[tests]]
+  name = "remap_function_now_error"
+  no_outputs_from = ["remap_function_now_error"]
+  [tests.input]
+    insert_at = "remap_function_now_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "UTC"
+      b = false
