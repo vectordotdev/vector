@@ -45,6 +45,7 @@ env:
   RUST_BACKTRACE: full
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
+  CONTAINER_TOOL: "docker"
 
 jobs:
   cancel-previous:
@@ -152,7 +153,7 @@ jobs:
           KUBERNETES_VERSION: ${{ matrix.kubernetes_version.version }}
           MINIKUBE_VERSION: ${{ matrix.minikube_version }}
           CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
-      - run: USE_CONTAINER=none make slim-builds
+      - run: make slim-builds
       - run: make test-e2e-kubernetes
         env:
           USE_MINIKUBE_CACHE: "true"

@@ -41,6 +41,7 @@ env:
   RUST_BACKTRACE: full
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
+  CONTAINER_TOOL: "docker"
 
 jobs:
   cancel-previous:
@@ -103,7 +104,6 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - env:
-          USE_CONTAINER: none
           RUSTFLAGS: "-D warnings"
         run: cargo test --no-default-features --features default-msvc
 
