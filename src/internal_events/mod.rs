@@ -65,6 +65,8 @@ mod syslog;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 mod tag_cardinality_limit;
 mod tcp;
+#[cfg(feature = "transforms-tokenizer")]
+mod tokenizer;
 mod unix;
 mod vector;
 #[cfg(feature = "wasm")]
@@ -134,6 +136,8 @@ pub use self::syslog::*;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub(crate) use self::tag_cardinality_limit::*;
 pub use self::tcp::*;
+#[cfg(feature = "transforms-tokenizer")]
+pub(crate) use self::tokenizer::*;
 pub use self::unix::*;
 pub use self::vector::*;
 #[cfg(feature = "wasm")]

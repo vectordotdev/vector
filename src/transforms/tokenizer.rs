@@ -2,6 +2,7 @@ use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, PathComponent, PathIter},
+    internal_events::{TokenizerConvertFailed, TokenizerEventProcessed, TokenizerFieldMissing},
     types::{parse_check_conversion_map, Conversion},
 };
 use nom::{
@@ -65,7 +66,7 @@ impl TransformConfig for TokenizerConfig {
 }
 
 pub struct Tokenizer {
-    field_names: Vec<(String, Vec<PathComponent>, Conversion)>,
+    field_names: Vec<(Atom, Vec<PathComponent>, Conversion)>,
     field: Atom,
     drop_field: bool,
 }
@@ -82,7 +83,7 @@ impl Tokenizer {
             .map(|name| {
                 let conversion = types.get(&name).unwrap_or(&Conversion::Bytes).clone();
                 let path: Vec<PathComponent> = PathIter::new(&name).collect();
-                (name.to_string(), path, conversion)
+                (name, path, conversion)
             })
             .collect();
 
@@ -107,12 +108,7 @@ impl Transform for Tokenizer {
                         event.as_mut_log().insert_path(path.clone(), value);
                     }
                     Err(error) => {
-                        debug!(
-                            message = "Could not convert types.",
-                            path = &name[..],
-                            %error,
-                            rate_limit_secs = 30
-                        );
+                        emit!(TokenizerConvertFailed { field: name, error });
                     }
                 }
             }
@@ -120,11 +116,10 @@ impl Transform for Tokenizer {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            debug!(
-                message = "Field does not exist.",
-                field = self.field.as_ref(),
-            );
+            emit!(TokenizerFieldMissing { field: &self.field });
         };
+
+        emit!(TokenizerEventProcessed);
 
         Some(event)
     }
