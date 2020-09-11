@@ -9729,11 +9729,11 @@ require('custom_module')
 
 # Streams `metric` events to StatsD metrics service.
 [sinks.statsd]
-  # The address to send stats to. The address _must_ include a port.
+  # The UDP socket address to send stats to.
   #
-  # * required
+  # * optional
+  # * default: "127.0.0.1:8125"
   # * type: string
-  # * required when mode = "tcp" or mode = "udp"
   address = "127.0.0.1:8125"
 
   # Enables/disables the sink healthcheck upon start.
@@ -9749,23 +9749,6 @@ require('custom_module')
   # * required
   # * type: [string]
   inputs = ["my-source-or-transform-id"]
-
-
-  # The type of socket to use.
-  #
-  # * required
-  # * type: string
-  # * enum: "tcp", "udp", and "unix"
-  mode = "tcp"
-  mode = "udp"
-  mode = "unix"
-
-  # The unix socket path. This should be the absolute path.
-  #
-  # * required
-  # * type: string
-  # * required when mode = "unix"
-  path = "/path/to/socket"
 
   # A prefix that will be added to all metric names.
   #
