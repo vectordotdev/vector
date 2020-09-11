@@ -37,9 +37,8 @@ use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
     task::Poll,
-    time::{Duration, Instant},
 };
-use tokio::time::{delay_for, delay_until};
+use tokio::time::{self, delay_until, Duration, Instant};
 use tower::Service;
 
 #[derive(Copy, Clone, Debug, Default, Deserialize, Serialize)]
@@ -178,7 +177,7 @@ impl Service<Vec<Event>> for TestSink {
     fn call(&mut self, _request: Vec<Event>) -> Self::Future {
         let now = Instant::now();
         let mut stats = self.stats.lock().expect("Poisoned stats lock");
-        stats.in_flight.adjust(1, now);
+        stats.in_flight.adjust(1, now.into());
         let in_flight = stats.in_flight.level();
 
         let params = self.params;
@@ -191,7 +190,7 @@ impl Service<Vec<Event>> for TestSink {
         let delay = delay_until((now + delay).into());
 
         if params.concurrency_drop > 0 && in_flight >= params.concurrency_drop {
-            stats.in_flight.adjust(-1, now);
+            stats.in_flight.adjust(-1, now.into());
             Box::pin(pending())
         } else {
             let stats2 = Arc::clone(&self.stats);
@@ -199,7 +198,7 @@ impl Service<Vec<Event>> for TestSink {
                 delay.await;
                 let mut stats = stats2.lock().expect("Poisoned stats lock");
                 let in_flight = stats.in_flight.level();
-                stats.in_flight.adjust(-1, Instant::now());
+                stats.in_flight.adjust(-1, Instant::now().into());
 
                 if params.concurrency_defer > 0 && in_flight >= params.concurrency_defer {
                     Err(Error::Deferred)
@@ -273,9 +272,15 @@ async fn run_test(params: TestParams, file_path: PathBuf) -> TestResults {
 
     let controller = get_controller().unwrap();
 
-    // Give time for the generator to start and queue all its data.
+    // Give time for the generator to start and queue all its data, and
+    // all the requests to resolve to a response.
     let delay = params.interval.unwrap_or(0.0) * (params.requests as f64) + 1.0;
-    delay_for(Duration::from_secs_f64(delay)).await;
+    // This is crude and dumb, but it works, and the tests run fast and
+    // the results are highly repeatable.
+    let msecs = (delay * 1000.0) as usize;
+    for _ in 0..msecs {
+        time::advance(Duration::from_millis(1)).await;
+    }
     topology.stop().compat().await.unwrap();
 
     let stats = Arc::try_unwrap(stats)
@@ -412,11 +417,9 @@ struct TestInput {
 }
 
 async fn run_compare(file_path: PathBuf, input: TestInput) {
-    eprintln!("Starting test in {:?}", file_path);
+    eprintln!("Running test in {:?}", file_path);
 
     let results = run_test(input.params, file_path.clone()).await;
-
-    eprintln!("Finished running {:?}", file_path);
 
     if let Some(test) = input.stats.in_flight {
         let in_flight = results.stats.in_flight.stats().unwrap();
@@ -449,7 +452,7 @@ async fn all_tests() {
     const PATH: &str = "tests/data/auto-concurrency";
 
     // Read and parse everything first
-    let entries = read_dir(PATH)
+    let mut entries = read_dir(PATH)
         .expect("Could not open data directory")
         .map(|entry| entry.expect("Could not read data directory").path())
         .filter_map(|file_path| {
@@ -468,10 +471,12 @@ async fn all_tests() {
         })
         .collect::<Vec<_>>();
 
-    // Then run all the tests at once
-    let tests = entries
-        .into_iter()
-        .map(|(file_path, input)| run_compare(file_path, input))
-        .collect::<Vec<_>>();
-    futures::future::join_all(tests).await;
+    entries.sort_unstable_by_key(|entry| entry.0.to_string_lossy().to_string());
+
+    time::pause();
+
+    // Then run all the tests
+    for (file_path, input) in entries {
+        run_compare(file_path, input).await;
+    }
 }

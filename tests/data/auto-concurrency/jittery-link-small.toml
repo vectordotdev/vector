@@ -1,5 +1,5 @@
 [params]
-requests = 500
+requests = 1000
 delay = 0.100
 jitter = 0.1
 
@@ -7,19 +7,19 @@ jitter = 0.1
 # will typically reach high values of requests in flight.
 
 [stats.in_flight]
-max = [12, 30]
-mean = [6.0, 20.0]
+max = [20, 35]
+mean = [10.0, 20.0]
 
 [controller.in_flight]
-max = [12, 30]
-mean = [6.0, 20.0]
+max = [20, 35]
+mean = [10.0, 20.0]
 
 [controller.concurrency_limit]
-max = [10, 30]
-mean = [6.0, 200.0]
+max = [20, 35]
+mean = [10.0, 20.0]
 
 [controller.observed_rtt]
-mean = [0.090, 0.130]
+mean = [0.100, 0.130]
 
 [controller.averaged_rtt]
-mean = [0.090, 0.130]
+mean = [0.100, 0.130]

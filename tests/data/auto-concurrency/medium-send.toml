@@ -8,21 +8,22 @@ delay = 0.100
 # timing jitter.
 
 [stats.in_flight]
+max = [8, 8]
 mode = [4, 5]
-mean = [4.0, 6.0]
+mean = [4.0, 4.5]
 
 [controller.in_flight]
-max = [4, 20]
+max = [8, 8]
 mode = [4, 5]
-mean = [4.0, 5.0]
+mean = [4.0, 4.5]
 
 [controller.concurrency_limit]
-max = [4, 20]
+max = [8, 8]
 
 [controller.observed_rtt]
-min = [0.090, 0.125]
-max = [0.090, 0.125]
+min = [0.100, 0.102]
+max = [0.100, 0.102]
 
 [controller.averaged_rtt]
-min = [0.090, 0.125]
-max = [0.090, 0.125]
+min = [0.100, 0.102]
+max = [0.100, 0.102]
