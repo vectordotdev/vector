@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "vector.fullname" . }}
+  labels:
+    {{- include "vector.labels" . | nindent 4 }}
+spec:
+  ports:
+    - name: metrics
+      port: 9598
+      protocol: TCP
+      targetPort: 9598
+  selector:
+    {{- include "vector.selectorLabels" . | nindent 4 }}

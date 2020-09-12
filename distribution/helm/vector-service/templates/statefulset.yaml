@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "vector.fullname" . }}
+  labels:
+    {{- include "vector.labels" . | nindent 4 }}
+spec:
+  podManagementPolicy: "{{ .Values.podManagementPolicy }}"
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      {{- include "vector.selectorLabels" . | nindent 6 }}
+  serviceName: {{ include "vector.fullname" . }}
+  template:
+    metadata:
+    {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- with .Values.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- include "vector.selectorLabels" . | nindent 8 }}
+        vector.dev/exclude: "true"
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "vector.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: vector
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ include "vector.imageTag" . }}"
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          env:
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            # Vector data dir mount.
+            - name: data-dir
+              mountPath: "{{ .Values.globalOptions.dataDir }}"
+            # Vector config dir mount.
+            - name: config-dir
+              mountPath: /etc/vector
+              readOnly: true
+            # Extra volumes.
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      terminationGracePeriodSeconds: 60
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        # Vector will store it's data here.
+        - name: data-dir
+        {{- if .Values.storage.persistentVolume.enabled }}
+          persistentVolumeClaim:
+            claimName: datadir
+        {{- else if .Values.storage.hostPath }}
+          hostPath:
+            path: {{ .Values.storage.hostPath | quote }}
+        {{- else }}
+          emptyDir: {}
+        {{- end }}
+        # Vector config dir with a managed config map.
+        - name: config-dir
+          configMap:
+            name: {{ include "vector.configMapName" . }}
+        # Extra volumes.
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+{{- if .Values.storage.persistentVolume.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data-dir
+        labels:
+          app.kubernetes.io/name: {{ template "vector.name" . }}
+          app.kubernetes.io/instance: {{ .Release.Name | quote }}
+        {{- with .Values.storage.persistentVolume.labels }}
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.labels }}
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      {{- with .Values.storage.persistentVolume.annotations }}
+        annotations: {{- toYaml . | nindent 10 }}
+      {{- end }}
+      spec:
+        accessModes: ["ReadWriteOnce"]
+      {{- if .Values.storage.persistentVolume.storageClass }}
+      {{- if (eq "-" .Values.storage.persistentVolume.storageClass) }}
+        storageClassName: ""
+      {{- else }}
+        storageClassName: {{ .Values.storage.persistentVolume.storageClass | quote}}
+      {{- end }}
+      {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.storage.persistentVolume.size | quote }}
+{{- end }}
