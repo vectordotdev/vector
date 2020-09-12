@@ -12,6 +12,12 @@ publish = false
 [profile.bench]
 debug = true
 
+[profile.release]
+opt-level = 3
+debug = false
+lto = "fat"
+codegen-units = 1
+
 [package.metadata.deb]
 maintainer-scripts = "distribution/debian/scripts/"
 conf-files = ["/etc/vector/vector.toml"]
@@ -206,6 +212,12 @@ default-cmake = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveld
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
 default-msvc = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb-cmake", "rdkafka-cmake"]
+
+# Target specific release features.
+# The `make` tasks will select this according to the appropriate triple.
+# Use this section to turn off or on specific features for specific triples.
+target-x86_64-unknown-linux-gnu = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb-cmake", "rdkafka-cmake"]
+target-aarch64-unknown-linux-gnu = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "leveldb-cmake", "rdkafka-cmake"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["jemallocator"]
