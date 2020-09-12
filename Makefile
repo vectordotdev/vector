@@ -25,10 +25,10 @@ export AUTOINSTALL ?= false
 export VERBOSE ?= false
 # Override to set a different Rust toolchain
 export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
-# Override the container tool. Tries podman first and then tries docker.
+# Override the container tool. Tries docker first and then tries podman.
 export CONTAINER_TOOL ?= auto
 ifeq ($(CONTAINER_TOOL),auto)
-	override CONTAINER_TOOL = $(shell podman version >/dev/null 2>&1 && echo podman || echo docker)
+	override CONTAINER_TOOL = $(shell docker version >/dev/null 2>&1 && echo docker || echo podman)
 endif
 # If we're using podman create pods else if we're using docker create networks.
 ifeq ($(CONTAINER_TOOL),podman)
