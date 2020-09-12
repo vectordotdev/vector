@@ -149,18 +149,14 @@ impl MaybeTlsIncomingStream<TcpStream> {
     }
 
     #[cfg(not(feature = "listenfd"))]
-    pub(super) fn new(
-        stream: TcpStream,
-        _: SocketAddr,
-        acceptor: Option<SslAcceptor>,
-    ) -> crate::tls::Result<Self> {
+    pub(super) fn new(stream: TcpStream, _: SocketAddr, acceptor: Option<SslAcceptor>) -> Self {
         let state = match acceptor {
             Some(acceptor) => StreamState::Accepting(
                 async move { tokio_openssl::accept(&acceptor, stream).await }.boxed(),
             ),
             None => StreamState::Accepted(MaybeTlsStream::Raw(stream)),
         };
-        Ok(Self { state })
+        Self { state }
     }
 
     // Explicit handshake method
