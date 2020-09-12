@@ -26,4 +26,3 @@ jobs:
           docker rmi $(docker image ls -aq)
           df -h
       - run: make environment-prepare
-      - run: docker push docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
