@@ -55,3 +55,6 @@ add-apt-repository \
 # Install those new things
 apt update --yes
 apt install --yes yarn docker-ce docker-ce-cli containerd.io
+
+# Apt cleanup
+apt clean
