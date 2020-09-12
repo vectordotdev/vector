@@ -25,4 +25,5 @@ cat <<-EOF >> ./Cargo.toml
 debug = false
 opt-level = "s" # Binary size
 lto = false # Don't LTO on CI
+codegen-units = 1
 EOF
