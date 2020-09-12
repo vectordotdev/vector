@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::metric::{Metric, MetricValue},
+    event::metric::{Metric, MetricValue, StatisticKind},
     sinks::{
         influxdb::{
             encode_namespace, encode_timestamp, healthcheck, influx_line_protocol,
@@ -751,6 +751,50 @@ mod tests {
 
         let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
         assert_eq!(line_protocols.len(), 0);
+    }
+
+    #[test]
+    fn test_encode_distribution_summary() {
+        let events = vec![Metric {
+            name: "requests".into(),
+            timestamp: Some(ts()),
+            tags: Some(tags()),
+            kind: MetricKind::Incremental,
+            value: MetricValue::Distribution {
+                values: vec![1.0, 2.0, 3.0],
+                sample_rates: vec![3, 3, 2],
+                statistic: StatisticKind::Summary,
+            },
+        }];
+
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
+        let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
+        assert_eq!(line_protocols.len(), 1);
+
+        let line_protocol = split_line_protocol(line_protocols[0]);
+        assert_eq!("ns.requests", line_protocol.0);
+        assert_eq!(
+            "metric_type=distribution,normal_tag=value,true_tag=true",
+            line_protocol.1
+        );
+        assert_fields(
+            line_protocol.2.to_string(),
+            [
+                "avg=1.875",
+                "count=8",
+                "max=3",
+                "median=2",
+                "min=1",
+                "sum=15",
+                "quantile_0.50=2",
+                "quantile_0.75=2",
+                "quantile_0.90=3",
+                "quantile_0.95=3",
+                "quantile_0.99=3",
+            ]
+            .to_vec(),
+        );
+        assert_eq!("1542182950000000011", line_protocol.3);
     }
 }
 
