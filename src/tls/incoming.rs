@@ -151,6 +151,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
     #[cfg(not(feature = "listenfd"))]
     pub(super) fn new(
         stream: TcpStream,
+        _: SocketAddr,
         acceptor: Option<SslAcceptor>,
     ) -> crate::tls::Result<Self> {
         let state = match acceptor {
