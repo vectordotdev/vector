@@ -1409,6 +1409,7 @@ mod tests {
         );
     }
 
+    #[ignore]
     #[tokio::test]
     async fn remove_file() {
         trace_init();

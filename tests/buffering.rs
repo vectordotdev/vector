@@ -134,6 +134,7 @@ fn test_buffering() {
     });
 }
 
+#[ignore]
 #[test]
 fn test_max_size() {
     trace_init();
