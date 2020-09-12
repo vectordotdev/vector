@@ -46,7 +46,7 @@ impl SinkConfig for DatadogLogsConfig {
         };
 
         let tls_settings = MaybeTlsSettings::from_config(
-            &Some(self.tls.clone().unwrap_or_else(|| TlsConfig::enabled())),
+            &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
             false,
         )?;
 

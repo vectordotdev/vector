@@ -38,7 +38,7 @@ impl SinkConfig for PapertrailConfig {
             .ok_or_else(|| "A port is required for endpoint".to_string())?;
 
         let tls = MaybeTlsSettings::from_config(
-            &Some(self.tls.clone().unwrap_or_else(|| TlsConfig::enabled())),
+            &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
             false,
         )?;
 
