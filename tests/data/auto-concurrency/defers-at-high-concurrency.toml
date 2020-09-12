@@ -1,0 +1,36 @@
+[params]
+requests = 500
+delay = 0.100
+concurrency_defer = 5
+
+# With a constant time link that gives deferrals over a certain
+# concurrency, the limiter will ramp up to that concurrency and then
+# drop down repeatedly. Note that, due to the timing of the adjustment,
+# this may actually occasionally go over the error limit above, but it
+# will be rare.
+[stats.in_flight]
+max = [4, 6]
+# Since the concurrency will drop down by half each time, the average
+# will be below this maximum.
+mode = [4, 4]
+mean = [4.0, 5.0]
+
+[controller.in_flight]
+max = [5, 6]
+mode = [4, 4]
+mean = [4.0, 5.0]
+
+[controller.concurrency_limit]
+max = [5, 6]
+mode = [2, 5]
+mean = [4.0, 5.0]
+
+[controller.observed_rtt]
+min = [0.100, 0.102]
+max = [0.100, 0.102]
+mean = [0.100, 0.102]
+
+[controller.averaged_rtt]
+min = [0.100, 0.102]
+max = [0.100, 0.102]
+mean = [0.100, 0.102]
