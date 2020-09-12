@@ -219,13 +219,13 @@ $ curl -u "$GITHUB_USERNAME:$GITHUB_TOKEN" \
 
 We're super excited to have you interested in working on Vector! Before you start you should pick how you want to develop.
 
-For small or first-time contributions, we recommend the Docker method. If you do a lot of contributing, try adopting the Nix method! It'll be way faster and feel more smooth. Prefer to do it yourself? That's fine too!
+For small or first-time contributions, we recommend the Docker method. Prefer to do it yourself? That's fine too!
 
 #### Using a Docker or Podman environment
 
 > **Targets:** You can use this method to produce AARCH64, Arm6/7, as well as x86/64 Linux builds.
 
-Since not everyone has a full working native environment, or can use Nix, we took our Nix environment and stuffed it into a Docker (or Podman) container!
+Since not everyone has a full working native environment, we took our environment and stuffed it into a Docker (or Podman) container!
 
 This is ideal for users who want it to "Just work" and just want to start contributing. It's also what we use for our CI, so you know if it breaks we can't do anything else until we fix it. 😉
 
