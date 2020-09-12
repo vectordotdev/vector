@@ -269,9 +269,13 @@ fn encode_events(
             MetricValue::Distribution {
                 values,
                 sample_rates,
-                statistic: _,
+                statistic,
             } => {
-                let fields = encode_distribution(&values, &sample_rates);
+                let quantiles = match statistic {
+                    StatisticKind::Histogram => &[0.95] as &[_],
+                    StatisticKind::Summary => &[0.5, 0.75, 0.9, 0.95, 0.99] as &[_],
+                };
+                let fields = encode_distribution(&values, &sample_rates, quantiles);
 
                 influx_line_protocol(
                     protocol_version,
@@ -291,7 +295,11 @@ fn encode_events(
     output
 }
 
-fn encode_distribution(values: &[f64], counts: &[u32]) -> Option<HashMap<String, Field>> {
+fn encode_distribution(
+    values: &[f64],
+    counts: &[u32],
+    quantiles: &[f64],
+) -> Option<HashMap<String, Field>> {
     if values.len() != counts.len() {
         return None;
     }
@@ -317,9 +325,13 @@ fn encode_distribution(values: &[f64], counts: &[u32]) -> Option<HashMap<String,
                 ("avg".to_owned(), Field::Float(val)),
                 ("sum".to_owned(), Field::Float(val)),
                 ("count".to_owned(), Field::Float(1.0)),
-                ("quantile_0.95".to_owned(), Field::Float(val)),
             ]
             .into_iter()
+            .chain(
+                quantiles
+                    .iter()
+                    .map(|p| (format!("quantile_{:.2}", p), Field::Float(val))),
+            )
             .collect(),
         );
     }
@@ -330,8 +342,11 @@ fn encode_distribution(values: &[f64], counts: &[u32]) -> Option<HashMap<String,
     let min = samples.first().unwrap();
     let max = samples.last().unwrap();
 
-    let p50 = samples[(0.50 * length - 1.0).round() as usize];
-    let p95 = samples[(0.95 * length - 1.0).round() as usize];
+    let median = samples[(0.50 * length - 1.0).round() as usize];
+    let quantiles = quantiles.iter().map(|p| {
+        let sample = samples[(p * length - 1.0).round() as usize];
+        (format!("quantile_{:.2}", p), Field::Float(sample))
+    });
 
     let sum = samples.iter().sum();
     let avg = sum / length;
@@ -339,13 +354,13 @@ fn encode_distribution(values: &[f64], counts: &[u32]) -> Option<HashMap<String,
     let fields: HashMap<String, Field> = vec![
         ("min".to_owned(), Field::Float(*min)),
         ("max".to_owned(), Field::Float(*max)),
-        ("median".to_owned(), Field::Float(p50)),
+        ("median".to_owned(), Field::Float(median)),
         ("avg".to_owned(), Field::Float(avg)),
         ("sum".to_owned(), Field::Float(sum)),
         ("count".to_owned(), Field::Float(length)),
-        ("quantile_0.95".to_owned(), Field::Float(p95)),
     ]
     .into_iter()
+    .chain(quantiles)
     .collect();
 
     Some(fields)
