@@ -6,6 +6,11 @@ on:
       - v0.*
       - v1.*
 
+
+env:
+  AUTOINSTALL: true
+  VERBOSE: true
+
 jobs:
   build-x86_64-unknown-linux-musl-packages:
     runs-on: ubuntu-latest
