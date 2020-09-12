@@ -1,0 +1,49 @@
+{{- if (empty .Values.existingConfigMap) -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "vector.configMapName" . }}
+  labels:
+    {{- include "vector.labels" . | nindent 4 }}
+data:
+  vector.toml: |
+    data_dir = "{{ .Values.globalOptions.dataDir }}"
+
+    {{- with .Values.logSchema }}
+    [log_schema]
+      host_key = "{{ .hostKey }}"
+      message_key = "{{ .messageKey }}"
+      source_type_key = "{{ .sourceTypeKey }}"
+      timestamp_key = "{{ .timestampKey }}"
+    {{- end }}
+
+    {{- range $sourceId, $source := .Values.sources }}
+    [sources.{{ $sourceId }}]
+      type = "{{ $source.type }}"
+
+      {{- with $source.rawConfig }}
+      {{- . | nindent 6 }}
+      {{- end }}
+    {{- end }}
+
+    {{- range $transformId, $transform := .Values.transforms }}
+    [transforms.{{ $transformId }}]
+      type = "{{ $transform.type }}"
+      inputs = {{ $transform.inputs | toJson }}
+
+      {{- with $transform.rawConfig }}
+      {{- . | nindent 6 }}
+      {{- end }}
+    {{- end }}
+
+    {{- range $sinkId, $sink := .Values.sinks }}
+    [sinks.{{ $sinkId }}]
+      type = "{{ $sink.type }}"
+      inputs = {{ $sink.inputs | toJson }}
+
+      {{- with $sink.rawConfig }}
+      {{- . | nindent 6 }}
+      {{- end }}
+    {{- end }}
+
+{{- end }}
