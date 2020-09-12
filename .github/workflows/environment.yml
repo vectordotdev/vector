@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+  workflow_dispatch:
 
 env:
   VERBOSE: true
@@ -18,4 +19,3 @@ jobs:
       - run: docker login https://docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/checkout@v2
       - run: make environment-prepare
-      - run: docker push docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
