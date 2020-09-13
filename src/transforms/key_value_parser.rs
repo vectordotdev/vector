@@ -1,8 +1,8 @@
 use super::Transform;
 use crate::internal_events::KeyValueParseFailed;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{self, Event},
+    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    event::{Event},
     internal_events::{KeyValueEventProcessed, KeyValueFieldDoesNotExist, KeyValueTargetExists},
     types::{parse_conversion_map, Conversion},
 };
@@ -38,7 +38,7 @@ impl TransformConfig for KeyValueConfig {
         let field = self
             .field
             .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+            .unwrap_or(&log_schema().message_key());
         let field_split = self.field_split.clone().unwrap_or_else(|| "=".to_string());
         let separator = self.separator.clone().unwrap_or_else(|| " ".to_string());
         let trim_key = self.trim_key.as_ref().map(|key| key.chars().collect());

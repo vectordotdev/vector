@@ -1,0 +1,91 @@
+[transforms.key_value_parser]
+title = "Key Value Parser"
+allow_you_to_description = "parse a log field value of key/value pairs"
+beta = true
+common = false
+function_category = "parse"
+input_types = ["log"]
+output_types = ["log"]
+requirements = {}
+
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "key_value_parser") %>
+
+[transforms.key_value_parser.options.drop_field]
+type = "bool"
+common = true
+default = true
+description = """\
+If `true` will drop the specified `field` after parsing.\
+"""
+
+[transforms.key_value_parser.options.field]
+type = "string"
+common = true
+default = "message"
+examples = ["message", "parent.child", "array[0]"]
+field_path_notation = true
+description = """\
+The log field containing key/value pairs to parse. Must be a `string` value.\
+"""
+
+[transforms.key_value_parser.options.field_split]
+type = "string"
+common = true
+default = "="
+examples = [":", "="]
+description = """\
+The character(s) to split a key/value pair on which results in a new field \
+with an associated value. Must be a `string` value.\
+"""
+
+[transforms.json_parser.options.overwrite_target]
+type = "bool"
+default = false
+description = """\
+If `target_field` is set and the log contains a field of the same name \
+as the target, it will only be overwritten if this is set to `true`.\
+"""
+
+[transforms.json_parser.options.overwrite_target]
+type = "bool"
+default = false
+description = """\
+If `target_field` is set and the log contains a field of the same name \
+as the target, it will only be overwritten if this is set to `true`.\
+"""
+
+[transforms.key_value_parser.options.separator]
+type = "string"
+common = true
+default = "[whitespace]"
+examples = [",", ";", "|"]
+description = "The character(s) that separate key/value pairs. Must be a `string` value."
+
+[transforms.key_value_parser.options.target_field]
+type = "string"
+examples = ["root_field", "parent.child"]
+field_path_notation = true
+description = """\
+If this setting is present, the parsed JSON will be inserted into the \
+log as a sub-object with this name. \
+If a field with the same name already exists, the parser will fail and \
+produce an error.\
+"""
+
+[transforms.key_value_parser.options.trim_key]
+type = "string"
+examples = ["<>", "{}"]
+description = """
+Removes characters from the beginning and end of a key until a character that is not listed.\
+ex: `<key>=value` would result in `key: value` with this option set to `<>`.\
+"""
+
+[transforms.key_value_parser.options.trim_value]
+type = "string"
+examples = ["<>", "{}"]
+description = """\
+Removes characters from the beginning and end of a value until a character that is not listed.\
+ex: `key=<<>value>>` would result in `key: value` with this option set to `<>`.\
+"""
+
+<%= render("_partials/fields/_types_options.toml", namespace: "transforms.key_value_parser.options", common: true) %>
