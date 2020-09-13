@@ -39,7 +39,7 @@ impl<'a> InternalEvent for HTTPBadRequest<'a> {
         warn!(
             message = "Received bad request.",
             code = %self.error_code,
-            message = %self.error_message,
+            error_message = %self.error_message,
             rate_limit_secs = 10,
         );
     }
