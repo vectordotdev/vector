@@ -46,7 +46,9 @@ pub struct AuthConfig {
 pub enum Encoding {
     #[derivative(Default)]
     Text,
-    Json,
+    // Deprecated name
+    #[serde(alias = "json")]
+    Ndjson,
 }
 
 struct PulsarSink {
@@ -194,7 +196,7 @@ fn encode_event(item: Event, encoding: &EncodingConfig<Encoding>) -> crate::Resu
     let log = item.into_log();
 
     Ok(match encoding.codec() {
-        Encoding::Json => serde_json::to_vec(&log)?,
+        Encoding::Ndjson => serde_json::to_vec(&log)?,
         Encoding::Text => log
             .get(&log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
@@ -212,7 +214,7 @@ mod tests {
         let msg = "hello_world".to_owned();
         let mut evt = Event::from(msg.clone());
         evt.as_mut_log().insert("key", "value");
-        let result = encode_event(evt, &EncodingConfig::from(Encoding::Json)).unwrap();
+        let result = encode_event(evt, &EncodingConfig::from(Encoding::Ndjson)).unwrap();
         let map: HashMap<String, String> = serde_json::from_slice(&result[..]).unwrap();
         assert_eq!(msg, map[&log_schema().message_key().to_string()]);
     }
