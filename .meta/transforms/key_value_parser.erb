@@ -46,14 +46,6 @@ If `target_field` is set and the log contains a field of the same name \
 as the target, it will only be overwritten if this is set to `true`.\
 """
 
-[transforms.json_parser.options.overwrite_target]
-type = "bool"
-default = false
-description = """\
-If `target_field` is set and the log contains a field of the same name \
-as the target, it will only be overwritten if this is set to `true`.\
-"""
-
 [transforms.key_value_parser.options.separator]
 type = "string"
 common = true
@@ -89,3 +81,44 @@ ex: `key=<<>value>>` would result in `key: value` with this option set to `<>`.\
 """
 
 <%= render("_partials/fields/_types_options.toml", namespace: "transforms.key_value_parser.options", common: true) %>
+
+[[transforms.key_value_parser.examples]]
+label = "Example"
+body = """\
+Given the following log event:
+
+```javascript
+{
+  "message": "<id>: 123, name: bob, description: hello"
+}
+```
+
+You can parse the keys into fields with:
+
+```toml
+[transforms.json]
+  inputs = ["<source_id>"]
+  type = "key_value_parser"
+  field = "message"
+  field_split = ":"
+  separator = ","
+  target_field = "data"
+  trim_key = "<>"
+  types.id = "int"
+```
+
+This would produce the following event as output:
+
+```javascript
+{
+  "data": {
+    "id": 123,
+    "name": "bob",
+    "description": "hello"
+  }
+}
+```
+
+By default, Vector drops fields after parsing them via the `drop_field`
+option.\
+"""
