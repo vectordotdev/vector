@@ -68,7 +68,9 @@ lazy_static! {
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
     Text,
-    Json,
+    // Deprecated name
+    #[serde(alias = "json")]
+    Ndjson,
 }
 
 inventory::submit! {
@@ -274,7 +276,7 @@ fn encode_event(
 
     let log = event.into_log();
     let data = match encoding.codec() {
-        Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
+        Encoding::Ndjson => serde_json::to_vec(&log).expect("Error encoding event as json."),
         Encoding::Text => log
             .get(&log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
@@ -321,7 +323,7 @@ mod tests {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("key", "value");
-        let event = encode_event(event, &None, &Encoding::Json.into()).unwrap();
+        let event = encode_event(event, &None, &Encoding::Ndjson.into()).unwrap();
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
