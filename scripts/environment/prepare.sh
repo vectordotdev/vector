@@ -17,5 +17,3 @@ cd ..
 
 pip3 install jsonschema==3.2.0
 pip3 install remarshal==0.11.2
-
-sudo apt install gawk
