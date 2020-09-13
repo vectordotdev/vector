@@ -56,7 +56,7 @@ description = "The endpoint used to ship logs to."
 
 <%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.loki.options",
-  encodings: ["json", "text"],
+  encodings: ["ndjson", "text"],
   default: "json"
 ) %>
 

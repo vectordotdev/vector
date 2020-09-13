@@ -60,8 +60,9 @@ pub struct LokiConfig {
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 enum Encoding {
-    #[derivative(Default)]
-    Json,
+    // Deprecated name
+    #[serde(alias = "json"),derivative(Default)]
+    Ndjson,
     Text,
 }
 
@@ -145,7 +146,7 @@ impl HttpSink for LokiConfig {
 
         self.encoding.apply_rules(&mut event);
         let event = match &self.encoding.codec() {
-            Encoding::Json => serde_json::to_string(&event.as_log().all_fields())
+            Encoding::Ndjson => serde_json::to_string(&event.as_log().all_fields())
                 .expect("json encoding should never fail"),
 
             Encoding::Text => event
