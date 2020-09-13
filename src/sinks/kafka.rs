@@ -64,7 +64,9 @@ fn default_message_timeout_ms() -> u64 {
 pub enum Encoding {
     #[derivative(Default)]
     Text,
-    Json,
+    // Deprecated name
+    #[serde(alias = "json")]
+    Ndjson,
 }
 
 pub struct KafkaSink {
@@ -263,7 +265,7 @@ fn encode_event(
         .unwrap_or_default();
 
     let body = match encoding.codec() {
-        Encoding::Json => serde_json::to_vec(&event.as_log()).unwrap(),
+        Encoding::Ndjson => serde_json::to_vec(&event.as_log()).unwrap(),
         Encoding::Text => event
             .as_log()
             .get(&log_schema().message_key())
@@ -304,7 +306,7 @@ mod tests {
         let (key, bytes) = encode_event(
             event,
             &Some("key".into()),
-            &EncodingConfig::from(Encoding::Json),
+            &EncodingConfig::from(Encoding::Ndjson),
         );
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
