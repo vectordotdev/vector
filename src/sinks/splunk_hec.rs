@@ -72,7 +72,9 @@ lazy_static! {
 pub enum Encoding {
     #[derivative(Default)]
     Text,
-    Json,
+    // Deprecated name
+    #[serde(alias = "json")]
+    Ndjson,
 }
 
 fn default_host_key() -> Atom {
@@ -166,7 +168,7 @@ impl HttpSink for HecSinkConfig {
             .collect::<LogEvent>();
 
         let event = match self.encoding.codec() {
-            Encoding::Json => json!(event),
+            Encoding::Ndjson => json!(event),
             Encoding::Text => json!(event
                 .get(&log_schema().message_key())
                 .map(|v| v.to_string_lossy())
@@ -516,7 +518,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let indexed_fields = vec![Atom::from("asdf")];
-        let config = config(Encoding::Json, indexed_fields).await;
+        let config = config(Encoding::Ndjson, indexed_fields).await;
         let (sink, _) = config.build(cx).unwrap();
 
         let message = random_string(100);
@@ -536,7 +538,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let indexed_fields = vec![Atom::from("asdf")];
-        let config = config(Encoding::Json, indexed_fields).await;
+        let config = config(Encoding::Ndjson, indexed_fields).await;
         let (sink, _) = config.build(cx).unwrap();
 
         let message = random_string(100);
@@ -559,7 +561,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let indexed_fields = vec![Atom::from("asdf")];
-        let mut config = config(Encoding::Json, indexed_fields).await;
+        let mut config = config(Encoding::Ndjson, indexed_fields).await;
         config.sourcetype = Template::try_from("_json".to_string()).ok();
 
         let (sink, _) = config.build(cx).unwrap();
@@ -584,7 +586,7 @@ mod integration_tests {
 
         let config = HecSinkConfig {
             host_key: "roast".into(),
-            ..config(Encoding::Json, vec![Atom::from("asdf")]).await
+            ..config(Encoding::Ndjson, vec![Atom::from("asdf")]).await
         };
 
         let (sink, _) = config.build(cx).unwrap();
