@@ -50,7 +50,7 @@ write_to_description = "[Amazon Web Service's CloudWatch Logs service][urls.aws_
 
 <%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.aws_cloudwatch_logs.options",
-  encodings: ["json", "text"]
+  encodings: ["ndjson", "text"]
 ) %>
 
 <%= render("_partials/fields/_compression_options.toml",

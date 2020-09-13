@@ -136,7 +136,9 @@ pub struct CloudwatchLogsPartitionSvc {
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
     Text,
-    Json,
+    // Deprecated name
+    #[serde(alias = "json")]
+    Ndjson,
 }
 
 #[derive(Debug)]
@@ -413,7 +415,7 @@ fn encode_log(
     };
 
     let message = match encoding.codec() {
-        Encoding::Json => serde_json::to_string(&log).unwrap(),
+        Encoding::Ndjson => serde_json::to_string(&log).unwrap(),
         Encoding::Text => log
             .get(&log_schema().message_key())
             .map(|v| v.to_string_lossy())
@@ -783,7 +785,7 @@ mod tests {
     fn cloudwatch_encoded_event_retains_timestamp() {
         let mut event = Event::from("hello world").into_log();
         event.insert("key", "value");
-        let encoded = encode_log(event.clone(), &Encoding::Json.into()).unwrap();
+        let encoded = encode_log(event.clone(), &Encoding::Ndjson.into()).unwrap();
 
         let ts = if let Value::Timestamp(ts) = event[&log_schema().timestamp_key()] {
             ts.timestamp_millis()
@@ -798,7 +800,7 @@ mod tests {
     fn cloudwatch_encode_log_as_json() {
         let mut event = Event::from("hello world").into_log();
         event.insert("key", "value");
-        let encoded = encode_log(event, &Encoding::Json.into()).unwrap();
+        let encoded = encode_log(event, &Encoding::Ndjson.into()).unwrap();
         let map: HashMap<Atom, String> = serde_json::from_str(&encoded.message[..]).unwrap();
         assert!(map.get(&log_schema().timestamp_key()).is_none());
     }
