@@ -55,14 +55,15 @@ inventory::submit! {
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum Encoding {
-    #[derivative(Default)]
-    Json,
+     // Deprecated name
+     #[serde(alias = "json"),derivative(Default)]
+     Ndjson,
 }
 
 impl From<Encoding> for crate::sinks::http::Encoding {
     fn from(v: Encoding) -> crate::sinks::http::Encoding {
         match v {
-            Encoding::Json => crate::sinks::http::Encoding::Json,
+            Encoding::Ndjson => crate::sinks::http::Encoding::Ndjson,
         }
     }
 }
@@ -179,7 +180,7 @@ mod tests {
             "https://log-api.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
-        assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
+        assert_eq!(http_config.encoding.codec(), &Encoding::Ndjson.into());
         assert_eq!(
             http_config.batch.max_bytes,
             Some(bytesize::mib(5u64) as usize)
@@ -213,7 +214,7 @@ mod tests {
             "https://log-api.eu.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
-        assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
+        assert_eq!(http_config.encoding.codec(), &Encoding::Ndjson.into());
         assert_eq!(
             http_config.batch.max_bytes,
             Some(bytesize::mib(8u64) as usize)
@@ -253,7 +254,7 @@ mod tests {
             "https://log-api.eu.newrelic.com/log/v1".to_string()
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
-        assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
+        assert_eq!(http_config.encoding.codec(), &Encoding::Ndjson.into());
         assert_eq!(
             http_config.batch.max_bytes,
             Some(bytesize::mib(8u64) as usize)

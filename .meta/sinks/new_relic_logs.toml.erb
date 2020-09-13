@@ -76,6 +76,6 @@ eu = "The EU region"
 
 <%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.new_relic_logs.options",
-  encodings: ["json"],
-  default: "json"
+  encodings: ["ndjson"],
+  default: "ndjson"
 ) %>
