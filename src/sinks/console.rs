@@ -38,7 +38,9 @@ pub struct ConsoleSinkConfig {
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
     Text,
-    Json,
+    // Deprecated name
+    #[serde(alias = "json")]
+    Ndjson,
 }
 
 inventory::submit! {
@@ -81,7 +83,7 @@ fn encode_event(
     encoding.apply_rules(&mut event);
     match event {
         Event::Log(log) => match encoding.codec() {
-            Encoding::Json => serde_json::to_string(&log),
+            Encoding::Ndjson => serde_json::to_string(&log),
             Encoding::Text => {
                 let s = log
                     .get(&crate::config::log_schema().message_key())
@@ -91,7 +93,7 @@ fn encode_event(
             }
         },
         Event::Metric(metric) => match encoding.codec() {
-            Encoding::Json => serde_json::to_string(&metric),
+            Encoding::Ndjson => serde_json::to_string(&metric),
             Encoding::Text => Ok(format!("{}", metric)),
         },
     }
@@ -154,7 +156,7 @@ mod test {
         log.insert("z", Value::from(25));
         log.insert("a", Value::from("0"));
 
-        let encoded = encode_event(event, &EncodingConfig::from(Encoding::Json));
+        let encoded = encode_event(event, &EncodingConfig::from(Encoding::Ndjson));
         let expected = r#"{"a":"0","x":"23","z":25}"#;
         assert_eq!(encoded.unwrap(), expected);
     }
@@ -178,7 +180,7 @@ mod test {
         });
         assert_eq!(
             r#"{"name":"foos","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"Key3":"Value3","key1":"value1","key2":"value2"},"kind":"incremental","counter":{"value":100.0}}"#,
-            encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
+            encode_event(event, &EncodingConfig::from(Encoding::Ndjson)).unwrap()
         );
     }
 
@@ -195,7 +197,7 @@ mod test {
         });
         assert_eq!(
             r#"{"name":"users","timestamp":null,"tags":null,"kind":"incremental","set":{"values":["bob"]}}"#,
-            encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
+            encode_event(event, &EncodingConfig::from(Encoding::Ndjson)).unwrap()
         );
     }
 
@@ -214,7 +216,7 @@ mod test {
         });
         assert_eq!(
             r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","distribution":{"values":[10.0],"sample_rates":[1],"statistic":"histogram"}}"#,
-            encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
+            encode_event(event, &EncodingConfig::from(Encoding::Ndjson)).unwrap()
         );
     }
 

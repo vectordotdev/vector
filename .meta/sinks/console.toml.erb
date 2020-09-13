@@ -25,7 +25,7 @@ write_to_description = "[standard output streams][urls.standard_streams], such a
 <%= render(
   "_partials/fields/_encoding_options.toml",
   namespace: "sinks.console.options",
-  encodings: ["json", "text"]
+  encodings: ["ndjson", "text"]
 ) %>
 
 [sinks.console.options.target]
