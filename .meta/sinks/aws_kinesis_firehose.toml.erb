@@ -52,7 +52,7 @@ write_to_description = "[Amazon Web Service's Kinesis Data Firehose][urls.aws_ki
 
 <%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.aws_kinesis_firehose.options",
-  encodings: ["json", "text"]
+  encodings: ["ndjson", "text"]
 ) %>
 
 <%= render("_partials/fields/_compression_options.toml",
