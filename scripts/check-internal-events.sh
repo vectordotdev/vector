@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016
 exec find src/internal_events -type f -name \*.rs -exec awk '
   BEGIN {
     RS = ""
