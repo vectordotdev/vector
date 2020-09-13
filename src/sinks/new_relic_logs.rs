@@ -55,10 +55,10 @@ inventory::submit! {
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum Encoding {
-     // Deprecated name
-     #[serde(alias = "json")]
+    // Deprecated name
+    #[serde(alias = "json")]
     #[derivative(Default)]
-     Ndjson,
+    Ndjson,
 }
 
 impl From<Encoding> for crate::sinks::http::Encoding {
