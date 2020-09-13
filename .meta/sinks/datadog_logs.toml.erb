@@ -27,7 +27,7 @@ requirements = {}
 <%= render(
   "_partials/fields/_encoding_options.toml",
   namespace: "sinks.datadog_logs.options",
-  encodings: ["json", "text"]
+  encodings: ["ndjson", "text"]
 ) %>
 
 [sinks.datadog_logs.options.api_key]

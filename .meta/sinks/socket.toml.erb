@@ -31,7 +31,7 @@ write_to_description = "a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP
 
 <%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.socket.options",
-  encodings: ["json", "text"],
+  encodings: ["ndjson", "text"],
   groups: ["tcp", "udp", "unix"]
 ) %>
 

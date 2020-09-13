@@ -28,7 +28,7 @@ write_to_description = "[Papertrail][urls.papertrail] via [Syslog][urls.papertra
 
 <%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.papertrail.options",
-  encodings: ["json", "text"],
+  encodings: ["ndjson", "text"],
 ) %>
 
 [sinks.papertrail.options.endpoint]

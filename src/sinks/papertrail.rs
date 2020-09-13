@@ -91,7 +91,7 @@ fn encode_event(
     let log = event.into_log();
 
     let message = match encoding.codec() {
-        Encoding::Json => serde_json::to_string(&log).unwrap(),
+        Encoding::Ndjson => serde_json::to_string(&log).unwrap(),
         Encoding::Text => log
             .get(&log_schema().message_key())
             .map(|v| v.to_string_lossy())

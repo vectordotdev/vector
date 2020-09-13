@@ -51,7 +51,9 @@ enum SinkBuildError {
 #[serde(rename_all = "snake_case")]
 pub enum Encoding {
     Text,
-    Json,
+    // Deprecated name
+    #[serde(alias = "json")]
+    Ndjson,
 }
 
 /**
@@ -64,7 +66,7 @@ pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Op
     let log = event.into_log();
 
     let b = match encoding.codec() {
-        Encoding::Json => serde_json::to_vec(&log),
+        Encoding::Ndjson => serde_json::to_vec(&log),
         Encoding::Text => {
             let bytes = log
                 .get(&crate::config::log_schema().message_key())
