@@ -93,6 +93,6 @@ description = "The optional endpoint to send Humio logs to."
 
 <%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.humio_logs.options",
-  encodings: ["json", "text"],
+  encodings: ["ndjson", "text"],
   default: "json"
 ) %>

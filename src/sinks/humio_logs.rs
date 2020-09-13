@@ -43,15 +43,16 @@ inventory::submit! {
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
 pub enum Encoding {
-    #[derivative(Default)]
-    Json,
+    // Deprecated name
+    #[serde(alias = "json"),derivative(Default)]
+    Ndjson,
     Text,
 }
 
 impl From<Encoding> for splunk_hec::Encoding {
     fn from(v: Encoding) -> Self {
         match v {
-            Encoding::Json => splunk_hec::Encoding::Json,
+            Encoding::Ndjson => splunk_hec::Encoding::Ndjson,
             Encoding::Text => splunk_hec::Encoding::Text,
         }
     }
@@ -259,7 +260,7 @@ mod integration_tests {
             endpoint: Some(HOST.to_string()),
             token: token.to_string(),
             compression: Compression::None,
-            encoding: Encoding::Json.into(),
+            encoding: Encoding::Ndjson.into(),
             batch: BatchConfig {
                 max_events: Some(1),
                 ..Default::default()
