@@ -338,5 +338,5 @@ fn encode_priority(severity: Severity, facility: Facility) -> u8 {
 }
 
 fn tcp_json_sink(address: String) -> SocketSinkConfig {
-    SocketSinkConfig::make_tcp_config(address, EncodingConfig::from(Encoding::Json), None)
+    SocketSinkConfig::make_tcp_config(address, EncodingConfig::from(Encoding::Ndjson), None)
 }
