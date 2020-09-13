@@ -52,7 +52,7 @@ impl<'a> InternalEvent for DockerContainerEventReceived<'a> {
         );
     }
 }
-length
+
 #[derive(Debug)]
 pub struct DockerContainerWatch<'a> {
     pub container_id: &'a str,
