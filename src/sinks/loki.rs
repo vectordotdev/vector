@@ -61,7 +61,8 @@ pub struct LokiConfig {
 #[derivative(Default)]
 enum Encoding {
     // Deprecated name
-    #[serde(alias = "json"),derivative(Default)]
+    #[serde(alias = "json")]
+    #[derivative(Default)]
     Ndjson,
     Text,
 }

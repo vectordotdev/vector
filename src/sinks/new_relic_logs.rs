@@ -56,14 +56,15 @@ inventory::submit! {
 #[derivative(Default)]
 pub enum Encoding {
      // Deprecated name
-     #[serde(alias = "json"),derivative(Default)]
+     #[serde(alias = "json")]
+    #[derivative(Default)]
      Ndjson,
 }
 
 impl From<Encoding> for crate::sinks::http::Encoding {
     fn from(v: Encoding) -> crate::sinks::http::Encoding {
         match v {
-            Encoding::Ndjson => crate::sinks::http::Encoding::Ndjson,
+            Encoding::Ndjson => crate::sinks::http::Encoding::Json,
         }
     }
 }
