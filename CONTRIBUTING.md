@@ -209,7 +209,7 @@ $ curl -u "$GITHUB_USERNAME:$GITHUB_TOKEN" \
 
 ##### Test harness
 
-You can invoke the [test hardness][urls.vector_test_harness] by commenting on
+You can invoke the [test harness][urls.vector_test_harness] by commenting on
 any pull request with:
 
 ```
@@ -477,10 +477,10 @@ to run. A few rules when setting up integration tests:
 
 - [ ] To ensure all contributors can run integration tests, the service must
       run in a Docker container.
-- [ ] The service must be configured on a unique port that configured through an
-      environment variable.
+- [ ] The service must be configured on a unique port that is configured through
+      an environment variable.
 - [ ] Add a `test-integration-<name>` to Vector's [`Makefile`](/Makefile) and
-      ensure that is starts the service before running the integration test.
+      ensure that it starts the service before running the integration test.
 - [ ] Add a `test-integration-<name>` job to Vector's
       [`.github/workflows/test.yml`](.github/workflows/test.yml) workflow and
       call your make target accordingly.
@@ -494,7 +494,7 @@ make test-integration-<name>
 #### Blackbox Tests
 
 Vector also offers blackbox testing via
-[Vector's test hardness][urls.vector_test_harness]. This is a complex testing
+[Vector's test harness][urls.vector_test_harness]. This is a complex testing
 suite that tests Vector's performance in real-world environments. It is
 typically used for benchmarking, but also correctness testing.
 
@@ -548,7 +548,7 @@ This will create a `100MiB` sample log file in the `sample.log` file.
 
 All benchmarks are placed in the [`/benches`](/benches) folder. You can
 run benchmarks via the `make benchmarks` command. In addition, Vector
-maintains a full [test hardness][urls.vector_test_harness] for complex
+maintains a full [test harness][urls.vector_test_harness] for complex
 end-to-end integration and performance testing.
 
 ### Profiling
