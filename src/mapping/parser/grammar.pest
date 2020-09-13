@@ -60,7 +60,8 @@ query_function = {
     md5 |
     now |
     strip_whitespace |
-    truncate
+    truncate |
+    parse_json
 }
 
 to_string = { "to_string(" ~ query_arithmetic ~ ("," ~ (string | null) )? ~ ")"}
@@ -77,6 +78,7 @@ md5 = { "md5(" ~ query_arithmetic ~ ")" }
 now = { "now(" ~ query_arithmetic ~ ")" }
 strip_whitespace = { "strip_whitespace(" ~ query_arithmetic ~ ")"}
 truncate = { "truncate(" ~ query_arithmetic ~ "," ~ query_arithmetic ~ ("," ~ boolean)? ~ ")" }
+parse_json = { "parse_json(" ~ query_arithmetic ~ ")" }
 
 group = { "(" ~ query_arithmetic ~ ")" }
 

@@ -440,6 +440,7 @@ impl Function for NowFn {
 
 //------------------------------------------------------------------------------
 
+#[derive(Debug)]
 pub(in crate::mapping) struct TruncateFn {
     query: Box<dyn Function>,
     limit: Box<dyn Function>,
@@ -511,11 +512,39 @@ impl Function for TruncateFn {
 
 //------------------------------------------------------------------------------
 
+#[derive(Debug)]
+pub(in crate::mapping) struct ParseJsonFn {
+    query: Box<dyn Function>,
+}
+
+impl ParseJsonFn {
+    pub(in crate::mapping) fn new(query: Box<dyn Function>) -> Self {
+        ParseJsonFn { query }
+    }
+}
+
+impl Function for ParseJsonFn {
+    fn execute(&self, ctx: &Event) -> Result<Value> {
+        let value = self.query.execute(ctx)?;
+        if let Value::Bytes(bytes) = value {
+            match serde_json::from_slice::<serde_json::Value>(&bytes) {
+                Ok(value) => Ok(value.into()),
+                Err(err) => Err(format!("unable to parse json {}", err)),
+            }
+        } else {
+            Err("unable to apply \"parse_json\" to non-string types".to_string())
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::mapping::query::{path::Path, Literal};
     use chrono::{DateTime, Utc};
+    use std::collections::BTreeMap;
 
     #[test]
     fn check_not_operator() {
@@ -1011,6 +1040,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn check_strip_whitespace() {
         let cases = vec![
             (
@@ -1187,6 +1217,60 @@ mod tests {
                     Box::new(Literal::from(Value::Float(5.0))),
                     Some(Value::Boolean(true)),
                 ),
+            ),
+        ];
+
+        for (input_event, exp, query) in cases {
+            assert_eq!(query.execute(&input_event), exp);
+        }
+    }
+
+    #[test]
+    fn check_parse_json() {
+        let cases = vec![
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::from("42"));
+                    event
+                },
+                Ok(Value::from(42)),
+                ParseJsonFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::from("\"hello\""));
+                    event
+                },
+                Ok(Value::from("hello")),
+                ParseJsonFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event
+                        .as_mut_log()
+                        .insert("foo", Value::from("{\"field\": \"value\"}"));
+                    event
+                },
+                Ok(Value::Map({
+                    let mut map = BTreeMap::new();
+                    map.insert("field".into(), Value::from("value"));
+                    map
+                })),
+                ParseJsonFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event
+                        .as_mut_log()
+                        .insert("foo", Value::from("{\"field\"x \"value\"}"));
+                    event
+                },
+                Err("unable to parse json expected `:` at line 1 column 9".into()),
+                ParseJsonFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
         ];
 
