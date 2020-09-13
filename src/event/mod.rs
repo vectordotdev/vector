@@ -3,10 +3,6 @@ use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
-use serde::{Serialize, Serializer};
-use serde_json::Value as JsonValue;
-use std::{collections::BTreeMap, iter::FromIterator};
-use metric::{MetricKind, MetricValue};
 use std::collections::{BTreeMap, HashMap};
 use string_cache::DefaultAtom as Atom;
 
@@ -16,13 +12,11 @@ pub mod merge_state;
 pub mod metric;
 pub mod util;
 
-pub use log_schema::{log_schema, LogSchema, LOG_SCHEMA};
-pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 mod log_event;
 mod value;
 
 pub use log_event::LogEvent;
-pub use metric::{Metric, StatisticKind};
+pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use std::convert::{TryFrom, TryInto};
 pub(crate) use util::log::PathComponent;
 pub(crate) use util::log::PathIter;
