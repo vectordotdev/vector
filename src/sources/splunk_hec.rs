@@ -931,7 +931,7 @@ mod tests {
         trace_init();
 
         let message = "one_simple_json_event";
-        let (sink, source) = start(Encoding::Json, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Ndjson, Compression::Gzip).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
@@ -948,7 +948,7 @@ mod tests {
         trace_init();
 
         let n = 200;
-        let (sink, source) = start(Encoding::Json, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Ndjson, Compression::Gzip).await;
 
         let messages = (0..n)
             .map(|i| format!("multiple_simple_json_event{}", i))
@@ -969,7 +969,7 @@ mod tests {
     async fn json_event() {
         trace_init();
 
-        let (sink, source) = start(Encoding::Json, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Ndjson, Compression::Gzip).await;
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("greeting", "hello");
@@ -990,7 +990,7 @@ mod tests {
     async fn line_to_message() {
         trace_init();
 
-        let (sink, source) = start(Encoding::Json, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Ndjson, Compression::Gzip).await;
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("line", "hello");

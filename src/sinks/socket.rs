@@ -101,7 +101,7 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Udp(UdpSinkConfig {
                 address: addr.to_string(),
-                encoding: Encoding::Json.into(),
+                encoding: Encoding::Ndjson.into(),
             }),
         };
         let context = SinkContext::new_test();
@@ -145,7 +145,7 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
                 address: addr.to_string(),
-                encoding: Encoding::Json.into(),
+                encoding: Encoding::Ndjson.into(),
                 tls: None,
             }),
         };
