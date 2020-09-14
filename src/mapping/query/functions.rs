@@ -4,7 +4,7 @@ use crate::{
     mapping::Result,
     types::Conversion,
 };
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 
 #[derive(Debug)]
 pub(in crate::mapping) struct NotFn {
@@ -225,15 +225,10 @@ impl UpcaseFn {
 impl Function for UpcaseFn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
         match self.query.execute(ctx)? {
-            Value::Bytes(bytes) => {
-                let mut buf = BytesMut::with_capacity(bytes.len());
-
-                buf.extend_from_slice(&bytes);
-                buf.iter_mut().for_each(|c| c.make_ascii_uppercase());
-
-                Ok(Value::Bytes(buf.freeze()))
-            }
-            _ => Err("unable to upcase non-string types".to_string()),
+            Value::Bytes(bytes) => Ok(Value::Bytes(
+                bytes.iter().map(|c| c.to_ascii_uppercase()).collect(),
+            )),
+            _ => Err(r#"unable to apply "upcase" to non-string types"#.to_string()),
         }
     }
 }
@@ -254,15 +249,10 @@ impl DowncaseFn {
 impl Function for DowncaseFn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
         match self.query.execute(ctx)? {
-            Value::Bytes(bytes) => {
-                let mut buf = BytesMut::with_capacity(bytes.len());
-
-                buf.extend_from_slice(&bytes);
-                buf.iter_mut().for_each(|c| c.make_ascii_lowercase());
-
-                Ok(Value::Bytes(buf.freeze()))
-            }
-            _ => Err("unable to downcase non-string types".to_string()),
+            Value::Bytes(bytes) => Ok(Value::Bytes(
+                bytes.iter().map(|c| c.to_ascii_lowercase()).collect(),
+            )),
+            _ => Err(r#"unable to apply "downcase" to non-string types"#.to_string()),
         }
     }
 }
@@ -309,7 +299,7 @@ impl Function for Sha1Fn {
                 let sha1 = hex::encode(Sha1::digest(&bytes));
                 Ok(Value::Bytes(sha1.into()))
             }
-            _ => Err("unable to sha1 encode non-string types".to_string()),
+            _ => Err(r#"unable to apply "sha1" to non-string types"#.to_string()),
         }
     }
 }
@@ -336,7 +326,7 @@ impl Function for Md5Fn {
                 let md5 = hex::encode(Md5::digest(&bytes));
                 Ok(Value::Bytes(md5.into()))
             }
-            _ => Err("unable to md5 encode non-string types".to_string()),
+            _ => Err(r#"unable to apply "md5" to non-string types"#.to_string()),
         }
     }
 }
@@ -369,7 +359,7 @@ impl Function for NowFn {
 
                 Ok(Value::Bytes(dt.into()))
             }
-            _ => Err("unable to use non-string type as timezone".to_string()),
+            _ => Err(r#"unable to use non-string types for "now" function"#.to_string()),
         }
     }
 }
@@ -674,7 +664,7 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::Integer(20));
                     event
                 },
-                Err("unable to upcase non-string types".to_owned()),
+                Err(r#"unable to apply "upcase" to non-string types"#.to_string()),
                 UpcaseFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
             (
@@ -683,7 +673,7 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::Boolean(true));
                     event
                 },
-                Err("unable to upcase non-string types".to_owned()),
+                Err(r#"unable to apply "upcase" to non-string types"#.to_string()),
                 UpcaseFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
         ];
@@ -716,7 +706,7 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::Integer(20));
                     event
                 },
-                Err("unable to downcase non-string types".to_owned()),
+                Err(r#"unable to apply "downcase" to non-string types"#.to_string()),
                 DowncaseFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
             (
@@ -725,7 +715,7 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::Boolean(true));
                     event
                 },
-                Err("unable to downcase non-string types".to_owned()),
+                Err(r#"unable to apply "downcase" to non-string types"#.to_string()),
                 DowncaseFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
         ];
@@ -768,7 +758,7 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::Integer(20));
                     event
                 },
-                Err("unable to sha1 encode non-string types".to_owned()),
+                Err(r#"unable to apply "sha1" to non-string types"#.to_string()),
                 Sha1Fn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
             (
@@ -777,7 +767,7 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::Boolean(true));
                     event
                 },
-                Err("unable to sha1 encode non-string types".to_owned()),
+                Err(r#"unable to apply "sha1" to non-string types"#.to_string()),
                 Sha1Fn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
         ];
@@ -810,7 +800,7 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::Integer(20));
                     event
                 },
-                Err("unable to md5 encode non-string types".to_owned()),
+                Err(r#"unable to apply "md5" to non-string types"#.to_string()),
                 Md5Fn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
             (
@@ -819,7 +809,7 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::Boolean(true));
                     event
                 },
-                Err("unable to md5 encode non-string types".to_owned()),
+                Err(r#"unable to apply "md5" to non-string types"#.to_string()),
                 Md5Fn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
         ];
