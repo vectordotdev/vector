@@ -182,7 +182,7 @@ The review process is outlined in the [Review guide](REVIEWING.md).
 
 All pull requests are squashed and merged. We generally discourage large pull
 requests that are over 300-500 lines of diff. If you would like to propose a
-change that is larger we suggest coming onto our gitter channel and discuss it
+change that is larger we suggest coming onto our [Discord server](https://chat.vector.dev/) and discuss it
 with one of our engineers. This way we can talk through the solution and
 discuss if a change that large is even needed! This will produce a quicker
 response to the change and likely produce code that aligns better with our
