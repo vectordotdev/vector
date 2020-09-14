@@ -60,7 +60,7 @@ impl UdpSinkConfig {
     }
 
     pub fn build_service(&self, cx: SinkContext) -> crate::Result<(UdpService, Healthcheck)> {
-        let (connector, healthcheck) = self.build_connector(cx.clone())?;
+        let (connector, healthcheck) = self.build_connector(cx)?;
         Ok((connector.into(), healthcheck))
     }
 
@@ -97,7 +97,7 @@ impl UdpConnector {
     fn connect(&self) -> BoxFuture<'static, Result<UdpSocket, UdpError>> {
         let host = self.host.clone();
         let port = self.port;
-        let resolver = self.resolver.clone();
+        let resolver = self.resolver;
 
         async move {
             let ip = resolver

@@ -84,7 +84,7 @@ impl TcpSinkConfig {
     }
 
     pub fn build_service(&self, cx: SinkContext) -> crate::Result<(TcpService, Healthcheck)> {
-        let connector = self.build_connector(cx.clone())?;
+        let connector = self.build_connector(cx)?;
         let healthcheck = connector.healthcheck();
         Ok((connector.into(), healthcheck))
     }
@@ -117,7 +117,7 @@ impl TcpConnector {
     fn connect(&self) -> BoxFuture<'static, Result<TcpOrTlsStream, TcpError>> {
         let host = self.host.clone();
         let port = self.port;
-        let resolver = self.resolver.clone();
+        let resolver = self.resolver;
         let tls = self.tls.clone();
 
         async move {
