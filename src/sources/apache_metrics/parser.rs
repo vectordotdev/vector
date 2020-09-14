@@ -179,7 +179,10 @@ pub fn parse(
     now: DateTime<Utc>,
     tags: Option<&BTreeMap<String, String>>,
 ) -> impl Iterator<Item = Result<Metric, ParseError>> {
-    let mut parsed = payload
+    // We use a HashMap rather than a Vector as mod_status has
+    // BusyWorkers/IdleWorkers repeated
+    // https://bz.apache.org/bugzilla/show_bug.cgi?id=63300
+    let parsed = payload
         .lines()
         .into_iter()
         .filter_map(|l| {
@@ -191,13 +194,7 @@ pub fn parse(
                 _ => None,
             }
         })
-        .collect::<Vec<_>>();
-
-    // mod_status has BusyWorkers/IdleWorkers repeated
-    // https://bz.apache.org/bugzilla/show_bug.cgi?id=63300
-    // TODO better way to do this without .collect()ing? Do we care?
-    parsed.sort();
-    parsed.dedup();
+        .collect::<HashMap<_, _>>();
 
     parsed
         .iter()
