@@ -81,7 +81,6 @@ impl ConfigBuilder {
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
-        // API
         #[cfg(feature = "api")]
         api::update_config(self, &with);
 

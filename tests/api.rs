@@ -32,7 +32,7 @@ mod tests {
     )]
     struct HeartbeatSubscription;
 
-    // provides a config that enables the API server, assigned to a random port. Implicitly
+    // Provides a config that enables the API server, assigned to a random port. Implicitly
     // tests that the config shape matches expectations
     fn api_enabled_config() -> Config {
         let mut config = Config::builder();
@@ -44,7 +44,7 @@ mod tests {
         config.build().unwrap()
     }
 
-    // returns the result of a URL test against the API. Wraps the test in retry_until
+    // Returns the result of a URL test against the API. Wraps the test in retry_until
     // to guard against the race condition of the TCP listener not being ready
     async fn url_test(config: Config, url: &'static str) -> reqwest::Response {
         let addr = config.api.bind.unwrap();
