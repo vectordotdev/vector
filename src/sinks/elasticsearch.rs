@@ -336,7 +336,7 @@ impl RetryLogic for ElasticSearchRetryLogic {
                                     reason = %error.reason,
                                     rate_limit_secs = 30
                                 ),
-                                _ => warn!(
+                                None => warn!(
                                     message = "Unusual ElasticSearch error response",
                                     %body,
                                     rate_limit_secs = 30

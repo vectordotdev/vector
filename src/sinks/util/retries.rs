@@ -97,18 +97,18 @@ where
         match result {
             Ok(response) => {
                 if self.remaining_attempts == 0 {
-                    error!("Retries exhausted");
+                    error!("retries exhausted; dropping the request.");
                     return None;
                 }
 
                 match self.logic.should_retry_response(response) {
                     RetryAction::Retry(reason) => {
-                        warn!(message = "Retrying after response.", %reason);
+                        warn!(message = "retrying after response.", %reason);
                         Some(self.build_retry())
                     }
 
                     RetryAction::DontRetry(reason) => {
-                        error!(message = "Request is not retryable; dropping the request.", %reason);
+                        error!(message = "not retriable; dropping the request.", %reason);
                         None
                     }
 
@@ -117,7 +117,7 @@ where
             }
             Err(error) => {
                 if self.remaining_attempts == 0 {
-                    error!(message = "retries exhausted.", %error);
+                    error!(message = "retries exhausted; dropping the request.", %error);
                     return None;
                 }
 
@@ -126,14 +126,14 @@ where
                         warn!("retrying after error: {}", expected);
                         Some(self.build_retry())
                     } else {
-                        error!(message = "encountered non-retriable error.", %error);
+                        error!(message = "non-retriable error; dropping the request.", %error);
                         None
                     }
                 } else if error.downcast_ref::<Elapsed>().is_some() {
                     warn!("request timed out.");
                     Some(self.build_retry())
                 } else {
-                    error!(message = "unexpected error type.", %error);
+                    error!(message = "unexpected error type; dropping the request.", %error);
                     None
                 }
             }
