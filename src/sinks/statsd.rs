@@ -213,8 +213,19 @@ impl Service<Vec<u8>> for StatsdSvc {
     type Error = StatsdError;
     type Future = future::BoxFuture<'static, Result<(), Self::Error>>;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        match &mut self.client {
+            Client::Tcp(service) => service
+                .poll_ready(cx)
+                .map_err(|source| StatsdError::Tcp { source }),
+            Client::Udp(service) => service
+                .poll_ready(cx)
+                .map_err(|source| StatsdError::Udp { source }),
+            #[cfg(unix)]
+            Client::Unix(service) => service
+                .poll_ready(cx)
+                .map_err(|source| StatsdError::Unix { source }),
+        }
     }
 
     fn call(&mut self, mut frame: Vec<u8>) -> Self::Future {
