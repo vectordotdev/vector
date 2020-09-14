@@ -1,4 +1,4 @@
-# .PHONY: $(MAKECMDGOALS) all
+.PHONY: $(MAKECMDGOALS)
 .DEFAULT_GOAL := help
 RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/scripts/docker-compose-run.sh)
 
