@@ -14,14 +14,11 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{
     future,
-    stream::{Stream, StreamExt},
+    stream::{BoxStream, StreamExt},
     FutureExt,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    pin::Pin,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
@@ -183,10 +180,7 @@ impl FileSink {
             .expect("unable to compute next deadline")
     }
 
-    async fn run(
-        &mut self,
-        mut input: Pin<Box<dyn Stream<Item = Result<Event, ()>> + Send>>,
-    ) -> crate::Result<()> {
+    async fn run(&mut self, mut input: BoxStream<'_, Result<Event, ()>>) -> crate::Result<()> {
         loop {
             tokio::select! {
                 event = input.next() => {
@@ -322,10 +316,7 @@ async fn write_event_to_file(
 
 #[async_trait]
 impl StreamSink2 for FileSink {
-    async fn run(
-        &mut self,
-        input: Pin<Box<dyn futures::Stream<Item = Result<Event, ()>> + Send>>,
-    ) -> Result<(), ()> {
+    async fn run(&mut self, input: BoxStream<'_, Result<Event, ()>>) -> Result<(), ()> {
         FileSink::run(self, input).await.expect("file sink error");
         Ok(())
     }

@@ -40,6 +40,7 @@ use crate::{buffers::Acker, Event};
 use async_trait::async_trait;
 use futures::{
     compat::{Compat, Future01CompatExt},
+    stream::BoxStream,
     FutureExt, TryFutureExt,
 };
 use futures01::{
@@ -52,7 +53,6 @@ use std::{
     fmt,
     hash::Hash,
     marker::PhantomData,
-    pin::Pin,
 };
 use tokio::time::{delay_for, Duration};
 use tower::Service;
@@ -137,10 +137,7 @@ impl<T: Sink> Sink for StreamSink<T> {
 
 #[async_trait]
 pub trait StreamSink2 {
-    async fn run(
-        &mut self,
-        input: Pin<Box<dyn futures::Stream<Item = Result<Event, ()>> + Send>>,
-    ) -> Result<(), ()>;
+    async fn run(&mut self, input: BoxStream<'_, Result<Event, ()>>) -> Result<(), ()>;
 }
 
 // === BatchSink ===

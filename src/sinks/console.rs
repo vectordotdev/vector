@@ -10,11 +10,10 @@ use crate::{
 use async_trait::async_trait;
 use futures::{
     future,
-    stream::{Stream, StreamExt},
+    stream::{BoxStream, StreamExt},
     FutureExt,
 };
 use serde::{Deserialize, Serialize};
-use std::pin::Pin;
 use tokio::io::{self, AsyncWriteExt};
 
 #[derive(Debug, Derivative, Deserialize, Serialize)]
@@ -119,10 +118,7 @@ struct WriterSink {
 
 #[async_trait]
 impl StreamSink2 for WriterSink {
-    async fn run(
-        &mut self,
-        mut input: Pin<Box<dyn Stream<Item = Result<Event, ()>> + Send>>,
-    ) -> Result<(), ()> {
+    async fn run(&mut self, mut input: BoxStream<'_, Result<Event, ()>>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
             if let Ok(event) = event {
                 write_event_to_output(&mut self.output, event, &self.encoding)
