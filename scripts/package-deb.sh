@@ -75,7 +75,7 @@ cargo deb --target "$TARGET" --deb-version "$PACKAGE_VERSION" --no-build
 # Rename the resulting .deb file to use - instead of _ since this
 # is consistent with our package naming scheme.
 for file in target/"${TARGET}"/debian/*.deb; do
-  base=$(basename ${file})
+  base=$(basename "${file}")
   renamed=${base//_/-}
   mv "${file}" target/"${TARGET}"/debian/"${renamed}";
 done
