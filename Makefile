@@ -1,4 +1,4 @@
-.PHONY: $(MAKECMDGOALS) all
+# .PHONY: $(MAKECMDGOALS) all
 .DEFAULT_GOAL := help
 RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/scripts/docker-compose-run.sh)
 
@@ -19,14 +19,16 @@ export SCOPE ?= ""
 export AUTOSPAWN ?= true
 # Override to control if services are turned off after integration tests.
 export AUTODESPAWN ?= ${AUTOSPAWN}
+# Override autoinstalling of tools. (Eg `cargo install`)
+export AUTOINSTALL ?= false
 # Override to true for a bit more log output in your environment building (more coming!)
 export VERBOSE ?= false
 # Override to set a different Rust toolchain
 export RUST_TOOLCHAIN ?= $(shell cat rust-toolchain)
-# Override the container tool. Tries podman first and then tries docker.
+# Override the container tool. Tries docker first and then tries podman.
 export CONTAINER_TOOL ?= auto
 ifeq ($(CONTAINER_TOOL),auto)
-	override CONTAINER_TOOL = $(shell podman version >/dev/null 2>&1 && echo podman || echo docker)
+	override CONTAINER_TOOL = $(shell docker version >/dev/null 2>&1 && echo docker || echo podman)
 endif
 # If we're using podman create pods else if we're using docker create networks.
 ifeq ($(CONTAINER_TOOL),podman)
@@ -42,7 +44,7 @@ export ENVIRONMENT_UPSTREAM ?= docker.pkg.github.com/timberio/vector/environment
 # Override to disable building the container, having it pull from the Github packages repo instead
 # TODO: Disable this by default. Blocked by `docker pull` from Github Packages requiring authenticated login
 export ENVIRONMENT_AUTOBUILD ?= true
-# Override this when appropriate to disable a TTY being available in commands with `ENVIRONMENT=true` (Useful for CI, but CI uses Nix!)
+# Override this when appropriate to disable a TTY being available in commands with `ENVIRONMENT=true`
 export ENVIRONMENT_TTY ?= true
 # A list of WASM modules by name
 export WASM_MODULES = $(patsubst tests/data/wasm/%/,%,$(wildcard tests/data/wasm/*/))
@@ -57,6 +59,10 @@ FORMATTING_BEGIN_YELLOW = \033[0;33m
 FORMATTING_BEGIN_BLUE = \033[36m
 FORMATTING_END = \033[0m
 
+# "One weird trick!" https://www.gnu.org/software/make/manual/make.html#Syntax-of-Functions
+EMPTY:=
+SPACE:= ${EMPTY} ${EMPTY}
+
 help:
 	@printf -- "${FORMATTING_BEGIN_BLUE}                                      __   __  __${FORMATTING_END}\n"
 	@printf -- "${FORMATTING_BEGIN_BLUE}                                      \ \ / / / /${FORMATTING_END}\n"
@@ -66,7 +72,6 @@ help:
 	@printf -- "                                      V E C T O R\n"
 	@printf -- "\n"
 	@printf -- "---------------------------------------------------------------------------------------\n"
-	@printf -- "Nix user? You can use ${FORMATTING_BEGIN_YELLOW}\`direnv allow .\`${FORMATTING_END} or ${FORMATTING_BEGIN_YELLOW}\`nix-shell --pure\`${FORMATTING_END}\n"
 	@printf -- "Want to use ${FORMATTING_BEGIN_YELLOW}\`docker\`${FORMATTING_END} or ${FORMATTING_BEGIN_YELLOW}\`podman\`${FORMATTING_END}? See ${FORMATTING_BEGIN_YELLOW}\`ENVIRONMENT=true\`${FORMATTING_END} commands. (Default ${FORMATTING_BEGIN_YELLOW}\`CONTAINER_TOOL=docker\`${FORMATTING_END})\n"
 	@printf -- "\n"
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make ${FORMATTING_BEGIN_BLUE}<target>${FORMATTING_END}\n"} /^[a-zA-Z0-9_-]+:.*?##/ { printf "  ${FORMATTING_BEGIN_BLUE}%-46s${FORMATTING_END} %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
@@ -175,8 +180,11 @@ build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`
 
 build-all: build-x86_64-unknown-linux-musl build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
 
-build-x86_64-unknown-linux-gnu: ## Build dynamically linked binary in release mode for the x86_64 architecture
-	$(RUN) build-x86_64-unknown-linux-gnu
+build-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/release/vector ## Build a release binary for the x86_64-unknown-linux-gnu triple.
+	@echo "Output to ${<}"
+
+build-aarch64-unknown-linux-gnu: target/aarch64-unknown-linux-gnu/release/vector ## Build a release binary for the aarch64-unknown-linux-gnu triple.
+	@echo "Output to ${<}"
 
 build-x86_64-unknown-linux-musl: ## Build static binary in release mode for the x86_64 architecture
 	$(RUN) build-x86_64-unknown-linux-musl
@@ -184,12 +192,70 @@ build-x86_64-unknown-linux-musl: ## Build static binary in release mode for the 
 build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in release mode for the aarch64 architecture
 	$(RUN) build-aarch64-unknown-linux-musl
 
+##@ Cross Compiling
+.PHONY: cross-enable
+cross-enable: cargo-install-cross
+
+.PHONY: CARGO_HANDLES_FRESHNESS
+CARGO_HANDLES_FRESHNESS:
+	${EMPTY}
+
+# This is basically a shorthand for folks.
+# `cross-anything-triple` will call `cross anything --target triple` with the right features.
+.PHONY: cross-%
+cross-%: export PAIR =$(subst -, ,$($(strip @):cross-%=%))
+cross-%: export COMMAND ?=$(word 1,${PAIR})
+cross-%: export TRIPLE ?=$(subst ${SPACE},-,$(wordlist 2,99,${PAIR}))
+cross-%: export PROFILE ?= release
+cross-%: export RUSTFLAGS += -C link-arg=-s
+cross-%: cargo-install-cross
+	cross ${COMMAND} \
+		$(if $(findstring release,$(PROFILE)),--release,) \
+		--target ${TRIPLE} \
+		--no-default-features \
+		--features target-${TRIPLE}
+
+target/%/vector: export PAIR =$(subst /, ,$(@:target/%/vector=%))
+target/%/vector: export TRIPLE ?=$(word 1,${PAIR})
+target/%/vector: export PROFILE ?=$(word 2,${PAIR})
+target/%/vector: export RUSTFLAGS += -C link-arg=-s
+target/%/vector: cargo-install-cross CARGO_HANDLES_FRESHNESS
+	cross build \
+		$(if $(findstring release,$(PROFILE)),--release,) \
+		--target ${TRIPLE} \
+		--no-default-features \
+		--features target-${TRIPLE}
+
+target/%/vector.tar.gz: export PAIR =$(subst /, ,$(@:target/%/vector.tar.gz=%))
+target/%/vector.tar.gz: export TRIPLE ?=$(word 1,${PAIR})
+target/%/vector.tar.gz: export PROFILE ?=$(word 2,${PAIR})
+target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
+	tar --create \
+		--gzip \
+		--verbose \
+		--file target/${TRIPLE}/${PROFILE}/vector.tar.gz \
+		--transform='s|target/${TRIPLE}/${PROFILE}/|bin/|' \
+		--transform='s|distribution/|etc/|' \
+		--transform 's|^|vector-${TRIPLE}/|' \
+		target/${TRIPLE}/${PROFILE}/vector \
+		README.md \
+		LICENSE \
+		config \
+		distribution/init.d \
+		distribution/systemd
+
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
 test: ## Run the unit test suite
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
 
 test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.
+
+test-x86_64-unknown-linux-gnu: cross-test-x86_64-unknown-linux-gnu ## Runs unit tests on the x86_64-unknown-linux-gnu triple
+	${EMPTY}
+
+test-aarch64-unknown-linux-gnu: cross-test-aarch64-unknown-linux-gnu ## Runs unit tests on the aarch64-unknown-linux-gnu triple
+	${EMPTY}
 
 test-behavior: ## Runs behaviorial test
 	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/**/*.toml
@@ -619,7 +685,10 @@ bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
 check: ## Run prerequisite code checks
 	${MAYBE_ENVIRONMENT_EXEC} cargo check --all --no-default-features --features ${DEFAULT_FEATURES}
 
-check-all: check-fmt check-clippy check-style check-markdown check-meta check-version check-examples check-component-features check-scripts ## Check everything
+check-all: ## Check everything
+check-all: check-fmt check-clippy check-style check-markdown check-meta
+check-all: check-version check-examples check-component-features
+check-all: check-scripts check-kubernetes-yaml
 
 check-component-features: ## Check that all component features are setup properly
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-component-features.sh
@@ -651,6 +720,9 @@ check-scripts: ## Check that scipts do not have common mistakes
 check-helm: ## Check that the Helm Chart passes helm lint
 	${MAYBE_ENVIRONMENT_EXEC} helm lint distribution/helm/vector
 
+check-kubernetes-yaml: ## Check that the generated Kubernetes YAML config is up to date
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh check
+
 ##@ Packaging
 
 package-all: package-archive-all package-deb-all package-rpm-all ## Build all packages
@@ -665,20 +737,38 @@ package-x86_64-unknown-linux-gnu-all: package-archive-x86_64-unknown-linux-gnu p
 package-aarch64-unknown-linux-musl-all: package-archive-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
 
 # archives
+.PHONY: package-archive
+
+target/artifacts/vector-%.tar.gz: export TRIPLE :=$(@:target/artifacts/vector-%.tar.gz=%)
+target/artifacts/vector-%.tar.gz: target/%/release/vector.tar.gz
+	@echo "Built to ${<}, relocating to ${@}"
+	@mkdir -p target/artifacts/
+	@cp -v \
+		${<} \
+		${@}
 
 package-archive: build ## Build the Vector archive
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/package-archive.sh
 
+.PHONY: package-archive-all
 package-archive-all: package-archive-x86_64-unknown-linux-musl package-archive-x86_64-unknown-linux-gnu package-archive-aarch64-unknown-linux-musl ## Build all archives
 
+.PHONY: package-archive-x86_64-unknown-linux-musl
 package-archive-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## Build the x86_64 archive
 	$(RUN) package-archive-x86_64-unknown-linux-musl
 
-package-archive-x86_64-unknown-linux-gnu: build-x86_64-unknown-linux-gnu ## Build the x86_64 archive
-	$(RUN) package-archive-x86_64-unknown-linux-gnu
+.PHONY: package-archive-x86_64-unknown-linux-gnu
+package-archive-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build an archive of the x86_64-unknown-linux-gnu triple.
+	@echo "Output to ${<}."
 
-package-archive-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## Build the aarch64 archive
+.PHONY: package-archive-aarch64-unknown-linux-musl
+package-archive-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## Build an archive of the aarch64-unknown-linux-gnu triple.
 	$(RUN) package-archive-aarch64-unknown-linux-musl
+
+.PHONY: package-archive-aarch64-unknown-linux-gnu
+package-archive-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build the aarch64 archive
+	@echo "Output to ${<}."
+
 
 # debs
 
@@ -780,9 +870,6 @@ verify-deb-artifact-on-ubuntu-18-04: package-deb-x86_64 ## Verify the deb packag
 verify-deb-artifact-on-ubuntu-20-04: package-deb-x86_64 ## Verify the deb package on Ubuntu 20.04
 	$(RUN) verify-deb-artifact-on-ubuntu-20-04
 
-verify-nixos:  ## Verify that Vector can be built on NixOS
-	$(RUN) verify-nixos
-
 ##@ Utility
 
 build-ci-docker-images: ## Rebuilds all Docker images used in CI
@@ -815,6 +902,13 @@ version: ## Get the current Vector version
 
 git-hooks: ## Add Vector-local git hooks for commit sign-off
 	@scripts/install-git-hooks.sh
+
+update-kubernetes-yaml: ## Regenerate the Kubernetes YAML config
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh update
+
+cargo-install-%: override TOOL = $(@:cargo-install-%=%)
+cargo-install-%:
+	$(if $(findstring true,$(AUTOINSTALL)),${MAYBE_ENVIRONMENT_EXEC} cargo install ${TOOL} --quiet,)
 
 .PHONY: ensure-has-wasm-toolchain ### Configures a wasm toolchain for test artifact building, if required
 ensure-has-wasm-toolchain: target/wasm32-wasi/.obtained
