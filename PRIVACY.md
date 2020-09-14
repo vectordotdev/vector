@@ -55,8 +55,8 @@ ways Vector can improve.
 
 ### Vector Chat
 
-The Vector chat uses Gitter, which is owned by Gitlab; you can review their
-privacy policy [here][gitter_pp].
+The Vector chat uses Discord; you can review their
+privacy policy [here][discord_pp].
 
 ### Vector Mailing List
 
@@ -65,6 +65,6 @@ The Vector mailing list uses Vero; you can review their privacy policy
 for any reason, and Vector will not send you spam email.
 
 [github_pp]: https://help.github.com/en/github/site-policy/github-privacy-statement
-[gitter_pp]: https://about.gitlab.com/privacy/
+[discord_pp]: https://discord.com/privacy/
 [netlify_analytics]: https://www.netlify.com/products/analytics/
 [vero_pp]: https://www.getvero.com/privacy/
