@@ -1,7 +1,7 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
-    event::{self, Event},
+    event::Event,
     internal_events::AwsKinesisStreamsEventSent,
     region::RegionOrEndpoint,
     sinks::util::{
@@ -13,7 +13,7 @@ use crate::{
     },
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, FutureExt, TryFutureExt};
+use futures::{future::BoxFuture, FutureExt};
 use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
 use rand::random;
@@ -77,11 +77,14 @@ inventory::submit! {
 
 #[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(cx.resolver())?;
-        let healthcheck = self.clone().healthcheck(client.clone()).boxed().compat();
+        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = KinesisService::new(self.clone(), client, cx)?;
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -273,7 +276,7 @@ fn encode_event(
     let data = match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
         Encoding::Text => log
-            .get(&event::log_schema().message_key())
+            .get(&log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };
@@ -302,10 +305,7 @@ fn gen_partition_key() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        event::{self, Event},
-        test_util::random_string,
-    };
+    use crate::{event::Event, test_util::random_string};
     use std::collections::BTreeMap;
 
     #[test]
@@ -325,7 +325,7 @@ mod tests {
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
-        assert_eq!(map[&event::log_schema().message_key().to_string()], message);
+        assert_eq!(map[&log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
     }
 

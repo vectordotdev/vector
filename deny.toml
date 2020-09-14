@@ -1,0 +1,12 @@
+[advisories]
+ignore = [
+    # net2: `net2` crate has been deprecated; use `socket2` instead
+    "RUSTSEC-2020-0016",
+    # spin: spin is no longer actively maintained
+    "RUSTSEC-2019-0031",
+    # failure: failure is officially deprecated/unmaintained
+    "RUSTSEC-2020-0036",
+    # sized-chunks: Multiple soundness issues in Chunk and InlineArray
+    # Tracking issue: https://github.com/timberio/vector/issues/3764
+    "RUSTSEC-2020-0041",
+]

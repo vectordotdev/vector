@@ -10,6 +10,7 @@ use futures::{
 };
 use futures01::{sync::mpsc, Stream as Stream01};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
+use portpicker::pick_unused_port;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::{
     collections::HashMap,
@@ -18,7 +19,7 @@ use std::{
     future::Future,
     io::Read,
     iter,
-    net::{Shutdown, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr},
     path::{Path, PathBuf},
     pin::Pin,
     sync::{
@@ -49,75 +50,14 @@ macro_rules! assert_downcast_matches {
     }};
 }
 
-#[macro_export]
-macro_rules! assert_within {
-    // Adapted from std::assert_eq
-    ($expr:expr, $low:expr, $high:expr) => ({
-        match (&$expr, &$low, &$high) {
-            (expr, low, high) => {
-                if *expr < *low {
-                    panic!(
-                        r#"assertion failed: `(expr < low)`
-expr: {} = `{:?}`,
- low: `{:?}`"#,
-                        stringify!($expr),
-                        &*expr,
-                        &*low
-                    );
-                }
-                if *expr > *high {
-                    panic!(
-                        r#"assertion failed: `(expr > high)`
-expr: {} = `{:?}`,
-high: `{:?}`"#,
-                        stringify!($expr),
-                        &*expr,
-                        &*high
-                    );
-                }
-            }
-        }
-    });
-    ($expr:expr, $low:expr, $high:expr, $($arg:tt)+) => ({
-        match (&$expr, &$low, &$high) {
-            (expr, low, high) => {
-                if *expr < *low {
-                    panic!(
-                        r#"assertion failed: `(expr < low)`
-expr: {} = `{:?}`,
- low: `{:?}`
-{}"#,
-                        stringify!($expr),
-                        &*expr,
-                        &*low,
-                        format_args!($($arg)+)
-                    );
-                }
-                if *expr > *high {
-                    panic!(
-                        r#"assertion failed: `(expr > high)`
-expr: {} = `{:?}`,
-high: `{:?}`
-{}"#,
-                        stringify!($expr),
-                        &*expr,
-                        &*high,
-                        format_args!($($arg)+)
-                    );
-                }
-            }
-        }
-    });
-
+pub fn next_addr() -> SocketAddr {
+    let port = pick_unused_port().unwrap();
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
 }
 
-static NEXT_PORT: AtomicUsize = AtomicUsize::new(1234);
-
-pub fn next_addr() -> SocketAddr {
-    use std::net::{IpAddr, Ipv4Addr};
-
-    let port = NEXT_PORT.fetch_add(1, Ordering::AcqRel) as u16;
-    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
+pub fn next_addr_v6() -> SocketAddr {
+    let port = pick_unused_port().unwrap();
+    SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port)
 }
 
 pub fn trace_init() {
@@ -161,11 +101,17 @@ pub async fn send_lines_tls(
     addr: SocketAddr,
     host: String,
     lines: impl Iterator<Item = String>,
+    ca: impl Into<Option<&Path>>,
 ) -> Result<(), Infallible> {
     let stream = TcpStream::connect(&addr).await.unwrap();
 
     let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
-    connector.set_verify(SslVerifyMode::NONE);
+    if let Some(ca) = ca.into() {
+        connector.set_ca_file(ca).unwrap();
+    } else {
+        connector.set_verify(SslVerifyMode::NONE);
+    }
+
     let config = connector.build().configure().unwrap();
 
     let stream = tokio_openssl::connect(config, &host, stream).await.unwrap();
@@ -297,7 +243,8 @@ pub fn runtime() -> runtime::Runtime {
         .unwrap()
 }
 
-pub async fn wait_for<F, Fut>(mut f: F)
+// Wait for a Future to resolve, or the duration to elapse (will panic)
+pub async fn wait_for_duration<F, Fut>(mut f: F, duration: Duration)
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = bool> + Send + 'static,
@@ -305,14 +252,33 @@ where
     let started = Instant::now();
     while !f().await {
         delay_for(Duration::from_millis(5)).await;
-        if started.elapsed().as_secs() > 5 {
+        if started.elapsed() > duration {
             panic!("Timed out while waiting");
         }
     }
 }
 
+// Wait for 5 seconds
+pub async fn wait_for<F, Fut>(f: F)
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = bool> + Send + 'static,
+{
+    wait_for_duration(f, Duration::from_secs(5)).await
+}
+
+// Wait (for 5 secs) for a TCP socket to be reachable
 pub async fn wait_for_tcp(addr: SocketAddr) {
     wait_for(|| async move { TcpStream::connect(addr).await.is_ok() }).await
+}
+
+// Allows specifying a custom duration to wait for a TCP socket to be reachable
+pub async fn wait_for_tcp_duration(addr: SocketAddr, duration: Duration) {
+    wait_for_duration(
+        || async move { TcpStream::connect(addr).await.is_ok() },
+        duration,
+    )
+    .await
 }
 
 pub async fn wait_for_atomic_usize<T, F>(value: T, unblock: F)
@@ -328,6 +294,64 @@ where
     .await
 }
 
+// Retries a func every `retry` duration until given an Ok(T); panics after `until` elapses
+pub async fn retry_until<F, Fut, T, E>(mut f: F, retry: Duration, until: Duration) -> T
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, E>> + Send + 'static,
+{
+    let started = Instant::now();
+    while started.elapsed() < until {
+        match f().await {
+            Ok(res) => return res,
+            Err(_) => tokio::time::delay_for(retry).await,
+        }
+    }
+    panic!("Timeout")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::retry_until;
+    use std::{
+        sync::{Arc, RwLock},
+        time::Duration,
+    };
+
+    // helper which errors the first 3x, and succeeds on the 4th
+    async fn retry_until_helper(count: Arc<RwLock<i32>>) -> Result<(), ()> {
+        if *count.read().unwrap() < 3 {
+            let mut c = count.write().unwrap();
+            *c += 1;
+            return Err(());
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn retry_until_before_timeout() {
+        let count = Arc::new(RwLock::new(0));
+        let func = || {
+            let count = Arc::clone(&count);
+            retry_until_helper(count)
+        };
+
+        retry_until(func, Duration::from_millis(10), Duration::from_secs(1)).await;
+    }
+
+    #[tokio::test]
+    #[should_panic]
+    async fn retry_until_after_timeout() {
+        let count: Arc<RwLock<i32>> = Arc::new(RwLock::new(0));
+        let func = || {
+            let count = Arc::clone(&count);
+            retry_until_helper(count)
+        };
+
+        retry_until(func, Duration::from_millis(50), Duration::from_millis(100)).await;
+    }
+}
+
 pub struct CountReceiver<T> {
     count: Arc<AtomicUsize>,
     trigger: Option<oneshot::Sender<()>>,
@@ -340,7 +364,7 @@ impl<T: Send + 'static> CountReceiver<T> {
         self.count.load(Ordering::Relaxed)
     }
 
-    /// Succeds once first connection has been made.
+    /// Succeeds once first connection has been made.
     pub async fn connected(&mut self) {
         if let Some(tripwire) = self.connected.take() {
             tripwire.await.unwrap();
@@ -463,7 +487,7 @@ pub async fn start_topology(
     require_healthy: bool,
 ) -> (RunningTopology, mpsc::UnboundedReceiver<()>) {
     let diff = ConfigDiff::initial(&config);
-    let pieces = topology::validate(&config, &diff).await.unwrap();
+    let pieces = topology::build_or_log_errors(&config, &diff).await.unwrap();
     topology::start_validated(config, diff, pieces, require_healthy)
         .await
         .unwrap()

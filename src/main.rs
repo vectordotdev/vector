@@ -10,9 +10,8 @@ use futures::{
     compat::{Future01CompatExt, Stream01CompatExt},
     StreamExt,
 };
-use futures01::Future;
 use std::cmp::max;
-use tokio::select;
+use tokio::{runtime, select};
 use vector::{
     config::{self, ConfigDiff},
     generate, heartbeat,
@@ -20,7 +19,7 @@ use vector::{
         VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed,
         VectorReloaded, VectorStarted, VectorStopped,
     },
-    list, metrics, runtime,
+    list, metrics,
     signal::{self, SignalTo},
     topology, trace, unit_test, validate,
 };
@@ -78,10 +77,15 @@ fn main() {
 
     let mut rt = {
         let threads = opts.threads.unwrap_or_else(|| max(1, num_cpus::get()));
-        runtime::Runtime::with_thread_count(threads).expect("Unable to create async runtime")
+        runtime::Builder::new()
+            .threaded_scheduler()
+            .enable_all()
+            .core_threads(threads)
+            .build()
+            .expect("Unable to create async runtime")
     };
 
-    rt.block_on_std(async move {
+    rt.block_on(async move {
         if let Some(s) = sub_command {
             std::process::exit(match s {
                 SubCommand::Validate(v) => validate::validate(&v, color).await,
@@ -114,12 +118,12 @@ fn main() {
                 std::process::exit(exitcode::CONFIG);
             });
 
-        vector::event::LOG_SCHEMA
+        crate::config::LOG_SCHEMA
             .set(config.global.log_schema.clone())
             .expect("Couldn't set schema");
 
         let diff = ConfigDiff::initial(&config);
-        let pieces = topology::validate(&config, &diff).await.unwrap_or_else(|| {
+        let pieces = topology::build_or_log_errors(&config, &diff).await.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });
 
@@ -191,8 +195,6 @@ fn main() {
             SignalTo::Reload => unreachable!(),
         }
     });
-
-    rt.shutdown_now().wait().unwrap();
 }
 
 fn handle_config_errors(errors: Vec<String>) {

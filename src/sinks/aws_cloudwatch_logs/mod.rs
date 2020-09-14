@@ -1,9 +1,9 @@
 mod request;
 
 use crate::{
-    config::{DataType, SinkConfig, SinkContext},
+    config::{log_schema, DataType, SinkConfig, SinkContext},
     dns::Resolver,
-    event::{self, Event, LogEvent, Value},
+    event::{Event, LogEvent, Value},
     region::RegionOrEndpoint,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -77,7 +77,7 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: TowerRequestConfig<Option<usize>>,
     pub assume_role: Option<String>,
 }
 
@@ -98,7 +98,7 @@ fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {
 }
 
 lazy_static! {
-    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig<Option<usize>> = TowerRequestConfig {
         ..Default::default()
     };
 }
@@ -164,7 +164,7 @@ impl CloudwatchLogsSinkConfig {
 
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let batch = BatchSettings::default()
             .bytes(1_048_576)
             .events(10_000)
@@ -177,11 +177,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 
         let client = self.create_client(cx.resolver())?;
         let svc = ServiceBuilder::new()
-            .concurrency_limit(
-                request
-                    .in_flight_limit
-                    .expect("in_flight_limit=auto is not allowed"),
-            )
+            .concurrency_limit(request.in_flight_limit.unwrap())
             .service(CloudwatchLogsPartitionSvc::new(
                 self.clone(),
                 client.clone(),
@@ -198,9 +194,9 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             Box::new(svc_sink)
         };
 
-        let healthcheck = healthcheck(self.clone(), client).boxed().compat();
+        let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((sink, Box::new(healthcheck)))
+        Ok((super::VectorSink::Futures01Sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -248,11 +244,7 @@ impl Service<PartitionInnerBuffer<Vec<InputLogEvent>, CloudwatchKey>>
             // Buffer size is in_flight_limit because current service always ready.
             // Concurrency limit is 1 because we need token from previous request.
             let svc = ServiceBuilder::new()
-                .buffer(
-                    self.request_settings
-                        .in_flight_limit
-                        .expect("in_flight_limit=auto is not allowed"),
-                )
+                .buffer(self.request_settings.in_flight_limit.unwrap())
                 .concurrency_limit(1)
                 .rate_limit(
                     self.request_settings.rate_limit_num,
@@ -415,7 +407,7 @@ fn encode_log(
     mut log: LogEvent,
     encoding: &EncodingConfig<Encoding>,
 ) -> Result<InputLogEvent, CloudwatchLogsError> {
-    let timestamp = match log.remove(&event::log_schema().timestamp_key()) {
+    let timestamp = match log.remove(&log_schema().timestamp_key()) {
         Some(Value::Timestamp(ts)) => ts.timestamp_millis(),
         _ => Utc::now().timestamp_millis(),
     };
@@ -423,7 +415,7 @@ fn encode_log(
     let message = match encoding.codec() {
         Encoding::Json => serde_json::to_string(&log).unwrap(),
         Encoding::Text => log
-            .get(&event::log_schema().message_key())
+            .get(&log_schema().message_key())
             .map(|v| v.to_string_lossy())
             .unwrap_or_else(|| "".into()),
     };
@@ -669,7 +661,7 @@ mod tests {
     use super::*;
     use crate::{
         dns::Resolver,
-        event::{self, Event, Value},
+        event::{Event, Value},
         region::RegionOrEndpoint,
     };
     use std::collections::HashMap;
@@ -793,7 +785,7 @@ mod tests {
         event.insert("key", "value");
         let encoded = encode_log(event.clone(), &Encoding::Json.into()).unwrap();
 
-        let ts = if let Value::Timestamp(ts) = event[&event::log_schema().timestamp_key()] {
+        let ts = if let Value::Timestamp(ts) = event[&log_schema().timestamp_key()] {
             ts.timestamp_millis()
         } else {
             panic!()
@@ -808,7 +800,7 @@ mod tests {
         event.insert("key", "value");
         let encoded = encode_log(event, &Encoding::Json.into()).unwrap();
         let map: HashMap<Atom, String> = serde_json::from_str(&encoded.message[..]).unwrap();
-        assert!(map.get(&event::log_schema().timestamp_key()).is_none());
+        assert!(map.get(&log_schema().timestamp_key()).is_none());
     }
 
     #[test]
@@ -828,7 +820,7 @@ mod tests {
                 let mut event = Event::new_empty_log();
                 event
                     .as_mut_log()
-                    .insert(&event::log_schema().timestamp_key(), timestamp);
+                    .insert(&log_schema().timestamp_key(), timestamp);
                 encode_log(event.into_log(), &Encoding::Text.into()).unwrap()
             })
             .collect();
@@ -853,17 +845,13 @@ mod integration_tests {
         region::RegionOrEndpoint,
         test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
     };
-    use futures::{
-        compat::{Future01CompatExt, Sink01CompatExt},
-        SinkExt, TryStreamExt,
-    };
-    use futures01::{stream, Sink};
+    use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt, TryStreamExt};
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_logs::{CloudWatchLogs, CreateLogGroupRequest, GetLogEventsRequest};
     use std::convert::TryFrom;
 
-    const GROUP_NAME: &'static str = "vector-cw";
+    const GROUP_NAME: &str = "vector-cw";
 
     #[tokio::test]
     async fn cloudwatch_insert_log_event() {
@@ -889,9 +877,8 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, mut events) = random_lines_with_stream(100, 11);
-
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let (input_lines, events) = random_lines_with_stream(100, 11);
+        sink.run(events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -939,23 +926,19 @@ mod integration_tests {
         // add a historical timestamp to all but the first event, to simulate
         // out-of-order timestamps.
         let mut doit = false;
-        let _ = sink
-            .sink_compat()
-            .send_all(&mut events.map_ok(move |mut event| {
-                if doit {
-                    let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
-
-                    event.as_mut_log().insert(
-                        event::log_schema().timestamp_key(),
-                        Value::Timestamp(timestamp),
-                    );
-                }
-                doit = true;
+        let events = events.map_ok(move |mut event| {
+            if doit {
+                let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
 
                 event
-            }))
-            .await
-            .unwrap();
+                    .as_mut_log()
+                    .insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
+            }
+            doit = true;
+
+            event
+        });
+        let _ = sink.run(events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -1010,7 +993,7 @@ mod integration_tests {
             let mut event = Event::from(line.clone());
             event
                 .as_mut_log()
-                .insert(event::log_schema().timestamp_key(), now + offset);
+                .insert(log_schema().timestamp_key(), now + offset);
             events.push(event);
             line
         };
@@ -1027,10 +1010,7 @@ mod integration_tests {
         lines.push(add_event(Duration::days(-1)));
         lines.push(add_event(Duration::days(-13)));
 
-        let pump = sink.send_all(stream::iter_ok(events));
-        let (sink, _) = pump.compat().await.unwrap();
-        // drop the sink so it closes all its connections
-        drop(sink);
+        sink.run(stream::iter(events).map(Ok)).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -1073,9 +1053,8 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, mut events) = random_lines_with_stream(100, 11);
-
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let (input_lines, events) = random_lines_with_stream(100, 11);
+        sink.run(events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -1124,8 +1103,12 @@ mod integration_tests {
         let timestamp = chrono::Utc::now();
 
         let (input_lines, mut events) = random_lines_with_stream(100, 11);
-
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let _ = sink
+            .into_futures01sink()
+            .sink_compat()
+            .send_all(&mut events)
+            .await
+            .unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -1178,15 +1161,10 @@ mod integration_tests {
                 let mut event = Event::from(e);
                 let stream = format!("{}", (i % 2));
                 event.as_mut_log().insert("key", stream);
-                event
+                Ok(event)
             })
             .collect::<Vec<_>>();
-
-        let pump = sink.send_all(iter_ok(events));
-        let (sink, _) = pump.compat().await.unwrap();
-        let sink = sink.flush().compat().await.unwrap();
-        // drop the sink so it closes all its connections
-        drop(sink);
+        sink.run(stream::iter(events)).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = format!("{}-0", stream_name);

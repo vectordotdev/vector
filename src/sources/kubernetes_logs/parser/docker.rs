@@ -1,4 +1,5 @@
 use crate::{
+    config::log_schema,
     event::{self, Event, LogEvent, Value},
     internal_events::KubernetesLogsDockerFormatParseFailed,
     transforms::Transform,
@@ -34,7 +35,7 @@ impl Transform for Docker {
 
 /// Parses `message` as json object and removes it.
 fn parse_json(log: &mut LogEvent) -> Option<()> {
-    let to_parse = log.remove(&event::log_schema().message_key())?.as_bytes();
+    let to_parse = log.remove(&log_schema().message_key())?.as_bytes();
 
     match serde_json::from_slice(to_parse.as_ref()) {
         Ok(JsonValue::Object(object)) => {
@@ -61,10 +62,7 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     };
     let time = DateTime::parse_from_rfc3339(String::from_utf8_lossy(time.as_ref()).as_ref())
         .context(TimeParsing)?;
-    log.insert(
-        event::log_schema().timestamp_key(),
-        time.with_timezone(&Utc),
-    );
+    log.insert(log_schema().timestamp_key(), time.with_timezone(&Utc));
 
     // Parse message, remove trailing newline and detect if it's partial.
     let message = log.remove(&LOG).context(LogFieldMissing)?;
@@ -72,7 +70,7 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::LogValueUnexpectedType),
     };
-    // Here we apply out heuristics to detect if messge is partial.
+    // Here we apply out heuristics to detect if message is partial.
     // Partial messages are only split in docker at the maximum message length
     // (`DOCKER_MESSAGE_SPLIT_THRESHOLD`).
     // Thus, for a message to be partial it also has to have exactly that
@@ -88,7 +86,7 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
         message.truncate(message.len() - 1);
         is_partial = false;
     };
-    log.insert(event::log_schema().message_key(), message);
+    log.insert(log_schema().message_key(), message);
 
     // For partial messages add a partial event indicator.
     if is_partial {
@@ -109,9 +107,7 @@ enum NormalizationError {
 
 #[cfg(test)]
 pub mod tests {
-    use super::super::test_util;
-    use super::Docker;
-    use crate::event::LogEvent;
+    use super::{super::test_util, *};
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()

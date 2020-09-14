@@ -13,6 +13,7 @@ env:
   RUST_BACKTRACE: full
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
+  CONTAINER_TOOL: "docker"
 
 jobs:
   cancel-previous:
@@ -43,6 +44,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
+      - run: scripts/ci-setup-helm.sh
       - run: make slim-builds
       - run: make check-markdown
       - run: make check-meta
@@ -50,6 +52,8 @@ jobs:
       - run: make check-clippy
       - run: make check-version
       - run: make check-scripts
+      - run: make check-helm
+      - run: make check-kubernetes-yaml
       - uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check advisories

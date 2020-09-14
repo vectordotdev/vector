@@ -3,11 +3,12 @@
 
 namespace: vector
 
+bases:
+  - distribution/kubernetes
+
 resources:
-  - distribution/kubernetes/vector-global.yaml
   - skaffold/manifests/namespace.yaml
   - skaffold/manifests/config.yaml
-  - distribution/kubernetes/vector-namespaced.yaml
 
 patchesStrategicMerge:
   - skaffold/manifests/patches/env.yaml

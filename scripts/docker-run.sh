@@ -26,15 +26,14 @@ fi
 # Variables
 #
 
-DOCKER="${USE_CONTAINER:-"docker"}"
 TAG="$1"
 IMAGE="timberiodev/vector-$TAG:latest"
 
 #
 # (Re)Build
 #
-if ! $DOCKER inspect "$IMAGE" >/dev/null 2>&1 || [ "${REBUILD_CONTAINER_IMAGE:-"true"}" == "true" ]; then
-  $DOCKER build \
+if ! docker inspect "$IMAGE" >/dev/null 2>&1 || [ "${REBUILD_CONTAINER_IMAGE:-"true"}" == "true" ]; then
+  docker build \
     --file "scripts/ci-docker-images/$TAG/Dockerfile" \
     --tag "$IMAGE" \
     .
@@ -69,7 +68,7 @@ for LINE in $(env | grep '^PASS_' | sed 's/^PASS_//'); do
 done
 unset IFS
 
-$DOCKER run \
+docker run \
   "${DOCKER_FLAGS[@]}" \
   -w "$PWD" \
   -v "$PWD":"$PWD" \
