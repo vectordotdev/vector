@@ -235,7 +235,7 @@ $ curl -u "$GITHUB_USERNAME:$GITHUB_TOKEN" \
 You can invoke the [test harness][urls.vector_test_harness] by commenting on
 any pull request with:
 
-```
+```bash
 /test -t <name>
 ```
 
