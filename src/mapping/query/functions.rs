@@ -163,6 +163,49 @@ impl Function for ToBooleanFn {
 //------------------------------------------------------------------------------
 
 #[derive(Debug)]
+pub(in crate::mapping) struct ToTimestampFn {
+    query: Box<dyn Function>,
+    default: Option<Value>,
+}
+
+impl ToTimestampFn {
+    pub(in crate::mapping) fn new(query: Box<dyn Function>, default: Option<Value>) -> Self {
+        Self { query, default }
+    }
+}
+
+impl Function for ToTimestampFn {
+    fn execute(&self, ctx: &Event) -> Result<Value> {
+        use chrono::{DateTime, TimeZone, Utc};
+
+        let value_to_timestamp = |v| {
+            match v {
+                Value::Bytes(b) => DateTime::parse_from_rfc3339(&String::from_utf8_lossy(&b))
+                    .map(|dt| dt.with_timezone(&Utc))
+                    .map_err(|_| "cannot parse string as RFC3339".to_owned()),
+                Value::Integer(i) => Ok(Utc.timestamp(i, 0)),
+                Value::Timestamp(t) => Ok(t),
+                _ => Err("unable to parse non-string or integer type to timestamp".to_string()),
+            }
+            .map(Value::Timestamp)
+        };
+
+        self.query
+            .execute(ctx)
+            .and_then(value_to_timestamp)
+            .or_else(|err| {
+                self.default
+                    .as_ref()
+                    .cloned()
+                    .ok_or(err)
+                    .and_then(value_to_timestamp)
+            })
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug)]
 pub(in crate::mapping) struct ParseTimestampFn {
     conversion: Conversion,
     query: Box<dyn Function>,
@@ -568,6 +611,53 @@ mod tests {
 
     #[test]
     fn check_timestamp_conversions() {
+        let cases = vec![
+            (
+                Event::from(""),
+                Err("path .foo not found in event".to_string()),
+                ToTimestampFn::new(Box::new(Path::from(vec![vec!["foo"]])), None),
+            ),
+            (
+                Event::from(""),
+                Ok(Value::Timestamp(
+                    DateTime::parse_from_rfc3339("1970-01-01T00:00:10Z")
+                        .unwrap()
+                        .with_timezone(&Utc),
+                )),
+                ToTimestampFn::new(
+                    Box::new(Path::from(vec![vec!["foo"]])),
+                    Some(Value::Integer(10)),
+                ),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert(
+                        "foo",
+                        Value::Timestamp(
+                            DateTime::parse_from_rfc3339("1970-02-01T00:00:10Z")
+                                .unwrap()
+                                .with_timezone(&Utc),
+                        ),
+                    );
+                    event
+                },
+                Ok(Value::Timestamp(
+                    DateTime::parse_from_rfc3339("1970-02-01T00:00:10Z")
+                        .unwrap()
+                        .with_timezone(&Utc),
+                )),
+                ToTimestampFn::new(Box::new(Path::from(vec![vec!["foo"]])), None),
+            ),
+        ];
+
+        for (input_event, exp, query) in cases {
+            assert_eq!(query.execute(&input_event), exp);
+        }
+    }
+
+    #[test]
+    fn check_timestamp_parsing() {
         let cases = vec![
             (
                 Event::from(""),

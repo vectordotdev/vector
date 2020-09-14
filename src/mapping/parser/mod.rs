@@ -9,7 +9,7 @@ use crate::{
             arithmetic::Operator,
             functions::{
                 DowncaseFn, Md5Fn, NotFn, NowFn, ParseTimestampFn, Sha1Fn, ToBooleanFn, ToFloatFn,
-                ToIntegerFn, ToStringFn, UpcaseFn, UuidV4Fn,
+                ToIntegerFn, ToStringFn, ToTimestampFn, UpcaseFn, UuidV4Fn,
             },
             path::Path as QueryPath,
             Literal,
@@ -254,6 +254,27 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
                 ),
             });
             Ok(Box::new(ToBooleanFn::new(query, default)))
+        }
+        Rule::to_timestamp => {
+            let (first, mut other) = split_inner_rules_from_pair(pair)?;
+            let query = query_arithmetic_from_pair(first)?;
+            let default = other
+                .next()
+                .map(|r| match r.as_rule() {
+                    Rule::string => r
+                        .into_inner()
+                        .next()
+                        .ok_or(TOKEN_ERR)
+                        .map_err(str::to_owned)
+                        .and_then(inner_quoted_string_escaped_from_pair)
+                        .map(Value::from),
+                    Rule::number => Ok(Value::Integer(r.as_str().parse::<f64>().unwrap() as i64)),
+                    _ => unreachable!(
+                        "parser should not allow other to_timestamp default arg child rules here"
+                    ),
+                })
+                .transpose()?;
+            Ok(Box::new(ToTimestampFn::new(query, default)))
         }
         Rule::parse_timestamp => {
             let (first, mut other) = split_inner_rules_from_pair(pair)?;
@@ -924,6 +945,33 @@ mod tests {
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToBooleanFn::new(Box::new(QueryPath::from("bar")), None)),
+                ))]),
+            ),
+            (
+                ".foo = to_timestamp(.foo, 10)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToTimestampFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Some(Value::Integer(10)),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = to_timestamp(.foo, \"2020-09-14T12:51:12+00:00\")",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToTimestampFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Some(Value::from("2020-09-14T12:51:12+00:00")),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = to_timestamp(.bar)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToTimestampFn::new(Box::new(QueryPath::from("bar")), None)),
                 ))]),
             ),
             (
