@@ -4,8 +4,9 @@ use chrono::{DateTime, Utc};
 use serde::{Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::convert::TryInto;
+use derive_is_enum_variant::is_enum_variant;
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, is_enum_variant)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
@@ -161,48 +162,6 @@ impl TryInto<serde_json::Value> for Value {
 }
 
 impl Value {
-    pub fn is_boolean(&self) -> bool {
-        match self {
-            Value::Boolean(_) => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_integer(&self) -> bool {
-        match self {
-            Value::Integer(_) => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_float(&self) -> bool {
-        match self {
-            Value::Float(_) => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_map(&self) -> bool {
-        match self {
-            Value::Map(_) => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_array(&self) -> bool {
-        match self {
-            Value::Array(_) => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_null(&self) -> bool {
-        match self {
-            Value::Null => true,
-            _ => false,
-        }
-    }
-
     // TODO: return Cow
     pub fn to_string_lossy(&self) -> String {
         match self {
@@ -214,13 +173,6 @@ impl Value {
             Value::Map(map) => serde_json::to_string(map).expect("Cannot serialize map"),
             Value::Array(arr) => serde_json::to_string(arr).expect("Cannot serialize array"),
             Value::Null => "<null>".to_string(),
-        }
-    }
-
-    pub fn is_bytes(&self) -> bool {
-        match self {
-            Value::Bytes(_) => true,
-            _ => false,
         }
     }
 
@@ -241,13 +193,6 @@ impl Value {
 
     pub fn into_bytes(self) -> Bytes {
         self.as_bytes()
-    }
-
-    pub fn is_timestamp(&self) -> bool {
-        match self {
-            Value::Timestamp(_) => true,
-            _ => false,
-        }
     }
 
     pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {

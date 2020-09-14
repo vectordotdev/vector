@@ -181,6 +181,7 @@ impl Serialize for LogEvent {
 #[cfg(test)]
 mod test {
     use super::*;
+    use tracing::trace;
     use std::{fs, io::Read, path::Path};
 
     fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<Vec<u8>> {
@@ -205,7 +206,7 @@ mod test {
         crate::test_util::trace_init();
         const FIXTURE_ROOT: &str = "tests/data/fixtures/log_event";
 
-        tracing::trace!(?FIXTURE_ROOT, "Opening.");
+        trace!(?FIXTURE_ROOT, "Opening.");
         std::fs::read_dir(FIXTURE_ROOT)
             .unwrap()
             .for_each(|fixture_file| match fixture_file {
