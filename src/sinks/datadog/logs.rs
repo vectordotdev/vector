@@ -2,12 +2,7 @@ use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::{
-        util::{
-            self,
-            encoding::{EncodingConfig, EncodingConfiguration},
-            tcp::TcpSink,
-            Encoding, StreamSink, UriSerde,
-        },
+        util::{self, encoding::EncodingConfig, tcp::TcpSink, Encoding, StreamSink, UriSerde},
         Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsConfig},
@@ -79,8 +74,6 @@ fn encode_event(
     api_key: &str,
     encoding: &EncodingConfig<Encoding>,
 ) -> Option<Bytes> {
-    encoding.apply_rules(&mut event);
-
     let log = event.as_mut_log();
 
     if let Some(message) = log.remove(&log_schema().message_key()) {

@@ -56,7 +56,7 @@ pub enum Encoding {
 
 /**
 * Encodes the given event into raw bytes that can be sent into a Sink, according to
-* the given encoding.  If there are any errors encoding the event, logs a warning
+* the given encoding. If there are any errors encoding the event, logs a warning
 * and returns None.
 **/
 pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {

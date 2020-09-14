@@ -162,8 +162,7 @@ impl HttpSink for StackdriverSink {
     type Input = serde_json::Value;
     type Output = Vec<BoxedRawValue>;
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-        self.config.encoding.apply_rules(&mut event);
+    fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let mut log = event.into_log();
         let severity = self
             .severity_key
@@ -172,8 +171,11 @@ impl HttpSink for StackdriverSink {
             .map(remap_severity)
             .unwrap_or_else(|| 0.into());
 
+        let mut event = Event::Log(log);
+        self.config.encoding.apply_rules(&mut event);
+
         let entry = serde_json::json!({
-            "jsonPayload": log,
+            "jsonPayload": event.into_log(),
             "severity": severity,
         });
 
@@ -279,6 +281,7 @@ mod tests {
            log_id = "testlogs"
            resource.type = "generic_node"
            resource.namespace = "office"
+           encoding.except_fields = ["anumber"]
         "#,
         )
         .unwrap();
