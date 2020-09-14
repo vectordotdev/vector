@@ -250,7 +250,6 @@ fn encode_event(
     partition_key_field: &Option<Atom>,
     encoding: &EncodingConfig<Encoding>,
 ) -> Option<PutRecordsRequestEntry> {
-    encoding.apply_rules(&mut event);
     let partition_key = if let Some(partition_key_field) = partition_key_field {
         if let Some(v) = event.as_log().get(&partition_key_field) {
             v.to_string_lossy()
@@ -271,6 +270,8 @@ fn encode_event(
     } else {
         partition_key
     };
+
+    encoding.apply_rules(&mut event);
 
     let log = event.into_log();
     let data = match encoding.codec() {
@@ -347,6 +348,21 @@ mod tests {
 
         assert_eq!(&event.data[..], b"hello world");
         assert_eq!(event.partition_key.len(), 256);
+    }
+
+    #[test]
+    fn kinesis_encode_event_apply_rules() {
+        let mut event = Event::from("hello world");
+        event.as_mut_log().insert("key", "some_key");
+
+        let mut encoding: EncodingConfig<_> = Encoding::Json.into();
+        encoding.except_fields = Some(vec![Atom::from("key")]);
+
+        let event = encode_event(event, &Some("key".into()), &encoding).unwrap();
+        let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
+
+        assert_eq!(&event.partition_key, &"some_key".to_string());
+        assert!(!map.contains_key("key"));
     }
 }
 
