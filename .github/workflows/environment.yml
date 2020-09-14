@@ -25,4 +25,8 @@ jobs:
           sudo apt clean
           docker rmi $(docker image ls -aq)
           df -h
-      - run: make environment-prepare
+      - name: prepare environment
+        run: make environment-prepare
+      - name: push image
+        if: github.event_name != 'workflow_dispatch'
+        run: docker push docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
