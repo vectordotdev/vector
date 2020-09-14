@@ -165,14 +165,24 @@ docs: fix typos
 
 #### Reviews & Approvals
 
-All pull requests must be reviewed and approved by at least one Vector team
-member. The review process is outlined in the [Review guide](REVIEWING.md).
+All pull requests should be reviewed by:
+
+- No review required for cosmetic changes like whitespace, typos, and spelling
+  by a maintainer
+- One Vector team member for minor changes or trivial changes from contributors
+- Two Vector team members for major changes
+- Three Vector team members for RFCs
+
+If there are any CODEOWNERs automatically assigned, you should also wait for
+their review.
+
+The review process is outlined in the [Review guide](REVIEWING.md).
 
 #### Merge Style
 
 All pull requests are squashed and merged. We generally discourage large pull
 requests that are over 300-500 lines of diff. If you would like to propose a
-change that is larger we suggest coming onto our gitter channel and discuss it
+change that is larger we suggest coming onto our [Discord server](https://chat.vector.dev/) and discuss it
 with one of our engineers. This way we can talk through the solution and
 discuss if a change that large is even needed! This will produce a quicker
 response to the change and likely produce code that aligns better with our
@@ -209,13 +219,13 @@ $ curl -u "$GITHUB_USERNAME:$GITHUB_TOKEN" \
 
 We're super excited to have you interested in working on Vector! Before you start you should pick how you want to develop.
 
-For small or first-time contributions, we recommend the Docker method. If you do a lot of contributing, try adopting the Nix method! It'll be way faster and feel more smooth. Prefer to do it yourself? That's fine too!
+For small or first-time contributions, we recommend the Docker method. Prefer to do it yourself? That's fine too!
 
 #### Using a Docker or Podman environment
 
 > **Targets:** You can use this method to produce AARCH64, Arm6/7, as well as x86/64 Linux builds.
 
-Since not everyone has a full working native environment, or can use Nix, we took our Nix environment and stuffed it into a Docker (or Podman) container!
+Since not everyone has a full working native environment, we took our environment and stuffed it into a Docker (or Podman) container!
 
 This is ideal for users who want it to "Just work" and just want to start contributing. It's also what we use for our CI, so you know if it breaks we can't do anything else until we fix it. 😉
 

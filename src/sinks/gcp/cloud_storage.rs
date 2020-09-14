@@ -1,7 +1,7 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{self, Event},
+    event::Event,
     serde::to_string,
     sinks::{
         util::{
@@ -423,7 +423,7 @@ fn encode_event(
             .expect("Failed to encode event as json, this is a bug!"),
         Encoding::Text => {
             let mut bytes = log
-                .get(&event::log_schema().message_key())
+                .get(&crate::config::log_schema().message_key())
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             bytes.push(b'\n');
@@ -464,7 +464,7 @@ impl RetryLogic for GcsRetryLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{self, Event};
+    use crate::event::Event;
 
     use std::collections::HashMap;
 
@@ -497,7 +497,7 @@ mod tests {
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(
-            map.get(&event::log_schema().message_key().to_string()),
+            map.get(&crate::config::log_schema().message_key().to_string()),
             Some(&message)
         );
         assert_eq!(map["key"], "value".to_string());
