@@ -74,8 +74,9 @@ cargo deb --target "$TARGET" --deb-version "$PACKAGE_VERSION" --no-build
 
 # Rename the resulting .deb file to use - instead of _ since this
 # is consistent with our package naming scheme.
-# shellcheck disable=SC2016
-rename -v 's/vector_([^_]*)_(.*)\.deb/vector-$2\.deb/' "target/$TARGET/debian"/*.deb
+for file in /target/"${TARGET}"/debian/*.deb; do
+  mv "${file}" "${file//_/-}}";
+done
 
 #
 # Move the deb into the artifacts dir
