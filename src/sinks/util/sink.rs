@@ -273,6 +273,9 @@ where
                         trace!("Polling batch linger.");
                         self.service.poll_complete()?;
                         try_ready!(linger.poll());
+                        // If the linger is ready, we've done it.
+                        // Reset the state so we don't get UB later.
+                        self.linger.take();
                     } else {
                         try_ready!(self.service.poll_complete());
                     }
