@@ -1,6 +1,7 @@
 #! /usr/bin/env bash
 set -e -o verbose
 
+rustup toolchain install "$(cat rust-toolchain)"
 rustup default "$(cat rust-toolchain)"
 rustup component add rustfmt
 rustup component add clippy

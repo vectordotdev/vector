@@ -36,6 +36,7 @@ ifeq ($(CONTAINER_TOOL),podman)
 else
     export CONTAINER_ENCLOSURE = "network"
 endif
+export CURRENT_DIR = $(shell pwd)
 
 # Override this to automatically enter a container containing the correct, full, official build environment for Vector, ready for development
 export ENVIRONMENT ?= false
@@ -112,7 +113,7 @@ define ENVIRONMENT_EXEC
 			--interactive \
 			--env INSIDE_ENVIRONMENT=true \
 			--network host \
-			--mount type=bind,source=${PWD},target=/git/timberio/vector \
+			--mount type=bind,source=${CURRENT_DIR},target=/git/timberio/vector \
 			--mount type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock \
 			--mount type=volume,source=vector-target,target=/git/timberio/vector/target \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
