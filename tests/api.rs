@@ -32,14 +32,12 @@ mod tests {
         // Build the request
         let client = reqwest::Client::new();
 
-        let res = retry_until(
+        retry_until(
             || client.get(&url).send(),
             Duration::from_millis(100),
             Duration::from_secs(10),
         )
-        .await;
-
-        res
+        .await
     }
 
     #[tokio::test]
