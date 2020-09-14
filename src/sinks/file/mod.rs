@@ -347,7 +347,7 @@ mod tests {
         let mut sink = FileSink::new(&config, Acker::Null);
         let (input, _events) = random_lines_with_stream(100, 64);
 
-        let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)).map(Ok));
+        let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
         sink.run(events).await.unwrap();
 
         let output = lines_from_file(template);
@@ -372,7 +372,7 @@ mod tests {
         let mut sink = FileSink::new(&config, Acker::Null);
         let (input, _) = random_lines_with_stream(100, 64);
 
-        let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)).map(Ok));
+        let events = Box::pin(stream::iter(input.clone().into_iter().map(Event::from)));
         sink.run(events).await.unwrap();
 
         let output = lines_from_gzip_file(template);
@@ -419,7 +419,7 @@ mod tests {
         input[7].as_mut_log().insert("date", "2019-29-07");
         input[7].as_mut_log().insert("level", "error");
 
-        let events = Box::pin(stream::iter(input.clone().into_iter()).map(Ok));
+        let events = Box::pin(stream::iter(input.clone().into_iter()));
         sink.run(events).await.unwrap();
 
         let output = vec![
@@ -489,7 +489,7 @@ mod tests {
 
         // send initial payload
         for line in input.clone() {
-            tx.send(Ok(Event::from(line))).await.unwrap();
+            tx.send(Event::from(line)).await.unwrap();
         }
 
         // wait for file to go idle and be closed
@@ -497,7 +497,7 @@ mod tests {
 
         // trigger another write
         let last_line = "i should go at the end";
-        tx.send(Ok(Event::from(last_line))).await.unwrap();
+        tx.send(Event::from(last_line)).await.unwrap();
         input.push(String::from(last_line));
 
         // wait for another flush

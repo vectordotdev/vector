@@ -203,9 +203,9 @@ pub fn temp_dir() -> PathBuf {
 pub fn random_lines_with_stream(
     len: usize,
     count: usize,
-) -> (Vec<String>, impl Stream<Item = Result<Event, ()>>) {
+) -> (Vec<String>, impl Stream<Item = Event>) {
     let lines = (0..count).map(|_| random_string(len)).collect::<Vec<_>>();
-    let stream = stream::iter(lines.clone()).map(Event::from).map(Ok);
+    let stream = stream::iter(lines.clone()).map(Event::from);
     (lines, stream)
 }
 

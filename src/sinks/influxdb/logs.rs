@@ -471,7 +471,7 @@ mod tests {
             events.push(event);
         }
 
-        sink.run(stream::iter(events).map(Ok)).await.unwrap();
+        sink.run(stream::iter(events)).await.unwrap();
 
         let output = rx.next().await.unwrap();
 
@@ -534,7 +534,7 @@ mod tests {
             events.push(event);
         }
 
-        sink.run(stream::iter(events).map(Ok)).await.unwrap();
+        sink.run(stream::iter(events)).await.unwrap();
 
         let output = rx.next().await.unwrap();
 
