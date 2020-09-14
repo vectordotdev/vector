@@ -1,9 +1,5 @@
 use crate::Event;
-use futures::{
-    compat::{Sink01CompatExt, Stream01CompatExt},
-    future::BoxFuture,
-    StreamExt,
-};
+use futures::{compat::Sink01CompatExt, future::BoxFuture, StreamExt};
 use snafu::Snafu;
 use std::fmt;
 
@@ -94,19 +90,12 @@ pub enum HealthcheckError {
 }
 
 impl VectorSink {
-    pub async fn run01<S>(self, input: S) -> Result<(), ()>
-    where
-        S: futures01::Stream<Item = Event, Error = ()> + Send + 'static,
-    {
-        self.run(input.compat()).await
-    }
-
     pub async fn run<S>(mut self, input: S) -> Result<(), ()>
     where
-        S: futures::Stream<Item = Result<Event, ()>> + Send + 'static,
+        S: futures::Stream<Item = Event> + Send + 'static,
     {
         match self {
-            Self::Futures01Sink(sink) => input.forward(sink.sink_compat()).await,
+            Self::Futures01Sink(sink) => input.map(Ok).forward(sink.sink_compat()).await,
             Self::Stream(ref mut s) => s.run(Box::pin(input)).await,
         }
     }

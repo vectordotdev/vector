@@ -180,13 +180,12 @@ impl FileSink {
             .expect("unable to compute next deadline")
     }
 
-    async fn run(&mut self, mut input: BoxStream<'_, Result<Event, ()>>) -> crate::Result<()> {
+    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> crate::Result<()> {
         loop {
             tokio::select! {
                 event = input.next() => {
                     match event {
-                        Some(Err(())) => {},
-                        Some(Ok(event)) => {
+                        Some(event) => {
                             self.process_event(event).await;
                             self.acker.ack(1);
                         },
@@ -316,7 +315,7 @@ async fn write_event_to_file(
 
 #[async_trait]
 impl StreamSink2 for FileSink {
-    async fn run(&mut self, input: BoxStream<'_, Result<Event, ()>>) -> Result<(), ()> {
+    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
         FileSink::run(self, input).await.expect("file sink error");
         Ok(())
     }

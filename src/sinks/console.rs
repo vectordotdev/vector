@@ -118,14 +118,12 @@ struct WriterSink {
 
 #[async_trait]
 impl StreamSink2 for WriterSink {
-    async fn run(&mut self, mut input: BoxStream<'_, Result<Event, ()>>) -> Result<(), ()> {
+    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
-            if let Ok(event) = event {
-                write_event_to_output(&mut self.output, event, &self.encoding)
-                    .await
-                    .expect("console sink error");
-                self.acker.ack(1);
-            }
+            write_event_to_output(&mut self.output, event, &self.encoding)
+                .await
+                .expect("console sink error");
+            self.acker.ack(1);
         }
         Ok(())
     }

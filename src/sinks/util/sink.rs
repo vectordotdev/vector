@@ -137,7 +137,7 @@ impl<T: Sink> Sink for StreamSink<T> {
 
 #[async_trait]
 pub trait StreamSink2 {
-    async fn run(&mut self, input: BoxStream<'_, Result<Event, ()>>) -> Result<(), ()>;
+    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()>;
 }
 
 // === BatchSink ===
