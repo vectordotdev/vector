@@ -9,6 +9,7 @@ apt upgrade --yes
 # Deps
 apt install --yes \
     build-essential \
+    cmake \
     pkg-config \
     libssl-dev \
     python3-pip \
