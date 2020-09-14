@@ -255,12 +255,13 @@ fn encode_event(
     key_field: &Option<Atom>,
     encoding: &EncodingConfig<Encoding>,
 ) -> (Vec<u8>, Vec<u8>) {
-    encoding.apply_rules(&mut event);
     let key = key_field
         .as_ref()
         .and_then(|f| event.as_log().get(f))
         .map(|v| v.as_bytes().to_vec())
         .unwrap_or_default();
+
+    encoding.apply_rules(&mut event);
 
     let body = match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&event.as_log()).unwrap(),
@@ -313,6 +314,28 @@ mod tests {
         assert_eq!(map[&log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
         assert_eq!(map["foo"], "bar".to_string());
+    }
+
+    #[test]
+    fn kafka_encode_event_apply_rules() {
+        let mut event = Event::from("hello");
+        event.as_mut_log().insert("key", "value");
+
+        let (key, bytes) = encode_event(
+            event,
+            &Some("key".into()),
+            &EncodingConfigWithDefault {
+                codec: Encoding::Json,
+                except_fields: Some(vec![Atom::from("key")]),
+                ..Default::default()
+            }
+            .into(),
+        );
+
+        let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+
+        assert_eq!(&key[..], b"value");
+        assert!(!map.contains_key("key"));
     }
 }
 
