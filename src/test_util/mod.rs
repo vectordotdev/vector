@@ -212,19 +212,19 @@ pub fn random_lines_with_stream(
 fn random_events_with_stream_generic<F>(
     count: usize,
     generator: F,
-) -> (Vec<Event>, impl Stream<Item = Result<Event, ()>>)
+) -> (Vec<Event>, impl Stream<Item = Event>)
 where
     F: Fn() -> Event,
 {
     let events = (0..count).map(|_| generator()).collect::<Vec<_>>();
-    let stream = stream::iter(events.clone()).map(Ok);
+    let stream = stream::iter(events.clone());
     (events, stream)
 }
 
 pub fn random_events_with_stream(
     len: usize,
     count: usize,
-) -> (Vec<Event>, impl Stream<Item = Result<Event, ()>>) {
+) -> (Vec<Event>, impl Stream<Item = Event>) {
     random_events_with_stream_generic(count, move || Event::from(random_string(len)))
 }
 
