@@ -39,7 +39,7 @@ pub struct AddFieldsTemplateInvalid<'a> {
 
 impl<'a> InternalEvent for AddFieldsTemplateInvalid<'a> {
     fn emit_logs(&self) {
-        error!(message = "Invalid template; using as string", %self.field, %self.error, rate_limit_secs = 30);
+        error!(message = "Invalid template; using as string.", %self.field, %self.error, rate_limit_secs = 30);
     }
 
     fn emit_metrics(&self) {

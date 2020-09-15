@@ -24,7 +24,7 @@ pub(crate) struct TagCardinalityLimitRejectingEvent<'a> {
 impl<'a> InternalEvent for TagCardinalityLimitRejectingEvent<'a> {
     fn emit_logs(&self) {
         error!(
-            message = "Event containing tag with new value after hitting configured 'value_limit'; discarding event",
+            message = "Event containing tag with new value after hitting configured 'value_limit'; discarding event.",
             tag_key = self.tag_key,
             tag_value = self.tag_value,
             rate_limit_secs = 10,
@@ -47,7 +47,7 @@ pub(crate) struct TagCardinalityLimitRejectingTag<'a> {
 impl<'a> InternalEvent for TagCardinalityLimitRejectingTag<'a> {
     fn emit_logs(&self) {
         warn!(
-            message = "Rejecting tag after hitting configured 'value_limit'",
+            message = "Rejecting tag after hitting configured 'value_limit'.",
             tag_key = self.tag_key,
             tag_value = self.tag_value,
             rate_limit_secs = 10,
@@ -69,7 +69,7 @@ pub(crate) struct TagCardinalityValueLimitReached<'a> {
 impl<'a> InternalEvent for TagCardinalityValueLimitReached<'a> {
     fn emit_logs(&self) {
         warn!(
-            "value_limit reached for key {}. New values for this key will be rejected",
+            "Value_limit reached for key {}. New values for this key will be rejected.",
             key = self.key,
         );
     }

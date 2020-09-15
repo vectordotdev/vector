@@ -12,7 +12,7 @@ pub struct KubernetesLogsEventReceived<'a> {
 impl InternalEvent for KubernetesLogsEventReceived<'_> {
     fn emit_logs(&self) {
         trace!(
-            message = "received one event",
+            message = "Received one event.",
             file = %self.file
         );
     }
@@ -39,7 +39,7 @@ pub struct KubernetesLogsEventAnnotationFailed<'a> {
 impl InternalEvent for KubernetesLogsEventAnnotationFailed<'_> {
     fn emit_logs(&self) {
         warn!(
-            message = "failed to annotate event with pod metadata",
+            message = "Failed to annotate event with pod metadata.",
             event = ?self.event
         );
     }
@@ -61,7 +61,7 @@ pub struct KubernetesLogsDockerFormatParseFailed<'a> {
 impl InternalEvent for KubernetesLogsDockerFormatParseFailed<'_> {
     fn emit_logs(&self) {
         warn!(
-            message = "failed to parse message as JSON object",
+            message = "Failed to parse message as JSON object.",
             value = %String::from_utf8_lossy(self.message),
         );
     }

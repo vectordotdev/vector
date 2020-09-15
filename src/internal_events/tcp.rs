@@ -9,9 +9,9 @@ pub struct TcpConnectionEstablished {
 impl InternalEvent for TcpConnectionEstablished {
     fn emit_logs(&self) {
         if let Some(peer_addr) = self.peer_addr {
-            debug!(message = "Connected", %peer_addr);
+            debug!(message = "Connected.", %peer_addr);
         } else {
-            debug!(message = "Connected", peer_addr = "unknown");
+            debug!(message = "Connected.", peer_addr = "unknown");
         }
     }
 
@@ -46,7 +46,7 @@ pub struct TcpConnectionDisconnected {
 
 impl InternalEvent for TcpConnectionDisconnected {
     fn emit_logs(&self) {
-        error!(message = "connection disconnected.", error = %self.error);
+        error!(message = "Connection disconnected.", error = %self.error);
     }
 
     fn emit_metrics(&self) {
@@ -61,7 +61,7 @@ pub struct TcpConnectionShutdown {}
 
 impl InternalEvent for TcpConnectionShutdown {
     fn emit_logs(&self) {
-        debug!(message = "received EOF from the server; reconnecting.");
+        debug!(message = "Received EOF from the server; reconnecting.");
     }
 
     fn emit_metrics(&self) {
@@ -80,7 +80,7 @@ pub struct TcpConnectionError<T> {
 
 impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for TcpConnectionError<T> {
     fn emit_logs(&self) {
-        warn!(message = "connection error.", error = %self.error, rate_limit_secs = 10);
+        warn!(message = "Connection error.", error = %self.error, rate_limit_secs = 10);
     }
 
     fn emit_metrics(&self) {
@@ -97,7 +97,7 @@ pub struct TcpFlushError {
 
 impl InternalEvent for TcpFlushError {
     fn emit_logs(&self) {
-        error!(message = "unable to flush connection.", error = %self.error);
+        error!(message = "Unable to flush connection.", error = %self.error);
     }
 
     fn emit_metrics(&self) {
@@ -114,7 +114,7 @@ pub struct TcpEventSent {
 
 impl InternalEvent for TcpEventSent {
     fn emit_logs(&self) {
-        trace!(message = "sending event.", byte_size = %self.byte_size);
+        trace!(message = "Sending event.", byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {

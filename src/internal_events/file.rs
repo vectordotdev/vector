@@ -43,7 +43,7 @@ pub struct FileChecksumFailed<'a> {
 impl<'a> InternalEvent for FileChecksumFailed<'a> {
     fn emit_logs(&self) {
         warn!(
-            message = "currently ignoring file too small for fingerprinting.",
+            message = "Currently ignoring file too small for fingerprinting.",
             path = ?self.path,
         );
     }
@@ -67,7 +67,7 @@ pub struct FileFingerprintReadFailed<'a> {
 impl<'a> InternalEvent for FileFingerprintReadFailed<'a> {
     fn emit_logs(&self) {
         error!(
-            message = "failed reading file for fingerprinting.",
+            message = "Failed reading file for fingerprinting.",
             path = ?self.path,
             error = ?self.error,
         );
@@ -92,7 +92,7 @@ pub struct FileDeleteFailed<'a> {
 impl<'a> InternalEvent for FileDeleteFailed<'a> {
     fn emit_logs(&self) {
         warn!(
-            message = "failed in deleting file.",
+            message = "Failed in deleting file.",
             path = ?self.path,
             error = ?self.error,
             rate_limit_secs = 1
@@ -117,7 +117,7 @@ pub struct FileDeleted<'a> {
 impl<'a> InternalEvent for FileDeleted<'a> {
     fn emit_logs(&self) {
         info!(
-            message = "file deleted.",
+            message = "File deleted.",
             path = ?self.path,
         );
     }
@@ -140,7 +140,7 @@ pub struct FileUnwatched<'a> {
 impl<'a> InternalEvent for FileUnwatched<'a> {
     fn emit_logs(&self) {
         info!(
-            message = "stopped watching file.",
+            message = "Stopped watching file.",
             path = ?self.path,
         );
     }
@@ -164,7 +164,7 @@ pub struct FileWatchFailed<'a> {
 impl<'a> InternalEvent for FileWatchFailed<'a> {
     fn emit_logs(&self) {
         error!(
-            message = "failed to watch file.",
+            message = "Failed to watch file.",
             path = ?self.path,
             error = ?self.error
         );
@@ -189,7 +189,7 @@ pub struct FileResumed<'a> {
 impl<'a> InternalEvent for FileResumed<'a> {
     fn emit_logs(&self) {
         info!(
-            message = "resuming to watch file.",
+            message = "Resuming to watch file.",
             path = ?self.path,
             file_position = %self.file_position
         );
@@ -213,7 +213,7 @@ pub struct FileAdded<'a> {
 impl<'a> InternalEvent for FileAdded<'a> {
     fn emit_logs(&self) {
         info!(
-            message = "found new file to watch.",
+            message = "Found new file to watch.",
             path = ?self.path,
         );
     }
@@ -235,7 +235,7 @@ pub struct FileCheckpointed {
 
 impl InternalEvent for FileCheckpointed {
     fn emit_logs(&self) {
-        debug!(message = "files checkpointed.", count = %self.count);
+        debug!(message = "Files checkpointed.", count = %self.count);
     }
 
     fn emit_metrics(&self) {
@@ -254,7 +254,7 @@ pub struct FileCheckpointWriteFailed {
 
 impl InternalEvent for FileCheckpointWriteFailed {
     fn emit_logs(&self) {
-        warn!(message = "failed writing checkpoints.", error = ?self.error);
+        warn!(message = "Failed writing checkpoints.", error = ?self.error);
     }
 
     fn emit_metrics(&self) {

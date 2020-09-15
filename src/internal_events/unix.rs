@@ -8,7 +8,7 @@ pub struct UnixSocketConnectionEstablished<'a> {
 
 impl InternalEvent for UnixSocketConnectionEstablished<'_> {
     fn emit_logs(&self) {
-        debug!(message = "Connected", path = ?self.path);
+        debug!(message = "Connected.", path = ?self.path);
     }
 
     fn emit_metrics(&self) {
@@ -27,7 +27,7 @@ pub struct UnixSocketConnectionFailure<'a> {
 impl InternalEvent for UnixSocketConnectionFailure<'_> {
     fn emit_logs(&self) {
         error!(
-            message = "Unix socket connection failure",
+            message = "Unix socket connection failure.",
             error = %self.error,
             path = ?self.path,
         );
@@ -51,7 +51,7 @@ impl<E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display> InternalEven
 {
     fn emit_logs(&self) {
         debug!(
-            message = "unix socket error.",
+            message = "Unix socket error.",
             error = %self.error,
             path = ?self.path,
         );

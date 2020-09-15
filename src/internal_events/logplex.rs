@@ -35,7 +35,7 @@ pub struct HerokuLogplexRequestReadError {
 impl InternalEvent for HerokuLogplexRequestReadError {
     fn emit_logs(&self) {
         error!(
-            message = "error reading request body.",
+            message = "Error reading request body.",
             error = ?self.error,
             rate_limit_secs = 10
         );

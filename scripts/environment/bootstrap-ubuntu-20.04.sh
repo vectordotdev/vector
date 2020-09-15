@@ -26,7 +26,8 @@ apt install --yes \
     ruby-bundler \
     libsasl2-dev \
     gnupg2 \
-    wget
+    wget \
+    gawk
 
 # Grease
 # Grease is used for the `make release-github` task.

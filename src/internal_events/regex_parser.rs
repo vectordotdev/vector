@@ -26,7 +26,7 @@ pub(crate) struct RegexParserFailedMatch<'a> {
 impl InternalEvent for RegexParserFailedMatch<'_> {
     fn emit_logs(&self) {
         warn!(
-            message = "regex pattern failed to match.",
+            message = "Regex pattern failed to match.",
             field = &super::truncate_string_at(&String::from_utf8_lossy(&self.value), 60)[..],
             rate_limit_secs = 30
         );
