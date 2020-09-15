@@ -264,7 +264,8 @@ mod integration_tests {
         trace_init();
 
         let num_events = 1_000;
-        let (_input, mut events) = random_lines_with_stream(100, num_events);
+        let (_input, events) = random_lines_with_stream(100, num_events);
+        let mut events = events.map(Ok);
 
         let topic = format!("test-{}", random_string(10));
         let cnf = PulsarSinkConfig {

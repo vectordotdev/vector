@@ -2,7 +2,7 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::proto,
     internal_events::VectorEventSent,
-    sinks::util::{tcp::TcpSink, StreamSink},
+    sinks::util::{tcp::TcpSink, StreamSinkOld},
     tls::{MaybeTlsSettings, TlsConfig},
     Event,
 };
@@ -49,7 +49,7 @@ impl SinkConfig for VectorSinkConfig {
 
         let sink = TcpSink::new(host, port, cx.resolver(), tls);
         let healthcheck = sink.healthcheck();
-        let sink = StreamSink::new(sink, cx.acker())
+        let sink = StreamSinkOld::new(sink, cx.acker())
             .with_flat_map(move |event| iter_ok(encode_event(event)));
 
         Ok((

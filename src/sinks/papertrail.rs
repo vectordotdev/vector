@@ -3,7 +3,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSink,
-        Encoding, StreamSink, UriSerde,
+        Encoding, StreamSinkOld, UriSerde,
     },
     tls::{MaybeTlsSettings, TlsSettings},
     Event,
@@ -49,7 +49,7 @@ impl SinkConfig for PapertrailConfig {
 
         let encoding = self.encoding.clone();
 
-        let sink = StreamSink::new(sink, cx.acker())
+        let sink = StreamSinkOld::new(sink, cx.acker())
             .with_flat_map(move |e| iter_ok(encode_event(e, pid, &encoding)));
 
         Ok((

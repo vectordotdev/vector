@@ -756,7 +756,7 @@ mod integration_tests {
         Event,
     };
     use chrono::Utc;
-    use futures::{stream, StreamExt};
+    use futures::stream;
 
     //    fn onboarding_v1() {
     //        let client = reqwest::Client::builder()
@@ -819,7 +819,7 @@ mod integration_tests {
 
         let client = HttpClient::new(cx.resolver(), None).unwrap();
         let sink = InfluxDBSvc::new(config, cx, client).unwrap();
-        sink.run(stream::iter(events).map(Ok)).await.unwrap();
+        sink.run(stream::iter(events)).await.unwrap();
 
         let mut body = std::collections::HashMap::new();
         body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));

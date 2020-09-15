@@ -2,7 +2,7 @@
 
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
-    SinkExt,
+    SinkExt, StreamExt,
 };
 use prost::Message;
 use tempfile::tempdir;
@@ -63,8 +63,9 @@ fn test_buffering() {
     let mut rt = runtime();
     let (topology, input_events) = rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
-        let (input_events, mut input_events_stream) =
+        let (input_events, input_events_stream) =
             random_events_with_stream(line_length, num_events);
+        let mut input_events_stream = input_events_stream.map(Ok);
 
         let _ = in_tx
             .sink_compat()
@@ -113,8 +114,9 @@ fn test_buffering() {
     rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
 
-        let (input_events2, mut input_events_stream) =
+        let (input_events2, input_events_stream) =
             random_events_with_stream(line_length, num_events);
+        let mut input_events_stream = input_events_stream.map(Ok);
 
         let _ = in_tx
             .sink_compat()
@@ -144,8 +146,8 @@ fn test_max_size() {
 
     let num_events: usize = 1000;
     let line_length = 1000;
-    let (input_events, mut input_events_stream) =
-        random_events_with_stream(line_length, num_events);
+    let (input_events, input_events_stream) = random_events_with_stream(line_length, num_events);
+    let mut input_events_stream = input_events_stream.map(Ok);
 
     let max_size = input_events
         .clone()
