@@ -125,12 +125,17 @@ mod tests {
     use metrics::counter;
     use tracing::{span, Level};
 
+    #[ignore]
     #[test]
     fn test_labels_injection() {
         trace_init();
         let _ = super::init();
 
-        let span = span!(Level::INFO, "my span", component_name = "foobar");
+        let span = span!(Level::ERROR, "my span", component_name = "foobar");
+        // See https://github.com/tokio-rs/tracing/issues/978
+        if span.is_disabled() {
+            panic!("test is not configured properly, set TEST_LOG=info env var")
+        }
         let _enter = span.enter();
 
         counter!("labels_injected", 1);
