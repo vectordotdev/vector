@@ -32,11 +32,15 @@
 //! driven independently from the sink. A oneshot channel is used to tie them back into
 //! the sink to allow it to notify the consumer that the request has succeeded.
 
-use super::batch::{Batch, PushResult, StatefulBatch};
-use super::buffer::partition::Partition;
-use crate::buffers::Acker;
+use super::{
+    batch::{Batch, PushResult, StatefulBatch},
+    buffer::partition::Partition,
+};
+use crate::{buffers::Acker, Event};
+use async_trait::async_trait;
 use futures::{
     compat::{Compat, Future01CompatExt},
+    stream::BoxStream,
     FutureExt, TryFutureExt,
 };
 use futures01::{
@@ -54,7 +58,7 @@ use tokio::time::{delay_for, Duration};
 use tower::Service;
 use tracing_futures::Instrument;
 
-// === StreamSink ===
+// === StreamSinkOld ===
 
 const STREAM_SINK_MAX: usize = 10_000;
 
@@ -65,14 +69,14 @@ const STREAM_SINK_MAX: usize = 10_000;
 /// will also attempt to fully flush if the amount of
 /// in flight acks is larger than `STREAM_SINK_MAX`.
 #[derive(Debug)]
-pub struct StreamSink<T> {
+pub struct StreamSinkOld<T> {
     inner: T,
     acker: Acker,
     pending: usize,
     closing_inner: bool,
 }
 
-impl<T> StreamSink<T> {
+impl<T> StreamSinkOld<T> {
     pub fn new(inner: T, acker: Acker) -> Self {
         Self {
             inner,
@@ -83,7 +87,7 @@ impl<T> StreamSink<T> {
     }
 }
 
-impl<T: Sink> Sink for StreamSink<T> {
+impl<T: Sink> Sink for StreamSinkOld<T> {
     type SinkItem = T::SinkItem;
     type SinkError = T::SinkError;
 
@@ -127,6 +131,13 @@ impl<T: Sink> Sink for StreamSink<T> {
         }
         self.inner.close()
     }
+}
+
+// === StreamSink ===
+
+#[async_trait]
+pub trait StreamSink {
+    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()>;
 }
 
 // === BatchSink ===

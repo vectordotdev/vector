@@ -287,7 +287,7 @@ mod tests {
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();
-        let events = stream::iter(input_lines.clone()).map(|x| Ok(Event::from(x)));
+        let events = stream::iter(input_lines.clone()).map(Event::from);
         let pump = sink.run(events);
 
         tokio::spawn(server);

@@ -845,7 +845,7 @@ mod integration_tests {
         region::RegionOrEndpoint,
         test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
     };
-    use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt, TryStreamExt};
+    use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt};
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_logs::{CloudWatchLogs, CreateLogGroupRequest, GetLogEventsRequest};
@@ -926,7 +926,7 @@ mod integration_tests {
         // add a historical timestamp to all but the first event, to simulate
         // out-of-order timestamps.
         let mut doit = false;
-        let events = events.map_ok(move |mut event| {
+        let events = events.map(move |mut event| {
             if doit {
                 let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
 
@@ -1010,7 +1010,7 @@ mod integration_tests {
         lines.push(add_event(Duration::days(-1)));
         lines.push(add_event(Duration::days(-13)));
 
-        sink.run(stream::iter(events).map(Ok)).await.unwrap();
+        sink.run(stream::iter(events)).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name.clone().into();
@@ -1102,7 +1102,8 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now();
 
-        let (input_lines, mut events) = random_lines_with_stream(100, 11);
+        let (input_lines, events) = random_lines_with_stream(100, 11);
+        let mut events = events.map(Ok);
         let _ = sink
             .into_futures01sink()
             .sink_compat()
@@ -1161,7 +1162,7 @@ mod integration_tests {
                 let mut event = Event::from(e);
                 let stream = format!("{}", (i % 2));
                 event.as_mut_log().insert("key", stream);
-                Ok(event)
+                event
             })
             .collect::<Vec<_>>();
         sink.run(stream::iter(events)).await.unwrap();

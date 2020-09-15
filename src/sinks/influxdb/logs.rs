@@ -501,7 +501,7 @@ mod tests {
             events.push(event);
         }
 
-        sink.run(stream::iter(events).map(Ok)).await.unwrap();
+        sink.run(stream::iter(events)).await.unwrap();
 
         let output = rx.next().await.unwrap();
 
@@ -564,7 +564,7 @@ mod tests {
             events.push(event);
         }
 
-        sink.run(stream::iter(events).map(Ok)).await.unwrap();
+        sink.run(stream::iter(events)).await.unwrap();
 
         let output = rx.next().await.unwrap();
 
@@ -633,7 +633,7 @@ mod integration_tests {
         },
     };
     use chrono::Utc;
-    use futures::{stream, StreamExt};
+    use futures::stream;
 
     #[tokio::test]
     async fn influxdb2_logs_put_data() {
@@ -673,7 +673,7 @@ mod integration_tests {
         events.push(event1);
         events.push(event2);
 
-        sink.run(stream::iter(events).map(Ok)).await.unwrap();
+        sink.run(stream::iter(events)).await.unwrap();
 
         let mut body = std::collections::HashMap::new();
         body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"{}.vector\")", ns.clone()));

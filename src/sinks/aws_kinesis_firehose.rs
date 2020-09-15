@@ -288,7 +288,7 @@ mod integration_tests {
         },
         test_util::{random_events_with_stream, random_string},
     };
-    use futures::{compat::Sink01CompatExt, SinkExt};
+    use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
     use rusoto_core::Region;
     use rusoto_firehose::{
         CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration, KinesisFirehose,
@@ -330,7 +330,8 @@ mod integration_tests {
         let client = config.create_client(cx.resolver()).unwrap();
         let sink = KinesisFirehoseService::new(config, client, cx).unwrap();
 
-        let (input, mut events) = random_events_with_stream(100, 100);
+        let (input, events) = random_events_with_stream(100, 100);
+        let mut events = events.map(Ok);
 
         let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 

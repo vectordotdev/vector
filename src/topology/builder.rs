@@ -11,7 +11,10 @@ use crate::{
     shutdown::SourceShutdownCoordinator,
     Pipeline,
 };
-use futures::{compat::Future01CompatExt, FutureExt};
+use futures::{
+    compat::{Future01CompatExt, Stream01CompatExt},
+    future, FutureExt, StreamExt,
+};
 use futures01::{sync::mpsc, Future, Stream};
 use std::collections::HashMap;
 use tokio::time::{timeout, Duration};
@@ -157,7 +160,12 @@ pub async fn build_pieces(
         };
 
         let sink = sink
-            .run01(filter_event_type(rx, input_type))
+            .run(
+                filter_event_type(rx, input_type)
+                    .compat()
+                    .take_while(|e| future::ready(e.is_ok()))
+                    .map(|x| x.unwrap()),
+            )
             .inspect(|_| debug!("Finished"));
         let task = Task::new(name, typetag, sink);
 

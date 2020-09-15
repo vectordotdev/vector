@@ -505,7 +505,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let stream = stream::iter(events).map(|x| Ok(x.into()));
+        let stream = stream::iter(events).map(Into::into);
         sink.run(stream).await.unwrap();
     }
 }

@@ -6,7 +6,9 @@ use crate::{
         TcpConnectionDisconnected, TcpConnectionEstablished, TcpConnectionFailed,
         TcpConnectionShutdown, TcpEventSent, TcpFlushError,
     },
-    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSink},
+    sinks::util::{
+        encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSinkOld,
+    },
     sinks::{Healthcheck, VectorSink},
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
 };
@@ -61,7 +63,7 @@ impl TcpSinkConfig {
 
         let encoding = self.encoding.clone();
         let sink = Box::new(
-            StreamSink::new(tcp, cx.acker())
+            StreamSinkOld::new(tcp, cx.acker())
                 .with_flat_map(move |event| iter_ok(encode_event(event, &encoding))),
         );
 

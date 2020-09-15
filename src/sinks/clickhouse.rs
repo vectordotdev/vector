@@ -278,7 +278,7 @@ mod integration_tests {
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.run(stream::once(future::ok(input_event.clone())))
+        sink.run(stream::once(future::ready(input_event.clone())))
             .await
             .unwrap();
 
@@ -327,7 +327,7 @@ mod integration_tests {
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.run(stream::once(future::ok(input_event.clone())))
+        sink.run(stream::once(future::ready(input_event.clone())))
             .await
             .unwrap();
 
@@ -387,7 +387,7 @@ timestamp_format = "unix""#,
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.run(stream::once(future::ok(input_event.clone())))
+        sink.run(stream::once(future::ready(input_event.clone())))
             .await
             .unwrap();
 
@@ -446,7 +446,7 @@ timestamp_format = "unix""#,
         // this timeout should trigger.
         timeout(
             Duration::from_secs(5),
-            sink.run(stream::once(future::ok(input_event))),
+            sink.run(stream::once(future::ready(input_event))),
         )
         .await
         .unwrap()

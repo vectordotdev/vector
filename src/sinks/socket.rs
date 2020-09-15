@@ -108,7 +108,7 @@ mod test {
         let (sink, _healthcheck) = config.build(context).unwrap();
 
         let event = Event::from("raw log line");
-        sink.run(stream::once(future::ok(event))).await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let mut buf = [0; 256];
         let (size, _src_addr) = receiver
@@ -278,7 +278,8 @@ mod test {
                 .await;
         });
 
-        let (_, mut events) = random_lines_with_stream(10, 10);
+        let (_, events) = random_lines_with_stream(10, 10);
+        let mut events = events.map(Ok);
         sink.send_all(&mut events).await.unwrap();
 
         // Loop and check for 10 events, we should always get 10 events. Once,
@@ -298,7 +299,8 @@ mod test {
         assert_eq!(conn_counter.load(Ordering::SeqCst), 1);
 
         // Send another 10 events
-        let (_, mut events) = random_lines_with_stream(10, 10);
+        let (_, events) = random_lines_with_stream(10, 10);
+        let mut events = events.map(Ok);
         sink.send_all(&mut events).await.unwrap();
         drop(sink);
 

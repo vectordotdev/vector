@@ -403,7 +403,7 @@ mod test {
                 .unwrap()
         });
 
-        sink.run(stream::iter(events).map(Ok)).await.unwrap();
+        sink.run(stream::iter(events)).await.unwrap();
 
         let messages = collect_n(rx, 1).await.unwrap();
         assert_eq!(

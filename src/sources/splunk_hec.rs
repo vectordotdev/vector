@@ -842,7 +842,7 @@ mod tests {
         let n = messages.len();
 
         tokio::spawn(async move {
-            sink.run(stream::iter(messages).map(|x| Ok(x.into())))
+            sink.run(stream::iter(messages).map(|x| x.into()))
                 .await
                 .unwrap();
         });
@@ -974,7 +974,7 @@ mod tests {
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("greeting", "hello");
         event.as_mut_log().insert("name", "bob");
-        sink.run(stream::once(future::ok(event))).await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
         assert_eq!(event.as_log()[&"greeting".into()], "hello".into());
@@ -994,7 +994,7 @@ mod tests {
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("line", "hello");
-        sink.run(stream::once(future::ok(event))).await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
         assert_eq!(event.as_log()[&log_schema().message_key()], "hello".into());
