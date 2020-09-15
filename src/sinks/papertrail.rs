@@ -3,9 +3,10 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSink,
-        Encoding, StreamSink, UriSerde,
+        Encoding, StreamSinkOld, UriSerde,
     },
     tls::{MaybeTlsSettings, TlsConfig},
+    Event,
 };
 use bytes::Bytes;
 use futures01::{stream::iter_ok, Sink};
@@ -49,7 +50,7 @@ impl SinkConfig for PapertrailConfig {
 
         let encoding = self.encoding.clone();
 
-        let sink = StreamSink::new(sink, cx.acker())
+        let sink = StreamSinkOld::new(sink, cx.acker())
             .with_flat_map(move |e| iter_ok(encode_event(e, pid, &encoding)));
 
         Ok((
@@ -67,13 +68,7 @@ impl SinkConfig for PapertrailConfig {
     }
 }
 
-fn encode_event(
-    mut event: crate::Event,
-    pid: u32,
-    encoding: &EncodingConfig<Encoding>,
-) -> Option<Bytes> {
-    encoding.apply_rules(&mut event);
-
+fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {
     let host = if let Some(host) = event.as_mut_log().remove(log_schema().host_key()) {
         Some(host.to_string_lossy())
     } else {
@@ -89,6 +84,7 @@ fn encode_event(
 
     let mut s: Vec<u8> = Vec::new();
 
+    encoding.apply_rules(&mut event);
     let log = event.into_log();
 
     let message = match encoding.codec() {
@@ -106,4 +102,33 @@ fn encode_event(
     s.push(b'\n');
 
     Some(Bytes::from(s))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn encode_event_apply_rules() {
+        let mut evt = Event::from("vector");
+        evt.as_mut_log().insert("magic", "key");
+
+        let bytes = encode_event(
+            evt,
+            0,
+            &EncodingConfig {
+                codec: Encoding::Json,
+                only_fields: None,
+                except_fields: Some(vec![Atom::from("magic")]),
+                timestamp_format: None,
+            },
+        )
+        .unwrap();
+
+        let msg =
+            bytes.slice(String::from_utf8_lossy(&bytes).find(": ").unwrap() + 2..bytes.len() - 1);
+        let value: serde_json::Value = serde_json::from_slice(&msg).unwrap();
+        assert!(!value.as_object().unwrap().contains_key("magic"));
+    }
 }

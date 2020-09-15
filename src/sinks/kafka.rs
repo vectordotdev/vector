@@ -255,12 +255,13 @@ fn encode_event(
     key_field: &Option<Atom>,
     encoding: &EncodingConfig<Encoding>,
 ) -> (Vec<u8>, Vec<u8>) {
-    encoding.apply_rules(&mut event);
     let key = key_field
         .as_ref()
         .and_then(|f| event.as_log().get(f))
         .map(|v| v.as_bytes().to_vec())
         .unwrap_or_default();
+
+    encoding.apply_rules(&mut event);
 
     let body = match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&event.as_log()).unwrap(),
@@ -314,6 +315,28 @@ mod tests {
         assert_eq!(map["key"], "value".to_string());
         assert_eq!(map["foo"], "bar".to_string());
     }
+
+    #[test]
+    fn kafka_encode_event_apply_rules() {
+        let mut event = Event::from("hello");
+        event.as_mut_log().insert("key", "value");
+
+        let (key, bytes) = encode_event(
+            event,
+            &Some("key".into()),
+            &EncodingConfigWithDefault {
+                codec: Encoding::Json,
+                except_fields: Some(vec![Atom::from("key")]),
+                ..Default::default()
+            }
+            .into(),
+        );
+
+        let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+
+        assert_eq!(&key[..], b"value");
+        assert!(!map.contains_key("key"));
+    }
 }
 
 #[cfg(feature = "kafka-integration-tests")]
@@ -326,7 +349,7 @@ mod integration_test {
         test_util::{random_lines_with_stream, random_string, wait_for},
         tls::TlsOptions,
     };
-    use futures::{compat::Sink01CompatExt, future, SinkExt};
+    use futures::{compat::Sink01CompatExt, future, SinkExt, StreamExt};
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
         Message, Offset, TopicPartitionList,
@@ -458,7 +481,8 @@ mod integration_test {
         let sink = KafkaSink::new(config, acker).unwrap();
 
         let num_events = 1000;
-        let (input, mut events) = random_lines_with_stream(100, num_events);
+        let (input, events) = random_lines_with_stream(100, num_events);
+        let mut events = events.map(Ok);
 
         let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 

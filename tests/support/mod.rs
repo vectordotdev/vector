@@ -18,7 +18,7 @@ use vector::config::{
 };
 use vector::event::{metric::MetricValue, Event, Value};
 use vector::shutdown::ShutdownSignal;
-use vector::sinks::{util::StreamSink, Healthcheck, VectorSink};
+use vector::sinks::{util::StreamSinkOld, Healthcheck, VectorSink};
 use vector::sources::Source;
 use vector::transforms::Transform;
 use vector::Pipeline;
@@ -281,7 +281,7 @@ where
         let sink = sink.sink_map_err(|error| {
             error!(message = "Ingesting an event failed at mock sink", ?error)
         });
-        let sink = StreamSink::new(sink, cx.acker());
+        let sink = StreamSinkOld::new(sink, cx.acker());
         let healthcheck = if self.healthy {
             future::ok(())
         } else {
