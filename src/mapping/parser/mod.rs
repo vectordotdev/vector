@@ -15,7 +15,7 @@ use crate::{
             path::Path as QueryPath,
             Literal,
         },
-        Assignment, Deletion, Function, IfStatement, Mapping, Noop, OnlyFields, Result,
+        Assignment, Deletion, Function, IfStatement, Mapping, MergeFn, Noop, OnlyFields, Result,
     },
 };
 use pest::{
@@ -418,10 +418,23 @@ fn if_statement_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn Function>> 
     Ok(Box::new(IfStatement::new(query, first, second)))
 }
 
+fn merge_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
+    let (first, mut other) = split_inner_rules_from_pair(pair)?;
+    let to_path = target_path_from_pair(first)?;
+    let query2 = query_arithmetic_from_pair(other.next().ok_or(TOKEN_ERR)?)?;
+    let deep = match other.next() {
+        None => None,
+        Some(pair) => Some(query_arithmetic_from_pair(pair)?),
+    };
+
+    Ok(Box::new(MergeFn::new(to_path.into(), query2, deep)))
+}
+
 fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
         Rule::deletion => Ok(Box::new(Deletion::new(paths_from_pair(pair)?))),
         Rule::only_fields => Ok(Box::new(OnlyFields::new(paths_from_pair(pair)?))),
+        Rule::merge => merge_function_from_pair(pair),
         _ => unreachable!("parser should not allow other function child rules here"),
     }
 }
@@ -1063,6 +1076,30 @@ mod tests {
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ParseJsonFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                "merge(.bar, .baz)",
+                Mapping::new(vec![Box::new(MergeFn::new(
+                    "bar".into(),
+                    Box::new(QueryPath::from("baz")),
+                    None,
+                ))]),
+            ),
+            (
+                "merge(.bar, .baz, .boz)",
+                Mapping::new(vec![Box::new(MergeFn::new(
+                    "bar".into(),
+                    Box::new(QueryPath::from("baz")),
+                    Some(Box::new(QueryPath::from("boz"))),
+                ))]),
+            ),
+            (
+                "merge(.bar, .baz, true)",
+                Mapping::new(vec![Box::new(MergeFn::new(
+                    "bar".into(),
+                    Box::new(QueryPath::from("baz")),
+                    Some(Box::new(Literal::from(Value::Boolean(true)))),
                 ))]),
             ),
         ];
