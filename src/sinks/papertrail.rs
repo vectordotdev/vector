@@ -5,7 +5,7 @@ use crate::{
         tcp::TcpSink,
         Encoding, StreamSinkOld, UriSerde,
     },
-    tls::{MaybeTlsSettings, TlsSettings},
+    tls::{MaybeTlsSettings, TlsConfig},
     Event,
 };
 use bytes::Bytes;
@@ -18,6 +18,7 @@ use syslog::{Facility, Formatter3164, LogFormat, Severity};
 pub struct PapertrailConfig {
     endpoint: UriSerde,
     encoding: EncodingConfig<Encoding>,
+    tls: Option<TlsConfig>,
 }
 
 inventory::submit! {
@@ -37,12 +38,12 @@ impl SinkConfig for PapertrailConfig {
             .port_u16()
             .ok_or_else(|| "A port is required for endpoint".to_string())?;
 
-        let sink = TcpSink::new(
-            host,
-            port,
-            cx.resolver(),
-            MaybeTlsSettings::Tls(TlsSettings::default()),
-        );
+        let tls = MaybeTlsSettings::from_config(
+            &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
+            false,
+        )?;
+
+        let sink = TcpSink::new(host, port, cx.resolver(), tls);
         let healthcheck = sink.healthcheck();
 
         let pid = std::process::id();

@@ -27,7 +27,7 @@ inventory::submit! {
 #[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let (host, port, tls) = if let Some(uri) = &self.endpoint {
+        let (host, port) = if let Some(uri) = &self.endpoint {
             let host = uri
                 .host()
                 .ok_or_else(|| "A host is required for endpoint".to_string())?;
@@ -35,18 +35,15 @@ impl SinkConfig for DatadogLogsConfig {
                 .port_u16()
                 .ok_or_else(|| "A port is required for endpoint".to_string())?;
 
-            (host.to_string(), port, self.tls.clone())
+            (host.to_string(), port)
         } else {
-            let tls = self.tls.clone().unwrap_or({
-                let mut tls = TlsConfig::default();
-                tls.enabled = Some(true);
-                tls
-            });
-
-            ("intake.logs.datadoghq.com".to_string(), 10516, Some(tls))
+            ("intake.logs.datadoghq.com".to_string(), 10516)
         };
 
-        let tls_settings = MaybeTlsSettings::from_config(&tls, false)?;
+        let tls_settings = MaybeTlsSettings::from_config(
+            &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
+            false,
+        )?;
 
         let sink = TcpSink::new(host, port, cx.resolver(), tls_settings);
         let healthcheck = sink.healthcheck();
