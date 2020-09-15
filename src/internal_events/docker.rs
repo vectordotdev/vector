@@ -12,7 +12,7 @@ pub struct DockerEventReceived<'a> {
 impl<'a> InternalEvent for DockerEventReceived<'a> {
     fn emit_logs(&self) {
         trace!(
-            message = "received one event.",
+            message = "Received one event.",
             byte_size = %self.byte_size,
             container_id = %self.container_id
         );
@@ -39,7 +39,7 @@ pub struct DockerContainerEventReceived<'a> {
 impl<'a> InternalEvent for DockerContainerEventReceived<'a> {
     fn emit_logs(&self) {
         debug!(
-            message = "received one container event.",
+            message = "Received one container event.",
             container_id = %self.container_id,
             action = %self.action
         );
@@ -61,7 +61,7 @@ pub struct DockerContainerWatch<'a> {
 impl<'a> InternalEvent for DockerContainerWatch<'a> {
     fn emit_logs(&self) {
         info!(
-            message = "started watching for logs of container.",
+            message = "Started watching for logs of container.",
             container_id = %self.container_id,
         );
     }
@@ -82,7 +82,7 @@ pub struct DockerContainerUnwatch<'a> {
 impl<'a> InternalEvent for DockerContainerUnwatch<'a> {
     fn emit_logs(&self) {
         info!(
-            message = "stopped watching for logs of container.",
+            message = "Stopped watching for logs of container.",
             container_id = %self.container_id,
         );
     }
@@ -104,7 +104,7 @@ pub struct DockerCommunicationError<'a> {
 impl<'a> InternalEvent for DockerCommunicationError<'a> {
     fn emit_logs(&self) {
         error!(
-            message = "error in communication with docker daemon.",
+            message = "Error in communication with docker daemon.",
             error = %self.error,
             container_id = ?self.container_id,
             rate_limit_secs = 10
@@ -128,7 +128,7 @@ pub struct DockerContainerMetadataFetchFailed<'a> {
 impl<'a> InternalEvent for DockerContainerMetadataFetchFailed<'a> {
     fn emit_logs(&self) {
         error!(
-            message = "failed to fetch container metadata.",
+            message = "Failed to fetch container metadata.",
             error = %self.error,
             container_id = ?self.container_id,
             rate_limit_secs = 10
@@ -152,7 +152,7 @@ pub struct DockerTimestampParseFailed<'a> {
 impl<'a> InternalEvent for DockerTimestampParseFailed<'a> {
     fn emit_logs(&self) {
         error!(
-            message = "failed to parse timestamp as rfc3339 timestamp.",
+            message = "Failed to parse timestamp as rfc3339 timestamp.",
             error = %self.error,
             container_id = ?self.container_id,
             rate_limit_secs = 10
@@ -176,7 +176,7 @@ pub struct DockerLoggingDriverUnsupported<'a> {
 impl<'a> InternalEvent for DockerLoggingDriverUnsupported<'a> {
     fn emit_logs(&self) {
         error!(
-            message = r#"docker engine is not using either `jsonfile` or `journald`
+            message = r#"Docker engine is not using either `jsonfile` or `journald`
                 logging driver. Please enable one of these logging drivers
                 to get logs from the docker daemon."#,
             error = %self.error,

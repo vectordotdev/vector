@@ -8,7 +8,7 @@ pub struct StatsdEventReceived {
 
 impl InternalEvent for StatsdEventReceived {
     fn emit_logs(&self) {
-        trace!(message = "received packet.", byte_size = %self.byte_size);
+        trace!(message = "Received packet.", byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {
@@ -33,7 +33,7 @@ pub struct StatsdInvalidRecord<'a> {
 
 impl InternalEvent for StatsdInvalidRecord<'_> {
     fn emit_logs(&self) {
-        error!(message = "invalid packet from statsd, discarding.", error = %self.error, text = %self.text);
+        error!(message = "Invalid packet from statsd, discarding.", error = %self.error, text = %self.text);
     }
 
     fn emit_metrics(&self) {
@@ -79,8 +79,8 @@ impl<T> StatsdSocketError<T> {
 impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for StatsdSocketError<T> {
     fn emit_logs(&self) {
         let message = match self.r#type {
-            StatsdSocketErrorType::Bind => "failed to bind to UDP listener socket.",
-            StatsdSocketErrorType::Read => "failed to read UDP datagram.",
+            StatsdSocketErrorType::Bind => "Failed to bind to UDP listener socket.",
+            StatsdSocketErrorType::Read => "Failed to read UDP datagram.",
         };
         error!(message, error = %self.error);
     }

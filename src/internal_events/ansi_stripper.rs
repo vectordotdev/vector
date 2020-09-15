@@ -45,7 +45,7 @@ pub struct ANSIStripperFieldInvalid<'a> {
 impl InternalEvent for ANSIStripperFieldInvalid<'_> {
     fn emit_logs(&self) {
         debug!(
-            message = "field value must be a string.",
+            message = "Field value must be a string.",
             field = %self.field,
             rate_limit_secs = 10
         );
@@ -69,7 +69,7 @@ pub struct ANSIStripperFailed<'a> {
 impl InternalEvent for ANSIStripperFailed<'_> {
     fn emit_logs(&self) {
         debug!(
-            message = "could not strip ANSI escape sequences.",
+            message = "Could not strip ANSI escape sequences.",
             field = %self.field,
             error = %self.error,
             rate_limit_secs = 10,
