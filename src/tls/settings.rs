@@ -1,7 +1,8 @@
 use super::{
     AddCertToStore, AddExtraChainCert, CaStackPush, DerExportError, FileOpenFailed, FileReadFailed,
     MaybeTls, NewCaStack, NewStoreBuilder, ParsePkcs12, Pkcs12Error, PrivateKeyParseError, Result,
-    SetCertificate, SetPrivateKey, SetVerifyCert, TlsError, TlsIdentityError, X509ParseError,
+    SetCertificate, SetDefaultVerifyPaths, SetPrivateKey, SetVerifyCert, TlsError,
+    TlsIdentityError, X509ParseError,
 };
 use openssl::{
     pkcs12::{ParsedPkcs12, Pkcs12},
@@ -132,6 +133,10 @@ impl TlsSettings {
                 .context(SetVerifyCert)?;
         } else {
             debug!("Fetching system root certs.");
+
+            context
+                .set_default_verify_paths()
+                .context(SetDefaultVerifyPaths)?;
 
             #[cfg(windows)]
             load_windows_certs(context).unwrap();
