@@ -1,10 +1,10 @@
 use crate::event::timestamp_to_string;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+use derive_is_enum_variant::is_enum_variant;
 use serde::{Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::convert::TryInto;
-use derive_is_enum_variant::is_enum_variant;
 
 #[derive(PartialEq, Debug, Clone, is_enum_variant)]
 pub enum Value {

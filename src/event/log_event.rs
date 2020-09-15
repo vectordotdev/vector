@@ -181,8 +181,8 @@ impl Serialize for LogEvent {
 #[cfg(test)]
 mod test {
     use super::*;
-    use tracing::trace;
     use std::{fs, io::Read, path::Path};
+    use tracing::trace;
 
     fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<Vec<u8>> {
         let mut test_file = match fs::File::open(path) {
