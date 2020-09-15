@@ -211,7 +211,7 @@ mod test {
     fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<Vec<u8>> {
         let mut test_file = match fs::File::open(path) {
             Ok(file) => file,
-            Err(e) => Err(e)?,
+            Err(e) => return Err(e),
         };
 
         let mut buf = Vec::new();
