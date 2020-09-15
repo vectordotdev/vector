@@ -120,23 +120,6 @@ define ENVIRONMENT_EXEC
 			$(ENVIRONMENT_UPSTREAM)
 endef
 
-define ENVIRONMENT_COPY_ARTIFACTS
-	@echo "Copying artifacts off volumes... (Docker errors below are totally okay)"
-	@mkdir -p ./target/release
-	@mkdir -p ./target/debug
-	@mkdir -p ./target/criterion
-	@$(CONTAINER_TOOL) rm -f vector-build-outputs || true
-	@$(CONTAINER_TOOL) run \
-		-d \
-		-v vector-target:/target \
-		--name vector-build-outputs \
-		busybox true
-	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/release/vector ./target/release/ || true
-	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/debug/vector ./target/debug/ || true
-	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/criterion ./target/criterion || true
-	@$(CONTAINER_TOOL) rm -f vector-build-outputs
-endef
-
 
 ifeq ($(ENVIRONMENT_AUTOBUILD), true)
 define ENVIRONMENT_PREPARE
@@ -243,19 +226,26 @@ target/%/vector.tar.gz: export PAIR =$(subst /, ,$(@:target/%/vector.tar.gz=%))
 target/%/vector.tar.gz: export TRIPLE ?=$(word 1,${PAIR})
 target/%/vector.tar.gz: export PROFILE ?=$(word 2,${PAIR})
 target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
+	rm -rf target/scratch/vector-${TRIPLE} || true
+	mkdir -p target/scratch/vector-${TRIPLE}/bin target/scratch/vector-${TRIPLE}/etc
+	cp --recursive --force --verbose \
+		target/${TRIPLE}/${PROFILE}/vector \
+		target/scratch/vector-${TRIPLE}/bin/vector
+	cp --recursive --force --verbose \
+		README.md \
+		LICENSE \
+		config \
+		target/scratch/vector-${TRIPLE}/
+	cp --recursive --force --verbose \
+		distribution/systemd \
+		target/scratch/vector-${TRIPLE}/etc/
 	tar --create \
 		--gzip \
 		--verbose \
 		--file target/${TRIPLE}/${PROFILE}/vector.tar.gz \
-		--transform='s|target/${TRIPLE}/${PROFILE}/|bin/|' \
-		--transform='s|distribution/|etc/|' \
-		--transform 's|^|vector-${TRIPLE}/|' \
-		target/${TRIPLE}/${PROFILE}/vector \
-		README.md \
-		LICENSE \
-		config \
-		distribution/init.d \
-		distribution/systemd
+		--directory target/scratch/ \
+		vector-${TRIPLE}
+	rm -rf target/scratch/
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
@@ -1030,7 +1020,7 @@ update-kubernetes-yaml: ## Regenerate the Kubernetes YAML config
 .PHONY: cargo-install-%
 cargo-install-%: override TOOL = $(@:cargo-install-%=%)
 cargo-install-%:
-	$(if $(findstring true,$(AUTOINSTALL)),${MAYBE_ENVIRONMENT_EXEC} cargo install ${TOOL} --quiet,)
+	$(if $(findstring true,$(AUTOINSTALL)),cargo install ${TOOL} --quiet,)
 
 .PHONY: ensure-has-wasm-toolchain ### Configures a wasm toolchain for test artifact building, if required
 ensure-has-wasm-toolchain: target/wasm32-wasi/.obtained
