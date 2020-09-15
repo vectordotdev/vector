@@ -10,7 +10,7 @@ use std::{
     io::Write,
     net::SocketAddr,
     path::PathBuf,
-    process::{Command,Child},
+    process::{Child, Command},
     thread::sleep,
     time::{Duration, Instant},
 };
@@ -51,14 +51,13 @@ const PROMETHEUS_SINK_CONFIG: &'static str = r#"
 
 /// Creates a file with given content
 fn create_file(config: &str) -> PathBuf {
-    let path=temp_file();
-    overwrite_file(path.clone(),config);
+    let path = temp_file();
+    overwrite_file(path.clone(), config);
     path
 }
 
-
 /// Overwrites file with given content
-fn overwrite_file(path: PathBuf,config: &str) {
+fn overwrite_file(path: PathBuf, config: &str) {
     let mut file = OpenOptions::new()
         .create(true)
         .write(true)
@@ -224,17 +223,22 @@ fn timely_shutdown_journald() {
 #[test]
 fn timely_shutdown_prometheus() {
     let address = next_addr();
-    test_timely_shutdown_with_sub(vector_with(create_file(PROMETHEUS_SINK_CONFIG), address), |_| {
-        test_timely_shutdown(vector_with(
-            create_file(source_config(
-                r#"
+    test_timely_shutdown_with_sub(
+        vector_with(create_file(PROMETHEUS_SINK_CONFIG), address),
+        |_| {
+            test_timely_shutdown(vector_with(
+                create_file(
+                    source_config(
+                        r#"
         type = "prometheus"
         hosts = ["http://${VECTOR_TEST_ADDRESS}"]"#,
-            )
-            .as_str()),
-            address,
-        ));
-    });
+                    )
+                    .as_str(),
+                ),
+                address,
+            ));
+        },
+    );
 }
 
 #[test]
@@ -385,31 +389,41 @@ fn timely_shutdown_lua_timer() {
     ));
 }
 
-
 #[test]
 fn timely_reload_shutdown() {
-    let path=create_file(source_config(
-        r#"
-        type = "socket"
-        address = "${VECTOR_TEST_ADDRESS}"
-        mode = "tcp""#,
-    ).as_str());
-
-    let mut cmd = vector_with(path.clone(),next_addr());
-    cmd.arg("-w true");
-
-    test_timely_shutdown_with_sub(cmd, |vector| {
-        overwrite_file(path,source_config(
+    let path = create_file(
+        source_config(
             r#"
             type = "socket"
             address = "${VECTOR_TEST_ADDRESS}"
-            mode = "udp""#,
-        ).as_str());
+            mode = "tcp""#,
+        )
+        .as_str(),
+    );
+
+    let mut cmd = vector_with(path.clone(), next_addr());
+    cmd.arg("-w true");
+
+    test_timely_shutdown_with_sub(cmd, |vector| {
+        overwrite_file(
+            path,
+            source_config(
+                r#"
+                type = "socket"
+                address = "${VECTOR_TEST_ADDRESS}"
+                mode = "udp""#,
+            )
+            .as_str(),
+        );
 
         // Give vector time to reload.
         sleep(Duration::from_secs(5));
 
         // Check if vector is still running
-        assert_eq!(None, vector.try_wait().unwrap(), "Vector exited too early on reload.");
+        assert_eq!(
+            None,
+            vector.try_wait().unwrap(),
+            "Vector exited too early on reload."
+        );
     });
 }
