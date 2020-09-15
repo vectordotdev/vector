@@ -3,13 +3,12 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSink,
-        Encoding, StreamSinkOld, UriSerde,
+        Encoding, UriSerde,
     },
     tls::{MaybeTlsSettings, TlsConfig},
     Event,
 };
 use bytes::Bytes;
-use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
 
@@ -37,26 +36,19 @@ impl SinkConfig for PapertrailConfig {
             .endpoint
             .port_u16()
             .ok_or_else(|| "A port is required for endpoint".to_string())?;
-
         let tls = MaybeTlsSettings::from_config(
             &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
             false,
         )?;
 
-        let sink = TcpSink::new(host, port, cx.resolver(), tls);
+        let pid = std::process::id();
+        let encoding = self.encoding.clone();
+        let encode_event = Box::new(move |event| encode_event(event, pid, &encoding));
+
+        let sink = TcpSink::new(host, port, tls, cx, encode_event);
         let healthcheck = sink.healthcheck();
 
-        let pid = std::process::id();
-
-        let encoding = self.encoding.clone();
-
-        let sink = StreamSinkOld::new(sink, cx.acker())
-            .with_flat_map(move |e| iter_ok(encode_event(e, pid, &encoding)));
-
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        Ok((super::VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

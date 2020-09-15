@@ -3,8 +3,8 @@ use crate::{
     buffers::Acker,
     config::SinkContext,
     dns::Resolver,
-    event::Event,
     sinks::{Healthcheck, VectorSink},
+    Event,
 };
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};

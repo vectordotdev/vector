@@ -1,14 +1,13 @@
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
     sinks::{
-        util::{self, encoding::EncodingConfig, tcp::TcpSink, Encoding, StreamSinkOld, UriSerde},
+        util::{self, encoding::EncodingConfig, tcp::TcpSink, Encoding, UriSerde},
         Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsConfig},
+    Event,
 };
 use bytes::Bytes;
-use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -39,22 +38,19 @@ impl SinkConfig for DatadogLogsConfig {
         } else {
             ("intake.logs.datadoghq.com".to_string(), 10516)
         };
-
-        let tls_settings = MaybeTlsSettings::from_config(
+        let tls = MaybeTlsSettings::from_config(
             &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
             false,
         )?;
 
-        let sink = TcpSink::new(host, port, cx.resolver(), tls_settings);
-        let healthcheck = sink.healthcheck();
-
         let encoding = self.encoding.clone();
         let api_key = self.api_key.clone();
+        let encode_event = Box::new(move |event| encode_event(event, &api_key, &encoding));
 
-        let sink = StreamSinkOld::new(sink, cx.acker())
-            .with_flat_map(move |e| iter_ok(encode_event(e, &api_key, &encoding)));
+        let sink = TcpSink::new(host, port, tls, cx, encode_event);
+        let healthcheck = sink.healthcheck();
 
-        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

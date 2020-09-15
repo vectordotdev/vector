@@ -1,7 +1,6 @@
 use crate::{
     buffers::Acker,
     config::SinkContext,
-    event::Event,
     internal_events::{
         UnixSocketConnectionEstablished, UnixSocketConnectionFailure, UnixSocketError,
         UnixSocketEventSent,
@@ -10,6 +9,7 @@ use crate::{
         util::{encode_event, encoding::EncodingConfig, Encoding, StreamSink},
         Healthcheck, VectorSink,
     },
+    Event,
 };
 use async_trait::async_trait;
 use futures::{stream::BoxStream, FutureExt, SinkExt, StreamExt};

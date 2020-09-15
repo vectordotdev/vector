@@ -3,7 +3,6 @@ use crate::{
     config::SinkContext,
     dns::Resolver,
     emit,
-    event::Event,
     internal_events::{
         TcpConnectionDisconnected, TcpConnectionEstablished, TcpConnectionFailed,
         TcpConnectionShutdown, TcpEventSent, TcpFlushError,
@@ -11,8 +10,10 @@ use crate::{
     sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSink},
     sinks::{Healthcheck, VectorSink},
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
+    Event,
 };
 use async_trait::async_trait;
+use bytes::Bytes;
 use futures::{stream::BoxStream, task::noop_waker_ref, FutureExt, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -49,11 +50,12 @@ impl TcpSinkConfig {
 
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
-
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
         let encoding = self.encoding.clone();
-        let sink = TcpSink::new(host, port, tls, cx, encoding);
+        let encode_event = Box::new(move |event| encode_event(event, &encoding));
+
+        let sink = TcpSink::new(host, port, tls, cx, encode_event);
         let healthcheck = sink.healthcheck();
 
         Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
@@ -66,7 +68,7 @@ pub struct TcpSink {
     tls: MaybeTlsSettings,
     resolver: Resolver,
     acker: Acker,
-    encoding: EncodingConfig<Encoding>,
+    encode_event: Box<dyn FnMut(Event) -> Option<Bytes> + Send>,
     state: TcpSinkState,
     backoff: ExponentialBackoff,
     span: tracing::Span,
@@ -83,7 +85,7 @@ impl TcpSink {
         port: u16,
         tls: MaybeTlsSettings,
         cx: SinkContext,
-        encoding: EncodingConfig<Encoding>,
+        encode_event: Box<dyn FnMut(Event) -> Option<Bytes> + Send>,
     ) -> Self {
         let span = info_span!("connection", %host, %port);
         Self {
@@ -92,7 +94,7 @@ impl TcpSink {
             tls,
             resolver: cx.resolver(),
             acker: cx.acker(),
-            encoding,
+            encode_event,
             state: TcpSinkState::Disconnected,
             backoff: Self::fresh_backoff(),
             span,
@@ -130,7 +132,7 @@ impl StreamSink for TcpSink {
             let event = match slot.take() {
                 Some(event) => event,
                 None => match input.next().await {
-                    Some(event) => match encode_event(event, &self.encoding) {
+                    Some(event) => match (*self.encode_event)(event) {
                         Some(event) => event,
                         None => continue,
                     },

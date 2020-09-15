@@ -2,12 +2,11 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::proto,
     internal_events::VectorEventSent,
-    sinks::util::{tcp::TcpSink, StreamSinkOld},
+    sinks::util::tcp::TcpSink,
     tls::{MaybeTlsSettings, TlsConfig},
     Event,
 };
 use bytes::{BufMut, Bytes, BytesMut};
-use futures01::{stream::iter_ok, Sink};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -44,18 +43,12 @@ impl SinkConfig for VectorSinkConfig {
 
         let host = uri.host().ok_or(BuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(BuildError::MissingPort)?;
-
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
-        let sink = TcpSink::new(host, port, cx.resolver(), tls);
+        let sink = TcpSink::new(host, port, tls, cx, Box::new(encode_event));
         let healthcheck = sink.healthcheck();
-        let sink = StreamSinkOld::new(sink, cx.acker())
-            .with_flat_map(move |event| iter_ok(encode_event(event)));
 
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        Ok((super::VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

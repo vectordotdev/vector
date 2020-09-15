@@ -1,11 +1,11 @@
 use crate::{
     buffers::Acker,
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
     },
+    Event,
 };
 use async_trait::async_trait;
 use futures::{
