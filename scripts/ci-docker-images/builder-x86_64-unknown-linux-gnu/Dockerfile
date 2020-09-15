@@ -7,12 +7,9 @@ RUN yum install -y epel-release && \
     yum makecache
 RUN yum install -y \
         make openssl-devel cmake3 git \
-        gcc gcc-c++ libstdc++-static sudo \
-        perl-App-cpanminus && \
+        gcc gcc-c++ libstdc++-static sudo && \
     yum clean all
 RUN ln -s /usr/bin/cmake3 /usr/bin/cmake
-RUN cpanm File::Rename \
- && rename --version
 
 RUN cd /tmp && \
   git clone https://github.com/github/cmark-gfm && \
