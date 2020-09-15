@@ -226,22 +226,25 @@ target/%/vector.tar.gz: export PAIR =$(subst /, ,$(@:target/%/vector.tar.gz=%))
 target/%/vector.tar.gz: export TRIPLE ?=$(word 1,${PAIR})
 target/%/vector.tar.gz: export PROFILE ?=$(word 2,${PAIR})
 target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
-	rm -rf target/scratch/ || true
-	mkdir -p target/scratch/bin target/scratch/etc
-	cp --recursive --force --verbose target/${TRIPLE}/${PROFILE}/vector target/scratch/bin/vector
+	rm -rf target/scratch/vector-${TRIPLE} || true
+	mkdir -p target/scratch/vector-${TRIPLE}/bin target/scratch/vector-${TRIPLE}/etc
+	cp --recursive --force --verbose \
+		target/${TRIPLE}/${PROFILE}/vector \
+		target/scratch/vector-${TRIPLE}/bin/vector
 	cp --recursive --force --verbose \
 		README.md \
 		LICENSE \
 		config \
-		target/scratch/
+		target/scratch/vector-${TRIPLE}/
 	cp --recursive --force --verbose \
 		distribution/systemd \
-		target/scratch/etc/
+		target/scratch/vector-${TRIPLE}/etc/
 	tar --create \
 		--gzip \
 		--verbose \
 		--file target/${TRIPLE}/${PROFILE}/vector.tar.gz \
-		target/scratch
+		--directory target/scratch/ \
+		vector-${TRIPLE}
 	rm -rf target/scratch/
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
