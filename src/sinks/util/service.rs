@@ -241,8 +241,25 @@ impl TowerRequestSettings {
         B: Batch<Output = Request>,
         Request: Send + Clone + 'static,
     {
+        BatchSink::new(
+            self.service(retry_logic, service),
+            batch,
+            batch_timeout,
+            acker,
+        )
+    }
+
+    pub fn service<L, S, Request>(&self, retry_logic: L, service: S) -> Svc<S, L>
+    where
+        L: RetryLogic<Response = S::Response>,
+        S: Service<Request> + Clone + Send + 'static,
+        S::Error: Into<crate::Error> + Send + Sync + 'static,
+        S::Response: Send + Response,
+        S::Future: Send + 'static,
+        Request: Send + Clone + 'static,
+    {
         let policy = self.retry_policy(retry_logic.clone());
-        let service = ServiceBuilder::new()
+        ServiceBuilder::new()
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
             .retry(policy)
             .layer(AutoConcurrencyLimitLayer::new(
@@ -251,9 +268,7 @@ impl TowerRequestSettings {
                 retry_logic,
             ))
             .timeout(self.timeout)
-            .service(service);
-
-        BatchSink::new(service, batch, batch_timeout, acker)
+            .service(service)
     }
 }
 

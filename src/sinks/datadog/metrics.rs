@@ -1,27 +1,28 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::{
-        metric::{Metric, MetricKind, MetricValue},
+        metric::{Metric, MetricKind, MetricValue, StatisticKind},
         Event,
     },
     sinks::{
         util::{
             encode_namespace,
-            http::{BatchedHttpSink, HttpClient, HttpSink},
-            BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
+            http::{HttpBatchService, HttpClient, HttpRetryLogic},
+            BatchConfig, BatchSettings, MetricBuffer, PartitionBatchSink, PartitionBuffer,
+            PartitionInnerBuffer, TowerRequestConfig,
         },
         Healthcheck, HealthcheckError, UriParseError, VectorSink,
     },
 };
 use chrono::{DateTime, Utc};
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{future, FutureExt};
+use futures01::{stream::iter_ok, Sink};
 use http::{uri::InvalidUri, Request, StatusCode, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicI64, Ordering::SeqCst};
 
 #[derive(Debug, Snafu)]
@@ -51,8 +52,8 @@ pub struct DatadogConfig {
 
 struct DatadogSink {
     config: DatadogConfig,
-    last_sent_timestamp: AtomicI64,
-    uri: Uri,
+    /// Endpoint -> (uri_path, last_sent_timestamp)
+    endpoint_data: HashMap<DatadogEndpoint, (Uri, AtomicI64)>,
 }
 
 lazy_static! {
@@ -64,12 +65,21 @@ lazy_static! {
 
 // https://docs.datadoghq.com/api/?lang=bash#post-timeseries-points
 #[derive(Debug, Clone, PartialEq, Serialize)]
-struct DatadogRequest {
-    series: Vec<DatadogMetric>,
+struct DatadogRequest<T> {
+    series: Vec<T>,
 }
 
 pub fn default_endpoint() -> String {
     String::from("https://api.datadoghq.com")
+}
+
+// https://github.com/DataDog/datadogpy/blob/1f143ab875e5994a94345ed373ac308c9f69b0ec/datadog/api/distributions.py#L9-L11
+#[derive(Debug, Clone, PartialEq, Serialize)]
+struct DatadogDistributionMetric {
+    metric: String,
+    interval: Option<i64>,
+    points: Vec<DatadogPoint<Vec<f64>>>,
+    tags: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -77,7 +87,7 @@ struct DatadogMetric {
     metric: String,
     r#type: DatadogMetricType,
     interval: Option<i64>,
-    points: Vec<DatadogPoint>,
+    points: Vec<DatadogPoint<f64>>,
     tags: Option<Vec<String>>,
 }
 
@@ -90,7 +100,7 @@ pub enum DatadogMetricType {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
-struct DatadogPoint(i64, f64);
+struct DatadogPoint<T>(i64, T);
 
 #[derive(Debug, Clone, PartialEq)]
 struct DatadogStats {
@@ -101,6 +111,34 @@ struct DatadogStats {
     sum: f64,
     count: f64,
     quantiles: Vec<(f64, f64)>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum DatadogEndpoint {
+    Series,
+    Distribution,
+}
+
+impl DatadogEndpoint {
+    fn build_uri(host: &str) -> crate::Result<Vec<(Self, Uri)>> {
+        Ok(vec![
+            (DatadogEndpoint::Series, build_uri(host, "/api/v1/series")?),
+            (
+                DatadogEndpoint::Distribution,
+                build_uri(host, "/api/v1/distribution_points")?,
+            ),
+        ])
+    }
+
+    fn from_metric(event: &Event) -> Self {
+        match event.as_metric().value {
+            MetricValue::Distribution {
+                statistic: StatisticKind::Summary,
+                ..
+            } => Self::Distribution,
+            _ => Self::Series,
+        }
+    }
 }
 
 inventory::submit! {
@@ -119,26 +157,34 @@ impl SinkConfig for DatadogConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        let uri = build_uri(&self.endpoint)?;
+        let uri = DatadogEndpoint::build_uri(&self.endpoint)?;
         let timestamp = Utc::now().timestamp();
 
         let sink = DatadogSink {
             config: self.clone(),
-            uri,
-            last_sent_timestamp: AtomicI64::new(timestamp),
+            endpoint_data: uri
+                .into_iter()
+                .map(|(endpoint, uri)| (endpoint, (uri, AtomicI64::new(timestamp))))
+                .collect(),
         };
 
-        let sink = BatchedHttpSink::new(
-            sink,
-            MetricBuffer::new(batch.size),
-            request,
-            batch.timeout,
-            client,
-            cx.acker(),
-        )
-        .sink_map_err(|e| error!("Fatal datadog error: {}", e));
+        let svc = request.service(
+            HttpRetryLogic,
+            HttpBatchService::new(client, move |request| {
+                future::ready(sink.build_request(request))
+            }),
+        );
 
-        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
+        let buffer = PartitionBuffer::new(MetricBuffer::new(batch.size));
+
+        let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+            .sink_map_err(|e| error!("Fatal datadog metric sink error: {}", e))
+            .with_flat_map(move |event: Event| {
+                let ep = DatadogEndpoint::from_metric(&event);
+                iter_ok(Some(PartitionInnerBuffer::new(event, ep)))
+            });
+
+        Ok((VectorSink::Futures01Sink(Box::new(svc_sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -150,24 +196,34 @@ impl SinkConfig for DatadogConfig {
     }
 }
 
-#[async_trait::async_trait]
-impl HttpSink for DatadogSink {
-    type Input = Event;
-    type Output = Vec<Metric>;
+impl DatadogSink {
+    fn build_request(
+        &self,
+        events: PartitionInnerBuffer<Vec<Metric>, DatadogEndpoint>,
+    ) -> crate::Result<Request<Vec<u8>>> {
+        let (events, endpoint) = events.into_parts();
+        let endpoint_data = self
+            .endpoint_data
+            .get(&endpoint)
+            .expect("The endpoint doesn't have data.");
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
-        Some(event)
-    }
-
-    async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
         let now = Utc::now().timestamp();
-        let interval = now - self.last_sent_timestamp.load(SeqCst);
-        self.last_sent_timestamp.store(now, SeqCst);
+        let interval = now - endpoint_data.1.load(SeqCst);
+        endpoint_data.1.store(now, SeqCst);
 
-        let input = encode_events(events, interval, self.config.namespace.as_deref());
-        let body = serde_json::to_vec(&input).unwrap();
+        let body = match endpoint {
+            DatadogEndpoint::Series => {
+                let input = encode_events(events, interval, self.config.namespace.as_deref());
+                serde_json::to_vec(&input).unwrap()
+            }
+            DatadogEndpoint::Distribution => {
+                let input =
+                    encode_distribution_events(events, interval, self.config.namespace.as_deref());
+                serde_json::to_vec(&input).unwrap()
+            }
+        };
 
-        Request::post(self.uri.clone())
+        Request::post(endpoint_data.0.clone())
             .header("Content-Type", "application/json")
             .header("DD-API-KEY", self.config.api_key.clone())
             .body(body)
@@ -175,8 +231,8 @@ impl HttpSink for DatadogSink {
     }
 }
 
-fn build_uri(host: &str) -> crate::Result<Uri> {
-    let uri = format!("{}/api/v1/series", host)
+fn build_uri(host: &str, endpoint: &'static str) -> crate::Result<Uri> {
+    let uri = format!("{}{}", host, endpoint)
         .parse::<Uri>()
         .context(UriParseError)?;
 
@@ -270,7 +326,12 @@ fn stats(values: &[f64], counts: &[u32]) -> Option<DatadogStats> {
     })
 }
 
-fn encode_events(events: Vec<Metric>, interval: i64, namespace: Option<&str>) -> DatadogRequest {
+fn encode_events(
+    events: Vec<Metric>,
+    interval: i64,
+    namespace: Option<&str>,
+) -> DatadogRequest<DatadogMetric> {
+    debug!(message = "series", count = events.len());
     let series = events
         .into_iter()
         .filter_map(|event| {
@@ -289,7 +350,7 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: Option<&str>) ->
                     MetricValue::Distribution {
                         values,
                         sample_rates,
-                        statistic: _,
+                        statistic: StatisticKind::Histogram,
                     } => {
                         // https://docs.datadoghq.com/developers/metrics/metrics_type/?tab=histogram#metric-type-definition
                         if let Some(s) = stats(&values, &sample_rates) {
@@ -375,12 +436,59 @@ fn encode_events(events: Vec<Metric>, interval: i64, namespace: Option<&str>) ->
     DatadogRequest { series }
 }
 
+fn encode_distribution_events(
+    events: Vec<Metric>,
+    interval: i64,
+    namespace: Option<&str>,
+) -> DatadogRequest<DatadogDistributionMetric> {
+    debug!(message = "distribution", count = events.len());
+    let series = events
+        .into_iter()
+        .filter_map(|event| {
+            let fullname = encode_namespace(namespace, '.', &event.name);
+            let ts = encode_timestamp(event.timestamp);
+            let tags = event.tags.clone().map(encode_tags);
+            match event.kind {
+                MetricKind::Incremental => match event.value {
+                    MetricValue::Distribution {
+                        values,
+                        sample_rates,
+                        statistic: StatisticKind::Summary,
+                    } => {
+                        let samples = values
+                            .iter()
+                            .zip(sample_rates.iter())
+                            .map(|(&value, &rate)| (0..rate).map(move |_| value))
+                            .flatten()
+                            .collect::<Vec<_>>();
+
+                        if samples.is_empty() {
+                            None
+                        } else {
+                            Some(DatadogDistributionMetric {
+                                metric: fullname,
+                                interval: Some(interval),
+                                points: vec![DatadogPoint(ts, samples)],
+                                tags,
+                            })
+                        }
+                    }
+                    _ => None,
+                },
+                _ => None,
+            }
+        })
+        .collect();
+
+    DatadogRequest { series }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
         event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-        sinks::util::{http::HttpSink, test::load_sink},
+        sinks::util::test::load_sink,
     };
     use chrono::{offset::TimeZone, Utc};
     use http::{Method, Uri};
@@ -412,10 +520,13 @@ mod tests {
         .unwrap();
 
         let timestamp = Utc::now().timestamp();
+        let uri = DatadogEndpoint::build_uri(&default_endpoint()).unwrap();
         let sink = DatadogSink {
             config: sink,
-            uri: build_uri(&default_endpoint()).unwrap(),
-            last_sent_timestamp: AtomicI64::new(timestamp),
+            endpoint_data: uri
+                .into_iter()
+                .map(|(endpoint, uri)| (endpoint, (uri, AtomicI64::new(timestamp))))
+                .collect(),
         };
 
         let events = vec![
@@ -441,7 +552,9 @@ mod tests {
                 value: MetricValue::Counter { value: 1.0 },
             },
         ];
-        let req = sink.build_request(events).await.unwrap();
+        let req = sink
+            .build_request(PartitionInnerBuffer::new(events, DatadogEndpoint::Series))
+            .unwrap();
 
         assert_eq!(req.method(), Method::POST);
         assert_eq!(
@@ -652,6 +765,29 @@ mod tests {
         assert_eq!(
             json,
             r#"{"series":[{"metric":"requests.min","type":"gauge","interval":60,"points":[[1542182950,1.0]],"tags":null},{"metric":"requests.avg","type":"gauge","interval":60,"points":[[1542182950,1.875]],"tags":null},{"metric":"requests.count","type":"rate","interval":60,"points":[[1542182950,8.0]],"tags":null},{"metric":"requests.median","type":"gauge","interval":60,"points":[[1542182950,2.0]],"tags":null},{"metric":"requests.max","type":"gauge","interval":60,"points":[[1542182950,3.0]],"tags":null},{"metric":"requests.95percentile","type":"gauge","interval":60,"points":[[1542182950,3.0]],"tags":null}]}"#
+        );
+    }
+
+    #[test]
+    fn encode_datadog_distribution() {
+        // https://docs.datadoghq.com/developers/metrics/types/?tab=distribution#definition
+        let events = vec![Metric {
+            name: "requests".into(),
+            timestamp: Some(ts()),
+            tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Distribution {
+                values: vec![1.0, 2.0, 3.0],
+                sample_rates: vec![3, 3, 2],
+                statistic: StatisticKind::Summary,
+            },
+        }];
+        let input = encode_distribution_events(events, 60, None);
+        let json = serde_json::to_string(&input).unwrap();
+
+        assert_eq!(
+            json,
+            r#"{"series":[{"metric":"requests","interval":60,"points":[[1542182950,[1.0,1.0,1.0,2.0,2.0,2.0,3.0,3.0]]],"tags":null}]}"#
         );
     }
 }
