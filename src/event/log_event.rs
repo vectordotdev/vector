@@ -177,3 +177,59 @@ impl Serialize for LogEvent {
         serializer.collect_map(self.fields.iter())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::{fs, io::Read, path::Path};
+    use tracing::trace;
+
+    fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<Vec<u8>> {
+        let mut test_file = match fs::File::open(path) {
+            Ok(file) => file,
+            Err(e) => return Err(e),
+        };
+
+        let mut buf = Vec::new();
+        test_file.read_to_end(&mut buf)?;
+
+        Ok(buf)
+    }
+
+    // This test iterates over the `tests/data/fixtures/log_event` folder and:
+    //   * Ensures the EventLog parsed from bytes and turned into a serde_json::Value are equal to the
+    //     item being just plain parsed as json.
+    //
+    // Basically: This test makes sure we aren't mutilating any content users might be sending.
+    #[test]
+    fn json_value_to_vector_log_event_to_json_value() {
+        crate::test_util::trace_init();
+        const FIXTURE_ROOT: &str = "tests/data/fixtures/log_event";
+
+        trace!(?FIXTURE_ROOT, "Opening.");
+        std::fs::read_dir(FIXTURE_ROOT)
+            .unwrap()
+            .for_each(|fixture_file| match fixture_file {
+                Ok(fixture_file) => {
+                    let path = fixture_file.path();
+                    tracing::trace!(?path, "Opening.");
+                    let buf = parse_artifact(&path).unwrap();
+
+                    let serde_value: serde_json::Value = serde_json::from_slice(&*buf).unwrap();
+                    let vector_value = LogEvent::try_from(serde_value.clone()).unwrap();
+                    let serde_value_again: serde_json::Value =
+                        vector_value.clone().try_into().unwrap();
+
+                    tracing::trace!(
+                        ?path,
+                        ?serde_value,
+                        ?vector_value,
+                        ?serde_value_again,
+                        "Asserting equal."
+                    );
+                    assert_eq!(serde_value, serde_value_again);
+                }
+                _ => panic!("This test should never read Err'ing test fixtures."),
+            });
+    }
+}

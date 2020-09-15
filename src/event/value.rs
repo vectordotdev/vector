@@ -1,10 +1,12 @@
 use crate::event::timestamp_to_string;
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+use derive_is_enum_variant::is_enum_variant;
 use serde::{Serialize, Serializer};
 use std::collections::BTreeMap;
+use std::convert::TryInto;
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, is_enum_variant)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
@@ -142,6 +144,23 @@ impl From<serde_json::Value> for Value {
     }
 }
 
+impl TryInto<serde_json::Value> for Value {
+    type Error = crate::Error;
+
+    fn try_into(self) -> Result<serde_json::Value, Self::Error> {
+        match self {
+            Value::Boolean(v) => Ok(serde_json::Value::from(v)),
+            Value::Integer(v) => Ok(serde_json::Value::from(v)),
+            Value::Float(v) => Ok(serde_json::Value::from(v)),
+            Value::Bytes(v) => Ok(serde_json::Value::from(String::from_utf8(v.to_vec())?)),
+            Value::Map(v) => Ok(serde_json::to_value(v)?),
+            Value::Array(v) => Ok(serde_json::to_value(v)?),
+            Value::Null => Ok(serde_json::Value::Null),
+            Value::Timestamp(v) => Ok(serde_json::Value::from(timestamp_to_string(&v))),
+        }
+    }
+}
+
 impl Value {
     // TODO: return Cow
     pub fn to_string_lossy(&self) -> String {
@@ -181,5 +200,73 @@ impl Value {
             Value::Timestamp(ts) => Some(ts),
             _ => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::{fs, io::Read, path::Path};
+
+    fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<Vec<u8>> {
+        let mut test_file = match fs::File::open(path) {
+            Ok(file) => file,
+            Err(e) => return Err(e),
+        };
+
+        let mut buf = Vec::new();
+        test_file.read_to_end(&mut buf)?;
+
+        Ok(buf)
+    }
+
+    // This test iterates over the `tests/data/fixtures/value` folder and:
+    //   * Ensures the parsed folder name matches the parsed type of the `Value`.
+    //   * Ensures the `serde_json::Value` to `vector::Value` conversions are harmless. (Think UTF-8 errors)
+    //
+    // Basically: This test makes sure we aren't mutilating any content users might be sending.
+    #[test]
+    fn json_value_to_vector_value_to_json_value() {
+        crate::test_util::trace_init();
+        const FIXTURE_ROOT: &str = "tests/data/fixtures/value";
+
+        tracing::trace!(?FIXTURE_ROOT, "Opening");
+        std::fs::read_dir(FIXTURE_ROOT).unwrap().for_each(|type_dir| match type_dir {
+            Ok(type_name) => {
+                let path = type_name.path();
+                tracing::trace!(?path, "Opening");
+                std::fs::read_dir(path).unwrap().for_each(|fixture_file| match fixture_file {
+                    Ok(fixture_file) => {
+                        let path = fixture_file.path();
+                        let buf = parse_artifact(&path).unwrap();
+
+                        let serde_value: serde_json::Value = serde_json::from_slice(&*buf).unwrap();
+                        let vector_value = Value::from(serde_value.clone());
+
+                        // Validate type
+                        let expected_type = type_name.path().file_name().unwrap().to_string_lossy().to_string();
+                        assert!(match &*expected_type {
+                            "boolean" => vector_value.is_boolean(),
+                            "integer" => vector_value.is_integer(),
+                            "bytes" => vector_value.is_bytes(),
+                            "array" => vector_value.is_array(),
+                            "map" => vector_value.is_map(),
+                            "null" => vector_value.is_null(),
+                            _ => unreachable!("You need to add a new type handler here."),
+                        }, "Typecheck failure. Wanted {}, got {:?}.", expected_type, vector_value);
+
+                        let serde_value_again: serde_json::Value = vector_value.clone().try_into().unwrap();
+
+                        tracing::trace!(?path, ?serde_value, ?vector_value, ?serde_value_again, "Asserting equal.");
+                        assert_eq!(
+                            serde_value,
+                            serde_value_again
+                        );
+                    },
+                    _ => panic!("This test should never read Err'ing test fixtures."),
+                });
+            },
+            _ => panic!("This test should never read Err'ing type folders."),
+        })
     }
 }
