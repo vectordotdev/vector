@@ -1,6 +1,6 @@
 use crate::{event::Metric, Event};
-use metrics::{Key, Recorder};
-use metrics_tracing_context::TracingContextLayer;
+use metrics::{Key, Label, Recorder};
+use metrics_tracing_context::{LabelFilter, TracingContextLayer};
 use metrics_util::layers::Layer;
 use metrics_util::{CompositeKey, Handle, MetricKind, Registry};
 use once_cell::sync::OnceCell;
@@ -78,6 +78,15 @@ impl Recorder for VectorRecorder {
             |handle| handle.record_histogram(value),
             || Handle::histogram(),
         )
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ComponentNameFilter;
+
+impl LabelFilter for ComponentNameFilter {
+    fn should_include_label(&self, label: &Label) -> bool {
+        label.key() == "component_name"
     }
 }
 
