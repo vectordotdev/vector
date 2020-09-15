@@ -22,7 +22,7 @@ URL: %{_url}
 
 %prep
 # We are currently in the BUILD dir
-tar -xvf %{_sourcedir}/%{_source} --strip-components=1
+tar -xvf %{_sourcedir}/%{_source} --strip-components=2
 cp -a %{_sourcedir}/systemd/. systemd
 
 %install
