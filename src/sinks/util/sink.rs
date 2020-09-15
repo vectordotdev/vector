@@ -58,7 +58,7 @@ use tokio::time::{delay_for, Duration};
 use tower::Service;
 use tracing_futures::Instrument;
 
-// === StreamSink ===
+// === StreamSinkOld ===
 
 const STREAM_SINK_MAX: usize = 10_000;
 
@@ -69,14 +69,14 @@ const STREAM_SINK_MAX: usize = 10_000;
 /// will also attempt to fully flush if the amount of
 /// in flight acks is larger than `STREAM_SINK_MAX`.
 #[derive(Debug)]
-pub struct StreamSink<T> {
+pub struct StreamSinkOld<T> {
     inner: T,
     acker: Acker,
     pending: usize,
     closing_inner: bool,
 }
 
-impl<T> StreamSink<T> {
+impl<T> StreamSinkOld<T> {
     pub fn new(inner: T, acker: Acker) -> Self {
         Self {
             inner,
@@ -87,7 +87,7 @@ impl<T> StreamSink<T> {
     }
 }
 
-impl<T: Sink> Sink for StreamSink<T> {
+impl<T: Sink> Sink for StreamSinkOld<T> {
     type SinkItem = T::SinkItem;
     type SinkError = T::SinkError;
 
@@ -133,10 +133,10 @@ impl<T: Sink> Sink for StreamSink<T> {
     }
 }
 
-// === StreamSink2 ===
+// === StreamSink ===
 
 #[async_trait]
-pub trait StreamSink2 {
+pub trait StreamSink {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()>;
 }
 

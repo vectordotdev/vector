@@ -5,7 +5,7 @@ use crate::{
     event::Event,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        StreamSink2,
+        StreamSink,
     },
     template::Template,
 };
@@ -314,7 +314,7 @@ async fn write_event_to_file(
 }
 
 #[async_trait]
-impl StreamSink2 for FileSink {
+impl StreamSink for FileSink {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
         FileSink::run(self, input).await.expect("file sink error");
         Ok(())

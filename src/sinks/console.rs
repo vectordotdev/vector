@@ -4,7 +4,7 @@ use crate::{
     event::Event,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        StreamSink2,
+        StreamSink,
     },
 };
 use async_trait::async_trait;
@@ -117,7 +117,7 @@ struct WriterSink {
 }
 
 #[async_trait]
-impl StreamSink2 for WriterSink {
+impl StreamSink for WriterSink {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
             write_event_to_output(&mut self.output, event, &self.encoding)

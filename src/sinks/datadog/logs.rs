@@ -6,7 +6,7 @@ use crate::{
             self,
             encoding::{EncodingConfig, EncodingConfiguration},
             tcp::TcpSink,
-            Encoding, StreamSink, UriSerde,
+            Encoding, StreamSinkOld, UriSerde,
         },
         Healthcheck, VectorSink,
     },
@@ -59,7 +59,7 @@ impl SinkConfig for DatadogLogsConfig {
         let encoding = self.encoding.clone();
         let api_key = self.api_key.clone();
 
-        let sink = StreamSink::new(sink, cx.acker())
+        let sink = StreamSinkOld::new(sink, cx.acker())
             .with_flat_map(move |e| iter_ok(encode_event(e, &api_key, &encoding)));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))

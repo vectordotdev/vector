@@ -64,7 +64,7 @@ pub mod vector;
 
 pub enum VectorSink {
     Futures01Sink(Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + Send + 'static>),
-    Stream(Box<dyn util::StreamSink2 + Send>),
+    Stream(Box<dyn util::StreamSink + Send>),
 }
 
 pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
