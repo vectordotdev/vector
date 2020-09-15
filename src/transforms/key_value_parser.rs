@@ -99,9 +99,7 @@ impl KeyValue {
             let key = kv_pair.next()?;
             let val = kv_pair.next()?;
             if kv_pair.next().is_some() {
-                emit!(KeyValueMultipleSplitResults {
-                    pair: pair.into()
-                });
+                emit!(KeyValueMultipleSplitResults { pair: pair.into() });
                 return None;
             }
 
