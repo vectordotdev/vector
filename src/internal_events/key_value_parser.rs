@@ -77,7 +77,7 @@ impl InternalEvent for KeyValueFieldDoesNotExist {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_error", 1,
+        counter!("processing_errors", 1,
             "component_kind" => "transform",
             "component_type" => "key_value_parser",
             "error_type" => "failed_parse",
