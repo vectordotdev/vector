@@ -118,3 +118,34 @@ fn snapshot(controller: &Controller) -> Vec<Event> {
 pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
     snapshot(controller).into_iter()
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::test_util::trace_init;
+    use metrics::counter;
+    use tracing::{span, Level};
+
+    #[test]
+    fn test_labels_injection() {
+        trace_init();
+        let _ = super::init();
+
+        let span = span!(Level::INFO, "my span", component_name = "foobar");
+        let _enter = span.enter();
+
+        counter!("labels_injected", 1);
+
+        let metric = super::capture_metrics(super::get_controller().unwrap())
+            .map(|e| e.into_metric())
+            .find(|metric| metric.name == "labels_injected")
+            .unwrap();
+
+        let expected_tags = Some(
+            vec![("component_name".to_owned(), "foobar".to_owned())]
+                .into_iter()
+                .collect(),
+        );
+
+        assert_eq!(metric.tags, expected_tags);
+    }
+}
