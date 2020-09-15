@@ -176,31 +176,31 @@ impl ToTimestampFn {
 
 impl Function for ToTimestampFn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
-        use chrono::{DateTime, TimeZone, Utc};
-
-        let value_to_timestamp = |v| {
-            match v {
-                Value::Bytes(b) => DateTime::parse_from_rfc3339(&String::from_utf8_lossy(&b))
-                    .map(|dt| dt.with_timezone(&Utc))
-                    .map_err(|_| "cannot parse string as RFC3339".to_owned()),
-                Value::Integer(i) => Ok(Utc.timestamp(i, 0)),
-                Value::Timestamp(t) => Ok(t),
-                _ => Err("unable to parse non-string or integer type to timestamp".to_string()),
-            }
-            .map(Value::Timestamp)
-        };
-
         self.query
             .execute(ctx)
-            .and_then(value_to_timestamp)
+            .and_then(to_timestamp)
             .or_else(|err| {
                 self.default
                     .as_ref()
                     .cloned()
                     .ok_or(err)
-                    .and_then(value_to_timestamp)
+                    .and_then(to_timestamp)
             })
     }
+}
+
+fn to_timestamp(value: Value) -> Result<Value> {
+    use chrono::{DateTime, TimeZone, Utc};
+
+    match value {
+        Value::Bytes(b) => DateTime::parse_from_rfc3339(&String::from_utf8_lossy(&b))
+            .map(|dt| dt.with_timezone(&Utc))
+            .map_err(|_| "cannot parse string as RFC3339".to_owned()),
+        Value::Integer(i) => Ok(Utc.timestamp(i, 0)),
+        Value::Timestamp(t) => Ok(t),
+        _ => Err("unable to parse non-string or integer type to timestamp".to_string()),
+    }
+    .map(Value::Timestamp)
 }
 
 //------------------------------------------------------------------------------
@@ -269,7 +269,7 @@ impl Function for UpcaseFn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
         match self.query.execute(ctx)? {
             Value::Bytes(bytes) => Ok(Value::Bytes(
-                bytes.iter().map(|c| c.to_ascii_uppercase()).collect(),
+                String::from_utf8_lossy(&bytes).to_uppercase().into(),
             )),
             _ => Err(r#"unable to apply "upcase" to non-string types"#.to_string()),
         }
@@ -293,7 +293,7 @@ impl Function for DowncaseFn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
         match self.query.execute(ctx)? {
             Value::Bytes(bytes) => Ok(Value::Bytes(
-                bytes.iter().map(|c| c.to_ascii_lowercase()).collect(),
+                String::from_utf8_lossy(&bytes).to_lowercase().into(),
             )),
             _ => Err(r#"unable to apply "downcase" to non-string types"#.to_string()),
         }

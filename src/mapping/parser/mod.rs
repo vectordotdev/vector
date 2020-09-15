@@ -400,12 +400,9 @@ fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
 }
 
 fn paths_from_pair(pair: Pair<Rule>) -> Result<Vec<String>> {
-    let mut paths = Vec::new();
-    for pair in pair.into_inner() {
-        paths.push(target_path_from_pair(pair)?);
-    }
-
-    Ok(paths)
+    pair.into_inner()
+        .map(target_path_from_pair)
+        .collect::<Result<Vec<_>>>()
 }
 
 fn statement_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
