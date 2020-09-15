@@ -70,7 +70,7 @@ pub(crate) struct KeyValueFieldDoesNotExist {
 impl InternalEvent for KeyValueFieldDoesNotExist {
     fn emit_logs(&self) {
         warn!(
-            message = "Record failed to parse as KeyValue.",
+            message = "Field specified does not exist.",
             field = %self.field,
             rate_limit_secs = 30
         )
@@ -81,6 +81,29 @@ impl InternalEvent for KeyValueFieldDoesNotExist {
             "component_kind" => "transform",
             "component_type" => "key_value_parser",
             "error_type" => "failed_parse",
+        );
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct KeyValueMultipleSplitResults {
+    pub pair: Atom,
+}
+
+impl InternalEvent for KeyValueMultipleSplitResults {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Splitting a key/value pair resulted in more than two values.",
+            pair = %self.pair,
+            rate_limit_sec = 30
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("processing_errors", 1,
+            "component_kind" => "transform",
+            "component_type" => "key_value_parser",
+            "error_type" => "failed parse",
         );
     }
 }

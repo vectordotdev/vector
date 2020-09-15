@@ -1,9 +1,11 @@
 use super::Transform;
-use crate::internal_events::KeyValueParseFailed;
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
-    internal_events::{KeyValueEventProcessed, KeyValueFieldDoesNotExist, KeyValueTargetExists},
+    internal_events::{
+        KeyValueEventProcessed, KeyValueFieldDoesNotExist, KeyValueMultipleSplitResults,
+        KeyValueParseFailed, KeyValueTargetExists,
+    },
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -97,10 +99,9 @@ impl KeyValue {
             let key = kv_pair.next()?;
             let val = kv_pair.next()?;
             if kv_pair.next().is_some() {
-                error!(
-                    message = "KeyValue parser saw more than one separator",
-                    rate_limit_secs = 30
-                );
+                emit!(KeyValueMultipleSplitResults {
+                    pair: pair.into()
+                });
                 return None;
             }
 
