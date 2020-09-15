@@ -325,7 +325,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: Push amd64 deb
-        id: push
+        id: push-deb-amd64
         uses: cloudsmith-io/action@master
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
@@ -338,7 +338,7 @@ jobs:
           republish: "true"
           file: "target/artifacts/vector-amd64.deb"
       - name: Push arm64 deb
-        id: push
+        id: push-deb-ard64
         uses: cloudsmith-io/action@master
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
@@ -351,7 +351,7 @@ jobs:
           republish: "true"
           file: "target/artifacts/vector-arm64.deb"
       - name: Push x86_64 RPM
-        id: push
+        id: push-rpm-x86_64
         uses: cloudsmith-io/action@master
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
@@ -364,7 +364,7 @@ jobs:
           republish: "true"
           file: "target/artifacts/vector-x86_64.rpm"
       - name: Push aarch64 RPM
-        id: push
+        id: push-rpm-aarch64
         uses: cloudsmith-io/action@master
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
