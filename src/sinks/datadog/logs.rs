@@ -1,16 +1,13 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{log_schema, Event},
-    sinks::util::{
-        self,
-        encoding::{EncodingConfig, EncodingConfiguration},
-        tcp::TcpSink,
-        Encoding, StreamSink, UriSerde,
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
+    sinks::{
+        util::{self, encoding::EncodingConfig, tcp::TcpSink, Encoding, StreamSinkOld, UriSerde},
+        Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsConfig},
 };
 use bytes::Bytes;
-use futures::TryFutureExt;
 use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
 
@@ -29,7 +26,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let (host, port, tls) = if let Some(uri) = &self.endpoint {
             let host = uri
                 .host()
@@ -57,10 +54,10 @@ impl SinkConfig for DatadogLogsConfig {
         let encoding = self.encoding.clone();
         let api_key = self.api_key.clone();
 
-        let sink = StreamSink::new(sink, cx.acker())
+        let sink = StreamSinkOld::new(sink, cx.acker())
             .with_flat_map(move |e| iter_ok(encode_event(e, &api_key, &encoding)));
 
-        Ok((Box::new(sink), Box::new(healthcheck.compat())))
+        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -77,8 +74,6 @@ fn encode_event(
     api_key: &str,
     encoding: &EncodingConfig<Encoding>,
 ) -> Option<Bytes> {
-    encoding.apply_rules(&mut event);
-
     let log = event.as_mut_log();
 
     if let Some(message) = log.remove(&log_schema().message_key()) {

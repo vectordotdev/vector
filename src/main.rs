@@ -118,12 +118,12 @@ fn main() {
                 std::process::exit(exitcode::CONFIG);
             });
 
-        vector::event::LOG_SCHEMA
+        crate::config::LOG_SCHEMA
             .set(config.global.log_schema.clone())
             .expect("Couldn't set schema");
 
         let diff = ConfigDiff::initial(&config);
-        let pieces = topology::validate(&config, &diff).await.unwrap_or_else(|| {
+        let pieces = topology::build_or_log_errors(&config, &diff).await.unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });
 

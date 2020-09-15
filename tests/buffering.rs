@@ -2,7 +2,7 @@
 
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
-    SinkExt,
+    SinkExt, StreamExt,
 };
 use prost::Message;
 use tempfile::tempdir;
@@ -49,7 +49,7 @@ fn test_buffering() {
     let (in_tx, source_config, source_event_counter) = support::source_with_event_counter();
     let sink_config = support::sink_dead();
     let config = {
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source("in", source_config);
         config.add_sink("out", &["in"], sink_config);
         config.sinks["out"].buffer = BufferConfig::Disk {
@@ -57,14 +57,15 @@ fn test_buffering() {
             when_full: Default::default(),
         };
         config.global.data_dir = Some(data_dir.clone());
-        config
+        config.build().unwrap()
     };
 
     let mut rt = runtime();
     let (topology, input_events) = rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
-        let (input_events, mut input_events_stream) =
+        let (input_events, input_events_stream) =
             random_events_with_stream(line_length, num_events);
+        let mut input_events_stream = input_events_stream.map(Ok);
 
         let _ = in_tx
             .sink_compat()
@@ -98,7 +99,7 @@ fn test_buffering() {
     let (in_tx, source_config) = support::source();
     let (out_rx, sink_config) = support::sink(10);
     let config = {
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source("in", source_config);
         config.add_sink("out", &["in"], sink_config);
         config.sinks["out"].buffer = BufferConfig::Disk {
@@ -106,15 +107,16 @@ fn test_buffering() {
             when_full: Default::default(),
         };
         config.global.data_dir = Some(data_dir);
-        config
+        config.build().unwrap()
     };
 
     let mut rt = runtime();
     rt.block_on(async move {
         let (topology, _crash) = start_topology(config, false).await;
 
-        let (input_events2, mut input_events_stream) =
+        let (input_events2, input_events_stream) =
             random_events_with_stream(line_length, num_events);
+        let mut input_events_stream = input_events_stream.map(Ok);
 
         let _ = in_tx
             .sink_compat()
@@ -144,8 +146,8 @@ fn test_max_size() {
 
     let num_events: usize = 1000;
     let line_length = 1000;
-    let (input_events, mut input_events_stream) =
-        random_events_with_stream(line_length, num_events);
+    let (input_events, input_events_stream) = random_events_with_stream(line_length, num_events);
+    let mut input_events_stream = input_events_stream.map(Ok);
 
     let max_size = input_events
         .clone()
@@ -160,7 +162,7 @@ fn test_max_size() {
     let (in_tx, source_config, source_event_counter) = support::source_with_event_counter();
     let sink_config = support::sink_dead();
     let config = {
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source("in", source_config);
         config.add_sink("out", &["in"], sink_config);
         config.sinks["out"].buffer = BufferConfig::Disk {
@@ -168,7 +170,7 @@ fn test_max_size() {
             when_full: Default::default(),
         };
         config.global.data_dir = Some(data_dir.clone());
-        config
+        config.build().unwrap()
     };
 
     let mut rt = runtime();
@@ -208,7 +210,7 @@ fn test_max_size() {
     let (_in_tx, source_config) = support::source();
     let (out_rx, sink_config) = support::sink(10);
     let config = {
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source("in", source_config);
         config.add_sink("out", &["in"], sink_config);
         config.sinks["out"].buffer = BufferConfig::Disk {
@@ -216,7 +218,7 @@ fn test_max_size() {
             when_full: Default::default(),
         };
         config.global.data_dir = Some(data_dir);
-        config
+        config.build().unwrap()
     };
 
     let mut rt = runtime();

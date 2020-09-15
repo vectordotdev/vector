@@ -1,6 +1,6 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{self, Event, LogEvent, Value},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    event::{Event, LogEvent, Value},
     internal_events::{
         SplunkEventEncodeError, SplunkEventSent, SplunkSourceMissingKeys,
         SplunkSourceTypeMissingKeys,
@@ -13,7 +13,7 @@ use crate::{
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::Sink;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
@@ -76,7 +76,7 @@ pub enum Encoding {
 }
 
 fn default_host_key() -> Atom {
-    event::LogSchema::default().host_key().clone()
+    crate::config::LogSchema::default().host_key().clone()
 }
 
 inventory::submit! {
@@ -85,7 +85,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "splunk_hec")]
 impl SinkConfig for HecSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         validate_host(&self.endpoint)?;
 
         let batch = BatchSettings::default()
@@ -106,9 +106,12 @@ impl SinkConfig for HecSinkConfig {
         )
         .sink_map_err(|e| error!("Fatal splunk_hec sink error: {}", e));
 
-        let healthcheck = healthcheck(self.clone(), client).boxed().compat();
+        let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -125,9 +128,7 @@ impl HttpSink for HecSinkConfig {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-        self.encoding.apply_rules(&mut event);
-
+    fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let sourcetype = self.sourcetype.as_ref().and_then(|sourcetype| {
             sourcetype
                 .render_string(&event)
@@ -150,7 +151,7 @@ impl HttpSink for HecSinkConfig {
 
         let host = event.get(&self.host_key).cloned();
 
-        let timestamp = match event.remove(&event::log_schema().timestamp_key()) {
+        let timestamp = match event.remove(&log_schema().timestamp_key()) {
             Some(Value::Timestamp(ts)) => ts,
             _ => chrono::Utc::now(),
         };
@@ -162,10 +163,14 @@ impl HttpSink for HecSinkConfig {
             .filter_map(|field| event.get(field).map(|value| (field, value.clone())))
             .collect::<LogEvent>();
 
+        let mut event = Event::Log(event);
+        self.encoding.apply_rules(&mut event);
+        let event = event.into_log();
+
         let event = match self.encoding.codec() {
             Encoding::Json => json!(event),
             Encoding::Text => json!(event
-                .get(&event::log_schema().message_key())
+                .get(&log_schema().message_key())
                 .map(|v| v.to_string_lossy())
                 .unwrap_or_else(|| "".into())),
         };
@@ -276,6 +281,7 @@ mod tests {
         time: f64,
         event: BTreeMap<String, String>,
         fields: BTreeMap<String, String>,
+        source: Option<String>,
     }
 
     #[derive(Deserialize, Debug)]
@@ -289,6 +295,7 @@ mod tests {
     fn splunk_encode_event_json() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", "value");
+        event.as_mut_log().insert("magic", "vector");
 
         let (config, _cx) = load_sink::<HecSinkConfig>(
             r#"
@@ -296,9 +303,11 @@ mod tests {
             token = "alksjdfo"
             host_key = "host"
             indexed_fields = ["key"]
+            source = "{{ magic }}"
 
             [encoding]
             codec = "json"
+            except_fields = ["magic"]
         "#,
         )
         .unwrap();
@@ -312,12 +321,15 @@ mod tests {
 
         assert_eq!(kv, &"value".to_string());
         assert_eq!(
-            event[&event::log_schema().message_key().to_string()],
+            event[&log_schema().message_key().to_string()],
             "hello world".to_string()
         );
         assert!(event
-            .get(&event::log_schema().timestamp_key().to_string())
+            .get(&log_schema().timestamp_key().to_string())
             .is_none());
+
+        assert!(!event.contains_key("magic"));
+        assert_eq!(hec_event.source, Some("vector".to_string()));
 
         assert_eq!(
             hec_event.fields.get("key").map(|s| s.as_str()),
@@ -393,7 +405,7 @@ mod tests {
 #[cfg(feature = "splunk-integration-tests")]
 mod integration_tests {
     use super::*;
-    use crate::test_util::wait_for_tcp_duration;
+    use crate::test_util::retry_until;
     use crate::{
         assert_downcast_matches,
         config::{SinkConfig, SinkContext},
@@ -401,11 +413,7 @@ mod integration_tests {
         test_util::{random_lines_with_stream, random_string},
         Event,
     };
-    use futures::{
-        compat::{Future01CompatExt, Sink01CompatExt},
-        SinkExt,
-    };
-    use futures01::Sink;
+    use futures::{future, stream};
     use serde_json::Value as JsonValue;
     use std::net::SocketAddr;
     use tokio::time::{delay_for, Duration};
@@ -439,7 +447,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.send(event).compat().await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -458,7 +466,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.send(event).compat().await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -475,7 +483,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.send(event).compat().await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -489,8 +497,8 @@ mod integration_tests {
         let config = config(Encoding::Text, vec![]).await;
         let (sink, _) = config.build(cx).unwrap();
 
-        let (messages, mut events) = random_lines_with_stream(100, 10);
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let (messages, events) = random_lines_with_stream(100, 10);
+        sink.run(events).await.unwrap();
 
         let mut found_all = false;
         for _ in 0..20 {
@@ -523,7 +531,7 @@ mod integration_tests {
         let message = random_string(100);
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
-        sink.send(event).compat().await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -544,7 +552,7 @@ mod integration_tests {
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
         event.as_mut_log().insert("host", "example.com:1234");
-        sink.send(event).compat().await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -568,7 +576,7 @@ mod integration_tests {
         let message = random_string(100);
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
-        sink.send(event).compat().await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -583,7 +591,7 @@ mod integration_tests {
     async fn splunk_configure_hostname() {
         let cx = SinkContext::new_test();
 
-        let config = super::HecSinkConfig {
+        let config = HecSinkConfig {
             host_key: "roast".into(),
             ..config(Encoding::Json, vec![Atom::from("asdf")]).await
         };
@@ -595,7 +603,7 @@ mod integration_tests {
         event.as_mut_log().insert("asdf", "hello");
         event.as_mut_log().insert("host", "example.com:1234");
         event.as_mut_log().insert("roast", "beef.example.com:1234");
-        sink.send(event).compat().await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -610,7 +618,7 @@ mod integration_tests {
     async fn splunk_healthcheck() {
         let resolver = crate::dns::Resolver;
 
-        let config_to_healthcheck = move |config: super::HecSinkConfig| {
+        let config_to_healthcheck = move |config: HecSinkConfig| {
             let tls_settings = TlsSettings::from_options(&config.tls).unwrap();
             let client = HttpClient::new(resolver, tls_settings).unwrap();
             sinks::splunk_hec::healthcheck(config, client)
@@ -699,8 +707,8 @@ mod integration_tests {
     async fn config(
         encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
         indexed_fields: Vec<Atom>,
-    ) -> super::HecSinkConfig {
-        super::HecSinkConfig {
+    ) -> HecSinkConfig {
+        HecSinkConfig {
             endpoint: "http://localhost:8088/".into(),
             token: get_token().await,
             host_key: "host".into(),
@@ -721,15 +729,17 @@ mod integration_tests {
             .build()
             .unwrap();
 
-        // Wait for port 8089 to be reachable before firing off request
-        wait_for_tcp_duration("127.0.0.1:8089".parse().unwrap(), Duration::from_secs(30)).await;
-
-        let res = client
-            .get("https://localhost:8089/services/data/inputs/http?output_mode=json")
-            .basic_auth(USERNAME, Some(PASSWORD))
-            .send()
-            .await
-            .unwrap();
+        let res = retry_until(
+            || {
+                client
+                    .get("https://localhost:8089/services/data/inputs/http?output_mode=json")
+                    .basic_auth(USERNAME, Some(PASSWORD))
+                    .send()
+            },
+            Duration::from_millis(500),
+            Duration::from_secs(30),
+        )
+        .await;
 
         let json: JsonValue = res.json().await.unwrap();
         let entries = json["entry"].as_array().unwrap().clone();

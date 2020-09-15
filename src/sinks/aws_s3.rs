@@ -1,7 +1,7 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
-    event::{self, Event},
+    event::Event,
     region::RegionOrEndpoint,
     serde::to_string,
     sinks::util::{
@@ -16,7 +16,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{future::BoxFuture, FutureExt, TryFutureExt};
+use futures::{future::BoxFuture, FutureExt};
 use futures01::{stream::iter_ok, Sink};
 use http::StatusCode;
 use lazy_static::lazy_static;
@@ -141,11 +141,11 @@ inventory::submit! {
 
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(cx.resolver())?;
-        let healthcheck = self.clone().healthcheck(client.clone()).boxed().compat();
+        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = self.new(client, cx)?;
-        Ok((sink, Box::new(healthcheck)))
+        Ok((sink, healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -168,7 +168,7 @@ enum HealthcheckError {
 }
 
 impl S3SinkConfig {
-    pub fn new(&self, client: S3Client, cx: SinkContext) -> crate::Result<super::RouterSink> {
+    pub fn new(&self, client: S3Client, cx: SinkContext) -> crate::Result<super::VectorSink> {
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = self.encoding.clone();
 
@@ -213,7 +213,7 @@ impl S3SinkConfig {
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
             .sink_map_err(|error| error!("Sink failed to flush: {}", error));
 
-        Ok(Box::new(sink))
+        Ok(super::VectorSink::Futures01Sink(Box::new(sink)))
     }
 
     pub async fn healthcheck(self, client: S3Client) -> crate::Result<()> {
@@ -396,7 +396,7 @@ fn encode_event(
             .expect("Failed to encode event as json, this is a bug!"),
         Encoding::Text => {
             let mut bytes = log
-                .get(&event::log_schema().message_key())
+                .get(&log_schema().message_key())
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             bytes.push(b'\n');
@@ -410,7 +410,7 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{self, Event};
+    use crate::event::Event;
 
     use std::collections::BTreeMap;
 
@@ -442,7 +442,7 @@ mod tests {
         let (bytes, _) = bytes.into_parts();
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
-        assert_eq!(map[&event::log_schema().message_key().to_string()], message);
+        assert_eq!(map[&log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
     }
 
@@ -465,7 +465,7 @@ mod tests {
         let (bytes, _) = bytes.into_parts();
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
-        assert_eq!(map[&event::log_schema().message_key().to_string()], message);
+        assert_eq!(map[&log_schema().message_key().to_string()], message);
         // assert_eq!(map["key"], "value".to_string());
     }
 
@@ -533,11 +533,7 @@ mod integration_tests {
     };
     use bytes::{buf::BufExt, BytesMut};
     use flate2::read::GzDecoder;
-    use futures::{
-        compat::{Future01CompatExt, Sink01CompatExt},
-        stream, SinkExt, StreamExt,
-    };
-    use futures01::Sink;
+    use futures::{stream, StreamExt};
     use pretty_assertions::assert_eq;
     use rusoto_core::region::Region;
     use rusoto_s3::{S3Client, S3};
@@ -554,9 +550,8 @@ mod integration_tests {
         let client = config.create_client(cx.resolver()).unwrap();
         let sink = config.new(client, cx).unwrap();
 
-        let (lines, mut events) = random_lines_with_stream(100, 10);
-
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let (lines, events) = random_lines_with_stream(100, 10);
+        sink.run(events).await.unwrap();
 
         let keys = get_keys(prefix.unwrap()).await;
         assert_eq!(keys.len(), 1);
@@ -599,12 +594,7 @@ mod integration_tests {
             e.as_mut_log().insert("i", format!("{}", i));
             e
         });
-
-        let _ = sink
-            .send_all(futures01::stream::iter_ok(events))
-            .compat()
-            .await
-            .unwrap();
+        sink.run(stream::iter(events)).await.unwrap();
 
         let keys = get_keys(prefix.unwrap()).await;
         assert_eq!(keys.len(), 3);
@@ -635,9 +625,8 @@ mod integration_tests {
         let client = config.create_client(cx.resolver()).unwrap();
         let sink = config.new(client, cx).unwrap();
 
-        let (lines, mut events) = random_lines_with_stream(100, 500);
-
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let (lines, events) = random_lines_with_stream(100, 500);
+        sink.run(events).await.unwrap();
 
         let keys = get_keys(prefix.unwrap()).await;
         assert_eq!(keys.len(), 6);
