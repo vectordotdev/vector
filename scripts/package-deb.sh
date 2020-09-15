@@ -76,8 +76,8 @@ cargo deb --target "$TARGET" --deb-version "$PACKAGE_VERSION" --no-build
 # is consistent with our package naming scheme.
 for file in target/"${TARGET}"/debian/*.deb; do
   base=$(basename "${file}")
-  renamed=${base//_/-}
-  mv "${file}" target/"${TARGET}"/debian/"${renamed}";
+  arch=${base#vector_${PACKAGE_VERSION}_}
+  mv "${file}" target/"${TARGET}"/debian/vector-"${arch}";
 done
 
 #
