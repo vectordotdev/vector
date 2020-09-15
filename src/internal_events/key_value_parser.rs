@@ -23,7 +23,7 @@ pub(crate) struct KeyValueParseFailed {
 impl InternalEvent for KeyValueParseFailed {
     fn emit_logs(&self) {
         warn!(
-            message = "Event failed to parse as KeyValue",
+            message = "Event failed to parse as key/value.",
             key = %self.key,
             error = %self.error,
             rate_limit_secs = 30
