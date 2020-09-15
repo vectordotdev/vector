@@ -204,6 +204,7 @@ impl RunningTopology {
     }
 
     /// On Error, topology is in invalid state.
+    /// May change componenets even if reload fails.
     pub async fn reload_config_and_respawn(
         &mut self,
         new_config: Config,
