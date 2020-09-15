@@ -136,6 +136,7 @@ scopes:
   - merge transform
   - reduce transform
   - regex_parser transform
+  - remap transform
   - remove_fields transform
   - remove_tags transform
   - rename_fields transform
