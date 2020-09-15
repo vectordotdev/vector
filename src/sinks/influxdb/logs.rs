@@ -7,7 +7,7 @@ use crate::{
             influxdb_settings, Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
         },
         util::{
-            encoding::EncodingConfigWithDefault,
+            encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpClient, HttpSink},
             BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
         },
@@ -49,6 +49,7 @@ struct InfluxDBLogsSink {
     protocol_version: ProtocolVersion,
     namespace: String,
     tags: HashSet<String>,
+    encoding: EncodingConfig<Encoding>,
 }
 
 lazy_static! {
@@ -106,6 +107,7 @@ impl SinkConfig for InfluxDBLogsConfig {
             protocol_version,
             namespace,
             tags,
+            encoding: self.encoding.clone().into(),
         };
 
         let sink = BatchedHttpSink::new(
@@ -135,8 +137,10 @@ impl HttpSink for InfluxDBLogsSink {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let mut output = String::new();
+
+        self.encoding.apply_rules(&mut event);
         let mut event = event.into_log();
 
         // Measurement
@@ -221,6 +225,7 @@ mod tests {
     };
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
+    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn test_config_without_tags() {
@@ -233,6 +238,31 @@ mod tests {
         "#;
 
         toml::from_str::<InfluxDBLogsConfig>(&config).unwrap();
+    }
+
+    #[test]
+    fn test_encode_event_apply_rules() {
+        let mut event = Event::from("hello");
+        event.as_mut_log().insert("host", "aws.cloud.eur");
+        event.as_mut_log().insert("timestamp", ts());
+
+        let mut sink = create_sink(
+            "http://localhost:9999",
+            "my-token",
+            ProtocolVersion::V1,
+            "ns",
+            vec![],
+        );
+        sink.encoding.except_fields = Some(vec![Atom::from("host")]);
+
+        let bytes = sink.encode_event(event).unwrap();
+        let string = std::str::from_utf8(&bytes).unwrap();
+
+        let line_protocol = split_line_protocol(&string);
+        assert_eq!("ns.vector", line_protocol.0);
+        assert_eq!("metric_type=logs", line_protocol.1);
+        assert_fields(line_protocol.2.to_string(), ["message=\"hello\""].to_vec());
+        assert_eq!("1542182950000000011\n", line_protocol.3);
     }
 
     #[test]
@@ -585,6 +615,7 @@ mod tests {
             protocol_version,
             namespace,
             tags,
+            encoding: EncodingConfigWithDefault::default().into(),
         }
     }
 }

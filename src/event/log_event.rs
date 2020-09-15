@@ -1,6 +1,7 @@
 use crate::event::{util, PathComponent, Value};
 use serde::{Serialize, Serializer};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
+use std::convert::{TryFrom, TryInto};
 use std::iter::FromIterator;
 use string_cache::DefaultAtom;
 
@@ -89,6 +90,47 @@ impl Into<BTreeMap<String, Value>> for LogEvent {
     fn into(self) -> BTreeMap<String, Value> {
         let Self { fields } = self;
         fields
+    }
+}
+
+impl From<HashMap<String, Value>> for LogEvent {
+    fn from(map: HashMap<String, Value>) -> Self {
+        LogEvent {
+            fields: map.into_iter().collect(),
+        }
+    }
+}
+
+impl Into<HashMap<String, Value>> for LogEvent {
+    fn into(self) -> HashMap<String, Value> {
+        self.fields.into_iter().collect()
+    }
+}
+
+impl TryFrom<serde_json::Value> for LogEvent {
+    type Error = crate::Error;
+
+    fn try_from(map: serde_json::Value) -> Result<Self, Self::Error> {
+        match map {
+            serde_json::Value::Object(fields) => Ok(LogEvent::from(
+                fields
+                    .into_iter()
+                    .map(|(k, v)| (k, v.into()))
+                    .collect::<BTreeMap<_, _>>(),
+            )),
+            _ => Err(crate::Error::from(
+                "Attempted to convert non-Object JSON into a LogEvent.",
+            )),
+        }
+    }
+}
+
+impl TryInto<serde_json::Value> for LogEvent {
+    type Error = crate::Error;
+
+    fn try_into(self) -> Result<serde_json::Value, Self::Error> {
+        let Self { fields } = self;
+        Ok(serde_json::to_value(fields)?)
     }
 }
 
