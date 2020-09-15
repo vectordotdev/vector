@@ -220,15 +220,22 @@ ci-condition: skip
 ##### Daily tests
 
 Some long running tests are only run daily, rather than on every pull request.
-If needed, an administrator can kick off these tests manually via:
+If needed, an administrator can kick off these tests manually via the button on
+the [nightly build action
+page](https://github.com/timberio/vector/actions?query=workflow%3Anightly)
 
-``` bash
-$ curl -u "$GITHUB_USERNAME:$GITHUB_TOKEN" \
-  -H 'Accept: application/vnd.github.v3+json' \
-  -X POST \
-  https://api.github.com/repos/timberio/vector/actions/workflows/nightly.yml/dispatches \
-  --data '{"ref": "$GIT_REF}'
-```
+#### Flakey tests
+
+Historically, we've had some trouble with tests being flakey. If your PR does
+not have passing tests:
+
+- Ensure that the test failures are unrelated to your change
+  - Is it failing on master?
+  - Does it fail if you rerun CI?
+  - Can you reproduce locally?
+- Find or open an issue for the test failure
+  ([example](https://github.com/timberio/vector/issues/3781))
+- Link the PR in the issue for the failing test so that there are more examples
 
 ##### Test harness
 

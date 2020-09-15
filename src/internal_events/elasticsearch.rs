@@ -10,7 +10,7 @@ pub struct ElasticSearchEventReceived {
 
 impl InternalEvent for ElasticSearchEventReceived {
     fn emit_logs(&self) {
-        trace!(message = "Inserting event", index = %self.index);
+        trace!(message = "Inserting event.", index = %self.index);
     }
 
     fn emit_metrics(&self) {
@@ -35,7 +35,7 @@ pub struct ElasticSearchMissingKeys {
 impl InternalEvent for ElasticSearchMissingKeys {
     fn emit_logs(&self) {
         warn!(
-            message = "keys do not exist on the event; dropping event.",
+            message = "Keys do not exist on the event; dropping event.",
             missing_keys = ?self.keys,
             rate_limit_secs = 30,
         )

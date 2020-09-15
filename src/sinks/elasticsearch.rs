@@ -601,7 +601,7 @@ mod integration_tests {
         tls::TlsOptions,
         Event,
     };
-    use futures::{future, stream, TryStreamExt};
+    use futures::{future, stream, StreamExt};
     use http::{Request, StatusCode};
     use hyper::Body;
     use serde_json::{json, Value};
@@ -645,7 +645,7 @@ mod integration_tests {
         input_event.as_mut_log().insert("my_id", "42");
         input_event.as_mut_log().insert("foo", "bar");
 
-        sink.run(stream::once(future::ok(input_event.clone())))
+        sink.run(stream::once(future::ready(input_event.clone())))
             .await
             .unwrap();
 
@@ -764,7 +764,7 @@ mod integration_tests {
             true => {
                 // Break all but the first event to simulate some kind of partial failure
                 let mut doit = false;
-                sink.run(events.map_ok(move |mut event| {
+                sink.run(events.map(move |mut event| {
                     if doit {
                         event.as_mut_log().insert("_type", 1);
                     }

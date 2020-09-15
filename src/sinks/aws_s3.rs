@@ -592,7 +592,7 @@ mod integration_tests {
                 3
             };
             e.as_mut_log().insert("i", format!("{}", i));
-            Ok(e)
+            e
         });
         sink.run(stream::iter(events)).await.unwrap();
 
