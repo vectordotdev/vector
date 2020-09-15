@@ -316,7 +316,10 @@ impl RetryLogic for ElasticSearchRetryLogic {
                 }
 
                 let reason = match serde_json::from_str::<ESResultResponse>(&body) {
-                    Err(json_error) => format!("could not parse response, error: {}", json_error),
+                    Err(json_error) => format!(
+                        "some messages failed, could not parse response, error: {}",
+                        json_error
+                    ),
                     Ok(resp) => match resp.items.into_iter().find_map(|item| item.index.error) {
                         Some(error) => {
                             format!("error type: {}, reason: {}", error.err_type, error.reason)
