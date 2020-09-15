@@ -1,22 +1,19 @@
 use crate::{
+    buffers::Acker,
     config::SinkContext,
     dns::Resolver,
     emit,
+    event::Event,
     internal_events::{
         TcpConnectionDisconnected, TcpConnectionEstablished, TcpConnectionFailed,
         TcpConnectionShutdown, TcpEventSent, TcpFlushError,
     },
-    sinks::util::{
-        encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSinkOld,
-    },
+    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSink},
     sinks::{Healthcheck, VectorSink},
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
 };
-use bytes::Bytes;
-use futures::{compat::CompatSink, task::noop_waker_ref, FutureExt, TryFutureExt};
-use futures01::{
-    stream::iter_ok, try_ready, Async, AsyncSink, Future, Poll as Poll01, Sink, StartSend,
-};
+use async_trait::async_trait;
+use futures::{stream::BoxStream, task::noop_waker_ref, FutureExt, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
@@ -25,13 +22,10 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tokio::{
-    io::AsyncRead,
-    net::TcpStream,
-    time::{delay_for, Delay},
-};
+use tokio::{io::AsyncRead, net::TcpStream, time::delay_for};
 use tokio_retry::strategy::ExponentialBackoff;
 use tokio_util::codec::{BytesCodec, FramedWrite};
+use tracing_futures::Instrument;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -58,47 +52,47 @@ impl TcpSinkConfig {
 
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
-        let tcp = TcpSink::new(host, port, cx.resolver(), tls);
-        let healthcheck = tcp.healthcheck();
-
         let encoding = self.encoding.clone();
-        let sink = Box::new(
-            StreamSinkOld::new(tcp, cx.acker())
-                .with_flat_map(move |event| iter_ok(encode_event(event, &encoding))),
-        );
+        let sink = TcpSink::new(host, port, tls, cx, encoding);
+        let healthcheck = sink.healthcheck();
 
-        Ok((VectorSink::Futures01Sink(sink), healthcheck))
+        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 }
 
 pub struct TcpSink {
     host: String,
     port: u16,
-    resolver: Resolver,
     tls: MaybeTlsSettings,
+    resolver: Resolver,
+    acker: Acker,
+    encoding: EncodingConfig<Encoding>,
     state: TcpSinkState,
     backoff: ExponentialBackoff,
     span: tracing::Span,
 }
 
 enum TcpSinkState {
+    Connected(FramedWrite<MaybeTlsStream<TcpStream>, BytesCodec>),
     Disconnected,
-    ResolvingDns(crate::dns::ResolverFuture),
-    Connecting(Box<dyn Future<Item = MaybeTlsStream<TcpStream>, Error = TlsError> + Send>),
-    Connected(TcpOrTlsStream),
-    Backoff(Box<dyn Future<Item = (), Error = ()> + Send>),
 }
 
-type TcpOrTlsStream = CompatSink<FramedWrite<MaybeTlsStream<TcpStream>, BytesCodec>, Bytes>;
-
 impl TcpSink {
-    pub fn new(host: String, port: u16, resolver: Resolver, tls: MaybeTlsSettings) -> Self {
+    pub fn new(
+        host: String,
+        port: u16,
+        tls: MaybeTlsSettings,
+        cx: SinkContext,
+        encoding: EncodingConfig<Encoding>,
+    ) -> Self {
         let span = info_span!("connection", %host, %port);
         Self {
             host,
             port,
-            resolver,
             tls,
+            resolver: cx.resolver(),
+            acker: cx.acker(),
+            encoding,
             state: TcpSinkState::Disconnected,
             backoff: Self::fresh_backoff(),
             span,
@@ -122,85 +116,71 @@ impl TcpSink {
             .max_delay(Duration::from_secs(60))
     }
 
-    fn next_delay(&mut self) -> Delay {
-        delay_for(self.backoff.next().unwrap())
-    }
-
-    fn next_delay01(&mut self) -> Box<dyn Future<Item = (), Error = ()> + Send> {
-        let delay = self.next_delay();
-        Box::new(async move { Ok(delay.await) }.boxed().compat())
-    }
-
-    fn poll_connection(&mut self) -> Poll01<&mut TcpOrTlsStream, ()> {
-        loop {
-            self.state = match self.state {
-                TcpSinkState::Disconnected => {
-                    debug!(message = "resolving DNS.", host = %self.host);
-                    let fut = self.resolver.lookup_ip_01(self.host.clone());
-
-                    TcpSinkState::ResolvingDns(fut)
-                }
-                TcpSinkState::ResolvingDns(ref mut dns) => match dns.poll() {
-                    Ok(Async::Ready(mut ips)) => {
-                        if let Some(ip) = ips.next() {
-                            let addr = SocketAddr::new(ip, self.port);
-
-                            debug!(message = "connecting", %addr);
-                            let fut = self.tls.clone().connect(self.host.clone(), addr);
-                            let fut = Box::new(fut.boxed().compat());
-                            TcpSinkState::Connecting(fut)
-                        } else {
-                            error!("DNS resolved but there were no IP addresses.");
-                            TcpSinkState::Backoff(self.next_delay01())
-                        }
-                    }
-                    Ok(Async::NotReady) => return Ok(Async::NotReady),
-                    Err(error) => {
-                        error!(message = "unable to resolve DNS.", %error);
-                        TcpSinkState::Backoff(self.next_delay01())
-                    }
-                },
-                TcpSinkState::Connecting(ref mut connect_future) => match connect_future.poll() {
-                    Ok(Async::Ready(stream)) => {
-                        emit!(TcpConnectionEstablished {
-                            peer_addr: stream.peer_addr().ok(),
-                        });
-                        self.backoff = Self::fresh_backoff();
-                        let out = FramedWrite::new(stream, BytesCodec::new());
-                        TcpSinkState::Connected(CompatSink::new(out))
-                    }
-                    Ok(Async::NotReady) => return Ok(Async::NotReady),
-                    Err(error) => {
-                        emit!(TcpConnectionFailed { error });
-                        TcpSinkState::Backoff(self.next_delay01())
-                    }
-                },
-                TcpSinkState::Connected(ref mut connection) => return Ok(Async::Ready(connection)),
-                TcpSinkState::Backoff(ref mut delay) => match delay.poll() {
-                    Ok(Async::NotReady) => return Ok(Async::NotReady),
-                    // Err can only occur if the tokio runtime has been shutdown or if more than 2^63 timers have been created
-                    Err(()) => unreachable!(),
-                    Ok(Async::Ready(())) => {
-                        debug!(message = "disconnected.");
-                        TcpSinkState::Disconnected
-                    }
-                },
-            };
-        }
+    async fn next_delay(&mut self) {
+        delay_for(self.backoff.next().unwrap()).await
     }
 }
 
-// New Sink trait implemented in PR#3188: https://github.com/timberio/vector/pull/3188#discussion_r463843208
-impl Sink for TcpSink {
-    type SinkItem = Bytes;
-    type SinkError = ();
+#[async_trait]
+impl StreamSink for TcpSink {
+    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        // TODO: use select! for `input.next()` & `???`.
+        let mut slot = None;
+        loop {
+            let event = match slot.take() {
+                Some(event) => event,
+                None => match input.next().await {
+                    Some(event) => match encode_event(event, &self.encoding) {
+                        Some(event) => event,
+                        None => continue,
+                    },
+                    None => break,
+                },
+            };
 
-    fn start_send(&mut self, line: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        let span = self.span.clone();
-        let _enter = span.enter();
+            let span = self.span.clone();
+            async {
+                let stream = loop {
+                    match &mut self.state {
+                        TcpSinkState::Connected(stream) => break stream,
+                        TcpSinkState::Disconnected => {
+                            debug!(message = "resolving DNS.", host = %self.host);
+                            match self.resolver.lookup_ip(self.host.clone()).await {
+                                Ok(mut ips) => match ips.next() {
+                                    Some(ip) => {
+                                        let addr = SocketAddr::new(ip, self.port);
+                                        debug!(message = "connecting", %addr);
+                                        let tls = self.tls.clone();
+                                        match tls.connect(self.host.clone(), addr).await {
+                                            Ok(stream) => {
+                                                emit!(TcpConnectionEstablished {
+                                                    peer_addr: stream.peer_addr().ok(),
+                                                });
+                                                let out =
+                                                    FramedWrite::new(stream, BytesCodec::new());
+                                                self.state = TcpSinkState::Connected(out);
+                                                self.backoff = Self::fresh_backoff();
+                                            }
+                                            Err(error) => {
+                                                emit!(TcpConnectionFailed { error });
+                                                self.next_delay().await
+                                            }
+                                        }
+                                    }
+                                    None => {
+                                        error!("DNS resolved but there were no IP addresses.");
+                                        self.next_delay().await
+                                    }
+                                },
+                                Err(error) => {
+                                    error!(message = "unable to resolve DNS.", %error);
+                                    self.next_delay().await
+                                }
+                            }
+                        }
+                    }
+                };
 
-        match self.poll_connection() {
-            Ok(Async::Ready(connection)) => {
                 // Test if the remote has issued a disconnect by calling read(2)
                 // with a 1 sized buffer.
                 //
@@ -209,74 +189,53 @@ impl Sink for TcpSink {
                 //
                 // If this returns `Poll::Pending` we know the connection is still
                 // valid and the write will most likely succeed.
-
-                let stream: &mut MaybeTlsStream<TcpStream> = connection.get_mut().get_mut();
+                let inner: &mut MaybeTlsStream<TcpStream> = stream.get_mut();
                 let mut cx = Context::from_waker(noop_waker_ref());
-                match Pin::new(stream).poll_read(&mut cx, &mut [0u8; 1]) {
+                match Pin::new(inner).poll_read(&mut cx, &mut [0u8; 1]) {
                     Poll::Ready(Err(error)) => {
                         emit!(TcpConnectionDisconnected { error });
                         self.state = TcpSinkState::Disconnected;
-                        Ok(AsyncSink::NotReady(line))
+                        slot = Some(event);
                     }
                     Poll::Ready(Ok(0)) => {
                         // Maybe this is only a sign to close the channel,
                         // in which case we should try to flush our buffers
                         // before disconnecting.
-                        match connection.poll_complete() {
-                            // Flush done so we can safely disconnect, or
-                            // error in which case we have really been
-                            // disconnected.
-                            Ok(Async::Ready(())) | Err(_) => {
-                                emit!(TcpConnectionShutdown {});
-                                self.state = TcpSinkState::Disconnected;
-                            }
-                            Ok(Async::NotReady) => (),
-                        }
-
-                        Ok(AsyncSink::NotReady(line))
+                        // Flush done so we can safely disconnect, or error
+                        // in which case we have really been disconnected.
+                        let _ = stream.close().await;
+                        emit!(TcpConnectionShutdown {});
+                        self.state = TcpSinkState::Disconnected;
+                        slot = Some(event);
                     }
                     _ => {
-                        let byte_size = line.len();
-                        match connection.start_send(line) {
-                            Ok(AsyncSink::NotReady(line)) => Ok(AsyncSink::NotReady(line)),
+                        let byte_size = event.len();
+                        match stream.send(event).await {
+                            Ok(()) => emit!(TcpEventSent { byte_size }),
                             Err(error) => {
                                 error!(message = "connection disconnected.", %error);
                                 self.state = TcpSinkState::Disconnected;
-                                Ok(AsyncSink::Ready)
-                            }
-                            Ok(AsyncSink::Ready) => {
-                                emit!(TcpEventSent { byte_size });
-                                Ok(AsyncSink::Ready)
                             }
                         }
+                        self.acker.ack(1);
                     }
                 }
             }
-            Ok(Async::NotReady) => Ok(AsyncSink::NotReady(line)),
-            Err(_) => unreachable!(),
-        }
-    }
-
-    fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
-        // Stream::forward will immediately poll_complete the sink it's forwarding to,
-        // but we don't want to connect before the first event actually comes through.
-        if let TcpSinkState::Disconnected = self.state {
-            return Ok(Async::Ready(()));
+            .instrument(span)
+            .await;
         }
 
-        let span = self.span.clone();
-        let _enter = span.enter();
-
-        let connection = try_ready!(self.poll_connection());
-
-        match connection.poll_complete() {
-            Err(error) => {
-                emit!(TcpFlushError { error });
-                self.state = TcpSinkState::Disconnected;
-                Ok(Async::Ready(()))
+        if let TcpSinkState::Connected(stream) = &mut self.state {
+            async {
+                if let Err(error) = stream.close().await {
+                    emit!(TcpFlushError { error });
+                }
             }
-            Ok(ok) => Ok(ok),
+            .instrument(self.span.clone())
+            .await
         }
+
+        Ok(())
     }
 }
 
