@@ -2416,6 +2416,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "metrics-tracing-context"
+version = "0.1.0-alpha1"
+source = "git+https://github.com/MOZGIII/metrics?branch=refactor/metrics-v2-tracing-context#339dc25b45968424d566dd798588df042e03359a"
+dependencies = [
+ "metrics",
+ "metrics-util",
+ "tracing 0.1.19 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tracing-core 0.1.15 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "metrics-util"
 version = "0.4.0-alpha.2"
 source = "git+https://github.com/MOZGIII/metrics?branch=refactor/metrics-v2-tracing-context#339dc25b45968424d566dd798588df042e03359a"
@@ -5380,6 +5392,7 @@ dependencies = [
  "matches",
  "maxminddb",
  "metrics",
+ "metrics-tracing-context",
  "metrics-util",
  "nix 0.16.1",
  "nom 5.1.2",

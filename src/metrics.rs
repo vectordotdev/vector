@@ -1,33 +1,47 @@
 use crate::{event::Metric, Event};
 use metrics::{Key, Recorder};
+use metrics_tracing_context::TracingContextLayer;
+use metrics_util::layers::Layer;
 use metrics_util::{CompositeKey, Handle, MetricKind, Registry};
 use once_cell::sync::OnceCell;
+use std::sync::Arc;
 
 static CONTROLLER: OnceCell<Controller> = OnceCell::new();
 
 pub fn init() -> crate::Result<()> {
+    // Prepare the registry.
+    let registry = Registry::new();
+    let registry = Arc::new(registry);
+
+    // Initialize the controller.
+    let controller = Controller {
+        registry: Arc::clone(&registry),
+    };
+    // Register the controller globally.
     CONTROLLER
-        .set(Controller::new())
+        .set(controller)
         .map_err(|_| "controller already initialized")?;
 
-    metrics::set_recorder(CONTROLLER.get().unwrap()).map_err(|_| "recorder already initialized")?;
+    // Initialize the recorder.
+    let recorder = VectorRecorder {
+        registry: Arc::clone(&registry),
+    };
+    // Apply a layer to capture tracing span fields as labels.
+    let recorder = TracingContextLayer::all().layer(recorder);
+    // Register the recorder globally.
+    metrics::set_boxed_recorder(Box::new(recorder)).map_err(|_| "recorder already initialized")?;
 
+    // Done.
     Ok(())
 }
 
-pub struct Controller {
-    registry: Registry<CompositeKey, Handle>,
+/// [`VectorRecorder`] is a [`metrics::Recorder`] implementation that's suitable
+/// for the advanced usage that we have in Vector.
+struct VectorRecorder {
+    registry: Arc<Registry<CompositeKey, Handle>>,
 }
 
-impl Controller {
-    pub fn new() -> Self {
-        Self {
-            registry: Registry::new(),
-        }
-    }
-}
-
-impl Recorder for Controller {
+impl Recorder for VectorRecorder {
     fn register_counter(&self, key: Key, _description: Option<&'static str>) {
         let ckey = CompositeKey::new(MetricKind::Counter, key);
         self.registry.op(ckey, |_| {}, || Handle::counter())
@@ -67,13 +81,19 @@ impl Recorder for Controller {
     }
 }
 
+/// Controller allows capturing metric snapshots.
+pub struct Controller {
+    registry: Arc<Registry<CompositeKey, Handle>>,
+}
+
+/// Get a handle to the globally registered controller, if it's initialized.
 pub fn get_controller() -> crate::Result<&'static Controller> {
     CONTROLLER
         .get()
         .ok_or_else(|| "metrics system not initialized".into())
 }
 
-pub fn snapshot(controller: &Controller) -> Vec<Event> {
+fn snapshot(controller: &Controller) -> Vec<Event> {
     let handles = controller.registry.get_handles();
     handles
         .into_iter()
@@ -84,6 +104,8 @@ pub fn snapshot(controller: &Controller) -> Vec<Event> {
         .collect()
 }
 
+/// Take a snapshot of all gathered metrics and expose them as metric
+/// [`Event`]s.
 pub fn capture_metrics(controller: &Controller) -> impl Iterator<Item = Event> {
     snapshot(controller).into_iter()
 }

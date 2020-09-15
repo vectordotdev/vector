@@ -68,6 +68,7 @@ tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "f470db1b03
 # Metrics
 metrics = { version = "0.13.0-alpha", git = "https://github.com/MOZGIII/metrics", branch = "refactor/metrics-v2-tracing-context" }
 metrics-util = { version = "0.4.0-alpha", git = "https://github.com/MOZGIII/metrics", branch = "refactor/metrics-v2-tracing-context"  }
+metrics-tracing-context = { version = "0.1.0-alpha", git = "https://github.com/MOZGIII/metrics", branch = "refactor/metrics-v2-tracing-context"  }
 
 # Aws
 rusoto_core = { version = "0.45.0", features = ["encoding"], optional = true }
