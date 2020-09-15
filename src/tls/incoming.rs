@@ -103,7 +103,6 @@ pub struct MaybeTlsIncomingStream<S> {
     // BoxFuture doesn't allow access to the inner stream, but users
     // of MaybeTlsIncomingStream want access to the peer address while
     // still handshaking, so we have to cache it here.
-    #[cfg(feature = "listenfd")]
     peer_addr: SocketAddr,
 }
 
@@ -113,13 +112,14 @@ enum StreamState<S> {
     AcceptError(String),
 }
 
-#[cfg(feature = "listenfd")]
 impl<S> MaybeTlsIncomingStream<S> {
+    #[cfg_attr(not(feature = "listenfd"), allow(dead_code))]
     pub fn peer_addr(&self) -> SocketAddr {
         self.peer_addr
     }
 
     /// None if connection still hasn't been established.
+    #[cfg(feature = "listenfd")]
     pub fn get_ref(&self) -> Option<&S> {
         match &self.state {
             StreamState::Accepted(stream) => Some(match stream {
@@ -133,7 +133,6 @@ impl<S> MaybeTlsIncomingStream<S> {
 }
 
 impl MaybeTlsIncomingStream<TcpStream> {
-    #[cfg(feature = "listenfd")]
     pub(super) fn new(
         stream: TcpStream,
         peer_addr: SocketAddr,
@@ -146,17 +145,6 @@ impl MaybeTlsIncomingStream<TcpStream> {
             None => StreamState::Accepted(MaybeTlsStream::Raw(stream)),
         };
         Self { peer_addr, state }
-    }
-
-    #[cfg(not(feature = "listenfd"))]
-    pub(super) fn new(stream: TcpStream, _: SocketAddr, acceptor: Option<SslAcceptor>) -> Self {
-        let state = match acceptor {
-            Some(acceptor) => StreamState::Accepting(
-                async move { tokio_openssl::accept(&acceptor, stream).await }.boxed(),
-            ),
-            None => StreamState::Accepted(MaybeTlsStream::Raw(stream)),
-        };
-        Self { state }
     }
 
     // Explicit handshake method
