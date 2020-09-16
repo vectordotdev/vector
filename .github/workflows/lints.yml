@@ -54,6 +54,7 @@ jobs:
       - run: make check-scripts
       - run: make check-helm
       - run: make check-kubernetes-yaml
+      - run: make check-internal-events
       - uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check advisories

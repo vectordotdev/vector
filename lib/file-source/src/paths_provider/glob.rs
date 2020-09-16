@@ -52,7 +52,7 @@ impl PathsProvider for Glob {
         self.include_patterns
             .iter()
             .flat_map(|include_pattern| {
-                glob::glob_with(include_pattern.as_str(), &self.glob_match_options)
+                glob::glob_with(include_pattern.as_str(), self.glob_match_options)
                     .expect("failed to read glob pattern")
                     .filter_map(|val| val.ok())
             })
