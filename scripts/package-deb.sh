@@ -41,10 +41,12 @@ fi
 
 if ! [ -x "$(command -v cmark-gfm)" ]; then
   if [ -x "$(command -v dpkg)" ]; then
+     cd /tmp
      wget http://ftp.br.debian.org/debian/pool/main/c/cmark-gfm/libcmark-gfm0_0.28.3.gfm.19-3_amd64.deb
      wget http://ftp.br.debian.org/debian/pool/main/c/cmark-gfm/libcmark-gfm-extensions0_0.28.3.gfm.19-3_amd64.deb
      wget http://ftp.br.debian.org/debian/pool/main/c/cmark-gfm/cmark-gfm_0.28.3.gfm.19-3_amd64.deb
      sudo dpkg -i cmark-gfm_0.28.3.gfm.19-3_amd64.deb libcmark-gfm-extensions0_0.28.3.gfm.19-3_amd64.deb libcmark-gfm0_0.28.3.gfm.19-3_amd64.deb
+     rm -fr libcmark*.deb cmark*.deb
      cmark-gfm --version
   else
      echo "You need to install cmark-gfm"
