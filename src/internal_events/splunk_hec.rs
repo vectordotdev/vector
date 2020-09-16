@@ -34,7 +34,7 @@ pub(crate) struct SplunkEventEncodeError {
 impl InternalEvent for SplunkEventEncodeError {
     fn emit_logs(&self) {
         error!(
-            message = "error encoding Splunk HEC event to JSON.",
+            message = "Error encoding Splunk HEC event to JSON.",
             error = ?self.error,
             rate_limit_secs = 30,
         );
@@ -57,7 +57,7 @@ pub struct SplunkSourceTypeMissingKeys {
 impl InternalEvent for SplunkSourceTypeMissingKeys {
     fn emit_logs(&self) {
         warn!(
-            message = "failed to render template for sourcetype, leaving empty",
+            message = "Failed to render template for sourcetype, leaving empty.",
             missing_keys = ?self.keys,
             rate_limit_secs = 30,
         )
@@ -80,7 +80,7 @@ pub struct SplunkSourceMissingKeys {
 impl InternalEvent for SplunkSourceMissingKeys {
     fn emit_logs(&self) {
         warn!(
-            message = "failed to render template for source, leaving empty",
+            message = "Failed to render template for source, leaving empty.",
             missing_keys = ?self.keys,
             rate_limit_secs = 30,
         )
@@ -106,7 +106,7 @@ mod source {
 
     impl InternalEvent for SplunkHECEventReceived {
         fn emit_logs(&self) {
-            trace!(message = "received one event.");
+            trace!(message = "Received one event.");
         }
 
         fn emit_metrics(&self) {
@@ -126,7 +126,7 @@ mod source {
     impl<'a> InternalEvent for SplunkHECRequestReceived<'a> {
         fn emit_logs(&self) {
             debug!(
-                message = "received one request.",
+                message = "Received one request.",
                 path = %self.path,
                 rate_limit_secs = 10
             );
@@ -149,7 +149,7 @@ mod source {
     impl InternalEvent for SplunkHECRequestBodyInvalid {
         fn emit_logs(&self) {
             error!(
-                message = "invalid request body.",
+                message = "Invalid request body.",
                 error = %self.error,
                 rate_limit_secs = 10
             );
@@ -166,7 +166,7 @@ mod source {
     impl InternalEvent for SplunkHECRequestError {
         fn emit_logs(&self) {
             error!(
-                message = "error processing request.",
+                message = "Error processing request.",
                 error = %self.error,
                 rate_limit_secs = 10
             );

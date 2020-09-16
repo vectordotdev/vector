@@ -176,6 +176,7 @@ fn main() {
                                     break SignalTo::Shutdown;
                                 }
                             }
+                            sources_finished = topology.sources_finished().compat();
                         } else {
                             emit!(VectorConfigLoadFailed);
                         }

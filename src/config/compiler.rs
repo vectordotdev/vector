@@ -15,6 +15,8 @@ pub fn compile(raw: ConfigBuilder) -> Result<Config, Vec<String>> {
 
     let mut errors = Vec::new();
 
+    expand_macros(&mut config)?;
+
     if let Some(warnings) = validation::warnings(&config) {
         for warning in warnings {
             warn!(message = %warning)
@@ -28,8 +30,6 @@ pub fn compile(raw: ConfigBuilder) -> Result<Config, Vec<String>> {
     if let Err(type_errors) = validation::typecheck(&config) {
         errors.extend(type_errors);
     }
-
-    expand_macros(&mut config)?;
 
     if errors.is_empty() {
         Ok(config)

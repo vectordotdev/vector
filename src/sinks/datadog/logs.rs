@@ -2,12 +2,7 @@ use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::{
-        util::{
-            self,
-            encoding::{EncodingConfig, EncodingConfiguration},
-            tcp::TcpSink,
-            Encoding, StreamSink, UriSerde,
-        },
+        util::{self, encoding::EncodingConfig, tcp::TcpSink, Encoding, StreamSinkOld, UriSerde},
         Healthcheck, VectorSink,
     },
     tls::{MaybeTlsSettings, TlsConfig},
@@ -32,7 +27,7 @@ inventory::submit! {
 #[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let (host, port, tls) = if let Some(uri) = &self.endpoint {
+        let (host, port) = if let Some(uri) = &self.endpoint {
             let host = uri
                 .host()
                 .ok_or_else(|| "A host is required for endpoint".to_string())?;
@@ -40,18 +35,15 @@ impl SinkConfig for DatadogLogsConfig {
                 .port_u16()
                 .ok_or_else(|| "A port is required for endpoint".to_string())?;
 
-            (host.to_string(), port, self.tls.clone())
+            (host.to_string(), port)
         } else {
-            let tls = self.tls.clone().unwrap_or({
-                let mut tls = TlsConfig::default();
-                tls.enabled = Some(true);
-                tls
-            });
-
-            ("intake.logs.datadoghq.com".to_string(), 10516, Some(tls))
+            ("intake.logs.datadoghq.com".to_string(), 10516)
         };
 
-        let tls_settings = MaybeTlsSettings::from_config(&tls, false)?;
+        let tls_settings = MaybeTlsSettings::from_config(
+            &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
+            false,
+        )?;
 
         let sink = TcpSink::new(host, port, cx.resolver(), tls_settings);
         let healthcheck = sink.healthcheck();
@@ -59,7 +51,7 @@ impl SinkConfig for DatadogLogsConfig {
         let encoding = self.encoding.clone();
         let api_key = self.api_key.clone();
 
-        let sink = StreamSink::new(sink, cx.acker())
+        let sink = StreamSinkOld::new(sink, cx.acker())
             .with_flat_map(move |e| iter_ok(encode_event(e, &api_key, &encoding)));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
@@ -79,8 +71,6 @@ fn encode_event(
     api_key: &str,
     encoding: &EncodingConfig<Encoding>,
 ) -> Option<Bytes> {
-    encoding.apply_rules(&mut event);
-
     let log = event.as_mut_log();
 
     if let Some(message) = log.remove(&log_schema().message_key()) {

@@ -9,6 +9,7 @@ apt upgrade --yes
 # Deps
 apt install --yes \
     build-essential \
+    cmake \
     pkg-config \
     libssl-dev \
     python3-pip \
@@ -25,7 +26,8 @@ apt install --yes \
     ruby-bundler \
     libsasl2-dev \
     gnupg2 \
-    wget
+    wget \
+    gawk
 
 # Grease
 # Grease is used for the `make release-github` task.
