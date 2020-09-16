@@ -63,10 +63,7 @@ impl Function for Path {
         let mut value = self.path[0]
             .iter()
             .find_map(|p| ctx.as_log().get(p))
-            .ok_or(format!(
-                "path .{} not found in event",
-                self.path[0].first().unwrap()
-            ))?;
+            .ok_or_else(|| format!("path .{} not found in event", self.path[0].first().unwrap()))?;
 
         // Walk remaining (if any) path segments. Our parse is already capable
         // of extracting individual path tokens from user input. For example,
@@ -84,17 +81,19 @@ impl Function for Path {
             value = segments
                 .iter()
                 .find_map(|p| get_value(value, PathIter::new(p)))
-                .ok_or(format!(
-                    "path {} not found in event",
-                    self.path
-                        .iter()
-                        .take(i + 1)
-                        .fold("".to_string(), |acc, p| format!(
-                            "{}.{}",
-                            acc,
-                            p.first().unwrap()
-                        ),)
-                ))?;
+                .ok_or_else(|| {
+                    format!(
+                        "path {} not found in event",
+                        self.path
+                            .iter()
+                            .take(i + 1)
+                            .fold("".to_string(), |acc, p| format!(
+                                "{}.{}",
+                                acc,
+                                p.first().unwrap()
+                            ),)
+                    )
+                })?;
         }
 
         Ok(value.clone())
