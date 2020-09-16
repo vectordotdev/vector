@@ -3,6 +3,7 @@ set -e -o verbose
 
 export DEBIAN_FRONTEND=noninteractive
 
+apt-get install -y grub-efi
 update-grub
 
 apt update -y -qq
