@@ -798,7 +798,7 @@ target/artifacts/vector-%.tar.gz: target/%/release/vector.tar.gz
 		${@}
 
 .PHONY: package
-package: build ## Build the Vector archive
+package: build ## Build the Vector packages
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/package-archive.sh
 
 .PHONY: package-all
@@ -812,19 +812,19 @@ package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-d
 package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
 
 .PHONY: package-x86_64-unknown-linux-gnu
-package-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build an archive of the x86_64-unknown-linux-gnu triple.
+package-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build the x86_64-unknown-linux-gnu triple.
 	@echo "Output to ${<}."
 
 .PHONY: package-x86_64-unknown-linux-musl
-package-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## Build the x86_64 musl archive
+package-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## Build the x86_64 musl package
 	$(RUN) package-x86_64-unknown-linux-musl
 
 .PHONY: package-aarch64-unknown-linux-musl
-package-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## Build an archive of the aarch64-unknown-linux-gnu triple.
+package-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## Build the aarch64-unknown-linux-gnu triple.
 	$(RUN) package-aarch64-unknown-linux-musl
 
 .PHONY: package-aarch64-unknown-linux-gnu
-package-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build the aarch64 archive
+package-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build the aarch64 package
 	@echo "Output to ${<}."
 
 # debs
