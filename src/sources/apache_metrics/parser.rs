@@ -140,9 +140,9 @@ pub fn parse(
         .filter_map(|l| {
             let mut parts = l.splitn(2, ":");
             let key = parts.next();
-            let value = parts.next().map(|s| s.trim());
+            let value = parts.next();
             match (key, value) {
-                (Some(k), Some(v)) => Some((k, v)),
+                (Some(k), Some(v)) => Some((k, v.trim())),
                 _ => None,
             }
         })
