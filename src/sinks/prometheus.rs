@@ -2,12 +2,15 @@ use crate::{
     buffers::Acker,
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue},
-    sinks::util::{encode_namespace, MetricEntry},
+    sinks::util::{encode_namespace, MetricEntry, StreamSink},
     Event,
 };
+use async_trait::async_trait;
 use chrono::Utc;
-use futures::{compat::Future01CompatExt, future, FutureExt, TryFutureExt};
-use futures01::{Async, AsyncSink, Future, Sink};
+use futures::{
+    compat::Future01CompatExt, future, stream::BoxStream, FutureExt, StreamExt, TryFutureExt,
+};
+use futures01::Future;
 use hyper::{
     header::HeaderValue,
     service::{make_service_fn, service_fn},
@@ -73,10 +76,10 @@ impl SinkConfig for PrometheusSinkConfig {
             }));
         }
 
-        let sink = Box::new(PrometheusSink::new(self.clone(), cx.acker()));
+        let sink = PrometheusSink::new(self.clone(), cx.acker());
         let healthcheck = future::ok(()).boxed();
 
-        Ok((super::VectorSink::Futures01Sink(sink), healthcheck))
+        Ok((super::VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -368,54 +371,44 @@ impl PrometheusSink {
     }
 }
 
-impl Sink for PrometheusSink {
-    type SinkItem = Event;
-    type SinkError = ();
+#[async_trait]
+impl StreamSink for PrometheusSink {
+    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        while let Some(event) = input.next().await {
+            self.start_server_if_needed();
 
-    fn start_send(
-        &mut self,
-        event: Self::SinkItem,
-    ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
-        self.start_server_if_needed();
+            let item = event.into_metric();
+            let mut metrics = self.metrics.write().unwrap();
 
-        let item = event.into_metric();
-        let mut metrics = self.metrics.write().unwrap();
-
-        match item.kind {
-            MetricKind::Incremental => {
-                let new = MetricEntry(item.to_absolute());
-                if let Some(MetricEntry(mut existing)) = metrics.take(&new) {
-                    if item.value.is_set() {
-                        // sets need to be expired from time to time
-                        // because otherwise they could grow infinitelly
-                        let now = Utc::now().timestamp();
-                        let interval = now - *self.last_flush_timestamp.read().unwrap();
-                        if interval > self.config.flush_period_secs as i64 {
-                            *self.last_flush_timestamp.write().unwrap() = now;
-                            existing.reset();
+            match item.kind {
+                MetricKind::Incremental => {
+                    let new = MetricEntry(item.to_absolute());
+                    if let Some(MetricEntry(mut existing)) = metrics.take(&new) {
+                        if item.value.is_set() {
+                            // sets need to be expired from time to time
+                            // because otherwise they could grow infinitelly
+                            let now = Utc::now().timestamp();
+                            let interval = now - *self.last_flush_timestamp.read().unwrap();
+                            if interval > self.config.flush_period_secs as i64 {
+                                *self.last_flush_timestamp.write().unwrap() = now;
+                                existing.reset();
+                            }
                         }
-                    }
-                    existing.add(&item);
-                    metrics.insert(MetricEntry(existing));
-                } else {
-                    metrics.insert(new);
-                };
-            }
-            MetricKind::Absolute => {
-                let new = MetricEntry(item);
-                metrics.replace(new);
-            }
-        };
+                        existing.add(&item);
+                        metrics.insert(MetricEntry(existing));
+                    } else {
+                        metrics.insert(new);
+                    };
+                }
+                MetricKind::Absolute => {
+                    let new = MetricEntry(item);
+                    metrics.replace(new);
+                }
+            };
 
-        self.acker.ack(1);
-
-        Ok(AsyncSink::Ready)
-    }
-
-    fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
-        self.start_server_if_needed();
-
-        Ok(Async::Ready(()))
+            self.acker.ack(1);
+        }
+        Ok(())
     }
 }
 
