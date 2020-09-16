@@ -16,7 +16,7 @@ pub mod udp;
 pub mod unix;
 pub mod uri;
 
-use crate::event::{self, Event};
+use crate::event::Event;
 use bytes::Bytes;
 use encoding::{EncodingConfig, EncodingConfiguration};
 use serde::{Deserialize, Serialize};
@@ -33,7 +33,7 @@ pub use service::{
     InFlightLimit, ServiceBuilderExt, TowerBatchedSink, TowerRequestConfig, TowerRequestLayer,
     TowerRequestSettings,
 };
-pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
+pub use sink::{BatchSink, PartitionBatchSink, StreamSink, StreamSinkOld};
 pub use uri::UriSerde;
 
 #[derive(Debug, Snafu)]
@@ -56,7 +56,7 @@ pub enum Encoding {
 
 /**
 * Encodes the given event into raw bytes that can be sent into a Sink, according to
-* the given encoding.  If there are any errors encoding the event, logs a warning
+* the given encoding. If there are any errors encoding the event, logs a warning
 * and returns None.
 **/
 pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {
@@ -67,7 +67,7 @@ pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Op
         Encoding::Json => serde_json::to_vec(&log),
         Encoding::Text => {
             let bytes = log
-                .get(&event::log_schema().message_key())
+                .get(&crate::config::log_schema().message_key())
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             Ok(bytes)

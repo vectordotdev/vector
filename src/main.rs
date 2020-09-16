@@ -118,7 +118,7 @@ fn main() {
                 std::process::exit(exitcode::CONFIG);
             });
 
-        vector::event::LOG_SCHEMA
+        crate::config::LOG_SCHEMA
             .set(config.global.log_schema.clone())
             .expect("Couldn't set schema");
 
@@ -161,6 +161,7 @@ fn main() {
                                     break SignalTo::Shutdown;
                                 }
                             }
+                            sources_finished = topology.sources_finished().compat();
                         } else {
                             emit!(VectorConfigLoadFailed);
                         }

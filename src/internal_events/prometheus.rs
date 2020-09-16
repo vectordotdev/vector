@@ -61,9 +61,9 @@ pub struct PrometheusParseError<'a> {
 
 impl<'a> InternalEvent for PrometheusParseError<'a> {
     fn emit_logs(&self) {
-        error!(message = "parsing error.", url = %self.url, error = %self.error);
+        error!(message = "Parsing error.", url = %self.url, error = %self.error);
         debug!(
-            message = %format!("failed to parse response:\n\n{}\n\n", self.body),
+            message = %format!("Failed to parse response:\n\n{}\n\n", self.body),
             url = %self.url,
             rate_limit_secs = 10
         );

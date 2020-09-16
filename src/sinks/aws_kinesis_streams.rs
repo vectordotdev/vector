@@ -1,7 +1,7 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
-    event::{self, Event},
+    event::Event,
     internal_events::AwsKinesisStreamsEventSent,
     region::RegionOrEndpoint,
     sinks::util::{
@@ -250,7 +250,6 @@ fn encode_event(
     partition_key_field: &Option<Atom>,
     encoding: &EncodingConfig<Encoding>,
 ) -> Option<PutRecordsRequestEntry> {
-    encoding.apply_rules(&mut event);
     let partition_key = if let Some(partition_key_field) = partition_key_field {
         if let Some(v) = event.as_log().get(&partition_key_field) {
             v.to_string_lossy()
@@ -272,11 +271,13 @@ fn encode_event(
         partition_key
     };
 
+    encoding.apply_rules(&mut event);
+
     let log = event.into_log();
     let data = match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
         Encoding::Text => log
-            .get(&event::log_schema().message_key())
+            .get(&log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };
@@ -305,10 +306,7 @@ fn gen_partition_key() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        event::{self, Event},
-        test_util::random_string,
-    };
+    use crate::{event::Event, test_util::random_string};
     use std::collections::BTreeMap;
 
     #[test]
@@ -328,7 +326,7 @@ mod tests {
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
-        assert_eq!(map[&event::log_schema().message_key().to_string()], message);
+        assert_eq!(map[&log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
     }
 
@@ -351,6 +349,21 @@ mod tests {
         assert_eq!(&event.data[..], b"hello world");
         assert_eq!(event.partition_key.len(), 256);
     }
+
+    #[test]
+    fn kinesis_encode_event_apply_rules() {
+        let mut event = Event::from("hello world");
+        event.as_mut_log().insert("key", "some_key");
+
+        let mut encoding: EncodingConfig<_> = Encoding::Json.into();
+        encoding.except_fields = Some(vec![Atom::from("key")]);
+
+        let event = encode_event(event, &Some("key".into()), &encoding).unwrap();
+        let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
+
+        assert_eq!(&event.partition_key, &"some_key".to_string());
+        assert!(!map.contains_key("key"));
+    }
 }
 
 #[cfg(feature = "aws-kinesis-streams-integration-tests")]
@@ -362,7 +375,7 @@ mod integration_tests {
         region::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string},
     };
-    use futures::{compat::Sink01CompatExt, SinkExt};
+    use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
     use rusoto_core::Region;
     use rusoto_kinesis::{Kinesis, KinesisClient};
     use std::sync::Arc;
@@ -400,7 +413,8 @@ mod integration_tests {
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 
-        let (mut input_lines, mut events) = random_lines_with_stream(100, 11);
+        let (mut input_lines, events) = random_lines_with_stream(100, 11);
+        let mut events = events.map(Ok);
 
         let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 

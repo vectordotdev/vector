@@ -28,6 +28,15 @@ pub struct TlsConfig {
     pub options: TlsOptions,
 }
 
+impl TlsConfig {
+    pub fn enabled() -> Self {
+        Self {
+            enabled: Some(true),
+            ..Self::default()
+        }
+    }
+}
+
 /// Standard TLS options
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct TlsOptions {

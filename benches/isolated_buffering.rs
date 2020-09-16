@@ -7,7 +7,7 @@ use futures01::{stream, AsyncSink, Poll, Sink, StartSend, Stream};
 use tempfile::tempdir;
 use vector::{
     buffers::disk::{leveldb_buffer, DiskBuffer},
-    sinks::util::StreamSink,
+    sinks::util::StreamSinkOld,
     test_util::runtime,
     Event,
 };
@@ -134,7 +134,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let (writer, _stream) = rt.block_on(write_handle).unwrap().unwrap();
                     drop(writer);
 
-                    let read_loop = StreamSink::new(NullSink, acker).send_all(reader);
+                    let read_loop = StreamSinkOld::new(NullSink, acker).send_all(reader);
 
                     (rt, read_loop)
                 },
@@ -160,7 +160,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let (writer, reader, acker) =
                         leveldb_buffer::Buffer::build(path, plenty_of_room).unwrap();
 
-                    let read_loop = StreamSink::new(NullSink, acker).send_all(reader);
+                    let read_loop = StreamSinkOld::new(NullSink, acker).send_all(reader);
 
                     (rt, writer, read_loop)
                 },
