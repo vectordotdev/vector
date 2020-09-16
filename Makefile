@@ -834,13 +834,11 @@ package-deb-all: package-deb-x86_64 package-deb-aarch64 ## Build all deb package
 
 .PHONY: package-deb-x86_64
 package-deb-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 deb package
-	@export TARGET="x86_64-unknown-linux-gnu"
-	@scripts/package-deb.sh
+	TARGET="x86_64-unknown-linux-gnu" scripts/package-deb.sh
 
 .PHONY: package-deb-aarch64
 package-deb-aarch64: package-aarch64-unknown-linux-musl  ## Build the aarch64 deb package
-	@export TARGET="aarch64-unknown-linux-musl"
-	@scripts/package-deb.sh
+	TARGET="aarch64-unknown-linux-musl" scripts/package-deb.sh
 
 # rpms
 
@@ -849,11 +847,11 @@ package-rpm-all: package-rpm-x86_64 package-rpm-aarch64 ## Build all rpm package
 
 .PHONY: package-rpm-x86_64
 package-rpm-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
-	$(RUN) package-rpm-x86_64
+	TARGET="x86_64-unknown-linux-gnu" scripts/package-rpm.sh
 
 .PHONY: package-rpm-aarch64
 package-rpm-aarch64: package-aarch64-unknown-linux-musl ## Build the aarch64 rpm package
-	$(RUN) package-rpm-aarch64
+	TARGET="aarch64-unknown-linux-musl" scripts/package-rpm.sh
 
 ##@ Releasing
 

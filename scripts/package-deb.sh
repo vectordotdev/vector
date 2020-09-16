@@ -35,7 +35,22 @@ echo "TARGET: $TARGET"
 # Install dependencies
 #
 
-cargo install cargo-deb --version '^1.24.0'
+if ! [ -x "$(command -v cargo-deb)" ]; then
+  cargo install cargo-deb --version '^1.24.0'
+fi
+
+if ! [ -x "$(command -v cmark-gfm)" ]; then
+  cd /tmp && \
+    git clone https://github.com/github/cmark-gfm && \
+    cd cmark-gfm && \
+    git checkout 0.29.0.gfm.0 && \
+    make
+    make install INSTALL_PREFIX=/usr && \
+    ldconfig && \
+    cd .. && \
+    rm -rf cmark-gfm && \
+    cmark-gfm --version
+fi
 
 #
 # Unarchive

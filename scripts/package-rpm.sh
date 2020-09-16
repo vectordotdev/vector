@@ -39,6 +39,19 @@ if [[ "$UID" == "0" ]]; then
 fi
 
 #
+# Dependencies
+#
+
+
+if ! [ -x "$(command -v rpmbuild)" ]; then
+  if [ -x "$(command -v apt-get)" ]; then
+    sudo apt-get -y -qq update && sudo apt-get -y -qq install rpm
+  else
+    echo "You need to install rpmbuild"
+    exit 1
+fi
+
+#
 # Package
 #
 
