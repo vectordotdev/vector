@@ -195,150 +195,42 @@ fn query_arithmetic_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Functio
     query_arithmetic_boolean_from_pairs(pair.into_inner())
 }
 
-fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
-    match pair.as_rule() {
-        Rule::to_string => {
-            let (first, mut other) = split_inner_rules_from_pair(pair)?;
-            let query = query_arithmetic_from_pair(first)?;
-            let default = other
-                .next()
-                .map(|r| match r.as_rule() {
-                    Rule::string => r
-                        .into_inner()
-                        .next()
-                        .ok_or(TOKEN_ERR)
-                        .map_err(str::to_owned)
-                        .and_then(inner_quoted_string_escaped_from_pair)
-                        .map(Value::from),
-                    Rule::null => Ok(Value::Null),
-                    _ => unreachable!(
-                        "parser should not allow other to_string default arg child rules here"
-                    ),
-                })
-                .transpose()?;
-            Ok(Box::new(ToStringFn::new(query, default)))
-        }
-        Rule::to_int => {
-            let (first, mut other) = split_inner_rules_from_pair(pair)?;
-            let query = query_arithmetic_from_pair(first)?;
-            let default = other.next().map(|r| match r.as_rule() {
-                // TODO: Try parsing directly into int first. Maybe return error
-                // if the string is not a valid int.
-                Rule::number => Value::Integer(r.as_str().parse::<f64>().unwrap() as i64),
-                Rule::null => Value::Null,
-                _ => unreachable!(
-                    "parser should not allow other to_int default arg child rules here"
-                ),
-            });
-            Ok(Box::new(ToIntegerFn::new(query, default)))
-        }
-        Rule::to_float => {
-            let (first, mut other) = split_inner_rules_from_pair(pair)?;
-            let query = query_arithmetic_from_pair(first)?;
-            let default = other.next().map(|r| match r.as_rule() {
-                Rule::number => Value::Float(r.as_str().parse::<f64>().unwrap()),
-                Rule::null => Value::Null,
-                _ => unreachable!(
-                    "parser should not allow other to_float default arg child rules here"
-                ),
-            });
-            Ok(Box::new(ToFloatFn::new(query, default)))
-        }
-        Rule::to_bool => {
-            let (first, mut other) = split_inner_rules_from_pair(pair)?;
-            let query = query_arithmetic_from_pair(first)?;
-            let default = other.next().map(|r| match r.as_rule() {
-                Rule::boolean => Value::Boolean(r.as_str() == "true"),
-                Rule::null => Value::Null,
-                _ => unreachable!(
-                    "parser should not allow other to_bool default arg child rules here"
-                ),
-            });
-            Ok(Box::new(ToBooleanFn::new(query, default)))
-        }
-        Rule::to_timestamp => {
-            let (first, mut other) = split_inner_rules_from_pair(pair)?;
-            let query = query_arithmetic_from_pair(first)?;
-            let default = other
-                .next()
-                .map(|r| match r.as_rule() {
-                    Rule::string => r
-                        .into_inner()
-                        .next()
-                        .ok_or(TOKEN_ERR)
-                        .map_err(str::to_owned)
-                        .and_then(inner_quoted_string_escaped_from_pair)
-                        .map(Value::from),
-                    Rule::number => Ok(Value::Integer(r.as_str().parse::<f64>().unwrap() as i64)),
-                    _ => unreachable!(
-                        "parser should not allow other to_timestamp default arg child rules here"
-                    ),
-                })
-                .transpose()?;
-            Ok(Box::new(ToTimestampFn::new(query, default)))
-        }
-        Rule::parse_timestamp => {
-            let (first, mut other) = split_inner_rules_from_pair(pair)?;
-            let query = query_arithmetic_from_pair(first)?;
-            let format = inner_quoted_string_escaped_from_pair(
-                other
-                    .next()
-                    .ok_or(TOKEN_ERR)?
-                    .into_inner()
-                    .next()
-                    .ok_or(TOKEN_ERR)?,
-            )?;
-            Ok(Box::new(ParseTimestampFn::new(&format, query, None)?))
-        }
-        Rule::upcase => {
-            let pair = pair.into_inner().next().ok_or(TOKEN_ERR)?;
-            let query = query_arithmetic_from_pair(pair)?;
-            Ok(Box::new(UpcaseFn::new(query)))
-        }
-        Rule::downcase => {
-            let pair = pair.into_inner().next().ok_or(TOKEN_ERR)?;
-            let query = query_arithmetic_from_pair(pair)?;
-            Ok(Box::new(DowncaseFn::new(query)))
-        }
-        Rule::uuid_v4 => Ok(Box::new(UuidV4Fn::new())),
-        Rule::sha1 => {
-            let pair = pair.into_inner().next().ok_or(TOKEN_ERR)?;
-            let query = query_arithmetic_from_pair(pair)?;
-            Ok(Box::new(Sha1Fn::new(query)))
-        }
-        Rule::md5 => {
-            let pair = pair.into_inner().next().ok_or(TOKEN_ERR)?;
-            let query = query_arithmetic_from_pair(pair)?;
-            Ok(Box::new(Md5Fn::new(query)))
-        }
-        Rule::now => Ok(Box::new(NowFn::new())),
-        Rule::strip_whitespace => {
-            let param = pair.into_inner().next().ok_or(TOKEN_ERR)?;
-            let query = query_arithmetic_from_pair(param)?;
-            Ok(Box::new(StripWhitespaceFn::new(query)))
-        }
-        Rule::truncate => {
-            let (first, mut other) = split_inner_rules_from_pair(pair)?;
-            let query = query_arithmetic_from_pair(first)?;
-            let limit = query_arithmetic_from_pair(other.next().ok_or(TOKEN_ERR)?)?;
+fn function_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
+    dbg!(&pairs);
 
-            let ellipsis = other.next().map(|r| match r.as_rule() {
-                Rule::boolean => Value::Boolean(r.as_str() == "true"),
-                Rule::null => Value::Null,
-                _ => unreachable!(
-                    "parser should not allow other to_bool default arg child rules here"
-                ),
-            });
+    let function_name = pairs.next().ok_or(TOKEN_ERR)?;
 
-            Ok(Box::new(TruncateFn::new(query, limit, ellipsis)))
-        }
-        Rule::parse_json => {
-            let param = pair.into_inner().next().ok_or(TOKEN_ERR)?;
-            let query = query_arithmetic_from_pair(param)?;
-            Ok(Box::new(ParseJsonFn::new(query)))
-        }
+    let arguments = pairs
+        .filter_map(|pair| match pair.as_rule() {
+            Rule::function_argument => Some(pair.into_inner().next().expect("TODO")),
+            rule => unreachable!(
+                "parser must only support function_argument in function signature: {:?}",
+                rule
+            ),
+        })
+        .map(|pair| match pair.as_rule() {
+            Rule::query_arithmetic_boolean => (None, query_arithmetic_from_pair(pair)),
+            Rule::named_argument => {
+                let mut pairs = pair.into_inner();
+                let name = pairs.next().expect("TODO").as_span().as_str();
+                let pair = pairs.next().expect("TODO");
 
-        _ => unreachable!("parser should not allow other query_function child rules here"),
+                (Some(name), query_arithmetic_from_pair(pair))
+            }
+            rule => unreachable!(
+                "parser must only support query_arithmetic_boolean and named_argument arguments: {:?}",
+                rule
+            ),
+        })
+        .map(|(key, query_result)| match query_result {
+            Ok(query) => Ok((key, query)),
+            Err(err) => Err(err),
+        })
+        .collect::<Result<_>>()?;
+
+    match function_name.as_span().as_str() {
+        "downcase" => Ok(Box::new(DowncaseFn::new(arguments)?)),
+        _ => todo!(),
     }
 }
 
@@ -394,10 +286,11 @@ fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
         }
         Rule::dot_path => Box::new(QueryPath::from(path_segments_from_pair(pair)?)),
         Rule::group => query_arithmetic_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?,
-        Rule::query_function => {
-            query_function_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?
-        }
-        _ => unreachable!("parser should not allow other query child rules here"),
+        Rule::function => function_from_pairs(pair.into_inner())?,
+        rule => unreachable!(
+            "parser should not allow other query child rules here: {:#?}\n\n {:#?}",
+            rule, pair
+        ),
     })
 }
 
@@ -426,7 +319,7 @@ fn merge_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     Ok(Box::new(MergeFn::new(to_path.into(), query2, deep)))
 }
 
-fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
+fn root_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
         Rule::deletion => Ok(Box::new(Deletion::new(paths_from_pair(pair)?))),
         Rule::only_fields => Ok(Box::new(OnlyFields::new(paths_from_pair(pair)?))),
@@ -449,7 +342,7 @@ fn statement_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
             let query = query_arithmetic_from_pair(inner_rules.next().ok_or(TOKEN_ERR)?)?;
             Ok(Box::new(Assignment::new(path, query)))
         }
-        Rule::function => function_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?),
+        Rule::root_function => root_function_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?),
         Rule::if_statement => if_statement_from_pairs(pair.into_inner()),
         _ => unreachable!("parser should not allow other statement child rules here"),
     }
@@ -467,7 +360,7 @@ fn mapping_from_pairs(pairs: Pairs<Rule>) -> Result<Mapping> {
     for pair in pairs {
         match pair.as_rule() {
             // Rules expected at the root of a mapping statement.
-            Rule::assignment | Rule::function | Rule::if_statement => {
+            Rule::assignment | Rule::root_function | Rule::if_statement => {
                 assignments.push(statement_from_pair(pair)?);
             }
             Rule::EOI => (),
@@ -534,7 +427,7 @@ mod tests {
                 "foo = \"bar\"",
                 vec![
                     " 1:1\n",
-                    "= expected if_statement, target_path, or function",
+                    "= expected if_statement, target_path, or root_function",
                 ],
             ),
             (
@@ -554,7 +447,7 @@ mod tests {
                 r#"if .foo { }"#,
                 vec![
                     " 1:11\n",
-                    "= expected if_statement, target_path, or function",
+                    "= expected if_statement, target_path, or root_function",
                 ],
             ),
             (

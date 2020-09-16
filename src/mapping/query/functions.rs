@@ -308,20 +308,53 @@ impl Function for UpcaseFn {
 
 #[derive(Debug)]
 pub(in crate::mapping) struct DowncaseFn {
-    query: Box<dyn Function>,
+    path: Box<dyn Function>,
+    append: Option<Box<dyn Function>>,
 }
 
 impl DowncaseFn {
-    pub(in crate::mapping) fn new(query: Box<dyn Function>) -> Self {
-        Self { query }
+    pub(in crate::mapping) fn new(
+        arguments: Vec<(Option<&str>, Box<dyn Function>)>,
+    ) -> Result<Self> {
+        let mut args = arguments
+            .into_iter()
+            .enumerate()
+            .map(|arg| match arg {
+                (0, (None, query)) => Ok(query),
+                (_, (Some("append"), query)) => Ok(query),
+
+                (i, (None, _)) => Err(format!("unexpected positional argument at {}", i)),
+                (0, (Some(_), _)) => Err("missing positional argument at 0".to_owned()),
+                (_, (Some(key), _)) => Err(format!("unexpected named argument: {}", key)),
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let (append, path) = match args.len() {
+            0 => return Err("missing positional argument at 0".to_owned()),
+            1 => (None, args.remove(0)),
+            2 => (args.pop(), args.remove(0)),
+            _ => unreachable!(),
+        };
+
+        Ok(Self { path, append })
     }
 }
 
 impl Function for DowncaseFn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
-        match self.query.execute(ctx)? {
+        let append = match &self.append {
+            Some(append) => append.execute(ctx)?.to_string_lossy(),
+            None => "".to_owned(),
+        };
+
+        match self.path.execute(ctx)? {
             Value::Bytes(bytes) => Ok(Value::Bytes(
-                String::from_utf8_lossy(&bytes).to_lowercase().into(),
+                format!(
+                    "{}{}",
+                    String::from_utf8_lossy(&bytes).to_lowercase(),
+                    append
+                )
+                .into(),
             )),
             _ => Err(r#"unable to apply "downcase" to non-string types"#.to_string()),
         }
