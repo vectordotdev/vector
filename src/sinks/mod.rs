@@ -1,13 +1,8 @@
 use crate::Event;
-use futures::{
-    compat::{Compat, Future01CompatExt},
-    future::BoxFuture,
-    StreamExt, TryFutureExt,
-};
+use futures::{compat::Sink01CompatExt, future::BoxFuture, StreamExt};
 use snafu::Snafu;
 use std::fmt;
 
-pub mod streaming_sink;
 pub mod util;
 
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
@@ -68,7 +63,8 @@ pub mod statsd;
 pub mod vector;
 
 pub enum VectorSink {
-    Futures01Sink(Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + 'static + Send>),
+    Futures01Sink(Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + Send + 'static>),
+    Stream(Box<dyn util::StreamSink + Send>),
 }
 
 pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
@@ -94,28 +90,22 @@ pub enum HealthcheckError {
 }
 
 impl VectorSink {
-    pub async fn run01<S>(self, input: S) -> Result<(), ()>
+    pub async fn run<S>(mut self, input: S) -> Result<(), ()>
     where
-        S: futures01::Stream<Item = Event, Error = ()>,
+        S: futures::Stream<Item = Event> + Send + 'static,
     {
         match self {
-            Self::Futures01Sink(sink) => input.forward(sink).compat().map_ok(|_| ()).await,
+            Self::Futures01Sink(sink) => input.map(Ok).forward(sink.sink_compat()).await,
+            Self::Stream(ref mut s) => s.run(Box::pin(input)).await,
         }
-    }
-
-    pub async fn run<S>(self, input: S) -> Result<(), ()>
-    where
-        S: futures::Stream<Item = Result<Event, ()>> + Send,
-    {
-        self.run01(Compat::new(input.boxed())).await
     }
 
     pub fn into_futures01sink(
         self,
-    ) -> Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + 'static + Send> {
+    ) -> Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + Send + 'static> {
         match self {
             Self::Futures01Sink(sink) => sink,
-            // _ => panic!("Failed type coercion, {:?} is not a Futures01Sink", self),
+            _ => panic!("Failed type coercion, {:?} is not a Futures01Sink", self),
         }
     }
 }
