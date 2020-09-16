@@ -50,111 +50,111 @@ impl<'a> StatusFieldStatistic<'a> {
         value: &'a str,
     ) -> Option<Result<StatusFieldStatistic<'a>, ParseError>> {
         match key {
-            "ServerUptimeSeconds" => match value.parse() {
-                Ok(value) => Some(Ok(StatusFieldStatistic::ServerUptimeSeconds(value))),
-                Err(err) => Some(Err(ParseError {
+            "ServerUptimeSeconds" => Some(match value.parse() {
+                Ok(value) => Ok(StatusFieldStatistic::ServerUptimeSeconds(value)),
+                Err(err) => Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
-                })),
-            },
-            "Total Accesses" => match value.parse() {
-                Ok(value) => Some(Ok(StatusFieldStatistic::TotalAccesses(value))),
-                Err(err) => Some(Err(ParseError {
+                }),
+            }),
+            "Total Accesses" => Some(match value.parse() {
+                Ok(value) => Ok(StatusFieldStatistic::TotalAccesses(value)),
+                Err(err) => Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
-                })),
-            },
-            "Total kBytes" => match value.parse() {
-                Ok(value) => Some(Ok(StatusFieldStatistic::TotalKBytes(value))),
-                Err(err) => Some(Err(ParseError {
+                }),
+            }),
+            "Total kBytes" => Some(match value.parse() {
+                Ok(value) => Ok(StatusFieldStatistic::TotalKBytes(value)),
+                Err(err) => Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
-                })),
-            },
-            "Total Duration" => match value.parse() {
-                Ok(value) => Some(Ok(StatusFieldStatistic::TotalDuration(value))),
-                Err(err) => Some(Err(ParseError {
+                }),
+            }),
+            "Total Duration" => Some(match value.parse() {
+                Ok(value) => Ok(StatusFieldStatistic::TotalDuration(value)),
+                Err(err) => Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
-                })),
-            },
-            "CPUUser" => match value.parse() {
-                Ok(value) => Some(Ok(StatusFieldStatistic::CPUUser(value))),
-                Err(err) => Some(Err(ParseError {
+                }),
+            }),
+            "CPUUser" => Some(match value.parse() {
+                Ok(value) => Ok(StatusFieldStatistic::CPUUser(value)),
+                Err(err) => Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
-                })),
-            },
-            "CPUSystem" => match value.parse() {
-                Ok(value) => Some(Ok(StatusFieldStatistic::CPUSystem(value))),
-                Err(err) => Some(Err(ParseError {
+                }),
+            }),
+            "CPUSystem" => Some(match value.parse() {
+                Ok(value) => Ok(StatusFieldStatistic::CPUSystem(value)),
+                Err(err) => Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
-                })),
-            },
-            "CPUChildrenUser" => match value.parse() {
-                Ok(value) => Some(Ok(StatusFieldStatistic::CPUChildrenUser(value))),
-                Err(err) => Some(Err(ParseError {
+                }),
+            }),
+            "CPUChildrenUser" => Some(match value.parse() {
+                Ok(value) => Ok(StatusFieldStatistic::CPUChildrenUser(value)),
+                Err(err) => Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
-                })),
-            },
-            "CPUChildrenSystem" => match value.parse() {
-                Ok(value) => Some(Ok(StatusFieldStatistic::CPUChildrenSystem(value))),
-                Err(err) => Some(Err(ParseError {
+                }),
+            }),
+            "CPUChildrenSystem" => Some(match value.parse() {
+                Ok(value) => Ok(StatusFieldStatistic::CPUChildrenSystem(value)),
+                Err(err) => Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
-                })),
-            },
-            "CPULoad" => match value.parse() {
-                Ok(value) => Some(Ok(StatusFieldStatistic::CPULoad(value))),
-                Err(err) => Some(Err(ParseError {
+                }),
+            }),
+            "CPULoad" => Some(match value.parse() {
+                Ok(value) => Ok(StatusFieldStatistic::CPULoad(value)),
+                Err(err) => Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
-                })),
-            },
-            "IdleWorkers" => match value.parse() {
-                Ok(value) => Some(Ok(StatusFieldStatistic::IdleWorkers(value))),
-                Err(err) => Some(Err(ParseError {
+                }),
+            }),
+            "IdleWorkers" => Some(match value.parse() {
+                Ok(value) => Ok(StatusFieldStatistic::IdleWorkers(value)),
+                Err(err) => Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
-                })),
-            },
-            "BusyWorkers" => match value.parse() {
-                Ok(value) => Some(Ok(StatusFieldStatistic::BusyWorkers(value))),
-                Err(err) => Some(Err(ParseError {
+                }),
+            }),
+            "BusyWorkers" => Some(match value.parse() {
+                Ok(value) => Ok(StatusFieldStatistic::BusyWorkers(value)),
+                Err(err) => Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
-                })),
-            },
-            "ConnsTotal" => match value.parse() {
-                Ok(value) => Some(Ok(StatusFieldStatistic::ConnsTotal(value))),
-                Err(err) => Some(Err(ParseError {
+                }),
+            }),
+            "ConnsTotal" => Some(match value.parse() {
+                Ok(value) => Ok(StatusFieldStatistic::ConnsTotal(value)),
+                Err(err) => Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
-                })),
-            },
-            "ConnsAsyncWriting" => match value.parse() {
-                Ok(value) => Some(Ok(StatusFieldStatistic::ConnsAsyncWriting(value))),
-                Err(err) => Some(Err(ParseError {
+                }),
+            }),
+            "ConnsAsyncWriting" => Some(match value.parse() {
+                Ok(value) => Ok(StatusFieldStatistic::ConnsAsyncWriting(value)),
+                Err(err) => Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
-                })),
-            },
-            "ConnsAsyncClosing" => match value.parse() {
-                Ok(value) => Some(Ok(StatusFieldStatistic::ConnsAsyncClosing(value))),
-                Err(err) => Some(Err(ParseError {
+                }),
+            }),
+            "ConnsAsyncClosing" => Some(match value.parse() {
+                Ok(value) => Ok(StatusFieldStatistic::ConnsAsyncClosing(value)),
+                Err(err) => Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
-                })),
-            },
-            "ConnsAsyncKeepAlive" => match value.parse() {
-                Ok(value) => Some(Ok(StatusFieldStatistic::ConnsAsyncKeepAlive(value))),
-                Err(err) => Some(Err(ParseError {
+                }),
+            }),
+            "ConnsAsyncKeepAlive" => Some(match value.parse() {
+                Ok(value) => Ok(StatusFieldStatistic::ConnsAsyncKeepAlive(value)),
+                Err(err) => Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
-                })),
-            },
+                }),
+            }),
             "Scoreboard" => Some(Ok(StatusFieldStatistic::Scoreboard(value))),
 
             _ => None,
