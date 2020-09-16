@@ -12,7 +12,7 @@ mod tests {
     use std::time::Duration;
     use vector::api;
     use vector::config::Config;
-    use vector::test_util::{next_addr, retry_until, wait_for_tcp};
+    use vector::test_util::{next_addr, retry_until};
 
     #[derive(GraphQLQuery)]
     #[graphql(
@@ -138,9 +138,13 @@ mod tests {
         let request_body =
             HeartbeatSubscription::build_query(heartbeat_subscription::Variables { interval: 500 });
 
-        wait_for_tcp(bind).await;
+        let mut client = retry_until(
+            || api::make_subscription_client(bind),
+            Duration::from_millis(50),
+            Duration::from_secs(10),
+        )
+        .await;
 
-        let mut client = api::make_subscription_client(bind).await.unwrap();
         let subscription = client
             .start::<HeartbeatSubscription>(&request_body)
             .await

@@ -34,9 +34,10 @@ impl Payload {
     }
 }
 
-pub struct Subscription {
+pub struct Subscription<T: GraphQLQuery> {
     id: Uuid,
     tx: broadcast::Sender<Payload>,
+    payload: GraphQLQuer,
 }
 
 impl Subscription {
