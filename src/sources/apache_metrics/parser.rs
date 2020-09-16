@@ -3,9 +3,7 @@ use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-use std::error;
-use std::fmt;
-use std::num;
+use std::{error, fmt, iter, num};
 
 lazy_static! {
     static ref SCOREBOARD: HashMap<char, &'static str> = vec![
@@ -162,16 +160,16 @@ pub fn parse(
         .into_iter()
 }
 
-fn line_to_metrics(
+fn line_to_metrics<'a>(
     key: &str,
     value: &str,
-    namespace: &str,
+    namespace: &'a str,
     now: DateTime<Utc>,
-    tags: Option<&BTreeMap<String, String>>,
-) -> Option<Result<Vec<Metric>, ParseError>> {
-    StatusFieldStatistic::from_key_value(key, value).map(|result| {
-        result.map(|statistic| match statistic {
-            StatusFieldStatistic::ServerUptimeSeconds(value) => vec![Metric {
+    tags: Option<&'a BTreeMap<String, String>>,
+) -> Option<Result<Box<dyn Iterator<Item = Metric> + 'a>, ParseError>> {
+    StatusFieldStatistic::from_key_value(key, value).map(move |result| {
+        result.map(move |statistic| match statistic {
+            StatusFieldStatistic::ServerUptimeSeconds(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "uptime_seconds_total"),
                 timestamp: Some(now),
                 tags: tags.map(|tags| tags.clone()),
@@ -179,8 +177,8 @@ fn line_to_metrics(
                 value: MetricValue::Counter {
                     value: value as f64,
                 },
-            }],
-            StatusFieldStatistic::TotalAccesses(value) => vec![Metric {
+            })),
+            StatusFieldStatistic::TotalAccesses(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "access_total"),
                 timestamp: Some(now),
                 tags: tags.map(|tags| tags.clone()),
@@ -188,8 +186,8 @@ fn line_to_metrics(
                 value: MetricValue::Counter {
                     value: value as f64,
                 },
-            }],
-            StatusFieldStatistic::TotalKBytes(value) => vec![Metric {
+            })),
+            StatusFieldStatistic::TotalKBytes(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "sent_bytes_total"),
                 timestamp: Some(now),
                 tags: tags.map(|tags| tags.clone()),
@@ -197,8 +195,8 @@ fn line_to_metrics(
                 value: MetricValue::Counter {
                     value: (value * 1024) as f64,
                 },
-            }],
-            StatusFieldStatistic::TotalDuration(value) => vec![Metric {
+            })),
+            StatusFieldStatistic::TotalDuration(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "duration_seconds_total"),
                 timestamp: Some(now),
                 tags: tags.map(|tags| tags.clone()),
@@ -206,8 +204,8 @@ fn line_to_metrics(
                 value: MetricValue::Counter {
                     value: value as f64,
                 },
-            }],
-            StatusFieldStatistic::CPUUser(value) => vec![Metric {
+            })),
+            StatusFieldStatistic::CPUUser(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "cpu_seconds_total"),
                 timestamp: Some(now),
                 tags: {
@@ -217,8 +215,9 @@ fn line_to_metrics(
                 },
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value },
-            }],
-            StatusFieldStatistic::CPUSystem(value) => vec![Metric {
+            }))
+                as Box<dyn Iterator<Item = Metric>>,
+            StatusFieldStatistic::CPUSystem(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "cpu_seconds_total"),
                 timestamp: Some(now),
                 tags: {
@@ -228,8 +227,9 @@ fn line_to_metrics(
                 },
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value },
-            }],
-            StatusFieldStatistic::CPUChildrenUser(value) => vec![Metric {
+            }))
+                as Box<dyn Iterator<Item = Metric>>,
+            StatusFieldStatistic::CPUChildrenUser(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "cpu_seconds_total"),
                 timestamp: Some(now),
                 tags: {
@@ -239,8 +239,9 @@ fn line_to_metrics(
                 },
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value },
-            }],
-            StatusFieldStatistic::CPUChildrenSystem(value) => vec![Metric {
+            }))
+                as Box<dyn Iterator<Item = Metric>>,
+            StatusFieldStatistic::CPUChildrenSystem(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "cpu_seconds_total"),
                 timestamp: Some(now),
                 tags: {
@@ -250,15 +251,17 @@ fn line_to_metrics(
                 },
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value },
-            }],
-            StatusFieldStatistic::CPULoad(value) => vec![Metric {
+            }))
+                as Box<dyn Iterator<Item = Metric>>,
+            StatusFieldStatistic::CPULoad(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "cpu_load"),
                 timestamp: Some(now),
                 tags: tags.map(|tags| tags.clone()),
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value },
-            }],
-            StatusFieldStatistic::IdleWorkers(value) => vec![Metric {
+            }))
+                as Box<dyn Iterator<Item = Metric>>,
+            StatusFieldStatistic::IdleWorkers(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "workers"),
                 timestamp: Some(now),
                 tags: {
@@ -270,8 +273,9 @@ fn line_to_metrics(
                 value: MetricValue::Gauge {
                     value: value as f64,
                 },
-            }],
-            StatusFieldStatistic::BusyWorkers(value) => vec![Metric {
+            }))
+                as Box<dyn Iterator<Item = Metric>>,
+            StatusFieldStatistic::BusyWorkers(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "workers"),
                 timestamp: Some(now),
                 tags: {
@@ -283,8 +287,8 @@ fn line_to_metrics(
                 value: MetricValue::Gauge {
                     value: value as f64,
                 },
-            }],
-            StatusFieldStatistic::ConnsTotal(value) => vec![Metric {
+            })),
+            StatusFieldStatistic::ConnsTotal(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "connections"),
                 timestamp: Some(now),
                 tags: {
@@ -296,8 +300,8 @@ fn line_to_metrics(
                 value: MetricValue::Gauge {
                     value: value as f64,
                 },
-            }],
-            StatusFieldStatistic::ConnsAsyncWriting(value) => vec![Metric {
+            })),
+            StatusFieldStatistic::ConnsAsyncWriting(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "connections"),
                 timestamp: Some(now),
                 tags: {
@@ -309,8 +313,8 @@ fn line_to_metrics(
                 value: MetricValue::Gauge {
                     value: value as f64,
                 },
-            }],
-            StatusFieldStatistic::ConnsAsyncClosing(value) => vec![Metric {
+            })),
+            StatusFieldStatistic::ConnsAsyncClosing(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "connections"),
                 timestamp: Some(now),
                 tags: {
@@ -322,8 +326,8 @@ fn line_to_metrics(
                 value: MetricValue::Gauge {
                     value: value as f64,
                 },
-            }],
-            StatusFieldStatistic::ConnsAsyncKeepAlive(value) => vec![Metric {
+            })),
+            StatusFieldStatistic::ConnsAsyncKeepAlive(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "connections"),
                 timestamp: Some(now),
                 tags: {
@@ -335,25 +339,22 @@ fn line_to_metrics(
                 value: MetricValue::Gauge {
                     value: value as f64,
                 },
-            }],
+            })),
             StatusFieldStatistic::Scoreboard(value) => {
                 let scores = value.chars().fold(HashMap::new(), |mut m, c| {
                     *m.entry(c).or_insert(0u32) += 1;
                     m
                 });
 
-                SCOREBOARD
-                    .iter()
-                    .map(|(c, name)| {
-                        score_to_metric(
-                            namespace,
-                            now,
-                            tags,
-                            name,
-                            scores.get(c).copied().unwrap_or_default(),
-                        )
-                    })
-                    .collect::<Vec<_>>()
+                Box::new(SCOREBOARD.iter().map(move |(c, name)| {
+                    score_to_metric(
+                        namespace,
+                        now,
+                        tags,
+                        name,
+                        scores.get(c).copied().unwrap_or_default(),
+                    )
+                })) as Box<dyn Iterator<Item = Metric>>
             }
         })
     })
