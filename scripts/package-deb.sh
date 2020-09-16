@@ -45,8 +45,8 @@ if ! [ -x "$(command -v cmark-gfm)" ]; then
     cd cmark-gfm && \
     git checkout 0.29.0.gfm.0 && \
     make
-    make install INSTALL_PREFIX=/usr && \
-    ldconfig && \
+    sudo make install INSTALL_PREFIX=/usr && \
+    sudo ldconfig && \
     cd .. && \
     rm -rf cmark-gfm && \
     cmark-gfm --version
