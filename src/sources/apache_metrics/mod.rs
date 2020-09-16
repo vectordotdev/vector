@@ -88,7 +88,7 @@ fn apache_metrics(
         .sink_compat();
     let task = tokio::time::interval(Duration::from_secs(interval))
         .take_until(shutdown.compat())
-        .map(move |_| stream::iter(urls.clone())) // TODO remove clone?
+        .map(move |_| stream::iter(urls.clone()))
         .flatten()
         .map(move |url| {
             let https = HttpsConnector::new().expect("TLS initialization failed");
@@ -105,7 +105,7 @@ fn apache_metrics(
             }
 
             let start = Instant::now();
-            let namespace = namespace.clone(); // TODO remove?
+            let namespace = namespace.clone();
             client
                 .request(request)
                 .and_then(|response| async {
