@@ -26,21 +26,21 @@ lazy_static! {
 
 /// enum of mod_status fields we care about
 enum StatusFieldStatistic<'a> {
-    ServerUptimeSeconds(f64),
-    TotalAccesses(f64),
-    TotalKBytes(f64),
-    TotalDuration(f64),
+    ServerUptimeSeconds(u64),
+    TotalAccesses(u64),
+    TotalKBytes(u64),
+    TotalDuration(u64),
     CPUUser(f64),
     CPUSystem(f64),
     CPUChildrenUser(f64),
     CPUChildrenSystem(f64),
     CPULoad(f64),
-    IdleWorkers(f64),
-    BusyWorkers(f64),
-    ConnsTotal(f64),
-    ConnsAsyncWriting(f64),
-    ConnsAsyncKeepAlive(f64),
-    ConnsAsyncClosing(f64),
+    IdleWorkers(u64),
+    BusyWorkers(u64),
+    ConnsTotal(u64),
+    ConnsAsyncWriting(u64),
+    ConnsAsyncKeepAlive(u64),
+    ConnsAsyncClosing(u64),
     Scoreboard(&'a str),
 }
 
@@ -50,105 +50,105 @@ impl<'a> StatusFieldStatistic<'a> {
         value: &'a str,
     ) -> Option<Result<StatusFieldStatistic<'a>, ParseError>> {
         match key {
-            "ServerUptimeSeconds" => match value.parse::<f64>() {
+            "ServerUptimeSeconds" => match value.parse() {
                 Ok(value) => Some(Ok(StatusFieldStatistic::ServerUptimeSeconds(value))),
                 Err(err) => Some(Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
                 })),
             },
-            "Total Accesses" => match value.parse::<f64>() {
+            "Total Accesses" => match value.parse() {
                 Ok(value) => Some(Ok(StatusFieldStatistic::TotalAccesses(value))),
                 Err(err) => Some(Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
                 })),
             },
-            "Total kBytes" => match value.parse::<f64>() {
+            "Total kBytes" => match value.parse() {
                 Ok(value) => Some(Ok(StatusFieldStatistic::TotalKBytes(value))),
                 Err(err) => Some(Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
                 })),
             },
-            "Total Duration" => match value.parse::<f64>() {
+            "Total Duration" => match value.parse() {
                 Ok(value) => Some(Ok(StatusFieldStatistic::TotalDuration(value))),
                 Err(err) => Some(Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
                 })),
             },
-            "CPUUser" => match value.parse::<f64>() {
+            "CPUUser" => match value.parse() {
                 Ok(value) => Some(Ok(StatusFieldStatistic::CPUUser(value))),
                 Err(err) => Some(Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
                 })),
             },
-            "CPUSystem" => match value.parse::<f64>() {
+            "CPUSystem" => match value.parse() {
                 Ok(value) => Some(Ok(StatusFieldStatistic::CPUSystem(value))),
                 Err(err) => Some(Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
                 })),
             },
-            "CPUChildrenUser" => match value.parse::<f64>() {
+            "CPUChildrenUser" => match value.parse() {
                 Ok(value) => Some(Ok(StatusFieldStatistic::CPUChildrenUser(value))),
                 Err(err) => Some(Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
                 })),
             },
-            "CPUChildrenSystem" => match value.parse::<f64>() {
+            "CPUChildrenSystem" => match value.parse() {
                 Ok(value) => Some(Ok(StatusFieldStatistic::CPUChildrenSystem(value))),
                 Err(err) => Some(Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
                 })),
             },
-            "CPULoad" => match value.parse::<f64>() {
+            "CPULoad" => match value.parse() {
                 Ok(value) => Some(Ok(StatusFieldStatistic::CPULoad(value))),
                 Err(err) => Some(Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
                 })),
             },
-            "IdleWorkers" => match value.parse::<f64>() {
+            "IdleWorkers" => match value.parse() {
                 Ok(value) => Some(Ok(StatusFieldStatistic::IdleWorkers(value))),
                 Err(err) => Some(Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
                 })),
             },
-            "BusyWorkers" => match value.parse::<f64>() {
+            "BusyWorkers" => match value.parse() {
                 Ok(value) => Some(Ok(StatusFieldStatistic::BusyWorkers(value))),
                 Err(err) => Some(Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
                 })),
             },
-            "ConnsTotal" => match value.parse::<f64>() {
+            "ConnsTotal" => match value.parse() {
                 Ok(value) => Some(Ok(StatusFieldStatistic::ConnsTotal(value))),
                 Err(err) => Some(Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
                 })),
             },
-            "ConnsAsyncWriting" => match value.parse::<f64>() {
+            "ConnsAsyncWriting" => match value.parse() {
                 Ok(value) => Some(Ok(StatusFieldStatistic::ConnsAsyncWriting(value))),
                 Err(err) => Some(Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
                 })),
             },
-            "ConnsAsyncClosing" => match value.parse::<f64>() {
+            "ConnsAsyncClosing" => match value.parse() {
                 Ok(value) => Some(Ok(StatusFieldStatistic::ConnsAsyncClosing(value))),
                 Err(err) => Some(Err(ParseError {
                     key: key.to_string(),
                     err: err.into(),
                 })),
             },
-            "ConnsAsyncKeepAlive" => match value.parse::<f64>() {
+            "ConnsAsyncKeepAlive" => match value.parse() {
                 Ok(value) => Some(Ok(StatusFieldStatistic::ConnsAsyncKeepAlive(value))),
                 Err(err) => Some(Err(ParseError {
                     key: key.to_string(),
@@ -241,14 +241,18 @@ fn line_to_metrics(
                 timestamp: Some(now),
                 tags: tags.map(|tags| tags.clone()),
                 kind: MetricKind::Absolute,
-                value: MetricValue::Counter { value },
+                value: MetricValue::Counter {
+                    value: value as f64,
+                },
             }],
             StatusFieldStatistic::TotalAccesses(value) => vec![Metric {
                 name: encode_namespace(namespace, "access_total"),
                 timestamp: Some(now),
                 tags: tags.map(|tags| tags.clone()),
                 kind: MetricKind::Absolute,
-                value: MetricValue::Counter { value },
+                value: MetricValue::Counter {
+                    value: value as f64,
+                },
             }],
             StatusFieldStatistic::TotalKBytes(value) => vec![Metric {
                 name: encode_namespace(namespace, "sent_bytes_total"),
@@ -256,7 +260,7 @@ fn line_to_metrics(
                 tags: tags.map(|tags| tags.clone()),
                 kind: MetricKind::Absolute,
                 value: MetricValue::Counter {
-                    value: value * 1024.0,
+                    value: (value * 1024) as f64,
                 },
             }],
             StatusFieldStatistic::TotalDuration(value) => vec![Metric {
@@ -264,7 +268,9 @@ fn line_to_metrics(
                 timestamp: Some(now),
                 tags: tags.map(|tags| tags.clone()),
                 kind: MetricKind::Absolute,
-                value: MetricValue::Counter { value },
+                value: MetricValue::Counter {
+                    value: value as f64,
+                },
             }],
             StatusFieldStatistic::CPUUser(value) => vec![Metric {
                 name: encode_namespace(namespace, "cpu_seconds_total"),
@@ -326,7 +332,9 @@ fn line_to_metrics(
                     Some(tags)
                 },
                 kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value },
+                value: MetricValue::Gauge {
+                    value: value as f64,
+                },
             }],
             StatusFieldStatistic::BusyWorkers(value) => vec![Metric {
                 name: encode_namespace(namespace, "workers"),
@@ -337,7 +345,9 @@ fn line_to_metrics(
                     Some(tags)
                 },
                 kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value },
+                value: MetricValue::Gauge {
+                    value: value as f64,
+                },
             }],
             StatusFieldStatistic::ConnsTotal(value) => vec![Metric {
                 name: encode_namespace(namespace, "connections"),
@@ -348,7 +358,9 @@ fn line_to_metrics(
                     Some(tags)
                 },
                 kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value },
+                value: MetricValue::Gauge {
+                    value: value as f64,
+                },
             }],
             StatusFieldStatistic::ConnsAsyncWriting(value) => vec![Metric {
                 name: encode_namespace(namespace, "connections"),
@@ -359,7 +371,9 @@ fn line_to_metrics(
                     Some(tags)
                 },
                 kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value },
+                value: MetricValue::Gauge {
+                    value: value as f64,
+                },
             }],
             StatusFieldStatistic::ConnsAsyncClosing(value) => vec![Metric {
                 name: encode_namespace(namespace, "connections"),
@@ -370,7 +384,9 @@ fn line_to_metrics(
                     Some(tags)
                 },
                 kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value },
+                value: MetricValue::Gauge {
+                    value: value as f64,
+                },
             }],
             StatusFieldStatistic::ConnsAsyncKeepAlive(value) => vec![Metric {
                 name: encode_namespace(namespace, "connections"),
@@ -381,7 +397,9 @@ fn line_to_metrics(
                     Some(tags)
                 },
                 kind: MetricKind::Absolute,
-                value: MetricValue::Gauge { value },
+                value: MetricValue::Gauge {
+                    value: value as f64,
+                },
             }],
             StatusFieldStatistic::Scoreboard(value) => {
                 let scores = value.chars().fold(HashMap::new(), |mut m, c| {
