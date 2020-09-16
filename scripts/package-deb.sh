@@ -32,6 +32,12 @@ echo "Packaging .deb for $ARCHIVE_NAME"
 echo "TARGET: $TARGET"
 
 #
+# Install dependencies
+#
+
+cargo install cargo-deb --version '^1.24.0'
+
+#
 # Unarchive
 #
 
