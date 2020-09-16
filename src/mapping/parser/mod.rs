@@ -901,7 +901,7 @@ mod tests {
                     "baz".to_string(),
                 ]))]),
             ),
-            // function: string
+            // function: to_string
             (
                 ".foo = to_string(.foo, \"bar\")",
                 Mapping::new(vec![Box::new(Assignment::new(
