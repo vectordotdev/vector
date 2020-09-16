@@ -26,7 +26,7 @@ pub(crate) struct SocketEventReceived {
 
 impl InternalEvent for SocketEventReceived {
     fn emit_logs(&self) {
-        trace!(message = "received one event.", byte_size = %self.byte_size, mode = self.mode.as_str());
+        trace!(message = "Received one event.", byte_size = %self.byte_size, mode = self.mode.as_str());
     }
 
     fn emit_metrics(&self) {
@@ -51,7 +51,7 @@ pub(crate) struct SocketReceiveError {
 
 impl InternalEvent for SocketReceiveError {
     fn emit_logs(&self) {
-        error!(message = "error receiving data.", error = %self.error, mode = %self.mode.as_str());
+        error!(message = "Error receiving data.", error = %self.error, mode = %self.mode.as_str());
     }
 
     fn emit_metrics(&self) {

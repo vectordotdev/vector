@@ -1,6 +1,6 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{self, Event, LogEvent, Value},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    event::{Event, LogEvent, Value},
     internal_events::{
         SplunkEventEncodeError, SplunkEventSent, SplunkSourceMissingKeys,
         SplunkSourceTypeMissingKeys,
@@ -76,7 +76,7 @@ pub enum Encoding {
 }
 
 fn default_host_key() -> Atom {
-    event::LogSchema::default().host_key().clone()
+    crate::config::LogSchema::default().host_key().clone()
 }
 
 inventory::submit! {
@@ -128,9 +128,7 @@ impl HttpSink for HecSinkConfig {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-        self.encoding.apply_rules(&mut event);
-
+    fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let sourcetype = self.sourcetype.as_ref().and_then(|sourcetype| {
             sourcetype
                 .render_string(&event)
@@ -153,7 +151,7 @@ impl HttpSink for HecSinkConfig {
 
         let host = event.get(&self.host_key).cloned();
 
-        let timestamp = match event.remove(&event::log_schema().timestamp_key()) {
+        let timestamp = match event.remove(&log_schema().timestamp_key()) {
             Some(Value::Timestamp(ts)) => ts,
             _ => chrono::Utc::now(),
         };
@@ -165,10 +163,14 @@ impl HttpSink for HecSinkConfig {
             .filter_map(|field| event.get(field).map(|value| (field, value.clone())))
             .collect::<LogEvent>();
 
+        let mut event = Event::Log(event);
+        self.encoding.apply_rules(&mut event);
+        let event = event.into_log();
+
         let event = match self.encoding.codec() {
             Encoding::Json => json!(event),
             Encoding::Text => json!(event
-                .get(&event::log_schema().message_key())
+                .get(&log_schema().message_key())
                 .map(|v| v.to_string_lossy())
                 .unwrap_or_else(|| "".into())),
         };
@@ -279,6 +281,7 @@ mod tests {
         time: f64,
         event: BTreeMap<String, String>,
         fields: BTreeMap<String, String>,
+        source: Option<String>,
     }
 
     #[derive(Deserialize, Debug)]
@@ -292,6 +295,7 @@ mod tests {
     fn splunk_encode_event_json() {
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("key", "value");
+        event.as_mut_log().insert("magic", "vector");
 
         let (config, _cx) = load_sink::<HecSinkConfig>(
             r#"
@@ -299,9 +303,11 @@ mod tests {
             token = "alksjdfo"
             host_key = "host"
             indexed_fields = ["key"]
+            source = "{{ magic }}"
 
             [encoding]
             codec = "json"
+            except_fields = ["magic"]
         "#,
         )
         .unwrap();
@@ -315,12 +321,15 @@ mod tests {
 
         assert_eq!(kv, &"value".to_string());
         assert_eq!(
-            event[&event::log_schema().message_key().to_string()],
+            event[&log_schema().message_key().to_string()],
             "hello world".to_string()
         );
         assert!(event
-            .get(&event::log_schema().timestamp_key().to_string())
+            .get(&log_schema().timestamp_key().to_string())
             .is_none());
+
+        assert!(!event.contains_key("magic"));
+        assert_eq!(hec_event.source, Some("vector".to_string()));
 
         assert_eq!(
             hec_event.fields.get("key").map(|s| s.as_str()),
@@ -438,7 +447,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.run(stream::once(future::ok(event))).await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -457,7 +466,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.run(stream::once(future::ok(event))).await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -474,7 +483,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.run(stream::once(future::ok(event))).await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -522,7 +531,7 @@ mod integration_tests {
         let message = random_string(100);
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
-        sink.run(stream::once(future::ok(event))).await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -543,7 +552,7 @@ mod integration_tests {
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
         event.as_mut_log().insert("host", "example.com:1234");
-        sink.run(stream::once(future::ok(event))).await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -567,7 +576,7 @@ mod integration_tests {
         let message = random_string(100);
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
-        sink.run(stream::once(future::ok(event))).await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -594,7 +603,7 @@ mod integration_tests {
         event.as_mut_log().insert("asdf", "hello");
         event.as_mut_log().insert("host", "example.com:1234");
         event.as_mut_log().insert("roast", "beef.example.com:1234");
-        sink.run(stream::once(future::ok(event))).await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 

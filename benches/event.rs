@@ -2,7 +2,8 @@ use bytes::Bytes;
 use criterion::{criterion_group, Criterion};
 use serde_json::{json, Value};
 use vector::{
-    event::{self, Event, LogEvent},
+    config::log_schema,
+    event::{Event, LogEvent},
     transforms::{
         json_parser::{JsonParser, JsonParserConfig},
         Transform,
@@ -88,7 +89,7 @@ fn create_event(json: Value) -> LogEvent {
     let mut event = Event::new_empty_log();
     event
         .as_mut_log()
-        .insert(event::log_schema().message_key().clone(), s);
+        .insert(log_schema().message_key().clone(), s);
 
     let mut parser = JsonParser::from(JsonParserConfig::default());
     parser.transform(event).unwrap().into_log()

@@ -237,8 +237,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::{SinkConfig, SinkContext},
-        event,
+        config::{log_schema, SinkConfig, SinkContext},
         event::Event,
         sinks::util::encoding::TimestampFormat,
         test_util::{random_string, trace_init},
@@ -279,7 +278,7 @@ mod integration_tests {
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.run(stream::once(future::ok(input_event.clone())))
+        sink.run(stream::once(future::ready(input_event.clone())))
             .await
             .unwrap();
 
@@ -328,7 +327,7 @@ mod integration_tests {
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.run(stream::once(future::ok(input_event.clone())))
+        sink.run(stream::once(future::ready(input_event.clone())))
             .await
             .unwrap();
 
@@ -337,11 +336,11 @@ mod integration_tests {
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            event::log_schema().timestamp_key().clone(),
+            log_schema().timestamp_key().clone(),
             format!(
                 "{}",
                 exp_event
-                    .get(&event::log_schema().timestamp_key())
+                    .get(&log_schema().timestamp_key())
                     .unwrap()
                     .as_timestamp()
                     .unwrap()
@@ -388,7 +387,7 @@ timestamp_format = "unix""#,
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.run(stream::once(future::ok(input_event.clone())))
+        sink.run(stream::once(future::ready(input_event.clone())))
             .await
             .unwrap();
 
@@ -397,11 +396,11 @@ timestamp_format = "unix""#,
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            event::log_schema().timestamp_key().clone(),
+            log_schema().timestamp_key().clone(),
             format!(
                 "{}",
                 exp_event
-                    .get(&event::log_schema().timestamp_key())
+                    .get(&log_schema().timestamp_key())
                     .unwrap()
                     .as_timestamp()
                     .unwrap()
@@ -447,7 +446,7 @@ timestamp_format = "unix""#,
         // this timeout should trigger.
         timeout(
             Duration::from_secs(5),
-            sink.run(stream::once(future::ok(input_event))),
+            sink.run(stream::once(future::ready(input_event))),
         )
         .await
         .unwrap()

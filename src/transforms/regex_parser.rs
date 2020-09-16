@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{self, Event, Value},
+    event::{Event, Value},
     internal_events::{
         RegexParserConversionFailed, RegexParserEventProcessed, RegexParserFailedMatch,
         RegexParserMissingField, RegexParserTargetExists,
@@ -136,7 +136,7 @@ impl RegexParser {
         let field = config
             .field
             .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+            .unwrap_or(&crate::config::log_schema().message_key());
 
         let patterns = match (&config.regex, &config.patterns.len()) {
             (None, 0) => {

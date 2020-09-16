@@ -37,3 +37,12 @@ common = true
 required = true
 examples = ["logs.papertrailapp.com:12345"]
 description = "The endpoint to stream logs to."
+
+<%= render(
+  "_partials/fields/_tls_connector_options.toml",
+  namespace: "sinks.papertrail.options",
+  can_enable: true,
+  enabled_default: true,
+  can_verify_certificate: true,
+  can_verify_hostname: true
+) %>

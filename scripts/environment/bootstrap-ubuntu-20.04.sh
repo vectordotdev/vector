@@ -3,12 +3,12 @@ set -e -o verbose
 
 export DEBIAN_FRONTEND=noninteractive
 
-apt update --yes
-apt upgrade --yes
+apt update -y -qq
 
 # Deps
 apt install --yes \
     build-essential \
+    cmake \
     pkg-config \
     libssl-dev \
     python3-pip \
@@ -25,7 +25,8 @@ apt install --yes \
     ruby-bundler \
     libsasl2-dev \
     gnupg2 \
-    wget
+    wget \
+    gawk
 
 # Grease
 # Grease is used for the `make release-github` task.
@@ -55,3 +56,6 @@ add-apt-repository \
 # Install those new things
 apt update --yes
 apt install --yes yarn docker-ce docker-ce-cli containerd.io
+
+# Apt cleanup
+apt clean

@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
-    event::{self, Event},
+    event::Event,
     internal_events::BlackholeEventReceived,
 };
 use futures::{future, FutureExt};
@@ -61,7 +61,7 @@ impl Sink for BlackholeSink {
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let message_len = match item {
             Event::Log(log) => log
-                .get(&event::log_schema().message_key())
+                .get(&crate::config::log_schema().message_key())
                 .map(|v| v.as_bytes().len())
                 .unwrap_or(0),
             Event::Metric(metric) => serde_json::to_string(&metric).map(|v| v.len()).unwrap_or(0),
@@ -95,14 +95,15 @@ impl Sink for BlackholeSink {
 mod tests {
     use super::*;
     use crate::{buffers::Acker, test_util::random_events_with_stream};
-    use futures::{compat::Sink01CompatExt, SinkExt};
+    use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
 
     #[tokio::test]
     async fn blackhole() {
         let config = BlackholeConfig { print_amount: 10 };
         let sink = BlackholeSink::new(config, Acker::Null);
 
-        let (_input_lines, mut events) = random_events_with_stream(100, 10);
+        let (_input_lines, events) = random_events_with_stream(100, 10);
+        let mut events = events.map(Ok);
 
         let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
     }

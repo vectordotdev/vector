@@ -9,7 +9,7 @@ pub struct Heartbeat {
 
 impl InternalEvent for Heartbeat {
     fn emit_logs(&self) {
-        trace!(target: "vector", message = "beep.");
+        trace!(target: "vector", message = "Beep.");
     }
 
     fn emit_metrics(&self) {
