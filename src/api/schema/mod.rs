@@ -1,3 +1,4 @@
+pub mod client;
 mod health;
 mod metrics;
 

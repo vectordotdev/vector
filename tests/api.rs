@@ -7,12 +7,14 @@ mod support;
 #[cfg(feature = "api")]
 mod tests {
     use crate::support::{sink, source};
+    use futures::{SinkExt, StreamExt};
     use graphql_client::*;
+    use serde_json::json;
     use std::time::Duration;
+    use tokio_tungstenite::{connect_async, tungstenite::Message};
     use vector::api;
     use vector::config::Config;
-    use vector::test_util::{next_addr, retry_until};
-    use websocket;
+    use vector::test_util::{next_addr, retry_until, wait_for_tcp};
 
     #[derive(GraphQLQuery)]
     #[graphql(
@@ -73,7 +75,7 @@ mod tests {
         let server = api::Server::start(config.api);
         let client = reqwest::Client::new();
 
-        let res = retry_until(
+        retry_until(
             || client.post(&url).json(&request_body).send(),
             Duration::from_millis(100),
             Duration::from_secs(10),
@@ -81,9 +83,7 @@ mod tests {
         .await
         .json()
         .await
-        .unwrap();
-
-        res
+        .unwrap()
     }
 
     #[tokio::test]
@@ -137,16 +137,17 @@ mod tests {
         let server = api::Server::start(config.api);
         let bind = config.api.bind.unwrap();
 
-        let url = &*format!("ws://{}:{}/graphql", bind.ip(), bind.port());
-
-        let (rx, mut tx) = websocket::ClientBuilder::new(url)
-            .unwrap()
-            .connect_insecure()
-            .unwrap()
-            .split()
-            .unwrap();
-
         let request_body =
             HeartbeatSubscription::build_query(heartbeat_subscription::Variables { interval: 500 });
+
+        wait_for_tcp(bind).await;
+
+        let mut client = api::make_subscription_client(bind).await.unwrap();
+        let subscription = client
+            .start::<HeartbeatSubscription>(&request_body)
+            .await
+            .unwrap();
+
+        println!("got here");
     }
 }
