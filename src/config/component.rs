@@ -62,7 +62,7 @@ where
         inventory::iter::<ComponentDescription<T>>
             .into_iter()
             .find(|t| t.type_str == type_str)
-            .ok_or(ExampleError::DoesNotExist {
+            .ok_or_else(|| ExampleError::DoesNotExist {
                 type_str: type_str.to_owned(),
             })
             .and_then(|t| (t.example_value)().ok_or(ExampleError::MissingExample))
