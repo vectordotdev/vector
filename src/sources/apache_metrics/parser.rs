@@ -410,10 +410,9 @@ fn score_to_metric(
 }
 
 fn encode_namespace(namespace: &str, name: &str) -> String {
-    if namespace.is_empty() {
-        name.to_string()
-    } else {
-        format!("{}_{}", namespace, name)
+    match namespace {
+        "" => name.to_string(),
+        _ => format!("{}_{}", namespace, name),
     }
 }
 
