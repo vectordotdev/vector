@@ -4,13 +4,12 @@ use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     SinkExt, StreamExt,
 };
-use prost::Message;
 use tempfile::tempdir;
 use tokio::runtime::Runtime;
 use tracing::trace;
 use vector::{
     buffers::BufferConfig,
-    config, event,
+    config,
     test_util::{
         random_events_with_stream, runtime, start_topology, trace_init, wait_for_atomic_usize,
         CountReceiver,
