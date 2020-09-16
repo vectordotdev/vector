@@ -3,8 +3,9 @@ use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-use std::error::Error;
+use std::error;
 use std::fmt;
+use std::num;
 
 lazy_static! {
     static ref SCOREBOARD: HashMap<char, &'static str> = vec![
@@ -159,24 +160,6 @@ pub fn parse(
             acc
         })
         .into_iter()
-}
-
-#[derive(Debug)]
-pub struct ParseError {
-    key: String,
-    err: Box<dyn Error>,
-}
-
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "could not parse value for {}: {}", self.key, self.err)
-    }
-}
-
-impl Error for ParseError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        Some(self.err.as_ref())
-    }
 }
 
 fn line_to_metrics(
@@ -378,7 +361,7 @@ fn line_to_metrics(
 
 fn parse_numeric_value<T: std::str::FromStr>(key: &str, value: &str) -> Result<T, ParseError>
 where
-    <T as std::str::FromStr>::Err: std::error::Error,
+    <T as std::str::FromStr>::Err: Into<ValueParseError>,
     <T as std::str::FromStr>::Err: 'static,
 {
     value.parse::<T>().map_err(|err| ParseError {
@@ -413,6 +396,60 @@ fn encode_namespace(namespace: &str, name: &str) -> String {
     match namespace {
         "" => name.to_string(),
         _ => format!("{}_{}", namespace, name),
+    }
+}
+
+#[derive(Debug)]
+enum ValueParseError {
+    Float(num::ParseFloatError),
+    Int(num::ParseIntError),
+}
+
+impl From<num::ParseFloatError> for ValueParseError {
+    fn from(err: num::ParseFloatError) -> ValueParseError {
+        ValueParseError::Float(err)
+    }
+}
+
+impl From<num::ParseIntError> for ValueParseError {
+    fn from(err: num::ParseIntError) -> ValueParseError {
+        ValueParseError::Int(err)
+    }
+}
+
+impl error::Error for ValueParseError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match *self {
+            ValueParseError::Float(ref e) => Some(e),
+            ValueParseError::Int(ref e) => Some(e),
+        }
+    }
+}
+
+impl fmt::Display for ValueParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            ValueParseError::Float(ref e) => e.fmt(f),
+            ValueParseError::Int(ref e) => e.fmt(f),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ParseError {
+    key: String,
+    err: ValueParseError,
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "could not parse value for {}: {}", self.key, self.err)
+    }
+}
+
+impl error::Error for ParseError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        Some(&self.err)
     }
 }
 
