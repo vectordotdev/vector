@@ -8,6 +8,8 @@ mod apache_metrics;
 #[cfg(feature = "api")]
 mod api;
 mod auto_concurrency;
+#[cfg(feature = "sources-aws_kinesis_firehose")]
+mod aws_kinesis_firehose;
 mod aws_kinesis_streams;
 mod blackhole;
 #[cfg(feature = "transforms-coercer")]
@@ -88,6 +90,8 @@ pub use self::apache_metrics::*;
 #[cfg(feature = "api")]
 pub use self::api::*;
 pub use self::auto_concurrency::*;
+#[cfg(feature = "sources-aws_kinesis_firehose")]
+pub use self::aws_kinesis_firehose::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
 #[cfg(feature = "transforms-coercer")]
