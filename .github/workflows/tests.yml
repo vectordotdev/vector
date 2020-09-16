@@ -57,7 +57,7 @@ jobs:
 
   test-linux:
     name: Unit - x86_64-unknown-linux-gnu
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
@@ -77,7 +77,7 @@ jobs:
   # https://github.com/timberio/vector/issues/3771
   build-x86_64-unknown-linux-gnu:
     name: Unit - x86_64-unknown-linux-gnu
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
@@ -97,7 +97,7 @@ jobs:
   # https://github.com/timberio/vector/issues/3771
   build-aarch64-unknown-linux-gnu:
     name: Unit - aarch64-unknown-linux-gnu
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
@@ -150,7 +150,7 @@ jobs:
 
   test-misc:
     name: Shutdown - Linux
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
@@ -170,7 +170,7 @@ jobs:
 
   test-integration-aws:
     name: Integration - Linux, AWS
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
@@ -188,7 +188,7 @@ jobs:
 
   test-integration-clickhouse:
     name: Integration - Linux, Clickhouse
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
@@ -206,7 +206,7 @@ jobs:
 
   test-integration-docker:
     name: Integration - Linux, Docker
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
@@ -224,7 +224,7 @@ jobs:
 
   test-integration-elasticsearch:
     name: Integration - Linux, ES
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
@@ -242,7 +242,7 @@ jobs:
 
   test-integration-gcp:
     name: Integration - Linux, GCP
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
@@ -260,7 +260,7 @@ jobs:
 
   test-integration-influxdb:
     name: Integration - Linux, Influx
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
@@ -278,7 +278,7 @@ jobs:
 
   test-integration-kafka:
     name: Integration - Linux, Kafka
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
@@ -296,7 +296,7 @@ jobs:
 
   test-integration-loki:
     name: Integration - Linux, Loki
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
@@ -314,7 +314,7 @@ jobs:
 
   test-integration-pulsar:
     name: Integration - Linux, Pulsar
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
@@ -332,7 +332,7 @@ jobs:
 
   test-integration-splunk:
     name: Integration - Linux, Splunk
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:

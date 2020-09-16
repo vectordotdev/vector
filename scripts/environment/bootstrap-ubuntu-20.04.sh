@@ -3,10 +3,6 @@ set -e -o verbose
 
 export DEBIAN_FRONTEND=noninteractive
 
-umount /boot/efi
-apt install -f
-mount -a
-
 apt update -y -qq
 apt upgrade -y -f -qq
 
