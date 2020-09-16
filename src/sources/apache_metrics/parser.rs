@@ -50,111 +50,63 @@ impl<'a> StatusFieldStatistic<'a> {
         value: &'a str,
     ) -> Option<Result<StatusFieldStatistic<'a>, ParseError>> {
         match key {
-            "ServerUptimeSeconds" => Some(match value.parse() {
-                Ok(value) => Ok(StatusFieldStatistic::ServerUptimeSeconds(value)),
-                Err(err) => Err(ParseError {
-                    key: key.to_string(),
-                    err: err.into(),
-                }),
-            }),
-            "Total Accesses" => Some(match value.parse() {
-                Ok(value) => Ok(StatusFieldStatistic::TotalAccesses(value)),
-                Err(err) => Err(ParseError {
-                    key: key.to_string(),
-                    err: err.into(),
-                }),
-            }),
-            "Total kBytes" => Some(match value.parse() {
-                Ok(value) => Ok(StatusFieldStatistic::TotalKBytes(value)),
-                Err(err) => Err(ParseError {
-                    key: key.to_string(),
-                    err: err.into(),
-                }),
-            }),
-            "Total Duration" => Some(match value.parse() {
-                Ok(value) => Ok(StatusFieldStatistic::TotalDuration(value)),
-                Err(err) => Err(ParseError {
-                    key: key.to_string(),
-                    err: err.into(),
-                }),
-            }),
-            "CPUUser" => Some(match value.parse() {
-                Ok(value) => Ok(StatusFieldStatistic::CPUUser(value)),
-                Err(err) => Err(ParseError {
-                    key: key.to_string(),
-                    err: err.into(),
-                }),
-            }),
-            "CPUSystem" => Some(match value.parse() {
-                Ok(value) => Ok(StatusFieldStatistic::CPUSystem(value)),
-                Err(err) => Err(ParseError {
-                    key: key.to_string(),
-                    err: err.into(),
-                }),
-            }),
-            "CPUChildrenUser" => Some(match value.parse() {
-                Ok(value) => Ok(StatusFieldStatistic::CPUChildrenUser(value)),
-                Err(err) => Err(ParseError {
-                    key: key.to_string(),
-                    err: err.into(),
-                }),
-            }),
-            "CPUChildrenSystem" => Some(match value.parse() {
-                Ok(value) => Ok(StatusFieldStatistic::CPUChildrenSystem(value)),
-                Err(err) => Err(ParseError {
-                    key: key.to_string(),
-                    err: err.into(),
-                }),
-            }),
-            "CPULoad" => Some(match value.parse() {
-                Ok(value) => Ok(StatusFieldStatistic::CPULoad(value)),
-                Err(err) => Err(ParseError {
-                    key: key.to_string(),
-                    err: err.into(),
-                }),
-            }),
-            "IdleWorkers" => Some(match value.parse() {
-                Ok(value) => Ok(StatusFieldStatistic::IdleWorkers(value)),
-                Err(err) => Err(ParseError {
-                    key: key.to_string(),
-                    err: err.into(),
-                }),
-            }),
-            "BusyWorkers" => Some(match value.parse() {
-                Ok(value) => Ok(StatusFieldStatistic::BusyWorkers(value)),
-                Err(err) => Err(ParseError {
-                    key: key.to_string(),
-                    err: err.into(),
-                }),
-            }),
-            "ConnsTotal" => Some(match value.parse() {
-                Ok(value) => Ok(StatusFieldStatistic::ConnsTotal(value)),
-                Err(err) => Err(ParseError {
-                    key: key.to_string(),
-                    err: err.into(),
-                }),
-            }),
-            "ConnsAsyncWriting" => Some(match value.parse() {
-                Ok(value) => Ok(StatusFieldStatistic::ConnsAsyncWriting(value)),
-                Err(err) => Err(ParseError {
-                    key: key.to_string(),
-                    err: err.into(),
-                }),
-            }),
-            "ConnsAsyncClosing" => Some(match value.parse() {
-                Ok(value) => Ok(StatusFieldStatistic::ConnsAsyncClosing(value)),
-                Err(err) => Err(ParseError {
-                    key: key.to_string(),
-                    err: err.into(),
-                }),
-            }),
-            "ConnsAsyncKeepAlive" => Some(match value.parse() {
-                Ok(value) => Ok(StatusFieldStatistic::ConnsAsyncKeepAlive(value)),
-                Err(err) => Err(ParseError {
-                    key: key.to_string(),
-                    err: err.into(),
-                }),
-            }),
+            "ServerUptimeSeconds" => Some(
+                parse_numeric_value(key, value)
+                    .map(|value| StatusFieldStatistic::ServerUptimeSeconds(value)),
+            ),
+            "Total Accesses" => Some(
+                parse_numeric_value(key, value)
+                    .map(|value| StatusFieldStatistic::TotalAccesses(value)),
+            ),
+            "Total kBytes" => Some(
+                parse_numeric_value(key, value)
+                    .map(|value| StatusFieldStatistic::TotalKBytes(value)),
+            ),
+            "Total Duration" => Some(
+                parse_numeric_value(key, value)
+                    .map(|value| StatusFieldStatistic::TotalDuration(value)),
+            ),
+            "CPUUser" => Some(
+                parse_numeric_value(key, value).map(|value| StatusFieldStatistic::CPUUser(value)),
+            ),
+            "CPUSystem" => Some(
+                parse_numeric_value(key, value).map(|value| StatusFieldStatistic::CPUSystem(value)),
+            ),
+            "CPUChildrenUser" => Some(
+                parse_numeric_value(key, value)
+                    .map(|value| StatusFieldStatistic::CPUChildrenUser(value)),
+            ),
+            "CPUChildrenSystem" => Some(
+                parse_numeric_value(key, value)
+                    .map(|value| StatusFieldStatistic::CPUChildrenSystem(value)),
+            ),
+            "CPULoad" => Some(
+                parse_numeric_value(key, value).map(|value| StatusFieldStatistic::CPULoad(value)),
+            ),
+            "IdleWorkers" => Some(
+                parse_numeric_value(key, value)
+                    .map(|value| StatusFieldStatistic::IdleWorkers(value)),
+            ),
+            "BusyWorkers" => Some(
+                parse_numeric_value(key, value)
+                    .map(|value| StatusFieldStatistic::BusyWorkers(value)),
+            ),
+            "ConnsTotal" => Some(
+                parse_numeric_value(key, value)
+                    .map(|value| StatusFieldStatistic::ConnsTotal(value)),
+            ),
+            "ConnsAsyncWriting" => Some(
+                parse_numeric_value(key, value)
+                    .map(|value| StatusFieldStatistic::ConnsAsyncWriting(value)),
+            ),
+            "ConnsAsyncClosing" => Some(
+                parse_numeric_value(key, value)
+                    .map(|value| StatusFieldStatistic::ConnsAsyncClosing(value)),
+            ),
+            "ConnsAsyncKeepAlive" => Some(
+                parse_numeric_value(key, value)
+                    .map(|value| StatusFieldStatistic::ConnsAsyncKeepAlive(value)),
+            ),
             "Scoreboard" => Some(Ok(StatusFieldStatistic::Scoreboard(value))),
 
             _ => None,
@@ -421,6 +373,17 @@ fn line_to_metrics(
                     .collect::<Vec<_>>()
             }
         })
+    })
+}
+
+fn parse_numeric_value<T: std::str::FromStr>(key: &str, value: &str) -> Result<T, ParseError>
+where
+    <T as std::str::FromStr>::Err: std::error::Error,
+    <T as std::str::FromStr>::Err: 'static,
+{
+    value.parse::<T>().map_err(|err| ParseError {
+        key: key.to_string(),
+        err: err.into(),
     })
 }
 
