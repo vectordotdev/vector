@@ -88,47 +88,81 @@ impl UnixSink {
     async fn next_delay(&mut self) {
         delay_for(self.backoff.next().unwrap()).await
     }
+
+    async fn get_stream(&mut self) -> &mut FramedWrite<UnixStream, BytesCodec> {
+        loop {
+            match self.state {
+                UnixSinkState::Connected(ref mut stream) => return stream,
+                UnixSinkState::Disconnected => {
+                    debug!(
+                        message = "Connecting",
+                        path = &field::display(self.path.to_str().unwrap())
+                    );
+                    match UnixStream::connect(self.path.clone()).await {
+                        Ok(stream) => {
+                            emit!(UnixSocketConnectionEstablished { path: &self.path });
+                            let out = FramedWrite::new(stream, BytesCodec::new());
+                            self.state = UnixSinkState::Connected(out);
+                            self.backoff = Self::fresh_backoff()
+                        }
+                        Err(error) => {
+                            emit!(UnixSocketConnectionFailure {
+                                error,
+                                path: &self.path
+                            });
+                            self.next_delay().await
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[async_trait]
 impl StreamSink for UnixSink {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        // use futures::future;
+        // let encoding = self.encoding.clone();
+        // let encode_event = move |event| encode_event(event, &encoding);
+
+        // let mut slot = None;
+        // loop {
+        //     let stream = self.get_stream().await;
+
+        //     let mut stream_error = None;
+        //     tokio::select! {
+        //         // poll_ready => start_send
+        //         // poll_flush => ack
+        //         // next => slot
+        //         event = input.next(), if slot.is_none() => match event {
+        //             Some(event) => slot = encode_event(event),
+        //             None => break,
+        //         },
+        //         ready = future::poll_fn(|cx| stream.poll_ready_unpin(cx)), if slot.is_some() => match ready {
+        //             Ok(()) => match stream.start_send(slot.take().expect("slot should not be empty")) {
+
+        //             },
+        //             Err(error) => {
+        //                 stream_error = Some(error);
+        //                 // emit!(UnixSocketError { error, path: &self.path });
+        //                 // self.state = UnixSinkState::Disconnected;
+        //             }
+        //         },
+        //     };
+        // }
+
         // TODO: use select! for `input.next()` & `stream.start_send / stream.poll_flush`.
         while let Some(event) = input.next().await {
-            let event = match encode_event(event, &self.encoding) {
-                Some(event) => event,
+            let bytes = match encode_event(event, &self.encoding) {
+                Some(bytes) => bytes,
                 None => continue,
             };
 
-            let stream = loop {
-                match &mut self.state {
-                    UnixSinkState::Connected(stream) => break stream,
-                    UnixSinkState::Disconnected => {
-                        debug!(
-                            message = "Connecting",
-                            path = &field::display(self.path.to_str().unwrap())
-                        );
-                        match UnixStream::connect(self.path.clone()).await {
-                            Ok(stream) => {
-                                emit!(UnixSocketConnectionEstablished { path: &self.path });
-                                let out = FramedWrite::new(stream, BytesCodec::new());
-                                self.state = UnixSinkState::Connected(out);
-                                self.backoff = Self::fresh_backoff();
-                            }
-                            Err(error) => {
-                                emit!(UnixSocketConnectionFailure {
-                                    error,
-                                    path: &self.path
-                                });
-                                self.next_delay().await;
-                            }
-                        }
-                    }
-                }
-            };
+            let stream = self.get_stream().await;
 
-            let byte_size = event.len();
-            match stream.send(event).await {
+            let byte_size = bytes.len();
+            match stream.send(bytes).await {
                 Ok(()) => emit!(UnixSocketEventSent { byte_size }),
                 Err(error) => {
                     emit!(UnixSocketError {
