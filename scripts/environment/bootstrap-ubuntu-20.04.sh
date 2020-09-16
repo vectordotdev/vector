@@ -4,6 +4,7 @@ set -e -o verbose
 export DEBIAN_FRONTEND=noninteractive
 
 apt update -y -qq
+apt-get -f install
 apt upgrade -y -f -qq
 
 # Deps
