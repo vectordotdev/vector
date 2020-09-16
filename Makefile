@@ -834,13 +834,13 @@ package-deb-all: package-deb-x86_64 package-deb-aarch64 ## Build all deb package
 
 .PHONY: package-deb-x86_64
 package-deb-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 deb package
-package-deb-x86_64: export TARGET="x86_64-unknown-linux-gnu"
-package-deb-x86_64: @scripts/package-deb.sh
+	@export TARGET="x86_64-unknown-linux-gnu"
+	@scripts/package-deb.sh
 
 .PHONY: package-deb-aarch64
 package-deb-aarch64: package-aarch64-unknown-linux-musl  ## Build the aarch64 deb package
-package-deb-x86_64: export TARGET="aarch64-unknown-linux-musl"
-package-deb-x86_64: @scripts/package-deb.sh
+	@export TARGET="aarch64-unknown-linux-musl"
+	@scripts/package-deb.sh
 
 # rpms
 
