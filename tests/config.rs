@@ -706,3 +706,43 @@ async fn parses_sink_full_es_aws() {
     .await
     .unwrap();
 }
+
+#[cfg(all(
+    feature = "sources-socket",
+    feature = "transforms-swimlanes",
+    feature = "sinks-socket"
+))]
+#[tokio::test]
+async fn swimlanes() {
+    let warnings = load(
+        r#"
+        [sources.in]
+        type = "socket"
+        mode = "tcp"
+        address = "127.0.0.1:1235"
+
+        [transforms.splitting_gerrys]
+        type = "swimlanes"
+        inputs = ["in"]
+
+        [transforms.splitting_gerrys.lanes.only_gerrys]
+        type = "check_fields"
+        "host.eq" = "gerry"
+
+        [transforms.splitting_gerrys.lanes.no_gerrys]
+        type = "check_fields"
+        "host.neq" = "gerry"
+
+        [sinks.out]
+        type = "socket"
+        mode = "tcp"
+        inputs = ["splitting_gerrys.only_gerrys", "splitting_gerrys.no_gerrys"]
+        encoding = "text"
+        address = "127.0.0.1:9999"
+      "#,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(0, warnings.len());
+}
