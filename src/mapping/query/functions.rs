@@ -252,6 +252,36 @@ impl Function for ParseTimestampFn {
     }
 }
 
+#[derive(Debug)]
+pub(in crate::mapping) struct StripWhitespaceFn {
+    query: Box<dyn Function>,
+}
+
+impl StripWhitespaceFn {
+    pub(in crate::mapping) fn new(query: Box<dyn Function>) -> Self {
+        Self { query }
+    }
+}
+
+impl Function for StripWhitespaceFn {
+    fn execute(&self, ctx: &Event) -> Result<Value> {
+        let value = self.query.execute(ctx)?;
+        if let Value::Bytes(bytes) = value {
+            // Convert it to a str which will validate that it is valid utf8,
+            // and will give us a trim function.
+            // This does not need to allocate any additional memory.
+            if let Ok(s) = std::str::from_utf8(&bytes) {
+                Ok(Value::Bytes(bytes.slice_ref(s.trim().as_bytes())))
+            } else {
+                // Not a valid unicode string.
+                Err("unable to strip white_space from non-unicode string types".to_string())
+            }
+        } else {
+            Err("unable to strip white_space from non-string types".to_string())
+        }
+    }
+}
+
 //------------------------------------------------------------------------------
 
 #[derive(Debug)]
@@ -373,6 +403,7 @@ impl Function for Md5Fn {
         }
     }
 }
+
 //------------------------------------------------------------------------------
 
 #[derive(Debug)]
@@ -409,11 +440,111 @@ impl Function for NowFn {
 
 //------------------------------------------------------------------------------
 
+#[derive(Debug)]
+pub(in crate::mapping) struct TruncateFn {
+    query: Box<dyn Function>,
+    limit: Box<dyn Function>,
+    ellipsis: Option<Value>,
+}
+
+impl TruncateFn {
+    pub(in crate::mapping) fn new(
+        query: Box<dyn Function>,
+        limit: Box<dyn Function>,
+        ellipsis: Option<Value>,
+    ) -> Self {
+        TruncateFn {
+            query,
+            limit,
+            ellipsis,
+        }
+    }
+}
+
+impl Function for TruncateFn {
+    fn execute(&self, ctx: &Event) -> Result<Value> {
+        let value = self.query.execute(ctx)?;
+        if let Value::Bytes(bytes) = value {
+            let limit = match self.limit.execute(ctx)? {
+                // If the result of execution is a float, we take the floor as our limit.
+                Value::Float(f) => f.floor() as usize,
+                Value::Integer(i) if i >= 0 => i as usize,
+                _ => return Err("limit is not a positive number".into()),
+            };
+
+            let ellipsis = match self.ellipsis {
+                None => false,
+                Some(Value::Boolean(value)) => value,
+                _ => return Err("ellipsis is not a boolean".into()),
+            };
+
+            if let Ok(s) = std::str::from_utf8(&bytes) {
+                let pos = if let Some((pos, chr)) = s.char_indices().take(limit).last() {
+                    // char_indices gives us the starting position of the character at limit,
+                    // we want the end position.
+                    pos + chr.len_utf8()
+                } else {
+                    // We have an empty string
+                    0
+                };
+
+                if s.len() <= pos {
+                    // No truncating necessary.
+                    Ok(Value::Bytes(bytes))
+                } else if ellipsis {
+                    // Allocate a new string to add the ellipsis to.
+                    let mut new = s[0..pos].to_string();
+                    new.push_str("...");
+                    Ok(Value::Bytes(new.into()))
+                } else {
+                    // Just pull the relevant part out of the original parameter.
+                    Ok(Value::Bytes(bytes.slice(0..pos)))
+                }
+            } else {
+                // Not a valid utf8 string.
+                Err("unable to truncate from non-unicode string types".to_string())
+            }
+        } else {
+            Err("unable to truncate non-string types".to_string())
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
+#[derive(Debug)]
+pub(in crate::mapping) struct ParseJsonFn {
+    query: Box<dyn Function>,
+}
+
+impl ParseJsonFn {
+    pub(in crate::mapping) fn new(query: Box<dyn Function>) -> Self {
+        ParseJsonFn { query }
+    }
+}
+
+impl Function for ParseJsonFn {
+    fn execute(&self, ctx: &Event) -> Result<Value> {
+        let value = self.query.execute(ctx)?;
+        if let Value::Bytes(bytes) = value {
+            match serde_json::from_slice::<serde_json::Value>(&bytes) {
+                Ok(value) => Ok(value.into()),
+                Err(err) => Err(format!("unable to parse json {}", err)),
+            }
+        } else {
+            Err("unable to apply \"parse_json\" to non-string types".to_string())
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::mapping::query::{path::Path, Literal};
     use chrono::{DateTime, Utc};
+    use std::collections::BTreeMap;
 
     #[test]
     fn check_not_operator() {
@@ -901,6 +1032,245 @@ mod tests {
                 },
                 Err(r#"unable to apply "md5" to non-string types"#.to_string()),
                 Md5Fn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+        ];
+
+        for (input_event, exp, query) in cases {
+            assert_eq!(query.execute(&input_event), exp);
+        }
+    }
+
+    #[test]
+    fn check_strip_whitespace() {
+        let cases = vec![
+            (
+                Event::from(""),
+                Err("path .foo not found in event".to_string()),
+                StripWhitespaceFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::from(""));
+                    event
+                },
+                Ok(Value::Bytes("".into())),
+                StripWhitespaceFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::from("    "));
+                    event
+                },
+                Ok(Value::Bytes("".into())),
+                StripWhitespaceFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::from("hi there"));
+                    event
+                },
+                Ok(Value::Bytes("hi there".into())),
+                StripWhitespaceFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event
+                        .as_mut_log()
+                        .insert("foo", Value::from("     hi there    "));
+                    event
+                },
+                Ok(Value::Bytes("hi there".into())),
+                StripWhitespaceFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert(
+                        "foo",
+                        Value::from(" \u{3000}\u{205F}\u{202F}\u{A0}\u{9} ❤❤ hi there ❤❤  \u{9}\u{A0}\u{202F}\u{205F}\u{3000} "),
+                    );
+                    event
+                },
+                Ok(Value::Bytes("❤❤ hi there ❤❤".into())),
+                StripWhitespaceFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+        ];
+
+        for (input_event, exp, query) in cases {
+            assert_eq!(query.execute(&input_event), exp);
+        }
+    }
+
+    #[test]
+    fn check_truncate() {
+        let cases = vec![
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::from("Super"));
+                    event
+                },
+                Ok(Value::Bytes("".into())),
+                TruncateFn::new(
+                    Box::new(Path::from(vec![vec!["foo"]])),
+                    Box::new(Literal::from(Value::Float(0.0))),
+                    Some(Value::Boolean(false)),
+                ),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::from("Super"));
+                    event
+                },
+                Ok(Value::Bytes("...".into())),
+                TruncateFn::new(
+                    Box::new(Path::from(vec![vec!["foo"]])),
+                    Box::new(Literal::from(Value::Float(0.0))),
+                    Some(Value::Boolean(true)),
+                ),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::from("Super"));
+                    event
+                },
+                Ok(Value::Bytes("Super".into())),
+                TruncateFn::new(
+                    Box::new(Path::from(vec![vec!["foo"]])),
+                    Box::new(Literal::from(Value::Float(10.0))),
+                    Some(Value::Boolean(false)),
+                ),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::from("Super"));
+                    event
+                },
+                Ok(Value::Bytes("Super".into())),
+                TruncateFn::new(
+                    Box::new(Path::from(vec![vec!["foo"]])),
+                    Box::new(Literal::from(Value::Float(5.0))),
+                    Some(Value::Boolean(true)),
+                ),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event
+                        .as_mut_log()
+                        .insert("foo", Value::from("Supercalifragilisticexpialidocious"));
+                    event
+                },
+                Ok(Value::Bytes("Super".into())),
+                TruncateFn::new(
+                    Box::new(Path::from(vec![vec!["foo"]])),
+                    Box::new(Literal::from(Value::Float(5.0))),
+                    Some(Value::Boolean(false)),
+                ),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event
+                        .as_mut_log()
+                        .insert("foo", Value::from("♔♕♖♗♘♙♚♛♜♝♞♟"));
+                    event
+                },
+                Ok(Value::Bytes("♔♕♖♗♘♙...".into())),
+                TruncateFn::new(
+                    Box::new(Path::from(vec![vec!["foo"]])),
+                    Box::new(Literal::from(Value::Float(6.0))),
+                    Some(Value::Boolean(true)),
+                ),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event
+                        .as_mut_log()
+                        .insert("foo", Value::from("Supercalifragilisticexpialidocious"));
+                    event
+                },
+                Ok(Value::Bytes("Super...".into())),
+                TruncateFn::new(
+                    Box::new(Path::from(vec![vec!["foo"]])),
+                    Box::new(Literal::from(Value::Float(5.0))),
+                    Some(Value::Boolean(true)),
+                ),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::Float(3.0));
+                    event
+                },
+                Err("unable to truncate non-string types".to_string()),
+                TruncateFn::new(
+                    Box::new(Path::from(vec![vec!["foo"]])),
+                    Box::new(Literal::from(Value::Float(5.0))),
+                    Some(Value::Boolean(true)),
+                ),
+            ),
+        ];
+
+        for (input_event, exp, query) in cases {
+            assert_eq!(query.execute(&input_event), exp);
+        }
+    }
+
+    #[test]
+    fn check_parse_json() {
+        let cases = vec![
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::from("42"));
+                    event
+                },
+                Ok(Value::from(42)),
+                ParseJsonFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::from("\"hello\""));
+                    event
+                },
+                Ok(Value::from("hello")),
+                ParseJsonFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event
+                        .as_mut_log()
+                        .insert("foo", Value::from("{\"field\": \"value\"}"));
+                    event
+                },
+                Ok(Value::Map({
+                    let mut map = BTreeMap::new();
+                    map.insert("field".into(), Value::from("value"));
+                    map
+                })),
+                ParseJsonFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event
+                        .as_mut_log()
+                        .insert("foo", Value::from("{\"field\"x \"value\"}"));
+                    event
+                },
+                Err("unable to parse json expected `:` at line 1 column 9".into()),
+                ParseJsonFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
         ];
 

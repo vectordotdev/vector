@@ -22,11 +22,13 @@ target_path = @{ ("." ~ (path_segment | quoted_path_segment))+ }
 // Functions
 function = {
     deletion |
-    only_fields
+    only_fields |
+    merge
 }
 
 deletion = { "del(" ~ target_paths ~ ")" }
 only_fields = { "only_fields(" ~ target_paths ~ ")" }
+merge = { "merge(" ~ target_path ~ "," ~ query_arithmetic ~ ("," ~ query_arithmetic)? ~ ")" }
 
 // One or more path arguments for a given function.
 //
@@ -58,7 +60,10 @@ query_function = {
     uuid_v4 |
     sha1 |
     md5 |
-    now
+    now |
+    strip_whitespace |
+    truncate |
+    parse_json
 }
 
 to_string = { "to_string(" ~ query_arithmetic ~ ("," ~ (string | null) )? ~ ")"}
@@ -73,6 +78,9 @@ uuid_v4 = { "uuid_v4()" }
 sha1 = { "sha1(" ~ query_arithmetic ~ ")" }
 md5 = { "md5(" ~ query_arithmetic ~ ")" }
 now = { "now(" ~ query_arithmetic ~ ")" }
+strip_whitespace = { "strip_whitespace(" ~ query_arithmetic ~ ")"}
+truncate = { "truncate(" ~ query_arithmetic ~ "," ~ query_arithmetic ~ ("," ~ boolean)? ~ ")" }
+parse_json = { "parse_json(" ~ query_arithmetic ~ ")" }
 
 group = { "(" ~ query_arithmetic ~ ")" }
 

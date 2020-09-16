@@ -8,13 +8,14 @@ use crate::{
             arithmetic::Arithmetic,
             arithmetic::Operator,
             functions::{
-                DowncaseFn, Md5Fn, NotFn, NowFn, ParseTimestampFn, Sha1Fn, ToBooleanFn, ToFloatFn,
-                ToIntegerFn, ToStringFn, ToTimestampFn, UpcaseFn, UuidV4Fn,
+                DowncaseFn, Md5Fn, NotFn, NowFn, ParseJsonFn, ParseTimestampFn, Sha1Fn,
+                StripWhitespaceFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn,
+                TruncateFn, UpcaseFn, UuidV4Fn,
             },
             path::Path as QueryPath,
             Literal,
         },
-        Assignment, Deletion, Function, IfStatement, Mapping, Noop, OnlyFields, Result,
+        Assignment, Deletion, Function, IfStatement, Mapping, MergeFn, Noop, OnlyFields, Result,
     },
 };
 use pest::{
@@ -315,6 +316,32 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
             let query = query_arithmetic_from_pair(pair)?;
             Ok(Box::new(NowFn::new(query)))
         }
+        Rule::strip_whitespace => {
+            let param = pair.into_inner().next().ok_or(TOKEN_ERR)?;
+            let query = query_arithmetic_from_pair(param)?;
+            Ok(Box::new(StripWhitespaceFn::new(query)))
+        }
+        Rule::truncate => {
+            let (first, mut other) = split_inner_rules_from_pair(pair)?;
+            let query = query_arithmetic_from_pair(first)?;
+            let limit = query_arithmetic_from_pair(other.next().ok_or(TOKEN_ERR)?)?;
+
+            let ellipsis = other.next().map(|r| match r.as_rule() {
+                Rule::boolean => Value::Boolean(r.as_str() == "true"),
+                Rule::null => Value::Null,
+                _ => unreachable!(
+                    "parser should not allow other to_bool default arg child rules here"
+                ),
+            });
+
+            Ok(Box::new(TruncateFn::new(query, limit, ellipsis)))
+        }
+        Rule::parse_json => {
+            let param = pair.into_inner().next().ok_or(TOKEN_ERR)?;
+            let query = query_arithmetic_from_pair(param)?;
+            Ok(Box::new(ParseJsonFn::new(query)))
+        }
+
         _ => unreachable!("parser should not allow other query_function child rules here"),
     }
 }
@@ -391,10 +418,23 @@ fn if_statement_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn Function>> 
     Ok(Box::new(IfStatement::new(query, first, second)))
 }
 
+fn merge_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
+    let (first, mut other) = split_inner_rules_from_pair(pair)?;
+    let to_path = target_path_from_pair(first)?;
+    let query2 = query_arithmetic_from_pair(other.next().ok_or(TOKEN_ERR)?)?;
+    let deep = match other.next() {
+        None => None,
+        Some(pair) => Some(query_arithmetic_from_pair(pair)?),
+    };
+
+    Ok(Box::new(MergeFn::new(to_path.into(), query2, deep)))
+}
+
 fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
         Rule::deletion => Ok(Box::new(Deletion::new(paths_from_pair(pair)?))),
         Rule::only_fields => Ok(Box::new(OnlyFields::new(paths_from_pair(pair)?))),
+        Rule::merge => merge_function_from_pair(pair),
         _ => unreachable!("parser should not allow other function child rules here"),
     }
 }
@@ -993,6 +1033,73 @@ mod tests {
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(DowncaseFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                ".foo = strip_whitespace(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(StripWhitespaceFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                ".foo = strip_whitespace(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(StripWhitespaceFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                ".foo = truncate(.foo, .limit)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(TruncateFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Box::new(QueryPath::from("limit")),
+                        None,
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = truncate(.foo, 5, true)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(TruncateFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Box::new(Literal::from(Value::Float(5.0))),
+                        Some(Value::Boolean(true)),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = parse_json(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ParseJsonFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                "merge(.bar, .baz)",
+                Mapping::new(vec![Box::new(MergeFn::new(
+                    "bar".into(),
+                    Box::new(QueryPath::from("baz")),
+                    None,
+                ))]),
+            ),
+            (
+                "merge(.bar, .baz, .boz)",
+                Mapping::new(vec![Box::new(MergeFn::new(
+                    "bar".into(),
+                    Box::new(QueryPath::from("baz")),
+                    Some(Box::new(QueryPath::from("boz"))),
+                ))]),
+            ),
+            (
+                "merge(.bar, .baz, true)",
+                Mapping::new(vec![Box::new(MergeFn::new(
+                    "bar".into(),
+                    Box::new(QueryPath::from("baz")),
+                    Some(Box::new(Literal::from(Value::Boolean(true)))),
                 ))]),
             ),
         ];
