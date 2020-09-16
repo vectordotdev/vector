@@ -1,7 +1,7 @@
 use super::InternalEvent;
+use crate::sources::apache_metrics;
 use http::Uri;
 use metrics::{counter, timing};
-use std::error;
 use std::time::Instant;
 
 #[derive(Debug)]
@@ -54,7 +54,7 @@ impl InternalEvent for ApacheMetricsRequestCompleted {
 
 #[derive(Debug)]
 pub struct ApacheMetricsParseError {
-    pub error: Box<dyn error::Error>,
+    pub error: apache_metrics::ParseError,
     pub url: Uri,
 }
 

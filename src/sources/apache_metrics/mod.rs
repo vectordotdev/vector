@@ -23,6 +23,8 @@ use std::time::{Duration, Instant};
 
 mod parser;
 
+pub use parser::ParseError;
+
 #[derive(Deserialize, Serialize, Clone, Debug)]
 struct ApacheMetricsConfig {
     endpoints: Vec<String>,
