@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
+    event::{Event, LogEvent},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
@@ -52,6 +52,8 @@ pub struct HttpSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+    #[serde(default)]
+    pub metrics_plus_mode: bool,
 }
 
 #[cfg(test)]
@@ -67,6 +69,7 @@ fn default_config(e: Encoding) -> HttpSinkConfig {
         encoding: e.into(),
         request: Default::default(),
         tls: Default::default(),
+        metrics_plus_mode: Default::default(),
     }
 }
 
@@ -145,12 +148,19 @@ impl SinkConfig for HttpSinkConfig {
     }
 
     fn input_type(&self) -> DataType {
-        DataType::Log
+        DataType::Any
     }
 
     fn sink_type(&self) -> &'static str {
         "http"
     }
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+enum EventOrLog {
+    Event(Event),
+    Log(LogEvent),
 }
 
 #[async_trait::async_trait]
@@ -160,20 +170,32 @@ impl HttpSink for HttpSinkConfig {
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
-        let event = event.into_log();
-
+        let event = if self.metrics_plus_mode {
+            EventOrLog::Event(event)
+        } else {
+            match event {
+                Event::Log(event) => EventOrLog::Log(event),
+                Event::Metric(_) => panic!(
+                    "metrics_plus_mode must be set to true to send metrics through the HTTP sink."
+                ),
+            }
+        };
         let body = match &self.encoding.codec() {
             Encoding::Text => {
-                if let Some(v) = event.get(&Atom::from(crate::config::log_schema().message_key())) {
-                    let mut b = v.to_string_lossy().into_bytes();
-                    b.push(b'\n');
-                    b
+                if let EventOrLog::Log(event) = event {
+                    if let Some(v) = event.get(&Atom::from(crate::config::log_schema().message_key()) {
+                        let mut b = v.to_string_lossy().into_bytes();
+                        b.push(b'\n');
+                        b
+                    } else {
+                        warn!(
+                            message = "Event missing the message key; dropping event.",
+                            rate_limit_secs = 30,
+                        );
+                        return None;
+                    }
                 } else {
-                    warn!(
-                        message = "Event missing the message key; dropping event.",
-                        rate_limit_secs = 30,
-                    );
-                    return None;
+                    panic!("HTTP sink: Text encoding is not compatible with metrics_plus_mode");
                 }
             }
 
@@ -341,6 +363,21 @@ mod tests {
         let output = serde_json::from_slice::<ExpectedEvent>(&bytes[..]).unwrap();
 
         assert_eq!(output.message, "hello world".to_string());
+    }
+
+    #[test]
+    fn http_encode_event_json_metrics_plus_mode() {
+        let encoding = EncodingConfig::from(Encoding::Ndjson);
+        let event = Event::from("hello world");
+
+        let mut config = default_config(Encoding::Json);
+        config.encoding = encoding;
+        config.metrics_plus_mode = true;
+        let bytes = config.encode_event(event.clone()).unwrap();
+
+        let output = serde_json::from_slice::<Event>(&bytes[..]).unwrap();
+
+        assert_eq!(output, event);
     }
 
     #[test]

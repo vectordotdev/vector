@@ -1,41 +1,96 @@
-use crate::{event::timestamp_to_string, Result};
+use crate::event::{string_to_timestamp, timestamp_to_string};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use serde::{Serialize, Serializer};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::iter::FromIterator;
 use toml::value::Value as TomlValue;
 
-#[derive(PartialEq, Debug, Clone, is_enum_variant)]
+#[derive(PartialEq, Debug, Clone, is_enum_variant, Deserialize, Serialize)]
+#[serde(untagged)]
 pub enum Value {
-    Bytes(Bytes),
+    // Order of variants is important here, because for an untagged enum deserialization is
+    // attempted top to bottom, so when types can be confused for eachother we want the more
+    // specific variant listed first.
     Integer(i64),
     Float(f64),
     Boolean(bool),
-    Timestamp(DateTime<Utc>),
     Map(BTreeMap<String, Value>),
     Array(Vec<Value>),
+    #[serde(
+        serialize_with = "serialize_as_string_timestamp",
+        deserialize_with = "deserialize_as_string_timestamp"
+    )]
+    Timestamp(DateTime<Utc>),
+    #[serde(
+        serialize_with = "serialize_as_string_bytes",
+        deserialize_with = "deserialize_as_string_bytes"
+    )]
+    Bytes(Bytes),
+    #[serde(
+        serialize_with = "serialize_as_none",
+        deserialize_with = "deserialize_as_none"
+    )]
     Null,
 }
 
-impl Serialize for Value {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match &self {
-            Value::Integer(i) => serializer.serialize_i64(*i),
-            Value::Float(f) => serializer.serialize_f64(*f),
-            Value::Boolean(b) => serializer.serialize_bool(*b),
-            Value::Bytes(_) | Value::Timestamp(_) => {
-                serializer.serialize_str(&self.to_string_lossy())
-            }
-            Value::Map(m) => serializer.collect_map(m),
-            Value::Array(a) => serializer.collect_seq(a),
-            Value::Null => serializer.serialize_none(),
-        }
+fn serialize_as_string_bytes<S: Serializer>(
+    input: &Bytes,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    serializer.serialize_str(&String::from_utf8_lossy(input))
+}
+
+fn serialize_as_string_timestamp<S: Serializer>(
+    input: &DateTime<Utc>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    serializer.serialize_str(&timestamp_to_string(input))
+}
+
+fn deserialize_as_string_bytes<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Bytes, D::Error> {
+    match String::deserialize(deserializer) {
+        Ok(s) => Ok(Bytes::copy_from_slice(s.as_bytes())),
+        Err(e) => Err(e),
+    }
+}
+
+fn deserialize_as_string_timestamp<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<DateTime<Utc>, D::Error> {
+    match String::deserialize(deserializer) {
+        Ok(s) => string_to_timestamp(&s).map_err(|_| {
+            <D::Error as de::Error>::invalid_type(de::Unexpected::Str(&s), &"timestamp")
+        }),
+        Err(e) => Err(e),
+    }
+}
+
+fn serialize_as_none<S: Serializer>(serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.serialize_none()
+}
+
+fn deserialize_as_none<'de, D: Deserializer<'de>>(deserializer: D) -> Result<(), D::Error> {
+    match Option::<()>::deserialize(deserializer) {
+        Ok(Some(_)) => Err(<D::Error as de::Error>::unknown_variant(
+            "???",
+            &[
+                "timestamp",
+                "bytes",
+                "integer",
+                "float",
+                "boolean",
+                "map",
+                "array",
+                "null",
+            ],
+        )),
+        Ok(None) => Ok(()),
+        Err(e) => Err(e),
     }
 }
 
@@ -67,12 +122,12 @@ impl TryFrom<TomlValue> for Value {
             TomlValue::Array(a) => Self::from(
                 a.into_iter()
                     .map(Value::try_from)
-                    .collect::<Result<Vec<_>>>()?,
+                    .collect::<crate::Result<Vec<_>>>()?,
             ),
             TomlValue::Table(t) => Self::from(
                 t.into_iter()
                     .map(|(k, v)| Value::try_from(v).map(|v| (k, v)))
-                    .collect::<Result<BTreeMap<_, _>>>()?,
+                    .collect::<crate::Result<BTreeMap<_, _>>>()?,
             ),
             TomlValue::Datetime(dt) => Self::from(dt.to_string().parse::<DateTime<Utc>>()?),
             TomlValue::Boolean(b) => Self::from(b),
@@ -313,5 +368,23 @@ mod test {
             },
             _ => panic!("This test should never read Err'ing type folders."),
         })
+    }
+
+    #[test]
+    fn serialize_and_deserialize_custom_functions() {
+        let timestamp = Value::Timestamp(Utc::now());
+        assert_eq!(
+            serde_json::from_str::<Value>(&serde_json::to_string(&timestamp).unwrap()).unwrap(),
+            timestamp
+        );
+        let bytes = Value::Bytes(Bytes::from("hello world!"));
+        assert_eq!(
+            serde_json::from_str::<Value>(&serde_json::to_string(&bytes).unwrap()).unwrap(),
+            bytes
+        );
+        assert_eq!(
+            serde_json::from_str::<Value>(&serde_json::to_string(&Value::Null).unwrap()).unwrap(),
+            Value::Null
+        );
     }
 }

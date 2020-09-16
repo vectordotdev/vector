@@ -1,8 +1,9 @@
 use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricProto, Log};
 use crate::config::log_schema;
 use bytes::Bytes;
-use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
+use chrono::{format::ParseError, DateTime, FixedOffset, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use string_cache::DefaultAtom as Atom;
 
@@ -34,7 +35,7 @@ lazy_static! {
     pub static ref PARTIAL: Atom = Atom::from(PARTIAL_STR);
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Deserialize, Serialize)]
 pub enum Event {
     Log(LogEvent),
     Metric(Metric),
@@ -90,6 +91,10 @@ impl Event {
 
 fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
+}
+
+fn string_to_timestamp(string: &str) -> Result<DateTime<Utc>, ParseError> {
+    DateTime::<FixedOffset>::parse_from_rfc3339(string).map(|d| d.into())
 }
 
 fn decode_map(fields: BTreeMap<String, proto::Value>) -> Option<Value> {

@@ -7,8 +7,9 @@ use std::{
 };
 use string_cache::DefaultAtom;
 
-#[derive(PartialEq, Debug, Clone, Default)]
+#[derive(PartialEq, Debug, Clone, Default, Deserialize, Serialize)]
 pub struct LogEvent {
+    #[serde(flatten)]
     fields: BTreeMap<String, Value>,
 }
 
@@ -208,15 +209,6 @@ impl IntoIterator for LogEvent {
 
     fn into_iter(self) -> Self::IntoIter {
         self.fields.into_iter()
-    }
-}
-
-impl Serialize for LogEvent {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.collect_map(self.fields.iter())
     }
 }
 
