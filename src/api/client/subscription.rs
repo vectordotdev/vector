@@ -1,24 +1,25 @@
-use futures::{SinkExt, StreamExt};
-use futures_util;
+use futures::{SinkExt, Stream};
+use futures_util::stream::SplitSink;
 use graphql_client::GraphQLQuery;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::net::SocketAddr;
-use std::sync::Weak;
-use std::sync::{Arc, RwLock};
-use tokio::sync::mpsc::error::SendError;
-use tokio::{
-    net::TcpStream,
-    select,
-    sync::{mpsc, oneshot},
+use std::{
+    boxed::Box,
+    net::SocketAddr,
+    pin::Pin,
+    sync::{Arc, RwLock, Weak},
 };
-use tokio_tungstenite::tungstenite::{Error, Message};
-use tokio_tungstenite::{connect_async, tungstenite, WebSocketStream};
+use tokio::{net::TcpStream, select, stream::StreamExt, sync::broadcast, sync::oneshot};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{self, Error, Message},
+    WebSocketStream,
+};
 use uuid::Uuid;
 use weak_table::WeakValueHashMap;
 
-#[derive(Serialize, Deserialize, Debug)]
-struct Payload {
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Payload {
     id: Uuid,
     #[serde(rename = "type")]
     payload_type: String,
@@ -35,77 +36,78 @@ impl Payload {
 
 pub struct Subscription {
     id: Uuid,
-    tx: RwLock<mpsc::Sender<Payload>>,
-    rx: mpsc::Receiver<Payload>,
+    tx: broadcast::Sender<Payload>,
 }
 
 impl Subscription {
+    /// Returns a new Subscription, with the broadcast::Sender stored against it. Here,
+    /// we are ignoring the broadcast::Receiver, because it can be cloned with
+    /// Sender.subscribe()
     pub fn new(id: Uuid) -> Self {
-        let (tx, rx) = mpsc::channel(10);
-
-        Self {
-            id,
-            tx: RwLock::new(tx),
-            rx,
-        }
+        let (tx, _) = broadcast::channel(1);
+        Self { id, tx }
     }
 
-    pub async fn send(&self, payload: Payload) -> Result<(), SendError<Payload>> {
-        self.tx.write().unwrap().send(payload).await
+    /// Send a payload down the channel. This is synchronous because broadcast::Sender::send
+    /// is also synchronous
+    fn transmit(&self, payload: Payload) -> Result<usize, broadcast::SendError<Payload>> {
+        self.tx.send(payload)
     }
 
-    pub fn receive(&self) -> &mpsc::Receiver<Payload> {
-        &self.rx
+    /// Returns a stream of `Payload` responses, received from the GraphQL server
+    pub fn stream(&self) -> Pin<Box<impl Stream<Item = Payload>>> {
+        Box::pin(
+            self.tx
+                .subscribe()
+                .into_stream()
+                .filter(Result::is_ok)
+                .map(Result::unwrap),
+        )
     }
-
-    // pub async fn close(&mut self) -> Result<(), SendError<Payload>> {
-    //     self.tx.send(Payload::close(self.id)).await
-    // }
 }
 
 pub struct SubscriptionClient {
-    ws_tx: futures_util::stream::SplitSink<WebSocketStream<TcpStream>, Message>,
+    ws_tx: SplitSink<WebSocketStream<TcpStream>, Message>,
     subscriptions: Arc<RwLock<WeakValueHashMap<Uuid, Weak<Subscription>>>>,
+    _shutdown_tx: oneshot::Sender<()>,
 }
 
 impl SubscriptionClient {
     fn new(tx: WebSocketStream<TcpStream>) -> Self {
         // Oneshot channel for cancelling the listener if SubscriptionClient is dropped
-        let (shutdown_tx, mut shutdown_rx) = oneshot::channel::<()>();
+        let (_shutdown_tx, mut shutdown_rx) = oneshot::channel::<()>();
 
         // Create a hashmap to store subscriptions. This needs to be thread safe and behind
         // a RWLock, to handle looking up by subscription ID when receiving 'global' payloads.
         let subscriptions = Arc::new(RwLock::new(WeakValueHashMap::new()));
 
         // Split the receiver channel
-        let (ws_tx, mut ws_rx) = tx.split();
-
-        // let res = ws_rx.next().await;
-        //
-        // let payload: Option<Payload> = res
-        //     .and_then(|r| r.ok())
-        //     .and_then(|r| r.to_text().ok().and_then(|t| serde_json::from_str(t).ok()));
-        //
-        // if let Some(p) = payload {
-        //     if let Some(mut s) = subscriptions.read().unwrap().get::<Uuid>(&p.id) {
-        //         s.tx.send(p).await;
-        //     }
-        // }
+        let (ws_tx, mut ws_rx) = futures::StreamExt::split(tx);
 
         // Spawn a handler for receiving payloads back from the client.
+        let spawned_subscriptions = Arc::clone(&subscriptions);
         tokio::spawn(async move {
             loop {
                 select! {
+                    // Break the loop if shutdown is triggered. This happens implicitly once
+                    // the client goes out of scope
                     _ = &mut shutdown_rx => break,
-                    res = &mut ws_rx.next() => {
-                        let payload: Option<Payload> = res
-                            .and_then(|r| r.ok())
-                            .and_then(|r| r.to_text().ok().and_then(|t| serde_json::from_str(t).ok()));
 
-                        if let Some(p) = payload {
-                            if let Some(s) = subscriptions.read().unwrap().get::<Uuid>(&p.id) {
-                                Subscription::send(s, p).await;
-                            }
+                    // Handle received payloads back from the server
+                    res = &mut ws_rx.next() => {
+
+                        // Attempt to both deserialize the payload, and obtain a subscription
+                        // with a matching ID. Rust cannot infer the Arc type, so being explicit here
+                        let sp: Option<(Option<Arc<Subscription>>, Payload)> = res
+                            .and_then(|r| r.ok())
+                            .and_then(|r| {
+                                r.to_text()
+                                    .ok()
+                                    .and_then(|t| serde_json::from_str::<Payload>(t).ok())
+                            }).and_then(|p| Some((spawned_subscriptions.read().unwrap().get::<Uuid>(&p.id), p)));
+
+                        if let Some((Some(s), p)) = sp {
+                            let _ = s.transmit(p);
                         }
                     }
                 }
@@ -115,6 +117,7 @@ impl SubscriptionClient {
         // Return a new client
         Self {
             ws_tx,
+            _shutdown_tx,
             subscriptions: Arc::clone(&subscriptions),
         }
     }
@@ -133,6 +136,8 @@ impl SubscriptionClient {
         // to receive payloads
         let subscription = Arc::new(Subscription::new(id));
 
+        // Store the subscription in the WeakValueHashMap. This is converted internally into
+        // a weak reference, to prevent dropped subscriptions lingering in memory
         self.subscriptions
             .write()
             .unwrap()

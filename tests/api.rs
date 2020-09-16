@@ -7,11 +7,9 @@ mod support;
 #[cfg(feature = "api")]
 mod tests {
     use crate::support::{sink, source};
-    use futures::{SinkExt, StreamExt};
+    use futures::StreamExt;
     use graphql_client::*;
-    use serde_json::json;
     use std::time::Duration;
-    use tokio_tungstenite::{connect_async, tungstenite::Message};
     use vector::api;
     use vector::config::Config;
     use vector::test_util::{next_addr, retry_until, wait_for_tcp};
@@ -72,7 +70,7 @@ mod tests {
         let addr = config.api.bind.unwrap();
         let url = format!("http://{}:{}/graphql", addr.ip(), addr.port());
 
-        let server = api::Server::start(config.api);
+        let _server = api::Server::start(config.api);
         let client = reqwest::Client::new();
 
         retry_until(
@@ -134,7 +132,7 @@ mod tests {
     #[tokio::test]
     async fn api_graphql_heartbeat() {
         let config = api_enabled_config();
-        let server = api::Server::start(config.api);
+        let _server = api::Server::start(config.api);
         let bind = config.api.bind.unwrap();
 
         let request_body =
@@ -148,6 +146,12 @@ mod tests {
             .await
             .unwrap();
 
-        println!("got here");
+        tokio::pin! {
+            let taken = subscription.stream().take(3);
+        }
+
+        while let Some(payload) = taken.next().await {
+            println!("Got: {:?}", payload);
+        }
     }
 }
