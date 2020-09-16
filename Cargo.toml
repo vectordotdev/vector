@@ -477,3 +477,6 @@ required-features = ["kubernetes-e2e-tests"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
+
+[package.metadata.deb]
+depends = 
