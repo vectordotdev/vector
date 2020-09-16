@@ -390,10 +390,7 @@
   inputs = []
   type = "remap"
   mapping = """
-    .a = now(.a)
-    .b = now(.b)
-    .c = now(.c)
-    .d = now(.d)
+    .a = now()
   """
 [[tests]]
   name = "remap_function_now"
@@ -401,32 +398,8 @@
     insert_at = "remap_function_now"
     type = "log"
     [tests.input.log_fields]
-      a = "UTC"
-      b = "America/Argentina/Rio_Gallegos"
-      c = "foo"
   [[tests.outputs]]
     extract_from = "remap_function_now"
     [[tests.outputs.conditions]]
       "a.ends_with" = "Z"
-      "a.length_eq" = 30
-      "b.ends_with" = "-03:00"
-      "b.length_eq" = 35
-      "c.equals" = "foo"
-
-[transforms.remap_function_now_error]
-  inputs = []
-  type = "remap"
-  drop_on_err = true
-  mapping = """
-    .a = now(.a)
-    .b = now(.b)
-  """
-[[tests]]
-  name = "remap_function_now_error"
-  no_outputs_from = ["remap_function_now_error"]
-  [tests.input]
-    insert_at = "remap_function_now_error"
-    type = "log"
-    [tests.input.log_fields]
-      a = "UTC"
-      b = false
+      "a.length_eq" = 27

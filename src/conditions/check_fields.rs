@@ -431,9 +431,8 @@ impl CheckFieldsPredicate for LengthEqualsPredicate {
         match event {
             Event::Log(l) => l.get(&self.target).map_or(false, |v| {
                 let len = match v {
-                    Value::Bytes(bytes) => bytes.len(),
                     Value::Array(value) => value.len(),
-                    _ => return false,
+                    value => value.to_string_lossy().len(),
                 };
 
                 len as i64 == self.arg

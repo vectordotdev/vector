@@ -407,34 +407,17 @@ impl Function for Md5Fn {
 //------------------------------------------------------------------------------
 
 #[derive(Debug)]
-pub(in crate::mapping) struct NowFn {
-    query: Box<dyn Function>,
-}
+pub(in crate::mapping) struct NowFn {}
 
 impl NowFn {
-    pub(in crate::mapping) fn new(query: Box<dyn Function>) -> Self {
-        Self { query }
+    pub(in crate::mapping) fn new() -> Self {
+        Self {}
     }
 }
 
 impl Function for NowFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
-        use chrono::{SecondsFormat, TimeZone, Utc};
-        use chrono_tz::Tz;
-
-        match self.query.execute(ctx)? {
-            Value::Bytes(bytes) => {
-                let utc = Utc::now().naive_utc();
-                let dt = std::str::from_utf8(&bytes)
-                    .map_err(|e| e.to_string())
-                    .and_then(str::parse::<Tz>)?
-                    .from_utc_datetime(&utc)
-                    .to_rfc3339_opts(SecondsFormat::Nanos, true);
-
-                Ok(Value::Bytes(dt.into()))
-            }
-            _ => Err(r#"unable to use non-string types for "now" function"#.to_string()),
-        }
+    fn execute(&self, _: &Event) -> Result<Value> {
+        Ok(Value::Timestamp(chrono::Utc::now()))
     }
 }
 

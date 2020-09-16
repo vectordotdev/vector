@@ -311,11 +311,7 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
             let query = query_arithmetic_from_pair(pair)?;
             Ok(Box::new(Md5Fn::new(query)))
         }
-        Rule::now => {
-            let pair = pair.into_inner().next().ok_or(TOKEN_ERR)?;
-            let query = query_arithmetic_from_pair(pair)?;
-            Ok(Box::new(NowFn::new(query)))
-        }
+        Rule::now => Ok(Box::new(NowFn::new())),
         Rule::strip_whitespace => {
             let param = pair.into_inner().next().ok_or(TOKEN_ERR)?;
             let query = query_arithmetic_from_pair(param)?;
