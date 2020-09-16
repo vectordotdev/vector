@@ -27,6 +27,7 @@ pub struct FileWatcher {
     is_dead: bool,
     last_read_attempt: Instant,
     last_read_success: Instant,
+    max_line_bytes: usize,
 }
 
 impl FileWatcher {
@@ -39,6 +40,7 @@ impl FileWatcher {
         path: PathBuf,
         file_position: FilePosition,
         ignore_before: Option<SystemTime>,
+        max_line_bytes: usize,
     ) -> Result<FileWatcher, io::Error> {
         let f = fs::File::open(&path)?;
         let (devno, ino) = (f.portable_dev()?, f.portable_ino()?);
@@ -93,6 +95,7 @@ impl FileWatcher {
             is_dead: false,
             last_read_attempt: ts,
             last_read_success: ts,
+            max_line_bytes,
         })
     }
 
@@ -144,14 +147,20 @@ impl FileWatcher {
     /// This function will attempt to read a new line from its file, blocking,
     /// up to some maximum but unspecified amount of time. `read_line` will open
     /// a new file handler as needed, transparently to the caller.
-    pub fn read_line(&mut self, mut buffer: &mut Vec<u8>, max_size: usize) -> io::Result<usize> {
+    pub fn read_line(&mut self, mut buffer: &mut Vec<u8>) -> io::Result<usize> {
         self.track_read_attempt();
 
         // ensure buffer is re-initialized
         buffer.clear();
         let reader = &mut self.reader;
         let file_position = &mut self.file_position;
-        match read_until_with_max_size(reader, file_position, b'\n', &mut buffer, max_size) {
+        match read_until_with_max_size(
+            reader,
+            file_position,
+            b'\n',
+            &mut buffer,
+            self.max_line_bytes,
+        ) {
             Ok(sz) => {
                 if sz > 0 {
                     self.track_read_success()

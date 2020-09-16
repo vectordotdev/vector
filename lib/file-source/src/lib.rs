@@ -203,7 +203,8 @@ mod test {
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
         let mut rotation_count = 0;
-        let mut fw = FileWatcher::new(path.clone(), 0, None).expect("must be able to create");
+        let mut fw =
+            FileWatcher::new(path.clone(), 0, None, 100_000).expect("must be able to create");
 
         let mut writes = 0;
         let mut sut_reads = 0;
@@ -259,7 +260,7 @@ mod test {
                     let mut buf = Vec::new();
                     let mut attempts = 10;
                     while attempts > 0 {
-                        match fw.read_line(&mut buf, 100_000) {
+                        match fw.read_line(&mut buf) {
                             Err(_) => {
                                 unreachable!();
                             }
@@ -295,7 +296,8 @@ mod test {
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
         let mut rotation_count = 0;
-        let mut fw = FileWatcher::new(path.clone(), 0, None).expect("must be able to create");
+        let mut fw =
+            FileWatcher::new(path.clone(), 0, None, 100_000).expect("must be able to create");
 
         let mut fwfiles: Vec<FWFile> = vec![];
         fwfiles.push(FWFile::new());
@@ -330,7 +332,7 @@ mod test {
                     let mut buf = Vec::new();
                     let mut attempts = 10;
                     while attempts > 0 {
-                        match fw.read_line(&mut buf, 100_000) {
+                        match fw.read_line(&mut buf) {
                             Err(_) => {
                                 unreachable!();
                             }

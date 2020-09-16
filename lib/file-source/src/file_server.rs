@@ -204,7 +204,7 @@ where
                 }
 
                 let mut bytes_read: usize = 0;
-                while let Ok(sz) = watcher.read_line(&mut line_buffer, self.max_line_bytes) {
+                while let Ok(sz) = watcher.read_line(&mut line_buffer) {
                     if sz > 0 {
                         trace!(
                             message = "read bytes.",
@@ -321,7 +321,12 @@ where
         } else {
             checkpointer.get_checkpoint(file_id).unwrap_or(0)
         };
-        match FileWatcher::new(path.clone(), file_position, self.ignore_before) {
+        match FileWatcher::new(
+            path.clone(),
+            file_position,
+            self.ignore_before,
+            self.max_line_bytes,
+        ) {
             Ok(mut watcher) => {
                 if file_position == 0 {
                     self.emitter.emit_file_added(&path);
