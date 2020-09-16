@@ -11,7 +11,7 @@ use crate::{
             path::Path as QueryPath,
             Literal,
         },
-        Assignment, Deletion, Function, IfStatement, Mapping, Noop, OnlyFields, Result,
+        Path, Assignment, Deletion, Function, IfStatement, Mapping, Noop, OnlyFields, Result,
     },
 };
 use pest::{
@@ -24,7 +24,7 @@ static TOKEN_ERR: &str = "unexpected token sequence";
 
 #[derive(Parser)]
 #[grammar = "./mapping/parser/grammar.pest"]
-struct MappingParser;
+pub(crate) struct MappingParser;
 
 fn target_path_from_pair(pair: Pair<Rule>) -> Result<String> {
     let mut segments = Vec::new();

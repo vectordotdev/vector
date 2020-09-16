@@ -4,6 +4,8 @@ statement = _{ assignment | function | if_statement }
 
 assignment = { target_path ~ "=" ~ query_arithmetic }
 
+path = { dot_path }
+
 if_statement = {
     "if" ~ query_arithmetic ~ "{" ~ NEWLINE* ~
         statement ~
