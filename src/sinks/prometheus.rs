@@ -10,7 +10,6 @@ use chrono::Utc;
 use futures::{
     compat::Future01CompatExt, future, stream::BoxStream, FutureExt, StreamExt, TryFutureExt,
 };
-use futures01::Future;
 use hyper::{
     header::HeaderValue,
     service::{make_service_fn, service_fn},
@@ -21,6 +20,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
     collections::{BTreeMap, HashSet},
+    convert::Infallible,
     net::SocketAddr,
     sync::{Arc, RwLock},
 };
@@ -271,7 +271,7 @@ fn handle(
     buckets: &[f64],
     expired: bool,
     metrics: &IndexSet<MetricEntry>,
-) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send> {
+) -> Response<Body> {
     let mut response = Response::new(Body::empty());
 
     match (req.method(), req.uri().path()) {
@@ -310,7 +310,8 @@ fn handle(
         message = "Request complete",
         response_code = field::debug(response.status())
     );
-    Box::new(futures01::future::ok(response))
+
+    response
 }
 
 impl PrometheusSink {
@@ -343,18 +344,20 @@ impl PrometheusSink {
             let flush_period_secs = flush_period_secs;
 
             async move {
-                Ok::<_, crate::Error>(service_fn(move |req| {
+                Ok::<_, Infallible>(service_fn(move |req| {
                     let metrics = metrics.read().unwrap();
                     let last_flush_timestamp = last_flush_timestamp.read().unwrap();
                     let interval = (Utc::now().timestamp() - *last_flush_timestamp) as u64;
                     let expired = interval > flush_period_secs;
-                    info_span!(
+
+                    let response = info_span!(
                         "prometheus_server",
                         method = field::debug(req.method()),
                         path = field::debug(req.uri().path()),
                     )
-                    .in_scope(|| handle(req, namespace.as_deref(), &buckets, expired, &metrics))
-                    .compat()
+                    .in_scope(|| handle(req, namespace.as_deref(), &buckets, expired, &metrics));
+
+                    future::ok::<_, Infallible>(response)
                 }))
             }
         });
