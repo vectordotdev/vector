@@ -787,25 +787,8 @@ check-internal-events: ## Check that internal events satisfy patterns set in htt
 
 ##@ Packaging
 
-.PHONY: package-all
-package-all: package-archive-all package-deb-all package-rpm-all ## Build all packages
-
-.PHONY: package-x86_64-unknown-linux-musl-all
-package-x86_64-unknown-linux-musl-all: package-archive-x86_64-unknown-linux-musl package-deb-x86_64 package-rpm-x86_64 # Build all x86_64 MUSL packages
-
-
-.PHONY: package-x86_64-unknown-linux-musl-all
-package-x86_64-unknown-linux-musl-all: package-archive-x86_64-unknown-linux-musl # Build all x86_64 MUSL packages
-
-.PHONY: package-x86_64-unknown-linux-gnu-all
-package-x86_64-unknown-linux-gnu-all: package-archive-x86_64-unknown-linux-gnu package-deb-x86_64 package-rpm-x86_64 # Build all x86_64 GNU packages
-
-.PHONY: package-aarch64-unknown-linux-musl-all
-package-aarch64-unknown-linux-musl-all: package-archive-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
-
 # archives
-.PHONY: package-archive
-
+.PHONY: package
 target/artifacts/vector-%.tar.gz: export TRIPLE :=$(@:target/artifacts/vector-%.tar.gz=%)
 target/artifacts/vector-%.tar.gz: target/%/release/vector.tar.gz
 	@echo "Built to ${<}, relocating to ${@}"
@@ -814,29 +797,31 @@ target/artifacts/vector-%.tar.gz: target/%/release/vector.tar.gz
 		${<} \
 		${@}
 
-.PHONY: package-archive
-package-archive: build ## Build the Vector archive
+.PHONY: package
+package: build ## Build the Vector archive
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/package-archive.sh
 
-.PHONY: package-archive-all
-package-archive-all: package-archive-x86_64-unknown-linux-musl package-archive-x86_64-unknown-linux-gnu package-archive-aarch64-unknown-linux-musl ## Build all archives
+.PHONY: package-x86_64-unknown-linux-gnu-all
+package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-deb-x86_64 package-rpm-x86_64 # Build all x86_64 GNU packages
 
-.PHONY: package-archive-x86_64-unknown-linux-musl
-package-archive-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## Build the x86_64 archive
-	$(RUN) package-archive-x86_64-unknown-linux-musl
+.PHONY: package-aarch64-unknown-linux-musl-all
+package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
 
-.PHONY: package-archive-x86_64-unknown-linux-gnu
-package-archive-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build an archive of the x86_64-unknown-linux-gnu triple.
+.PHONY: package-x86_64-unknown-linux-gnu
+package-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build an archive of the x86_64-unknown-linux-gnu triple.
 	@echo "Output to ${<}."
 
-.PHONY: package-archive-aarch64-unknown-linux-musl
-package-archive-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## Build an archive of the aarch64-unknown-linux-gnu triple.
-	$(RUN) package-archive-aarch64-unknown-linux-musl
+.PHONY: package-x86_64-unknown-linux-musl
+package-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## Build the x86_64 musl archive
+	$(RUN) package-x86_64-unknown-linux-musl
 
-.PHONY: package-archive-aarch64-unknown-linux-gnu
-package-archive-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build the aarch64 archive
+.PHONY: package-aarch64-unknown-linux-musl
+package-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## Build an archive of the aarch64-unknown-linux-gnu triple.
+	$(RUN) package-aarch64-unknown-linux-musl
+
+.PHONY: package-aarch64-unknown-linux-gnu
+package-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build the aarch64 archive
 	@echo "Output to ${<}."
-
 
 # debs
 
@@ -844,32 +829,22 @@ package-archive-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unkno
 package-deb: ## Build the deb package
 	$(RUN) package-deb
 
-.PHONY: package-deb-all
-package-deb-all: package-deb-x86_64 ## Build all deb packages
-
 .PHONY: package-deb-x86_64
-package-deb-x86_64: package-archive-x86_64-unknown-linux-gnu ## Build the x86_64 deb package
+package-deb-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 deb package
 	$(RUN) package-deb-x86_64
 
 .PHONY: package-deb-aarch64
-package-deb-aarch64: package-archive-aarch64-unknown-linux-musl  ## Build the aarch64 deb package
+package-deb-aarch64: package-aarch64-unknown-linux-musl  ## Build the aarch64 deb package
 	$(RUN) package-deb-aarch64
 
 # rpms
 
-.PHONY: package-rpm
-package-rpm: ## Build the rpm package
-	@scripts/package-rpm.sh
-
-.PHONY: package-rpm-all
-package-rpm-all: package-rpm-x86_64 package-rpm-aarch64 ## Build all rpm packages
-
 .PHONY: package-rpm-x86_64
-package-rpm-x86_64: package-archive-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
+package-rpm-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
 	$(RUN) package-rpm-x86_64
 
 .PHONY: package-rpm-aarch64
-package-rpm-aarch64: package-archive-aarch64-unknown-linux-musl ## Build the aarch64 rpm package
+package-rpm-aarch64: package-aarch64-unknown-linux-musl ## Build the aarch64 rpm package
 	$(RUN) package-rpm-aarch64
 
 ##@ Releasing
