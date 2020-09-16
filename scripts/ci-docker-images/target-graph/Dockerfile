@@ -1,4 +1,4 @@
-FROM ubuntu:19.10
+FROM ubuntu:20.04
 
 RUN apt-get update && apt-get install -y build-essential git libgraph-easy-perl
 RUN git clone https://github.com/lindenb/makefile2graph && \

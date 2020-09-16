@@ -32,7 +32,7 @@ ARG CLANG_PREFIX=/usr
 ARG LIBS_PREFIX=/opt/libs
 
 # Libs
-FROM ubuntu:19.10 AS libs-builder
+FROM ubuntu:20.04 AS libs-builder
 
 ARG CLANG_PREFIX
 RUN apt-get update && apt-get install -y clang llvm lld
@@ -247,7 +247,7 @@ RUN echo > dummy.c && \
   rm dummy.c dummy.o
 
 # The actual builder.
-FROM ubuntu:19.10
+FROM ubuntu:20.04
 
 # Install Rust using rustup.
 RUN apt-get update && apt-get install -y curl
