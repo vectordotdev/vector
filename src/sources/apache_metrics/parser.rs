@@ -360,10 +360,10 @@ fn line_to_metrics<'a>(
     })
 }
 
-fn parse_numeric_value<T: std::str::FromStr>(key: &str, value: &str) -> Result<T, ParseError>
+fn parse_numeric_value<T>(key: &str, value: &str) -> Result<T, ParseError>
 where
-    <T as std::str::FromStr>::Err: Into<ValueParseError>,
-    <T as std::str::FromStr>::Err: 'static,
+    T: std::str::FromStr,
+    T::Err: Into<ValueParseError> + 'static,
 {
     value.parse::<T>().map_err(|err| ParseError {
         key: key.to_string(),
