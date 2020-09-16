@@ -40,16 +40,16 @@ if ! [ -x "$(command -v cargo-deb)" ]; then
 fi
 
 if ! [ -x "$(command -v cmark-gfm)" ]; then
-  cd /tmp && \
-    git clone https://github.com/github/cmark-gfm && \
-    cd cmark-gfm && \
-    git checkout 0.29.0.gfm.0 && \
-    make
-    sudo make install INSTALL_PREFIX=/usr && \
-    sudo ldconfig && \
-    cd .. && \
-    rm -rf cmark-gfm && \
-    cmark-gfm --version
+  if [ -x "$(command -v dpkg)" ]; then
+     wget http://ftp.br.debian.org/debian/pool/main/c/cmark-gfm/libcmark-gfm0_0.28.3.gfm.19-3_amd64.deb
+     wget http://ftp.br.debian.org/debian/pool/main/c/cmark-gfm/libcmark-gfm-extensions0_0.28.3.gfm.19-3_amd64.deb
+     wget http://ftp.br.debian.org/debian/pool/main/c/cmark-gfm/cmark-gfm_0.28.3.gfm.19-3_amd64.deb
+     sudo dpkg -i cmark-gfm_0.28.3.gfm.19-3_amd64.deb libcmark-gfm-extensions0_0.28.3.gfm.19-3_amd64.deb libcmark-gfm0_0.28.3.gfm.19-3_amd64.deb
+     cmark-gfm --version
+  else
+     echo "You need to install cmark-gfm"
+     exit 1
+  fi
 fi
 
 #
