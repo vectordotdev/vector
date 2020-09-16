@@ -311,27 +311,27 @@ impl RetryLogic for ElasticSearchRetryLogic {
             _ if status.is_success() => {
                 let body = String::from_utf8_lossy(response.body());
 
-                if !body.contains("\"errors\":true") {
-                    return RetryAction::Successful;
+                if body.contains("\"errors\":true") {
+                    RetryAction::DontRetry(get_error_reason(&body))
+                } else {
+                    RetryAction::Successful
                 }
-
-                let reason = match serde_json::from_str::<ESResultResponse>(&body) {
-                    Err(json_error) => format!(
-                        "some messages failed, could not parse response, error: {}",
-                        json_error
-                    ),
-                    Ok(resp) => match resp.items.into_iter().find_map(|item| item.index.error) {
-                        Some(error) => {
-                            format!("error type: {}, reason: {}", error.err_type, error.reason)
-                        }
-                        None => format!("error response: {}", body),
-                    },
-                };
-
-                RetryAction::DontRetry(reason)
             }
             _ => RetryAction::DontRetry(format!("response status: {}", status)),
         }
+    }
+}
+
+fn get_error_reason(body: &str) -> String {
+    match serde_json::from_str::<ESResultResponse>(&body) {
+        Err(json_error) => format!(
+            "some messages failed, could not parse response, error: {}",
+            json_error
+        ),
+        Ok(resp) => match resp.items.into_iter().find_map(|item| item.index.error) {
+            Some(error) => format!("error type: {}, reason: {}", error.err_type, error.reason),
+            None => format!("error response: {}", body),
+        },
     }
 }
 
