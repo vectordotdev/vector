@@ -539,6 +539,75 @@ impl Function for ParseJsonFn {
 
 //------------------------------------------------------------------------------
 
+/// Create an iterator that can walk a tree of Array values.
+/// This can be used to flatten the array.
+struct ValueFlatten<'a> {
+    values: std::slice::Iter<'a, Value>,
+    inner: Option<Box<ValueFlatten<'a>>>,
+}
+
+impl<'a> ValueFlatten<'a> {
+    fn new(values: std::slice::Iter<'a, Value>) -> Self {
+        ValueFlatten {
+            values,
+            inner: None,
+        }
+    }
+}
+
+impl<'a> std::iter::Iterator for ValueFlatten<'a> {
+    type Item = &'a Value;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Iterate over our inner list first.
+        if let Some(ref mut inner) = self.inner {
+            let next = inner.next();
+            if next.is_some() {
+                return next;
+            } else {
+                // The inner list has been exhausted.
+                self.inner = None;
+            }
+        }
+
+        // Then iterate over our values.
+        let next = self.values.next();
+        if let Some(Value::Array(next)) = next {
+            // Create a new iterator for this child list.
+            self.inner = Some(Box::new(ValueFlatten::new(next.iter())));
+            self.next()
+        } else {
+            next
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(in crate::mapping) struct FlattenFn {
+    query: Box<dyn Function>,
+}
+
+impl FlattenFn {
+    pub(in crate::mapping) fn new(query: Box<dyn Function>) -> Self {
+        FlattenFn { query }
+    }
+}
+
+impl Function for FlattenFn {
+    fn execute(&self, ctx: &Event) -> Result<Value> {
+        let value = self.query.execute(ctx)?;
+        if let Value::Array(arr) = value {
+            Ok(Value::Array(
+                ValueFlatten::new(arr.iter()).cloned().collect(),
+            ))
+        } else {
+            Err("unable to apply \"flatten\" to non-array types".to_string())
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1271,6 +1340,103 @@ mod tests {
                 },
                 Err("unable to parse json expected `:` at line 1 column 9".into()),
                 ParseJsonFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+        ];
+
+        for (input_event, exp, query) in cases {
+            assert_eq!(query.execute(&input_event), exp);
+        }
+    }
+
+    #[test]
+    fn check_flatten() {
+        let cases = vec![
+            (
+                {
+                    let mut event = Event::from("");
+                    event
+                        .as_mut_log()
+                        .insert("foo", Value::from(vec![Value::from(42)]));
+                    event
+                },
+                Ok(Value::from(vec![Value::from(42)])),
+                FlattenFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert(
+                        "foo",
+                        Value::from(vec![
+                            Value::from(42),
+                            Value::from(vec![Value::from(43), Value::from(44)]),
+                        ]),
+                    );
+                    event
+                },
+                Ok(Value::from(vec![
+                    Value::from(42),
+                    Value::from(43),
+                    Value::from(44),
+                ])),
+                FlattenFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert(
+                        "foo",
+                        Value::from(vec![Value::from(42), Value::Array(vec![]), Value::from(43)]),
+                    );
+                    event
+                },
+                Ok(Value::from(vec![Value::from(42), Value::from(43)])),
+                FlattenFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert(
+                        "foo",
+                        Value::from(vec![
+                            Value::from(42),
+                            Value::from(vec![
+                                Value::from(43),
+                                Value::from(44),
+                                Value::from(vec![Value::from(45), Value::from(46)]),
+                            ]),
+                        ]),
+                    );
+                    event
+                },
+                Ok(Value::from(vec![
+                    Value::from(42),
+                    Value::from(43),
+                    Value::from(44),
+                    Value::from(45),
+                    Value::from(46),
+                ])),
+                FlattenFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert(
+                        "foo",
+                        Value::from(vec![
+                            Value::from(vec![Value::from(42), Value::from(43)]),
+                            Value::from(vec![Value::from(44), Value::from(45)]),
+                        ]),
+                    );
+                    event
+                },
+                Ok(Value::from(vec![
+                    Value::from(42),
+                    Value::from(43),
+                    Value::from(44),
+                    Value::from(45),
+                ])),
+                FlattenFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
         ];
 

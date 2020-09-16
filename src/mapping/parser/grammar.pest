@@ -63,7 +63,8 @@ query_function = {
     now |
     strip_whitespace |
     truncate |
-    parse_json
+    parse_json |
+    flatten
 }
 
 to_string = { "to_string(" ~ query_arithmetic ~ ("," ~ (string | null) )? ~ ")"}
@@ -81,6 +82,7 @@ now = { "now(" ~ query_arithmetic ~ ")" }
 strip_whitespace = { "strip_whitespace(" ~ query_arithmetic ~ ")"}
 truncate = { "truncate(" ~ query_arithmetic ~ "," ~ query_arithmetic ~ ("," ~ boolean)? ~ ")" }
 parse_json = { "parse_json(" ~ query_arithmetic ~ ")" }
+flatten = { "flatten(" ~ query_arithmetic ~ ")" }
 
 group = { "(" ~ query_arithmetic ~ ")" }
 

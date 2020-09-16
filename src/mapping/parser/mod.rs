@@ -8,7 +8,7 @@ use crate::{
             arithmetic::Arithmetic,
             arithmetic::Operator,
             functions::{
-                DowncaseFn, Md5Fn, NotFn, NowFn, ParseJsonFn, ParseTimestampFn, Sha1Fn,
+                DowncaseFn, FlattenFn, Md5Fn, NotFn, NowFn, ParseJsonFn, ParseTimestampFn, Sha1Fn,
                 StripWhitespaceFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn,
                 TruncateFn, UpcaseFn, UuidV4Fn,
             },
@@ -340,6 +340,11 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
             let param = pair.into_inner().next().ok_or(TOKEN_ERR)?;
             let query = query_arithmetic_from_pair(param)?;
             Ok(Box::new(ParseJsonFn::new(query)))
+        }
+        Rule::flatten => {
+            let param = pair.into_inner().next().ok_or(TOKEN_ERR)?;
+            let query = query_arithmetic_from_pair(param)?;
+            Ok(Box::new(FlattenFn::new(query)))
         }
 
         _ => unreachable!("parser should not allow other query_function child rules here"),
@@ -1076,6 +1081,13 @@ mod tests {
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ParseJsonFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                ".foo = flatten(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(FlattenFn::new(Box::new(QueryPath::from("foo")))),
                 ))]),
             ),
             (
