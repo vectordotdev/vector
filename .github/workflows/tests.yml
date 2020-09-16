@@ -47,7 +47,7 @@ env:
 jobs:
   cancel-previous:
     name: Cancel redundant jobs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
