@@ -49,6 +49,7 @@ if ! [ -x "$(command -v rpmbuild)" ]; then
   else
     echo "You need to install rpmbuild"
     exit 1
+  fi
 fi
 
 #
