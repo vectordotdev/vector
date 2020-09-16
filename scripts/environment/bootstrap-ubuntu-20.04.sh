@@ -3,11 +3,11 @@ set -e -o verbose
 
 export DEBIAN_FRONTEND=noninteractive
 
-apt-get install -y grub-efi
+apt-get install --yes grub-efi
 update-grub
 
-apt update -y -qq
-apt upgrade -y -qq
+apt update --yes
+apt upgrade --yes
 
 # Deps
 apt install --yes \
