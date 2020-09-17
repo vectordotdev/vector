@@ -197,7 +197,6 @@ There are alternative implementations of the Resource Metrics API that don't
 have this limitation:
 
 - <https://github.com/DirectXMan12/k8s-prometheus-adapter>
-- <https://github.com/kedacore/keda>
 
 Overall, it looks like Metrics API is designed to allow external monitoring
 tools to route data in such a way that it's available in a "native" fashion
