@@ -40,7 +40,7 @@ services:
     user: $USER
     command: scripts/build.sh
 
-  package-archive-x86_64-unknown-linux-musl:
+  package-x86_64-unknown-linux-musl:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile
@@ -58,7 +58,7 @@ services:
     user: $USER
     command: ./scripts/package-archive.sh
 
-  package-archive-aarch64-unknown-linux-musl:
+  package-aarch64-unknown-linux-musl:
     build:
       context: .
       dockerfile: scripts/ci-docker-images/builder-aarch64-unknown-linux-musl/Dockerfile
