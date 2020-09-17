@@ -18,6 +18,9 @@ This RFC will not cover:
   - fetching metrics from Prometheus server deployed for "Full metrics
     pipeline" - Prometheus can natively monitor Kubernetes, nodes, and itself,
     and we could just grab all the metrics from it;
+  - gathering metrics over the living Kubernetes API Objects - not resource
+    usage, but arbitrary metrics - see
+    <https://github.com/kubernetes/kube-state-metrics>;
 - Vendor-specific Metrics API implementations - we focus on Resource Metrics
   API for now.
 
@@ -191,7 +194,6 @@ not the Metrics API / Resource Metrics API general limitation.
 There are alternative implementations of the Resource Metrics API that don't
 have this limitation:
 
-- <https://github.com/kubernetes/kube-state-metrics>
 - <https://github.com/DirectXMan12/k8s-prometheus-adapter>
 
 Overall, it looks like Metrics API is designed to allow external monitoring
