@@ -5,6 +5,7 @@ use crate::{
     types::Conversion,
 };
 use bytes::Bytes;
+use chrono::{TimeZone, Utc};
 
 #[derive(Debug)]
 pub(in crate::mapping) struct NotFn {
@@ -190,19 +191,14 @@ impl Function for ToTimestampFn {
 }
 
 fn to_timestamp(value: Value) -> Result<Value> {
-    use chrono::{TimeZone, Utc};
-
     match value {
-        Value::Bytes(b) => {
-            return Conversion::Timestamp
-                .convert(Value::Bytes(b))
-                .map_err(|e| e.to_string())
-        }
-        Value::Integer(i) => Ok(Utc.timestamp(i, 0)),
-        Value::Timestamp(t) => Ok(t),
+        Value::Bytes(_) => Conversion::Timestamp
+            .convert(value)
+            .map_err(|e| e.to_string()),
+        Value::Integer(i) => Ok(Value::Timestamp(Utc.timestamp(i, 0))),
+        Value::Timestamp(_) => Ok(value),
         _ => Err("unable to parse non-string or integer type to timestamp".to_string()),
     }
-    .map(Value::Timestamp)
 }
 
 //------------------------------------------------------------------------------
@@ -419,7 +415,7 @@ impl NowFn {
 
 impl Function for NowFn {
     fn execute(&self, _: &Event) -> Result<Value> {
-        Ok(Value::Timestamp(chrono::Utc::now()))
+        Ok(Value::Timestamp(Utc::now()))
     }
 }
 
