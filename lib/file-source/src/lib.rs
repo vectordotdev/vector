@@ -257,14 +257,13 @@ mod test {
                     read_index += 1;
                 }
                 FWAction::Read => {
-                    let mut buf = Vec::new();
                     let mut attempts = 10;
                     while attempts > 0 {
-                        match fw.read_line(&mut buf) {
+                        match fw.read_line() {
                             Err(_) => {
                                 unreachable!();
                             }
-                            Ok(0) => {
+                            Ok(line) if line.is_empty() => {
                                 attempts -= 1;
                                 continue;
                             }
@@ -329,24 +328,22 @@ mod test {
                     read_index += 1;
                 }
                 FWAction::Read => {
-                    let mut buf = Vec::new();
                     let mut attempts = 10;
                     while attempts > 0 {
-                        match fw.read_line(&mut buf) {
+                        match fw.read_line() {
                             Err(_) => {
                                 unreachable!();
                             }
-                            Ok(0) => {
+                            Ok(line) if line.is_empty() => {
                                 attempts -= 1;
                                 assert!(fwfiles[read_index].read_line().is_none());
                                 continue;
                             }
-                            Ok(sz) => {
+                            Ok(line) => {
                                 let exp =
                                     fwfiles[read_index].read_line().expect("could not readline");
-                                assert_eq!(exp.into_bytes(), buf);
-                                assert_eq!(sz, buf.len() + 1);
-                                buf.clear();
+                                assert_eq!(exp.into_bytes(), line);
+                                // assert_eq!(sz, buf.len() + 1);
                                 break;
                             }
                         }

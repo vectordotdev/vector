@@ -1,4 +1,5 @@
 use crate::FilePosition;
+use bytes::{Bytes, BytesMut};
 use flate2::bufread::MultiGzDecoder;
 use std::{
     fs::{self, File},
@@ -28,6 +29,7 @@ pub struct FileWatcher {
     last_read_attempt: Instant,
     last_read_success: Instant,
     max_line_bytes: usize,
+    buf: BytesMut,
 }
 
 impl FileWatcher {
@@ -96,6 +98,7 @@ impl FileWatcher {
             last_read_attempt: ts,
             last_read_success: ts,
             max_line_bytes,
+            buf: BytesMut::new(),
         })
     }
 
@@ -147,18 +150,16 @@ impl FileWatcher {
     /// This function will attempt to read a new line from its file, blocking,
     /// up to some maximum but unspecified amount of time. `read_line` will open
     /// a new file handler as needed, transparently to the caller.
-    pub fn read_line(&mut self, mut buffer: &mut Vec<u8>) -> io::Result<usize> {
+    pub fn read_line(&mut self) -> io::Result<Bytes> {
         self.track_read_attempt();
 
-        // ensure buffer is re-initialized
-        buffer.clear();
         let reader = &mut self.reader;
         let file_position = &mut self.file_position;
         match read_until_with_max_size(
             reader,
             file_position,
             b'\n',
-            &mut buffer,
+            &mut self.buf,
             self.max_line_bytes,
         ) {
             Ok(sz) => {
@@ -170,7 +171,7 @@ impl FileWatcher {
                     self.set_dead();
                 }
 
-                Ok(sz)
+                Ok(self.buf.split().freeze())
             }
             Err(e) => {
                 if let io::ErrorKind::NotFound = e.kind() {
@@ -215,7 +216,7 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
     r: &mut R,
     p: &mut FilePosition,
     delim: u8,
-    buf: &mut Vec<u8>,
+    buf: &mut BytesMut,
     max_size: usize,
 ) -> io::Result<usize> {
     let mut total_read = 0;
@@ -275,52 +276,53 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
 #[cfg(test)]
 mod test {
     use super::read_until_with_max_size;
+    use bytes::BytesMut;
     use std::io::Cursor;
 
     #[test]
     fn test_read_until_with_max_size() {
         let mut buf = Cursor::new(&b"12"[..]);
         let mut pos = 0;
-        let mut v = Vec::new();
+        let mut v = BytesMut::new();
         let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000).unwrap();
         assert_eq!(pos, 2);
         assert_eq!(p, 2);
-        assert_eq!(v, b"12");
+        assert_eq!(&*v, b"12");
 
         let mut buf = Cursor::new(&b"1233"[..]);
         let mut pos = 0;
-        let mut v = Vec::new();
+        let mut v = BytesMut::new();
         let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000).unwrap();
         assert_eq!(pos, 3);
         assert_eq!(p, 3);
-        assert_eq!(v, b"12");
+        assert_eq!(&*v, b"12");
         v.truncate(0);
         let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000).unwrap();
         assert_eq!(pos, 4);
         assert_eq!(p, 1);
-        assert_eq!(v, b"");
+        assert_eq!(&*v, b"");
         v.truncate(0);
         let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000).unwrap();
         assert_eq!(pos, 4);
         assert_eq!(p, 0);
-        assert_eq!(v, []);
+        assert_eq!(&*v, []);
 
         let mut buf = Cursor::new(&b"short\nthis is too long\nexact size\n11 eleven11\n"[..]);
         let mut pos = 0;
-        let mut v = Vec::new();
+        let mut v = BytesMut::new();
         let p = read_until_with_max_size(&mut buf, &mut pos, b'\n', &mut v, 10).unwrap();
         assert_eq!(pos, 6);
         assert_eq!(p, 6);
-        assert_eq!(v, b"short");
+        assert_eq!(&*v, b"short");
         v.truncate(0);
         let p = read_until_with_max_size(&mut buf, &mut pos, b'\n', &mut v, 10).unwrap();
         assert_eq!(pos, 34);
         assert_eq!(p, 28);
-        assert_eq!(v, b"exact size");
+        assert_eq!(&*v, b"exact size");
         v.truncate(0);
         let p = read_until_with_max_size(&mut buf, &mut pos, b'\n', &mut v, 10).unwrap();
         assert_eq!(pos, 46);
         assert_eq!(p, 12);
-        assert_eq!(v, []);
+        assert_eq!(&*v, []);
     }
 }
