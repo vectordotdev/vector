@@ -143,7 +143,7 @@ fn apache_metrics(
                                     Ok(metric) => Some(metric),
                                     Err(e) => {
                                         emit!(ApacheMetricsParseError {
-                                            error: e.into(),
+                                            error: e,
                                             url: url.clone(),
                                         });
                                         None
