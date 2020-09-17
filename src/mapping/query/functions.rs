@@ -190,12 +190,14 @@ impl Function for ToTimestampFn {
 }
 
 fn to_timestamp(value: Value) -> Result<Value> {
-    use chrono::{DateTime, TimeZone, Utc};
+    use chrono::{TimeZone, Utc};
 
     match value {
-        Value::Bytes(b) => DateTime::parse_from_rfc3339(&String::from_utf8_lossy(&b))
-            .map(|dt| dt.with_timezone(&Utc))
-            .map_err(|_| "cannot parse string as RFC3339".to_owned()),
+        Value::Bytes(b) => {
+            return Conversion::Timestamp
+                .convert(Value::Bytes(b))
+                .map_err(|e| e.to_string())
+        }
         Value::Integer(i) => Ok(Utc.timestamp(i, 0)),
         Value::Timestamp(t) => Ok(t),
         _ => Err("unable to parse non-string or integer type to timestamp".to_string()),
@@ -741,6 +743,18 @@ mod tests {
                 ToTimestampFn::new(
                     Box::new(Path::from(vec![vec!["foo"]])),
                     Some(Value::Integer(10)),
+                ),
+            ),
+            (
+                Event::from(""),
+                Ok(Value::Timestamp(
+                    DateTime::parse_from_rfc3339("1970-01-01T00:00:10Z")
+                        .unwrap()
+                        .with_timezone(&Utc),
+                )),
+                ToTimestampFn::new(
+                    Box::new(Path::from(vec![vec!["foo"]])),
+                    Some(Value::Bytes("10".into())),
                 ),
             ),
             (
