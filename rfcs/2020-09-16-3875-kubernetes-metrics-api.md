@@ -6,8 +6,9 @@ This RFC explores ways to integrate with Kubernetes Metrics API.
 
 This RFC will cover:
 
-- what's Metrics API, how it's defined, how it's deployed, hot to access it;
-- how should we integrate with Metrics API, and should we do it in the first place;
+- what's Metrics API, how it's defined, how it's deployed, how to access it;
+- how should we integrate with Metrics API, and should we do it in the first
+  place;
 
 This RFC will not cover:
 
