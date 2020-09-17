@@ -43,13 +43,7 @@ inventory::submit! {
 }
 
 async fn healthcheck(endpoint: String, mut client: HttpClient) -> crate::Result<()> {
-    // Note, this is not the most ideal endpoint for a healthcheck.
-    // Sematext will hopefully be setting up a 'ping' endpoint that we can use in due course.
-    let uri = format!(
-        "{}/write?db=metrics&v=vector-{}",
-        endpoint,
-        vector_version()
-    );
+    let uri = format!("{}/health", endpoint);
 
     let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
