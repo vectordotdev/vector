@@ -249,14 +249,10 @@ mod integration_tests {
         let (topic, subscription) = create_topic_subscription().await;
         let (sink, healthcheck) = config_build(&topic).await;
 
-        healthcheck.compat().await.expect("Health check failed");
+        healthcheck.await.expect("Health check failed");
 
-        let (input, mut events) = random_events_with_stream(100, 100);
-        let _ = sink
-            .sink_compat()
-            .send_all(&mut events)
-            .await
-            .expect("Sending events failed");
+        let (input, events) = random_events_with_stream(100, 100);
+        sink.run(events).await.expect("Sending events failed");
 
         let response = pull_messages(&subscription, 1000).await;
         let messages = response
@@ -280,7 +276,6 @@ mod integration_tests {
         let topic = format!("BAD{}", topic);
         let (_sink, healthcheck) = config_build(&topic).await;
         healthcheck
-            .compat()
             .await
             .expect_err("Health check did not fail");
     }
