@@ -275,9 +275,7 @@ mod integration_tests {
         let (topic, _subscription) = create_topic_subscription().await;
         let topic = format!("BAD{}", topic);
         let (_sink, healthcheck) = config_build(&topic).await;
-        healthcheck
-            .await
-            .expect_err("Health check did not fail");
+        healthcheck.await.expect_err("Health check did not fail");
     }
 
     async fn create_topic_subscription() -> (String, String) {
