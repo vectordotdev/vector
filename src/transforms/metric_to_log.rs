@@ -1,19 +1,17 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{
-        self,
-        metric::{MetricKind, MetricValue, StatisticKind},
-        Event, LogEvent, Metric, Value,
-    },
+    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    event::{Event, LogEvent},
+    types::Conversion,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use serde_json::Value;
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct MetricToLogConfig {
-    pub host_tag: Option<String>,
+    pub host_tag: Option<Atom>,
 }
 
 inventory::submit! {
@@ -40,147 +38,64 @@ impl TransformConfig for MetricToLogConfig {
 }
 
 pub struct MetricToLog {
-    host_tag: String,
+    timestamp_key: Atom,
+    host_tag: Atom,
 }
 
 impl MetricToLog {
-    pub fn new(host_tag: Option<String>) -> Self {
+    pub fn new(host_tag: Option<Atom>) -> Self {
         Self {
-            host_tag: host_tag.unwrap_or_else(|| event::log_schema().host_key().to_string()),
+            timestamp_key: Atom::from("timestamp"),
+            host_tag: Atom::from(format!(
+                "tags.{}",
+                host_tag.unwrap_or_else(|| log_schema().host_key().clone())
+            )),
         }
     }
 }
 
 impl Transform for MetricToLog {
     fn transform(&mut self, event: Event) -> Option<Event> {
-        let Metric {
-            name,
-            timestamp,
-            tags,
-            kind,
-            value,
-        } = event.into_metric();
+        let metric = event.into_metric();
 
-        let mut log = LogEvent::default();
-        log.insert_flat("name", name);
-        log.insert_flat("kind", kind);
+        serde_json::to_vec(&metric)
+            .ok()
+            .and_then(|buffer| serde_json::from_slice::<Value>(buffer.as_slice()).ok())
+            .and_then(|value| {
+                if let Value::Object(object) = value {
+                    let mut log = LogEvent::default();
 
-        if let Some(timestamp) = timestamp {
-            log.insert(&event::log_schema().timestamp_key(), timestamp);
-        }
+                    for (key, value) in object {
+                        log.insert_flat(key, value);
+                    }
 
-        if let Some(mut tags) = tags {
-            if let Some(host) = tags.remove(&self.host_tag) {
-                log.insert(&self.host_tag, host);
-            }
-            log.insert_flat("tags", tags);
-        }
+                    if let Some(value) = log.remove(&self.timestamp_key) {
+                        if let Ok(timestamp) = Conversion::Timestamp.convert(value) {
+                            log.insert(&log_schema().timestamp_key(), timestamp);
+                        }
+                    }
 
-        match value {
-            MetricValue::Counter { value } => {
-                log.insert("counter.value", value);
-            }
-            MetricValue::Gauge { value } => {
-                log.insert("gauge.value", value);
-            }
-            MetricValue::Set { values } => {
-                log.insert(
-                    "set.values",
-                    values.into_iter().map(Value::from).collect::<Vec<_>>(),
-                );
-            }
-            MetricValue::Distribution {
-                values,
-                sample_rates,
-                statistic,
-            } => {
-                let values = values.into_iter().map(Value::from).collect::<Vec<_>>();
-                let sample_rates = sample_rates
-                    .into_iter()
-                    .map(|i| Value::from(i as i64))
-                    .collect::<Vec<_>>();
+                    if let Some(host) = log.remove_prune(&self.host_tag, true) {
+                        log.insert(&log_schema().host_key(), host);
+                    }
 
-                let mut map = BTreeMap::new();
-                map.insert("values".to_string(), Value::from(values));
-                map.insert("sample_rates".to_string(), Value::from(sample_rates));
-                map.insert("statistic".to_string(), Value::from(statistic));
-                log.insert_flat("distribution", map);
-            }
-            MetricValue::AggregatedHistogram {
-                buckets,
-                counts,
-                count,
-                sum,
-            } => {
-                let buckets = buckets.into_iter().map(Value::from).collect::<Vec<_>>();
-                let counts = counts
-                    .into_iter()
-                    .map(|i| Value::from(i as i64))
-                    .collect::<Vec<_>>();
-
-                let mut map = BTreeMap::new();
-                map.insert("buckets".to_string(), Value::from(buckets));
-                map.insert("counts".to_string(), Value::from(counts));
-                map.insert("count".to_string(), Value::from(count as i64));
-                map.insert("sum".to_string(), Value::from(sum));
-                log.insert_flat("aggregated_histogram", map);
-            }
-            MetricValue::AggregatedSummary {
-                quantiles,
-                values,
-                count,
-                sum,
-            } => {
-                let quantiles = quantiles.into_iter().map(Value::from).collect::<Vec<_>>();
-                let values = values.into_iter().map(Value::from).collect::<Vec<_>>();
-
-                let mut map = BTreeMap::new();
-                map.insert("quantiles".to_string(), Value::from(quantiles));
-                map.insert("values".to_string(), Value::from(values));
-                map.insert("count".to_string(), Value::from(count as i64));
-                map.insert("sum".to_string(), Value::from(sum));
-                log.insert_flat("aggregated_summary", map);
-            }
-        }
-
-        Some(Event::Log(log))
-    }
-}
-
-impl From<MetricKind> for Value {
-    fn from(kind: MetricKind) -> Self {
-        match kind {
-            MetricKind::Incremental => "incremental",
-            MetricKind::Absolute => "absolute",
-        }
-        .into()
-    }
-}
-
-impl From<BTreeMap<String, String>> for Value {
-    fn from(value: BTreeMap<String, String>) -> Self {
-        let value = value
-            .into_iter()
-            .map(|(k, v)| (k, Value::from(v)))
-            .collect::<BTreeMap<_, _>>();
-        Value::Map(value)
-    }
-}
-
-impl From<StatisticKind> for Value {
-    fn from(kind: StatisticKind) -> Self {
-        match kind {
-            StatisticKind::Histogram => "histogram",
-            StatisticKind::Summary => "summary",
-        }
-        .into()
+                    Some(log.into())
+                } else {
+                    None
+                }
+            })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::{
+        metric::{MetricKind, MetricValue, StatisticKind},
+        Metric, Value,
+    };
     use chrono::{offset::TimeZone, DateTime, Utc};
+    use std::collections::BTreeMap;
 
     fn do_transform(metric: Metric) -> Option<LogEvent> {
         let event = Event::Metric(metric);
@@ -240,7 +155,7 @@ mod tests {
         let gauge = Metric {
             name: "gauge".into(),
             timestamp: None,
-            tags: None,
+            tags: Some(tags()),
             kind: MetricKind::Absolute,
             value: MetricValue::Gauge { value: 1.0 },
         };
@@ -252,8 +167,10 @@ mod tests {
             collected,
             vec![
                 (String::from("gauge.value"), &Value::from(1.0)),
+                (String::from("host"), &Value::from("localhost")),
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("gauge")),
+                (String::from("tags.some_tag"), &Value::from("some_value")),
             ]
         );
     }
@@ -263,7 +180,7 @@ mod tests {
         let set = Metric {
             name: "set".into(),
             timestamp: None,
-            tags: None,
+            tags: Some(tags()),
             kind: MetricKind::Absolute,
             value: MetricValue::Set {
                 values: vec!["one".into(), "two".into()].into_iter().collect(),
@@ -276,10 +193,12 @@ mod tests {
         assert_eq!(
             collected,
             vec![
+                (String::from("host"), &Value::from("localhost")),
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("set")),
                 (String::from("set.values[0]"), &Value::from("one")),
                 (String::from("set.values[1]"), &Value::from("two")),
+                (String::from("tags.some_tag"), &Value::from("some_value")),
             ]
         );
     }
@@ -289,7 +208,7 @@ mod tests {
         let distro = Metric {
             name: "distro".into(),
             timestamp: None,
-            tags: None,
+            tags: Some(tags()),
             kind: MetricKind::Absolute,
             value: MetricValue::Distribution {
                 values: vec![1.0, 2.0],
@@ -318,8 +237,10 @@ mod tests {
                 ),
                 (String::from("distribution.values[0]"), &Value::from(1.0)),
                 (String::from("distribution.values[1]"), &Value::from(2.0)),
+                (String::from("host"), &Value::from("localhost")),
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("distro")),
+                (String::from("tags.some_tag"), &Value::from("some_value")),
             ]
         );
     }
@@ -329,7 +250,7 @@ mod tests {
         let histo = Metric {
             name: "histo".into(),
             timestamp: None,
-            tags: None,
+            tags: Some(tags()),
             kind: MetricKind::Absolute,
             value: MetricValue::AggregatedHistogram {
                 buckets: vec![1.0, 2.0],
@@ -363,8 +284,10 @@ mod tests {
                     &Value::from(20)
                 ),
                 (String::from("aggregated_histogram.sum"), &Value::from(50.0)),
+                (String::from("host"), &Value::from("localhost")),
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("histo")),
+                (String::from("tags.some_tag"), &Value::from("some_value")),
             ]
         );
     }
@@ -374,7 +297,7 @@ mod tests {
         let summary = Metric {
             name: "summary".into(),
             timestamp: None,
-            tags: None,
+            tags: Some(tags()),
             kind: MetricKind::Absolute,
             value: MetricValue::AggregatedSummary {
                 quantiles: vec![50.0, 90.0],
@@ -408,8 +331,10 @@ mod tests {
                     String::from("aggregated_summary.values[1]"),
                     &Value::from(20.0)
                 ),
+                (String::from("host"), &Value::from("localhost")),
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("summary")),
+                (String::from("tags.some_tag"), &Value::from("some_value")),
             ]
         );
     }
