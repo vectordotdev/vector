@@ -111,6 +111,7 @@ scopes:
   - yandex service # Anything `yandex` service provider related
 
   # sources
+  - apache_metrics source # Anything `apache_metrics` source related
   - docker source # Anything `docker` source related
   - file source # Anything `file` source related
   - generator source # Anything `generator` source related
