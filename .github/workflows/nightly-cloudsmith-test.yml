@@ -2,8 +2,6 @@ name: nightly-cloudsmith-test
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 4 * * *"
 
 env:
   AUTOINSTALL: true
@@ -11,18 +9,6 @@ env:
   VERBOSE: true
 
 jobs:
-  build-x86_64-unknown-linux-musl-packages:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-      - env:
-          PASS_FEATURES: "default-cmake"
-        run: make package-x86_64-unknown-linux-musl
-      - uses: actions/upload-artifact@v1
-        with:
-          name: "vector-x86_64-unknown-linux-musl.tar.gz"
-          path: "./target/artifacts/vector-x86_64-unknown-linux-musl.tar.gz"
-
   build-x86_64-unknown-linux-gnu-packages:
     runs-on: ubuntu-latest
     steps:
@@ -63,7 +49,6 @@ jobs:
         with:
           name: "vector-aarch64.rpm"
           path: "./target/artifacts/vector-aarch64.rpm"
-
 
   release-cloudsmith:
     runs-on: ubuntu-latest
