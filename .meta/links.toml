@@ -18,6 +18,7 @@ program_transforms = "/components/?functions%5B%5D=program"
 [links.urls]
 add_company = "https://github.com/timberio/vector/blob/master/.meta/companies.toml"
 apache = "https://httpd.apache.org/"
+apache_extended_status = "https://httpd.apache.org/docs/current/mod/core.html#extendedstatus"
 apache_mod_status = "http://httpd.apache.org/docs/current/mod/mod_status.html"
 apt = "https://en.wikipedia.org/wiki/APT_(software)"
 arm = "https://en.wikipedia.org/wiki/ARM_architecture"
