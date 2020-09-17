@@ -2,6 +2,9 @@ use super::Transform;
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, LogEvent},
+    internal_events::{
+        MetricToLogEventProcessed, MetricToLogFailedDeserialize, MetricToLogFailedSerialize,
+    },
     types::Conversion,
 };
 use serde::{Deserialize, Serialize};
@@ -57,10 +60,16 @@ impl MetricToLog {
 impl Transform for MetricToLog {
     fn transform(&mut self, event: Event) -> Option<Event> {
         let metric = event.into_metric();
+        emit!(MetricToLogEventProcessed);
 
         serde_json::to_vec(&metric)
+            .map_err(|error| emit!(MetricToLogFailedSerialize { error }))
             .ok()
-            .and_then(|buffer| serde_json::from_slice::<Value>(buffer.as_slice()).ok())
+            .and_then(|buffer| {
+                serde_json::from_slice::<Value>(buffer.as_slice())
+                    .map_err(|error| emit!(MetricToLogFailedDeserialize { error }))
+                    .ok()
+            })
             .and_then(|value| {
                 if let Value::Object(object) = value {
                     let mut log = LogEvent::default();
