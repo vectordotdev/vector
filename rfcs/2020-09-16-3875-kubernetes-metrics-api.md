@@ -183,21 +183,6 @@ of the Metrics API to better understand the idea on how it all works.
 
 ## Should we use it
 
-There's a note in the `Metrics Server` `README.md`:
-
-> Metrics Server is not meant for non-autoscaling purposes.
-> For example, don't use it to forward metrics to monitoring solutions, or as a
-> source of monitoring solution metrics.
-
-I'm following up on that with the `sig-instrumentation`.
-For now, it looks like this is an aspect of the Metrics Server implementation,
-not the Metrics API / Resource Metrics API general limitation.
-
-There are alternative implementations of the Resource Metrics API that don't
-have this limitation:
-
-- <https://github.com/DirectXMan12/k8s-prometheus-adapter>
-
 Overall, it looks like Metrics API is designed to allow external monitoring
 tools to route data in such a way that it's available in a "native" fashion
 to the Horizontal Pod Autoscaler and other Kubernetes components that rely on
@@ -211,9 +196,42 @@ the same shape and form, and are therefore portable and independent on the
 underlying monitoring solution. They are dependent of the Kubernetes API though,
 which is arguable harder to maintain than a Prometheus scraping format.
 
-To sum up - it's an open question. My inquiry regarding the use of the
-Metrics Server for the source of data for Vector at `sig-instrumentation` might
-make this possibility obsolete - but who knows.
+There's a note in the `Metrics Server` `README.md`:
+
+> Metrics Server is not meant for non-autoscaling purposes.
+> For example, don't use it to forward metrics to monitoring solutions, or as a
+> source of monitoring solution metrics.
+
+I asked people from the `sig-instrumentation` to comment on this.
+
+The reason why they don't want monitoring tools to use Metrics API is that the
+reported metrics are not considered accurate. However, we are totally fine using
+it if whe treat this data at _inputs to the autoscalers_ - the difference being
+that we don't assume those to be accurate metrics - just merely some values that
+Kubernetes autoscalers see and act upon. They can still be very useful to our
+users to better understand how autoscalers are behaving and how their cluster
+estimates it's capacity, however they can't be considered accurate metrics on
+the resources. If we implement this, it important that we communicate this
+semantic aspect to the end users.
+
+Source: <https://kubernetes.slack.com/archives/C20HH14P7/p1600368737067500?thread_ts=1600347316.062400&cid=C20HH14P7>
+
+### The verdict
+
+Given that the data is not accurate, and the implementation is quite challenging
+(see <https://github.com/Arnavion/k8s-openapi/issues/76> - there are some
+technical difficulties with support for client generation - nothing impossible,
+but some effort is needed) and the underlying data is likely available via other
+means (for instance - via Prometheus endpoints of that same Metrics Server) -
+it would probably be more effective to focus on other ways to ingest metrics
+from the Kubernetes ecosystem now.
+
+We can and come back to this later. Signs that we want to revisit this would be
+voiced user demand for this feature or the necessity to monitor specifically
+the autoscalers inputs.
+
+It is still not clear if this data is easily available from elsewhere - but if
+it is, it's likely accessible via Prometheus scraping protocol.
 
 ## How to use it
 
