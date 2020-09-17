@@ -65,7 +65,7 @@ jobs:
           path: "./target/artifacts/vector-aarch64.rpm"
 
 
-   release-cloudsmith:
+  release-cloudsmith:
     runs-on: ubuntu-latest
     needs:
       - build-x86_64-unknown-linux-gnu-packages
