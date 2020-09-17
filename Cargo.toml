@@ -257,6 +257,7 @@ api = ["async-graphql", "async-graphql-warp"]
 
 # Sources
 sources = [
+  "sources-apache_metrics",
   "sources-docker",
   "sources-file",
   "sources-generator",
@@ -275,6 +276,7 @@ sources = [
   "sources-vector",
   "sources-kubernetes-logs",
 ]
+sources-apache_metrics = []
 sources-docker = ["bollard"]
 sources-file = ["bytesize"]
 sources-generator = []
