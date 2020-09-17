@@ -139,8 +139,6 @@ mod integration_tests {
         Event,
     };
     use chrono::Utc;
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
     use serde_json::{json, Value as JsonValue};
     use std::{collections::HashMap, convert::TryFrom};
 

@@ -219,10 +219,6 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::test_util::{random_events_with_stream, random_string, trace_init};
-    use futures::{
-        compat::{Future01CompatExt, Sink01CompatExt},
-        SinkExt,
-    };
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
 
