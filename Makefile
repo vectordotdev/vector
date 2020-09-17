@@ -244,7 +244,7 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 		--verbose \
 		--file target/${TRIPLE}/${PROFILE}/vector.tar.gz \
 		--directory target/scratch/ \
-		vector-${TRIPLE}
+		./vector-${TRIPLE}
 	rm -rf target/scratch/
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
