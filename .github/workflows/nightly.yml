@@ -78,7 +78,7 @@ jobs:
           NATIVE_BUILD: true
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          make package-archive
+          make package
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-x86_64-apple-darwin.tar.gz"
@@ -131,7 +131,7 @@ jobs:
           export RUST_LTO=""
           export TARGET="x86_64-pc-windows-msvc"
           export NATIVE_BUILD="true"
-          make package-archive
+          make package
       - name: "Build package"
         shell: bash
         run: |
