@@ -19,18 +19,18 @@ strategies = [
 
 <%= render("_partials/descriptions/_docker.toml") %>
 
-[installation.platforms.kubernetes]
-title = "Kubernetes"
-min_version = "1.14"
-archs = ["x86_64", "ARM64"]
-interfaces = [
-  "kubectl",
-  "helm",
-  "kustomize",
-]
-oss = ["Linux"]
-strategies = [
-  {name = "DaemonSet", source = "kubernetes_logs"},
-]
+# [installation.platforms.kubernetes]
+# title = "Kubernetes"
+# min_version = "1.14"
+# archs = ["x86_64", "ARM64"]
+# interfaces = [
+#   "kubectl",
+#   "helm",
+#   "kustomize",
+# ]
+# oss = ["Linux"]
+# strategies = [
+#   {name = "DaemonSet", source = "kubernetes_logs"},
+# ]
 
-<%= render("_partials/descriptions/_kubernetes.toml") %>
+# <%= render("_partials/descriptions/_kubernetes.toml") %>
