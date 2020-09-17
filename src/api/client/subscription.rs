@@ -9,6 +9,7 @@ use std::{
     pin::Pin,
     sync::{Arc, RwLock, Weak},
 };
+use tokio::sync::broadcast::SendError;
 use tokio::{net::TcpStream, select, stream::StreamExt, sync::broadcast, sync::oneshot};
 use tokio_tungstenite::{
     connect_async,
@@ -23,21 +24,24 @@ pub struct Payload {
     id: Uuid,
     #[serde(rename = "type")]
     payload_type: String,
+    payload: serde_json::Value,
 }
 
 impl Payload {
-    fn close(id: Uuid) -> Self {
-        Self {
-            id,
-            payload_type: String::from("close"),
+    pub fn response<T: GraphQLQuery>(&self) -> Option<graphql_client::Response<T::ResponseData>> {
+        match serde_json::from_value::<graphql_client::Response<T::ResponseData>>(
+            self.payload.clone(),
+        ) {
+            Ok(r) => Some(r),
+            Err(_) => None,
         }
     }
 }
 
-pub struct Subscription<T: GraphQLQuery> {
+#[derive(Debug)]
+pub struct Subscription {
     id: Uuid,
     tx: broadcast::Sender<Payload>,
-    payload: GraphQLQuer,
 }
 
 impl Subscription {
@@ -51,18 +55,21 @@ impl Subscription {
 
     /// Send a payload down the channel. This is synchronous because broadcast::Sender::send
     /// is also synchronous
-    fn transmit(&self, payload: Payload) -> Result<usize, broadcast::SendError<Payload>> {
+    fn transmit(&self, payload: Payload) -> Result<usize, SendError<Payload>> {
         self.tx.send(payload)
     }
 
     /// Returns a stream of `Payload` responses, received from the GraphQL server
-    pub fn stream(&self) -> Pin<Box<impl Stream<Item = Payload>>> {
+    pub fn stream<T: GraphQLQuery>(
+        &self,
+    ) -> Pin<Box<impl Stream<Item = Option<graphql_client::Response<T::ResponseData>>>>> {
         Box::pin(
             self.tx
                 .subscribe()
                 .into_stream()
                 .filter(Result::is_ok)
-                .map(Result::unwrap),
+                .map(Result::unwrap)
+                .map(|p| p.response::<T>()),
         )
     }
 }
@@ -105,7 +112,7 @@ impl SubscriptionClient {
                                 r.to_text()
                                     .ok()
                                     .and_then(|t| serde_json::from_str::<Payload>(t).ok())
-                            }).and_then(|p| Some((spawned_subscriptions.read().unwrap().get::<Uuid>(&p.id), p)));
+                            }).map(|p| (spawned_subscriptions.read().unwrap().get::<Uuid>(&p.id), p));
 
                         if let Some((Some(s), p)) = sp {
                             let _ = s.transmit(p);
@@ -152,9 +159,7 @@ impl SubscriptionClient {
         });
 
         // Send the message over the currently connected socket
-        self.ws_tx
-            .send(Message::Text(json.to_string().into()))
-            .await?;
+        self.ws_tx.send(Message::Text(json.to_string())).await?;
 
         Ok(subscription)
     }

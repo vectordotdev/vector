@@ -22,7 +22,7 @@ mod tests {
     )]
     struct HealthQuery;
 
-    type DateTime = chrono::NaiveDateTime;
+    type DateTime = chrono::DateTime<chrono::Utc>;
 
     #[derive(GraphQLQuery)]
     #[graphql(
@@ -151,7 +151,7 @@ mod tests {
             .unwrap();
 
         tokio::pin! {
-            let taken = subscription.stream().take(3);
+            let taken = subscription.stream::<HeartbeatSubscription>().take(3);
         }
 
         while let Some(payload) = taken.next().await {
