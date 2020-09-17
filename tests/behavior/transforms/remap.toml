@@ -402,4 +402,3 @@
     extract_from = "remap_function_now"
     [[tests.outputs.conditions]]
       "a.ends_with" = "Z"
-      "a.length_eq" = 27
