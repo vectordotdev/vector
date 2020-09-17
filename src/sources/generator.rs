@@ -1,6 +1,7 @@
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::Event,
+    internal_events::GeneratorEventProcessed,
     shutdown::ShutdownSignal,
     Pipeline,
 };
@@ -87,6 +88,8 @@ impl GeneratorConfig {
                 .lines
                 .iter()
                 .map(|line| {
+                    emit!(GeneratorEventProcessed);
+
                     if self.sequence {
                         number += 1;
                         Event::from(&format!("{} {}", number, line)[..])

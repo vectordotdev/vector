@@ -9,6 +9,8 @@ use snafu::{ResultExt, Snafu};
 use std::fs::DirBuilder;
 use std::path::PathBuf;
 
+#[cfg(feature = "api")]
+pub mod api;
 mod builder;
 mod compiler;
 pub mod component;
@@ -30,6 +32,8 @@ pub use validation::warnings;
 #[derive(Debug, Default)]
 pub struct Config {
     pub global: GlobalOptions,
+    #[cfg(feature = "api")]
+    pub api: api::Options,
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
     pub sinks: IndexMap<String, SinkOuter>,
     pub transforms: IndexMap<String, TransformOuter>,
