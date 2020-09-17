@@ -399,6 +399,51 @@ impl CheckFieldsPredicate for NegatePredicate {
 
 //------------------------------------------------------------------------------
 
+#[derive(Debug, Clone)]
+struct LengthEqualsPredicate {
+    target: Atom,
+    arg: i64,
+}
+
+impl LengthEqualsPredicate {
+    pub fn new(
+        target: String,
+        arg: &CheckFieldsPredicateArg,
+    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+        match arg {
+            CheckFieldsPredicateArg::Integer(i) => {
+                if *i < 0 {
+                    return Err("length_eq predicate integer cannot be negative".to_owned());
+                }
+
+                Ok(Box::new(Self {
+                    target: target.into(),
+                    arg: *i,
+                }))
+            }
+            _ => Err("length_eq predicate requires an integer argument".to_owned()),
+        }
+    }
+}
+
+impl CheckFieldsPredicate for LengthEqualsPredicate {
+    fn check(&self, event: &Event) -> bool {
+        match event {
+            Event::Log(l) => l.get(&self.target).map_or(false, |v| {
+                let len = match v {
+                    Value::Array(value) => value.len(),
+                    value => value.to_string_lossy().len(),
+                };
+
+                len as i64 == self.arg
+            }),
+            _ => false,
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
 fn build_predicate(
     predicate: &str,
     target: String,
@@ -420,6 +465,7 @@ fn build_predicate(
         "exists" => ExistsPredicate::new(target, arg),
         "regex" => RegexPredicate::new(target, arg),
         "ip_cidr_contains" => IpCidrPredicate::new(target, arg),
+        "length_eq" => LengthEqualsPredicate::new(target, arg),
         _ if predicate.starts_with("not_") => NegatePredicate::new(&predicate[4..], target, arg),
         _ => Err(format!("predicate type '{}' not recognized", predicate)),
     }
@@ -1040,6 +1086,33 @@ mod test {
             cond.check_with_context(&event),
             Err("predicates failed: [ bar.exists: false ]".to_owned())
         );
+    }
+
+    #[test]
+    fn check_field_length_eq() {
+        let mut preds: IndexMap<String, CheckFieldsPredicateArg> = IndexMap::new();
+        preds.insert("foo.length_eq".into(), CheckFieldsPredicateArg::Integer(10));
+        preds.insert("bar.length_eq".into(), CheckFieldsPredicateArg::Integer(4));
+
+        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+
+        let mut event = Event::from("");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ foo.length_eq: 10, bar.length_eq: 4 ]".to_owned())
+        );
+
+        event.as_mut_log().insert("foo", "helloworld");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ bar.length_eq: 4 ]".to_owned())
+        );
+
+        event.as_mut_log().insert("bar", vec![0, 1, 2, 3]);
+        assert_eq!(cond.check(&event), true);
+        assert_eq!(cond.check_with_context(&event), Ok(()));
     }
 
     #[test]

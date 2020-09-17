@@ -7,11 +7,15 @@ use crate::{
             self,
             arithmetic::Arithmetic,
             arithmetic::Operator,
-            functions::{NotFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn},
+            functions::{
+                DowncaseFn, Md5Fn, NotFn, NowFn, ParseJsonFn, ParseTimestampFn, Sha1Fn,
+                StripWhitespaceFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn,
+                TruncateFn, UpcaseFn, UuidV4Fn,
+            },
             path::Path as QueryPath,
             Literal,
         },
-        Assignment, Deletion, Function, IfStatement, Mapping, Noop, OnlyFields, Result,
+        Assignment, Deletion, Function, IfStatement, Mapping, MergeFn, Noop, OnlyFields, Result,
     },
 };
 use pest::{
@@ -34,7 +38,11 @@ fn target_path_from_pair(pair: Pair<Rule>) -> Result<String> {
             Rule::quoted_path_segment => {
                 segments.push(quoted_path_from_pair(segment)?.replace(".", "\\."))
             }
-            _ => unreachable!("parser should not allow other target_path child rules here"),
+            Rule::target_path => return target_path_from_pair(segment),
+            rule => unreachable!(
+                "parser should not allow other target_path child rules here: {:?}",
+                rule
+            ),
         }
     }
     Ok(segments.join("."))
@@ -251,6 +259,27 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
         Rule::to_timestamp => {
             let (first, mut other) = split_inner_rules_from_pair(pair)?;
             let query = query_arithmetic_from_pair(first)?;
+            let default = other
+                .next()
+                .map(|r| match r.as_rule() {
+                    Rule::string => r
+                        .into_inner()
+                        .next()
+                        .ok_or(TOKEN_ERR)
+                        .map_err(str::to_owned)
+                        .and_then(inner_quoted_string_escaped_from_pair)
+                        .map(Value::from),
+                    Rule::number => Ok(Value::Integer(r.as_str().parse::<f64>().unwrap() as i64)),
+                    _ => unreachable!(
+                        "parser should not allow other to_timestamp default arg child rules here"
+                    ),
+                })
+                .transpose()?;
+            Ok(Box::new(ToTimestampFn::new(query, default)))
+        }
+        Rule::parse_timestamp => {
+            let (first, mut other) = split_inner_rules_from_pair(pair)?;
+            let query = query_arithmetic_from_pair(first)?;
             let format = inner_quoted_string_escaped_from_pair(
                 other
                     .next()
@@ -259,8 +288,56 @@ fn query_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>
                     .next()
                     .ok_or(TOKEN_ERR)?,
             )?;
-            Ok(Box::new(ToTimestampFn::new(&format, query, None)?))
+            Ok(Box::new(ParseTimestampFn::new(&format, query, None)?))
         }
+        Rule::upcase => {
+            let pair = pair.into_inner().next().ok_or(TOKEN_ERR)?;
+            let query = query_arithmetic_from_pair(pair)?;
+            Ok(Box::new(UpcaseFn::new(query)))
+        }
+        Rule::downcase => {
+            let pair = pair.into_inner().next().ok_or(TOKEN_ERR)?;
+            let query = query_arithmetic_from_pair(pair)?;
+            Ok(Box::new(DowncaseFn::new(query)))
+        }
+        Rule::uuid_v4 => Ok(Box::new(UuidV4Fn::new())),
+        Rule::sha1 => {
+            let pair = pair.into_inner().next().ok_or(TOKEN_ERR)?;
+            let query = query_arithmetic_from_pair(pair)?;
+            Ok(Box::new(Sha1Fn::new(query)))
+        }
+        Rule::md5 => {
+            let pair = pair.into_inner().next().ok_or(TOKEN_ERR)?;
+            let query = query_arithmetic_from_pair(pair)?;
+            Ok(Box::new(Md5Fn::new(query)))
+        }
+        Rule::now => Ok(Box::new(NowFn::new())),
+        Rule::strip_whitespace => {
+            let param = pair.into_inner().next().ok_or(TOKEN_ERR)?;
+            let query = query_arithmetic_from_pair(param)?;
+            Ok(Box::new(StripWhitespaceFn::new(query)))
+        }
+        Rule::truncate => {
+            let (first, mut other) = split_inner_rules_from_pair(pair)?;
+            let query = query_arithmetic_from_pair(first)?;
+            let limit = query_arithmetic_from_pair(other.next().ok_or(TOKEN_ERR)?)?;
+
+            let ellipsis = other.next().map(|r| match r.as_rule() {
+                Rule::boolean => Value::Boolean(r.as_str() == "true"),
+                Rule::null => Value::Null,
+                _ => unreachable!(
+                    "parser should not allow other to_bool default arg child rules here"
+                ),
+            });
+
+            Ok(Box::new(TruncateFn::new(query, limit, ellipsis)))
+        }
+        Rule::parse_json => {
+            let param = pair.into_inner().next().ok_or(TOKEN_ERR)?;
+            let query = query_arithmetic_from_pair(param)?;
+            Ok(Box::new(ParseJsonFn::new(query)))
+        }
+
         _ => unreachable!("parser should not allow other query_function child rules here"),
     }
 }
@@ -337,18 +414,31 @@ fn if_statement_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn Function>> 
     Ok(Box::new(IfStatement::new(query, first, second)))
 }
 
-fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
-    let rule = pair.as_rule();
-    let paths = pair
-        .into_inner()
-        .map(target_path_from_pair)
-        .collect::<Result<Vec<_>>>();
+fn merge_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
+    let (first, mut other) = split_inner_rules_from_pair(pair)?;
+    let to_path = target_path_from_pair(first)?;
+    let query2 = query_arithmetic_from_pair(other.next().ok_or(TOKEN_ERR)?)?;
+    let deep = match other.next() {
+        None => None,
+        Some(pair) => Some(query_arithmetic_from_pair(pair)?),
+    };
 
-    match rule {
-        Rule::deletion => Ok(Box::new(Deletion::new(paths?))),
-        Rule::only_fields => Ok(Box::new(OnlyFields::new(paths?))),
+    Ok(Box::new(MergeFn::new(to_path.into(), query2, deep)))
+}
+
+fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
+    match pair.as_rule() {
+        Rule::deletion => Ok(Box::new(Deletion::new(paths_from_pair(pair)?))),
+        Rule::only_fields => Ok(Box::new(OnlyFields::new(paths_from_pair(pair)?))),
+        Rule::merge => merge_function_from_pair(pair),
         _ => unreachable!("parser should not allow other function child rules here"),
     }
+}
+
+fn paths_from_pair(pair: Pair<Rule>) -> Result<Vec<String>> {
+    pair.into_inner()
+        .map(target_path_from_pair)
+        .collect::<Result<Vec<_>>>()
 }
 
 fn statement_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
@@ -489,8 +579,8 @@ mod tests {
                 vec![" 1:13\n", "= expected target_path"],
             ),
             (
-                ".foo = string(\"bar\",)",
-                vec![" 1:21\n", "= expected null or string"],
+                ".foo = to_string(\"bar\",)",
+                vec![" 1:24\n", "= expected null or string"],
             ),
             (
                 // Due to the explicit list of allowed escape chars our grammar
@@ -741,6 +831,7 @@ mod tests {
                     )),
                 ))]),
             ),
+            // function: del
             (
                 "del(.foo)",
                 Mapping::new(vec![Box::new(Deletion::new(vec!["foo".to_string()]))]),
@@ -763,6 +854,7 @@ mod tests {
                     "bar.baz".to_string(),
                 ]))]),
             ),
+            //
             (
                 r#"if .foo == 5 {
                     .foo = .bar
@@ -797,6 +889,7 @@ mod tests {
                     Box::new(Noop {}),
                 ))]),
             ),
+            // function: only_fields
             (
                 "only_fields(.foo)",
                 Mapping::new(vec![Box::new(OnlyFields::new(vec!["foo".to_string()]))]),
@@ -808,8 +901,9 @@ mod tests {
                     "baz".to_string(),
                 ]))]),
             ),
+            // function: to_string
             (
-                ".foo = string(.foo, \"bar\")",
+                ".foo = to_string(.foo, \"bar\")",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToStringFn::new(
@@ -819,14 +913,14 @@ mod tests {
                 ))]),
             ),
             (
-                ".foo = string(.bar)",
+                ".foo = to_string(.bar)",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToStringFn::new(Box::new(QueryPath::from("bar")), None)),
                 ))]),
             ),
             (
-                ".foo = int(.foo, 5)",
+                ".foo = to_int(.foo, 5)",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToIntegerFn::new(
@@ -836,7 +930,7 @@ mod tests {
                 ))]),
             ),
             (
-                ".foo = int(.foo, 5.0)",
+                ".foo = to_int(.foo, 5.0)",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToIntegerFn::new(
@@ -846,14 +940,14 @@ mod tests {
                 ))]),
             ),
             (
-                ".foo = int(.bar)",
+                ".foo = to_int(.bar)",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToIntegerFn::new(Box::new(QueryPath::from("bar")), None)),
                 ))]),
             ),
             (
-                ".foo = float(.foo, 5.5)",
+                ".foo = to_float(.foo, 5.5)",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToFloatFn::new(
@@ -863,14 +957,14 @@ mod tests {
                 ))]),
             ),
             (
-                ".foo = float(.bar)",
+                ".foo = to_float(.bar)",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToFloatFn::new(Box::new(QueryPath::from("bar")), None)),
                 ))]),
             ),
             (
-                ".foo = bool(.foo, true)",
+                ".foo = to_bool(.foo, true)",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToBooleanFn::new(
@@ -880,20 +974,128 @@ mod tests {
                 ))]),
             ),
             (
-                ".foo = bool(.bar)",
+                ".foo = to_bool(.bar)",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ToBooleanFn::new(Box::new(QueryPath::from("bar")), None)),
                 ))]),
             ),
             (
-                ".foo = timestamp(.foo, \"%d %m %Y\")",
+                ".foo = to_timestamp(.foo, 10)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToTimestampFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Some(Value::Integer(10)),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = to_timestamp(.foo, \"2020-09-14T12:51:12+00:00\")",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToTimestampFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Some(Value::from("2020-09-14T12:51:12+00:00")),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = to_timestamp(.bar)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToTimestampFn::new(Box::new(QueryPath::from("bar")), None)),
+                ))]),
+            ),
+            (
+                ".foo = parse_timestamp(.foo, \"%d %m %Y\")",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(
-                        ToTimestampFn::new("%d %m %Y", Box::new(QueryPath::from("foo")), None)
+                        ParseTimestampFn::new("%d %m %Y", Box::new(QueryPath::from("foo")), None)
                             .unwrap(),
                     ),
+                ))]),
+            ),
+            (
+                ".foo = upcase(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(UpcaseFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                ".foo = downcase(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(DowncaseFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                ".foo = strip_whitespace(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(StripWhitespaceFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                ".foo = strip_whitespace(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(StripWhitespaceFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                ".foo = truncate(.foo, .limit)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(TruncateFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Box::new(QueryPath::from("limit")),
+                        None,
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = truncate(.foo, 5, true)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(TruncateFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Box::new(Literal::from(Value::Float(5.0))),
+                        Some(Value::Boolean(true)),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = parse_json(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ParseJsonFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                "merge(.bar, .baz)",
+                Mapping::new(vec![Box::new(MergeFn::new(
+                    "bar".into(),
+                    Box::new(QueryPath::from("baz")),
+                    None,
+                ))]),
+            ),
+            (
+                "merge(.bar, .baz, .boz)",
+                Mapping::new(vec![Box::new(MergeFn::new(
+                    "bar".into(),
+                    Box::new(QueryPath::from("baz")),
+                    Some(Box::new(QueryPath::from("boz"))),
+                ))]),
+            ),
+            (
+                "merge(.bar, .baz, true)",
+                Mapping::new(vec![Box::new(MergeFn::new(
+                    "bar".into(),
+                    Box::new(QueryPath::from("baz")),
+                    Some(Box::new(Literal::from(Value::Boolean(true)))),
                 ))]),
             ),
         ];

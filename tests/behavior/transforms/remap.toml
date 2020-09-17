@@ -133,10 +133,13 @@
   inputs = []
   type = "remap"
   mapping = """
-    .foo = string(.foo)
-    .bar = int(.bar)
-    .baz = float(.baz)
-    .bev = bool(.bev)
+    .foo = to_string(.foo)
+    .bar = to_int(.bar)
+    .baz = to_float(.baz)
+    .bev = to_bool(.bev)
+    .a = to_timestamp(.a)
+    .b = to_timestamp(.nope, 10)
+    .c = to_timestamp(.nope, "2020-09-14T12:51:12+02:00")
   """
 [[tests]]
   name = "remap_coercion"
@@ -148,6 +151,7 @@
       bar = "20"
       baz = "30.3"
       bev = "true"
+      a = "2020-09-14T12:53:44+03:00"
   [[tests.outputs]]
     extract_from = "remap_coercion"
     [[tests.outputs.conditions]]
@@ -155,6 +159,9 @@
       "bar.equals" = 20
       "baz.equals" = 30.3
       "bev.equals" = true
+      "a.equals" = "2020-09-14T09:53:44Z"
+      "b.equals" = "1970-01-01T00:00:10Z"
+      "c.equals" = "2020-09-14T10:51:12Z"
 
 [transforms.remap_quoted_path]
   inputs = []
@@ -174,3 +181,225 @@
     extract_from = "remap_quoted_path"
     [[tests.outputs.conditions]]
       "a.b\\.c.equals" = "baz"
+
+[transforms.remap_function_upcase]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = upcase(.a)
+    .b = upcase(.b)
+    .c.c = upcase(.c.c)
+
+    if upcase(.f) == "F" {
+        .f = "ff"
+    }
+  """
+[[tests]]
+  name = "remap_function_upcase"
+  [tests.input]
+    insert_at = "remap_function_upcase"
+    type = "log"
+    [tests.input.log_fields]
+      a = "a"
+      b = "bbb bb"
+      "c.c" = "c.c"
+      f = "f"
+  [[tests.outputs]]
+    extract_from = "remap_function_upcase"
+    [[tests.outputs.conditions]]
+      "a.equals" = "A"
+      "b.equals" = "BBB BB"
+      "c.c.equals" = "C.C"
+      "f.equals" = "ff"
+
+[transforms.remap_function_upcase_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  mapping = """
+    .a = upcase(.a)
+    .b = upcase(.b)
+  """
+[[tests]]
+  name = "remap_function_upcase_error"
+  no_outputs_from = ["remap_function_upcase_error"]
+  [tests.input]
+    insert_at = "remap_function_upcase_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "a"
+      b = true
+
+[transforms.remap_function_downcase]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  mapping = """
+    .a = downcase(.a)
+    .b = downcase(.b)
+    .c.c = downcase(.c.c)
+
+    if downcase(.f) == "f" {
+        .f = "FF"
+    }
+  """
+[[tests]]
+  name = "remap_function_downcase"
+  [tests.input]
+    insert_at = "remap_function_downcase"
+    type = "log"
+    [tests.input.log_fields]
+      a = "A"
+      b = "BBB BB"
+      "c.c" = "C.C"
+      f = "F"
+  [[tests.outputs]]
+    extract_from = "remap_function_downcase"
+    [[tests.outputs.conditions]]
+      "a.equals" = "a"
+      "b.equals" = "bbb bb"
+      "c.c.equals" = "c.c"
+      "f.equals" = "FF"
+
+[transforms.remap_function_downcase_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  mapping = """
+    .a = downcase(.a)
+    .b = downcase(.b)
+  """
+[[tests]]
+  name = "remap_function_downcase_error"
+  no_outputs_from = ["remap_function_downcase_error"]
+  [tests.input]
+    insert_at = "remap_function_downcase_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "A"
+      b = 10
+
+[transforms.remap_function_uuid_v4]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = uuid_v4()
+
+    if uuid_v4() != "" {
+        .b = "bar"
+    }
+  """
+[[tests]]
+  name = "remap_function_uuid_v4"
+  [tests.input]
+    insert_at = "remap_function_uuid_v4"
+    type = "log"
+    [tests.input.log_fields]
+      b = "foo"
+  [[tests.outputs]]
+    extract_from = "remap_function_uuid_v4"
+    [[tests.outputs.conditions]]
+      "a.regex" = "(?i)^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      "b.equals" = "bar"
+
+[transforms.remap_function_sha1]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = sha1(.a)
+
+    if sha1(.b) == "62cdb7020ff920e5aa642c3d4066950dd1f01f4d" {
+        .b = sha1(.a + .b + "baz")
+    }
+  """
+[[tests]]
+  name = "remap_function_sha1"
+  [tests.input]
+    insert_at = "remap_function_sha1"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_sha1"
+    [[tests.outputs.conditions]]
+      "a.equals" = "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"
+      "b.equals" = "6f74c252bb7f19f553115af5e49a733b9ff17138"
+
+[transforms.remap_function_sha1_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  mapping = """
+    .a = sha1(.a)
+    .b = sha1(.b)
+  """
+[[tests]]
+  name = "remap_function_sha1_error"
+  no_outputs_from = ["remap_function_sha1_error"]
+  [tests.input]
+    insert_at = "remap_function_sha1_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = true
+
+[transforms.remap_function_md5]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = md5(.a)
+
+    if md5(.b) == "37b51d194a7513e45b56f6524f2d51f2" {
+        .b = md5(.a + .b + "baz")
+    }
+  """
+[[tests]]
+  name = "remap_function_md5"
+  [tests.input]
+    insert_at = "remap_function_md5"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_md5"
+    [[tests.outputs.conditions]]
+      "a.equals" = "acbd18db4cc2f85cedef654fccc4a4d8"
+      "b.equals" = "223cfa6567e4c0599c9a23628bf7a234"
+
+[transforms.remap_function_md5_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  mapping = """
+    .a = md5(.a)
+    .b = md5(.b)
+  """
+[[tests]]
+  name = "remap_function_md5_error"
+  no_outputs_from = ["remap_function_md5_error"]
+  [tests.input]
+    insert_at = "remap_function_md5_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = true
+
+[transforms.remap_function_now]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = now()
+  """
+[[tests]]
+  name = "remap_function_now"
+  [tests.input]
+    insert_at = "remap_function_now"
+    type = "log"
+    [tests.input.log_fields]
+  [[tests.outputs]]
+    extract_from = "remap_function_now"
+    [[tests.outputs.conditions]]
+      "a.ends_with" = "Z"
+      "a.length_eq" = 27
