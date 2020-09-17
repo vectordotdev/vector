@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{
         SplunkHECEventReceived, SplunkHECRequestBodyInvalid, SplunkHECRequestError,
@@ -45,6 +45,10 @@ pub struct SplunkConfig {
     /// Splunk HEC token
     token: Option<String>,
     tls: Option<TlsConfig>,
+}
+
+inventory::submit! {
+    SourceDescription::new_without_default::<SplunkConfig>("splunk_hec")
 }
 
 impl SplunkConfig {

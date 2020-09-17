@@ -1,7 +1,7 @@
 use super::Transform;
 
 use crate::{
-    config::{DataType, TransformConfig, TransformContext},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
 };
 use serde::{Deserialize, Serialize};
@@ -27,6 +27,10 @@ pub struct Geoip {
 
 fn default_geoip_target_field() -> String {
     "geoip".to_string()
+}
+
+inventory::submit! {
+    TransformDescription::new_without_default::<GeoipConfig>("geoip")
 }
 
 #[typetag::serde(name = "geoip")]

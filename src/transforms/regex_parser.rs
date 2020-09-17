@@ -53,7 +53,7 @@ impl TransformConfig for RegexParserConfig {
     }
 
     fn transform_type(&self) -> &'static str {
-        "regex"
+        "regex_parser"
     }
 }
 

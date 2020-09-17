@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     shutdown::ShutdownSignal,
@@ -22,6 +22,10 @@ use warp::http::{HeaderMap, StatusCode};
 pub struct LogplexConfig {
     address: SocketAddr,
     tls: Option<TlsConfig>,
+}
+
+inventory::submit! {
+    SourceDescription::new_without_default::<LogplexConfig>("logplex")
 }
 
 #[derive(Clone, Default)]
