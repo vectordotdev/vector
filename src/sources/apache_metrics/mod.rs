@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GlobalOptions},
+    config::{self, GlobalOptions, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
         ApacheMetricsErrorResponse, ApacheMetricsEventReceived, ApacheMetricsHttpError,
@@ -40,6 +40,10 @@ pub fn default_scrape_interval_secs() -> u64 {
 
 pub fn default_namespace() -> String {
     "apache".to_string()
+}
+
+inventory::submit! {
+    SinkDescription::new_without_default::<ApacheMetricsConfig>("apache_metrics")
 }
 
 #[typetag::serde(name = "apache_metrics")]
