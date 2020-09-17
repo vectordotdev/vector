@@ -35,7 +35,7 @@ pub struct RegexParserConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new::<RegexParserConfig>("regex")
+    TransformDescription::new::<RegexParserConfig>("regex_parser")
 }
 
 #[typetag::serde(name = "regex_parser")]
@@ -53,7 +53,7 @@ impl TransformConfig for RegexParserConfig {
     }
 
     fn transform_type(&self) -> &'static str {
-        "regex"
+        "regex_parser"
     }
 }
 
