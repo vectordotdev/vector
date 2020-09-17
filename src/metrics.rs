@@ -44,15 +44,15 @@ struct VectorRecorder {
 impl Recorder for VectorRecorder {
     fn register_counter(&self, key: Key, _description: Option<&'static str>) {
         let ckey = CompositeKey::new(MetricKind::Counter, key);
-        self.registry.op(ckey, |_| {}, || Handle::counter())
+        self.registry.op(ckey, |_| {}, Handle::counter)
     }
     fn register_gauge(&self, key: Key, _description: Option<&'static str>) {
         let ckey = CompositeKey::new(MetricKind::Gauge, key);
-        self.registry.op(ckey, |_| {}, || Handle::gauge())
+        self.registry.op(ckey, |_| {}, Handle::gauge)
     }
     fn register_histogram(&self, key: Key, _description: Option<&'static str>) {
         let ckey = CompositeKey::new(MetricKind::Histogram, key);
-        self.registry.op(ckey, |_| {}, || Handle::histogram())
+        self.registry.op(ckey, |_| {}, Handle::histogram)
     }
 
     fn increment_counter(&self, key: Key, value: u64) {
@@ -60,7 +60,7 @@ impl Recorder for VectorRecorder {
         self.registry.op(
             ckey,
             |handle| handle.increment_counter(value),
-            || Handle::counter(),
+            Handle::counter,
         )
     }
     fn update_gauge(&self, key: Key, value: f64) {
@@ -68,7 +68,7 @@ impl Recorder for VectorRecorder {
         self.registry.op(
             ckey,
             |handle| handle.update_gauge(value),
-            || Handle::gauge(),
+            Handle::gauge,
         )
     }
     fn record_histogram(&self, key: Key, value: u64) {
@@ -76,7 +76,7 @@ impl Recorder for VectorRecorder {
         self.registry.op(
             ckey,
             |handle| handle.record_histogram(value),
-            || Handle::histogram(),
+            Handle::histogram,
         )
     }
 }
