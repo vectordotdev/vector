@@ -22,7 +22,8 @@ This RFC will not cover:
     usage, but arbitrary metrics - see
     <https://github.com/kubernetes/kube-state-metrics>;
 - Vendor-specific Metrics API implementations - we focus on Resource Metrics
-  API for now.
+  API for now;
+- Implementing the Metrics API itself in Vector.
 
 ## Introduction
 
@@ -234,3 +235,10 @@ To make the config more compact, we could offer
 a `kubernetes_resource_usage_metrics` macro that would unfold into
 `kubernetes_resource_usage_metrics_nodes` and
 `kubernetes_resource_usage_metrics_pods`.
+
+## We can implement Metrics API too
+
+That's right, we can implement the Metrics API and server Kubernetes as a source
+of data for the autoscaling workloads.
+
+However, it's a complicated topic, and it's worth its own focused RFC.
