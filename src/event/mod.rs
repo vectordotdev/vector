@@ -15,7 +15,7 @@ pub mod util;
 
 mod log_event;
 mod value;
-mod path;
+mod lookup;
 
 pub use log_event::LogEvent;
 pub use metric::{Metric, StatisticKind};

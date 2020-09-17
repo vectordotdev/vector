@@ -11,7 +11,7 @@ use crate::{
             path::Path as QueryPath,
             Literal,
         },
-        Path, Assignment, Deletion, Function, IfStatement, Mapping, Noop, OnlyFields, Result,
+        Assignment, Deletion, Function, IfStatement, Mapping, Noop, OnlyFields, Result,
     },
 };
 use pest::{
