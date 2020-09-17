@@ -1,7 +1,7 @@
 mod request;
 
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::{Event, LogEvent, Value},
     region::RegionOrEndpoint,
@@ -79,6 +79,10 @@ pub struct CloudwatchLogsSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig<Option<usize>>,
     pub assume_role: Option<String>,
+}
+
+inventory::submit! {
+    SinkDescription::new_without_default::<CloudwatchLogsSinkConfig>("aws_cloudwatch_logs")
 }
 
 #[cfg(test)]

@@ -35,7 +35,7 @@ pub struct RegexParserConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new::<RegexParserConfig>("regex_parser")
+    TransformDescription::new::<RegexParserConfig>("regex")
 }
 
 #[typetag::serde(name = "regex_parser")]
