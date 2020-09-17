@@ -1,6 +1,7 @@
 [installation.operating_systems.amazon-linux]
 title = "Amazon Linux"
 interfaces = [
+  "yum",
   "rpm",
   "vector-cli",
   "docker-cli",
@@ -14,6 +15,7 @@ strategies = [
 [installation.operating_systems.centos]
 title = "CentOS"
 interfaces = [
+  "yum",
   "rpm",
   "vector-cli",
   "docker-cli",
@@ -27,6 +29,7 @@ strategies = [
 [installation.operating_systems.debian]
 title = "Debian"
 interfaces = [
+  "apt",
   "dpkg",
   "vector-cli",
   "docker-cli",
@@ -78,6 +81,7 @@ strategies = [
 [installation.operating_systems.rhel]
 title = "RHEL"
 interfaces = [
+  "yum",
   "rpm",
   "vector-cli",
   "docker-cli",
@@ -91,6 +95,7 @@ strategies = [
 [installation.operating_systems.ubuntu]
 title = "Ubuntu"
 interfaces = [
+  "apt",
   "dpkg",
   "vector-cli",
   "docker-cli",
