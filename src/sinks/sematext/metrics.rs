@@ -360,7 +360,7 @@ mod tests {
                 kind: MetricKind::Incremental,
                 value: MetricValue::Counter { value: *val as f64 },
             });
-            events.push(Ok(event));
+            events.push(event);
         }
 
         let _ = sink.run(stream::iter(events)).await.unwrap();
