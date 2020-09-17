@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v1
       - env:
           PASS_FEATURES: "default-cmake"
-        run: make package-x86_64-unknown-linux-musl-all
+        run: make package-x86_64-unknown-linux-musl
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-x86_64-unknown-linux-musl.tar.gz"
@@ -78,7 +78,7 @@ jobs:
           NATIVE_BUILD: true
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
-          make package-archive
+          make package
       - uses: actions/upload-artifact@v1
         with:
           name: "vector-x86_64-apple-darwin.tar.gz"
@@ -131,7 +131,7 @@ jobs:
           export RUST_LTO=""
           export TARGET="x86_64-pc-windows-msvc"
           export NATIVE_BUILD="true"
-          make package-archive
+          make package
       - name: "Build package"
         shell: bash
         run: |
