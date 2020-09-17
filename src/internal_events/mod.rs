@@ -5,6 +5,8 @@ mod add_tags;
 mod ansi_stripper;
 #[cfg(feature = "sources-apache_metrics")]
 mod apache_metrics;
+#[cfg(feature = "api")]
+mod api;
 mod auto_concurrency;
 mod aws_kinesis_streams;
 mod blackhole;
@@ -17,6 +19,8 @@ mod dedupe;
 #[cfg(feature = "sources-docker")]
 mod docker;
 mod elasticsearch;
+#[cfg(feature = "sources-generator")]
+mod generator;
 #[cfg(feature = "transforms-grok_parser")]
 mod grok_parser;
 mod heartbeat;
@@ -81,6 +85,8 @@ pub use self::add_tags::*;
 pub use self::ansi_stripper::*;
 #[cfg(feature = "sources-apache_metrics")]
 pub use self::apache_metrics::*;
+#[cfg(feature = "api")]
+pub use self::api::*;
 pub use self::auto_concurrency::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
@@ -94,6 +100,8 @@ pub(crate) use self::dedupe::*;
 pub use self::docker::*;
 pub use self::elasticsearch::*;
 pub use self::file::*;
+#[cfg(feature = "sources-generator")]
+pub use self::generator::*;
 #[cfg(feature = "transforms-grok_parser")]
 pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;

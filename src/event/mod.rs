@@ -3,7 +3,6 @@ use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use lazy_static::lazy_static;
-use metric::{MetricKind, MetricValue};
 use std::collections::{BTreeMap, HashMap};
 use string_cache::DefaultAtom as Atom;
 
@@ -17,7 +16,7 @@ mod log_event;
 mod value;
 
 pub use log_event::LogEvent;
-pub use metric::{Metric, StatisticKind};
+pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use std::convert::{TryFrom, TryInto};
 pub(crate) use util::log::PathComponent;
 pub(crate) use util::log::PathIter;

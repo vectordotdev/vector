@@ -96,6 +96,10 @@ prost-types = "0.6.1"
 goauth = { version = "0.7.1", optional = true }
 smpl_jwt = { version = "0.5.0", optional = true }
 
+# API
+async-graphql = { version = "1.17.21", optional = true }
+async-graphql-warp = { version = "1.17.18", optional = true }
+
 # External libs
 derivative = "1.0"
 chrono = { version = "0.4.6", features = ["serde"] }
@@ -209,13 +213,13 @@ k8s-test-framework = { version = "0.1", path = "lib/k8s-test-framework" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb-plain", "rdkafka-plain"]
-default-musl = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb-cmake", "rdkafka-cmake"]
+default = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb-plain", "rdkafka-plain"]
+default-musl = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb-cmake", "rdkafka-cmake"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb-cmake", "rdkafka-cmake"]
+default-cmake = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb-cmake", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
-default-msvc = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb-cmake", "rdkafka-cmake"]
+default-msvc = ["api", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb-cmake", "rdkafka-cmake"]
 
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
@@ -247,6 +251,9 @@ wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm", "anyhow"]
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
 kubernetes = ["k8s-openapi", "evmap"]
+
+# This enables the API
+api = ["async-graphql", "async-graphql-warp"]
 
 # Sources
 sources = [
