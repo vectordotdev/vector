@@ -295,7 +295,7 @@ impl RetryLogic for ElasticSearchRetryLogic {
         let status = response.status();
 
         match status {
-            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("Too many requests".into()),
+            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
@@ -306,50 +306,32 @@ impl RetryLogic for ElasticSearchRetryLogic {
             )),
             _ if status.is_client_error() => {
                 let body = String::from_utf8_lossy(response.body());
-                warn!(
-                    message = "Client error",
-                    body = %body,
-                    rate_limit_secs = 30
-                );
-                RetryAction::DontRetry("client error".into())
+                RetryAction::DontRetry(format!("client-side error, {}: {}", status, body))
             }
             _ if status.is_success() => {
                 let body = String::from_utf8_lossy(response.body());
-                match body.find("\"errors\":true") {
-                    Some(_) => match serde_json::from_str::<ESResultResponse>(&body) {
-                        Err(json_error) => {
-                            warn!(
-                                message = "Elasticsearch unparsable error response",
-                                %json_error,
-                                rate_limit_secs = 30
-                            );
-                            RetryAction::DontRetry(
-                                "Some messages failed, and invalid response from Elasticsearch"
-                                    .into(),
-                            )
-                        }
-                        Ok(esrr) => {
-                            match esrr.items.into_iter().find_map(|item| item.index.error) {
-                                Some(error) => warn!(
-                                    message = "ElasticSearch error response",
-                                    err_type = %error.err_type,
-                                    reason = %error.reason,
-                                    rate_limit_secs = 30
-                                ),
-                                _ => warn!(
-                                    message = "Unusual ElasticSearch error response",
-                                    %body,
-                                    rate_limit_secs = 30
-                                ),
-                            };
-                            RetryAction::DontRetry("some messages failed".into())
-                        }
-                    },
-                    None => RetryAction::Successful,
+
+                if body.contains("\"errors\":true") {
+                    RetryAction::DontRetry(get_error_reason(&body))
+                } else {
+                    RetryAction::Successful
                 }
             }
             _ => RetryAction::DontRetry(format!("response status: {}", status)),
         }
+    }
+}
+
+fn get_error_reason(body: &str) -> String {
+    match serde_json::from_str::<ESResultResponse>(&body) {
+        Err(json_error) => format!(
+            "some messages failed, could not parse response, error: {}",
+            json_error
+        ),
+        Ok(resp) => match resp.items.into_iter().find_map(|item| item.index.error) {
+            Some(error) => format!("error type: {}, reason: {}", error.err_type, error.reason),
+            None => format!("error response: {}", body),
+        },
     }
 }
 

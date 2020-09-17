@@ -81,7 +81,7 @@ impl<L: RetryLogic> FixedRetryPolicy<L> {
         let policy = self.advance();
         let delay = delay_for(self.backoff());
 
-        debug!(message = "retrying request.", delay_ms = %self.backoff().as_millis());
+        debug!(message = "Retrying request.", delay_ms = %self.backoff().as_millis());
         RetryPolicyFuture { delay, policy }
     }
 }
@@ -97,7 +97,7 @@ where
         match result {
             Ok(response) => {
                 if self.remaining_attempts == 0 {
-                    error!("Retries exhausted");
+                    error!("Retries exhausted; dropping the request.");
                     return None;
                 }
 
@@ -108,7 +108,7 @@ where
                     }
 
                     RetryAction::DontRetry(reason) => {
-                        error!(message = "Request is not retryable; dropping the request.", %reason);
+                        error!(message = "Not retriable; dropping the request.", %reason);
                         None
                     }
 
@@ -117,23 +117,23 @@ where
             }
             Err(error) => {
                 if self.remaining_attempts == 0 {
-                    error!(message = "retries exhausted.", %error);
+                    error!(message = "Retries exhausted; dropping the request.", %error);
                     return None;
                 }
 
                 if let Some(expected) = error.downcast_ref::<L::Error>() {
                     if self.logic.is_retriable_error(expected) {
-                        warn!("retrying after error: {}", expected);
+                        warn!("Retrying after error: {}", expected);
                         Some(self.build_retry())
                     } else {
-                        error!(message = "encountered non-retriable error.", %error);
+                        error!(message = "Non-retriable error; dropping the request.", %error);
                         None
                     }
                 } else if error.downcast_ref::<Elapsed>().is_some() {
-                    warn!("request timed out.");
+                    warn!("Request timed out.");
                     Some(self.build_retry())
                 } else {
-                    error!(message = "unexpected error type.", %error);
+                    error!(message = "Unexpected error type; dropping the request.", %error);
                     None
                 }
             }
