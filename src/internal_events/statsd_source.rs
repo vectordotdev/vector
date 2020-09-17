@@ -1,5 +1,4 @@
 use super::InternalEvent;
-use crate::event::metric::{MetricKind, MetricValue};
 use metrics::counter;
 
 #[derive(Debug)]
@@ -26,14 +25,12 @@ impl InternalEvent for StatsdEventReceived {
     }
 }
 
-#[cfg(feature = "sources-statsd")]
 #[derive(Debug)]
 pub struct StatsdInvalidRecord<'a> {
     pub error: crate::sources::statsd::parser::ParseError,
     pub text: &'a str,
 }
 
-#[cfg(feature = "sources-statsd")]
 impl InternalEvent for StatsdInvalidRecord<'_> {
     fn emit_logs(&self) {
         error!(message = "Invalid packet from statsd, discarding.", error = %self.error, text = %self.text);
@@ -93,32 +90,6 @@ impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for StatsdSocketError
             "socket_errors", 1,
             "component_kind" => "source",
             "component_type" => "statsd",
-        );
-    }
-}
-
-#[derive(Debug)]
-pub struct StatsdInvalidMetric<'a> {
-    pub value: &'a MetricValue,
-    pub kind: &'a MetricKind,
-}
-
-impl<'a> InternalEvent for StatsdInvalidMetric<'a> {
-    fn emit_logs(&self) {
-        warn!(
-            message = "Invalid metric sent; dropping event.",
-            value = ?self.value,
-            kind = ?self.kind,
-            rate_limit_secs = 30,
-        )
-    }
-
-    fn emit_metrics(&self) {
-        counter!(
-            "processing_errors", 1,
-            "component_kind" => "sink",
-            "component_type" => "statsd",
-            "error_type" => "invalid_metric",
         );
     }
 }

@@ -3,7 +3,7 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::Event,
-    internal_events::StatsdInvalidMetric,
+    internal_events::StatsdInvalidMetricReceived,
     sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
 };
 use futures::{future, FutureExt};
@@ -182,7 +182,7 @@ fn encode_event(event: Event, namespace: Option<&str>) -> Option<Vec<u8>> {
             }
         }
         _ => {
-            emit!(StatsdInvalidMetric {
+            emit!(StatsdInvalidMetricReceived {
                 value: &metric.value,
                 kind: &metric.kind,
             });

@@ -56,8 +56,10 @@ mod socket;
 mod split;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 mod splunk_hec;
-#[cfg(any(feature = "sources-statsd", feature = "sinks-statsd"))]
-mod statsd;
+#[cfg(feature = "sinks-statsd")]
+mod statsd_sink;
+#[cfg(feature = "sources-statsd")]
+mod statsd_source;
 mod stdin;
 #[cfg(feature = "transforms-swimlanes")]
 mod swimlanes;
@@ -127,8 +129,10 @@ pub(crate) use self::socket::*;
 pub use self::split::*;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 pub(crate) use self::splunk_hec::*;
-#[cfg(any(feature = "sources-statsd", feature = "sinks-statsd"))]
-pub use self::statsd::*;
+#[cfg(feature = "sinks-statsd")]
+pub use self::statsd_sink::*;
+#[cfg(feature = "sources-statsd")]
+pub use self::statsd_source::*;
 pub use self::stdin::*;
 #[cfg(feature = "transforms-swimlanes")]
 pub use self::swimlanes::*;
