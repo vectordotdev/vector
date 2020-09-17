@@ -2563,6 +2563,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
 
 [[package]]
+name = "md-5"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b5a279bb9607f9f53c22d496eade00d138d1bdcccd07d74650387cf94942a15"
+dependencies = [
+ "block-buffer 0.9.0",
+ "digest 0.9.0",
+ "opaque-debug 0.3.0",
+]
+
+[[package]]
 name = "md5"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5756,6 +5767,7 @@ dependencies = [
  "bytes 0.5.6",
  "bytesize",
  "chrono",
+ "chrono-tz",
  "cidr-utils",
  "codec",
  "colored",
@@ -5776,6 +5788,7 @@ dependencies = [
  "goauth",
  "grok",
  "headers",
+ "hex",
  "hostname",
  "http 0.2.1",
  "hyper",
@@ -5797,6 +5810,7 @@ dependencies = [
  "lucetc",
  "matches",
  "maxminddb",
+ "md-5",
  "metrics",
  "metrics-core",
  "metrics-runtime",
@@ -5837,6 +5851,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "sha-1 0.9.1",
  "smpl_jwt",
  "snafu",
  "stream-cancel",

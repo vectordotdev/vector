@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GlobalOptions},
+    config::{self, GlobalOptions, SourceConfig, SourceDescription},
     internal_events::{
         PrometheusErrorResponse, PrometheusEventReceived, PrometheusHttpError,
         PrometheusParseError, PrometheusRequestCompleted,
@@ -33,8 +33,12 @@ pub fn default_scrape_interval_secs() -> u64 {
     15
 }
 
+inventory::submit! {
+    SourceDescription::new_without_default::<PrometheusConfig>("prometheus")
+}
+
 #[typetag::serde(name = "prometheus")]
-impl crate::config::SourceConfig for PrometheusConfig {
+impl SourceConfig for PrometheusConfig {
     fn build(
         &self,
         _name: &str,
