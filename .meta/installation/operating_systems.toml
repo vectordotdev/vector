@@ -2,6 +2,7 @@
 title = "Amazon Linux"
 interfaces = [
   "rpm",
+  "rpmrepo",
   "vector-cli",
   "docker-cli",
   "docker-compose",
@@ -15,6 +16,7 @@ strategies = [
 title = "CentOS"
 interfaces = [
   "rpm",
+  "rpmrepo",
   "vector-cli",
   "docker-cli",
   "docker-compose",
@@ -28,6 +30,7 @@ strategies = [
 title = "Debian"
 interfaces = [
   "dpkg",
+  "aptrepo",
   "vector-cli",
   "docker-cli",
   "docker-compose",
@@ -79,6 +82,7 @@ strategies = [
 title = "RHEL"
 interfaces = [
   "rpm",
+  "rpmrepo",
   "vector-cli",
   "docker-cli",
   "docker-compose",
@@ -92,6 +96,7 @@ strategies = [
 title = "Ubuntu"
 interfaces = [
   "dpkg",
+  "aptrepo",
   "vector-cli",
   "docker-cli",
   "docker-compose",

@@ -27,6 +27,13 @@ source = "journald"
 title = "DPKG"
 type = "package_manager"
 
+[installation.interfaces.aptrepo]
+archs = ["x86_64", "ARM64"]
+config_path = "/etc/vector/vector.toml"
+source = "journald"
+title = "Apt Repository"
+type = "package_manager"
+
 [installation.interfaces.homebrew]
 archs = ["x86_64"]
 config_path = "/etc/vector/vector.toml"
@@ -49,10 +56,17 @@ title = "Nix"
 type = "package_manager"
 
 [installation.interfaces.rpm]
-archs = ["x86_64"]
+archs = ["x86_64", "ARM64"]
 config_path = "/etc/vector/vector.toml"
 source = "journald"
 title = "RPM"
+type = "package_manager"
+
+[installation.interfaces.rpmrepo]
+archs = ["x86_64", "ARM64"]
+config_path = "/etc/vector/vector.toml"
+source = "journald"
+title = "RPM Repository"
 type = "package_manager"
 
 [installation.interfaces.vector-cli]

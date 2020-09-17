@@ -1,7 +1,7 @@
 [installation.package_managers.dpkg]
 title = "DPKG"
 archs = ["x86_64", "ARM64"]
-interfaces = ["dpkg"]
+interfaces = ["dpkg", "aptrepo" ]
 strategies = [
   {name = "daemon", source = "journald"},
 ]
@@ -32,8 +32,8 @@ strategies = [
 
 [installation.package_managers.rpm]
 title = "RPM"
-interfaces = ["rpm"]
-archs = ["x86_64"]
+interfaces = ["rpm", "rpmrepo" ]
+archs = ["x86_64", "ARM64"]
 strategies = [
   {name = "daemon", source = "journald"},
 ]
