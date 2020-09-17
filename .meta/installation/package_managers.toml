@@ -47,7 +47,7 @@ strategies = [
 ]
 
 [installation.package_managers.yum]
-title = "RPM"
+title = "YUM"
 interfaces = ["yum"]
 archs = ["x86_64", "ARM64"]
 strategies = [
