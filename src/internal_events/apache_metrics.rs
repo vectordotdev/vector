@@ -60,9 +60,9 @@ pub struct ApacheMetricsParseError {
 
 impl InternalEvent for ApacheMetricsParseError {
     fn emit_logs(&self) {
-        error!(message = "parsing error.", url = %self.url, error = %self.error);
+        error!(message = "Parsing error.", url = %self.url, error = %self.error);
         debug!(
-            message = %format!("parse error:\n\n{}\n\n", self.error),
+            message = %format!("Parse error:\n\n{}\n\n", self.error),
             url = %self.url,
             rate_limit_secs = 10
         );
