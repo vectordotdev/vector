@@ -1,4 +1,4 @@
-name: nightly
+name: nightly-cloudsmith-test
 
 on:
   workflow_dispatch:
