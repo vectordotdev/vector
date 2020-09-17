@@ -5,6 +5,8 @@ mod add_tags;
 mod ansi_stripper;
 #[cfg(feature = "api")]
 mod api;
+#[cfg(feature = "sources-apache_metrics")]
+mod apache_metrics;
 mod auto_concurrency;
 mod aws_kinesis_streams;
 mod blackhole;
@@ -83,6 +85,8 @@ pub use self::add_tags::*;
 pub use self::ansi_stripper::*;
 #[cfg(feature = "api")]
 pub use self::api::*;
+#[cfg(feature = "sources-apache_metrics")]
+pub use self::apache_metrics::*;
 pub use self::auto_concurrency::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
