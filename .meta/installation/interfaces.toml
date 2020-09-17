@@ -6,6 +6,13 @@
 #
 # Operating systems and platforms must specify which interfaces they support.
 
+[installation.interfaces.apt]
+archs = ["x86_64", "ARM64"]
+config_path = "/etc/vector/vector.toml"
+source = "journald"
+title = "APT"
+type = "package_manager"
+
 [installation.interfaces.docker-cli]
 archs = ["x86_64", "ARM64"]
 config_path = "/etc/vector/vector.toml"
@@ -25,13 +32,6 @@ archs = ["x86_64", "ARM64"]
 config_path = "/etc/vector/vector.toml"
 source = "journald"
 title = "DPKG"
-type = "package_manager"
-
-[installation.interfaces.aptrepo]
-archs = ["x86_64", "ARM64"]
-config_path = "/etc/vector/vector.toml"
-source = "journald"
-title = "Apt Repository"
 type = "package_manager"
 
 [installation.interfaces.homebrew]
@@ -62,11 +62,11 @@ source = "journald"
 title = "RPM"
 type = "package_manager"
 
-[installation.interfaces.rpmrepo]
+[installation.interfaces.yum]
 archs = ["x86_64", "ARM64"]
 config_path = "/etc/vector/vector.toml"
 source = "journald"
-title = "RPM Repository"
+title = "Yum"
 type = "package_manager"
 
 [installation.interfaces.vector-cli]

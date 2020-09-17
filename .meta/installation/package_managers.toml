@@ -1,7 +1,15 @@
+[installation.package_managers.apt]
+title = "APT"
+archs = ["x86_64", "ARM64"]
+interfaces = ["apt"]
+strategies = [
+  {name = "daemon", source = "journald"},
+]
+
 [installation.package_managers.dpkg]
 title = "DPKG"
 archs = ["x86_64", "ARM64"]
-interfaces = ["dpkg", "aptrepo" ]
+interfaces = ["dpkg"]
 strategies = [
   {name = "daemon", source = "journald"},
 ]
@@ -32,7 +40,15 @@ strategies = [
 
 [installation.package_managers.rpm]
 title = "RPM"
-interfaces = ["rpm", "rpmrepo" ]
+interfaces = ["rpm"]
+archs = ["x86_64", "ARM64"]
+strategies = [
+  {name = "daemon", source = "journald"},
+]
+
+[installation.package_managers.yum]
+title = "RPM"
+interfaces = ["yum"]
 archs = ["x86_64", "ARM64"]
 strategies = [
   {name = "daemon", source = "journald"},
