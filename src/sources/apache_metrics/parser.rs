@@ -49,63 +49,47 @@ impl<'a> StatusFieldStatistic<'a> {
         value: &'a str,
     ) -> Option<Result<StatusFieldStatistic<'a>, ParseError>> {
         match key {
-            "ServerUptimeSeconds" => Some(
-                parse_numeric_value(key, value)
-                    .map(|value| StatusFieldStatistic::ServerUptimeSeconds(value)),
-            ),
-            "Total Accesses" => Some(
-                parse_numeric_value(key, value)
-                    .map(|value| StatusFieldStatistic::TotalAccesses(value)),
-            ),
-            "Total kBytes" => Some(
-                parse_numeric_value(key, value)
-                    .map(|value| StatusFieldStatistic::TotalKBytes(value)),
-            ),
-            "Total Duration" => Some(
-                parse_numeric_value(key, value)
-                    .map(|value| StatusFieldStatistic::TotalDuration(value)),
-            ),
-            "CPUUser" => Some(
-                parse_numeric_value(key, value).map(|value| StatusFieldStatistic::CPUUser(value)),
-            ),
-            "CPUSystem" => Some(
-                parse_numeric_value(key, value).map(|value| StatusFieldStatistic::CPUSystem(value)),
-            ),
-            "CPUChildrenUser" => Some(
-                parse_numeric_value(key, value)
-                    .map(|value| StatusFieldStatistic::CPUChildrenUser(value)),
-            ),
-            "CPUChildrenSystem" => Some(
-                parse_numeric_value(key, value)
-                    .map(|value| StatusFieldStatistic::CPUChildrenSystem(value)),
-            ),
-            "CPULoad" => Some(
-                parse_numeric_value(key, value).map(|value| StatusFieldStatistic::CPULoad(value)),
-            ),
-            "IdleWorkers" => Some(
-                parse_numeric_value(key, value)
-                    .map(|value| StatusFieldStatistic::IdleWorkers(value)),
-            ),
-            "BusyWorkers" => Some(
-                parse_numeric_value(key, value)
-                    .map(|value| StatusFieldStatistic::BusyWorkers(value)),
-            ),
-            "ConnsTotal" => Some(
-                parse_numeric_value(key, value)
-                    .map(|value| StatusFieldStatistic::ConnsTotal(value)),
-            ),
-            "ConnsAsyncWriting" => Some(
-                parse_numeric_value(key, value)
-                    .map(|value| StatusFieldStatistic::ConnsAsyncWriting(value)),
-            ),
-            "ConnsAsyncClosing" => Some(
-                parse_numeric_value(key, value)
-                    .map(|value| StatusFieldStatistic::ConnsAsyncClosing(value)),
-            ),
-            "ConnsAsyncKeepAlive" => Some(
-                parse_numeric_value(key, value)
-                    .map(|value| StatusFieldStatistic::ConnsAsyncKeepAlive(value)),
-            ),
+            "ServerUptimeSeconds" => {
+                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::ServerUptimeSeconds))
+            }
+            "Total Accesses" => {
+                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::TotalAccesses))
+            }
+            "Total kBytes" => {
+                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::TotalKBytes))
+            }
+            "Total Duration" => {
+                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::TotalDuration))
+            }
+            "CPUUser" => Some(parse_numeric_value(key, value).map(StatusFieldStatistic::CPUUser)),
+            "CPUSystem" => {
+                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::CPUSystem))
+            }
+            "CPUChildrenUser" => {
+                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::CPUChildrenUser))
+            }
+            "CPUChildrenSystem" => {
+                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::CPUChildrenSystem))
+            }
+            "CPULoad" => Some(parse_numeric_value(key, value).map(StatusFieldStatistic::CPULoad)),
+            "IdleWorkers" => {
+                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::IdleWorkers))
+            }
+            "BusyWorkers" => {
+                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::BusyWorkers))
+            }
+            "ConnsTotal" => {
+                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::ConnsTotal))
+            }
+            "ConnsAsyncWriting" => {
+                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::ConnsAsyncWriting))
+            }
+            "ConnsAsyncClosing" => {
+                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::ConnsAsyncClosing))
+            }
+            "ConnsAsyncKeepAlive" => {
+                Some(parse_numeric_value(key, value).map(StatusFieldStatistic::ConnsAsyncKeepAlive))
+            }
             "Scoreboard" => Some(Ok(StatusFieldStatistic::Scoreboard(value))),
 
             _ => None,
@@ -135,9 +119,8 @@ pub fn parse(
     // https://bz.apache.org/bugzilla/show_bug.cgi?id=63300
     let parsed = payload
         .lines()
-        .into_iter()
         .filter_map(|l| {
-            let mut parts = l.splitn(2, ":");
+            let mut parts = l.splitn(2, ':');
             let key = parts.next();
             let value = parts.next();
             match (key, value) {
@@ -152,7 +135,7 @@ pub fn parse(
         .filter_map(|(key, value)| line_to_metrics(key, value, namespace, now, tags))
         .fold(vec![], |mut acc, v| {
             match v {
-                Ok(metrics) => metrics.into_iter().for_each(|v| acc.push(Ok(v))),
+                Ok(metrics) => metrics.for_each(|v| acc.push(Ok(v))),
                 Err(err) => acc.push(Err(err)),
             };
             acc
@@ -172,7 +155,7 @@ fn line_to_metrics<'a>(
             StatusFieldStatistic::ServerUptimeSeconds(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "uptime_seconds_total"),
                 timestamp: Some(now),
-                tags: tags.map(|tags| tags.clone()),
+                tags: tags.cloned(),
                 kind: MetricKind::Absolute,
                 value: MetricValue::Counter {
                     value: value as f64,
@@ -181,7 +164,7 @@ fn line_to_metrics<'a>(
             StatusFieldStatistic::TotalAccesses(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "access_total"),
                 timestamp: Some(now),
-                tags: tags.map(|tags| tags.clone()),
+                tags: tags.cloned(),
                 kind: MetricKind::Absolute,
                 value: MetricValue::Counter {
                     value: value as f64,
@@ -190,7 +173,7 @@ fn line_to_metrics<'a>(
             StatusFieldStatistic::TotalKBytes(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "sent_bytes_total"),
                 timestamp: Some(now),
-                tags: tags.map(|tags| tags.clone()),
+                tags: tags.cloned(),
                 kind: MetricKind::Absolute,
                 value: MetricValue::Counter {
                     value: (value * 1024) as f64,
@@ -199,7 +182,7 @@ fn line_to_metrics<'a>(
             StatusFieldStatistic::TotalDuration(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "duration_seconds_total"),
                 timestamp: Some(now),
-                tags: tags.map(|tags| tags.clone()),
+                tags: tags.cloned(),
                 kind: MetricKind::Absolute,
                 value: MetricValue::Counter {
                     value: value as f64,
@@ -209,7 +192,7 @@ fn line_to_metrics<'a>(
                 name: encode_namespace(namespace, "cpu_seconds_total"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
+                    let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("type".to_string(), "user".to_string());
                     Some(tags)
                 },
@@ -221,7 +204,7 @@ fn line_to_metrics<'a>(
                 name: encode_namespace(namespace, "cpu_seconds_total"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
+                    let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("type".to_string(), "system".to_string());
                     Some(tags)
                 },
@@ -233,7 +216,7 @@ fn line_to_metrics<'a>(
                 name: encode_namespace(namespace, "cpu_seconds_total"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
+                    let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("type".to_string(), "children_user".to_string());
                     Some(tags)
                 },
@@ -245,7 +228,7 @@ fn line_to_metrics<'a>(
                 name: encode_namespace(namespace, "cpu_seconds_total"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
+                    let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("type".to_string(), "children_system".to_string());
                     Some(tags)
                 },
@@ -256,7 +239,7 @@ fn line_to_metrics<'a>(
             StatusFieldStatistic::CPULoad(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "cpu_load"),
                 timestamp: Some(now),
-                tags: tags.map(|tags| tags.clone()),
+                tags: tags.cloned(),
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value },
             }))
@@ -265,7 +248,7 @@ fn line_to_metrics<'a>(
                 name: encode_namespace(namespace, "workers"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
+                    let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("state".to_string(), "idle".to_string());
                     Some(tags)
                 },
@@ -279,7 +262,7 @@ fn line_to_metrics<'a>(
                 name: encode_namespace(namespace, "workers"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
+                    let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("state".to_string(), "busy".to_string());
                     Some(tags)
                 },
@@ -292,7 +275,7 @@ fn line_to_metrics<'a>(
                 name: encode_namespace(namespace, "connections"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
+                    let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("state".to_string(), "total".to_string());
                     Some(tags)
                 },
@@ -305,7 +288,7 @@ fn line_to_metrics<'a>(
                 name: encode_namespace(namespace, "connections"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
+                    let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("state".to_string(), "writing".to_string());
                     Some(tags)
                 },
@@ -318,7 +301,7 @@ fn line_to_metrics<'a>(
                 name: encode_namespace(namespace, "connections"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
+                    let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("state".to_string(), "closing".to_string());
                     Some(tags)
                 },
@@ -331,7 +314,7 @@ fn line_to_metrics<'a>(
                 name: encode_namespace(namespace, "connections"),
                 timestamp: Some(now),
                 tags: {
-                    let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
+                    let mut tags = tags.cloned().unwrap_or_default();
                     tags.insert("state".to_string(), "keepalive".to_string());
                     Some(tags)
                 },
@@ -360,9 +343,8 @@ fn line_to_metrics<'a>(
     })
 }
 
-fn parse_numeric_value<T>(key: &str, value: &str) -> Result<T, ParseError>
+fn parse_numeric_value<T: std::str::FromStr>(key: &str, value: &str) -> Result<T, ParseError>
 where
-    T: std::str::FromStr,
     T::Err: Into<ValueParseError> + 'static,
 {
     value.parse::<T>().map_err(|err| ParseError {
@@ -382,7 +364,7 @@ fn score_to_metric(
         name: encode_namespace(namespace, "scoreboard"),
         timestamp: Some(now),
         tags: {
-            let mut tags = tags.map(|tags| tags.clone()).unwrap_or_default();
+            let mut tags = tags.cloned().unwrap_or_default();
             tags.insert("state".to_string(), state.to_string());
             Some(tags)
         },
