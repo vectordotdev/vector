@@ -2395,8 +2395,9 @@ dependencies = [
 
 [[package]]
 name = "metrics"
-version = "0.13.0-alpha.3"
-source = "git+https://github.com/MOZGIII/metrics?branch=refactor/metrics-v2-tracing-context#339dc25b45968424d566dd798588df042e03359a"
+version = "0.13.0-alpha.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de7e68e5386ca1883535512584aa1f41bd8129fc38f6ce6b252eb4325f0ed5f6"
 dependencies = [
  "metrics-macros",
  "once_cell",
@@ -2405,8 +2406,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-macros"
-version = "0.1.0-alpha.2"
-source = "git+https://github.com/MOZGIII/metrics?branch=refactor/metrics-v2-tracing-context#339dc25b45968424d566dd798588df042e03359a"
+version = "0.1.0-alpha.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0837df974417cbf0c476c54883e5f42fdaa5fa04cabe6dd6f30f58103c4b9bfc"
 dependencies = [
  "proc-macro-hack",
  "proc-macro2 1.0.19",
@@ -2417,8 +2419,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-tracing-context"
-version = "0.1.0-alpha1"
-source = "git+https://github.com/MOZGIII/metrics?branch=refactor/metrics-v2-tracing-context#339dc25b45968424d566dd798588df042e03359a"
+version = "0.1.0-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c67257e8274a6bbd93597f5b8e3bd11d4c1e46fe516f459c0974246845fadb15"
 dependencies = [
  "metrics",
  "metrics-util",
@@ -2429,8 +2432,9 @@ dependencies = [
 
 [[package]]
 name = "metrics-util"
-version = "0.4.0-alpha.2"
-source = "git+https://github.com/MOZGIII/metrics?branch=refactor/metrics-v2-tracing-context#339dc25b45968424d566dd798588df042e03359a"
+version = "0.4.0-alpha.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0640e284e8696d7880ccc330c463bbe5af72be8c50e137998297b7989022484"
 dependencies = [
  "aho-corasick",
  "arc-swap",
