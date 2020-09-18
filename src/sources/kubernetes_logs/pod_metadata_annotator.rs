@@ -144,10 +144,10 @@ mod tests {
             (
                 FieldsSpec {
                     pod_name: "name".to_owned(),
-                    container_name: "name".to_string(),
                     pod_namespace: "ns".to_owned(),
                     pod_uid: "uid".to_owned(),
                     pod_labels: "labels".to_owned(),
+                    ..Default::default()
                 },
                 ObjectMeta {
                     name: Some("sandbox0-name".to_owned()),
