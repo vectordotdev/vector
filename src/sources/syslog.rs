@@ -398,7 +398,7 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
 mod test {
     use super::{event_from_str, SyslogConfig};
     use crate::{config::log_schema, event::Event};
-    use chrono::TimeZone;
+    use chrono::prelude::*;
 
     #[test]
     fn config_tcp() {
@@ -582,10 +582,9 @@ mod test {
         let mut expected = Event::from(msg);
         {
             let expected = expected.as_mut_log();
-            expected.insert(
-                log_schema().timestamp_key().clone(),
-                chrono::Utc.ymd(2020, 2, 13).and_hms(20, 7, 26),
-            );
+            let expected_date: DateTime<Utc> =
+                chrono::Local.ymd(2020, 2, 13).and_hms(20, 7, 26).into();
+            expected.insert(log_schema().timestamp_key().clone(), expected_date);
             expected.insert(log_schema().host_key().clone(), "74794bfb6795");
             expected.insert(log_schema().source_type_key().clone(), "syslog");
             expected.insert("hostname", "74794bfb6795");
@@ -612,10 +611,9 @@ mod test {
         let mut expected = Event::from(msg);
         {
             let expected = expected.as_mut_log();
-            expected.insert(
-                log_schema().timestamp_key().clone(),
-                chrono::Utc.ymd(2020, 2, 13).and_hms(21, 31, 56),
-            );
+            let expected_date: DateTime<Utc> =
+                chrono::Local.ymd(2020, 2, 13).and_hms(21, 31, 56).into();
+            expected.insert(log_schema().timestamp_key().clone(), expected_date);
             expected.insert(log_schema().source_type_key().clone(), "syslog");
             expected.insert("host", "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
