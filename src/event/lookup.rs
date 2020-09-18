@@ -76,7 +76,7 @@ impl<'a> Segment<'a> {
         tracing::trace!(segment = segment.as_str(), rule = ?segment.as_rule(), action = %"enter");
         let segment = segment.into_inner().next()
             .expect("Did not get pair inside path_index segment. This is an invariant. Please report it.");
-        match segment.as_rule() {
+        let retval = match segment.as_rule() {
             Rule::inner_path_index => {
                 let index = segment.as_str().parse()?;
                 tracing::trace!(segment = index, rule = ?segment.as_rule(), action = %"push");
@@ -85,7 +85,9 @@ impl<'a> Segment<'a> {
             _ => Err(format!("Got invalid lookup rule. Got: {:?}. Want: {:?}", segment.as_rule(), [
                 Rule::inner_path_index,
             ]).into()),
-        }
+        };
+        tracing::trace!(segment = segment.as_str(), rule = ?segment.as_rule(), action = %"exit");
+        retval
     }
 
     #[tracing::instrument(skip(segment))]
@@ -93,7 +95,7 @@ impl<'a> Segment<'a> {
         tracing::trace!(segment = segment.as_str(), rule = ?segment.as_rule(), action = %"enter");
         let segment = segment.into_inner().next()
             .expect("Did not get pair inside quoted_path_segment segment. This is an invariant. Please report it.");
-        match segment.as_rule() {
+        let retval = match segment.as_rule() {
             Rule::inner_quoted_string => {
                 tracing::trace!(segment = segment.as_str(), rule = ?segment.as_rule(), action = %"push");
                 Ok(Segment::field(segment.as_str()))
@@ -101,7 +103,9 @@ impl<'a> Segment<'a> {
             _ => return Err(format!("Got invalid lookup rule. Got: {:?}. Want: {:?}", segment.as_rule(), [
                 Rule::inner_quoted_string,
             ]).into()),
-        }
+        };
+        tracing::trace!(segment = segment.as_str(), rule = ?segment.as_rule(), action = %"exit");
+        retval
     }
 }
 
