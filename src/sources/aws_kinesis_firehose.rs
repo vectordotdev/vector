@@ -24,6 +24,7 @@ use warp::http::{HeaderMap, StatusCode};
 //   * Should fail if metadata fields cannot be set?
 // * Move EncodingConfig into shared config
 // * Handle additional codecs by reusing http source components
+// * Consider using snafu crate for error union
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct AwsKinesisFirehoseConfig {
@@ -355,7 +356,6 @@ fn header_error_message(name: &str, msg: &str) -> ErrorMessage {
 
 /// decode record from its base64 gzip format
 fn decode_record(record: &EncodedFirehoseRecord) -> std::io::Result<Vec<u8>> {
-    dbg!(&record.data);
     use flate2::read::GzDecoder;
 
     let mut cursor = std::io::Cursor::new(record.data.as_bytes());
@@ -373,7 +373,7 @@ fn decode_record(record: &EncodedFirehoseRecord) -> std::io::Result<Vec<u8>> {
 /// Represents protocol v1.0 (the only protocol as of writing)
 ///
 /// https://docs.aws.amazon.com/firehose/latest/dev/httpdeliveryrequestresponse.html
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FirehoseRequest {
     request_id: String,
@@ -384,7 +384,7 @@ struct FirehoseRequest {
     records: Vec<EncodedFirehoseRecord>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct EncodedFirehoseRecord {
     data: String,
 }
@@ -453,11 +453,22 @@ mod tests {
     /// https://docs.aws.amazon.com/firehose/latest/dev/httpdeliveryrequestresponse.html
     async fn send(
         address: SocketAddr,
-        body: &str,
+        records: Vec<&str>,
         key: Option<&str>,
         request_id: &str,
         source_arn: &str,
     ) -> reqwest::Result<reqwest::Response> {
+        let request = FirehoseRequest {
+            request_id: request_id.to_string(),
+            timestamp: Utc::now(),
+            records: records
+                .into_iter()
+                .map(|record| EncodedFirehoseRecord {
+                    data: encode_record(record).unwrap().to_string(),
+                })
+                .collect(),
+        };
+
         let mut builder = reqwest::Client::new()
             .post(&format!("http://{}", address))
             .header("host", address.to_string())
@@ -465,13 +476,12 @@ mod tests {
                 "x-amzn-trace-id",
                 "Root=1-5f5fbf1c-877c68cace58bea222ddbeec",
             )
-            .header("content-length", body.len())
             .header("x-amz-firehose-protocol-version", "1.0")
             .header("x-amz-firehose-request-id", request_id.to_string())
             .header("x-amz-firehose-source-arn", source_arn.to_string())
             .header("user-agent", "Amazon Kinesis Data Firehose Agent/1.0")
             .header("content-type", "application/json")
-            .body(body.to_owned());
+            .json(&request);
 
         if let Some(key) = key {
             builder = builder.header("x-amz-firehose-access-key", key);
@@ -519,19 +529,6 @@ mod tests {
 }
 "#;
 
-        let body = r#"
-{
-  "requestId": "e17265d6-97af-4938-982e-90d5614c4242",
-  "timestamp": 1600110364268,
-  "records": [
-    {
-      "data": "%record%"
-    }
-  ]
-}
-"#
-        .replace("%record%", &encode_record(record).unwrap());
-
         let (rx, addr) = source(
             None,
             EncodingConfig {
@@ -543,7 +540,7 @@ mod tests {
         let source_arn = "arn:aws:firehose:us-east-1:111111111111:deliverystream/test";
         let request_id = "e17265d6-97af-4938-982e-90d5614c4242";
 
-        let res = send(addr, &body, None, request_id, source_arn)
+        let res = send(addr, vec![record], None, request_id, source_arn)
             .await
             .unwrap();
         assert_eq!(200, res.status().as_u16());
@@ -587,19 +584,6 @@ mod tests {
 }
 "#;
 
-        let body = r#"
-{
-  "requestId": "e17265d6-97af-4938-982e-90d5614c4242",
-  "timestamp": 1600110364268,
-  "records": [
-    {
-      "data": "%record%"
-    }
-  ]
-}
-"#
-        .replace("%record%", &encode_record(record).unwrap());
-
         let (rx, addr) = source(
             None,
             EncodingConfig {
@@ -608,7 +592,7 @@ mod tests {
         )
         .await;
 
-        let res = send(addr, &body, None, "", "").await.unwrap();
+        let res = send(addr, vec![record], None, "", "").await.unwrap();
         assert_eq!(200, res.status().as_u16());
 
         let events = collect_ready(rx).await.unwrap();
@@ -625,7 +609,7 @@ mod tests {
         )
         .await;
 
-        let res = send(addr, "", Some("bad access key"), "", "")
+        let res = send(addr, vec![], Some("bad access key"), "", "")
             .await
             .unwrap();
         assert_eq!(401, res.status().as_u16());
