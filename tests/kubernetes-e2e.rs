@@ -488,6 +488,7 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
 
         // Assert pod the event is properly annotated with pod metadata.
         assert_eq!(val["kubernetes"]["pod_name"], "test-pod");
+        assert_eq!(val["kubernetes"]["container_name"], "test-pod");
         // We've already asserted this above, but repeat for completeness.
         assert_eq!(val["kubernetes"]["pod_namespace"], "test-vector-test-pod");
         assert_eq!(val["kubernetes"]["pod_uid"].as_str().unwrap().len(), 36); // 36 is a standard UUID string length
