@@ -81,6 +81,7 @@
 /src/sources/apache_metrics/ @jszwedko
 /src/sources/docker.rs @fanatid
 /src/sources/generator.rs @bruceg
+/src/sources/host_metrics.rs @bruceg
 /src/sources/journald.rs @bruceg
 /src/sources/stdin.rs @bruceg
 /src/sources/syslog.rs @lukesteensen

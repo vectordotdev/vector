@@ -1,0 +1,23 @@
+[sources.host_metrics]
+title = "Host Metrics"
+noun = "Host Metrics"
+beta = true
+common = false
+delivery_guarantee = "at_least_once"
+features = [
+  "Gather host-based metrics.",
+]
+function_category = "collect"
+output_types = ["metric"]
+requirements = {}
+strategies = ["daemon", "sidecar", "service"]
+through_description = "local system data sources"
+
+<%= render("_partials/fields/_component_options.toml", type: "source", name: "host_metrics") %>
+
+[sources.host_metrics.options.scrape_interval_secs]
+type = "integer"
+common = false
+required = false
+default = 15
+description = "The interval between metric gathering, in seconds."
