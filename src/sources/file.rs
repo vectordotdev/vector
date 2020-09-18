@@ -313,7 +313,7 @@ fn create_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::Config, shutdown::ShutdownSignal, sources::file, test_util::trace_init};
+    use crate::{config::Config, shutdown::ShutdownSignal, sources::file};
     use futures01::Stream;
     use pretty_assertions::assert_eq;
     use std::{
