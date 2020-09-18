@@ -37,6 +37,7 @@ on:
       - "rust-toolchain"
   schedule:
     - cron: "0 4 * * *"
+  workflow_dispatch:
 
 env:
   VERBOSE: true
