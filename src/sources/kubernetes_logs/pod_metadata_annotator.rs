@@ -18,6 +18,7 @@ pub struct FieldsSpec {
     pub pod_namespace: String,
     pub pod_uid: String,
     pub pod_labels: String,
+    pub container_name: String,
 }
 
 impl Default for FieldsSpec {
@@ -27,6 +28,7 @@ impl Default for FieldsSpec {
             pod_namespace: "kubernetes.pod_namespace".to_owned(),
             pod_uid: "kubernetes.pod_uid".to_owned(),
             pod_labels: "kubernetes.pod_labels".to_owned(),
+            container_name: "kubernetes.container_name".to_owned(),
         }
     }
 }
@@ -56,10 +58,15 @@ impl PodMetadataAnnotator {
     /// [`FILE_KEY`] field set with a file that the line came from.
     pub fn annotate(&self, event: &mut Event, file: &str) -> Option<()> {
         let log = event.as_mut_log();
-        let uid = parse_log_file_path(file)?.pod_uid;
-        let guard = self.pods_state_reader.get(uid)?;
+        let file_info = parse_log_file_path(file)?;
+        let guard = self.pods_state_reader.get(file_info.pod_uid)?;
         let entry = guard.get_one()?;
         let pod: &Pod = entry.as_ref();
+
+        log.insert(
+            &self.fields_spec.container_name,
+            file_info.container_name.to_owned(),
+        );
         annotate_from_metadata(log, &self.fields_spec, &pod.metadata);
         Some(())
     }
@@ -130,6 +137,7 @@ mod tests {
             (
                 FieldsSpec {
                     pod_name: "name".to_owned(),
+                    container_name: "name".to_string(),
                     pod_namespace: "ns".to_owned(),
                     pod_uid: "uid".to_owned(),
                     pod_labels: "labels".to_owned(),
