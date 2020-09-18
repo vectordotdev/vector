@@ -258,7 +258,7 @@ data_dir = "/home/user/vector/"
   # Fingerprinting
   #
 
-  [sources.file.fingerprinti]
+  [sources.file.fingerprint]
     # The number of bytes read off the head of the file to generate a unique
     # fingerprint.
     #
