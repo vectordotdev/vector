@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
     event::Event,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
 };
@@ -63,7 +63,14 @@ struct PulsarSink {
 type SendFuture = Box<dyn Future<Item = CommandSendReceipt, Error = PulsarError> + 'static + Send>;
 
 inventory::submit! {
-    SinkDescription::new_without_default::<PulsarSinkConfig>("pulsar")
+    SinkDescription::new::<PulsarSinkConfig>("pulsar")
+}
+
+
+impl GenerateConfig for PulsarSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[async_trait::async_trait]

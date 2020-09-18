@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
     event::Event,
     internal_events::GeneratorEventProcessed,
     shutdown::ShutdownSignal,
@@ -41,6 +41,12 @@ impl GeneratorConfig {
 
 inventory::submit! {
     SourceDescription::new::<GeneratorConfig>("generator")
+}
+
+impl GenerateConfig for GeneratorConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "generator")]

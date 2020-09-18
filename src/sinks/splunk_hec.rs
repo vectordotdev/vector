@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
     event::{Event, LogEvent, Value},
     internal_events::{
         SplunkEventEncodeError, SplunkEventSent, SplunkSourceMissingKeys,
@@ -81,6 +81,13 @@ fn default_host_key() -> Atom {
 
 inventory::submit! {
     SinkDescription::new::<HecSinkConfig>("splunk_hec")
+}
+
+
+impl GenerateConfig for HecSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "splunk_hec")]

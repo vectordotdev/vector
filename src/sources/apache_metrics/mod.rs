@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GlobalOptions, SinkDescription},
+    config::{self, GlobalOptions, SinkDescription, GenerateConfig},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
         ApacheMetricsErrorResponse, ApacheMetricsEventReceived, ApacheMetricsHttpError,
@@ -43,7 +43,13 @@ pub fn default_namespace() -> String {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<ApacheMetricsConfig>("apache_metrics")
+    SinkDescription::new::<ApacheMetricsConfig>("apache_metrics")
+}
+
+impl GenerateConfig for ApacheMetricsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "apache_metrics")]

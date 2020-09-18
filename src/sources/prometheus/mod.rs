@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GlobalOptions, SourceConfig, SourceDescription},
+    config::{self, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
     internal_events::{
         PrometheusErrorResponse, PrometheusEventReceived, PrometheusHttpError,
         PrometheusParseError, PrometheusRequestCompleted,
@@ -34,7 +34,13 @@ pub fn default_scrape_interval_secs() -> u64 {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<PrometheusConfig>("prometheus")
+    SourceDescription::new::<PrometheusConfig>("prometheus")
+}
+
+impl GenerateConfig for PrometheusConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "prometheus")]

@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
     event::{Event, LogEvent, Value},
     internal_events::{
         SplunkHECEventReceived, SplunkHECRequestBodyInvalid, SplunkHECRequestError,
@@ -49,6 +49,13 @@ pub struct SplunkConfig {
 
 inventory::submit! {
     SourceDescription::new_without_default::<SplunkConfig>("splunk_hec")
+}
+
+
+impl GenerateConfig for SplunkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 impl SplunkConfig {

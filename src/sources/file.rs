@@ -1,6 +1,6 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
     event::Event,
     internal_events::{FileEventReceived, FileSourceInternalEventsEmitter},
     line_agg::{self, LineAgg},
@@ -136,6 +136,12 @@ impl Default for FileConfig {
 
 inventory::submit! {
     SourceDescription::new::<FileConfig>("file")
+}
+
+impl GenerateConfig for FileConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "file")]

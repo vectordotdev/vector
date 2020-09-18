@@ -12,7 +12,7 @@ use crate::internal_events::{
 };
 use crate::kubernetes as k8s;
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
     dns::Resolver,
     shutdown::ShutdownSignal,
     sources,
@@ -65,7 +65,13 @@ pub struct Config {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<Config>(COMPONENT_NAME)
+    SourceDescription::new::<Config>(COMPONENT_NAME)
+}
+
+impl GenerateConfig for Config {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 const COMPONENT_NAME: &str = "kubernetes_logs";

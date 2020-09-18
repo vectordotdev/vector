@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
     sinks::{
         http::{HttpMethod, HttpSinkConfig},
         util::{
@@ -49,6 +49,13 @@ pub struct NewRelicLogsConfig {
 
 inventory::submit! {
     SinkDescription::new::<NewRelicLogsConfig>("new_relic_logs")
+}
+
+
+impl GenerateConfig for NewRelicLogsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]

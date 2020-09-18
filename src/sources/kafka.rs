@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
     event::Event,
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::KafkaAuthConfig,
@@ -73,7 +73,13 @@ fn default_auto_offset_reset() -> String {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<KafkaSourceConfig>("kafka")
+    SourceDescription::new::<KafkaSourceConfig>("kafka")
+}
+
+impl GenerateConfig for KafkaSourceConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "kafka")]

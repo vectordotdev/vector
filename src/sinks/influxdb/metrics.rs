@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
     event::metric::{Metric, MetricValue, StatisticKind},
     sinks::{
         influxdb::{
@@ -60,6 +60,13 @@ struct InfluxDBRequest {
 
 inventory::submit! {
     SinkDescription::new::<InfluxDBConfig>("influxdb_metrics")
+}
+
+
+impl GenerateConfig for InfluxDBConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "influxdb_metrics")]

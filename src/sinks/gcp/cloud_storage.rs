@@ -1,6 +1,6 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
     event::Event,
     serde::to_string,
     sinks::{
@@ -145,7 +145,14 @@ impl Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<GcsSinkConfig>(NAME)
+    SinkDescription::new::<GcsSinkConfig>(NAME)
+}
+
+
+impl GenerateConfig for GcsSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[async_trait::async_trait]

@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::Event,
     sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
@@ -60,7 +60,14 @@ pub fn default_address() -> SocketAddr {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<StatsdSinkConfig>("statsd")
+    SinkDescription::new::<StatsdSinkConfig>("statsd")
+}
+
+
+impl GenerateConfig for StatsdSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "statsd")]

@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
     event::{Event, LogEvent, Value},
     internal_events::{JournaldEventReceived, JournaldInvalidRecord},
     shutdown::ShutdownSignal,
@@ -78,6 +78,12 @@ pub struct JournaldConfig {
 
 inventory::submit! {
     SourceDescription::new::<JournaldConfig>("journald")
+}
+
+impl GenerateConfig for JournaldConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 type Record = HashMap<Atom, String>;

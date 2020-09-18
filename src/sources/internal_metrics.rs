@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
     metrics::{capture_metrics, get_controller},
     shutdown::ShutdownSignal,
     Pipeline,
@@ -20,6 +20,12 @@ pub struct InternalMetricsConfig;
 
 inventory::submit! {
     SourceDescription::new::<InternalMetricsConfig>("internal_metrics")
+}
+
+impl GenerateConfig for InternalMetricsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "internal_metrics")]

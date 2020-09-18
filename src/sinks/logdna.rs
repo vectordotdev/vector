@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
     event::Event,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -48,7 +48,14 @@ pub struct LogdnaConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<LogdnaConfig>("logdna")
+    SinkDescription::new::<LogdnaConfig>("logdna")
+}
+
+
+impl GenerateConfig for LogdnaConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]

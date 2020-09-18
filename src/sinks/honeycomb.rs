@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
     event::{Event, Value},
     sinks::util::{
         http::{BatchedHttpSink, HttpClient, HttpSink},
@@ -32,7 +32,14 @@ pub struct HoneycombConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<HoneycombConfig>("honeycomb")
+    SinkDescription::new::<HoneycombConfig>("honeycomb")
+}
+
+
+impl GenerateConfig for HoneycombConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "honeycomb")]

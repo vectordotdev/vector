@@ -1,6 +1,6 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
     event::Event,
     sinks::{
         util::{
@@ -58,6 +58,13 @@ pub enum Encoding {
 
 inventory::submit! {
     SinkDescription::new::<PubsubConfig>("gcp_pubsub")
+}
+
+
+impl GenerateConfig for PubsubConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 lazy_static::lazy_static! {

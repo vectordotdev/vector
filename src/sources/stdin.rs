@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
     event::Event,
     internal_events::{StdinEventReceived, StdinReadFailed},
     shutdown::ShutdownSignal,
@@ -38,6 +38,13 @@ fn default_max_length() -> usize {
 
 inventory::submit! {
     SourceDescription::new::<StdinConfig>("stdin")
+}
+
+
+impl GenerateConfig for StdinConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "stdin")]

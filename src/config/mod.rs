@@ -129,6 +129,10 @@ pub enum DataType {
     Metric,
 }
 
+pub trait GenerateConfig {
+    fn generate_config() -> toml::Value;
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(tag = "type")]
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {

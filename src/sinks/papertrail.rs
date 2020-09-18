@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSink,
@@ -22,7 +22,14 @@ pub struct PapertrailConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<PapertrailConfig>("papertrail")
+    SinkDescription::new::<PapertrailConfig>("papertrail")
+}
+
+
+impl GenerateConfig for PapertrailConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "papertrail")]

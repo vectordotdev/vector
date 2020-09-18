@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
     dns::Resolver,
     event::Event,
     internal_events::AwsKinesisStreamsEventSent,
@@ -72,7 +72,14 @@ pub enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<KinesisSinkConfig>("aws_kinesis_streams")
+    SinkDescription::new::<KinesisSinkConfig>("aws_kinesis_streams")
+}
+
+
+impl GenerateConfig for KinesisSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "aws_kinesis_streams")]

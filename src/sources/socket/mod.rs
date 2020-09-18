@@ -5,7 +5,7 @@ mod unix;
 
 use super::util::TcpSource;
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
     shutdown::ShutdownSignal,
     tls::MaybeTlsSettings,
     Pipeline,
@@ -62,7 +62,13 @@ impl From<unix::UnixConfig> for SocketConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<SocketConfig>("socket")
+    SourceDescription::new::<SocketConfig>("socket")
+}
+
+impl GenerateConfig for SocketConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "socket")]

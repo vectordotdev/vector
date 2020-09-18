@@ -2,7 +2,7 @@ use super::util::{SocketListenAddr, TcpSource};
 #[cfg(unix)]
 use crate::sources::util::build_unix_source;
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
     event::{Event, Value},
     internal_events::{SyslogEventReceived, SyslogUdpReadError, SyslogUdpUtf8Error},
     shutdown::ShutdownSignal,
@@ -73,7 +73,14 @@ impl SyslogConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<SyslogConfig>("syslog")
+    SourceDescription::new::<SyslogConfig>("syslog")
+}
+
+
+impl GenerateConfig for SyslogConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "syslog")]

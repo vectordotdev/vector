@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
     event::{Event, Value},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
@@ -81,7 +81,14 @@ pub struct KafkaSink {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<KafkaSinkConfig>("kafka")
+    SinkDescription::new::<KafkaSinkConfig>("kafka")
+}
+
+
+impl GenerateConfig for KafkaSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "kafka")]
