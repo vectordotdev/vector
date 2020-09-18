@@ -137,6 +137,7 @@ fn main() {
         tokio::spawn(heartbeat::heartbeat());
 
         let mut signals = signal::signals();
+        tokio::pin!(signals);
         let mut sources_finished = topology.sources_finished().compat();
         let mut graceful_crash = graceful_crash.compat();
 

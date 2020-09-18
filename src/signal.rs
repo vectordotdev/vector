@@ -1,4 +1,4 @@
-use futures::{compat::Stream01CompatExt, Stream, StreamExt, TryStreamExt};
+use futures::{compat::Stream01CompatExt, Stream, StreamExt, FutureExt, TryFutureExt, TryStreamExt};
 use futures01::{Future as Future01, Stream as Stream01};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -14,7 +14,7 @@ pub enum SignalTo {
 /// Signals from OS/user.
 #[cfg(unix)]
 pub fn signals() -> impl Stream<Item = SignalTo> {
-    use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
+    use tokio::signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 
     let sigint = Signal::new(SIGINT).flatten_stream();
     let sigterm = Signal::new(SIGTERM).flatten_stream();
@@ -38,11 +38,9 @@ pub fn signals() -> impl Stream<Item = SignalTo> {
 /// Signals from OS/user.
 #[cfg(windows)]
 pub fn signals() -> impl Stream<Item = SignalTo> {
-    let ctrl_c = tokio_signal::ctrl_c().flatten_stream();
+    let ctrl_c = tokio::signal::ctrl_c();
 
     ctrl_c
         .map(|_| SignalTo::Shutdown)
-        .compat()
         .into_stream()
-        .map(|result| result.expect("Shouldn't error"))
 }
