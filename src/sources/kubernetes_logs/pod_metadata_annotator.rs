@@ -223,6 +223,17 @@ mod tests {
                 log.insert("kubernetes.container_name", "sandbox0-container0-name");
                 log
             },
+        ),(
+            FieldsSpec{
+                container_name: "container_name".to_owned(),
+                ..Default::default()
+            },
+            "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/sandbox0-container0-name/1.log",
+            {
+                let mut log = LogEvent::default();
+                log.insert("container_name", "sandbox0-container0-name");
+                log
+            },
         )];
 
         for (fields_spec, file, expected) in cases.into_iter() {
