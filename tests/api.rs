@@ -7,6 +7,7 @@ mod support;
 #[cfg(feature = "api")]
 mod tests {
     use crate::support::{sink, source};
+    use chrono::Utc;
     use futures::StreamExt;
     use graphql_client::*;
     use std::time::Duration;
@@ -134,9 +135,11 @@ mod tests {
         let config = api_enabled_config();
         let _server = api::Server::start(config.api);
         let bind = config.api.bind.unwrap();
+        let interval: i64 = 500;
+        let num_results = 3;
 
         let request_body =
-            HeartbeatSubscription::build_query(heartbeat_subscription::Variables { interval: 500 });
+            HeartbeatSubscription::build_query(heartbeat_subscription::Variables { interval });
 
         let mut client = retry_until(
             || api::make_subscription_client(bind),
@@ -151,11 +154,29 @@ mod tests {
             .unwrap();
 
         tokio::pin! {
-            let taken = subscription.stream::<HeartbeatSubscription>().take(3);
+            let heartbeats = subscription.stream().take(num_results);
         }
 
-        while let Some(payload) = taken.next().await {
-            println!("Got: {:?}", payload);
+        // Should get 3x timestamps that are at least `interval` apart. The first one
+        // will be almost immediate, so move it by `interval` to account for the diff
+        let now = Utc::now() - chrono::Duration::milliseconds(interval);
+
+        for mul in 1..=num_results {
+            let diff = heartbeats
+                .next()
+                .await
+                .unwrap()
+                .unwrap()
+                .data
+                .unwrap()
+                .heartbeat
+                .utc
+                - now;
+
+            assert!(diff.num_milliseconds() > mul as i64 * interval);
         }
+
+        // Stream should have stopped after `num_results`
+        assert_matches!(heartbeats.next().await, None);
     }
 }
