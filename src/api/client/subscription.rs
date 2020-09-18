@@ -36,6 +36,7 @@ pub struct Payload {
 }
 
 impl Payload {
+    /// Returns a "start" payload necessary for starting a new subscription
     fn start<T: GraphQLQuery>(id: Uuid, payload: &graphql_client::QueryBody<T::Variables>) -> Self {
         Self {
             id,
@@ -44,10 +45,11 @@ impl Payload {
         }
     }
 
-    fn close(id: Uuid) -> Self {
+    /// Returns a "stop" payload for terminating the subscription in the GraphQL server
+    fn stop(id: Uuid) -> Self {
         Self {
             id,
-            payload_type: "close".to_owned(),
+            payload_type: "stop".to_owned(),
             payload: serde_json::Value::Null,
         }
     }
@@ -84,17 +86,17 @@ impl Subscription {
         self.tx.send(payload)
     }
 
-    /// Close a subscription. This has no return value since it'll be typically used by
+    /// Stop a subscription. This has no return value since it'll be typically used by
     /// the Drop implementation
-    fn close(&self) -> Result<usize, SendError<Payload>> {
-        self.tx.send(Payload::close(self.id))
+    fn stop(&self) -> Result<usize, SendError<Payload>> {
+        self.tx.send(Payload::stop(self.id))
     }
 }
 
 impl Drop for Subscription {
     /// Send a close message upstream once the subscription drops out of scope
     fn drop(&mut self) {
-        let _ = self.close();
+        let _ = self.stop();
     }
 }
 
