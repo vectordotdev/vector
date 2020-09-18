@@ -2,7 +2,7 @@
 
 #![deny(missing_docs)]
 
-use super::path_helpers::parse_log_file_path;
+use super::path_helpers::{parse_log_file_path, LogFileInfo};
 use crate::{
     event::{LogEvent, PathComponent, PathIter},
     kubernetes as k8s, Event,
@@ -62,14 +62,21 @@ impl PodMetadataAnnotator {
         let guard = self.pods_state_reader.get(file_info.pod_uid)?;
         let entry = guard.get_one()?;
         let pod: &Pod = entry.as_ref();
-
-        log.insert(
-            &self.fields_spec.container_name,
-            file_info.container_name.to_owned(),
-        );
+        annotate_from_file_info(log, &self.fields_spec, &file_info);
         annotate_from_metadata(log, &self.fields_spec, &pod.metadata);
         Some(())
     }
+}
+
+fn annotate_from_file_info(
+    log: &mut LogEvent,
+    fields_spec: &FieldsSpec,
+    file_info: &LogFileInfo<'_>,
+) {
+    log.insert(
+        &fields_spec.container_name,
+        file_info.container_name.to_owned(),
+    );
 }
 
 fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata: &ObjectMeta) {
@@ -202,6 +209,26 @@ mod tests {
         for (fields_spec, metadata, expected) in cases.into_iter() {
             let mut log = LogEvent::default();
             annotate_from_metadata(&mut log, &fields_spec, &metadata);
+            assert_eq!(log, expected);
+        }
+    }
+
+    #[test]
+    fn test_annotate_from_file_info() {
+        let cases = vec![(
+            FieldsSpec::default(),
+            "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/sandbox0-container0-name/1.log",
+            {
+                let mut log = LogEvent::default();
+                log.insert("kubernetes.container_name", "sandbox0-container0-name");
+                log
+            },
+        )];
+
+        for (fields_spec, file, expected) in cases.into_iter() {
+            let mut log = LogEvent::default();
+            let file_info = parse_log_file_path(file).unwrap();
+            annotate_from_file_info(&mut log, &fields_spec, &file_info);
             assert_eq!(log, expected);
         }
     }
