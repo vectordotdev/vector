@@ -340,7 +340,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[should_panic](expected = "Timeout")
+    #[should_panic](expected = "Timeout")]
     async fn retry_until_after_timeout() {
         let count: Arc<RwLock<i32>> = Arc::new(RwLock::new(0));
         let func = || {
