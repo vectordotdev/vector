@@ -3,10 +3,10 @@ use std::borrow::Cow;
 mod add_fields;
 mod add_tags;
 mod ansi_stripper;
-#[cfg(feature = "api")]
-mod api;
 #[cfg(feature = "sources-apache_metrics")]
 mod apache_metrics;
+#[cfg(feature = "api")]
+mod api;
 mod auto_concurrency;
 mod aws_kinesis_streams;
 mod blackhole;
@@ -83,10 +83,10 @@ pub mod kubernetes;
 pub use self::add_fields::*;
 pub use self::add_tags::*;
 pub use self::ansi_stripper::*;
-#[cfg(feature = "api")]
-pub use self::api::*;
 #[cfg(feature = "sources-apache_metrics")]
 pub use self::apache_metrics::*;
+#[cfg(feature = "api")]
+pub use self::api::*;
 pub use self::auto_concurrency::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
