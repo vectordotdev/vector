@@ -1,5 +1,4 @@
-use futures::{compat::Stream01CompatExt, Stream, StreamExt, FutureExt, TryFutureExt, TryStreamExt};
-use futures01::{Future as Future01, Stream as Stream01};
+use futures::{future::{select_all, BoxFuture}, Stream, FutureExt};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum SignalTo {
@@ -14,25 +13,23 @@ pub enum SignalTo {
 /// Signals from OS/user.
 #[cfg(unix)]
 pub fn signals() -> impl Stream<Item = SignalTo> {
-    use tokio::signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
+    use tokio::signal::unix::{SignalKind, signal};
 
-    let sigint = Signal::new(SIGINT).flatten_stream();
-    let sigterm = Signal::new(SIGTERM).flatten_stream();
-    let sigquit = Signal::new(SIGQUIT).flatten_stream();
-    let sighup = Signal::new(SIGHUP).flatten_stream();
+    let mut sigint = signal(SignalKind::interrupt()).expect("Signal handlers should not panic.");
+    let mut sigterm = signal(SignalKind::terminate()).expect("Signal handlers should not panic.");
+    let mut sigquit = signal(SignalKind::quit()).expect("Signal handlers should not panic.");
+    let mut sighup = signal(SignalKind::hangup()).expect("Signal handlers should not panic.");
 
-    let signals = sigint.select(sigterm.select(sigquit.select(sighup)));
+    let set: Vec<BoxFuture<SignalTo>> = vec![
+        Box::pin(async move { sigint.recv().map(|_| SignalTo::Shutdown).await }),
+        Box::pin(async move { sigterm.recv().map(|_| SignalTo::Shutdown).await }),
+        Box::pin(async move { sigquit.recv().map(|_| SignalTo::Quit).await }),
+        Box::pin(async move { sighup.recv().map(|_| SignalTo::Reload).await }),
+    ];
 
-    signals
-        .map(|signal| match signal {
-            SIGHUP => SignalTo::Reload,
-            SIGINT | SIGTERM => SignalTo::Shutdown,
-            SIGQUIT => SignalTo::Quit,
-            _ => unreachable!(),
-        })
-        .compat()
-        .into_stream()
-        .map(|result| result.expect("Neither stream errors"))
+    let selection = select_all(set.into_iter()).map(|(val, _, _)| val);
+
+    selection.into_stream()
 }
 
 /// Signals from OS/user.
