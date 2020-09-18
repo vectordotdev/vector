@@ -1,0 +1,127 @@
+name: nightly-cloudsmith-test
+
+on:
+  workflow_dispatch:
+
+env:
+  AUTOINSTALL: true
+  CHANNEL: nightly
+  VERBOSE: true
+
+jobs:
+  build-x86_64-unknown-linux-gnu-packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - env:
+          PASS_FEATURES: "default"
+        run: make package-x86_64-unknown-linux-gnu-all
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-x86_64-unknown-linux-gnu.tar.gz"
+          path: "./target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-amd64.deb"
+          path: "./target/artifacts/vector-amd64.deb"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-x86_64.rpm"
+          path: "./target/artifacts/vector-x86_64.rpm"
+
+  build-aarch64-unknown-linux-musl-packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - env:
+          DOCKER_PRIVILEGED: "true"
+          PASS_FEATURES: "default-cmake"
+        run: make package-aarch64-unknown-linux-musl-all
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-aarch64-unknown-linux-musl.tar.gz"
+          path: "./target/artifacts/vector-aarch64-unknown-linux-musl.tar.gz"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-arm64.deb"
+          path: "./target/artifacts/vector-arm64.deb"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-aarch64.rpm"
+          path: "./target/artifacts/vector-aarch64.rpm"
+
+  release-cloudsmith:
+    runs-on: ubuntu-latest
+    needs:
+      - build-x86_64-unknown-linux-gnu-packages
+      - build-aarch64-unknown-linux-musl-packages
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-amd64.deb
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-arm64.deb
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-x86_64.rpm
+          path: target/artifacts
+      - uses: actions/download-artifact@v1
+        with:
+          name: vector-aarch64.rpm
+          path: target/artifacts
+      - name: Push amd64 deb
+        id: push-deb-amd64
+        uses: cloudsmith-io/action@master
+        with:
+          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+          command: "push"
+          format: "deb"
+          owner: "timber"
+          repo: "vector-nightly"
+          distro: "any-distro"
+          release: "any-version"
+          republish: "true"
+          file: "target/artifacts/vector-amd64.deb"
+      - name: Push arm64 deb
+        id: push-deb-arm64
+        uses: cloudsmith-io/action@master
+        with:
+          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+          command: "push"
+          format: "deb"
+          owner: "timber"
+          repo: "vector-nightly"
+          distro: "any-distro"
+          release: "any-version"
+          republish: "true"
+          file: "target/artifacts/vector-arm64.deb"
+      - name: Push x86_64 RPM
+        id: push-rpm-x86_64
+        uses: cloudsmith-io/action@master
+        with:
+          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+          command: "push"
+          format: "rpm"
+          owner: "timber"
+          repo: "vector-nightly"
+          distro: "any-distro"
+          release: "any-version"
+          republish: "true"
+          file: "target/artifacts/vector-x86_64.rpm"
+      - name: Push aarch64 RPM
+        id: push-rpm-aarch64
+        uses: cloudsmith-io/action@master
+        with:
+          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+          command: "push"
+          format: "rpm"
+          owner: "timber"
+          repo: "vector-nightly"
+          distro: "any-distro"
+          release: "any-version"
+          republish: "true"
+          file: "target/artifacts/vector-aarch64.rpm"
