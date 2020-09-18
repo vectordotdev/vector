@@ -20,6 +20,11 @@ expanding into more specifics.
       1. [Reviews & Approvals](#reviews--approvals)
       1. [Merge Style](#merge-style)
    1. [CI](#ci)
+      1. [Releasing](#releasing)
+      1. [Testing](#testing)
+         1. [Skipping tests](#skipping-tests)
+         1. [Daily tests](#daily-tests)
+         1. [Test harness](#test-harness)
 1. [Development](#development)
    1. [Setup](#setup)
       1. [Using a Docker or Podman environment](#using-a-docker-or-podman-environment)
@@ -33,9 +38,13 @@ expanding into more specifics.
    1. [Guidelines](#guidelines)
       1. [Sink Healthchecks](#sink-healthchecks)
       1. [Metric naming convention](#metric-naming-convention)
-   1. [Testing](#testing)
-      1. [Sample Logs](#sample-logs)
+   1. [Testing](#testing-1)
+      1. [Unit Tests](#unit-tests)
+      1. [Integration Tests](#integration-tests)
+      1. [Blackbox Tests](#blackbox-tests)
       1. [Tips and Tricks](#tips-and-tricks)
+         1. [Testing Specific Components](#testing-specific-components)
+         1. [Generating Sample Logs](#generating-sample-logs)
    1. [Benchmarking](#benchmarking)
    1. [Profiling](#profiling)
    1. [Kubernetes](#kubernetes)
@@ -165,14 +174,24 @@ docs: fix typos
 
 #### Reviews & Approvals
 
-All pull requests must be reviewed and approved by at least one Vector team
-member. The review process is outlined in the [Review guide](REVIEWING.md).
+All pull requests should be reviewed by:
+
+- No review required for cosmetic changes like whitespace, typos, and spelling
+  by a maintainer
+- One Vector team member for minor changes or trivial changes from contributors
+- Two Vector team members for major changes
+- Three Vector team members for RFCs
+
+If there are any CODEOWNERs automatically assigned, you should also wait for
+their review.
+
+The review process is outlined in the [Review guide](REVIEWING.md).
 
 #### Merge Style
 
 All pull requests are squashed and merged. We generally discourage large pull
 requests that are over 300-500 lines of diff. If you would like to propose a
-change that is larger we suggest coming onto our gitter channel and discuss it
+change that is larger we suggest coming onto our [Discord server](https://chat.vector.dev/) and discuss it
 with one of our engineers. This way we can talk through the solution and
 discuss if a change that large is even needed! This will produce a quicker
 response to the change and likely produce code that aligns better with our
@@ -183,24 +202,48 @@ process.
 Currently Vector uses Github Actions to run tests. The workflows are defined in
 `.github/workflows`.
 
+#### Releasing
+
+Github Actions is responsible for releasing updated versions of Vector through
+various channels.
+
+#### Testing
+
+##### Skipping tests
+
 Tests are run for all changes except those that have the label:
 
 ```text
 ci-condition: skip
 ```
 
-Github Actions is responsible for releasing updated versions of Vector through
-various channels.
+##### Daily tests
 
 Some long running tests are only run daily, rather than on every pull request.
-If needed, an administrator can kick off these tests manually via:
+If needed, an administrator can kick off these tests manually via the button on
+the [nightly build action
+page](https://github.com/timberio/vector/actions?query=workflow%3Anightly)
 
-``` bash
-$ curl -u "$GITHUB_USERNAME:$GITHUB_TOKEN" \
-  -H 'Accept: application/vnd.github.v3+json' \
-  -X POST \
-  https://api.github.com/repos/timberio/vector/actions/workflows/nightly.yml/dispatches \
-  --data '{"ref": "$GIT_REF}'
+#### Flakey tests
+
+Historically, we've had some trouble with tests being flakey. If your PR does
+not have passing tests:
+
+- Ensure that the test failures are unrelated to your change
+  - Is it failing on master?
+  - Does it fail if you rerun CI?
+  - Can you reproduce locally?
+- Find or open an issue for the test failure
+  ([example](https://github.com/timberio/vector/issues/3781))
+- Link the PR in the issue for the failing test so that there are more examples
+
+##### Test harness
+
+You can invoke the [test harness][urls.vector_test_harness] by commenting on
+any pull request with:
+
+```bash
+/test -t <name>
 ```
 
 ## Development
@@ -209,13 +252,13 @@ $ curl -u "$GITHUB_USERNAME:$GITHUB_TOKEN" \
 
 We're super excited to have you interested in working on Vector! Before you start you should pick how you want to develop.
 
-For small or first-time contributions, we recommend the Docker method. If you do a lot of contributing, try adopting the Nix method! It'll be way faster and feel more smooth. Prefer to do it yourself? That's fine too!
+For small or first-time contributions, we recommend the Docker method. Prefer to do it yourself? That's fine too!
 
 #### Using a Docker or Podman environment
 
 > **Targets:** You can use this method to produce AARCH64, Arm6/7, as well as x86/64 Linux builds.
 
-Since not everyone has a full working native environment, or can use Nix, we took our Nix environment and stuffed it into a Docker (or Podman) container!
+Since not everyone has a full working native environment, we took our environment and stuffed it into a Docker (or Podman) container!
 
 This is ideal for users who want it to "Just work" and just want to start contributing. It's also what we use for our CI, so you know if it breaks we can't do anything else until we fix it. 😉
 
@@ -476,24 +519,54 @@ When naming options for sinks, sources, and transforms it's important to keep in
 
 ### Testing
 
-You can run Vector's tests via the `make test` command. Our tests use Docker
-compose to spin up mock services for testing, such as
-[localstack](https://github.com/localstack/localstack).
+Testing is very important since Vector's primary design principle is reliability.
+You can read more about how Vector tests in our
+[testing blog post](https://vector.dev/blog/how-we-test-vector/).
 
-#### Sample Logs
+#### Unit Tests
 
-We use `flog` to build a sample set of log files to test sending logs from a
-file. This can be done with the following commands on mac with homebrew.
-Installation instruction for flog can be found
-[here](https://github.com/mingrammer/flog#installation).
+Unit tests refer to the majority of inline tests throughout Vector's code. A
+defining characteristic of unit tests is that they do not require external
+services to run, therfore they should be much quicker. You can run them with:
 
 ```bash
-flog --bytes $((100 * 1024 * 1024)) > sample.log
+cargo test
 ```
 
-This will create a `100MiB` sample log file in the `sample.log` file.
+#### Integration Tests
+
+Integration tests verify that Vector actually works with the services it
+integrates with. Unlike unit tests, integration tests require external services
+to run. A few rules when setting up integration tests:
+
+- [ ] To ensure all contributors can run integration tests, the service must
+      run in a Docker container.
+- [ ] The service must be configured on a unique port that is configured through
+      an environment variable.
+- [ ] Add a `test-integration-<name>` to Vector's [`Makefile`](/Makefile) and
+      ensure that it starts the service before running the integration test.
+- [ ] Add a `test-integration-<name>` job to Vector's
+      [`.github/workflows/test.yml`](.github/workflows/test.yml) workflow and
+      call your make target accordingly.
+
+Once complete, you can run your integration tests with:
+
+```bash
+make test-integration-<name>
+```
+
+#### Blackbox Tests
+
+Vector also offers blackbox testing via
+[Vector's test harness][urls.vector_test_harness]. This is a complex testing
+suite that tests Vector's performance in real-world environments. It is
+typically used for benchmarking, but also correctness testing.
+
+You can run these tests within a PR as described in the [CI section](#ci).
 
 #### Tips and Tricks
+
+##### Testing Specific Components
 
 If you are developing a particular component and want to quickly iterate on unit
 tests related only to this component, the following approach can reduce waiting
@@ -522,11 +595,24 @@ times:
      'cargo test --lib --no-default-features --features=transforms-add_fields transforms::add_fields'
    ```
 
+##### Generating Sample Logs
+
+We use `flog` to build a sample set of log files to test sending logs from a
+file. This can be done with the following commands on mac with homebrew.
+Installation instruction for flog can be found
+[here](https://github.com/mingrammer/flog#installation).
+
+```bash
+flog --bytes $((100 * 1024 * 1024)) > sample.log
+```
+
+This will create a `100MiB` sample log file in the `sample.log` file.
+
 ### Benchmarking
 
 All benchmarks are placed in the [`/benches`](/benches) folder. You can
 run benchmarks via the `make benchmarks` command. In addition, Vector
-maintains a full [test hardness][urls.vector_test_harness] for complex
+maintains a full [test harness][urls.vector_test_harness] for complex
 end-to-end integration and performance testing.
 
 ### Profiling

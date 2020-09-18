@@ -8,11 +8,11 @@ use crate::{
             http::{BatchedHttpSink, HttpClient, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
-        Healthcheck, RouterSink,
+        Healthcheck, VectorSink,
     },
     tls::{TlsOptions, TlsSettings},
 };
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::Sink;
 use http::{Request, Uri};
 use hyper::Body;
@@ -109,11 +109,11 @@ lazy_static! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
-    fn build(&self, _cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         unimplemented!()
     }
 
-    async fn build_async(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    async fn build_async(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let creds = self.auth.make_credentials(Scope::LoggingWrite).await?;
 
         let batch = BatchSettings::default()
@@ -133,7 +133,7 @@ impl SinkConfig for StackdriverConfig {
                 .map(|key| Atom::from(key.as_str())),
         };
 
-        let healthcheck = healthcheck(client.clone(), sink.clone()).boxed().compat();
+        let healthcheck = healthcheck(client.clone(), sink.clone()).boxed();
 
         let sink = BatchedHttpSink::new(
             sink,
@@ -145,7 +145,7 @@ impl SinkConfig for StackdriverConfig {
         )
         .sink_map_err(|e| error!("Fatal stackdriver sink error: {}", e));
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -162,8 +162,7 @@ impl HttpSink for StackdriverSink {
     type Input = serde_json::Value;
     type Output = Vec<BoxedRawValue>;
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-        self.config.encoding.apply_rules(&mut event);
+    fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let mut log = event.into_log();
         let severity = self
             .severity_key
@@ -172,8 +171,11 @@ impl HttpSink for StackdriverSink {
             .map(remap_severity)
             .unwrap_or_else(|| 0.into());
 
+        let mut event = Event::Log(log);
+        self.config.encoding.apply_rules(&mut event);
+
         let entry = serde_json::json!({
-            "jsonPayload": log,
+            "jsonPayload": event.into_log(),
             "severity": severity,
         });
 
@@ -279,6 +281,7 @@ mod tests {
            log_id = "testlogs"
            resource.type = "generic_node"
            resource.namespace = "office"
+           encoding.except_fields = ["anumber"]
         "#,
         )
         .unwrap();

@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GlobalOptions},
+    config::{self, GlobalOptions, SourceConfig, SourceDescription},
     internal_events::{
         PrometheusErrorResponse, PrometheusEventReceived, PrometheusHttpError,
         PrometheusParseError, PrometheusRequestCompleted,
@@ -33,8 +33,12 @@ pub fn default_scrape_interval_secs() -> u64 {
     15
 }
 
+inventory::submit! {
+    SourceDescription::new_without_default::<PrometheusConfig>("prometheus")
+}
+
 #[typetag::serde(name = "prometheus")]
-impl crate::config::SourceConfig for PrometheusConfig {
+impl SourceConfig for PrometheusConfig {
     fn build(
         &self,
         _name: &str,
@@ -207,7 +211,7 @@ mod test {
             }
         });
 
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source(
             "in",
             PrometheusConfig {
@@ -220,13 +224,13 @@ mod test {
             &["in"],
             PrometheusSinkConfig {
                 address: out_addr,
-                namespace: "vector".into(),
+                namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
                 flush_period_secs: 1,
             },
         );
 
-        let (topology, _crash) = start_topology(config, false).await;
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
         delay_for(Duration::from_secs(1)).await;
 
         let response = Client::new()

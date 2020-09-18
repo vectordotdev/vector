@@ -1,4 +1,6 @@
-use super::auto_concurrency::{AutoConcurrencyLimit, AutoConcurrencyLimitLayer};
+use super::auto_concurrency::{
+    AutoConcurrencyLimit, AutoConcurrencyLimitLayer, AutoConcurrencySettings,
+};
 use super::retries::{FixedRetryPolicy, RetryLogic};
 use super::sink::Response;
 use super::{Batch, BatchSink};
@@ -160,6 +162,8 @@ pub struct TowerRequestConfig<T = InFlightLimit> {
     pub retry_attempts: Option<usize>,         // max_value()
     pub retry_max_duration_secs: Option<u64>,
     pub retry_initial_backoff_secs: Option<u64>, // 1
+    #[serde(default)]
+    pub auto_concurrency: AutoConcurrencySettings,
 }
 
 impl<T: InFlightLimitOption> TowerRequestConfig<T> {
@@ -189,6 +193,7 @@ impl<T: InFlightLimitOption> TowerRequestConfig<T> {
                     .or(defaults.retry_initial_backoff_secs)
                     .unwrap_or(1),
             ),
+            auto_concurrency: self.auto_concurrency,
         }
     }
 }
@@ -202,6 +207,7 @@ pub struct TowerRequestSettings {
     pub retry_attempts: usize,
     pub retry_max_duration_secs: Duration,
     pub retry_initial_backoff_secs: Duration,
+    pub auto_concurrency: AutoConcurrencySettings,
 }
 
 impl TowerRequestSettings {
@@ -235,18 +241,34 @@ impl TowerRequestSettings {
         B: Batch<Output = Request>,
         Request: Send + Clone + 'static,
     {
+        BatchSink::new(
+            self.service(retry_logic, service),
+            batch,
+            batch_timeout,
+            acker,
+        )
+    }
+
+    pub fn service<L, S, Request>(&self, retry_logic: L, service: S) -> Svc<S, L>
+    where
+        L: RetryLogic<Response = S::Response>,
+        S: Service<Request> + Clone + Send + 'static,
+        S::Error: Into<crate::Error> + Send + Sync + 'static,
+        S::Response: Send + Response,
+        S::Future: Send + 'static,
+        Request: Send + Clone + 'static,
+    {
         let policy = self.retry_policy(retry_logic.clone());
-        let service = ServiceBuilder::new()
+        ServiceBuilder::new()
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
             .retry(policy)
             .layer(AutoConcurrencyLimitLayer::new(
                 self.in_flight_limit,
+                self.auto_concurrency,
                 retry_logic,
             ))
             .timeout(self.timeout)
-            .service(service);
-
-        BatchSink::new(service, batch, batch_timeout, acker)
+            .service(service)
     }
 }
 

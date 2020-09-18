@@ -46,7 +46,7 @@ pub struct SplitConvertFailed<'a> {
 impl<'a> InternalEvent for SplitConvertFailed<'a> {
     fn emit_logs(&self) {
         debug!(
-            message = "could not convert types.",
+            message = "Could not convert types.",
             field = %self.field,
             error = %self.error,
             rate_limit_secs = 10

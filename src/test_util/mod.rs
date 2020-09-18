@@ -10,6 +10,7 @@ use futures::{
 };
 use futures01::{sync::mpsc, Stream as Stream01};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
+use portpicker::pick_unused_port;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::{
     collections::HashMap,
@@ -18,7 +19,7 @@ use std::{
     future::Future,
     io::Read,
     iter,
-    net::{Shutdown, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr},
     path::{Path, PathBuf},
     pin::Pin,
     sync::{
@@ -49,75 +50,14 @@ macro_rules! assert_downcast_matches {
     }};
 }
 
-#[macro_export]
-macro_rules! assert_within {
-    // Adapted from std::assert_eq
-    ($expr:expr, $low:expr, $high:expr) => ({
-        match (&$expr, &$low, &$high) {
-            (expr, low, high) => {
-                if *expr < *low {
-                    panic!(
-                        r#"assertion failed: `(expr < low)`
-expr: {} = `{:?}`,
- low: `{:?}`"#,
-                        stringify!($expr),
-                        &*expr,
-                        &*low
-                    );
-                }
-                if *expr > *high {
-                    panic!(
-                        r#"assertion failed: `(expr > high)`
-expr: {} = `{:?}`,
-high: `{:?}`"#,
-                        stringify!($expr),
-                        &*expr,
-                        &*high
-                    );
-                }
-            }
-        }
-    });
-    ($expr:expr, $low:expr, $high:expr, $($arg:tt)+) => ({
-        match (&$expr, &$low, &$high) {
-            (expr, low, high) => {
-                if *expr < *low {
-                    panic!(
-                        r#"assertion failed: `(expr < low)`
-expr: {} = `{:?}`,
- low: `{:?}`
-{}"#,
-                        stringify!($expr),
-                        &*expr,
-                        &*low,
-                        format_args!($($arg)+)
-                    );
-                }
-                if *expr > *high {
-                    panic!(
-                        r#"assertion failed: `(expr > high)`
-expr: {} = `{:?}`,
-high: `{:?}`
-{}"#,
-                        stringify!($expr),
-                        &*expr,
-                        &*high,
-                        format_args!($($arg)+)
-                    );
-                }
-            }
-        }
-    });
-
+pub fn next_addr() -> SocketAddr {
+    let port = pick_unused_port().unwrap();
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
 }
 
-static NEXT_PORT: AtomicUsize = AtomicUsize::new(1234);
-
-pub fn next_addr() -> SocketAddr {
-    use std::net::{IpAddr, Ipv4Addr};
-
-    let port = NEXT_PORT.fetch_add(1, Ordering::AcqRel) as u16;
-    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
+pub fn next_addr_v6() -> SocketAddr {
+    let port = pick_unused_port().unwrap();
+    SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port)
 }
 
 pub fn trace_init() {
@@ -201,28 +141,28 @@ pub fn temp_dir() -> PathBuf {
 pub fn random_lines_with_stream(
     len: usize,
     count: usize,
-) -> (Vec<String>, impl Stream<Item = Result<Event, ()>>) {
+) -> (Vec<String>, impl Stream<Item = Event>) {
     let lines = (0..count).map(|_| random_string(len)).collect::<Vec<_>>();
-    let stream = stream::iter(lines.clone()).map(Event::from).map(Ok);
+    let stream = stream::iter(lines.clone()).map(Event::from);
     (lines, stream)
 }
 
 fn random_events_with_stream_generic<F>(
     count: usize,
     generator: F,
-) -> (Vec<Event>, impl Stream<Item = Result<Event, ()>>)
+) -> (Vec<Event>, impl Stream<Item = Event>)
 where
     F: Fn() -> Event,
 {
     let events = (0..count).map(|_| generator()).collect::<Vec<_>>();
-    let stream = stream::iter(events.clone()).map(Ok);
+    let stream = stream::iter(events.clone());
     (events, stream)
 }
 
 pub fn random_events_with_stream(
     len: usize,
     count: usize,
-) -> (Vec<Event>, impl Stream<Item = Result<Event, ()>>) {
+) -> (Vec<Event>, impl Stream<Item = Event>) {
     random_events_with_stream_generic(count, move || Event::from(random_string(len)))
 }
 
@@ -352,6 +292,64 @@ where
         future::ready(result)
     })
     .await
+}
+
+// Retries a func every `retry` duration until given an Ok(T); panics after `until` elapses
+pub async fn retry_until<F, Fut, T, E>(mut f: F, retry: Duration, until: Duration) -> T
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, E>> + Send + 'static,
+{
+    let started = Instant::now();
+    while started.elapsed() < until {
+        match f().await {
+            Ok(res) => return res,
+            Err(_) => tokio::time::delay_for(retry).await,
+        }
+    }
+    panic!("Timeout")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::retry_until;
+    use std::{
+        sync::{Arc, RwLock},
+        time::Duration,
+    };
+
+    // helper which errors the first 3x, and succeeds on the 4th
+    async fn retry_until_helper(count: Arc<RwLock<i32>>) -> Result<(), ()> {
+        if *count.read().unwrap() < 3 {
+            let mut c = count.write().unwrap();
+            *c += 1;
+            return Err(());
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn retry_until_before_timeout() {
+        let count = Arc::new(RwLock::new(0));
+        let func = || {
+            let count = Arc::clone(&count);
+            retry_until_helper(count)
+        };
+
+        retry_until(func, Duration::from_millis(10), Duration::from_secs(1)).await;
+    }
+
+    #[tokio::test]
+    #[should_panic]
+    async fn retry_until_after_timeout() {
+        let count: Arc<RwLock<i32>> = Arc::new(RwLock::new(0));
+        let func = || {
+            let count = Arc::clone(&count);
+            retry_until_helper(count)
+        };
+
+        retry_until(func, Duration::from_millis(50), Duration::from_millis(100)).await;
+    }
 }
 
 pub struct CountReceiver<T> {
@@ -489,7 +487,7 @@ pub async fn start_topology(
     require_healthy: bool,
 ) -> (RunningTopology, mpsc::UnboundedReceiver<()>) {
     let diff = ConfigDiff::initial(&config);
-    let pieces = topology::validate(&config, &diff).await.unwrap();
+    let pieces = topology::build_or_log_errors(&config, &diff).await.unwrap();
     topology::start_validated(config, diff, pieces, require_healthy)
         .await
         .unwrap()

@@ -3,7 +3,8 @@
 // all over the place.
 #![allow(dead_code)]
 
-use futures01::{future, sink::Sink, stream, sync::mpsc::Receiver, Async, Future, Stream};
+use futures::{future, FutureExt};
+use futures01::{sink::Sink, stream, sync::mpsc::Receiver, Async, Future, Stream};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::sync::{
@@ -15,9 +16,9 @@ use vector::config::{
     DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
     TransformContext,
 };
-use vector::event::{self, metric::MetricValue, Event, Value};
+use vector::event::{metric::MetricValue, Event, Value};
 use vector::shutdown::ShutdownSignal;
-use vector::sinks::{util::StreamSink, Healthcheck, RouterSink};
+use vector::sinks::{util::StreamSinkOld, Healthcheck, VectorSink};
 use vector::sources::Source;
 use vector::transforms::Transform;
 use vector::Pipeline;
@@ -106,7 +107,7 @@ impl SourceConfig for MockSourceConfig {
         let mut recv = wrapped.lock().unwrap().take().unwrap();
         let mut shutdown = Some(shutdown);
         let mut _token = None;
-        let source = future::lazy(move || {
+        let source = futures01::future::lazy(move || {
             stream::poll_fn(move || {
                 if let Some(until) = shutdown.as_mut() {
                     match until.poll() {
@@ -155,11 +156,14 @@ impl Transform for MockTransform {
         match &mut event {
             Event::Log(log) => {
                 let mut v = log
-                    .get(&event::log_schema().message_key())
+                    .get(&vector::config::log_schema().message_key())
                     .unwrap()
                     .to_string_lossy();
                 v.push_str(&self.suffix);
-                log.insert(event::log_schema().message_key().clone(), Value::from(v));
+                log.insert(
+                    vector::config::log_schema().message_key().clone(),
+                    Value::from(v),
+                );
             }
             Event::Metric(metric) => match metric.value {
                 MetricValue::Counter { ref mut value } => {
@@ -272,18 +276,21 @@ where
     T: Sink<SinkItem = Event> + std::fmt::Debug + Clone + Send + Sync + 'static,
     <T as Sink>::SinkError: std::fmt::Debug,
 {
-    fn build(&self, cx: SinkContext) -> Result<(RouterSink, Healthcheck), vector::Error> {
+    fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         let sink = self.sink.clone().unwrap();
         let sink = sink.sink_map_err(|error| {
             error!(message = "Ingesting an event failed at mock sink", ?error)
         });
-        let sink = StreamSink::new(sink, cx.acker());
+        let sink = StreamSinkOld::new(sink, cx.acker());
         let healthcheck = if self.healthy {
             future::ok(())
         } else {
             future::err(HealthcheckError::Unhealthy.into())
         };
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck.boxed(),
+        ))
     }
 
     fn input_type(&self) -> DataType {
