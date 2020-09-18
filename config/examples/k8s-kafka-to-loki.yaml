@@ -1,0 +1,57 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: vector
+  name: vector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vector
+  template:
+    metadata:
+      labels:
+        app: vector
+    spec:
+      containers:
+      - name: vector
+        image: timberio/vector:latest-alpine
+        volumeMounts:
+        - name: config
+          mountPath: "/etc/vector/vector.toml"
+          subPath: vector.toml
+      volumes:
+      - name: config
+        configMap:
+          name: vector-cm
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-cm
+
+data:
+  vector.toml: |- 
+    [sources.kafka-in]
+      bootstrap_servers = "kafka.kafka:9092" # required
+      group_id = "consumer-group-name" # required
+      topics = ["log"] # required
+      type = "kafka" # required
+    [transforms.kafka-tr]
+      type = "json_parser" # required
+      inputs = ["kafka-in"] # required
+      drop_field = true # optional, default
+      drop_invalid = true # required
+      field = "message" 
+    [sinks.kafka-out]
+      endpoint = "http://loki.loki:3100" # required
+      inputs = ["kafka-tr"] # required
+      type = "loki" # required
+      remove_label_fields = true
+      labels.app = "{{ kubernetes.labels.app }}"
+      labels.namespace = "{{ kubernetes.namespace_name }}"
+      labels.level = "{{ log.level }}"
+      labels.stream = "{{ stream }}"
+      # labels.app = "{{ kubernetes.labels.app }}"
