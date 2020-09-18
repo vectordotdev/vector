@@ -1,12 +1,13 @@
 use super::Transform;
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, LogEvent},
+    event::{Event, LogEvent, Value as EventValue},
     internal_events::{
         MetricToLogEventProcessed, MetricToLogFailedDeserialize, MetricToLogFailedSerialize,
     },
     types::Conversion,
 };
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use string_cache::DefaultAtom as Atom;
@@ -78,11 +79,11 @@ impl Transform for MetricToLog {
                         log.insert_flat(key, value);
                     }
 
-                    if let Some(value) = log.remove(&self.timestamp_key) {
-                        if let Ok(timestamp) = Conversion::Timestamp.convert(value) {
-                            log.insert(&log_schema().timestamp_key(), timestamp);
-                        }
-                    }
+                    let timestamp = log
+                        .remove(&self.timestamp_key)
+                        .and_then(|value| Conversion::Timestamp.convert(value).ok())
+                        .unwrap_or_else(|| EventValue::Timestamp(Utc::now()));
+                    log.insert(&log_schema().timestamp_key(), timestamp);
 
                     if let Some(host) = log.remove_prune(&self.host_tag, true) {
                         log.insert(&log_schema().host_key(), host);
@@ -163,7 +164,7 @@ mod tests {
     fn transform_gauge() {
         let gauge = Metric {
             name: "gauge".into(),
-            timestamp: None,
+            timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Absolute,
             value: MetricValue::Gauge { value: 1.0 },
@@ -180,6 +181,7 @@ mod tests {
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("gauge")),
                 (String::from("tags.some_tag"), &Value::from("some_value")),
+                (String::from("timestamp"), &Value::from(ts())),
             ]
         );
     }
@@ -188,7 +190,7 @@ mod tests {
     fn transform_set() {
         let set = Metric {
             name: "set".into(),
-            timestamp: None,
+            timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Absolute,
             value: MetricValue::Set {
@@ -208,6 +210,7 @@ mod tests {
                 (String::from("set.values[0]"), &Value::from("one")),
                 (String::from("set.values[1]"), &Value::from("two")),
                 (String::from("tags.some_tag"), &Value::from("some_value")),
+                (String::from("timestamp"), &Value::from(ts())),
             ]
         );
     }
@@ -216,7 +219,7 @@ mod tests {
     fn transform_distribution() {
         let distro = Metric {
             name: "distro".into(),
-            timestamp: None,
+            timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Absolute,
             value: MetricValue::Distribution {
@@ -250,6 +253,7 @@ mod tests {
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("distro")),
                 (String::from("tags.some_tag"), &Value::from("some_value")),
+                (String::from("timestamp"), &Value::from(ts())),
             ]
         );
     }
@@ -258,7 +262,7 @@ mod tests {
     fn transform_histogram() {
         let histo = Metric {
             name: "histo".into(),
-            timestamp: None,
+            timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Absolute,
             value: MetricValue::AggregatedHistogram {
@@ -297,6 +301,7 @@ mod tests {
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("histo")),
                 (String::from("tags.some_tag"), &Value::from("some_value")),
+                (String::from("timestamp"), &Value::from(ts())),
             ]
         );
     }
@@ -305,7 +310,7 @@ mod tests {
     fn transform_summary() {
         let summary = Metric {
             name: "summary".into(),
-            timestamp: None,
+            timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Absolute,
             value: MetricValue::AggregatedSummary {
@@ -344,6 +349,7 @@ mod tests {
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("summary")),
                 (String::from("tags.some_tag"), &Value::from("some_value")),
+                (String::from("timestamp"), &Value::from(ts())),
             ]
         );
     }
