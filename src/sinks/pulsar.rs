@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{self, Event},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
 };
 use futures::{lock::Mutex, FutureExt, TryFutureExt};
@@ -190,13 +190,14 @@ impl Sink for PulsarSink {
     }
 }
 
-fn encode_event(item: Event, encoding: &EncodingConfig<Encoding>) -> crate::Result<Vec<u8>> {
+fn encode_event(mut item: Event, encoding: &EncodingConfig<Encoding>) -> crate::Result<Vec<u8>> {
+    encoding.apply_rules(&mut item);
     let log = item.into_log();
 
     Ok(match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&log)?,
         Encoding::Text => log
-            .get(&event::log_schema().message_key())
+            .get(&log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     })
@@ -206,6 +207,7 @@ fn encode_event(item: Event, encoding: &EncodingConfig<Encoding>) -> crate::Resu
 mod tests {
     use super::*;
     use std::collections::HashMap;
+    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn pulsar_event_json() {
@@ -214,7 +216,7 @@ mod tests {
         evt.as_mut_log().insert("key", "value");
         let result = encode_event(evt, &EncodingConfig::from(Encoding::Json)).unwrap();
         let map: HashMap<String, String> = serde_json::from_slice(&result[..]).unwrap();
-        assert_eq!(msg, map[&event::log_schema().message_key().to_string()]);
+        assert_eq!(msg, map[&log_schema().message_key().to_string()]);
     }
 
     #[test]
@@ -224,6 +226,28 @@ mod tests {
         let event = encode_event(evt, &EncodingConfig::from(Encoding::Text)).unwrap();
 
         assert_eq!(&event[..], msg.as_bytes());
+    }
+
+    #[test]
+    fn pulsar_encode_event() {
+        let msg = "hello_world";
+
+        let mut evt = Event::from(msg);
+        evt.as_mut_log().insert("key", "value");
+
+        let event = encode_event(
+            evt,
+            &EncodingConfigWithDefault {
+                codec: Encoding::Json,
+                except_fields: Some(vec![Atom::from("key")]),
+                ..Default::default()
+            }
+            .into(),
+        )
+        .unwrap();
+
+        let map: HashMap<String, String> = serde_json::from_slice(&event[..]).unwrap();
+        assert!(!map.contains_key("key"));
     }
 }
 
@@ -240,7 +264,8 @@ mod integration_tests {
         trace_init();
 
         let num_events = 1_000;
-        let (_input, mut events) = random_lines_with_stream(100, num_events);
+        let (_input, events) = random_lines_with_stream(100, num_events);
+        let mut events = events.map(Ok);
 
         let topic = format!("test-{}", random_string(10));
         let cnf = PulsarSinkConfig {

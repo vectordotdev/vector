@@ -33,7 +33,7 @@ mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_sysconfdir}/%{_name}
 mkdir -p %{buildroot}%{_sharedstatedir}/%{_name}
 mkdir -p %{buildroot}%{_unitdir}
-cp -a %{_builddir}/bin/. %{buildroot}%{_bindir}
+cp -a %{_builddir}/bin/vector %{buildroot}%{_bindir}
 cp -a %{_builddir}/config/vector.toml %{buildroot}%{_sysconfdir}/%{_name}/vector.toml
 cp -a %{_builddir}/config/vector.spec.toml %{buildroot}%{_sysconfdir}/%{_name}/vector.spec.toml
 cp -a %{_builddir}/config/examples/. %{buildroot}%{_sysconfdir}/%{_name}/examples

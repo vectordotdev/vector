@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GlobalOptions},
+    config::{self, GlobalOptions, SourceConfig, SourceDescription},
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     Event, Pipeline,
@@ -23,8 +23,12 @@ struct StatsdConfig {
     address: SocketAddr,
 }
 
+inventory::submit! {
+    SourceDescription::new_without_default::<StatsdConfig>("statsd")
+}
+
 #[typetag::serde(name = "statsd")]
-impl crate::config::SourceConfig for StatsdConfig {
+impl SourceConfig for StatsdConfig {
     fn build(
         &self,
         _name: &str,

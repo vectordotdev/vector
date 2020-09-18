@@ -14,7 +14,7 @@ pub fn build_unit_tests_main(path: PathBuf) -> Result<Vec<UnitTest>, Vec<String>
     let config = super::loading::load_builder_from_paths(&[path])?;
 
     // Ignore failures on calls other than the first
-    crate::event::LOG_SCHEMA
+    crate::config::LOG_SCHEMA
         .set(config.global.log_schema.clone())
         .ok();
 
@@ -28,6 +28,8 @@ fn build_unit_tests(builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>
     // Don't let this escape since it's not validated
     let mut config = Config {
         global: builder.global,
+        #[cfg(feature = "api")]
+        api: builder.api,
         sources: builder.sources,
         sinks: builder.sinks,
         transforms: builder.transforms,
