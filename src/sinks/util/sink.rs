@@ -193,15 +193,16 @@ where
     }
 
     fn linger_elapsed(&mut self) -> bool {
-        let clue = self.capture_clue();
+        let clue = self.capture_clue("linger_elapsed");
         match &mut self.linger {
             Some(delay) => delay.poll_with_clue(clue).expect("timer error").is_ready(),
             None => false,
         }
     }
 
-    fn capture_clue(&self) -> Clue {
+    fn capture_clue(&self, caller: &'static str) -> Clue {
         Clue {
+            caller,
             closing: self.closing,
             batch_was_full: self.batch.was_full(),
             batch_is_empty: self.batch.is_empty(),
@@ -296,7 +297,7 @@ where
                     // We have data but not a full batch and the linger time has not elapsed, so do
                     // not sent a request yet. Instead, poll the inner service to drive progress
                     // and defer readiness to the linger timeout if present.
-                    let clue = self.capture_clue();
+                    let clue = self.capture_clue("should_not_send");
                     if let Some(linger) = &mut self.linger {
                         self.service.poll_complete()?;
 
@@ -383,6 +384,7 @@ impl SafeLinger {
 
 #[derive(Debug)]
 struct Clue {
+    caller: &'static str,
     closing: bool,
     batch_was_full: bool,
     batch_is_empty: bool,
