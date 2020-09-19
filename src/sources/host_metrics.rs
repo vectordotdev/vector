@@ -16,7 +16,7 @@ use futures::{
 use futures01::Sink;
 #[cfg(target_os = "linux")]
 use heim::cpu::os::linux::CpuTimeExt;
-use heim::{units::time::second, Error};
+use heim::{units::information::byte, units::time::second, Error};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::{select, time};
@@ -91,7 +91,10 @@ async fn run(mut out: Pipeline, shutdown: ShutdownSignal, duration: Duration) ->
 }
 
 async fn capture_metrics() -> impl Iterator<Item = Event> {
-    cpu_metrics().await.map(Into::into)
+    cpu_metrics()
+        .await
+        .chain(memory_metrics().await)
+        .map(Into::into)
 }
 
 async fn cpu_metrics() -> impl Iterator<Item = Metric> {
@@ -151,6 +154,51 @@ async fn cpu_metrics() -> impl Iterator<Item = Metric> {
         }
         Err(error) => {
             error!(message = "Failed to load CPU times", %error);
+            vec![]
+        }
+    }
+    .into_iter()
+}
+
+async fn memory_metrics() -> impl Iterator<Item = Metric> {
+    match heim::memory::memory().await {
+        Ok(memory) => {
+            let timestamp = Some(Utc::now());
+            vec![
+                Metric {
+                    name: "host_memory_total_bytes".into(),
+                    timestamp,
+                    tags: None,
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge {
+                        value: memory.total().get::<byte>() as f64,
+                    },
+                },
+                Metric {
+                    name: "host_memory_free_bytes".into(),
+                    timestamp,
+                    tags: None,
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge {
+                        value: memory.free().get::<byte>() as f64,
+                    },
+                },
+                Metric {
+                    name: "host_memory_FIXME_bytes".into(), // Doesn't match one of the metric names in the RFC
+                    timestamp,
+                    tags: None,
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge {
+                        value: memory.available().get::<byte>() as f64,
+                    },
+                },
+                // Missing: used, buffers, cached, shared, active,
+                // inactive on Linux from
+                // heim::memory::os::linux::MemoryExt
+            ]
+        }
+        Err(error) => {
+            error!(message = "Failed to load memory info", %error);
             vec![]
         }
     }
