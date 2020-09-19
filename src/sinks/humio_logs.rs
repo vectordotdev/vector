@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::splunk_hec::{self, HecSinkConfig},
     sinks::util::{
         encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
@@ -38,7 +38,6 @@ pub struct HumioLogsConfig {
 inventory::submit! {
     SinkDescription::new::<HumioLogsConfig>("humio_logs")
 }
-
 
 impl GenerateConfig for HumioLogsConfig {
     fn generate_config() -> toml::Value {

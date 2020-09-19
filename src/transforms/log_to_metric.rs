@@ -1,6 +1,9 @@
 use super::Transform;
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
+    config::{
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
+    },
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::Value,
     internal_events::{
@@ -85,7 +88,6 @@ pub struct LogToMetric {
 inventory::submit! {
     TransformDescription::new::<LogToMetricConfig>("log_to_metric")
 }
-
 
 impl GenerateConfig for LogToMetricConfig {
     fn generate_config() -> toml::Value {

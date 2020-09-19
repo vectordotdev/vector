@@ -1,7 +1,7 @@
 mod request;
 
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::{Event, LogEvent, Value},
     region::RegionOrEndpoint,
@@ -84,7 +84,6 @@ pub struct CloudwatchLogsSinkConfig {
 inventory::submit! {
     SinkDescription::new::<CloudwatchLogsSinkConfig>("aws_cloudwatch_logs")
 }
-
 
 impl GenerateConfig for CloudwatchLogsSinkConfig {
     fn generate_config() -> toml::Value {

@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{
         metric::{Metric, MetricKind, MetricValue, StatisticKind},
         Event,
@@ -144,7 +144,6 @@ impl DatadogEndpoint {
 inventory::submit! {
     SinkDescription::new::<DatadogConfig>("datadog_metrics")
 }
-
 
 impl GenerateConfig for DatadogConfig {
     fn generate_config() -> toml::Value {

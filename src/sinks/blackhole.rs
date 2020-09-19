@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     emit,
     event::Event,
     internal_events::BlackholeEventReceived,
@@ -24,7 +24,6 @@ pub struct BlackholeConfig {
 inventory::submit! {
     SinkDescription::new::<BlackholeConfig>("blackhole")
 }
-
 
 impl GenerateConfig for BlackholeConfig {
     fn generate_config() -> toml::Value {

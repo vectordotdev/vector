@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
 };
 use serde::{Deserialize, Serialize};
@@ -16,7 +16,6 @@ pub struct FieldFilterConfig {
 inventory::submit! {
     TransformDescription::new::<FieldFilterConfig>("field_filter")
 }
-
 
 impl GenerateConfig for FieldFilterConfig {
     fn generate_config() -> toml::Value {

@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::proto,
     internal_events::VectorEventSent,
     sinks::util::{tcp::TcpSink, StreamSinkOld},
@@ -36,7 +36,6 @@ enum BuildError {
 inventory::submit! {
     SinkDescription::new::<VectorSinkConfig>("vector")
 }
-
 
 impl GenerateConfig for VectorSinkConfig {
     fn generate_config() -> toml::Value {

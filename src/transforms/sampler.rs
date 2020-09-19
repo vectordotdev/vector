@@ -1,6 +1,9 @@
 use super::Transform;
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
+    config::{
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
+    },
     event::Event,
     internal_events::{SamplerEventDiscarded, SamplerEventProcessed},
 };
@@ -21,7 +24,6 @@ pub struct SamplerConfig {
 inventory::submit! {
     TransformDescription::new::<SamplerConfig>("sampler")
 }
-
 
 impl GenerateConfig for SamplerConfig {
     fn generate_config() -> toml::Value {

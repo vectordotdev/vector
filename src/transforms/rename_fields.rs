@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{
         RenameFieldsEventProcessed, RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten,
@@ -26,7 +26,6 @@ pub struct RenameFields {
 inventory::submit! {
     TransformDescription::new::<RenameFieldsConfig>("rename_fields")
 }
-
 
 impl GenerateConfig for RenameFieldsConfig {
     fn generate_config() -> toml::Value {

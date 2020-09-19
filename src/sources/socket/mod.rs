@@ -5,7 +5,9 @@ mod unix;
 
 use super::util::TcpSource;
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
+    config::{
+        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+    },
     shutdown::ShutdownSignal,
     tls::MaybeTlsSettings,
     Pipeline,

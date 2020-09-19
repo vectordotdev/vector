@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     event::Event,
     internal_events::GeneratorEventProcessed,
     shutdown::ShutdownSignal,

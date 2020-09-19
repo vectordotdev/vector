@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Value,
     internal_events::{
         ANSIStripperEventProcessed, ANSIStripperFailed, ANSIStripperFieldInvalid,
@@ -20,7 +20,6 @@ pub struct AnsiStripperConfig {
 inventory::submit! {
     TransformDescription::new::<AnsiStripperConfig>("ansi_stripper")
 }
-
 
 impl GenerateConfig for AnsiStripperConfig {
     fn generate_config() -> toml::Value {

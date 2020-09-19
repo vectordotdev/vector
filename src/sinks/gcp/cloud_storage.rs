@@ -1,6 +1,6 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     serde::to_string,
     sinks::{
@@ -147,7 +147,6 @@ impl Encoding {
 inventory::submit! {
     SinkDescription::new::<GcsSinkConfig>(NAME)
 }
-
 
 impl GenerateConfig for GcsSinkConfig {
     fn generate_config() -> toml::Value {

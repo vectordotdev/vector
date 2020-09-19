@@ -1,6 +1,6 @@
 use super::{BuildError, Transform};
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{ConcatEventProcessed, ConcatSubstringError, ConcatSubstringSourceMissing},
 };
@@ -21,7 +21,6 @@ pub struct ConcatConfig {
 inventory::submit! {
     TransformDescription::new::<ConcatConfig>("concat")
 }
-
 
 impl GenerateConfig for ConcatConfig {
     fn generate_config() -> toml::Value {

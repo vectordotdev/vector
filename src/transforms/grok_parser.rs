@@ -1,6 +1,9 @@
 use super::Transform;
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
+    config::{
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
+    },
     event::{Event, PathComponent, PathIter},
     internal_events::{
         GrokParserConversionFailed, GrokParserEventProcessed, GrokParserFailedMatch,
@@ -35,7 +38,6 @@ pub struct GrokParserConfig {
 inventory::submit! {
     TransformDescription::new::<GrokParserConfig>("grok_parser")
 }
-
 
 impl GenerateConfig for GrokParserConfig {
     fn generate_config() -> toml::Value {

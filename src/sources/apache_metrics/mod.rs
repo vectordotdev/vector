@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GlobalOptions, SinkDescription, GenerateConfig},
+    config::{self, GenerateConfig, GlobalOptions, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
         ApacheMetricsErrorResponse, ApacheMetricsEventReceived, ApacheMetricsHttpError,

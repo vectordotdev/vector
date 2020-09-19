@@ -1,6 +1,9 @@
 use super::Transform;
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
+    config::{
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
+    },
     event::Event,
     internal_events::{JsonParserEventProcessed, JsonParserFailedParse, JsonParserTargetExists},
 };
@@ -23,7 +26,6 @@ pub struct JsonParserConfig {
 inventory::submit! {
     TransformDescription::new::<JsonParserConfig>("json_parser")
 }
-
 
 impl GenerateConfig for JsonParserConfig {
     fn generate_config() -> toml::Value {

@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     emit,
     event::Event,
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
@@ -97,7 +97,6 @@ impl ElasticSearchAuth {
 inventory::submit! {
     SinkDescription::new::<ElasticSearchConfig>("elasticsearch")
 }
-
 
 impl GenerateConfig for ElasticSearchConfig {
     fn generate_config() -> toml::Value {

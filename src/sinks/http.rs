@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -98,7 +98,6 @@ pub enum Encoding {
 inventory::submit! {
     SinkDescription::new::<HttpSinkConfig>("http")
 }
-
 
 impl GenerateConfig for HttpSinkConfig {
     fn generate_config() -> toml::Value {

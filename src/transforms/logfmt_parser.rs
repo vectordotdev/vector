@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     types::{parse_conversion_map, Conversion},
 };
@@ -20,7 +20,6 @@ pub struct LogfmtConfig {
 inventory::submit! {
     TransformDescription::new::<LogfmtConfig>("logfmt_parser")
 }
-
 
 impl GenerateConfig for LogfmtConfig {
     fn generate_config() -> toml::Value {

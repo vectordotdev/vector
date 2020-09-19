@@ -1,6 +1,6 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     sinks::{
         util::{
@@ -94,7 +94,6 @@ pub struct StackdriverResource {
 inventory::submit! {
     SinkDescription::new::<StackdriverConfig>("gcp_stackdriver_logs")
 }
-
 
 impl GenerateConfig for StackdriverConfig {
     fn generate_config() -> toml::Value {

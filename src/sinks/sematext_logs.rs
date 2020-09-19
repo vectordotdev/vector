@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::elasticsearch::{ElasticSearchConfig, Encoding},
     sinks::util::{
         encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
@@ -33,7 +33,6 @@ pub struct SematextLogsConfig {
 inventory::submit! {
     SinkDescription::new::<SematextLogsConfig>("sematext")
 }
-
 
 impl GenerateConfig for SematextLogsConfig {
     fn generate_config() -> toml::Value {

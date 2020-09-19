@@ -1,7 +1,7 @@
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::util::{encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding},
     tls::TlsConfig,
 };
@@ -27,7 +27,6 @@ pub enum Mode {
 inventory::submit! {
     SinkDescription::new::<SocketSinkConfig>("socket")
 }
-
 
 impl GenerateConfig for SocketSinkConfig {
     fn generate_config() -> toml::Value {

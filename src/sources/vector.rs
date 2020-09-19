@@ -1,6 +1,6 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     event::proto,
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     shutdown::ShutdownSignal,
@@ -39,7 +39,6 @@ impl VectorConfig {
 inventory::submit! {
     SourceDescription::new::<VectorConfig>("vector")
 }
-
 
 impl GenerateConfig for VectorConfig {
     fn generate_config() -> toml::Value {

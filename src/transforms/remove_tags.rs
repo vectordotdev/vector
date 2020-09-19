@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     internal_events::RemoveTagsEventProcessed,
     Event,
 };
@@ -20,7 +20,6 @@ pub struct RemoveTags {
 inventory::submit! {
     TransformDescription::new::<RemoveTagsConfig>("remove_tags")
 }
-
 
 impl GenerateConfig for RemoveTagsConfig {
     fn generate_config() -> toml::Value {

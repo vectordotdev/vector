@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::metric::{Metric, MetricKind, MetricValue},
     region::RegionOrEndpoint,
@@ -54,7 +54,6 @@ lazy_static! {
 inventory::submit! {
     SinkDescription::new::<CloudWatchMetricsSinkConfig>("aws_cloudwatch_metrics")
 }
-
 
 impl GenerateConfig for CloudWatchMetricsSinkConfig {
     fn generate_config() -> toml::Value {

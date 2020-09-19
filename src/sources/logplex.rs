@@ -1,5 +1,7 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
+    config::{
+        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+    },
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     shutdown::ShutdownSignal,
@@ -27,7 +29,6 @@ pub struct LogplexConfig {
 inventory::submit! {
     SourceDescription::new::<LogplexConfig>("logplex")
 }
-
 
 impl GenerateConfig for LogplexConfig {
     fn generate_config() -> toml::Value {

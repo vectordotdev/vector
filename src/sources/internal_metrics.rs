@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     metrics::{capture_metrics, get_controller},
     shutdown::ShutdownSignal,
     Pipeline,

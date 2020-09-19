@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSink,
@@ -24,7 +24,6 @@ pub struct PapertrailConfig {
 inventory::submit! {
     SinkDescription::new::<PapertrailConfig>("papertrail")
 }
-
 
 impl GenerateConfig for PapertrailConfig {
     fn generate_config() -> toml::Value {

@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::Event,
     region::RegionOrEndpoint,
@@ -138,7 +138,6 @@ pub enum Encoding {
 inventory::submit! {
     SinkDescription::new::<S3SinkConfig>("aws_s3")
 }
-
 
 impl GenerateConfig for S3SinkConfig {
     fn generate_config() -> toml::Value {

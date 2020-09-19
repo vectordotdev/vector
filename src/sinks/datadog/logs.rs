@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::{
         util::{self, encoding::EncodingConfig, tcp::TcpSink, Encoding, StreamSinkOld, UriSerde},
@@ -23,7 +23,6 @@ pub struct DatadogLogsConfig {
 inventory::submit! {
     SinkDescription::new::<DatadogLogsConfig>("datadog_logs")
 }
-
 
 impl GenerateConfig for DatadogLogsConfig {
     fn generate_config() -> toml::Value {

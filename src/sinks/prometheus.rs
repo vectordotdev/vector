@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     sinks::util::{encode_namespace, MetricEntry},
     Event,
@@ -63,7 +63,6 @@ pub fn default_flush_period_secs() -> u64 {
 inventory::submit! {
     SinkDescription::new::<PrometheusSinkConfig>("prometheus")
 }
-
 
 impl GenerateConfig for PrometheusSinkConfig {
     fn generate_config() -> toml::Value {

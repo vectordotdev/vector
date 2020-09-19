@@ -1,6 +1,9 @@
 use super::Transform;
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
+    config::{
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
+    },
     event::{Event, Value},
     internal_events::{DedupeEventDiscarded, DedupeEventProcessed},
 };
@@ -73,7 +76,6 @@ pub struct Dedupe {
 inventory::submit! {
     TransformDescription::new::<DedupeConfig>("dedupe")
 }
-
 
 impl GenerateConfig for DedupeConfig {
     fn generate_config() -> toml::Value {

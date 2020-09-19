@@ -12,7 +12,7 @@ use crate::internal_events::{
 };
 use crate::kubernetes as k8s;
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     dns::Resolver,
     shutdown::ShutdownSignal,
     sources,

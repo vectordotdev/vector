@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
@@ -83,7 +83,6 @@ pub struct KafkaSink {
 inventory::submit! {
     SinkDescription::new::<KafkaSinkConfig>("kafka")
 }
-
 
 impl GenerateConfig for KafkaSinkConfig {
     fn generate_config() -> toml::Value {

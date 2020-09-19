@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::Event,
     region::RegionOrEndpoint,
@@ -69,7 +69,6 @@ pub enum Encoding {
 inventory::submit! {
     SinkDescription::new::<KinesisFirehoseSinkConfig>("aws_kinesis_firehose")
 }
-
 
 impl GenerateConfig for KinesisFirehoseSinkConfig {
     fn generate_config() -> toml::Value {

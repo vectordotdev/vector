@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
+    config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     Event, Pipeline,
@@ -26,7 +26,6 @@ struct StatsdConfig {
 inventory::submit! {
     SourceDescription::new::<StatsdConfig>("statsd")
 }
-
 
 impl GenerateConfig for StatsdConfig {
     fn generate_config() -> toml::Value {

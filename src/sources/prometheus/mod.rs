@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GlobalOptions, SourceConfig, SourceDescription, GenerateConfig},
+    config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     internal_events::{
         PrometheusErrorResponse, PrometheusEventReceived, PrometheusHttpError,
         PrometheusParseError, PrometheusRequestCompleted,

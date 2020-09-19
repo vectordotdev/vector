@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     sinks::{
         influxdb::{
@@ -70,7 +70,6 @@ pub enum Encoding {
 inventory::submit! {
     SinkDescription::new::<InfluxDBLogsConfig>("influxdb_logs")
 }
-
 
 impl GenerateConfig for InfluxDBLogsConfig {
     fn generate_config() -> toml::Value {

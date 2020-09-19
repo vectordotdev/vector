@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -43,7 +43,6 @@ pub enum Encoding {
 inventory::submit! {
     SinkDescription::new::<ConsoleSinkConfig>("console")
 }
-
 
 impl GenerateConfig for ConsoleSinkConfig {
     fn generate_config() -> toml::Value {

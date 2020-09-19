@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription, GenerateConfig},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::Event,
     sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
@@ -62,7 +62,6 @@ pub fn default_address() -> SocketAddr {
 inventory::submit! {
     SinkDescription::new::<StatsdSinkConfig>("statsd")
 }
-
 
 impl GenerateConfig for StatsdSinkConfig {
     fn generate_config() -> toml::Value {
