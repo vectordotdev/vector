@@ -1,5 +1,6 @@
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
+    config::GenerateConfig,
     event::Value,
     Event,
 };
@@ -520,7 +521,13 @@ pub struct CheckFieldsConfig {
 }
 
 inventory::submit! {
-    ConditionDescription::new_without_example::<CheckFieldsConfig>("check_fields")
+    ConditionDescription::new::<CheckFieldsConfig>("check_fields")
+}
+
+impl GenerateConfig for CheckFieldsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "check_fields")]

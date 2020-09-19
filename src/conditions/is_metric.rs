@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
+    config::GenerateConfig,
     Event,
 };
 
@@ -11,7 +12,13 @@ use crate::{
 pub struct IsMetricConfig {}
 
 inventory::submit! {
-    ConditionDescription::new_without_example::<IsMetricConfig>("is_metric")
+    ConditionDescription::new::<IsMetricConfig>("is_metric")
+}
+
+impl GenerateConfig for IsMetricConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "is_metric")]
