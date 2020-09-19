@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{AddTagsEventProcessed, AddTagsTagNotOverwritten, AddTagsTagOverwritten},
 };
@@ -23,7 +23,13 @@ pub struct AddTags {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<AddTagsConfig>("add_tags")
+    TransformDescription::new::<AddTagsConfig>("add_tags")
+}
+
+impl GenerateConfig for AddTagsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "add_tags")]

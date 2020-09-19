@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
     event::discriminant::Discriminant,
     event::{Event, LogEvent},
     internal_events::{ReduceEventProcessed, ReduceStaleEventFlushed},
@@ -46,6 +46,13 @@ pub struct ReduceConfig {
 
 inventory::submit! {
     TransformDescription::new::<ReduceConfig>("reduce")
+}
+
+
+impl GenerateConfig for ReduceConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "reduce")]

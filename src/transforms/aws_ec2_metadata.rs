@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
     event::Event,
     sinks::util::http::HttpClient,
 };
@@ -108,7 +108,14 @@ struct Keys {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<Ec2Metadata>("aws_ec2_metadata")
+    TransformDescription::new::<Ec2Metadata>("aws_ec2_metadata")
+}
+
+
+impl GenerateConfig for Ec2Metadata {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[async_trait::async_trait]

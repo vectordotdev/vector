@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
     event::Event,
     internal_events::{RemapEventProcessed, RemapFailedMapping},
     mapping::{parser::parse as parse_mapping, Mapping},
@@ -17,6 +17,13 @@ pub struct RemapConfig {
 
 inventory::submit! {
     TransformDescription::new::<RemapConfig>("remap")
+}
+
+
+impl GenerateConfig for RemapConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "remap")]

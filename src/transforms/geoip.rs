@@ -1,7 +1,7 @@
 use super::Transform;
 
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
     event::Event,
 };
 use serde::{Deserialize, Serialize};
@@ -30,7 +30,14 @@ fn default_geoip_target_field() -> String {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<GeoipConfig>("geoip")
+    TransformDescription::new::<GeoipConfig>("geoip")
+}
+
+
+impl GenerateConfig for GeoipConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "geoip")]

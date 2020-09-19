@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
     event::Event,
     internal_events::{SwimlanesEventDiscarded, SwimlanesEventProcessed},
 };
@@ -67,7 +67,14 @@ pub struct SwimlanesConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<SwimlanesConfig>("swimlanes")
+    TransformDescription::new::<SwimlanesConfig>("swimlanes")
+}
+
+
+impl GenerateConfig for SwimlanesConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "swimlanes")]

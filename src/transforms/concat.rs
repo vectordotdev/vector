@@ -1,6 +1,6 @@
 use super::{BuildError, Transform};
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
     event::Event,
     internal_events::{ConcatEventProcessed, ConcatSubstringError, ConcatSubstringSourceMissing},
 };
@@ -19,7 +19,14 @@ pub struct ConcatConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<ConcatConfig>("concat")
+    TransformDescription::new::<ConcatConfig>("concat")
+}
+
+
+impl GenerateConfig for ConcatConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "concat")]

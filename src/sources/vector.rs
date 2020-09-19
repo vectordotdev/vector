@@ -37,7 +37,7 @@ impl VectorConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<VectorConfig>("vector")
+    SourceDescription::new::<VectorConfig>("vector")
 }
 
 

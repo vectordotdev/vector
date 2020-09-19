@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
     event::Event,
     internal_events::{CoercerConversionFailed, CoercerEventProcessed},
     types::{parse_conversion_map, Conversion},
@@ -20,6 +20,13 @@ pub struct CoercerConfig {
 
 inventory::submit! {
     TransformDescription::new::<CoercerConfig>("coercer")
+}
+
+
+impl GenerateConfig for CoercerConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "coercer")]

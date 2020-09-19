@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
     event::{Event, Value},
     internal_events::{
         RegexParserConversionFailed, RegexParserEventProcessed, RegexParserFailedMatch,
@@ -36,6 +36,13 @@ pub struct RegexParserConfig {
 
 inventory::submit! {
     TransformDescription::new::<RegexParserConfig>("regex_parser")
+}
+
+
+impl GenerateConfig for RegexParserConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "regex_parser")]

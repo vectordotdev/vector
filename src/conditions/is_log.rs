@@ -11,7 +11,7 @@ use crate::{
 pub struct IsLogConfig {}
 
 inventory::submit! {
-    ConditionDescription::new::<IsLogConfig>("is_log")
+    ConditionDescription::new_without_example::<IsLogConfig>("is_log")
 }
 
 #[typetag::serde(name = "is_log")]

@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
     internal_events::{RemoveFieldsEventProcessed, RemoveFieldsFieldMissing},
     Event,
 };
@@ -20,7 +20,14 @@ pub struct RemoveFields {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<RemoveFieldsConfig>("remove_fields")
+    TransformDescription::new::<RemoveFieldsConfig>("remove_fields")
+}
+
+
+impl GenerateConfig for RemoveFieldsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "remove_fields")]

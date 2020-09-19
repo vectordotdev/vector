@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
     internal_events::{
         TagCardinalityLimitEventProcessed, TagCardinalityLimitRejectingEvent,
         TagCardinalityLimitRejectingTag, TagCardinalityValueLimitReached,
@@ -66,7 +66,14 @@ fn default_cache_size() -> usize {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<TagCardinalityLimitConfig>("tag_cardinality_limit")
+    TransformDescription::new::<TagCardinalityLimitConfig>("tag_cardinality_limit")
+}
+
+
+impl GenerateConfig for TagCardinalityLimitConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "tag_cardinality_limit")]

@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
     event::discriminant::Discriminant,
     event::merge_state::LogEventMergeState,
     event::{self, Event},
@@ -32,6 +32,13 @@ pub struct MergeConfig {
 
 inventory::submit! {
     TransformDescription::new::<MergeConfig>("merge")
+}
+
+
+impl GenerateConfig for MergeConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 impl Default for MergeConfig {

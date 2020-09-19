@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
     event::Event,
     internal_events::{SamplerEventDiscarded, SamplerEventProcessed},
 };
@@ -19,7 +19,14 @@ pub struct SamplerConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<SamplerConfig>("sampler")
+    TransformDescription::new::<SamplerConfig>("sampler")
+}
+
+
+impl GenerateConfig for SamplerConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "sampler")]

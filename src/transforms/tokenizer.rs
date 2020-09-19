@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
     event::{Event, PathComponent, PathIter},
     internal_events::{TokenizerConvertFailed, TokenizerEventProcessed, TokenizerFieldMissing},
     types::{parse_check_conversion_map, Conversion},
@@ -29,6 +29,13 @@ pub struct TokenizerConfig {
 
 inventory::submit! {
     TransformDescription::new::<TokenizerConfig>("tokenizer")
+}
+
+
+impl GenerateConfig for TokenizerConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "tokenizer")]

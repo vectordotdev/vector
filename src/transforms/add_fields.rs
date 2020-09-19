@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::serde::Fields;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{
         AddFieldsEventProcessed, AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten,
@@ -48,7 +48,13 @@ pub struct AddFields {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<AddFieldsConfig>("add_fields")
+    TransformDescription::new::<AddFieldsConfig>("add_fields")
+}
+
+impl GenerateConfig for AddFieldsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "add_fields")]

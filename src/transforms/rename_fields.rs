@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
     event::Event,
     internal_events::{
         RenameFieldsEventProcessed, RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten,
@@ -24,7 +24,14 @@ pub struct RenameFields {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<RenameFieldsConfig>("rename_fields")
+    TransformDescription::new::<RenameFieldsConfig>("rename_fields")
+}
+
+
+impl GenerateConfig for RenameFieldsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "rename_fields")]

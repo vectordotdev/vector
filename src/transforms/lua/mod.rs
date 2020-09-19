@@ -2,7 +2,7 @@ pub mod v1;
 pub mod v2;
 
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     transforms::Transform,
 };
 use serde::{Deserialize, Serialize};
@@ -43,7 +43,13 @@ pub enum LuaConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<LuaConfig>("lua")
+    TransformDescription::new::<LuaConfig>("lua")
+}
+
+impl GenerateConfig for LuaConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "lua")]

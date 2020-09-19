@@ -520,7 +520,7 @@ pub struct CheckFieldsConfig {
 }
 
 inventory::submit! {
-    ConditionDescription::new::<CheckFieldsConfig>("check_fields")
+    ConditionDescription::new_without_example::<CheckFieldsConfig>("check_fields")
 }
 
 #[typetag::serde(name = "check_fields")]

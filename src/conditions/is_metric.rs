@@ -11,7 +11,7 @@ use crate::{
 pub struct IsMetricConfig {}
 
 inventory::submit! {
-    ConditionDescription::new::<IsMetricConfig>("is_metric")
+    ConditionDescription::new_without_example::<IsMetricConfig>("is_metric")
 }
 
 #[typetag::serde(name = "is_metric")]

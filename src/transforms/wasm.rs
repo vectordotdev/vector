@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription, GenerateConfig},
     event::Event,
     wasm::WasmModule,
 };
@@ -46,7 +46,14 @@ impl Into<WasmModuleConfig> for WasmConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<WasmConfig>("wasm")
+    TransformDescription::new::<WasmConfig>("wasm")
+}
+
+
+impl GenerateConfig for WasmConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[typetag::serde(name = "wasm")]

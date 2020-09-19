@@ -48,7 +48,7 @@ pub struct SplunkConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<SplunkConfig>("splunk_hec")
+    SourceDescription::new::<SplunkConfig>("splunk_hec")
 }
 
 
