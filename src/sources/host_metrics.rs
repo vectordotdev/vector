@@ -94,6 +94,7 @@ async fn capture_metrics() -> impl Iterator<Item = Event> {
     cpu_metrics()
         .await
         .chain(memory_metrics().await)
+        .chain(swap_metrics().await)
         .map(Into::into)
 }
 
@@ -153,7 +154,7 @@ async fn cpu_metrics() -> impl Iterator<Item = Metric> {
                 .await
         }
         Err(error) => {
-            error!(message = "Failed to load CPU times", %error);
+            error!(message = "Failed to load CPU times", %error, rate_limit_secs = 60);
             vec![]
         }
     }
@@ -198,7 +199,49 @@ async fn memory_metrics() -> impl Iterator<Item = Metric> {
             ]
         }
         Err(error) => {
-            error!(message = "Failed to load memory info", %error);
+            error!(message = "Failed to load memory info", %error, rate_limit_secs = 60);
+            vec![]
+        }
+    }
+    .into_iter()
+}
+
+async fn swap_metrics() -> impl Iterator<Item = Metric> {
+    match heim::memory::swap().await {
+        Ok(swap) => {
+            let timestamp = Some(Utc::now());
+            vec![
+                Metric {
+                    name: "host_memory_swap_free_bytes".into(),
+                    timestamp,
+                    tags: None,
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge {
+                        value: swap.free().get::<byte>() as f64,
+                    },
+                },
+                Metric {
+                    name: "host_memory_swap_total_bytes".into(),
+                    timestamp,
+                    tags: None,
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge {
+                        value: swap.total().get::<byte>() as f64,
+                    },
+                },
+                Metric {
+                    name: "host_memory_swap_used_bytes".into(),
+                    timestamp,
+                    tags: None,
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Gauge {
+                        value: swap.used().get::<byte>() as f64,
+                    },
+                },
+            ]
+        }
+        Err(error) => {
+            error!(message = "Failed to load swap info", %error, rate_limit_secs = 60);
             vec![]
         }
     }
