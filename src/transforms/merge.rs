@@ -22,6 +22,8 @@ pub struct MergeConfig {
     /// merges in the fields from each successive partial event, until a
     /// non-partial event arrives. Finally, the non-partial event fields are
     /// merged in, producing the resulting merged event.
+    // Deprecated name is merge_fields
+    #[serde(alias = "merge_fields")]
     pub fields: Vec<Atom>,
     /// An ordered list of fields to distinguish streams by. Each stream has a
     /// separate partial event merging state. Should be used to prevent events

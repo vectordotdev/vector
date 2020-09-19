@@ -69,6 +69,8 @@ pub struct FileConfig {
     pub host_key: Option<String>,
     pub data_dir: Option<PathBuf>,
     pub glob_minimum_cooldown: u64, // millis
+    // Deprecated name
+    #[serde(alias = "fingerprinting")]
     pub fingerprint: FingerprintConfig,
     pub message_start_indicator: Option<String>,
     pub multi_line_timeout: u64, // millis
