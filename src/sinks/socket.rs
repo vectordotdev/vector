@@ -91,9 +91,17 @@ mod test {
         event::Event,
         test_util::{next_addr, next_addr_v6, random_lines_with_stream, trace_init, CountReceiver},
     };
-    use futures::{future, stream};
+    use futures::{
+        future,
+        stream::{self, StreamExt},
+    };
     use serde_json::Value;
-    use std::net::{SocketAddr, UdpSocket};
+    use std::{
+        net::{SocketAddr, UdpSocket},
+        time::Duration,
+    };
+    use tokio::{net::TcpListener, time::timeout};
+    use tokio_util::codec::{FramedRead, LinesCodec};
 
     async fn test_udp(addr: SocketAddr) {
         let receiver = UdpSocket::bind(addr).unwrap();
@@ -310,5 +318,63 @@ mod test {
         // Check that there are exactly 20 events.
         assert_eq!(msg_counter.load(Ordering::SeqCst), 20);
         assert_eq!(conn_counter.load(Ordering::SeqCst), 2);
+    }
+
+    /// Tests whether socket recovers from a hard disconnect.
+    #[tokio::test]
+    async fn reconnect() {
+        trace_init();
+
+        let addr = next_addr();
+        let config = SocketSinkConfig {
+            mode: Mode::Tcp(TcpSinkConfig {
+                address: addr.to_string(),
+                encoding: Encoding::Text.into(),
+                tls: None,
+            }),
+        };
+
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).unwrap();
+
+        let (_, events) = random_lines_with_stream(1000, 10000);
+        let _ = tokio::spawn(sink.run(events));
+
+        // First listener
+        let mut count = 20usize;
+        TcpListener::bind(addr)
+            .await
+            .unwrap()
+            .next()
+            .await
+            .unwrap()
+            .map(|socket| FramedRead::new(socket, LinesCodec::new()))
+            .unwrap()
+            .map(|x| x.unwrap())
+            .take_while(|_| {
+                future::ready(if count > 0 {
+                    count -= 1;
+                    true
+                } else {
+                    false
+                })
+            })
+            .collect::<Vec<_>>()
+            .await;
+
+        // Disconnect
+        if cfg!(windows) {
+            // Gives Windows time to release the addr port.
+            tokio::time::delay_for(Duration::from_secs(1)).await;
+        }
+
+        // Second listener
+        // If this doesn't succeed then the sink hanged.
+        assert!(timeout(
+            Duration::from_secs(5),
+            CountReceiver::receive_lines(addr).connected()
+        )
+        .await
+        .is_ok());
     }
 }
