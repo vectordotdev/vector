@@ -89,21 +89,3 @@ impl InternalEvent for KeyValueFieldDoesNotExist {
 pub(crate) struct KeyValueMultipleSplitResults {
     pub pair: Atom,
 }
-
-impl InternalEvent for KeyValueMultipleSplitResults {
-    fn emit_logs(&self) {
-        warn!(
-            message = "Splitting a key/value pair resulted in more than two values.",
-            pair = %self.pair,
-            rate_limit_sec = 30
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "key_value_parser",
-            "error_type" => "failed parse",
-        );
-    }
-}

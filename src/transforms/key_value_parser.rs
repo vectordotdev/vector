@@ -3,8 +3,8 @@ use crate::{
     config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{
-        KeyValueEventProcessed, KeyValueFieldDoesNotExist, KeyValueMultipleSplitResults,
-        KeyValueParseFailed, KeyValueTargetExists,
+        KeyValueEventProcessed, KeyValueFieldDoesNotExist, KeyValueParseFailed,
+        KeyValueTargetExists,
     },
     types::{parse_conversion_map, Conversion},
 };
@@ -38,7 +38,6 @@ impl TransformConfig for KeyValueConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let conversions = parse_conversion_map(&self.types)?;
         let field = self.field.as_ref().unwrap_or(&log_schema().message_key());
-        let field_split = self.field_split.clone().unwrap_or_else(|| "=".to_string());
         let separator = self.separator.clone().unwrap_or_else(|| " ".to_string());
         let trim_key = self.trim_key.as_ref().map(|key| key.chars().collect());
         let trim_value = self.trim_value.as_ref().map(|key| key.chars().collect());
@@ -50,6 +49,11 @@ impl TransformConfig for KeyValueConfig {
                 .as_ref()
                 .map(|target_field| field != target_field)
                 .unwrap_or(true);
+
+        let mut field_split = self.field_split.clone().unwrap_or_else(|| "=".to_string());
+        if field_split.is_empty() {
+            field_split = "=".to_string();
+        }
 
         Ok(Box::new(KeyValue {
             conversions,
@@ -94,36 +98,21 @@ impl KeyValue {
         let pair = pair.trim();
         let field_split = &self.field_split;
 
-        let fields = if field_split.is_empty() {
-            let mut kv_pair = pair.split_whitespace();
-            let key = kv_pair.next()?;
-            let val = kv_pair.next()?;
-            if kv_pair.next().is_some() {
-                emit!(KeyValueMultipleSplitResults { pair: pair.into() });
-                return None;
-            }
-
-            (key, val)
-        } else {
-            let split_index = pair.find(field_split).unwrap_or(0);
-            let (key, _val) = pair.split_at(split_index);
-            let key = key.trim();
-            if key.is_empty() {
-                return None;
-            }
-            let val = pair[split_index + field_split.len()..].trim();
-
-            (key, val)
-        };
-
+        let split_index = pair.find(field_split).unwrap_or(0);
+        let (key, _val) = pair.split_at(split_index);
+        let key = key.trim();
+        if key.is_empty() {
+            return None;
+        }
         let key = match &self.trim_key {
-            Some(trim_key) => fields.0.trim_matches(trim_key as &[_]),
-            None => fields.0,
+            Some(trim_key) => key.trim_matches(trim_key as &[_]),
+            None => key,
         };
 
+        let val = pair[split_index + field_split.len()..].trim();
         let val = match &self.trim_value {
-            Some(trim_value) => fields.1.trim_matches(trim_value as &[_]),
-            None => fields.1,
+            Some(trim_value) => val.trim_matches(trim_value as &[_]),
+            None => val,
         };
 
         Some((Atom::from(key), val.to_string()))
@@ -237,22 +226,6 @@ mod tests {
             "foo=bar, beep=bop, score=10",
             Some(",".to_string()),
             None,
-            false,
-            &[],
-            None,
-            None,
-            None,
-        );
-        assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
-        assert_eq!(log[&"beep".into()], Value::Bytes("bop".into()));
-    }
-
-    #[test]
-    fn it_splits_whitespace() {
-        let log = parse_log(
-            "foo bar, beep bop, score 10",
-            Some(",".to_string()),
-            Some(" ".to_string()),
             false,
             &[],
             None,
