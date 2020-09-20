@@ -136,7 +136,14 @@ fn encode_metric_header(namespace: Option<&str>, metric: &Metric) -> String {
     let r#type = match &metric.value {
         MetricValue::Counter { .. } => "counter",
         MetricValue::Gauge { .. } => "gauge",
-        MetricValue::Distribution { statistic: _, .. } => "histogram",
+        MetricValue::Distribution {
+            statistic: StatisticKind::Histogram,
+            ..
+        } => "histogram",
+        MetricValue::Distribution {
+            statistic: StatisticKind::Summary,
+            ..
+        } => "summary",
         MetricValue::Set { .. } => "gauge",
         MetricValue::AggregatedHistogram { .. } => "histogram",
         MetricValue::AggregatedSummary { .. } => "summary",
@@ -615,5 +622,29 @@ mod tests {
             "# HELP requests requests\n# TYPE requests summary\n".to_owned()
         );
         assert_eq!(frame, "requests{code=\"200\",quantile=\"0.01\"} 1.5\nrequests{code=\"200\",quantile=\"0.5\"} 2\nrequests{code=\"200\",quantile=\"0.99\"} 3\nrequests_sum{code=\"200\"} 12\nrequests_count{code=\"200\"} 6\n".to_owned());
+    }
+
+    #[test]
+    fn test_encode_distribution_summary() {
+        let metric = Metric {
+            name: "requests".to_owned(),
+            timestamp: None,
+            tags: Some(tags()),
+            kind: MetricKind::Absolute,
+            value: MetricValue::Distribution {
+                values: vec![1.0, 2.0, 3.0],
+                sample_rates: vec![3, 3, 2],
+                statistic: StatisticKind::Summary,
+            },
+        };
+
+        let header = encode_metric_header(None, &metric);
+        let frame = encode_metric_datum(None, &[], false, &metric);
+
+        assert_eq!(
+            header,
+            "# HELP requests requests\n# TYPE requests summary\n".to_owned()
+        );
+        assert_eq!(frame, "requests{code=\"200\",quantile=\"0.5\"} 2\nrequests{code=\"200\",quantile=\"0.75\"} 2\nrequests{code=\"200\",quantile=\"0.9\"} 3\nrequests{code=\"200\",quantile=\"0.95\"} 3\nrequests{code=\"200\",quantile=\"0.99\"} 3\nrequests_sum{code=\"200\"} 15\nrequests_count{code=\"200\"} 8\nrequests_min{code=\"200\"} 1\nrequests_max{code=\"200\"} 3\nrequests_avg{code=\"200\"} 1.875\n".to_owned());
     }
 }
