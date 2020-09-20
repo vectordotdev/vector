@@ -365,7 +365,7 @@ mod test {
         // Disconnect
         if cfg!(windows) {
             // Gives Windows time to release the addr port.
-            tokio::time::delay_for(Duration::from_secs(1));
+            tokio::time::delay_for(Duration::from_secs(1)).await;
         }
 
         // Second listener
