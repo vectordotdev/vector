@@ -1,8 +1,8 @@
 use crate::{
     buffers::Acker,
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::metric::{Metric, MetricKind, MetricValue},
-    sinks::util::{encode_namespace, MetricEntry},
+    event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
+    sinks::util::{encode_namespace, statistic::DistributionStatistic, MetricEntry},
     Event,
 };
 use chrono::Utc;
@@ -174,7 +174,7 @@ fn encode_metric_datum(
             MetricValue::Distribution {
                 values,
                 sample_rates,
-                statistic: _,
+                statistic: StatisticKind::Histogram,
             } => {
                 // convert distributions into aggregated histograms
                 let mut counts = Vec::new();
@@ -213,6 +213,34 @@ fn encode_metric_datum(
                 let tags = encode_tags(tags);
                 s.push_str(&format!("{}_sum{} {}\n", fullname, tags, sum));
                 s.push_str(&format!("{}_count{} {}\n", fullname, tags, count));
+            }
+            MetricValue::Distribution {
+                values,
+                sample_rates,
+                statistic: StatisticKind::Summary,
+            } => {
+                if let Some(statistic) =
+                    DistributionStatistic::new(values, sample_rates, &[0.5, 0.75, 0.9, 0.95, 0.99])
+                {
+                    for (q, v) in statistic.quantiles.iter() {
+                        s.push_str(&format!(
+                            "{}{} {}\n",
+                            fullname,
+                            encode_tags_with_extra(tags, "quantile".to_string(), q.to_string()),
+                            v
+                        ));
+                    }
+                    let tags = encode_tags(tags);
+                    s.push_str(&format!("{}_sum{} {}\n", fullname, tags, statistic.sum));
+                    s.push_str(&format!("{}_count{} {}\n", fullname, tags, statistic.count));
+                    s.push_str(&format!("{}_min{} {}\n", fullname, tags, statistic.min));
+                    s.push_str(&format!("{}_max{} {}\n", fullname, tags, statistic.max));
+                    s.push_str(&format!("{}_avg{} {}\n", fullname, tags, statistic.avg));
+                } else {
+                    let tags = encode_tags(tags);
+                    s.push_str(&format!("{}_sum{} {}\n", fullname, tags, 0.0));
+                    s.push_str(&format!("{}_count{} {}\n", fullname, tags, 0));
+                }
             }
             MetricValue::AggregatedHistogram {
                 buckets,

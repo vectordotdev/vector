@@ -7,8 +7,8 @@ use crate::{
             influxdb_settings, Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
         },
         util::{
-            statistic::DistributionStatistic,
             http::{HttpBatchService, HttpClient, HttpRetryLogic},
+            statistic::DistributionStatistic,
             BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -300,7 +300,7 @@ fn encode_distribution(
     counts: &[u32],
     quantiles: &[f64],
 ) -> Option<HashMap<String, Field>> {
-    let statistic=DistributionStatistic::new(values,counts,quantiles)?;
+    let statistic = DistributionStatistic::new(values, counts, quantiles)?;
 
     let fields: HashMap<String, Field> = vec![
         ("min".to_owned(), Field::Float(statistic.min)),
@@ -308,13 +308,14 @@ fn encode_distribution(
         ("median".to_owned(), Field::Float(statistic.median)),
         ("avg".to_owned(), Field::Float(statistic.avg)),
         ("sum".to_owned(), Field::Float(statistic.sum)),
-        ("count".to_owned(), Field::Float(statistic.count)),
+        ("count".to_owned(), Field::Float(statistic.count as f64)),
     ]
     .into_iter()
     .chain(
-        statistic.quantiles
+        statistic
+            .quantiles
             .iter()
-            .map(|&(p,val)| (format!("quantile_{:.2}", p), Field::Float(val))),
+            .map(|&(p, val)| (format!("quantile_{:.2}", p), Field::Float(val))),
     )
     .collect();
 

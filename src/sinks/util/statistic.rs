@@ -6,7 +6,7 @@ pub struct DistributionStatistic {
     pub median: f64,
     pub avg: f64,
     pub sum: f64,
-    pub count: f64,
+    pub count: u64,
     /// (quantile, value)
     pub quantiles: Vec<(f64, f64)>,
 }
@@ -36,7 +36,7 @@ impl DistributionStatistic {
                 median: val,
                 avg: val,
                 sum: val,
-                count: val,
+                count: 1,
                 quantiles: quantiles.iter().map(|&p| (p, val)).collect(),
             });
         }
@@ -65,7 +65,7 @@ impl DistributionStatistic {
             median,
             avg,
             sum,
-            count: length,
+            count: samples.len() as u64,
             quantiles,
         })
     }
