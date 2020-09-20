@@ -363,6 +363,10 @@ mod test {
             .await;
 
         // Disconnect
+        if cfg!(windows) {
+            // Gives Windows time to release the addr port.
+            tokio::time::delay_for(Duration::from_secs(1));
+        }
 
         // Second listener
         // If this doesn't succeed then the sink hanged.
