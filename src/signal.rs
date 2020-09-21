@@ -1,6 +1,4 @@
-use futures::{
-    FutureExt, Stream,
-};
+use futures::{FutureExt, Stream};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum SignalTo {
@@ -15,8 +13,8 @@ pub enum SignalTo {
 /// Signals from OS/user.
 #[cfg(unix)]
 pub fn signals() -> impl Stream<Item = SignalTo> {
-    use tokio::signal::unix::{signal, SignalKind};
     use futures::future::{select_all, BoxFuture};
+    use tokio::signal::unix::{signal, SignalKind};
 
     let mut sigint = signal(SignalKind::interrupt()).expect("Signal handlers should not panic.");
     let mut sigterm = signal(SignalKind::terminate()).expect("Signal handlers should not panic.");
