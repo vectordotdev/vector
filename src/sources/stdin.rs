@@ -73,7 +73,7 @@ where
     let host_key = config
         .host_key
         .unwrap_or_else(|| log_schema().host_key().to_string());
-    let hostname = hostname::get_hostname();
+    let hostname = crate::get_hostname().ok();
 
     let (mut sender, receiver) = channel(1024);
 

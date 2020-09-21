@@ -206,7 +206,7 @@ pub fn file_source(
         .host_key
         .clone()
         .unwrap_or_else(|| log_schema().host_key().to_string());
-    let hostname = hostname::get_hostname();
+    let hostname = crate::get_hostname().ok();
 
     let include = config.include.clone();
     let exclude = config.exclude.clone();
