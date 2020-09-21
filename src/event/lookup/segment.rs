@@ -1,6 +1,11 @@
 use crate::mapping::parser::Rule;
 use pest::iterators::Pair;
 use std::str;
+use std::{
+    str,
+};
+use crate::mapping::parser::{Rule};
+use pest::{iterators::Pair};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub enum Segment {

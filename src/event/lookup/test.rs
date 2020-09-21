@@ -27,6 +27,18 @@ fn impl_index_ranges() {
 }
 
 #[test]
+fn impl_index_ranges() {
+    crate::test_util::trace_init();
+    let lookup = Lookup::try_from(SUFFICIENTLY_COMPLEX).unwrap();
+
+    // This test is primarily to ensure certain interfaces exist and weren't disturbed.
+    assert_eq!(lookup[..], SUFFICIENTLY_DECOMPOSED[..]);
+    assert_eq!(lookup[..4], SUFFICIENTLY_DECOMPOSED[..4]);
+    assert_eq!(lookup[..=4], SUFFICIENTLY_DECOMPOSED[..=4]);
+    assert_eq!(lookup[2..], SUFFICIENTLY_DECOMPOSED[2..]);
+}
+
+#[test]
 fn impl_index_usize() {
     crate::test_util::trace_init();
     let lookup = Lookup::try_from(SUFFICIENTLY_COMPLEX).unwrap();
