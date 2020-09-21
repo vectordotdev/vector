@@ -60,9 +60,7 @@ impl SourceConfig for HostMetricsConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let interval = Duration::from_secs(self.scrape_interval_secs);
-        let fut = run(out, shutdown, interval).boxed().compat();
-        Ok(Box::new(fut))
+        Ok(Box::new(self.clone().run(out, shutdown).boxed().compat()))
     }
 
     fn output_type(&self) -> DataType {
@@ -74,28 +72,31 @@ impl SourceConfig for HostMetricsConfig {
     }
 }
 
-async fn run(mut out: Pipeline, shutdown: ShutdownSignal, duration: Duration) -> Result<(), ()> {
-    let mut interval = time::interval(duration).map(|_| ());
-    let mut shutdown = shutdown.compat();
+impl HostMetricsConfig {
+    async fn run(self, mut out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
+        let interval = Duration::from_secs(self.scrape_interval_secs);
+        let mut interval = time::interval(interval).map(|_| ());
+        let mut shutdown = shutdown.compat();
 
-    loop {
-        select! {
-            Some(()) = interval.next() => (),
-            _ = &mut shutdown => break,
-            else => break,
-        };
+        loop {
+            select! {
+                Some(()) = interval.next() => (),
+                _ = &mut shutdown => break,
+                else => break,
+            };
 
-        let metrics = capture_metrics().await;
+            let metrics = capture_metrics().await;
 
-        let (sink, _) = out
-            .send_all(futures01::stream::iter_ok(metrics))
-            .compat()
-            .await
-            .map_err(|error| error!(message = "Error sending host metrics", %error))?;
-        out = sink;
+            let (sink, _) = out
+                .send_all(futures01::stream::iter_ok(metrics))
+                .compat()
+                .await
+                .map_err(|error| error!(message = "Error sending host metrics", %error))?;
+            out = sink;
+        }
+
+        Ok(())
     }
-
-    Ok(())
 }
 
 async fn capture_metrics() -> impl Iterator<Item = Event> {
