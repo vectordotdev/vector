@@ -16,6 +16,8 @@ use futures::{
 use futures01::Sink;
 #[cfg(target_os = "linux")]
 use heim::cpu::os::linux::CpuTimeExt;
+#[cfg(target_os = "macos")]
+use heim::memory::os::macos::MemoryExt;
 #[cfg(not(target_os = "windows"))]
 use heim::memory::os::SwapExt;
 use heim::{
@@ -187,6 +189,25 @@ async fn memory_metrics() -> impl Iterator<Item = Metric> {
                     timestamp,
                     memory.available().get::<byte>()
                 ),
+                #[cfg(target_os = "macos")]
+                gauge!(
+                    "host_memory_active_bytes",
+                    timestamp,
+                    memory.active().get::<byte>()
+                ),
+                #[cfg(target_os = "macos")]
+                gauge!(
+                    "host_memory_inactive_bytes",
+                    timestamp,
+                    memory.inactive().get::<byte>()
+                ),
+                #[cfg(target_os = "macos")]
+                gauge!(
+                    "host_memory_wired_bytes",
+                    timestamp,
+                    memory.wire().get::<byte>()
+                ),
+                // Missing: host_memory_compressed_bytes from ???
                 // Missing: used, buffers, cached, shared, active,
                 // inactive on Linux from
                 // heim::memory::os::linux::MemoryExt
