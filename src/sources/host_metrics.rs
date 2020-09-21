@@ -30,6 +30,7 @@ use tokio::{select, time};
 
 macro_rules! btreemap {
     ( $( $key:expr => $value:expr ),* ) => {{
+        #[allow(unused_mut)]
         let mut result = std::collections::BTreeMap::default();
         $( result.insert($key, $value); )*
             result
@@ -98,34 +99,34 @@ async fn run(mut out: Pipeline, shutdown: ShutdownSignal, duration: Duration) ->
 }
 
 async fn capture_metrics() -> impl Iterator<Item = Event> {
+    let hostname = crate::get_hostname();
     (cpu_metrics().await)
-        .await
         .chain(memory_metrics().await)
         .chain(swap_metrics().await)
         .chain(loadavg_metrics().await)
+        .map(move |mut metric| {
+            if let Ok(hostname) = &hostname {
+                (metric.tags.as_mut().unwrap()).insert("host".into(), hostname.into());
+            }
+            metric
+        })
         .map(Into::into)
 }
 
 macro_rules! counter {
-    ( $name:expr, $timestamp:expr, $value:expr ) => {
-        metric!($name, $timestamp, Counter, $value => None)
-    };
-    ( $name:expr, $timestamp:expr, $value:expr $( , $tag:literal => $tagval:literal )+ ) => {
-        metric!($name, $timestamp, Counter, $value => Some(btreemap!( $( $tag.into() => $tagval.into() ),+ )))
+    ( $name:expr, $timestamp:expr, $value:expr $( , $tag:literal => $tagval:literal )* ) => {
+        metric!($name, $timestamp, Counter, $value $( , $tag => $tagval )* )
     };
 }
 
 macro_rules! gauge {
-    ( $name:expr, $timestamp:expr, $value:expr ) => {
-        metric!($name, $timestamp, Gauge, $value => None)
-    };
-    ( $name:expr, $timestamp:expr, $value:expr $( , $tag:literal => $tagval:literal )+ ) => {
-        metric!($name, $timestamp, Gauge, $value => Some(btreemap!( $( $tag.into() => $tagval.into() ),+ )))
+    ( $name:expr, $timestamp:expr, $value:expr $( , $tag:literal => $tagval:literal )* ) => {
+        metric!($name, $timestamp, Gauge, $value $( , $tag => $tagval )* )
     };
 }
 
 macro_rules! metric {
-    ( $name:expr, $timestamp:expr, $type:ident, $value:expr => $tags:expr ) => {
+    ( $name:expr, $timestamp:expr, $type:ident, $value:expr $( , $tag:literal => $tagval:literal )* ) => {
         Metric {
             name: $name.into(),
             timestamp: $timestamp,
@@ -133,7 +134,9 @@ macro_rules! metric {
             value: MetricValue::$type {
                 value: $value as f64,
             },
-            tags: $tags,
+            tags: Some(btreemap![
+                $( $tag.into() => $tagval.into() ),*
+            ]),
         }
     };
 }
@@ -166,7 +169,7 @@ async fn cpu_metrics() -> impl Iterator<Item = Metric> {
             vec![]
         }
     }
-    .into_iter()
+    .into_iter().map(add_collector("cpu"))
 }
 
 async fn memory_metrics() -> impl Iterator<Item = Metric> {
@@ -219,6 +222,7 @@ async fn memory_metrics() -> impl Iterator<Item = Metric> {
         }
     }
     .into_iter()
+    .map(add_collector("memory"))
 }
 
 async fn swap_metrics() -> impl Iterator<Item = Metric> {
@@ -261,6 +265,7 @@ async fn swap_metrics() -> impl Iterator<Item = Metric> {
         }
     }
     .into_iter()
+    .map(add_collector("memory"))
 }
 
 async fn loadavg_metrics() -> impl Iterator<Item = Metric> {
@@ -281,5 +286,12 @@ async fn loadavg_metrics() -> impl Iterator<Item = Metric> {
     };
     #[cfg(not(unix))]
     let result = vec![];
-    result.into_iter()
+    result.into_iter().map(add_collector("cpu"))
+}
+
+fn add_collector(collector: &str) -> impl Fn(Metric) -> Metric + '_ {
+    move |mut metric| {
+        (metric.tags.as_mut().unwrap()).insert("collector".into(), collector.into());
+        metric
+    }
 }
