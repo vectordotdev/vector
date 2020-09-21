@@ -14,10 +14,11 @@ pub mod metric;
 pub mod util;
 
 mod log_event;
-mod value;
 mod lookup;
+mod value;
 
 pub use log_event::LogEvent;
+pub use lookup::{Lookup};
 pub use metric::{Metric, StatisticKind};
 use std::convert::{TryFrom, TryInto};
 pub(crate) use util::log::PathComponent;

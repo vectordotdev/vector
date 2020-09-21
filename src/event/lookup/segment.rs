@@ -1,21 +1,20 @@
-use std::{
-    borrow::Cow,
-    convert::{TryInto, TryFrom},
-    str,
-    vec::IntoIter,
-};
-use crate::mapping::parser::{Rule};
-use pest::{iterators::Pair};
+use crate::mapping::parser::Rule;
+use pest::iterators::Pair;
+use std::str;
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
-pub enum Segment<'a> {
-    Field(&'a str),
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
+pub enum Segment {
+    Field(String),
     Index(usize),
 }
 
-impl<'a> Segment<'a> {
-    pub const fn field(v: &'a str) -> Segment<'a> { Segment::Field(v) }
-    pub const fn index(v: usize) -> Segment<'a> { Segment::Index(v) }
+impl Segment {
+    pub const fn field(v: String) -> Segment {
+        Segment::Field(v)
+    }
+    pub const fn index(v: usize) -> Segment {
+        Segment::Index(v)
+    }
 
     #[tracing::instrument(skip(segment))]
     pub(crate) fn from_lookup(segment: Pair<'_, Rule>) -> crate::Result<Vec<Segment>> {
@@ -24,14 +23,20 @@ impl<'a> Segment<'a> {
         let mut segments = Vec::default();
         for inner_segment in segment.into_inner() {
             match inner_segment.as_rule() {
-                Rule::path_segment => segments.append(&mut Segment::from_path_segment(inner_segment)?),
+                Rule::path_segment => {
+                    segments.append(&mut Segment::from_path_segment(inner_segment)?)
+                }
                 Rule::quoted_path_segment => {
                     segments.push(Segment::from_quoted_path_segment(inner_segment)?)
-                },
-                _ => return Err(format!("Got invalid lookup rule. Got: {:?}. Want: {:?}", inner_segment.as_rule(), [
-                    Rule::path_segment,
-                    Rule::quoted_path_segment
-                ]).into()),
+                }
+                _ => {
+                    return Err(format!(
+                        "Got invalid lookup rule. Got: {:?}. Want: {:?}",
+                        inner_segment.as_rule(),
+                        [Rule::path_segment, Rule::quoted_path_segment]
+                    )
+                    .into())
+                }
             }
         }
         tracing::trace!(segment = ?segments, ?rule, action = %"exit");
@@ -47,13 +52,17 @@ impl<'a> Segment<'a> {
             match inner_segment.as_rule() {
                 Rule::path_field_name => {
                     tracing::trace!(segment = inner_segment.as_str(), rule = ?inner_segment.as_rule(), action = %"push");
-                    segments.push(Segment::field(inner_segment.as_str()))
-                },
+                    segments.push(Segment::field(inner_segment.to_string()))
+                }
                 Rule::path_index => segments.push(Segment::from_path_index(inner_segment)?),
-                _ => return Err(format!("Got invalid lookup rule. Got: {:?}. Want: {:?}", inner_segment.as_rule(), [
-                    Rule::path_field_name,
-                    Rule::path_index
-                ]).into()),
+                _ => {
+                    return Err(format!(
+                        "Got invalid lookup rule. Got: {:?}. Want: {:?}",
+                        inner_segment.as_rule(),
+                        [Rule::path_field_name, Rule::path_index]
+                    )
+                    .into())
+                }
             }
         }
         tracing::trace!(segment = ?segments, ?rule, action = %"exit");
@@ -64,17 +73,21 @@ impl<'a> Segment<'a> {
     pub(crate) fn from_path_index(segment: Pair<'_, Rule>) -> crate::Result<Segment> {
         let full_segment = segment.as_str();
         tracing::trace!(segment = full_segment, rule = ?segment.as_rule(), action = %"enter");
-        let segment = segment.into_inner().next()
-            .expect("Did not get pair inside path_index segment. This is an invariant. Please report it.");
+        let segment = segment.into_inner().next().expect(
+            "Did not get pair inside path_index segment. This is an invariant. Please report it.",
+        );
         let retval = match segment.as_rule() {
             Rule::inner_path_index => {
                 let index = segment.as_str().parse()?;
                 tracing::trace!(segment = index, rule = ?segment.as_rule(), action = %"push");
                 Ok(Segment::index(index))
-            },
-            _ => Err(format!("Got invalid lookup rule. Got: {:?}. Want: {:?}", segment.as_rule(), [
-                Rule::inner_path_index,
-            ]).into()),
+            }
+            _ => Err(format!(
+                "Got invalid lookup rule. Got: {:?}. Want: {:?}",
+                segment.as_rule(),
+                [Rule::inner_path_index,]
+            )
+            .into()),
         };
         tracing::trace!(segment = full_segment, rule = ?segment.as_rule(), action = %"exit");
         retval
@@ -89,11 +102,16 @@ impl<'a> Segment<'a> {
         let retval = match segment.as_rule() {
             Rule::inner_quoted_string => {
                 tracing::trace!(segment = segment.as_str(), rule = ?segment.as_rule(), action = %"push");
-                Ok(Segment::field(segment.as_str()))
-            },
-            _ => return Err(format!("Got invalid lookup rule. Got: {:?}. Want: {:?}", segment.as_rule(), [
-                Rule::inner_quoted_string,
-            ]).into()),
+                Ok(Segment::field(segment.to_string()))
+            }
+            _ => {
+                return Err(format!(
+                    "Got invalid lookup rule. Got: {:?}. Want: {:?}",
+                    segment.as_rule(),
+                    [Rule::inner_quoted_string,]
+                )
+                .into())
+            }
         };
         tracing::trace!(segment = full_segment, rule = ?segment.as_rule(), action = %"exit");
         retval

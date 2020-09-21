@@ -8,6 +8,7 @@ use crate::{
         AddFieldsTemplateInvalid, AddFieldsTemplateRenderingError,
     },
     template::Template,
+    event::Lookup,
 };
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
@@ -42,8 +43,9 @@ impl From<Value> for TemplateOrValue {
     }
 }
 
+#[derive(Clone)]
 pub struct AddFields {
-    fields: IndexMap<Atom, TemplateOrValue>,
+    fields: IndexMap<Lookup, TemplateOrValue>,
     overwrite: bool,
 }
 
@@ -57,7 +59,7 @@ impl TransformConfig for AddFieldsConfig {
         Ok(Box::new(AddFields::new(
             self.fields.clone().all_fields().collect(),
             self.overwrite,
-        )))
+        )?))
     }
 
     fn input_type(&self) -> DataType {
@@ -74,17 +76,16 @@ impl TransformConfig for AddFieldsConfig {
 }
 
 impl AddFields {
-    pub fn new(fields: IndexMap<Atom, TomlValue>, overwrite: bool) -> Self {
-        let mut new_fields = IndexMap::new();
-
-        for (k, v) in fields {
-            flatten_field(k, v, &mut new_fields);
+    pub fn new(fields: IndexMap<Atom, TomlValue>, overwrite: bool) -> crate::Result<Self> {
+        let lookup_fields = IndexMap::with_capacity(fields.len());
+        for (k, v) in fields.drain(..) {
+            let lookup = Lookup::try_from(k)?;
+            lookup_fields.insert(lookup, TemplateOrValue::from(Value::from(v)));
         }
-
-        AddFields {
-            fields: new_fields,
+        Ok(AddFields {
+            fields: lookup_fields,
             overwrite,
-        }
+        })
     }
 }
 

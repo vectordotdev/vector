@@ -1,6 +1,7 @@
 use super::*;
 
-const SUFFICIENTLY_COMPLEX: &str = r#"regular."quoted"."quoted but spaces"."quoted.but.periods".lookup[0].nested_lookup[0][0]"#;
+const SUFFICIENTLY_COMPLEX: &str =
+    r#"regular."quoted"."quoted but spaces"."quoted.but.periods".lookup[0].nested_lookup[0][0]"#;
 const SUFFICIENTLY_DECOMPOSED: [Segment; 9] = [
     Segment::field(r#"regular"#),
     Segment::field(r#"quoted"#),
@@ -14,23 +15,19 @@ const SUFFICIENTLY_DECOMPOSED: [Segment; 9] = [
 ];
 
 #[test]
-fn as_ref_as_ref() {
+fn impl_index_ranges() {
     crate::test_util::trace_init();
     let lookup = Lookup::try_from(SUFFICIENTLY_COMPLEX).unwrap();
 
-    assert_eq!(lookup.as_ref(), &SUFFICIENTLY_DECOMPOSED[..])
+    // This test is primarily to ensure certain interfaces exist and weren't disturbed.
+    assert_eq!(lookup[..], SUFFICIENTLY_DECOMPOSED[..]);
+    assert_eq!(lookup[..4], SUFFICIENTLY_DECOMPOSED[..4]);
+    assert_eq!(lookup[..=4], SUFFICIENTLY_DECOMPOSED[..=4]);
+    assert_eq!(lookup[2..], SUFFICIENTLY_DECOMPOSED[2..]);
 }
 
 #[test]
-fn range() {
-    crate::test_util::trace_init();
-    let lookup = Lookup::try_from(SUFFICIENTLY_COMPLEX).unwrap();
-
-    assert_eq!(lookup[..], SUFFICIENTLY_DECOMPOSED[..])
-}
-
-#[test]
-fn impl_index_index() {
+fn impl_index_usize() {
     crate::test_util::trace_init();
     let lookup = Lookup::try_from(SUFFICIENTLY_COMPLEX).unwrap();
 
@@ -57,12 +54,11 @@ fn iter() {
 
     let mut iter = lookup.iter();
     for (index, expected) in SUFFICIENTLY_DECOMPOSED.iter().enumerate() {
-        let parsed = iter.next().expect(&format!("Expected at index {}: {:?}, got None.", index, expected));
-        assert_eq!(
-            expected,
-            parsed,
-            "Failed at {}", index
-        );
+        let parsed = iter.next().expect(&format!(
+            "Expected at index {}: {:?}, got None.",
+            index, expected
+        ));
+        assert_eq!(expected, parsed, "Failed at {}", index);
     }
 }
 
@@ -72,11 +68,10 @@ fn into_iter() {
     let lookup = Lookup::try_from(SUFFICIENTLY_COMPLEX).unwrap();
     let mut iter = lookup.into_iter();
     for (index, expected) in SUFFICIENTLY_DECOMPOSED.iter().cloned().enumerate() {
-        let parsed = iter.next().expect(&format!("Expected at index {}: {:?}, got None.", index, expected));
-        assert_eq!(
-            expected,
-            parsed,
-            "Failed at {}", index
-        );
+        let parsed = iter.next().expect(&format!(
+            "Expected at index {}: {:?}, got None.",
+            index, expected
+        ));
+        assert_eq!(expected, parsed, "Failed at {}", index);
     }
 }
