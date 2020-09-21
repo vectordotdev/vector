@@ -16,7 +16,10 @@ use futures::{
 use futures01::Sink;
 #[cfg(target_os = "linux")]
 use heim::cpu::os::linux::CpuTimeExt;
-use heim::{units::information::byte, units::time::second, Error};
+use heim::{
+    units::{information::byte, ratio::ratio, time::second},
+    Error,
+};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::{select, time};
@@ -91,10 +94,11 @@ async fn run(mut out: Pipeline, shutdown: ShutdownSignal, duration: Duration) ->
 }
 
 async fn capture_metrics() -> impl Iterator<Item = Event> {
-    cpu_metrics()
+    (cpu_metrics().await)
         .await
         .chain(memory_metrics().await)
         .chain(swap_metrics().await)
+        .chain(loadavg_metrics().await)
         .map(Into::into)
 }
 
@@ -222,4 +226,25 @@ async fn swap_metrics() -> impl Iterator<Item = Metric> {
         }
     }
     .into_iter()
+}
+
+async fn loadavg_metrics() -> impl Iterator<Item = Metric> {
+    #[cfg(unix)]
+    let result = match heim::cpu::os::unix::loadavg().await {
+        Ok(loadavg) => {
+            let timestamp = Some(Utc::now());
+            vec![
+                gauge!("host_load1", timestamp, loadavg.0.get::<ratio>()),
+                gauge!("host_load5", timestamp, loadavg.1.get::<ratio>()),
+                gauge!("host_load15", timestamp, loadavg.2.get::<ratio>()),
+            ]
+        }
+        Err(error) => {
+            error!(message = "Failed to load load average info", %error, rate_limit_secs = 60);
+            vec![]
+        }
+    };
+    #[cfg(not(unix))]
+    let result = vec![];
+    result.into_iter()
 }
