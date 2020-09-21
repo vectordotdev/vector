@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GlobalOptions, SinkDescription},
+    config::{self, GlobalOptions, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
         ApacheMetricsErrorResponse, ApacheMetricsEventReceived, ApacheMetricsHttpError,
@@ -43,7 +43,7 @@ pub fn default_namespace() -> String {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<ApacheMetricsConfig>("apache_metrics")
+    SourceDescription::new_without_default::<ApacheMetricsConfig>("apache_metrics")
 }
 
 #[typetag::serde(name = "apache_metrics")]
