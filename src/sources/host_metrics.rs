@@ -98,6 +98,38 @@ async fn capture_metrics() -> impl Iterator<Item = Event> {
         .map(Into::into)
 }
 
+macro_rules! counter {
+    ( $name:expr, $timestamp:expr, $value:expr ) => {
+        metric!($name, $timestamp, Counter, $value => None)
+    };
+    ( $name:expr, $timestamp:expr, $value:expr $( , $tag:literal => $tagval:literal )+ ) => {
+        metric!($name, $timestamp, Counter, $value => Some(btreemap!( $( $tag.into() => $tagval.into() ),+ )))
+    };
+}
+
+macro_rules! gauge {
+    ( $name:expr, $timestamp:expr, $value:expr ) => {
+        metric!($name, $timestamp, Gauge, $value => None)
+    };
+    ( $name:expr, $timestamp:expr, $value:expr $( , $tag:literal => $tagval:literal )+ ) => {
+        metric!($name, $timestamp, Gauge, $value => Some(btreemap!( $( $tag.into() => $tagval.into() ),+ )))
+    };
+}
+
+macro_rules! metric {
+    ( $name:expr, $timestamp:expr, $type:ident, $value:expr => $tags:expr ) => {
+        Metric {
+            name: $name.into(),
+            timestamp: $timestamp,
+            kind: MetricKind::Absolute,
+            value: MetricValue::$type {
+                value: $value as f64,
+            },
+            tags: $tags,
+        }
+    };
+}
+
 async fn cpu_metrics() -> impl Iterator<Item = Metric> {
     match heim::cpu::times().await {
         Ok(times) => {
@@ -107,47 +139,15 @@ async fn cpu_metrics() -> impl Iterator<Item = Metric> {
                     let timestamp = Some(Utc::now());
                     let name = "host_cpu_seconds_total";
                     stream::iter(
-                        vec![
-                            Metric {
-                                name: name.into(),
-                                timestamp,
-                                tags: Some(btreemap!("mode".into() => "idle".into())),
-                                kind: MetricKind::Absolute,
-                                value: MetricValue::Counter {
-                                    value: times.idle().get::<second>(),
-                                },
-                            },
-                            #[cfg(target_os = "linux")]
-                            Metric {
-                                name: name.into(),
-                                timestamp,
-                                tags: Some(btreemap!("mode".into() => "nice".into())),
-                                kind: MetricKind::Absolute,
-                                value: MetricValue::Counter {
-                                    value: times.nice().get::<second>(),
-                                },
-                            },
-                            Metric {
-                                name: name.into(),
-                                timestamp,
-                                tags: Some(btreemap!("mode".into() => "system".into())),
-                                kind: MetricKind::Absolute,
-                                value: MetricValue::Counter {
-                                    value: times.system().get::<second>(),
-                                },
-                            },
-                            Metric {
-                                name: name.into(),
-                                timestamp,
-                                tags: Some(btreemap!("mode".into() => "user".into())),
-                                kind: MetricKind::Absolute,
-                                value: MetricValue::Counter {
-                                    value: times.user().get::<second>(),
-                                },
-                            },
-                        ]
-                        .into_iter(),
-                    )
+                    vec![
+                        counter!(name, timestamp, times.idle().get::<second>(), "mode" => "idle"),
+                        #[cfg(target_os = "linux")]
+                        counter!(name, timestamp, times.nice().get::<second>(), "mode" => "nice"),
+                        counter!(name, timestamp, times.system().get::<second>(), "mode" => "system"),
+                        counter!(name, timestamp, times.user().get::<second>(), "mode" => "user"),
+                    ]
+                    .into_iter(),
+                )
                 })
                 .flatten()
                 .collect::<Vec<_>>()
@@ -166,33 +166,21 @@ async fn memory_metrics() -> impl Iterator<Item = Metric> {
         Ok(memory) => {
             let timestamp = Some(Utc::now());
             vec![
-                Metric {
-                    name: "host_memory_total_bytes".into(),
+                gauge!(
+                    "host_memory_total_bytes",
                     timestamp,
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge {
-                        value: memory.total().get::<byte>() as f64,
-                    },
-                },
-                Metric {
-                    name: "host_memory_free_bytes".into(),
+                    memory.total().get::<byte>()
+                ),
+                gauge!(
+                    "host_memory_free_bytes",
                     timestamp,
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge {
-                        value: memory.free().get::<byte>() as f64,
-                    },
-                },
-                Metric {
-                    name: "host_memory_FIXME_bytes".into(), // Doesn't match one of the metric names in the RFC
+                    memory.free().get::<byte>()
+                ),
+                gauge!(
+                    "host_memory_available_bytes",
                     timestamp,
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge {
-                        value: memory.available().get::<byte>() as f64,
-                    },
-                },
+                    memory.available().get::<byte>()
+                ),
                 // Missing: used, buffers, cached, shared, active,
                 // inactive on Linux from
                 // heim::memory::os::linux::MemoryExt
@@ -211,33 +199,21 @@ async fn swap_metrics() -> impl Iterator<Item = Metric> {
         Ok(swap) => {
             let timestamp = Some(Utc::now());
             vec![
-                Metric {
-                    name: "host_memory_swap_free_bytes".into(),
+                gauge!(
+                    "host_memory_swap_free_bytes",
                     timestamp,
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge {
-                        value: swap.free().get::<byte>() as f64,
-                    },
-                },
-                Metric {
-                    name: "host_memory_swap_total_bytes".into(),
+                    swap.free().get::<byte>()
+                ),
+                gauge!(
+                    "host_memory_swap_total_bytes",
                     timestamp,
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge {
-                        value: swap.total().get::<byte>() as f64,
-                    },
-                },
-                Metric {
-                    name: "host_memory_swap_used_bytes".into(),
+                    swap.total().get::<byte>()
+                ),
+                gauge!(
+                    "host_memory_swap_used_bytes",
                     timestamp,
-                    tags: None,
-                    kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge {
-                        value: swap.used().get::<byte>() as f64,
-                    },
-                },
+                    swap.used().get::<byte>()
+                ),
             ]
         }
         Err(error) => {
