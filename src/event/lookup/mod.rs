@@ -6,6 +6,7 @@ mod test;
 use std::{
     convert::{TryFrom},
     str,
+    ops::{RangeFull, RangeToInclusive, RangeTo, RangeFrom},
     slice::Iter,
     vec::IntoIter,
 };
@@ -70,6 +71,38 @@ impl<'a> Index<usize> for Lookup<'a> {
     type Output = Segment<'a>;
 
     fn index(&self, index: usize) -> &Self::Output {
+        self.segments.index(index)
+    }
+}
+
+impl<'a> Index<RangeFull> for Lookup<'a> {
+    type Output = Segment<'a>;
+
+    fn index(&self, index: RangeFull) -> &Self::Output {
+        self.segments.index(index)
+    }
+}
+
+impl<'a> Index<RangeToInclusive<usize>> for Lookup<'a> {
+    type Output = Segment<'a>;
+
+    fn index(&self, index: RangeToInclusive<usize>) -> &Self::Output {
+        self.segments.index(index)
+    }
+}
+
+impl<'a> Index<RangeTo<usize>> for Lookup<'a> {
+    type Output = Segment<'a>;
+
+    fn index(&self, index: RangeTo<usize>) -> &Self::Output {
+        self.segments.index(index)
+    }
+}
+
+impl<'a> Index<RangeFrom<usize>> for Lookup<'a> {
+    type Output = Segment<'a>;
+
+    fn index(&self, index: RangeFrom<usize>) -> &Self::Output {
         self.segments.index(index)
     }
 }
