@@ -139,8 +139,7 @@ mod integration_tests {
         Event,
     };
     use chrono::Utc;
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
+    use futures::{future, stream};
     use serde_json::{json, Value as JsonValue};
     use std::{collections::HashMap, convert::TryFrom};
 
@@ -160,7 +159,7 @@ mod integration_tests {
         let message = random_string(100);
         let event = Event::from(message.clone());
 
-        sink.send(event).compat().await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -193,7 +192,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.send(event).compat().await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -224,7 +223,7 @@ mod integration_tests {
                 .as_mut_log()
                 .insert("@timestamp", Utc::now().to_rfc3339());
 
-            sink.send(event).compat().await.unwrap();
+            sink.run(stream::once(future::ready(event))).await.unwrap();
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -245,7 +244,7 @@ mod integration_tests {
             let message = random_string(100);
             let event = Event::from(message.clone());
 
-            sink.send(event).compat().await.unwrap();
+            sink.run(stream::once(future::ready(event))).await.unwrap();
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 

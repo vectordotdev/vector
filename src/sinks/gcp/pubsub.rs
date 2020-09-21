@@ -219,10 +219,6 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::test_util::{random_events_with_stream, random_string, trace_init};
-    use futures::{
-        compat::{Future01CompatExt, Sink01CompatExt},
-        SinkExt,
-    };
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
 
@@ -253,14 +249,10 @@ mod integration_tests {
         let (topic, subscription) = create_topic_subscription().await;
         let (sink, healthcheck) = config_build(&topic).await;
 
-        healthcheck.compat().await.expect("Health check failed");
+        healthcheck.await.expect("Health check failed");
 
-        let (input, mut events) = random_events_with_stream(100, 100);
-        let _ = sink
-            .sink_compat()
-            .send_all(&mut events)
-            .await
-            .expect("Sending events failed");
+        let (input, events) = random_events_with_stream(100, 100);
+        sink.run(events).await.expect("Sending events failed");
 
         let response = pull_messages(&subscription, 1000).await;
         let messages = response
@@ -283,10 +275,7 @@ mod integration_tests {
         let (topic, _subscription) = create_topic_subscription().await;
         let topic = format!("BAD{}", topic);
         let (_sink, healthcheck) = config_build(&topic).await;
-        healthcheck
-            .compat()
-            .await
-            .expect_err("Health check did not fail");
+        healthcheck.await.expect_err("Health check did not fail");
     }
 
     async fn create_topic_subscription() -> (String, String) {
