@@ -1,92 +1,29 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SinkDescription, SourceConfig},
-    event::Event,
+    config::{DataType, GlobalOptions, SinkDescription, SourceConfig},
     internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
     shutdown::ShutdownSignal,
-    sources::util::{ErrorMessage, HttpSource},
-    tls::TlsConfig,
+    tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
 use async_trait::async_trait;
-use bytes::{buf::BufExt, Bytes};
-use chrono::serde::ts_milliseconds;
-use chrono::{DateTime, Utc};
+use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
-use std::{error, fmt, io::Read, net::SocketAddr};
-use warp::http::{HeaderMap, StatusCode};
+use std::net::SocketAddr;
 
 // TODO:
 // * Try to refactor reading encoded records to stream contents rather than copying into
 //   intermediate buffers
 // * Try avoiding intermediate collections while processing request
-// * Return the response structure AWS expects
-// * Consider using snafu crate for error union
+// * Should configuration take an endpoint rather than an address?
+// * Consider additional context for record that could not be decoded
+// * Readd internal events
+// * Verify gzip content-encoding support
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct AwsKinesisFirehoseConfig {
     address: SocketAddr,
     access_key: Option<String>,
     tls: Option<TlsConfig>,
-}
-
-inventory::submit! {
-    SinkDescription::new_without_default::<AwsKinesisFirehoseConfig>("aws_kinesis_firehose")
-}
-
-#[derive(Clone)]
-struct AwsKinesisFirehoseSource {
-    access_key: Option<String>,
-}
-
-impl HttpSource for AwsKinesisFirehoseSource {
-    fn build_event(&self, body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
-        let request_id = get_header(&header_map, "X-Amz-Firehose-Request-Id")?;
-        let source_arn = get_header(&header_map, "X-Amz-Firehose-Source-Arn")?;
-
-        emit!(AwsKinesisFirehoseRequestReceived {
-            request_id,
-            source_arn,
-        });
-
-        validate_access_key(
-            self.access_key.as_deref(),
-            get_header(&header_map, "X-Amz-Firehose-Access-Key")?,
-        )
-        .map_err(|err| {
-            let err = RequestError::AccessKey(err);
-            emit!(AwsKinesisFirehoseRequestError {
-                request_id,
-                error: &err,
-            });
-            ErrorMessage::new(StatusCode::UNAUTHORIZED, err.to_string())
-        })?;
-
-        match get_header(&header_map, "X-Amz-Firehose-Protocol-Version")? {
-            Some("1.0") => decode_message(body, request_id, source_arn),
-            Some(version) => {
-                let error = RequestError::Protocol(ProtocolError::Invalid(version.to_string()));
-                emit!(AwsKinesisFirehoseRequestError {
-                    request_id,
-                    error: &error
-                });
-                Err(ErrorMessage::new(
-                    StatusCode::BAD_REQUEST,
-                    error.to_string(),
-                ))
-            }
-            None => {
-                let error = RequestError::Protocol(ProtocolError::Missing);
-                emit!(AwsKinesisFirehoseRequestError {
-                    request_id,
-                    error: &error
-                });
-                Err(ErrorMessage::new(
-                    StatusCode::BAD_REQUEST,
-                    error.to_string(),
-                ))
-            }
-        }
-    }
 }
 
 #[typetag::serde(name = "aws_kinesis_firehose")]
@@ -109,10 +46,23 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let source = AwsKinesisFirehoseSource {
-            access_key: self.access_key.clone(),
+        let svc = filters::firehose(self.access_key.clone(), out);
+
+        let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
+        let mut listener = tls.bind(&self.address).await?;
+
+        let fut = async move {
+            let _ = warp::serve(svc)
+                .serve_incoming_with_graceful_shutdown(
+                    listener.incoming(),
+                    shutdown.clone().compat().map(|_| ()),
+                )
+                .await;
+            // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
+            drop(shutdown);
+            Ok(())
         };
-        source.run(self.address, "", &self.tls, out, shutdown)
+        Ok(Box::new(fut.boxed().compat()))
     }
 
     fn output_type(&self) -> DataType {
@@ -124,177 +74,319 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
     }
 }
 
-#[derive(Clone, Debug)]
-pub enum ProtocolError {
-    Missing,
-    Invalid(String),
+inventory::submit! {
+    SinkDescription::new_without_default::<AwsKinesisFirehoseConfig>("aws_kinesis_firehose")
 }
 
-#[derive(Clone, Debug)]
-pub enum AccessKeyError {
-    Missing,
-    Invalid,
-}
+mod filters {
+    use super::models::FirehoseResponse;
+    use super::{
+        errors::{AccessKeyError, RequestError},
+        handlers,
+    };
+    use crate::Pipeline;
+    use chrono::Utc;
+    use std::convert::Infallible;
+    use warp::http::StatusCode;
+    use warp::Filter;
 
-#[derive(Clone, Debug)]
-pub enum RequestError {
-    Protocol(ProtocolError),
-    AccessKey(AccessKeyError),
-    RequestParse(String),
-    RecordDecode(usize, String),
-}
-
-impl error::Error for RequestError {}
-impl fmt::Display for RequestError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            RequestError::AccessKey(AccessKeyError::Missing) => {
-                write!(f, "X-Amz-Firehose-Access-Key header missing")
-            }
-            RequestError::AccessKey(AccessKeyError::Invalid) => write!(
-                f,
-                "X-Amz-Firehose-Access-Key header does not match configured access key"
-            ),
-            RequestError::Protocol(ProtocolError::Missing) => {
-                write!(f, "X-Amz-Firehose-Protocol-Version header missing")
-            }
-            RequestError::Protocol(ProtocolError::Invalid(ref s)) => {
-                write!(f, "Unsupported Firehose protocol version: {}", s)
-            }
-            RequestError::RequestParse(ref s) => {
-                write!(f, "Could not parse Firehose request as JSON: {}", s)
-            }
-            RequestError::RecordDecode(ref i, ref s) => {
-                write!(f, "Could not decode record with index {}: {}", i, s)
-            }
-        }
+    /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
+    pub fn firehose(
+        access_key: Option<String>,
+        out: Pipeline,
+    ) -> impl Filter<Extract = impl warp::Reply, Error = Infallible> + Clone {
+        warp::post()
+            .and(authenticate(access_key))
+            .and(warp::header("X-Amz-Firehose-Request-Id"))
+            .and(warp::header("X-Amz-Firehose-Source-Arn"))
+            .and(warp::header::exact(
+                "X-Amz-Firehose-Protocol-Version",
+                "1.0",
+            ))
+            .and(warp::body::json())
+            .and(warp::any().map(move || out.clone()))
+            .and_then(handlers::firehose)
+            .recover(handle_firehose_rejection)
     }
-}
 
-/// if there is a configured access key, validate that the request key matches it
-fn validate_access_key(
-    access_key: Option<&str>,
-    request_access_key: Option<&str>,
-) -> Result<(), AccessKeyError> {
-    match access_key {
-        Some(access_key) => match request_access_key {
-            Some(request_access_key) => {
-                if request_access_key == access_key {
-                    Ok(())
-                } else {
-                    Err(AccessKeyError::Invalid)
+    /// Maps RequestError and warp errors to AWS Kinesis Firehose response structure
+    async fn handle_firehose_rejection(
+        err: warp::Rejection,
+    ) -> Result<impl warp::Reply, Infallible> {
+        let request_id;
+        let message;
+        let code;
+
+        if let Some(e) = err.find::<AccessKeyError>() {
+            match e {
+                AccessKeyError::Invalid { request_id: ref id } => {
+                    code = StatusCode::UNAUTHORIZED;
+                    message = "invalid access key".to_string();
+                    request_id = Some(id);
+                }
+                AccessKeyError::Missing { request_id: ref id } => {
+                    code = StatusCode::UNAUTHORIZED;
+                    message = "missing access key".to_string();
+                    request_id = Some(id);
                 }
             }
-            None => Err(AccessKeyError::Missing),
-        },
-        None => Ok(()),
+        } else if let Some(e) = err.find::<RequestError>() {
+            message = format!("{}", e);
+            match e {
+                RequestError::Parse {
+                    source: _source,
+                    request_id: ref id,
+                } => {
+                    code = StatusCode::BAD_REQUEST;
+                    request_id = Some(id);
+                }
+                RequestError::Decode {
+                    source: _source,
+                    request_id: ref id,
+                } => {
+                    code = StatusCode::BAD_REQUEST;
+                    request_id = Some(id);
+                }
+                RequestError::ShuttingDown {
+                    source: _source,
+                    request_id: ref id,
+                } => {
+                    code = StatusCode::SERVICE_UNAVAILABLE;
+                    request_id = Some(id);
+                }
+            }
+        } else {
+            code = StatusCode::INTERNAL_SERVER_ERROR;
+            message = format!("{:?}", err);
+            request_id = None;
+        }
+
+        let json = warp::reply::json(&FirehoseResponse {
+            request_id: request_id.cloned().unwrap_or_default(),
+            timestamp: Utc::now(),
+            error_message: Some(message),
+        });
+
+        Ok(warp::reply::with_status(json, code))
+    }
+
+    /// If there is a configured access key, validate that the request key matches it
+    fn authenticate(
+        configured_access_key: Option<String>,
+    ) -> impl Filter<Extract = (), Error = warp::Rejection> + Clone {
+        warp::any()
+            .and(warp::header("X-Amz-Firehose-Request-Id"))
+            .and(warp::header::optional("X-Amz-Firehose-Access-Key"))
+            .and_then(move |request_id: String, access_key: Option<String>| {
+                let configured_access_key = configured_access_key.clone();
+                async move {
+                    match (access_key, configured_access_key) {
+                        (_, None) => Ok(()),
+                        (Some(configured_access_key), Some(access_key))
+                            if configured_access_key == access_key =>
+                        {
+                            Ok(())
+                        }
+                        (Some(_), Some(_)) => {
+                            Err(warp::reject::custom(AccessKeyError::Invalid { request_id }))
+                        }
+                        (None, Some(_)) => {
+                            Err(warp::reject::custom(AccessKeyError::Missing { request_id }))
+                        }
+                    }
+                }
+            })
+            .untuple_one()
     }
 }
 
-fn decode_message(
-    body: Bytes,
-    request_id: Option<&str>,
-    source_arn: Option<&str>,
-) -> Result<Vec<Event>, ErrorMessage> {
-    let request: FirehoseRequest = serde_json::from_reader(body.reader()).map_err(|error| {
-        let error = RequestError::RequestParse(error.to_string());
-        emit!(AwsKinesisFirehoseRequestError {
-            request_id,
-            error: &error
-        });
-        ErrorMessage::new(StatusCode::BAD_REQUEST, error.to_string())
-    })?;
+mod handlers {
+    use super::errors::{Parse, RequestError};
+    use super::models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse};
+    use crate::{
+        config::log_schema, event::Event, internal_events::AwsKinesisFirehoseRequestReceived,
+        Pipeline,
+    };
+    use chrono::Utc;
+    use flate2::read::GzDecoder;
+    use futures::{compat::Future01CompatExt, TryFutureExt};
+    use futures01::Sink;
+    use snafu::ResultExt;
+    use std::io::Read;
+    use warp::reject;
 
-    let records: Vec<Event> = request
-        .records
-        .iter()
-        .enumerate()
-        .map(|(i, record)| {
-            decode_record(record)
-                .map(|record| {
+    /// Publishes decoded events from the FirehoseRequest to the pipeline
+    pub async fn firehose(
+        request_id: String,
+        source_arn: String,
+        request: FirehoseRequest,
+        out: Pipeline,
+    ) -> Result<impl warp::Reply, reject::Rejection> {
+        emit!(AwsKinesisFirehoseRequestReceived {
+            request_id: request_id.as_str(),
+            source_arn: source_arn.as_str(),
+        });
+
+        match parse_request(request, request_id.as_str(), source_arn.as_str()).with_context(|| {
+            Parse {
+                request_id: request_id.clone(),
+            }
+        }) {
+            Ok(events) => {
+                let request_id = request_id.clone();
+                out.send_all(futures01::stream::iter_ok(events))
+                    .compat()
+                    .map_err(|err| {
+                        let err = RequestError::ShuttingDown {
+                            request_id: request_id.clone(),
+                            source: err,
+                        };
+                        // can only fail if receiving end disconnected, so we are shutting down,
+                        // probably not gracefully.
+                        error!("Failed to forward events, downstream is closed");
+                        error!("Tried to send the following event: {:?}", err);
+                        warp::reject::custom(err)
+                    })
+                    .map_ok(|_| {
+                        warp::reply::json(&FirehoseResponse {
+                            request_id: request_id.clone(),
+                            timestamp: Utc::now(),
+                            error_message: None,
+                        })
+                    })
+                    .await
+            }
+            Err(err) => Err(reject::custom(err)),
+        }
+    }
+
+    /// Parses out events from the FirehoseRequest
+    fn parse_request(
+        request: FirehoseRequest,
+        request_id: &str,
+        source_arn: &str,
+    ) -> std::io::Result<Vec<Event>> {
+        let records: Vec<Event> = request
+            .records
+            .iter()
+            .map(|record| {
+                decode_record(record).map(|record| {
                     let mut event = Event::new_empty_log();
                     let log = event.as_mut_log();
 
                     log.insert(log_schema().message_key().clone(), record);
                     log.insert(log_schema().timestamp_key().clone(), request.timestamp);
-
-                    if let Some(id) = request_id {
-                        log.insert("request_id", id.to_string());
-                    }
-                    if let Some(arn) = source_arn {
-                        log.insert("source_arn", arn.to_string());
-                    }
+                    log.insert("request_id", request_id.to_string());
+                    log.insert("source_arn", source_arn.to_string());
 
                     event
                 })
-                .map_err(|error| {
-                    let error = RequestError::RecordDecode(i, error.to_string());
-                    emit!(AwsKinesisFirehoseRequestError {
-                        request_id,
-                        error: &error
-                    });
-                    ErrorMessage::new(StatusCode::BAD_REQUEST, error.to_string())
-                })
-        })
-        .collect::<Result<Vec<Event>, ErrorMessage>>()?;
+            })
+            .collect::<std::io::Result<Vec<Event>>>()?;
 
-    Ok(records)
+        Ok(records)
+    }
+
+    /// Decodes a Firehose record from its base64 gzip format
+    fn decode_record(record: &EncodedFirehoseRecord) -> std::io::Result<Vec<u8>> {
+        let mut cursor = std::io::Cursor::new(record.data.as_bytes());
+        let base64decoder = base64::read::DecoderReader::new(&mut cursor, base64::STANDARD);
+
+        let mut gz = GzDecoder::new(base64decoder);
+        let mut buffer = Vec::new();
+        gz.read_to_end(&mut buffer)?;
+
+        Ok(buffer)
+    }
 }
 
-/// return the parsed header, if it exists
-fn get_header<'a>(header_map: &'a HeaderMap, name: &str) -> Result<Option<&'a str>, ErrorMessage> {
-    header_map
-        .get(name)
-        .map(|value| {
-            value
-                .to_str()
-                .map(Some)
-                .map_err(|e| header_error_message(name, &e.to_string()))
-        })
-        .unwrap_or(Ok(None))
+mod models {
+    use chrono::serde::ts_milliseconds;
+    use chrono::{DateTime, Utc};
+    use serde::{Deserialize, Serialize};
+
+    /// Represents an AWS Kinesis Firehose request
+    ///
+    /// Represents protocol v1.0 (the only protocol as of writing)
+    ///
+    /// https://docs.aws.amazon.com/firehose/latest/dev/httpdeliveryrequestresponse.html
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct FirehoseRequest {
+        pub request_id: String,
+
+        #[serde(with = "ts_milliseconds")]
+        pub timestamp: DateTime<Utc>,
+
+        pub records: Vec<EncodedFirehoseRecord>,
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct EncodedFirehoseRecord {
+        /// data is base64 encoded, gzip'd, bytes
+        pub data: String,
+    }
+
+    /// Represents an AWS Kinesis Firehose response
+    ///
+    /// Represents protocol v1.0 (the only protocol as of writing)
+    ///
+    /// https://docs.aws.amazon.com/firehose/latest/dev/httpdeliveryrequestresponse.html
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct FirehoseResponse {
+        pub request_id: String,
+
+        #[serde(with = "ts_milliseconds")]
+        pub timestamp: DateTime<Utc>,
+
+        pub error_message: Option<String>,
+    }
 }
 
-/// convert header parse errors
-fn header_error_message(name: &str, msg: &str) -> ErrorMessage {
-    ErrorMessage::new(
-        StatusCode::BAD_REQUEST,
-        format!("Invalid request header {:?}: {:?}", name, msg),
-    )
-}
+pub mod errors {
+    use crate::event::Event;
+    use snafu::Snafu;
 
-/// decode record from its base64 gzip format
-fn decode_record(record: &EncodedFirehoseRecord) -> std::io::Result<Vec<u8>> {
-    use flate2::read::GzDecoder;
+    #[derive(Clone, Debug)]
+    pub enum AccessKeyError {
+        Missing { request_id: String },
+        Invalid { request_id: String },
+    }
 
-    let mut cursor = std::io::Cursor::new(record.data.as_bytes());
-    let base64decoder = base64::read::DecoderReader::new(&mut cursor, base64::STANDARD);
+    impl warp::reject::Reject for AccessKeyError {}
 
-    let mut gz = GzDecoder::new(base64decoder);
-    let mut buffer = Vec::new();
-    gz.read_to_end(&mut buffer)?;
+    #[derive(Debug, Snafu)]
+    #[snafu(visibility = "pub")]
+    pub enum RequestError {
+        #[snafu(display("Could not parse incoming request {}: {}", request_id, source))]
+        Parse {
+            source: std::io::Error,
+            request_id: String,
+        },
+        #[snafu(display("Could not decode record for request {}: {}", request_id, source))]
+        Decode {
+            source: std::io::Error,
+            request_id: String,
+        },
+        #[snafu(display(
+            "Could not forward events for request {}, downstream is closed: {}",
+            request_id,
+            source
+        ))]
+        ShuttingDown {
+            source: futures01::sync::mpsc::SendError<Event>,
+            request_id: String,
+        },
+    }
 
-    Ok(buffer)
-}
+    impl warp::reject::Reject for RequestError {}
 
-/// Represents an AWS Kinesis Firehose request
-///
-/// Represents protocol v1.0 (the only protocol as of writing)
-///
-/// https://docs.aws.amazon.com/firehose/latest/dev/httpdeliveryrequestresponse.html
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct FirehoseRequest {
-    request_id: String,
-
-    #[serde(with = "ts_milliseconds")]
-    timestamp: DateTime<Utc>,
-
-    records: Vec<EncodedFirehoseRecord>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct EncodedFirehoseRecord {
-    data: String,
+    impl From<RequestError> for warp::reject::Rejection {
+        fn from(error: RequestError) -> Self {
+            warp::reject::custom(error)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -351,12 +443,12 @@ mod tests {
         request_id: &str,
         source_arn: &str,
     ) -> reqwest::Result<reqwest::Response> {
-        let request = FirehoseRequest {
+        let request = models::FirehoseRequest {
             request_id: request_id.to_string(),
             timestamp,
             records: records
                 .into_iter()
-                .map(|record| EncodedFirehoseRecord {
+                .map(|record| models::EncodedFirehoseRecord {
                     data: encode_record(record).unwrap().to_string(),
                 })
                 .collect(),
@@ -444,15 +536,30 @@ mod tests {
                 "source_arn" => source_arn,
             },]
         );
+
+        let response: models::FirehoseResponse = res.json().await.unwrap();
+        assert_eq!(response.request_id, request_id);
     }
 
     #[tokio::test]
     async fn aws_kinesis_firehose_rejects_bad_access_key() {
         let (_rx, addr) = source(Some("an access key".to_string())).await;
 
-        let res = send(addr, Utc::now(), vec![], Some("bad access key"), "", "")
-            .await
-            .unwrap();
+        let request_id = "e17265d6-97af-4938-982e-90d5614c4242";
+
+        let res = send(
+            addr,
+            Utc::now(),
+            vec![],
+            Some("bad access key"),
+            request_id,
+            "",
+        )
+        .await
+        .unwrap();
         assert_eq!(401, res.status().as_u16());
+
+        let response: models::FirehoseResponse = res.json().await.unwrap();
+        assert_eq!(response.request_id, request_id);
     }
 }
