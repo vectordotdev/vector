@@ -44,15 +44,17 @@ path_coalesce = !{ "(" ~ (path_segment | quoted_path_segment) ~ ("|" ~ (path_seg
 
 dot_path = ${ ("." ~ (path_segment | quoted_path_segment | path_coalesce))+ }
 
-ident = @{ ASCII_ALPHA_LOWER ~ ( ASCII_ALPHA_LOWER | "_" )* }
+ident = @{ ASCII_ALPHANUMERIC ~ ( ASCII_ALPHANUMERIC | "_" )* }
 
-function = { ident ~ "(" ~ function_arguments? ~ ")"  }
+function = { ident ~ "(" ~ argument_list? ~ ")"  }
 
-function_arguments = _{ (function_argument ~ ("," ~ function_argument)* ) }
+argument_list = _{ argument_item ~ ("," ~ argument_item)* }
 
-function_argument = { query_arithmetic | named_argument }
+argument_item = _{ positional_item | keyword_item }
 
-named_argument = { ident ~ "=" ~ query_arithmetic }
+positional_item = { query_arithmetic }
+
+keyword_item = { ident ~ "=" ~ query_arithmetic }
 
 group = { "(" ~ query_arithmetic ~ ")" }
 

@@ -18,6 +18,33 @@ pub enum Value {
     Null,
 }
 
+#[derive(PartialEq, Debug, Clone, Copy, is_enum_variant)]
+pub enum ValueKind {
+    Bytes,
+    Integer,
+    Float,
+    Boolean,
+    Timestamp,
+    Map,
+    Array,
+    Null,
+}
+
+impl std::fmt::Display for ValueKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ValueKind::Bytes => f.write_str("string"),
+            ValueKind::Integer => f.write_str("integer"),
+            ValueKind::Float => f.write_str("float"),
+            ValueKind::Boolean => f.write_str("boolean"),
+            ValueKind::Timestamp => f.write_str("timestamp"),
+            ValueKind::Map => f.write_str("map"),
+            ValueKind::Array => f.write_str("array"),
+            ValueKind::Null => f.write_str("null"),
+        }
+    }
+}
+
 impl Serialize for Value {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -199,6 +226,19 @@ impl Value {
         match &self {
             Value::Timestamp(ts) => Some(ts),
             _ => None,
+        }
+    }
+
+    pub fn to_value_kind(&self) -> ValueKind {
+        match self {
+            Value::Bytes(_) => ValueKind::Bytes,
+            Value::Timestamp(_) => ValueKind::Timestamp,
+            Value::Integer(_) => ValueKind::Integer,
+            Value::Float(_) => ValueKind::Float,
+            Value::Boolean(_) => ValueKind::Boolean,
+            Value::Map(_) => ValueKind::Map,
+            Value::Array(_) => ValueKind::Array,
+            Value::Null => ValueKind::Null,
         }
     }
 }

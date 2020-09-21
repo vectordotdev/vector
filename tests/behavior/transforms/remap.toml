@@ -1,19 +1,446 @@
-[transforms.remap_test]
+[transforms.remap_nested]
   inputs = []
   type = "remap"
   mapping = """
-    .a = downcase(.b, append = .c + .d)
+    .a.b = 123
+    .x.y = 456
+    .x.z = 789
   """
 [[tests]]
-  name = "remap_test"
+  name = "remap_nested"
   [tests.input]
-    insert_at = "remap_test"
+    insert_at = "remap_nested"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_nested"
+    [[tests.outputs.conditions]]
+      "a.b.equals" = 123
+      "x.y.equals" = 456
+      "x.z.equals" = 789
+
+[transforms.remap_array]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a[0] = 0
+    .a[1] = "1"
+    .a[2] = 2.0
+    .b[2] = "two"
+    .b[0] = 0
+  """
+[[tests]]
+  name = "remap_array"
+  [tests.input]
+    insert_at = "remap_array"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_array"
+    [[tests.outputs.conditions]]
+      "a[0].equals" = 0
+      "a[1].equals" = "1"
+      "a[2].equals" = 2.0
+
+      "b[0].equals" = 0
+      "b[1].equals" = "<null>"
+      "b[2].equals" = "two"
+
+[transforms.remap_arithmetic]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .result_a = .a * .b + .c - .d
+    .result_b = .a * (.b + .c) - .d
+    .result_c = .a + .b * .c / .d
+    .result_d = (.a + .b) * (.c / .d)
+  """
+[[tests]]
+  name = "remap_arithmetic"
+  [tests.input]
+    insert_at = "remap_arithmetic"
     type = "log"
     [tests.input.log_fields]
-      b = "HELLO"
-      c = " world"
-      d = " and universe!"
+      a = 3
+      b = 7
+      c = 12
+      d = 6
   [[tests.outputs]]
-    extract_from = "remap_test"
+    extract_from = "remap_arithmetic"
     [[tests.outputs.conditions]]
-      "a.equals" = "hello world and universe!"
+      "result_a.equals" = 27
+      "result_b.equals" = 51
+      "result_c.equals" = 17
+      "result_d.equals" = 20
+
+[transforms.remap_boolean_arithmetic]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .result_a = .a + .b > 9
+    .result_b = .a * .b < 20
+    .result_c = 1 >= .a / .b
+    .result_d = .a + .b > .c + .d
+  """
+[[tests]]
+  name = "remap_boolean_arithmetic"
+  [tests.input]
+    insert_at = "remap_boolean_arithmetic"
+    type = "log"
+    [tests.input.log_fields]
+      a = 3
+      b = 7
+      c = 12
+      d = 6
+  [[tests.outputs]]
+    extract_from = "remap_boolean_arithmetic"
+    [[tests.outputs.conditions]]
+      "result_a.equals" = true
+      "result_b.equals" = false
+      "result_c.equals" = true
+      "result_d.equals" = false
+
+[transforms.remap_delete_only_fields]
+  inputs = []
+  type = "remap"
+  mapping = """
+    only_fields(.foo, .bar, .buz.second)
+    del(.foo.second)
+  """
+[[tests]]
+  name = "remap_delete_only_fields"
+  [tests.input]
+    insert_at = "remap_delete_only_fields"
+    type = "log"
+    [tests.input.log_fields]
+      "foo.first" = "foo first value"
+      "foo.second" = "foo second value"
+      bar = "bar value"
+      baz = "baz value"
+      "buz.first" = "buz first value"
+      "buz.second" = "buz second value"
+  [[tests.outputs]]
+    extract_from = "remap_delete_only_fields"
+    [[tests.outputs.conditions]]
+      "foo.first.equals" = "foo first value"
+      "foo.second.exists" = false
+      "bar.equals" = "bar value"
+      "baz.exists" = false
+      "buz.first.exists" = false
+      "buz.second.equals" = "buz second value"
+
+[transforms.remap_coercion]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .foo = to_string(.foo)
+    .bar = to_int(.bar)
+    .baz = to_float(.baz)
+    .bev = to_bool(.bev)
+    .a = to_timestamp(.a)
+    .b = to_timestamp(.nope, 10)
+    .c = to_timestamp(.nope, "2020-09-14T12:51:12+02:00")
+  """
+[[tests]]
+  name = "remap_coercion"
+  [tests.input]
+    insert_at = "remap_coercion"
+    type = "log"
+    [tests.input.log_fields]
+      foo = 10
+      bar = "20"
+      baz = "30.3"
+      bev = "true"
+      a = "2020-09-14T12:53:44+03:00"
+  [[tests.outputs]]
+    extract_from = "remap_coercion"
+    [[tests.outputs.conditions]]
+      "foo.equals" = "10"
+      "bar.equals" = 20
+      "baz.equals" = 30.3
+      "bev.equals" = true
+      "a.equals" = "2020-09-14T09:53:44Z"
+      "b.equals" = "1970-01-01T00:00:10Z"
+      "c.equals" = "2020-09-14T10:51:12Z"
+
+[transforms.remap_quoted_path]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a."b.c" = ."d.e"
+  """
+[[tests]]
+  name = "remap_quoted_path"
+  [tests.input]
+    insert_at = "remap_quoted_path"
+    type = "log"
+    [tests.input.log_fields]
+      "a.b\\.c" = "bar"
+      "d\\.e" = "baz"
+  [[tests.outputs]]
+    extract_from = "remap_quoted_path"
+    [[tests.outputs.conditions]]
+      "a.b\\.c.equals" = "baz"
+
+[transforms.remap_function_upcase]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = upcase(.a)
+    .b = upcase(.b)
+    .c.c = upcase(.c.c)
+
+    if upcase(.f) == "F" {
+        .f = "ff"
+    }
+  """
+[[tests]]
+  name = "remap_function_upcase"
+  [tests.input]
+    insert_at = "remap_function_upcase"
+    type = "log"
+    [tests.input.log_fields]
+      a = "a"
+      b = "bbb bb"
+      "c.c" = "c.c"
+      f = "f"
+  [[tests.outputs]]
+    extract_from = "remap_function_upcase"
+    [[tests.outputs.conditions]]
+      "a.equals" = "A"
+      "b.equals" = "BBB BB"
+      "c.c.equals" = "C.C"
+      "f.equals" = "ff"
+
+[transforms.remap_function_upcase_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  mapping = """
+    .a = upcase(.a)
+    .b = upcase(.b)
+  """
+[[tests]]
+  name = "remap_function_upcase_error"
+  no_outputs_from = ["remap_function_upcase_error"]
+  [tests.input]
+    insert_at = "remap_function_upcase_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "a"
+      b = true
+
+[transforms.remap_function_downcase]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  mapping = """
+    .a = downcase(.a)
+    .b = downcase(.b)
+    .c.c = downcase(.c.c)
+
+    if downcase(.f) == "f" {
+        .f = "FF"
+    }
+  """
+[[tests]]
+  name = "remap_function_downcase"
+  [tests.input]
+    insert_at = "remap_function_downcase"
+    type = "log"
+    [tests.input.log_fields]
+      a = "A"
+      b = "BBB BB"
+      "c.c" = "C.C"
+      f = "F"
+  [[tests.outputs]]
+    extract_from = "remap_function_downcase"
+    [[tests.outputs.conditions]]
+      "a.equals" = "a"
+      "b.equals" = "bbb bb"
+      "c.c.equals" = "c.c"
+      "f.equals" = "FF"
+
+[transforms.remap_function_downcase_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  mapping = """
+    .a = downcase(.a)
+    .b = downcase(.b)
+  """
+[[tests]]
+  name = "remap_function_downcase_error"
+  no_outputs_from = ["remap_function_downcase_error"]
+  [tests.input]
+    insert_at = "remap_function_downcase_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "A"
+      b = 10
+
+[transforms.remap_function_uuid_v4]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = uuid_v4()
+
+    if uuid_v4() != "" {
+        .b = "bar"
+    }
+  """
+[[tests]]
+  name = "remap_function_uuid_v4"
+  [tests.input]
+    insert_at = "remap_function_uuid_v4"
+    type = "log"
+    [tests.input.log_fields]
+      b = "foo"
+  [[tests.outputs]]
+    extract_from = "remap_function_uuid_v4"
+    [[tests.outputs.conditions]]
+      "a.regex" = "(?i)^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      "b.equals" = "bar"
+
+[transforms.remap_function_sha1]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = sha1(.a)
+
+    if sha1(.b) == "62cdb7020ff920e5aa642c3d4066950dd1f01f4d" {
+        .b = sha1(.a + .b + "baz")
+    }
+  """
+[[tests]]
+  name = "remap_function_sha1"
+  [tests.input]
+    insert_at = "remap_function_sha1"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_sha1"
+    [[tests.outputs.conditions]]
+      "a.equals" = "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"
+      "b.equals" = "6f74c252bb7f19f553115af5e49a733b9ff17138"
+
+[transforms.remap_function_sha1_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  mapping = """
+    .a = sha1(.a)
+    .b = sha1(.b)
+  """
+[[tests]]
+  name = "remap_function_sha1_error"
+  no_outputs_from = ["remap_function_sha1_error"]
+  [tests.input]
+    insert_at = "remap_function_sha1_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = true
+
+[transforms.remap_function_md5]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = md5(.a)
+
+    if md5(.b) == "37b51d194a7513e45b56f6524f2d51f2" {
+        .b = md5(.a + .b + "baz")
+    }
+  """
+[[tests]]
+  name = "remap_function_md5"
+  [tests.input]
+    insert_at = "remap_function_md5"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_md5"
+    [[tests.outputs.conditions]]
+      "a.equals" = "acbd18db4cc2f85cedef654fccc4a4d8"
+      "b.equals" = "223cfa6567e4c0599c9a23628bf7a234"
+
+[transforms.remap_function_md5_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  mapping = """
+    .a = md5(.a)
+    .b = md5(.b)
+  """
+[[tests]]
+  name = "remap_function_md5_error"
+  no_outputs_from = ["remap_function_md5_error"]
+  [tests.input]
+    insert_at = "remap_function_md5_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = true
+
+[transforms.remap_function_now]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = now()
+  """
+[[tests]]
+  name = "remap_function_now"
+  [tests.input]
+    insert_at = "remap_function_now"
+    type = "log"
+    [tests.input.log_fields]
+  [[tests.outputs]]
+    extract_from = "remap_function_now"
+    [[tests.outputs.conditions]]
+      "a.ends_with" = "Z"
+      "a.length_eq" = 27
+
+[transforms.remap_function_arguments]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = to_string(.in)
+    .b = to_string(value = .in)
+    .c = to_string(.in, 20)
+    .d = to_string(.in, default = 20)
+    .e = to_string(.nope, 20)
+    .f = to_string(.nope, default = 20)
+    .g = to_string(value = .in, default = 20)
+    .h = to_string(value = .in, 20)
+    .i = to_string(default = 20, .in)
+    .j = to_string(default = 20, value = .in)
+    .k = to_string(default = 20, value = .nope)
+    .l = to_string(default = .other, value = .nope)
+  """
+[[tests]]
+  name = "remap_function_arguments"
+  [tests.input]
+    insert_at = "remap_function_arguments"
+    type = "log"
+    [tests.input.log_fields]
+      in = 10
+      other = 30
+  [[tests.outputs]]
+    extract_from = "remap_function_arguments"
+    [[tests.outputs.conditions]]
+      "a.equals" = "10"
+      "b.equals" = "10"
+      "c.equals" = "10"
+      "d.equals" = "10"
+      "e.equals" = "20"
+      "f.equals" = "20"
+      "g.equals" = "10"
+      "h.equals" = "10"
+      "i.equals" = "10"
+      "j.equals" = "10"
+      "k.equals" = "20"
+      "l.equals" = "30"
