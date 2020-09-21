@@ -171,7 +171,16 @@ impl Sink for UdpSink {
                         error!(message = "send failed", %error);
                         Ok(AsyncSink::NotReady(line))
                     }
-                    Ok(_) => Ok(AsyncSink::Ready),
+                    Ok(sent) => {
+                        if sent != line.len() {
+                            warn!(
+                                "Could not send all data in one UDP packet, data length: {}, sent: {}.",
+                                line.len(),
+                                sent
+                            );
+                        }
+                        Ok(AsyncSink::Ready)
+                    }
                 }
             }
             Ok(Async::NotReady) => Ok(AsyncSink::NotReady(line)),
