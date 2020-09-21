@@ -1,6 +1,6 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     sinks::{
         util::{
@@ -18,6 +18,7 @@ use http::{Request, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, map};
 use snafu::Snafu;
 use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
@@ -174,12 +175,18 @@ impl HttpSink for StackdriverSink {
         let mut event = Event::Log(log);
         self.config.encoding.apply_rules(&mut event);
 
-        let entry = serde_json::json!({
-            "jsonPayload": event.into_log(),
-            "severity": severity,
-        });
+        let log = event.into_log();
 
-        Some(entry)
+        let mut entry = map::Map::with_capacity(3);
+        entry.insert("jsonPayload".into(), json!(log));
+        entry.insert("severity".into(), json!(severity));
+
+        // If the event contains a timestamp, send it in the main message so gcp can pick it up.
+        if let Some(timestamp) = log.get(&log_schema().timestamp_key()) {
+            entry.insert("timestamp".into(), json!(timestamp));
+        }
+
+        Some(json!(entry))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
@@ -270,6 +277,7 @@ impl StackdriverConfig {
 mod tests {
     use super::*;
     use crate::event::{LogEvent, Value};
+    use chrono::{TimeZone, Utc};
     use serde_json::value::RawValue;
     use std::iter::FromIterator;
 
@@ -302,6 +310,40 @@ mod tests {
         assert_eq!(
             body,
             "{\"jsonPayload\":{\"message\":\"hello world\"},\"severity\":100}"
+        );
+    }
+
+    #[test]
+    fn encode_inserts_timestamp() {
+        let config: StackdriverConfig = toml::from_str(
+            r#"
+           project_id = "project"
+           log_id = "testlogs"
+           resource.type = "generic_node"
+           resource.namespace = "office"
+        "#,
+        )
+        .unwrap();
+
+        let sink = StackdriverSink {
+            config,
+            creds: None,
+            severity_key: Some("anumber".into()),
+        };
+
+        let mut log = LogEvent::default();
+        log.insert("message", Value::Bytes("hello world".into()));
+        log.insert("anumber", Value::Bytes("100".into()));
+        log.insert(
+            "timestamp",
+            Value::Timestamp(Utc.ymd(2020, 1, 1).and_hms(12, 30, 0)),
+        );
+
+        let json = sink.encode_event(Event::from(log)).unwrap();
+        let body = serde_json::to_string(&json).unwrap();
+        assert_eq!(
+            body,
+            "{\"jsonPayload\":{\"message\":\"hello world\",\"timestamp\":\"2020-01-01T12:30:00Z\"},\"severity\":100,\"timestamp\":\"2020-01-01T12:30:00Z\"}"
         );
     }
 
