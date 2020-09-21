@@ -1,4 +1,4 @@
-use super::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSink};
+use super::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSinkOld};
 use crate::{
     config::SinkContext,
     dns::Resolver,
@@ -71,7 +71,7 @@ impl UdpSinkConfig {
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let (connector, healthcheck) = self.build_connector(cx.clone())?;
         let sink: UdpSink = connector.into();
-        let sink = StreamSink::new(sink, cx.acker())
+        let sink = StreamSinkOld::new(sink, cx.acker())
             .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))

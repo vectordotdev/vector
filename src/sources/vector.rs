@@ -105,7 +105,7 @@ mod test {
         tls::{TlsConfig, TlsOptions},
         Event, Pipeline,
     };
-    use futures::{compat::Future01CompatExt, stream, StreamExt};
+    use futures::{compat::Future01CompatExt, stream};
     use std::net::SocketAddr;
     use tokio::time::{delay_for, Duration};
 
@@ -145,9 +145,7 @@ mod test {
             }),
         ];
 
-        sink.run(stream::iter(events.clone()).map(Ok))
-            .await
-            .unwrap();
+        sink.run(stream::iter(events.clone())).await.unwrap();
 
         delay_for(Duration::from_millis(50)).await;
 

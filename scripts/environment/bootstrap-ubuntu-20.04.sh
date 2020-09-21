@@ -4,11 +4,25 @@ set -e -o verbose
 export DEBIAN_FRONTEND=noninteractive
 
 apt update --yes
+
+# This is a workaround for GH https://github.com/actions/virtual-environments/issues/1605
+# This fix will be removed when GH addresses the issue.
+# What's happening here? Well we use this script inside CI and Docker containers.
+# It'll run fine in CI because update-grub can find a root parition.
+# Inside a container it'll fail. Either way we don't care about the outcome of the command
+# so we ignore its exit.
+
+set +e
+apt-get install --yes grub-efi
+update-grub
+set -e
+
 apt upgrade --yes
 
 # Deps
 apt install --yes \
     build-essential \
+    cmake \
     pkg-config \
     libssl-dev \
     python3-pip \
@@ -25,7 +39,8 @@ apt install --yes \
     ruby-bundler \
     libsasl2-dev \
     gnupg2 \
-    wget
+    wget \
+    gawk
 
 # Grease
 # Grease is used for the `make release-github` task.

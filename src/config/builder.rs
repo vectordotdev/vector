@@ -1,3 +1,5 @@
+#[cfg(feature = "api")]
+use super::api;
 use super::{
     compiler, default_data_dir, Config, GlobalOptions, SinkConfig, SinkOuter, SourceConfig,
     TestDefinition, TransformConfig, TransformOuter,
@@ -10,6 +12,9 @@ use serde::{Deserialize, Serialize};
 pub struct ConfigBuilder {
     #[serde(flatten)]
     pub global: GlobalOptions,
+    #[cfg(feature = "api")]
+    #[serde(default)]
+    pub api: api::Options,
     #[serde(default)]
     pub sources: IndexMap<String, Box<dyn SourceConfig>>,
     #[serde(default)]
@@ -75,6 +80,9 @@ impl ConfigBuilder {
 
     pub fn append(&mut self, with: Self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
+
+        #[cfg(feature = "api")]
+        api::update_config(self, &with);
 
         if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
             self.global.data_dir = with.global.data_dir;

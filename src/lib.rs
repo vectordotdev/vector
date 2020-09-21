@@ -32,6 +32,8 @@ pub mod generate;
 pub mod wasm;
 #[macro_use]
 pub mod internal_events;
+#[cfg(feature = "api")]
+pub mod api;
 pub mod async_read;
 pub mod heartbeat;
 #[cfg(feature = "rdkafka")]
