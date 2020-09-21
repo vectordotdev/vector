@@ -20,17 +20,12 @@ use warp::http::{HeaderMap, StatusCode};
 //   intermediate buffers
 // * Try avoiding intermediate collections while processing request
 // * Return the response structure AWS expects
-// * Allow control of setting AWS metadata fields from headers?
-//   * Should fail if metadata fields cannot be set?
-// * Move EncodingConfig into shared config
-// * Handle additional codecs by reusing http source components
 // * Consider using snafu crate for error union
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct AwsKinesisFirehoseConfig {
     address: SocketAddr,
     access_key: Option<String>,
-    encoding: EncodingConfig<Encoding>,
     tls: Option<TlsConfig>,
 }
 
@@ -38,25 +33,9 @@ inventory::submit! {
     SinkDescription::new_without_default::<AwsKinesisFirehoseConfig>("aws_kinesis_firehose")
 }
 
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
-#[serde(deny_unknown_fields)]
-struct EncodingConfig<E> {
-    codec: E,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
-#[serde(rename_all = "snake_case")]
-enum Encoding {
-    Text,
-    Ndjson,
-    Json,
-    AwsCloudWatchLogsSubscription,
-}
-
 #[derive(Clone)]
 struct AwsKinesisFirehoseSource {
     access_key: Option<String>,
-    encoding: EncodingConfig<Encoding>,
 }
 
 impl HttpSource for AwsKinesisFirehoseSource {
@@ -83,7 +62,7 @@ impl HttpSource for AwsKinesisFirehoseSource {
         })?;
 
         match get_header(&header_map, "X-Amz-Firehose-Protocol-Version")? {
-            Some("1.0") => decode_message(body, request_id, source_arn, &self.encoding),
+            Some("1.0") => decode_message(body, request_id, source_arn),
             Some(version) => {
                 let error = RequestError::Protocol(ProtocolError::Invalid(version.to_string()));
                 emit!(AwsKinesisFirehoseRequestError {
@@ -132,7 +111,6 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
     ) -> crate::Result<super::Source> {
         let source = AwsKinesisFirehoseSource {
             access_key: self.access_key.clone(),
-            encoding: self.encoding.clone(),
         };
         source.run(self.address, "", &self.tls, out, shutdown)
     }
@@ -164,7 +142,6 @@ pub enum RequestError {
     AccessKey(AccessKeyError),
     RequestParse(String),
     RecordDecode(usize, String),
-    RecordParse(usize, String),
 }
 
 impl error::Error for RequestError {}
@@ -189,9 +166,6 @@ impl fmt::Display for RequestError {
             }
             RequestError::RecordDecode(ref i, ref s) => {
                 write!(f, "Could not decode record with index {}: {}", i, s)
-            }
-            RequestError::RecordParse(ref i, ref s) => {
-                write!(f, "Could not parse record with index {}: {}", i, s)
             }
         }
     }
@@ -221,7 +195,6 @@ fn decode_message(
     body: Bytes,
     request_id: Option<&str>,
     source_arn: Option<&str>,
-    encoding: &EncodingConfig<Encoding>,
 ) -> Result<Vec<Event>, ErrorMessage> {
     let request: FirehoseRequest = serde_json::from_reader(body.reader()).map_err(|error| {
         let error = RequestError::RequestParse(error.to_string());
@@ -232,105 +205,40 @@ fn decode_message(
         ErrorMessage::new(StatusCode::BAD_REQUEST, error.to_string())
     })?;
 
-    let records: Vec<Vec<u8>> = request
+    let records: Vec<Event> = request
         .records
         .iter()
         .enumerate()
         .map(|(i, record)| {
-            decode_record(record).map_err(|error| {
-                let error = RequestError::RecordDecode(i, error.to_string());
-                emit!(AwsKinesisFirehoseRequestError {
-                    request_id,
-                    error: &error
-                });
-                ErrorMessage::new(StatusCode::BAD_REQUEST, error.to_string())
-            })
-        })
-        .collect::<Result<Vec<Vec<u8>>, ErrorMessage>>()?;
+            decode_record(record)
+                .map(|record| {
+                    let mut event = Event::new_empty_log();
+                    let log = event.as_mut_log();
 
-    let records: Vec<Event> = records
-        .iter()
-        .enumerate()
-        .map(|(i, record)| {
-            parse_record(record, encoding).map_err(|error| {
-                let error = RequestError::RecordParse(i, error.to_string());
-                emit!(AwsKinesisFirehoseRequestError {
-                    request_id,
-                    error: &error
-                });
-                ErrorMessage::new(StatusCode::BAD_REQUEST, error.to_string())
-            })
+                    log.insert(log_schema().message_key().clone(), record);
+                    log.insert(log_schema().timestamp_key().clone(), request.timestamp);
+
+                    if let Some(id) = request_id {
+                        log.insert("request_id", id.to_string());
+                    }
+                    if let Some(arn) = source_arn {
+                        log.insert("source_arn", arn.to_string());
+                    }
+
+                    event
+                })
+                .map_err(|error| {
+                    let error = RequestError::RecordDecode(i, error.to_string());
+                    emit!(AwsKinesisFirehoseRequestError {
+                        request_id,
+                        error: &error
+                    });
+                    ErrorMessage::new(StatusCode::BAD_REQUEST, error.to_string())
+                })
         })
-        .collect::<Result<Vec<Vec<Event>>, ErrorMessage>>()?
-        .into_iter()
-        .flatten()
-        .map(|mut event| {
-            let log = event.as_mut_log();
-            if let Some(id) = request_id {
-                log.insert("amz_request_id", id.to_owned());
-            }
-            if let Some(arn) = source_arn {
-                log.insert("amz_source_arn", arn.to_owned());
-            }
-            event
-        })
-        .collect();
+        .collect::<Result<Vec<Event>, ErrorMessage>>()?;
 
     Ok(records)
-}
-
-fn parse_record(
-    record: &[u8],
-    encoding: &EncodingConfig<Encoding>,
-) -> Result<Vec<Event>, serde_json::error::Error> {
-    match encoding.codec {
-        Encoding::AwsCloudWatchLogsSubscription => {
-            let record: AwsCloudWatchLogsSubscriptionMessage =
-                serde_json::from_reader(record.reader())?;
-
-            Ok(match record.message_type {
-                AwsCloudWatchLogsSubscriptionMessageType::ControlMessage => vec![],
-                AwsCloudWatchLogsSubscriptionMessageType::DataMessage => record
-                    .log_events
-                    .into_iter()
-                    .map(|log_event| {
-                        let mut event = Event::from(log_event.message.as_str());
-                        let log = event.as_mut_log();
-                        log.insert(log_schema().timestamp_key().clone(), log_event.timestamp);
-                        event
-                    })
-                    .collect(),
-            })
-        }
-
-        _ => unimplemented!("TODO"),
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum AwsCloudWatchLogsSubscriptionMessageType {
-    ControlMessage,
-    DataMessage,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct AwsCloudWatchLogsSubscriptionMessage {
-    owner: String,
-    message_type: AwsCloudWatchLogsSubscriptionMessageType,
-    log_group: String,
-    log_stream: String,
-    subscription_filters: Vec<String>,
-    log_events: Vec<AwsCloudWatchLogEvent>,
-}
-
-#[derive(Debug, Deserialize)]
-struct AwsCloudWatchLogEvent {
-    id: String,
-    #[serde(with = "ts_milliseconds")]
-    timestamp: DateTime<Utc>,
-    message: String,
 }
 
 /// return the parsed header, if it exists
@@ -396,33 +304,18 @@ mod tests {
     use crate::{
         config::{GlobalOptions, SourceConfig},
         event::{Event, LogEvent},
+        log_event,
         test_util::{collect_ready, next_addr, wait_for_tcp},
         Pipeline,
     };
-    use chrono::{DateTime, Utc};
+    use chrono::{DateTime, SubsecRound, Utc};
     use futures::compat::Future01CompatExt;
     use futures01::sync::mpsc;
     use pretty_assertions::assert_eq;
     use std::io::Read;
     use std::net::SocketAddr;
 
-    macro_rules! log_event {
-        ($($key:expr => $value:expr),*  $(,)?) => {
-            {
-                let mut event = Event::Log(LogEvent::default());
-                let log = event.as_mut_log();
-                $(
-                    log.insert($key, $value);
-                )*
-				event
-            }
-        };
-    }
-
-    async fn source(
-        access_key: Option<String>,
-        encoding: EncodingConfig<Encoding>,
-    ) -> (mpsc::Receiver<Event>, SocketAddr) {
+    async fn source(access_key: Option<String>) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
         tokio::spawn(async move {
@@ -430,7 +323,6 @@ mod tests {
                 address,
                 tls: None,
                 access_key,
-                encoding,
             }
             .build_async(
                 "default",
@@ -453,6 +345,7 @@ mod tests {
     /// https://docs.aws.amazon.com/firehose/latest/dev/httpdeliveryrequestresponse.html
     async fn send(
         address: SocketAddr,
+        timestamp: DateTime<Utc>,
         records: Vec<&str>,
         key: Option<&str>,
         request_id: &str,
@@ -460,7 +353,7 @@ mod tests {
     ) -> reqwest::Result<reqwest::Response> {
         let request = FirehoseRequest {
             request_id: request_id.to_string(),
-            timestamp: Utc::now(),
+            timestamp,
             records: records
                 .into_iter()
                 .map(|record| EncodedFirehoseRecord {
@@ -504,7 +397,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn firehose_handles_cloudwatch_logs() {
+    async fn aws_kinesis_firehose_forwards_events() {
+        // example CloudWatch Logs subscription event
         let record = r#"
 {
   "messageType": "DATA_MESSAGE",
@@ -512,35 +406,30 @@ mod tests {
   "logGroup": "/jesse/test",
   "logStream": "test",
   "subscriptionFilters": [
-	"Destination"
+    "Destination"
   ],
   "logEvents": [
-	{
-	  "id": "35683658089614582423604394983260738922885519999578275840",
-	  "timestamp": 1600110569039,
-	  "message": "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-platform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}"
-	},
-	{
-	  "id": "35683658089659183914001456229543810359430816722590236673",
-	  "timestamp": 1600110569041,
-	  "message": "{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}"
-	}
+    {
+      "id": "35683658089614582423604394983260738922885519999578275840",
+      "timestamp": 1600110569039,
+      "message": "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-platform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}"
+    },
+    {
+      "id": "35683658089659183914001456229543810359430816722590236673",
+      "timestamp": 1600110569041,
+      "message": "{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}"
+    }
   ]
 }
 "#;
 
-        let (rx, addr) = source(
-            None,
-            EncodingConfig {
-                codec: Encoding::AwsCloudWatchLogsSubscription,
-            },
-        )
-        .await;
+        let (rx, addr) = source(None).await;
 
         let source_arn = "arn:aws:firehose:us-east-1:111111111111:deliverystream/test";
         let request_id = "e17265d6-97af-4938-982e-90d5614c4242";
+        let timestamp: DateTime<Utc> = Utc::now();
 
-        let res = send(addr, vec![record], None, request_id, source_arn)
+        let res = send(addr, timestamp, vec![record], None, request_id, source_arn)
             .await
             .unwrap();
         assert_eq!(200, res.status().as_u16());
@@ -548,68 +437,20 @@ mod tests {
         let events = collect_ready(rx).await.unwrap();
         assert_eq!(
             events,
-            vec![
-                log_event! {
-                    "message" => r#"{"bytes":26780,"datetime":"14/Sep/2020:11:45:41 -0400","host":"157.130.216.193","method":"PUT","protocol":"HTTP/1.0","referer":"https://www.principalcross-platform.io/markets/ubiquitous","request":"/expedite/convergence","source_type":"stdin","status":301,"user-identifier":"-"}"#,
-                    "timestamp" => "2020-09-14T19:09:29.039Z".parse::<DateTime<Utc>>().unwrap(),
-                    "amz_request_id" => request_id,
-                    "amz_source_arn" => source_arn,
-                },
-                log_event! {
-                    "message" => r#"{"bytes":17707,"datetime":"14/Sep/2020:11:45:41 -0400","host":"109.81.244.252","method":"GET","protocol":"HTTP/2.0","referer":"http://www.investormission-critical.io/24/7/vortals","request":"/scale/functionalities/optimize","source_type":"stdin","status":502,"user-identifier":"feeney1708"}"#,
-                    "timestamp" => "2020-09-14T19:09:29.041Z".parse::<DateTime<Utc>>().unwrap(),
-                    "amz_request_id" => request_id,
-                    "amz_source_arn" => source_arn,
-                },
-            ]
+            vec![log_event! {
+                "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
+                "message"=> record,
+                "request_id" => request_id,
+                "source_arn" => source_arn,
+            },]
         );
     }
 
     #[tokio::test]
-    async fn firehose_handles_cloudwatch_logs_ignores_control_message() {
-        let record = r#"
-{
-  "messageType": "CONTROL_MESSAGE",
-  "owner": "CloudwatchLogs",
-  "logGroup": "",
-  "logStream": "",
-  "subscriptionFilters": [],
-  "logEvents": [
-    {
-      "id": "",
-      "timestamp": 1600110003794,
-      "message": "CWL CONTROL MESSAGE: Checking health of destination Firehose."
-    }
-  ]
-}
-"#;
+    async fn aws_kinesis_firehose_rejects_bad_access_key() {
+        let (_rx, addr) = source(Some("an access key".to_string())).await;
 
-        let (rx, addr) = source(
-            None,
-            EncodingConfig {
-                codec: Encoding::AwsCloudWatchLogsSubscription,
-            },
-        )
-        .await;
-
-        let res = send(addr, vec![record], None, "", "").await.unwrap();
-        assert_eq!(200, res.status().as_u16());
-
-        let events = collect_ready(rx).await.unwrap();
-        assert_eq!(events, vec![]);
-    }
-
-    #[tokio::test]
-    async fn firehose_rejects_bad_access_key() {
-        let (_rx, addr) = source(
-            Some("an access key".to_string()),
-            EncodingConfig {
-                codec: Encoding::AwsCloudWatchLogsSubscription,
-            },
-        )
-        .await;
-
-        let res = send(addr, vec![], Some("bad access key"), "", "")
+        let res = send(addr, Utc::now(), vec![], Some("bad access key"), "", "")
             .await
             .unwrap();
         assert_eq!(401, res.status().as_u16());
