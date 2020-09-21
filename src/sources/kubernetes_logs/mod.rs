@@ -195,7 +195,9 @@ impl Source {
         let file_server = FileServer {
             paths_provider,
             max_read_bytes: 2048,
-            start_at_beginning: true,
+            // We want to use checkpoining mechanism, and resume from where we
+            // left off.
+            start_at_beginning: false,
             ignore_before: None,
             max_line_bytes,
             data_dir,
