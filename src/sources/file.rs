@@ -313,7 +313,7 @@ fn create_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::Config, shutdown::ShutdownSignal, sources::file, test_util::trace_init};
+    use crate::{config::Config, shutdown::ShutdownSignal, sources::file};
     use futures01::Stream;
     use pretty_assertions::assert_eq;
     use std::{
@@ -1407,49 +1407,5 @@ mod tests {
                 "hooray".into(),
             ]
         );
-    }
-
-    #[tokio::test]
-    async fn remove_file() {
-        trace_init();
-
-        let n = 5;
-        let remove_after = 2;
-
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
-        let dir = tempdir().unwrap();
-        let config = file::FileConfig {
-            include: vec![dir.path().join("*")],
-            remove_after: Some(remove_after),
-            ..test_default_file_config(&dir)
-        };
-
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source.compat());
-
-        let path = dir.path().join("file");
-        let mut file = File::create(&path).unwrap();
-
-        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
-
-        for i in 0..n {
-            writeln!(&mut file, "{}", i).unwrap();
-        }
-        std::mem::drop(file);
-
-        // Wait for remove grace period to end.
-        delay_for(Duration::from_secs(remove_after + 1)).await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(rx.collect().compat()).await;
-        assert_eq!(received.len(), n);
-
-        match File::open(&path) {
-            Ok(_) => panic!("File wasn't removed"),
-            Err(error) => assert_eq!(error.kind(), std::io::ErrorKind::NotFound),
-        }
     }
 }
