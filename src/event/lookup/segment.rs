@@ -1,8 +1,5 @@
 use std::{
-    borrow::Cow,
-    convert::{TryInto, TryFrom},
     str,
-    vec::IntoIter,
 };
 use crate::mapping::parser::{Rule};
 use pest::{iterators::Pair};

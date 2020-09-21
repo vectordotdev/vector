@@ -2,19 +2,16 @@ mod segment;
 #[cfg(test)]
 mod test;
 
-
 use std::{
     convert::{TryFrom},
     str,
     ops::{RangeFull, RangeToInclusive, RangeTo, RangeFrom},
     slice::Iter,
-    vec::IntoIter,
 };
 use crate::mapping::parser::{MappingParser, Rule};
 use pest::{Parser, iterators::Pair};
 
 pub use segment::Segment;
-use std::slice::SliceIndex;
 use std::ops::{Index, IndexMut};
 
 /// Lookups are precomputed event lookup paths.

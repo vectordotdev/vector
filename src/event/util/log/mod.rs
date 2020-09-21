@@ -4,11 +4,9 @@ mod get;
 mod get_mut;
 mod insert;
 mod keys;
-mod path_iter;
 mod remove;
 
 pub(self) use super::Value;
-pub(crate) use path_iter::{PathComponent, PathIter};
 
 pub use all_fields::all_fields;
 pub use contains::contains;
