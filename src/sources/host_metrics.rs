@@ -16,6 +16,8 @@ use futures::{
 use futures01::Sink;
 #[cfg(target_os = "linux")]
 use heim::cpu::os::linux::CpuTimeExt;
+#[cfg(not(target_os = "windows"))]
+use heim::memory::os::SwapExt;
 use heim::{
     units::{information::byte, ratio::ratio, time::second},
     Error,
@@ -217,6 +219,18 @@ async fn swap_metrics() -> impl Iterator<Item = Metric> {
                     "host_memory_swap_used_bytes",
                     timestamp,
                     swap.used().get::<byte>()
+                ),
+                #[cfg(not(target_os = "windows"))]
+                counter!(
+                    "host_memory_swapped_in_bytes_total",
+                    timestamp,
+                    swap.sin().map(|swap| swap.get::<byte>()).unwrap_or(0)
+                ),
+                #[cfg(not(target_os = "windows"))]
+                counter!(
+                    "host_memory_swapped_out_bytes_total",
+                    timestamp,
+                    swap.sout().map(|swap| swap.get::<byte>()).unwrap_or(0)
                 ),
             ]
         }
