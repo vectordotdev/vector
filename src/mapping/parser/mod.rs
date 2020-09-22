@@ -385,7 +385,7 @@ fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
         }
         Rule::dot_path => Box::new(QueryPath::from(path_segments_from_pair(pair)?)),
         Rule::group => query_arithmetic_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?,
-        Rule::function_signature => query_function_from_pairs(pair.into_inner())?,
+        Rule::query_function => query_function_from_pairs(pair.into_inner())?,
         _ => unexpected_parser_sytax!(pair),
     })
 }
@@ -522,7 +522,11 @@ mod tests {
             ),
             (
                 ".foo = !",
-                vec![" 1:9\n", "= expected dot_path, query_function, group, boolean, null, string, number, or not_operator"],
+                vec![" 1:9\n", "= expected dot_path, ident, group, boolean, null, string, number, or not_operator"],
+            ),
+            (
+                ".foo = to_string",
+                vec![" 1:8\n", "= expected query"],
             ),
             (
                 "foo = \"bar\"",

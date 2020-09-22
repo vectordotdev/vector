@@ -48,10 +48,7 @@ ident = @{ ASCII_ALPHANUMERIC ~ ( ASCII_ALPHANUMERIC | "_" )* }
 
 // Functions
 
-function_signature = ${ query_function ~ "(" ~ inner_function? ~ ")"  }
-
-// for better error reports
-query_function = @{ ident }
+query_function = ${ ident ~ "(" ~ inner_function? ~ ")"  }
 
 inner_function = !{ argument_list }
 
@@ -93,7 +90,7 @@ number = @{
 
 not_operator = { "!" ~ query_leaf }
 
-query_leaf = _{ not_operator | value | dot_path | group | function_signature }
+query_leaf = _{ not_operator | value | dot_path | group | query_function }
 
 // Arithmetic, broken down into tiers in order to support operator precedence.
 // Operators of the same tier are resolved from left to right.
