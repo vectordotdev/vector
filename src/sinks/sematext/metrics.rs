@@ -30,7 +30,7 @@ struct SematextMetricsSvc {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 struct SematextMetricsConfig {
     pub region: Option<Region>,
-    pub host: Option<String>,
+    pub endpoint: Option<String>,
     pub token: String,
     #[serde(default)]
     pub batch: BatchConfig,
@@ -61,20 +61,20 @@ impl SinkConfig for SematextMetricsConfig {
     fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = HttpClient::new(cx.resolver(), None)?;
 
-        let host = match (&self.host, &self.region) {
-            (Some(host), None) => host.clone(),
+        let endpoint = match (&self.endpoint, &self.region) {
+            (Some(endpoint), None) => endpoint.clone(),
             (None, Some(Region::Na)) => "https://spm-receiver.sematext.com".to_owned(),
             (None, Some(Region::Eu)) => "https://spm-receiver.eu.sematext.com".to_owned(),
             (None, None) => {
-                return Err("Either `region` or `host` must be set.".into());
+                return Err("Either `region` or `endpoint` must be set.".into());
             }
             (Some(_), Some(_)) => {
-                return Err("Only one of `region` and `host` can be set.".into());
+                return Err("Only one of `region` and `endpoint` can be set.".into());
             }
         };
 
-        let healthcheck = healthcheck(host.clone(), client.clone()).boxed();
-        let sink = SematextMetricsSvc::new(self.clone(), write_uri(&host)?, cx, client)?;
+        let healthcheck = healthcheck(endpoint.clone(), client.clone()).boxed();
+        let sink = SematextMetricsSvc::new(self.clone(), write_uri(&endpoint)?, cx, client)?;
 
         Ok((sink, healthcheck))
     }
@@ -110,7 +110,7 @@ fn write_uri(endpoint: &str) -> crate::Result<Uri> {
 impl SematextMetricsSvc {
     pub fn new(
         config: SematextMetricsConfig,
-        host: http::Uri,
+        endpoint: http::Uri,
         cx: SinkContext,
         client: HttpClient,
     ) -> crate::Result<VectorSink> {
@@ -119,7 +119,7 @@ impl SematextMetricsSvc {
             .timeout(1)
             .parse_config(config.batch)?;
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
-        let http_service = HttpBatchService::new(client, create_build_request(host));
+        let http_service = HttpBatchService::new(client, create_build_request(endpoint));
         let sematext_service = SematextMetricsSvc {
             config,
             inner: http_service,
@@ -323,10 +323,10 @@ mod tests {
         let _ = config.build(cx.clone()).unwrap();
 
         let addr = test_util::next_addr();
-        // Swap out the host so we can force send it
+        // Swap out the endpoint so we can force send it
         // to our local server
-        let host = format!("http://{}", addr);
-        config.host = Some(host.clone());
+        let endpoint = format!("http://{}", addr);
+        config.endpoint = Some(endpoint.clone());
         config.region = None;
 
         let (sink, _) = config.build(cx).unwrap();
