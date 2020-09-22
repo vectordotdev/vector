@@ -147,13 +147,4 @@ mod test {
             assert_eq!(event, expected);
         });
     }
-
-    #[test]
-    #[should_panic]
-    fn from_lua_missing_log_and_metric() {
-        let lua_event = r#"{
-            some_field: {}
-        }"#;
-        Lua::new().context(|ctx| ctx.load(lua_event).eval::<Event>().unwrap());
-    }
 }
