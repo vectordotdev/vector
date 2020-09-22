@@ -9,12 +9,13 @@ use crate::{
         BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
     },
     sinks::{Healthcheck, HealthcheckError, VectorSink},
-    vector_version,
+    vector_version, Result,
 };
 use futures::future::{ready, BoxFuture};
 use futures::FutureExt;
 use futures01::Sink;
 use http::{StatusCode, Uri};
+use hyper::{Body, Request};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
@@ -22,9 +23,9 @@ use std::task::Poll;
 use tower::Service;
 
 #[derive(Clone)]
-struct SematextMetricsSvc {
+struct SematextMetricsService {
     config: SematextMetricsConfig,
-    inner: HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>>,
+    inner: HttpBatchService<BoxFuture<'static, Result<Request<Vec<u8>>>>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -42,10 +43,12 @@ inventory::submit! {
     SinkDescription::new_without_default::<SematextMetricsConfig>("sematext_metrics")
 }
 
-async fn healthcheck(endpoint: String, mut client: HttpClient) -> crate::Result<()> {
+async fn healthcheck(endpoint: String, mut client: HttpClient) -> Result<()> {
     let uri = format!("{}/health", endpoint);
 
-    let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
+    let request = Request::get(uri)
+        .body(Body::empty())
+        .map_err(|e| e.to_string())?;
 
     let response = client.send(request).await?;
 
@@ -56,15 +59,18 @@ async fn healthcheck(endpoint: String, mut client: HttpClient) -> crate::Result<
     }
 }
 
+const ENDPOINT: &str = "https://spm-receiver.sematext.com";
+const EU_ENDPOINT: &str = "https://spm-receiver.eu.sematext.com";
+
 #[typetag::serde(name = "sematext_metrics")]
 impl SinkConfig for SematextMetricsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = HttpClient::new(cx.resolver(), None)?;
 
         let endpoint = match (&self.endpoint, &self.region) {
             (Some(endpoint), None) => endpoint.clone(),
-            (None, Some(Region::Na)) => "https://spm-receiver.sematext.com".to_owned(),
-            (None, Some(Region::Eu)) => "https://spm-receiver.eu.sematext.com".to_owned(),
+            (None, Some(Region::Na)) => ENDPOINT.to_owned(),
+            (None, Some(Region::Eu)) => EU_ENDPOINT.to_owned(),
             (None, None) => {
                 return Err("Either `region` or `endpoint` must be set.".into());
             }
@@ -74,7 +80,7 @@ impl SinkConfig for SematextMetricsConfig {
         };
 
         let healthcheck = healthcheck(endpoint.clone(), client.clone()).boxed();
-        let sink = SematextMetricsSvc::new(self.clone(), write_uri(&endpoint)?, cx, client)?;
+        let sink = SematextMetricsService::new(self.clone(), write_uri(&endpoint)?, cx, client)?;
 
         Ok((sink, healthcheck))
     }
@@ -95,7 +101,7 @@ lazy_static! {
     };
 }
 
-fn write_uri(endpoint: &str) -> crate::Result<Uri> {
+fn write_uri(endpoint: &str) -> Result<Uri> {
     encode_uri(
         &endpoint,
         "write",
@@ -107,20 +113,20 @@ fn write_uri(endpoint: &str) -> crate::Result<Uri> {
     )
 }
 
-impl SematextMetricsSvc {
+impl SematextMetricsService {
     pub fn new(
         config: SematextMetricsConfig,
         endpoint: http::Uri,
         cx: SinkContext,
         client: HttpClient,
-    ) -> crate::Result<VectorSink> {
+    ) -> Result<VectorSink> {
         let batch = BatchSettings::default()
             .events(20)
             .timeout(1)
             .parse_config(config.batch)?;
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let http_service = HttpBatchService::new(client, create_build_request(endpoint));
-        let sematext_service = SematextMetricsSvc {
+        let sematext_service = SematextMetricsService {
             config,
             inner: http_service,
         };
@@ -139,12 +145,15 @@ impl SematextMetricsSvc {
     }
 }
 
-impl Service<Vec<Metric>> for SematextMetricsSvc {
+impl Service<Vec<Metric>> for SematextMetricsService {
     type Response = http::Response<bytes::Bytes>;
     type Error = crate::Error;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+    type Future = BoxFuture<'static, std::result::Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, cx: &mut std::task::Context) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(
+        &mut self,
+        cx: &mut std::task::Context,
+    ) -> Poll<std::result::Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
     }
 
@@ -158,11 +167,10 @@ impl Service<Vec<Metric>> for SematextMetricsSvc {
 
 fn create_build_request(
     uri: http::Uri,
-) -> impl Fn(Vec<u8>) -> BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>> + Sync + Send + 'static
-{
+) -> impl Fn(Vec<u8>) -> BoxFuture<'static, Result<Request<Vec<u8>>>> + Sync + Send + 'static {
     move |body| {
         Box::pin(ready(
-            hyper::Request::post(uri.clone())
+            Request::post(uri.clone())
                 .header("Content-Type", "text/plain")
                 .body(body)
                 .map_err(Into::into),
@@ -173,7 +181,7 @@ fn create_build_request(
 /// Sematext takes the first part of the name as the namespace for the event.
 /// The rest of the name is the value label.
 /// If the name is not a '.' separated string, it will take the whole name as the
-/// namespace, and set label the value as 'value'.
+/// namespace, and set the label value to 'value'.
 /// This probably should not happen if you want meaningful metrics in Sematext.
 fn split_event_name(name: &str) -> (String, String) {
     match name.find('.') {
@@ -185,48 +193,35 @@ fn split_event_name(name: &str) -> (String, String) {
 fn encode_events(token: &str, events: Vec<Metric>) -> String {
     let mut output = String::new();
     for event in events.into_iter() {
-        let fullname = event.name;
-        let (namespace, label) = split_event_name(&fullname);
+        let (namespace, label) = split_event_name(&event.name);
         let ts = encode_timestamp(event.timestamp);
 
         // Authentication in Sematext is by inserting the token as a tag.
         let mut tags = event.tags.clone().unwrap_or_else(BTreeMap::new);
         tags.insert("token".into(), token.into());
 
-        match event.value {
-            MetricValue::Counter { value } => {
-                let fields = to_fields(label, value);
-
-                influx_line_protocol(
-                    ProtocolVersion::V1,
-                    namespace,
-                    "counter",
-                    Some(tags),
-                    Some(fields),
-                    ts,
-                    &mut output,
-                );
-            }
-            MetricValue::Gauge { value } => {
-                let fields = to_fields(label, value);
-
-                influx_line_protocol(
-                    ProtocolVersion::V1,
-                    namespace,
-                    "gauge",
-                    Some(tags),
-                    Some(fields),
-                    ts,
-                    &mut output,
-                );
-            }
+        let (metric_type, fields) = match event.value {
+            MetricValue::Counter { value } => ("counter", to_fields(label, value)),
+            MetricValue::Gauge { value } => ("gauge", to_fields(label, value)),
             _ => {
                 emit!(SematextMetricsInvalidMetricReceived {
                     value: event.value,
                     kind: event.kind,
                 });
+
+                continue;
             }
-        }
+        };
+
+        influx_line_protocol(
+            ProtocolVersion::V1,
+            namespace,
+            metric_type,
+            Some(tags),
+            Some(fields),
+            ts,
+            &mut output,
+        );
     }
 
     output.pop();
