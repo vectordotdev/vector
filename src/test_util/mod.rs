@@ -338,18 +338,6 @@ mod tests {
 
         retry_until(func, Duration::from_millis(10), Duration::from_secs(1)).await;
     }
-
-    #[tokio::test]
-    #[should_panic]
-    async fn retry_until_after_timeout() {
-        let count: Arc<RwLock<i32>> = Arc::new(RwLock::new(0));
-        let func = || {
-            let count = Arc::clone(&count);
-            retry_until_helper(count)
-        };
-
-        retry_until(func, Duration::from_millis(50), Duration::from_millis(100)).await;
-    }
 }
 
 pub struct CountReceiver<T> {
