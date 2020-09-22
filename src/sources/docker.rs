@@ -117,7 +117,7 @@ inventory::submit! {
 
 impl GenerateConfig for DockerConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(&DockerConfig::default()).unwrap()
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -1000,11 +1000,10 @@ fn line_agg_adapter(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::test_generate_config;
 
     #[test]
     fn generate_config() {
-        test_generate_config::<DockerConfig>();
+        crate::test_util::test_generate_config::<DockerConfig>();
     }
 }
 

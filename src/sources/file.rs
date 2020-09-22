@@ -142,7 +142,7 @@ inventory::submit! {
 
 impl GenerateConfig for FileConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(&FileConfig::default()).unwrap()
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 

@@ -45,7 +45,7 @@ inventory::submit! {
 
 impl GenerateConfig for GeneratorConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -122,6 +122,11 @@ mod tests {
     use futures::compat::Future01CompatExt;
     use futures01::{stream::Stream, sync::mpsc, Async::*};
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<GeneratorConfig>();
+    }
 
     async fn runit(config: &str) -> mpsc::Receiver<Event> {
         let (tx, rx) = Pipeline::new_test();
