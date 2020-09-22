@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GenerateConfig, GlobalOptions, SinkDescription},
+    config::{self, GenerateConfig, GlobalOptions, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
         ApacheMetricsErrorResponse, ApacheMetricsEventReceived, ApacheMetricsHttpError,
@@ -43,7 +43,7 @@ pub fn default_namespace() -> String {
 }
 
 inventory::submit! {
-    SinkDescription::new::<ApacheMetricsConfig>("apache_metrics")
+    SourceDescription::new::<ApacheMetricsConfig>("apache_metrics")
 }
 
 impl GenerateConfig for ApacheMetricsConfig {
