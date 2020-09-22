@@ -98,7 +98,7 @@ inventory::submit! {
 
 impl GenerateConfig for StackdriverConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -286,6 +286,11 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use serde_json::value::RawValue;
     use std::iter::FromIterator;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<StackdriverConfig>();
+    }
 
     #[test]
     fn encode_valid() {
