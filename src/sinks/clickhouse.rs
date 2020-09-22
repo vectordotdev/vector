@@ -53,7 +53,7 @@ inventory::submit! {
 
 impl GenerateConfig for ClickhouseConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -222,6 +222,11 @@ impl RetryLogic for ClickhouseRetryLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ClickhouseConfig>();
+    }
 
     #[test]
     fn encode_valid() {
