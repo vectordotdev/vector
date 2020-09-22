@@ -135,7 +135,7 @@ impl SubscriptionClient {
         let (mut ws_tx, mut ws_rx) = futures::StreamExt::split(ws);
 
         // Create a multi producer channel for sending messages back upstream
-        let (tx, mut rx) = broadcast::channel::<Payload>(1);
+        let (tx, mut rx) = broadcast::channel::<Payload>(100);
 
         // Spawn a handler for receiving payloads back from the client.
         let spawned_subscriptions = Arc::clone(&subscriptions);
@@ -182,7 +182,7 @@ impl SubscriptionClient {
 
     /// Start a new subscription request
     pub async fn start<T: GraphQLQuery>(
-        &mut self,
+        &self,
         request_body: &graphql_client::QueryBody<T::Variables>,
     ) -> Result<Box<Arc<dyn Receiver<T>>>, Error> {
         // Generate a unique ID for the subscription. Subscriptions can be multiplexed
@@ -194,12 +194,14 @@ impl SubscriptionClient {
         // tx channel to send payloads back upstream
         let subscription = Arc::new(Subscription::new(id, self.tx.clone()));
 
-        // Store the subscription in the WeakValueHashMap. This is converted internally into
-        // a weak reference, to prevent dropped subscriptions lingering in memory
-        self.subscriptions
-            .write()
-            .unwrap()
-            .insert(id, Arc::clone(&subscription));
+        {
+            // Store the subscription in the WeakValueHashMap. This is converted internally into
+            // a weak reference, to prevent dropped subscriptions lingering in memory
+            self.subscriptions
+                .write()
+                .unwrap()
+                .insert(id, Arc::clone(&subscription));
+        }
 
         // Start the subscription by sending a { type: "start" } payload upstream
         let _ = self.tx.send(Payload::start::<T>(id, request_body));

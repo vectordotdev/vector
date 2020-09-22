@@ -61,6 +61,9 @@ mod tests {
     fn init_metrics() {
         METRIC_INIT.call_once(|| {
             let _ = vector::metrics::init();
+
+            // Spawn the internal 'heartbeat' event, which triggers uptime
+            tokio::spawn(heartbeat::heartbeat());
         })
     }
 
@@ -146,63 +149,13 @@ mod tests {
         shutdown_tx
     }
 
-    #[tokio::test]
-    async fn api_health() {
-        let res = url_test(api_enabled_config(), "health")
-            .await
-            .text()
-            .await
-            .unwrap();
-
-        assert!(res.contains("ok"));
-    }
-
-    #[tokio::test]
-    async fn api_playground_enabled() {
-        let mut config = api_enabled_config();
-        config.api.playground = true;
-
-        let res = url_test(config, "playground").await.status();
-
-        assert!(res.is_success());
-    }
-
-    #[tokio::test]
-    async fn api_playground_disabled() {
-        let mut config = api_enabled_config();
-        config.api.playground = false;
-
-        let res = url_test(config, "playground").await.status();
-
-        assert!(res.is_client_error());
-    }
-
-    #[tokio::test]
-    async fn api_graphql_health() {
-        let request_body = HealthQuery::build_query(health_query::Variables);
-        let res = query::<HealthQuery>(&request_body).await;
-
-        assert_matches!(
-            res,
-            graphql_client::Response {
-                data: Some(health_query::ResponseData { health: true }),
-                errors: None,
-            }
-        );
-    }
-
-    #[tokio::test]
-    async fn api_graphql_heartbeat() {
-        let config = api_enabled_config();
-        let _server = api::Server::start(config.api);
-        let bind = config.api.bind.unwrap();
-        let interval: i64 = 500;
-        let num_results = 3;
-
+    async fn new_heartbeat_subscription(
+        client: &SubscriptionClient,
+        num_results: usize,
+        interval: i64,
+    ) {
         let request_body =
             HeartbeatSubscription::build_query(heartbeat_subscription::Variables { interval });
-
-        let mut client = new_subscription_client(bind).await;
 
         let subscription = client
             .start::<HeartbeatSubscription>(&request_body)
@@ -236,25 +189,11 @@ mod tests {
         assert_matches!(heartbeats.next().await, None);
     }
 
-    #[tokio::test]
-    async fn api_graphql_uptime_metrics() {
-        let config = api_enabled_config();
-        let _server = api::Server::start(config.api);
-        let bind = config.api.bind.unwrap();
-        let num_results = 3;
-
-        // Initialize the metrics system
-        init_metrics();
-
-        // Spawn the internal 'heartbeat' event, which triggers uptime
-        tokio::spawn(heartbeat::heartbeat());
-
+    async fn new_uptime_subscription(client: &SubscriptionClient, num_results: usize) {
         // Defaults to a 1 second interval, which we'll leave as-is since uptimeMetrics.seconds
         // isn't any more granular
         let request_body =
             UptimeMetricsSubscription::build_query(uptime_metrics_subscription::Variables {});
-
-        let mut client = new_subscription_client(bind).await;
 
         let subscription = client
             .start::<UptimeMetricsSubscription>(&request_body)
@@ -282,17 +221,11 @@ mod tests {
         )
     }
 
-    #[tokio::test]
-    async fn api_graphql_event_processed_metrics() {
-        let config = api_enabled_config();
-        let _server = api::Server::start(config.api);
-        let bind = config.api.bind.unwrap();
-        let num_results = 3;
-        let interval: i64 = 100;
-
-        // Initialize the metrics system
-        init_metrics();
-
+    async fn new_events_processed_subscription(
+        client: &SubscriptionClient,
+        num_results: usize,
+        interval: i64,
+    ) {
         // Emit events for the duration of the test
         let _shutdown = emit_fake_generator_events();
 
@@ -301,8 +234,6 @@ mod tests {
         let request_body = EventsProcessedMetricsSubscription::build_query(
             events_processed_metrics_subscription::Variables { interval },
         );
-
-        let mut client = new_subscription_client(bind).await;
 
         let subscription = client
             .start::<EventsProcessedMetricsSubscription>(&request_body)
@@ -329,5 +260,107 @@ mod tests {
             assert!(ep > last_result);
             last_result = ep
         }
+    }
+
+    #[tokio::test]
+    /// Tests the /health endpoint returns a 200 responses (non-GraphQL)
+    async fn api_health() {
+        let res = url_test(api_enabled_config(), "health")
+            .await
+            .text()
+            .await
+            .unwrap();
+
+        assert!(res.contains("ok"));
+    }
+
+    #[tokio::test]
+    /// Tests that the API playground is enabled when playground = true (implicit)
+    async fn api_playground_enabled() {
+        let mut config = api_enabled_config();
+        config.api.playground = true;
+
+        let res = url_test(config, "playground").await.status();
+
+        assert!(res.is_success());
+    }
+
+    #[tokio::test]
+    /// Tests that the /playground URL is inaccessible if it's been explicitly disabled
+    async fn api_playground_disabled() {
+        let mut config = api_enabled_config();
+        config.api.playground = false;
+
+        let res = url_test(config, "playground").await.status();
+
+        assert!(res.is_client_error());
+    }
+
+    #[tokio::test]
+    /// Tests the health query
+    async fn api_graphql_health() {
+        let request_body = HealthQuery::build_query(health_query::Variables);
+        let res = query::<HealthQuery>(&request_body).await;
+
+        assert_matches!(
+            res,
+            graphql_client::Response {
+                data: Some(health_query::ResponseData { health: true }),
+                errors: None,
+            }
+        );
+    }
+
+    #[tokio::test]
+    /// Tests that the heartbeat subscription returns a UTC payload every 1/2 second
+    async fn api_graphql_heartbeat() {
+        let config = api_enabled_config();
+        let _server = api::Server::start(config.api);
+        let bind = config.api.bind.unwrap();
+        let client = new_subscription_client(bind).await;
+
+        new_heartbeat_subscription(&client, 3, 500).await;
+    }
+
+    #[tokio::test]
+    /// Tests for Vector instance uptime in seconds
+    async fn api_graphql_uptime_metrics() {
+        let config = api_enabled_config();
+        let _server = api::Server::start(config.api);
+        let bind = config.api.bind.unwrap();
+        let client = new_subscription_client(bind).await;
+
+        init_metrics();
+
+        new_uptime_subscription(&client, 3).await;
+    }
+
+    #[tokio::test]
+    /// Tests for events processed metrics, using fake generator events
+    async fn api_graphql_event_processed_metrics() {
+        let config = api_enabled_config();
+        let _server = api::Server::start(config.api);
+        let bind = config.api.bind.unwrap();
+        let client = new_subscription_client(bind).await;
+
+        init_metrics();
+
+        new_events_processed_subscription(&client, 3, 100).await;
+    }
+
+    #[tokio::test]
+    /// Tests whether 2 disparate subscriptions can run against a single client
+    async fn api_graphql_combined_heartbeat_uptime() {
+        let config = api_enabled_config();
+        let _server = api::Server::start(config.api);
+        let bind = config.api.bind.unwrap();
+        let client = new_subscription_client(bind).await;
+
+        init_metrics();
+
+        futures::join! {
+            new_uptime_subscription(&client, 3),
+            new_heartbeat_subscription(&client, 3, 500),
+        };
     }
 }
