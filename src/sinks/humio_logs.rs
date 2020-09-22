@@ -41,7 +41,7 @@ inventory::submit! {
 
 impl GenerateConfig for HumioLogsConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -103,6 +103,11 @@ mod tests {
     use crate::sinks::util::{http::HttpSink, test::load_sink};
     use chrono::Utc;
     use serde::Deserialize;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<HumioLogsConfig>();
+    }
 
     #[derive(Deserialize, Debug)]
     struct HecEventJson {
