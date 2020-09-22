@@ -46,17 +46,24 @@ dot_path = ${ ("." ~ (path_segment | quoted_path_segment | path_coalesce))+ }
 
 ident = @{ ASCII_ALPHANUMERIC ~ ( ASCII_ALPHANUMERIC | "_" )* }
 
-function = ${ ident ~ "(" ~ inner_function? ~ ")"  }
+// Functions
+
+function_signature = ${ function ~ "(" ~ inner_function? ~ ")"  }
+
+// for better error reports
+function = @{ ident }
 
 inner_function = !{ argument_list }
 
-argument_list = _{ argument_item ~ ("," ~ argument_item)* }
+argument_list = _{ argument ~ ("," ~ argument)* }
 
-argument_item = _{ positional_item | keyword_item }
+argument = { positional_item | keyword_item }
 
 positional_item = { query_arithmetic }
 
 keyword_item = { ident ~ "=" ~ query_arithmetic }
+
+// end: Functions
 
 group = { "(" ~ query_arithmetic ~ ")" }
 
@@ -86,7 +93,7 @@ number = @{
 
 not_operator = { "!" ~ query_leaf }
 
-query_leaf = _{ not_operator | value | dot_path | group | function }
+query_leaf = _{ not_operator | value | dot_path | group | function_signature }
 
 // Arithmetic, broken down into tiers in order to support operator precedence.
 // Operators of the same tier are resolved from left to right.

@@ -225,6 +225,7 @@ fn function_arguments_from_pairs(
     let mut index = 0;
 
     pairs
+        .map(|pair| pair.into_inner().next().unwrap())
         .map(|pair| match pair.as_rule() {
             Rule::positional_item => {
                 index += 1;
@@ -384,7 +385,7 @@ fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
         }
         Rule::dot_path => Box::new(QueryPath::from(path_segments_from_pair(pair)?)),
         Rule::group => query_arithmetic_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?,
-        Rule::function => function_from_pairs(pair.into_inner())?,
+        Rule::function_signature => function_from_pairs(pair.into_inner())?,
         _ => unexpected_parser_sytax!(pair),
     })
 }
@@ -521,7 +522,7 @@ mod tests {
             ),
             (
                 ".foo = !",
-                vec![" 1:9\n", "= expected dot_path, ident, group, boolean, null, string, number, or not_operator"],
+                vec![" 1:9\n", "= expected dot_path, function, group, boolean, null, string, number, or not_operator"],
             ),
             (
                 "foo = \"bar\"",
@@ -573,7 +574,7 @@ mod tests {
             ),
             (
                 ".foo = to_string(\"bar\",)",
-                vec![" 1:24\n", "= expected ident or query"],
+                vec![" 1:24\n", "= expected argument"],
             ),
             (
                 // Due to the explicit list of allowed escape chars our grammar
