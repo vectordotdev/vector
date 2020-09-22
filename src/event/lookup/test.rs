@@ -1,4 +1,5 @@
 use super::*;
+use std::{fs, io::Read, path::Path};
 
 const SUFFICIENTLY_COMPLEX: &str =
     r#"regular."quoted"."quoted but spaces"."quoted.but.periods".lookup[0].nested_lookup[0][0]"#;
@@ -103,4 +104,44 @@ fn into_iter() {
         ));
         assert_eq!(expected, parsed, "Failed at {}", index);
     }
+}
+
+fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<String> {
+    let mut test_file = match fs::File::open(path) {
+        Ok(file) => file,
+        Err(e) => return Err(e),
+    };
+
+    let mut buf = Vec::new();
+    test_file.read_to_end(&mut buf)?;
+    let string = String::from_utf8(buf).unwrap();
+    Ok(string)
+}
+
+// This test iterates over the `tests/data/fixtures/lookup` folder and ensures the lookup parsed,
+// then turned into a string again is the same.
+#[test]
+fn lookup_to_string() {
+    crate::test_util::trace_init();
+    const FIXTURE_ROOT: &str = "tests/data/fixtures/lookup";
+
+    trace!(?FIXTURE_ROOT, "Opening.");
+    std::fs::read_dir(FIXTURE_ROOT)
+        .unwrap()
+        .for_each(|fixture_file| match fixture_file {
+            Ok(fixture_file) => {
+                let path = fixture_file.path();
+                tracing::trace!(?path, "Opening.");
+                let buf = parse_artifact(&path).unwrap();
+                let lookup = Lookup::try_from(buf.clone()).unwrap();
+                tracing::trace!(
+                        ?path,
+                        ?lookup,
+                        ?buf,
+                        "Asserting equal."
+                    );
+                assert_eq!(lookup.to_string(), buf);
+            }
+            _ => panic!("This test should never read Err'ing test fixtures."),
+        });
 }
