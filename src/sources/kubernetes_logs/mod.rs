@@ -70,7 +70,7 @@ inventory::submit! {
 
 impl GenerateConfig for Config {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -309,4 +309,12 @@ fn create_event(line: Bytes, file: &str) -> Event {
 /// as it should be at the generated config file.
 fn default_self_node_name_env_template() -> String {
     format!("${{{}}}", SELF_NODE_NAME_ENV_KEY.to_owned())
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::Config>();
+    }
 }
