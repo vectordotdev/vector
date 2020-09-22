@@ -57,7 +57,7 @@ inventory::submit! {
 
 impl GenerateConfig for CloudWatchMetricsSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -273,6 +273,11 @@ mod tests {
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
     use rusoto_cloudwatch::PutMetricDataInput;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<CloudWatchMetricsSinkConfig>();
+    }
 
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
