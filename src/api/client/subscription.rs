@@ -148,7 +148,7 @@ impl SubscriptionClient {
                     // the client goes out of scope
                     _ = &mut shutdown_rx => break,
 
-                    // Handle received payloads back from the server
+                    // Handle received payloads back _from_ the server
                     res = &mut ws_rx.next() => {
                         // Attempt to both deserialize the payload, and obtain a subscription
                         // with a matching ID. Rust cannot infer the Arc type, so being explicit here
@@ -160,11 +160,14 @@ impl SubscriptionClient {
                                     .and_then(|t| serde_json::from_str::<Payload>(t).ok())
                             }).map(|p| (spawned_subscriptions.read().unwrap().get::<Uuid>(&p.id), p));
 
+                        // If we have a payload and a valid Subscription that matches the returned
+                        // id, send the payload into the subscription to be picked up by its .stream()
                         if let Some((Some(s), p)) = sp {
                             let _ = s.transmit(p);
                         }
                     },
 
+                    // Handle payloads to be sent _to_ the GraphQL server
                     payload = &mut rx.next() => {
                         if let Some(p) = payload.and_then(|p| p.ok()) {
                             let _ = ws_tx.send(Message::Text(serde_json::to_string(&p).unwrap())).await;
@@ -196,14 +199,12 @@ impl SubscriptionClient {
         // tx channel to send payloads back upstream
         let subscription = Arc::new(Subscription::new(id, self.tx.clone()));
 
-        {
-            // Store the subscription in the WeakValueHashMap. This is converted internally into
-            // a weak reference, to prevent dropped subscriptions lingering in memory
-            self.subscriptions
-                .write()
-                .unwrap()
-                .insert(id, Arc::clone(&subscription));
-        }
+        // Store the subscription in the WeakValueHashMap. This is converted internally into
+        // a weak reference, to prevent dropped subscriptions lingering in memory
+        self.subscriptions
+            .write()
+            .unwrap()
+            .insert(id, Arc::clone(&subscription));
 
         // Start the subscription by sending a { type: "start" } payload upstream
         let _ = self.tx.send(Payload::start::<T>(id, request_body));
