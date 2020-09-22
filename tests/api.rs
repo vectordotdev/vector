@@ -10,10 +10,14 @@ mod tests {
     use chrono::Utc;
     use futures::StreamExt;
     use graphql_client::*;
+    use std::sync::Once;
     use std::time::Duration;
-    use vector::api;
+    use vector::api::client::subscription::SubscriptionClient;
     use vector::config::Config;
     use vector::test_util::{next_addr, retry_until};
+    use vector::{api, heartbeat};
+
+    static METRIC_INIT: Once = Once::new();
 
     #[derive(GraphQLQuery)]
     #[graphql(
@@ -32,6 +36,21 @@ mod tests {
         response_derives = "Debug"
     )]
     struct HeartbeatSubscription;
+
+    #[derive(GraphQLQuery)]
+    #[graphql(
+        schema_path = "graphql/schema.json",
+        query_path = "graphql/subscriptions/uptime_metrics.graphql",
+        response_derives = "Debug"
+    )]
+    struct UptimeMetricsSubscription;
+
+    // Initialize the metrics system. Idempotent.
+    fn init_metrics() {
+        METRIC_INIT.call_once(|| {
+            let _ = vector::metrics::init();
+        })
+    }
 
     // Provides a config that enables the API server, assigned to a random port. Implicitly
     // tests that the config shape matches expectations
@@ -83,6 +102,17 @@ mod tests {
         .json()
         .await
         .unwrap()
+    }
+
+    // Creates and returns a new subscription client. Connection is re-attempted until
+    // the specified timeout
+    async fn new_subscription_client(bind: std::net::SocketAddr) -> SubscriptionClient {
+        retry_until(
+            || api::make_subscription_client(bind),
+            Duration::from_millis(50),
+            Duration::from_secs(10),
+        )
+        .await
     }
 
     #[tokio::test]
@@ -141,12 +171,7 @@ mod tests {
         let request_body =
             HeartbeatSubscription::build_query(heartbeat_subscription::Variables { interval });
 
-        let mut client = retry_until(
-            || api::make_subscription_client(bind),
-            Duration::from_millis(50),
-            Duration::from_secs(10),
-        )
-        .await;
+        let mut client = new_subscription_client(bind).await;
 
         let subscription = client
             .start::<HeartbeatSubscription>(&request_body)
@@ -178,5 +203,51 @@ mod tests {
 
         // Stream should have stopped after `num_results`
         assert_matches!(heartbeats.next().await, None);
+    }
+
+    #[tokio::test]
+    async fn api_graphql_uptime_metrics() {
+        let config = api_enabled_config();
+        let _server = api::Server::start(config.api);
+        let bind = config.api.bind.unwrap();
+        let num_results = 3;
+
+        // Initialize the metrics system
+        init_metrics();
+
+        // Spawn the internal 'heartbeat' event, which triggers uptime
+        tokio::spawn(heartbeat::heartbeat());
+
+        // Defaults to a 1 second interval, which we'll leave as-is since uptimeMetrics.seconds
+        // isn't any more granular
+        let request_body =
+            UptimeMetricsSubscription::build_query(uptime_metrics_subscription::Variables {});
+
+        let mut client = new_subscription_client(bind).await;
+
+        let subscription = client
+            .start::<UptimeMetricsSubscription>(&request_body)
+            .await
+            .unwrap();
+
+        tokio::pin! {
+            let uptime = subscription.stream().skip(num_results);
+        }
+
+        // Uptime should be at least the number of seconds as the results - 1, to account
+        // for the initial uptime
+        assert!(
+            uptime
+                .take(1)
+                .next()
+                .await
+                .unwrap()
+                .unwrap()
+                .data
+                .unwrap()
+                .uptime_metrics
+                .seconds
+                > num_results as f64 - 1.0
+        )
     }
 }
