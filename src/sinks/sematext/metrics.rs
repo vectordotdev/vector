@@ -2,7 +2,7 @@ use super::Region;
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricValue},
-    internal_events::SematextMetricsInvalidMetric,
+    internal_events::SematextMetricsInvalidMetricReceived,
     sinks::influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
     sinks::util::{
         http::{HttpBatchService, HttpClient, HttpRetryLogic},
@@ -221,7 +221,7 @@ fn encode_events(token: &str, events: Vec<Metric>) -> String {
                 );
             }
             _ => {
-                emit!(SematextMetricsInvalidMetric {
+                emit!(SematextMetricsInvalidMetricReceived {
                     value: event.value,
                     kind: event.kind,
                 });

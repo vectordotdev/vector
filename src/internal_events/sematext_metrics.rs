@@ -3,15 +3,15 @@ use crate::event::metric::{MetricKind, MetricValue};
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct SematextMetricsInvalidMetric {
+pub struct SematextMetricsInvalidMetricReceived {
     pub value: MetricValue,
     pub kind: MetricKind,
 }
 
-impl InternalEvent for SematextMetricsInvalidMetric {
+impl InternalEvent for SematextMetricsInvalidMetricReceived {
     fn emit_logs(&self) {
         warn!(
-            message = "Invalid metric sent; dropping event.",
+            message = "Invalid metric received; dropping event.",
             value = ?self.value,
             kind = ?self.kind,
             rate_limit_secs = 30,
