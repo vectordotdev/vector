@@ -62,7 +62,7 @@ inventory::submit! {
 
 impl GenerateConfig for PubsubConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -204,6 +204,11 @@ async fn healthcheck(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<PubsubConfig>();
+    }
 
     #[tokio::test]
     async fn fails_missing_creds() {
