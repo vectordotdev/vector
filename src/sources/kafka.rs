@@ -80,7 +80,7 @@ inventory::submit! {
 
 impl GenerateConfig for KafkaSourceConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -230,6 +230,11 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer> 
 mod test {
     use super::{kafka_source, KafkaSourceConfig};
     use crate::{shutdown::ShutdownSignal, Pipeline};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<KafkaSourceConfig>();
+    }
 
     fn make_config() -> KafkaSourceConfig {
         KafkaSourceConfig {
