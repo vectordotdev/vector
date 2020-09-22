@@ -8,12 +8,6 @@ pub mod arithmetic;
 pub mod functions;
 pub mod path;
 
-// #[derive(Debug)]
-// pub(in crate::mapping) struct FunctionSignature<'a> {
-//     pub name: &'a str,
-//     pub parameters: &'a [Parameter],
-// }
-
 /// A parameter definition accepted by a function.
 #[derive(Debug, Clone)]
 pub(in crate::mapping) struct Parameter {
