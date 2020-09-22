@@ -146,7 +146,7 @@ jobs:
       - uses: actions/checkout@v1
       - env:
           RUSTFLAGS: "-D warnings"
-        run: cargo test --no-default-features --features default-msvc
+        run: cargo test --no-fail-fast --no-default-features --features default-msvc
 
   test-misc:
     name: Shutdown - Linux

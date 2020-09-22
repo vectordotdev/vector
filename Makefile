@@ -251,7 +251,7 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
 
 .PHONY: test-all
 test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.
@@ -326,7 +326,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-aws
 	sleep 5 # Many services are very slow... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features aws-integration-tests --lib ::aws_ -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features aws-integration-tests --lib ::aws_ -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-aws
 endif
@@ -358,14 +358,14 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-clickhouse
 	sleep 5 # Many services are very slow... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features clickhouse-integration-tests --lib ::clickhouse:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features clickhouse-integration-tests --lib ::clickhouse:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-clickhouse
 endif
 
 .PHONY: test-integration-docker
 test-integration-docker: ## Runs Docker integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features docker-integration-tests --lib ::docker:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features docker-integration-tests --lib ::docker:: -- --nocapture
 
 .PHONY: start-integration-elasticsearch
 start-integration-elasticsearch:
@@ -412,7 +412,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-elasticsearch
 	sleep 60 # Many services are very slow... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features es-integration-tests --lib ::elasticsearch:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features es-integration-tests --lib ::elasticsearch:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-elasticsearch
 endif
@@ -446,7 +446,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-gcp
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features "gcp-integration-tests gcp-pubsub-integration-tests gcp-cloud-storage-integration-tests" \
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "gcp-integration-tests gcp-pubsub-integration-tests gcp-cloud-storage-integration-tests" \
 	 --lib ::gcp:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-gcp
@@ -479,7 +479,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-humio
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features humio-integration-tests --lib ::humio:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features humio-integration-tests --lib ::humio:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-humio
 endif
@@ -517,7 +517,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-influxdb
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features influxdb-integration-tests --lib ::influxdb::integration_tests:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features influxdb-integration-tests --lib ::influxdb::integration_tests:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-influxdb
 endif
@@ -569,7 +569,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-kafka
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features "kafka-integration-tests rdkafka-plain" --lib ::kafka:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "kafka-integration-tests rdkafka-plain" --lib ::kafka:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-kafka
 endif
@@ -603,7 +603,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-loki
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features loki-integration-tests --lib ::loki:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features loki-integration-tests --lib ::loki:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-loki
 endif
@@ -637,7 +637,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-pulsar
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features pulsar-integration-tests --lib ::pulsar:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features pulsar-integration-tests --lib ::pulsar:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-pulsar
 endif
@@ -672,7 +672,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-splunk
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features splunk-integration-tests --lib ::splunk_hec:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features splunk-integration-tests --lib ::splunk_hec:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-splunk
 endif
@@ -688,14 +688,14 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-kafka
 	sleep 30 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features shutdown-tests --test shutdown -- --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features shutdown-tests --test shutdown -- --test-threads 4
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-kafka
 endif
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --test cli -- --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --test cli -- --test-threads 4
 
 .PHONY: build-wasm-tests
 test-wasm-build-modules: $(WASM_MODULE_OUTPUTS) ### Build all WASM test modules
@@ -714,7 +714,7 @@ $(WASM_MODULE_OUTPUTS): ### Build a specific WASM module
 test-wasm: export TEST_THREADS=1
 test-wasm: export TEST_LOG=vector=trace
 test-wasm: $(WASM_MODULE_OUTPUTS)  ### Run engine tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test wasm --no-default-features --features "wasm" --lib -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test wasm --no-fail-fast --no-default-features --features "wasm" --lib -- --nocapture
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
