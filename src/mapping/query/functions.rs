@@ -7,6 +7,7 @@ use crate::{
     types::Conversion,
 };
 use bytes::Bytes;
+use chrono::{TimeZone, Utc};
 use std::convert::TryFrom;
 use std::str::FromStr;
 
@@ -124,9 +125,6 @@ pub(in crate::mapping) struct ToStringFn {
 impl ToStringFn {
     #[cfg(test)]
     pub(in crate::mapping) fn new(query: Box<dyn Function>, default: Option<Value>) -> Self {
-        dbg!(&query);
-        dbg!(&default);
-
         Self {
             query,
             default: default.map(|v| Box::new(Literal::from(v)) as _),
@@ -170,9 +168,6 @@ impl TryFrom<ArgumentList> for ToStringFn {
     fn try_from(mut arguments: ArgumentList) -> Result<Self> {
         let query = arguments.required("value")?;
         let default = arguments.optional("default");
-
-        dbg!(&query);
-        dbg!(&default);
 
         Ok(Self { query, default })
     }
@@ -430,7 +425,8 @@ impl Function for ToTimestampFn {
                 self.default
                     .as_ref()
                     .ok_or(err)
-                    .and_then(|v| v.execute(ctx).and_then(to_timestamp))
+                    .and_then(|v| v.execute(ctx))
+                    .and_then(to_timestamp)
             })
     }
 
@@ -463,12 +459,12 @@ impl TryFrom<ArgumentList> for ToTimestampFn {
 
 fn to_timestamp(value: Value) -> Result<Value> {
     match value {
-        Value::Bytes(b) => DateTime::parse_from_rfc3339(&String::from_utf8_lossy(&b))
-            .map(|dt| dt.with_timezone(&Utc))
-            .map_err(|_| "cannot parse string as RFC3339".to_owned()),
-        Value::Integer(i) => Ok(Utc.timestamp(i, 0)),
-        Value::Timestamp(t) => Ok(t),
-        _ => unexpected_type!(value),
+        Value::Bytes(_) => Conversion::Timestamp
+            .convert(value)
+            .map_err(|e| e.to_string()),
+        Value::Integer(i) => Ok(Value::Timestamp(Utc.timestamp(i, 0))),
+        Value::Timestamp(_) => Ok(value),
+        _ => Err("unable to parse non-string or integer type to timestamp".to_string()),
     }
 }
 
@@ -1001,8 +997,8 @@ impl TryFrom<ArgumentList> for ParseJsonFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapping::query::{path::Path, Literal};
-    use chrono::{DateTime, Utc};
+    use crate::mapping::query::path::Path;
+    use chrono::DateTime;
     use std::collections::BTreeMap;
 
     #[test]

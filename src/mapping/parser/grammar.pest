@@ -1,6 +1,6 @@
 mapping = _{ SOI ~ statement ~ (NEWLINE+ ~ statement)* ~ NEWLINE* ~ EOI }
 
-statement = _{ assignment | root_function | if_statement }
+statement = _{ assignment | function | if_statement }
 
 assignment = { target_path ~ "=" ~ query_arithmetic }
 
@@ -20,7 +20,7 @@ quoted_path_segment = ${ "\"" ~ inner_quoted_string ~ "\"" ~ path_index? }
 target_path = @{ ("." ~ (path_segment | quoted_path_segment))+ }
 
 // Functions
-root_function = {
+function = {
     deletion |
     only_fields |
     merge
@@ -48,10 +48,10 @@ ident = @{ ASCII_ALPHANUMERIC ~ ( ASCII_ALPHANUMERIC | "_" )* }
 
 // Functions
 
-function_signature = ${ function ~ "(" ~ inner_function? ~ ")"  }
+function_signature = ${ query_function ~ "(" ~ inner_function? ~ ")"  }
 
 // for better error reports
-function = @{ ident }
+query_function = @{ ident }
 
 inner_function = !{ argument_list }
 

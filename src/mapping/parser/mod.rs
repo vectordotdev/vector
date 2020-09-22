@@ -202,7 +202,7 @@ fn query_arithmetic_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Functio
     query_arithmetic_boolean_from_pairs(pair.into_inner())
 }
 
-fn function_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
+fn query_function_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
     let name = pairs.next().ok_or(TOKEN_ERR)?.as_span().as_str();
     let signature = FunctionSignature::from_str(name)?;
     let arguments =
@@ -385,7 +385,7 @@ fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
         }
         Rule::dot_path => Box::new(QueryPath::from(path_segments_from_pair(pair)?)),
         Rule::group => query_arithmetic_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?,
-        Rule::function_signature => function_from_pairs(pair.into_inner())?,
+        Rule::function_signature => query_function_from_pairs(pair.into_inner())?,
         _ => unexpected_parser_sytax!(pair),
     })
 }
@@ -415,7 +415,7 @@ fn merge_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     Ok(Box::new(MergeFn::new(to_path.into(), query2, deep)))
 }
 
-fn root_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
+fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
         Rule::deletion => Ok(Box::new(Deletion::new(paths_from_pair(pair)?))),
         Rule::only_fields => Ok(Box::new(OnlyFields::new(paths_from_pair(pair)?))),
@@ -438,7 +438,7 @@ fn statement_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
             let query = query_arithmetic_from_pair(inner_rules.next().ok_or(TOKEN_ERR)?)?;
             Ok(Box::new(Assignment::new(path, query)))
         }
-        Rule::root_function => root_function_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?),
+        Rule::function => function_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?),
         Rule::if_statement => if_statement_from_pairs(pair.into_inner()),
         _ => unexpected_parser_sytax!(pair),
     }
@@ -456,7 +456,7 @@ fn mapping_from_pairs(pairs: Pairs<Rule>) -> Result<Mapping> {
     for pair in pairs {
         match pair.as_rule() {
             // Rules expected at the root of a mapping statement.
-            Rule::assignment | Rule::root_function | Rule::if_statement => {
+            Rule::assignment | Rule::function | Rule::if_statement => {
                 assignments.push(statement_from_pair(pair)?);
             }
             Rule::EOI => (),
@@ -522,13 +522,13 @@ mod tests {
             ),
             (
                 ".foo = !",
-                vec![" 1:9\n", "= expected dot_path, function, group, boolean, null, string, number, or not_operator"],
+                vec![" 1:9\n", "= expected dot_path, query_function, group, boolean, null, string, number, or not_operator"],
             ),
             (
                 "foo = \"bar\"",
                 vec![
                     " 1:1\n",
-                    "= expected if_statement, target_path, or root_function",
+                    "= expected if_statement, target_path, or function",
                 ],
             ),
             (
@@ -548,7 +548,7 @@ mod tests {
                 r#"if .foo { }"#,
                 vec![
                     " 1:11\n",
-                    "= expected if_statement, target_path, or root_function",
+                    "= expected if_statement, target_path, or function",
                 ],
             ),
             (
