@@ -24,7 +24,7 @@ inventory::submit! {
 
 impl GenerateConfig for InternalMetricsConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -85,6 +85,11 @@ mod tests {
     use crate::metrics::{capture_metrics, get_controller};
     use metrics::{counter, gauge, timing, value};
     use std::collections::BTreeMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::InternalMetricsConfig>();
+    }
 
     #[test]
     fn captures_internal_metrics() {
