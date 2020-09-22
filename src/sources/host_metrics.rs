@@ -37,10 +37,20 @@ macro_rules! btreemap {
     }}
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum Collector {
+    Cpu,
+    Load,
+    Memory,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct HostMetricsConfig {
     #[serde(default = "scrape_interval_default")]
     scrape_interval_secs: u64,
+
+    collectors: Option<Vec<Collector>>,
 }
 
 const fn scrape_interval_default() -> u64 {
@@ -85,7 +95,7 @@ impl HostMetricsConfig {
                 else => break,
             };
 
-            let metrics = capture_metrics().await;
+            let metrics = self.capture_metrics().await;
 
             let (sink, _) = out
                 .send_all(futures01::stream::iter_ok(metrics))
@@ -97,21 +107,34 @@ impl HostMetricsConfig {
 
         Ok(())
     }
-}
 
-async fn capture_metrics() -> impl Iterator<Item = Event> {
-    let hostname = crate::get_hostname();
-    (cpu_metrics().await)
-        .chain(memory_metrics().await)
-        .chain(swap_metrics().await)
-        .chain(loadavg_metrics().await)
-        .map(move |mut metric| {
-            if let Ok(hostname) = &hostname {
+    fn has_collector(&self, collector: Collector) -> bool {
+        match &self.collectors {
+            None => true,
+            Some(collectors) => collectors.iter().find(|&&c| c == collector).is_some(),
+        }
+    }
+
+    async fn capture_metrics(&self) -> impl Iterator<Item = Event> {
+        let hostname = crate::get_hostname();
+        let mut metrics = Vec::new();
+        if self.has_collector(Collector::Cpu) {
+            metrics.extend(add_collector("cpu", cpu_metrics().await));
+        }
+        if self.has_collector(Collector::Load) {
+            metrics.extend(add_collector("load", loadavg_metrics().await));
+        }
+        if self.has_collector(Collector::Memory) {
+            metrics.extend(add_collector("memory", memory_metrics().await));
+            metrics.extend(add_collector("memory", swap_metrics().await));
+        }
+        if let Ok(hostname) = &hostname {
+            for metric in &mut metrics {
                 (metric.tags.as_mut().unwrap()).insert("host".into(), hostname.into());
             }
-            metric
-        })
-        .map(Into::into)
+        }
+        metrics.into_iter().map(Into::into)
+    }
 }
 
 macro_rules! counter {
@@ -142,7 +165,7 @@ macro_rules! metric {
     };
 }
 
-async fn cpu_metrics() -> impl Iterator<Item = Metric> {
+async fn cpu_metrics() -> Vec<Metric> {
     match heim::cpu::times().await {
         Ok(times) => {
             times
@@ -170,10 +193,9 @@ async fn cpu_metrics() -> impl Iterator<Item = Metric> {
             vec![]
         }
     }
-    .into_iter().map(add_collector("cpu"))
 }
 
-async fn memory_metrics() -> impl Iterator<Item = Metric> {
+async fn memory_metrics() -> Vec<Metric> {
     match heim::memory::memory().await {
         Ok(memory) => {
             let timestamp = Some(Utc::now());
@@ -222,11 +244,9 @@ async fn memory_metrics() -> impl Iterator<Item = Metric> {
             vec![]
         }
     }
-    .into_iter()
-    .map(add_collector("memory"))
 }
 
-async fn swap_metrics() -> impl Iterator<Item = Metric> {
+async fn swap_metrics() -> Vec<Metric> {
     match heim::memory::swap().await {
         Ok(swap) => {
             let timestamp = Some(Utc::now());
@@ -265,11 +285,9 @@ async fn swap_metrics() -> impl Iterator<Item = Metric> {
             vec![]
         }
     }
-    .into_iter()
-    .map(add_collector("memory"))
 }
 
-async fn loadavg_metrics() -> impl Iterator<Item = Metric> {
+async fn loadavg_metrics() -> Vec<Metric> {
     #[cfg(unix)]
     let result = match heim::cpu::os::unix::loadavg().await {
         Ok(loadavg) => {
@@ -287,12 +305,13 @@ async fn loadavg_metrics() -> impl Iterator<Item = Metric> {
     };
     #[cfg(not(unix))]
     let result = vec![];
-    result.into_iter().map(add_collector("cpu"))
+
+    result
 }
 
-fn add_collector(collector: &str) -> impl Fn(Metric) -> Metric + '_ {
-    move |mut metric| {
+fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
+    for metric in &mut metrics {
         (metric.tags.as_mut().unwrap()).insert("collector".into(), collector.into());
-        metric
     }
+    metrics
 }

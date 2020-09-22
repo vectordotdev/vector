@@ -15,6 +15,17 @@ through_description = "local system data sources"
 
 <%= render("_partials/fields/_component_options.toml", type: "source", name: "host_metrics") %>
 
+[sources.host_metrics.options.collectors]
+type = "[string]"
+common = false
+required = false
+description = "The list of host metric collector services to use. Defaults to all collectors."
+
+[sources.host_metrics.options.collectors.enum]
+cpu = "Metrics related to CPU usage."
+load = "Load average metrics (UNIX only)."
+memory = "Metrics related to memory usage."
+
 [sources.host_metrics.options.scrape_interval_secs]
 type = "integer"
 common = false
