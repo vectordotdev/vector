@@ -205,36 +205,38 @@ fn query_arithmetic_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Functio
 fn query_function_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
     let name = pairs.next().ok_or(TOKEN_ERR)?.as_span().as_str();
     let signature = FunctionSignature::from_str(name)?;
-    let arguments =
-        function_arguments_from_pairs(pairs.next().ok_or(TOKEN_ERR)?.into_inner(), &signature)?;
+    let arguments = function_arguments_from_pairs(pairs, &signature)?;
 
     signature.into_boxed_function(arguments)
 }
 
 fn function_arguments_from_pairs(
-    pairs: Pairs<Rule>,
+    mut pairs: Pairs<Rule>,
     signature: &FunctionSignature,
 ) -> Result<ArgumentList> {
     let mut arguments = ArgumentList::new();
 
-    // Keeps track of positional argument indices.
-    //
-    // Used to map a positional argument to its keyword. Keyword arguments can
-    // be used in any order, and don't count towards the index of positional
-    // arguments.
-    let mut index = 0;
+    // Check if any arguments are provided.
+    if let Some(pairs) = pairs.next().map(|pair| pair.into_inner()) {
+        // Keeps track of positional argument indices.
+        //
+        // Used to map a positional argument to its keyword. Keyword arguments
+        // can be used in any order, and don't count towards the index of
+        // positional arguments.
+        let mut index = 0;
 
-    pairs
-        .map(|pair| pair.into_inner().next().unwrap())
-        .map(|pair| match pair.as_rule() {
-            Rule::positional_item => {
-                index += 1;
-                positional_item_from_pair(pair, &mut arguments, index - 1, signature)
-            }
-            Rule::keyword_item => keyword_item_from_pair(pair, &mut arguments, signature),
-            _ => unexpected_parser_sytax!(pair),
-        })
-        .collect::<Result<()>>()?;
+        pairs
+            .map(|pair| pair.into_inner().next().unwrap())
+            .map(|pair| match pair.as_rule() {
+                Rule::positional_item => {
+                    index += 1;
+                    positional_item_from_pair(pair, &mut arguments, index - 1, signature)
+                }
+                Rule::keyword_item => keyword_item_from_pair(pair, &mut arguments, signature),
+                _ => unexpected_parser_sytax!(pair),
+            })
+            .collect::<Result<()>>()?;
+    }
 
     // check invalid arity
     if arguments.len() > signature.parameters().len() {
@@ -1095,6 +1097,13 @@ mod tests {
                     "bar".into(),
                     Box::new(QueryPath::from("baz")),
                     Some(Box::new(Literal::from(Value::Boolean(true)))),
+                ))]),
+            ),
+            (
+                ".foo = uuid_v4()",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(UuidV4Fn::new()),
                 ))]),
             ),
         ];
