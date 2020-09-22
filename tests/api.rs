@@ -10,12 +10,16 @@ mod tests {
     use chrono::Utc;
     use futures::StreamExt;
     use graphql_client::*;
-    use std::sync::Once;
-    use std::time::Duration;
-    use vector::api::client::subscription::SubscriptionClient;
-    use vector::config::Config;
-    use vector::test_util::{next_addr, retry_until};
-    use vector::{api, heartbeat};
+    use std::{sync::Once, time::Duration};
+    use tokio::{select, sync::oneshot};
+    use vector::{
+        self,
+        api::{self, client::subscription::SubscriptionClient},
+        config::Config,
+        heartbeat,
+        internal_events::{emit, GeneratorEventProcessed},
+        test_util::{next_addr, retry_until},
+    };
 
     static METRIC_INIT: Once = Once::new();
 
@@ -44,6 +48,14 @@ mod tests {
         response_derives = "Debug"
     )]
     struct UptimeMetricsSubscription;
+
+    #[derive(GraphQLQuery)]
+    #[graphql(
+        schema_path = "graphql/schema.json",
+        query_path = "graphql/subscriptions/events_processed_metrics.graphql",
+        response_derives = "Debug"
+    )]
+    struct EventsProcessedMetricsSubscription;
 
     // Initialize the metrics system. Idempotent.
     fn init_metrics() {
@@ -113,6 +125,25 @@ mod tests {
             Duration::from_secs(10),
         )
         .await
+    }
+
+    // Emits fake generate events every 10ms until the returned shutdown falls out of scope
+    fn emit_fake_generator_events() -> oneshot::Sender<()> {
+        let (shutdown_tx, mut shutdown_rx) = oneshot::channel::<()>();
+        tokio::spawn(async move {
+            let mut timer = tokio::time::interval(Duration::from_millis(10));
+
+            loop {
+                select! {
+                    _ = &mut shutdown_rx => break,
+                    _ = timer.tick() => {
+                        emit(GeneratorEventProcessed);
+                    }
+                }
+            }
+        });
+
+        shutdown_tx
     }
 
     #[tokio::test]
@@ -249,5 +280,54 @@ mod tests {
                 .seconds
                 > num_results as f64 - 1.0
         )
+    }
+
+    #[tokio::test]
+    async fn api_graphql_event_processed_metrics() {
+        let config = api_enabled_config();
+        let _server = api::Server::start(config.api);
+        let bind = config.api.bind.unwrap();
+        let num_results = 3;
+        let interval: i64 = 100;
+
+        // Initialize the metrics system
+        init_metrics();
+
+        // Emit events for the duration of the test
+        let _shutdown = emit_fake_generator_events();
+
+        // Defaults to a 1 second interval, which we'll leave as-is since uptimeMetrics.seconds
+        // isn't any more granular
+        let request_body = EventsProcessedMetricsSubscription::build_query(
+            events_processed_metrics_subscription::Variables { interval },
+        );
+
+        let mut client = new_subscription_client(bind).await;
+
+        let subscription = client
+            .start::<EventsProcessedMetricsSubscription>(&request_body)
+            .await
+            .unwrap();
+
+        tokio::pin! {
+            let events_processed = subscription.stream().take(num_results);
+        }
+
+        let mut last_result = 0.0;
+
+        for _ in 0..num_results {
+            let ep = events_processed
+                .next()
+                .await
+                .unwrap()
+                .unwrap()
+                .data
+                .unwrap()
+                .events_processed_metrics
+                .events_processed;
+
+            assert!(ep > last_result);
+            last_result = ep
+        }
     }
 }
