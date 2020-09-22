@@ -1,5 +1,5 @@
 use crate::{
-    config::{Config, ConfigDiff},
+    config::{Config, ConfigDiff, GenerateConfig},
     topology::{self, RunningTopology},
     trace, Event,
 };
@@ -48,6 +48,14 @@ macro_rules! assert_downcast_matches {
             got => panic!("Assertion failed: got wrong error variant {:?}", got),
         }
     }};
+}
+
+pub fn test_generate_config<T>()
+where
+    for<'de> T: GenerateConfig + serde::Deserialize<'de>,
+{
+    let cfg = T::generate_config().to_string();
+    assert!(toml::from_str::<T>(&cfg).is_ok())
 }
 
 pub fn next_addr() -> SocketAddr {

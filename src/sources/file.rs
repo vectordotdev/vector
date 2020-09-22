@@ -142,7 +142,7 @@ inventory::submit! {
 
 impl GenerateConfig for FileConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&FileConfig::default()).unwrap()
     }
 }
 
@@ -332,6 +332,11 @@ mod tests {
     };
     use tempfile::tempdir;
     use tokio::time::{delay_for, timeout, Duration};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<FileConfig>();
+    }
 
     fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {
