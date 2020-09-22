@@ -211,58 +211,6 @@ fn function_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function
     signature.into_boxed_function(arguments)
 }
 
-fn positional_item_from_pair(
-    pair: Pair<Rule>,
-    list: &mut ArgumentList,
-    index: usize,
-    signature: &FunctionSignature,
-) -> Result<()> {
-    let resolver = query_arithmetic_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?;
-
-    let parameter = signature.parameters().get(index).cloned().ok_or(format!(
-        "unknown positional argument '{}' for function: '{}'",
-        index,
-        signature.as_str()
-    ))?;
-
-    let keyword = parameter.keyword.to_owned();
-    let argument = Argument::new(resolver, parameter);
-
-    // TODO(jean): I think we can get rid of the `ArgumentList` wrapper, as we
-    // always apply a keyword to an argument, even if a positional argument was
-    // given.
-    list.push(argument, Some(keyword));
-
-    Ok(())
-}
-
-fn keyword_item_from_pair(
-    pair: Pair<Rule>,
-    list: &mut ArgumentList,
-    signature: &FunctionSignature,
-) -> Result<()> {
-    let mut pairs = pair.into_inner();
-    let keyword = pairs.next().ok_or(TOKEN_ERR)?.as_span().as_str();
-    let resolver = query_arithmetic_from_pair(pairs.next().ok_or(TOKEN_ERR)?)?;
-
-    let parameter = signature
-        .parameters()
-        .iter()
-        .find(|p| p.keyword == keyword)
-        .ok_or(format!(
-            "unknown argument keyword '{}' for function '{}'",
-            keyword,
-            signature.as_str()
-        ))?
-        .clone();
-
-    let argument = Argument::new(resolver, parameter);
-
-    list.push(argument, Some(keyword.to_owned()));
-
-    Ok(())
-}
-
 fn function_arguments_from_pairs(
     pairs: Pairs<Rule>,
     signature: &FunctionSignature,
@@ -327,6 +275,58 @@ fn function_arguments_from_pairs(
         .collect::<Result<_>>()?;
 
     Ok(arguments)
+}
+
+fn positional_item_from_pair(
+    pair: Pair<Rule>,
+    list: &mut ArgumentList,
+    index: usize,
+    signature: &FunctionSignature,
+) -> Result<()> {
+    let resolver = query_arithmetic_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?;
+
+    let parameter = signature.parameters().get(index).cloned().ok_or(format!(
+        "unknown positional argument '{}' for function: '{}'",
+        index,
+        signature.as_str()
+    ))?;
+
+    let keyword = parameter.keyword.to_owned();
+    let argument = Argument::new(resolver, parameter);
+
+    // TODO(jean): I think we can get rid of the `ArgumentList` wrapper, as we
+    // always apply a keyword to an argument, even if a positional argument was
+    // given.
+    list.push(argument, Some(keyword));
+
+    Ok(())
+}
+
+fn keyword_item_from_pair(
+    pair: Pair<Rule>,
+    list: &mut ArgumentList,
+    signature: &FunctionSignature,
+) -> Result<()> {
+    let mut pairs = pair.into_inner();
+    let keyword = pairs.next().ok_or(TOKEN_ERR)?.as_span().as_str();
+    let resolver = query_arithmetic_from_pair(pairs.next().ok_or(TOKEN_ERR)?)?;
+
+    let parameter = signature
+        .parameters()
+        .iter()
+        .find(|p| p.keyword == keyword)
+        .ok_or(format!(
+            "unknown argument keyword '{}' for function '{}'",
+            keyword,
+            signature.as_str()
+        ))?
+        .clone();
+
+    let argument = Argument::new(resolver, parameter);
+
+    list.push(argument, Some(keyword.to_owned()));
+
+    Ok(())
 }
 
 fn inner_quoted_string_escaped_from_pair(pair: Pair<Rule>) -> Result<String> {
