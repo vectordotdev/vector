@@ -131,18 +131,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - uses: actions/download-artifact@v2
-        with:
-          name: e2e-test-deb-package
-          path: target/artifacts
       - name: Setup Minikube
         run: scripts/ci-setup-minikube.sh
         env:
           KUBERNETES_VERSION: ${{ matrix.kubernetes_version.version }}
           MINIKUBE_VERSION: ${{ matrix.minikube_version }}
           CONTAINER_RUNTIME: ${{ matrix.container_runtime }}
-      - run: make slim-builds
-      - run: make test-e2e-kubernetes
-        env:
-          USE_MINIKUBE_CACHE: "true"
-          SKIP_PACKAGE_DEB: "true"
