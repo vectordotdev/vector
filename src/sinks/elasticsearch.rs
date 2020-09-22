@@ -100,7 +100,7 @@ inventory::submit! {
 
 impl GenerateConfig for ElasticSearchConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -499,6 +499,11 @@ mod tests {
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ElasticSearchConfig>();
+    }
 
     #[test]
     fn removes_and_sets_id_from_custom_field() {

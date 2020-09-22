@@ -147,7 +147,7 @@ inventory::submit! {
 
 impl GenerateConfig for DatadogConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -500,6 +500,11 @@ mod tests {
     use http::{Method, Uri};
     use pretty_assertions::assert_eq;
     use std::sync::atomic::AtomicI64;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<DatadogConfig>();
+    }
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
