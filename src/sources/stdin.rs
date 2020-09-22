@@ -44,7 +44,7 @@ inventory::submit! {
 
 impl GenerateConfig for StdinConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -137,6 +137,11 @@ mod tests {
     use futures::compat::Future01CompatExt;
     use futures01::{Async::*, Stream};
     use std::io::Cursor;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<StdinConfig>();
+    }
 
     #[test]
     fn stdin_create_event() {
