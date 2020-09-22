@@ -8,12 +8,14 @@ use std::{
     pin::Pin,
     sync::{Arc, RwLock, Weak},
 };
-use tokio::sync::broadcast::SendError;
 use tokio::{
     net::TcpStream,
     select,
     stream::StreamExt,
-    sync::{broadcast, oneshot},
+    sync::{
+        broadcast::{self, SendError},
+        oneshot,
+    },
 };
 use tokio_tungstenite::{
     connect_async,
