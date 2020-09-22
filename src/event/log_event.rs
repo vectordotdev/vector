@@ -63,8 +63,8 @@ impl LogEvent {
         util::log::remove(&mut self.fields, &key, false)
     }
 
-    pub fn remove_prune(&mut self, key: &DefaultAtom, prune: bool) -> Option<Value> {
-        util::log::remove(&mut self.fields, &key, prune)
+    pub fn remove_prune(&mut self, key: impl AsRef<str>, prune: bool) -> Option<Value> {
+        util::log::remove(&mut self.fields, key.as_ref(), prune)
     }
 
     pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {

@@ -9,15 +9,6 @@ pub enum Segment {
     Index(usize),
 }
 
-impl Display for Segment {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            Segment::Index(i) => write!(formatter, "{}", i),
-            Segment::Field(f) => write!(formatter, "{}", f),
-        }
-    }
-}
-
 impl Segment {
     pub const fn field(v: String) -> Segment {
         Segment::Field(v)
@@ -142,5 +133,14 @@ impl Segment {
         };
         tracing::trace!(segment = full_segment, rule = ?segment.as_rule(), action = %"exit");
         retval
+    }
+}
+
+impl Display for Segment {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Segment::Index(i) => write!(formatter, "{}", i),
+            Segment::Field(f) => write!(formatter, "{}", f),
+        }
     }
 }

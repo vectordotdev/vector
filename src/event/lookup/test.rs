@@ -121,7 +121,7 @@ fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<String> {
 // This test iterates over the `tests/data/fixtures/lookup` folder and ensures the lookup parsed,
 // then turned into a string again is the same.
 #[test]
-fn lookup_to_string() {
+fn lookup_to_string_and_serialize() {
     crate::test_util::trace_init();
     const FIXTURE_ROOT: &str = "tests/data/fixtures/lookup";
 
@@ -141,6 +141,12 @@ fn lookup_to_string() {
                         "Asserting equal."
                     );
                 assert_eq!(lookup.to_string(), buf);
+                // Ensure serialization doesn't clobber.
+                let serialized = serde_json::to_string(&lookup.to_string()).unwrap();
+                assert_eq!(serialized, buf);
+                // Ensure deserializing doesn't clobber.
+                let deserialized = serde_json::from_str(&serialized).unwrap();
+                assert_eq!(lookup, deserialized);
             }
             _ => panic!("This test should never read Err'ing test fixtures."),
         });

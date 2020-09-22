@@ -17,6 +17,9 @@ use std::ops::{Index, IndexMut};
 use indexmap::map::IndexMap;
 use std::fmt::Display;
 use nom::lib::std::fmt::Formatter;
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::de::{self, Visitor};
+use core::fmt;
 
 /// Lookups are precomputed event lookup paths.
 ///
@@ -200,4 +203,47 @@ impl IndexMut<usize> for Lookup {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         self.segments.index_mut(index)
     }
+}
+
+impl Serialize for Lookup {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+    {
+        serializer.serialize_str(&*self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for Lookup {
+    fn deserialize<D>(deserializer: D) -> Result<Lookup, D::Error>
+        where
+            D: Deserializer<'de>,
+    {
+        deserializer.deserialize_string(LookupVisitor)
+    }
+}
+
+struct LookupVisitor;
+
+impl<'de> Visitor<'de> for LookupVisitor {
+    type Value = Lookup;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("Expected valid Lookup path.")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+    {
+        Lookup::try_from(value.to_owned()).map_err(de::Error::custom)
+    }
+
+    fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+    {
+        Lookup::try_from(value).map_err(de::Error::custom)
+    }
+
 }
