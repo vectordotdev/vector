@@ -141,7 +141,7 @@ inventory::submit! {
 
 impl GenerateConfig for S3SinkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -419,6 +419,11 @@ mod tests {
     use crate::event::Event;
 
     use std::collections::BTreeMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<S3SinkConfig>();
+    }
 
     #[test]
     fn s3_encode_event_text() {
