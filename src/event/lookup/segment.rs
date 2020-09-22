@@ -1,11 +1,7 @@
 use crate::mapping::parser::Rule;
 use pest::iterators::Pair;
-use std::str;
-use std::{
-    str,
-};
-use crate::mapping::parser::{Rule};
-use pest::{iterators::Pair};
+use std::fmt::Display;
+use nom::lib::std::fmt::Formatter;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub enum Segment {
@@ -13,12 +9,36 @@ pub enum Segment {
     Index(usize),
 }
 
+impl Display for Segment {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Segment::Index(i) => write!(formatter, "{}", i),
+            Segment::Field(f) => write!(formatter, "{}", f),
+        }
+    }
+}
+
 impl Segment {
     pub const fn field(v: String) -> Segment {
         Segment::Field(v)
     }
+
+    pub fn is_field(&self) -> bool {
+        match self {
+            Segment::Field(_) => true,
+            Segment::Index(_) => false,
+        }
+    }
+
     pub const fn index(v: usize) -> Segment {
         Segment::Index(v)
+    }
+
+    pub fn is_value(&self) -> bool {
+        match self {
+            Segment::Field(_) => true,
+            Segment::Index(_) => false,
+        }
     }
 
     #[tracing::instrument(skip(segment))]
@@ -57,7 +77,7 @@ impl Segment {
             match inner_segment.as_rule() {
                 Rule::path_field_name => {
                     tracing::trace!(segment = inner_segment.as_str(), rule = ?inner_segment.as_rule(), action = %"push");
-                    segments.push(Segment::field(inner_segment.to_string()))
+                    segments.push(Segment::field(inner_segment.as_str().to_owned()))
                 }
                 Rule::path_index => segments.push(Segment::from_path_index(inner_segment)?),
                 _ => {
@@ -107,7 +127,9 @@ impl Segment {
         let retval = match segment.as_rule() {
             Rule::inner_quoted_string => {
                 tracing::trace!(segment = segment.as_str(), rule = ?segment.as_rule(), action = %"push");
-                Ok(Segment::field(segment.to_string()))
+                Ok(Segment::field(
+                    String::from(r#"""#) + segment.as_str() + r#"""#
+                ))
             }
             _ => {
                 return Err(format!(

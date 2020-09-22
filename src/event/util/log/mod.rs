@@ -5,6 +5,7 @@ mod get_mut;
 mod insert;
 mod keys;
 mod remove;
+mod path_iter;
 
 pub(self) use super::Value;
 
@@ -16,6 +17,7 @@ pub use get_mut::get_mut;
 pub use insert::{insert, insert_path};
 pub use keys::keys;
 pub use remove::remove;
+pub use path_iter::{PathComponent, PathIter};
 
 #[cfg(test)]
 pub(self) mod test {

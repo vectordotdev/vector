@@ -14,7 +14,7 @@ if_statement = {
 }
 
 // Used by `src/event/lookup.rs`
-lookup = { (path_segment | quoted_path_segment) ~ ("." ~ (path_segment | quoted_path_segment))+ }
+lookup = { (path_segment | quoted_path_segment) ~ ("." ~ (path_segment | quoted_path_segment))* }
 
 // Paths
 path_index = { "[" ~ inner_path_index ~ "]" }

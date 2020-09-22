@@ -2,7 +2,7 @@ mod segment;
 #[cfg(test)]
 mod test;
 
-use crate::mapping::parser::{MappingParser, Rule};
+use crate::{mapping::parser::{MappingParser, Rule}, event::Value};
 use pest::{iterators::Pair, Parser};
 use std::{
     convert::TryFrom,
@@ -10,9 +10,13 @@ use std::{
     slice::Iter,
     str,
 };
+use toml::Value as TomlValue;
 
 pub use segment::Segment;
 use std::ops::{Index, IndexMut};
+use indexmap::map::IndexMap;
+use std::fmt::Display;
+use nom::lib::std::fmt::Formatter;
 
 /// Lookups are precomputed event lookup paths.
 ///
@@ -34,9 +38,82 @@ impl<'a> TryFrom<Pair<'a, Rule>> for Lookup {
     }
 }
 
+impl Display for Lookup {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let mut peeker = self.segments.iter().peekable();
+        let mut next = peeker.next();
+        let mut maybe_next = peeker.peek();
+        while let Some(segment) = next {
+            match segment {
+                Segment::Field(_) => {
+                    match maybe_next {
+                        Some(next) if next.is_field() => write!(f, r#"{}."#, segment)?,
+                        None | Some(_) => write!(f, "{}", segment)?,
+                    };
+                },
+                Segment::Index(_) =>  match maybe_next {
+                    Some(next) if next.is_field() => write!(f, r#"[{}]."#, segment)?,
+                    None | Some(_) => write!(f, "[{}]", segment)?,
+                },
+            }
+            next = peeker.next();
+            maybe_next = peeker.peek();
+        }
+        Ok(())
+    }
+}
+
 impl Lookup {
-    fn iter(&self) -> Iter<'_, Segment> {
+    pub fn iter(&self) -> Iter<'_, Segment> {
         self.segments.iter()
+    }
+
+    pub fn from_indexmap(values: IndexMap<String, TomlValue>) -> crate::Result<IndexMap<Lookup, Value>>{
+        let mut discoveries = IndexMap::new();
+        for (key, value) in values {
+            Self::from_recursive_step(Lookup::try_from(key)?, value, &mut discoveries)?;
+        }
+        Ok(discoveries)
+    }
+    pub fn from_toml(value: TomlValue) -> crate::Result<IndexMap<Lookup, Value>> {
+        let mut discoveries = IndexMap::new();
+        match value {
+            TomlValue::Table(map) => {
+                for (key, value) in map {
+                    Self::from_recursive_step(Lookup::try_from(key)?, value, &mut discoveries)?;
+                }
+                Ok(discoveries)
+            },
+            _ => Err(format!("A TOML table must be passed to the `from_toml_table` function. Passed: {:?}", value))?,
+        }
+    }
+
+    fn from_recursive_step(lookup: Lookup, value: TomlValue, discoveries: &mut IndexMap<Lookup, Value>) -> crate::Result<()> {
+        match value {
+            TomlValue::String(s) => discoveries.insert(Lookup::from(lookup), Value::from(s)),
+            TomlValue::Integer(i) => discoveries.insert(Lookup::from(lookup), Value::from(i)),
+            TomlValue::Float(f) => discoveries.insert(Lookup::from(lookup), Value::from(f)),
+            TomlValue::Boolean(b) => discoveries.insert(Lookup::from(lookup), Value::from(b)),
+            TomlValue::Datetime(dt) => {
+                let dt = dt.to_string();
+                discoveries.insert(Lookup::try_from(lookup)?, Value::from(dt))
+            },
+            TomlValue::Array(vals) => {
+                for (i, val) in vals.into_iter().enumerate() {
+                    let key = format!("{}[{}]", lookup, i);
+                    Self::from_recursive_step(Lookup::try_from(key)?, val, discoveries)?;
+                }
+                None
+            },
+            TomlValue::Table(map) => {
+                for (table_key, value) in map {
+                    let key = format!("{}.{}", lookup, table_key);
+                    Self::from_recursive_step(Lookup::try_from(key)?, value, discoveries)?;
+                }
+                None
+            },
+        };
+        Ok(())
     }
 }
 
@@ -54,6 +131,16 @@ impl TryFrom<String> for Lookup {
 
     fn try_from(input: String) -> Result<Self, Self::Error> {
         let mut pairs = MappingParser::parse(Rule::lookup, &input)?;
+        let pair = pairs.next().ok_or("No tokens found.")?;
+        Self::try_from(pair)
+    }
+}
+
+impl TryFrom<&str> for Lookup {
+    type Error = crate::Error;
+
+    fn try_from(input: &str) -> Result<Self, Self::Error> {
+        let mut pairs = MappingParser::parse(Rule::lookup, input)?;
         let pair = pairs.next().ok_or("No tokens found.")?;
         Self::try_from(pair)
     }

@@ -1,10 +1,11 @@
-use crate::event::timestamp_to_string;
+use crate::{Result, event::timestamp_to_string};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use serde::{Serialize, Serializer};
 use std::collections::BTreeMap;
-use std::convert::TryInto;
+use std::convert::{TryInto, TryFrom};
+use toml::value::Value as TomlValue;
 
 #[derive(PartialEq, Debug, Clone, is_enum_variant)]
 pub enum Value {
@@ -19,7 +20,7 @@ pub enum Value {
 }
 
 impl Serialize for Value {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -52,6 +53,24 @@ impl From<Vec<u8>> for Value {
 impl From<String> for Value {
     fn from(string: String) -> Self {
         Value::Bytes(string.into())
+    }
+}
+
+impl TryFrom<TomlValue> for Value {
+    type Error = crate::Error;
+
+    fn try_from(toml: TomlValue) -> crate::Result<Self> {
+        Ok(match toml {
+            TomlValue::String(s) => Self::from(s),
+            TomlValue::Integer(i) => Self::from(i),
+            TomlValue::Array(a) => Self::from(a.into_iter().map(|v| Value::try_from(v)).collect::<Result<Vec<_>>>()?),
+            TomlValue::Table(t) => Self::from(t.into_iter().map(|(k,v)|
+                Value::try_from(v).map(|v| (k,v))
+            ).collect::<Result<BTreeMap<_,_>>>()?),
+            TomlValue::Datetime(dt) => Self::from(dt.to_string().parse::<DateTime<Utc>>()?),
+            TomlValue::Boolean(b) => Self::from(b),
+            TomlValue::Float(f) => Self::from(f),
+        })
     }
 }
 
@@ -147,7 +166,7 @@ impl From<serde_json::Value> for Value {
 impl TryInto<serde_json::Value> for Value {
     type Error = crate::Error;
 
-    fn try_into(self) -> Result<serde_json::Value, Self::Error> {
+    fn try_into(self) -> std::result::Result<serde_json::Value, Self::Error> {
         match self {
             Value::Boolean(v) => Ok(serde_json::Value::from(v)),
             Value::Integer(v) => Ok(serde_json::Value::from(v)),

@@ -5,12 +5,11 @@ use crate::{
     event::{Event, Value},
     internal_events::{
         AddFieldsEventProcessed, AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten,
-        AddFieldsTemplateInvalid, AddFieldsTemplateRenderingError,
+        AddFieldsTemplateRenderingError,
     },
     template::Template,
     event::Lookup,
 };
-use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
@@ -76,14 +75,24 @@ impl TransformConfig for AddFieldsConfig {
 }
 
 impl AddFields {
-    pub fn new(fields: IndexMap<Atom, TomlValue>, overwrite: bool) -> crate::Result<Self> {
-        let lookup_fields = IndexMap::with_capacity(fields.len());
-        for (k, v) in fields.drain(..) {
-            let lookup = Lookup::try_from(k)?;
-            lookup_fields.insert(lookup, TemplateOrValue::from(Value::from(v)));
+    pub fn new(mut fields: IndexMap<Atom, TomlValue>, overwrite: bool) -> crate::Result<Self> {
+        let mut set = Lookup::from_indexmap(fields.drain(..).map(|(k, v)| (k.to_string(), v)).collect())?;
+        let mut with_templates = IndexMap::with_capacity(set.len());
+        for (k, v) in set.drain(..) {
+            let maybe_template = match v {
+                Value::Bytes(s) => {
+                    match Template::try_from(String::from_utf8(s.to_vec())?) {
+                        Ok(t) => TemplateOrValue::from(t),
+                        Err(_) => TemplateOrValue::from(Value::Bytes(s)),
+                    }
+                },
+                v => TemplateOrValue::from(v)
+            };
+            with_templates.insert(k, maybe_template);
         }
+
         Ok(AddFields {
-            fields: lookup_fields,
+            fields: with_templates,
             overwrite,
         })
     }
@@ -94,12 +103,13 @@ impl Transform for AddFields {
         emit!(AddFieldsEventProcessed);
 
         for (key, value_or_template) in self.fields.clone() {
+            let key_string = key.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
             let value = match value_or_template {
                 TemplateOrValue::Template(v) => match v.render_string(&event) {
                     Ok(v) => v,
                     Err(_) => {
                         emit!(AddFieldsTemplateRenderingError {
-                            field: key.as_ref()
+                            field: &format!("{}", &key),
                         });
                         continue;
                     }
@@ -108,75 +118,22 @@ impl Transform for AddFields {
                 TemplateOrValue::Value(v) => v,
             };
             if self.overwrite {
-                if event.as_mut_log().insert(&key, value).is_some() {
+                if event.as_mut_log().insert(&key_string, value).is_some() {
                     emit!(AddFieldsFieldOverwritten {
-                        field: key.as_ref()
+                        field: &format!("{}", &key),
                     });
                 }
-            } else if event.as_mut_log().contains(&key) {
+            } else if event.as_mut_log().contains(&key_string) {
                 emit!(AddFieldsFieldNotOverwritten {
-                    field: key.as_ref()
+                    field: &format!("{}", &key),
                 });
             } else {
-                event.as_mut_log().insert(key, value);
+                event.as_mut_log().insert(&key_string, value);
             }
         }
 
         Some(event)
     }
-}
-
-fn flatten_field(key: Atom, value: TomlValue, new_fields: &mut IndexMap<Atom, TemplateOrValue>) {
-    match value {
-        TomlValue::String(s) => match Template::try_from(s.as_str()) {
-            Ok(t) => new_fields.insert(key, t.into()),
-            Err(error) => {
-                emit!(AddFieldsTemplateInvalid {
-                    field: key.as_ref(),
-                    error
-                });
-                new_fields.insert(key, Value::from(s).into())
-            }
-        },
-        TomlValue::Integer(i) => {
-            let i = Value::from(i);
-            new_fields.insert(key, i.into())
-        }
-        TomlValue::Float(f) => {
-            let f = Value::from(f);
-            new_fields.insert(key, f.into())
-        }
-        TomlValue::Boolean(b) => {
-            let b = Value::from(b);
-            new_fields.insert(key, b.into())
-        }
-        TomlValue::Datetime(dt) => {
-            let dt = dt.to_string();
-            if let Ok(ts) = dt.parse::<DateTime<Utc>>() {
-                let ts = Value::from(ts);
-                new_fields.insert(key, ts.into())
-            } else {
-                let dt = Value::from(dt);
-                new_fields.insert(key, dt.into())
-            }
-        }
-        TomlValue::Array(vals) => {
-            for (i, val) in vals.into_iter().enumerate() {
-                let key = format!("{}[{}]", key, i);
-                flatten_field(key.into(), val, new_fields);
-            }
-
-            None
-        }
-        TomlValue::Table(map) => {
-            for (table_key, value) in map {
-                let key = format!("{}.{}", key, table_key);
-                flatten_field(key.into(), value, new_fields);
-            }
-
-            None
-        }
-    };
 }
 
 #[cfg(test)]
@@ -192,7 +149,7 @@ mod tests {
         let event = Event::from("augment me");
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "some_val".into());
-        let mut augment = AddFields::new(fields, true);
+        let mut augment = AddFields::new(fields, true).unwrap();
 
         let new_event = augment.transform(event).unwrap();
 
@@ -208,7 +165,7 @@ mod tests {
         let event = Event::from("augment me");
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "{{message}} {{message}}".into());
-        let mut augment = AddFields::new(fields, true);
+        let mut augment = AddFields::new(fields, true).unwrap();
 
         let new_event = augment.transform(event).unwrap();
 
@@ -227,7 +184,7 @@ mod tests {
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "some_overwritten_message".into());
 
-        let mut augment = AddFields::new(fields, false);
+        let mut augment = AddFields::new(fields, false).unwrap();
 
         let new_event = augment.transform(event.clone()).unwrap();
 
@@ -250,7 +207,7 @@ mod tests {
 
         fields.insert("table".into(), map.into());
 
-        let mut transform = AddFields::new(fields, false);
+        let mut transform = AddFields::new(fields, false).unwrap();
 
         let event = transform.transform(event).unwrap().into_log();
 
