@@ -117,7 +117,7 @@ inventory::submit! {
 
 impl GenerateConfig for DockerConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&DockerConfig::default()).unwrap()
     }
 }
 
