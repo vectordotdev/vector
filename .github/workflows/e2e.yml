@@ -60,19 +60,6 @@ jobs:
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
-  build-deb-package:
-    name: Build .deb package
-    runs-on: ubuntu-latest
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
-    steps:
-      - uses: actions/checkout@v2
-      - run: make package-deb-x86_64
-      - uses: actions/upload-artifact@v2
-        with:
-          name: e2e-test-deb-package
-          path: target/artifacts/*
-
   # Github Actions don't support `matrix` at the job-level `if:` condition.
   # We apply this workaround - compute `matrix` in a preceding job, and assign
   # it's value dynamically at the actual test job.
@@ -137,7 +124,6 @@ jobs:
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     needs:
-      - build-deb-package
       - compute-k8s-test-plan
     strategy:
       matrix: ${{ fromJson(needs.compute-k8s-test-plan.outputs.matrix) }}
