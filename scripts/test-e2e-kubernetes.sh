@@ -134,6 +134,7 @@ fi
 # Run the tests.
 cargo test \
   --test kubernetes-e2e \
+  --no-fail-fast \
   --no-default-features \
   --features kubernetes-e2e-tests \
   -- \
