@@ -91,14 +91,20 @@ impl ArgumentList {
             .iter()
             .position(|a| a.parameter.keyword == keyword)
             .map(|i| self.arguments.remove(i))
-            .map(|v| Box::new(v) as Box<dyn Function>)
+            .map(|v| Box::new(v) as _)
     }
 }
 
-#[derive(Debug)]
 pub(in crate::mapping) struct Argument {
     resolver: Box<dyn Function>,
     parameter: Parameter,
+}
+
+// delegates to resolver to satisfy tests in `mapping::parser`.
+impl std::fmt::Debug for Argument {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.resolver.fmt(f)
+    }
 }
 
 impl Argument {

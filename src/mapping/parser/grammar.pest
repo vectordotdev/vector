@@ -46,7 +46,9 @@ dot_path = ${ ("." ~ (path_segment | quoted_path_segment | path_coalesce))+ }
 
 ident = @{ ASCII_ALPHANUMERIC ~ ( ASCII_ALPHANUMERIC | "_" )* }
 
-function = { ident ~ "(" ~ argument_list? ~ ")"  }
+function = ${ ident ~ "(" ~ inner_function? ~ ")"  }
+
+inner_function = !{ argument_list }
 
 argument_list = _{ argument_item ~ ("," ~ argument_item)* }
 

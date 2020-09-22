@@ -205,7 +205,8 @@ fn query_arithmetic_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Functio
 fn function_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn query::Function>> {
     let name = pairs.next().ok_or(TOKEN_ERR)?.as_span().as_str();
     let signature = FunctionSignature::from_str(name)?;
-    let arguments = function_arguments_from_pairs(pairs, &signature)?;
+    let arguments =
+        function_arguments_from_pairs(pairs.next().ok_or(TOKEN_ERR)?.into_inner(), &signature)?;
 
     signature.into_boxed_function(arguments)
 }
@@ -501,597 +502,603 @@ pub fn parse(input: &str) -> Result<Mapping> {
     }
 }
 
-//#[cfg(test)]
-//mod tests {
-//    use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::mapping::query::functions::{
+        DowncaseFn, Md5Fn, NowFn, ParseJsonFn, ParseTimestampFn, Sha1Fn, StripWhitespaceFn,
+        ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn, TruncateFn, UpcaseFn,
+        UuidV4Fn,
+    };
 
-//    #[test]
-//    fn check_parser_errors() {
-//        let cases = vec![
-//            (".foo = {\"bar\"}", vec![" 1:8\n", "= expected query"]),
-//            (
-//                ". = \"bar\"",
-//                vec![" 1:2\n", "= expected path_segment or quoted_path_segment"],
-//            ),
-//            (
-//                ".foo = !",
-//                vec![" 1:9\n", "= expected dot_path, query_function, group, boolean, null, string, number, or not_operator"],
-//            ),
-//            (
-//                "foo = \"bar\"",
-//                vec![
-//                    " 1:1\n",
-//                    "= expected if_statement, target_path, or root_function",
-//                ],
-//            ),
-//            (
-//                ".foo.bar = \"baz\" and this",
-//                vec![" 1:18\n", "= expected EOI or operator"],
-//            ),
-//            (".foo.bar = \"baz\" +", vec![" 1:19", "= expected query"]),
-//            (
-//                ".foo.bar = .foo.(bar |)",
-//                vec![" 1:23\n", "= expected path_segment"],
-//            ),
-//            (
-//                "if .foo > 0 { .foo = \"bar\" } else",
-//                vec![" 1:30\n", "= expected EOI"],
-//            ),
-//            (
-//                r#"if .foo { }"#,
-//                vec![
-//                    " 1:11\n",
-//                    "= expected if_statement, target_path, or root_function",
-//                ],
-//            ),
-//            (
-//                r#"if { del(.foo) } else { del(.bar) }"#,
-//                vec![" 1:4\n", "= expected query"],
-//            ),
-//            (
-//                r#"if .foo > .bar { del(.foo) } else { .bar = .baz"#,
-//                // This message isn't great, ideally I'd like "expected closing bracket"
-//                vec![" 1:48\n", "= expected path_index or operator"],
-//            ),
-//            (
-//                r#"only_fields(.foo,)"#,
-//                vec![" 1:18\n", "= expected target_path"],
-//            ),
-//            (
-//                r#"only_fields()"#,
-//                vec![" 1:13\n", "= expected target_path"],
-//            ),
-//            (
-//                r#"only_fields(,)"#,
-//                vec![" 1:13\n", "= expected target_path"],
-//            ),
-//            (
-//                ".foo = to_string(\"bar\",)",
-//                vec![" 1:24\n", "= expected null or string"],
-//            ),
-//            (
-//                // Due to the explicit list of allowed escape chars our grammar
-//                // doesn't actually recognize this as a string literal.
-//                r#".foo = "invalid escape \k sequence""#,
-//                vec![" 1:8\n", "= expected query"],
-//            ),
-//            (
-//                // Same here as above.
-//                r#".foo."invalid \k escape".sequence = "foo""#,
-//                vec![" 1:6\n", "= expected path_segment or quoted_path_segment"],
-//            ),
-//        ];
+    #[test]
+    fn check_parser_errors() {
+        let cases = vec![
+            (".foo = {\"bar\"}", vec![" 1:8\n", "= expected query"]),
+            (
+                ". = \"bar\"",
+                vec![" 1:2\n", "= expected path_segment or quoted_path_segment"],
+            ),
+            (
+                ".foo = !",
+                vec![" 1:9\n", "= expected dot_path, ident, group, boolean, null, string, number, or not_operator"],
+            ),
+            (
+                "foo = \"bar\"",
+                vec![
+                    " 1:1\n",
+                    "= expected if_statement, target_path, or root_function",
+                ],
+            ),
+            (
+                ".foo.bar = \"baz\" and this",
+                vec![" 1:18\n", "= expected EOI or operator"],
+            ),
+            (".foo.bar = \"baz\" +", vec![" 1:19", "= expected query"]),
+            (
+                ".foo.bar = .foo.(bar |)",
+                vec![" 1:23\n", "= expected path_segment"],
+            ),
+            (
+                "if .foo > 0 { .foo = \"bar\" } else",
+                vec![" 1:30\n", "= expected EOI"],
+            ),
+            (
+                r#"if .foo { }"#,
+                vec![
+                    " 1:11\n",
+                    "= expected if_statement, target_path, or root_function",
+                ],
+            ),
+            (
+                r#"if { del(.foo) } else { del(.bar) }"#,
+                vec![" 1:4\n", "= expected query"],
+            ),
+            (
+                r#"if .foo > .bar { del(.foo) } else { .bar = .baz"#,
+                // This message isn't great, ideally I'd like "expected closing bracket"
+                vec![" 1:48\n", "= expected path_index or operator"],
+            ),
+            (
+                r#"only_fields(.foo,)"#,
+                vec![" 1:18\n", "= expected target_path"],
+            ),
+            (
+                r#"only_fields()"#,
+                vec![" 1:13\n", "= expected target_path"],
+            ),
+            (
+                r#"only_fields(,)"#,
+                vec![" 1:13\n", "= expected target_path"],
+            ),
+            (
+                ".foo = to_string(\"bar\",)",
+                vec![" 1:24\n", "= expected ident or query"],
+            ),
+            (
+                // Due to the explicit list of allowed escape chars our grammar
+                // doesn't actually recognize this as a string literal.
+                r#".foo = "invalid escape \k sequence""#,
+                vec![" 1:8\n", "= expected query"],
+            ),
+            (
+                // Same here as above.
+                r#".foo."invalid \k escape".sequence = "foo""#,
+                vec![" 1:6\n", "= expected path_segment or quoted_path_segment"],
+            ),
+        ];
 
-//        for (mapping, exp_expressions) in cases {
-//            let err = parse(mapping).err().unwrap().to_string();
-//            for exp in exp_expressions {
-//                assert!(
-//                    err.contains(exp),
-//                    "expected: {}\nwith mapping: {}\nfull error message: {}",
-//                    exp,
-//                    mapping,
-//                    err
-//                );
-//            }
-//        }
-//    }
+        for (mapping, exp_expressions) in cases {
+            let err = parse(mapping).err().unwrap().to_string();
+            for exp in exp_expressions {
+                assert!(
+                    err.contains(exp),
+                    "expected: {}\nwith mapping: {}\nfull error message: {}",
+                    exp,
+                    mapping,
+                    err
+                );
+            }
+        }
+    }
 
-//    #[test]
-//    fn check_parser() {
-//        let cases = vec![
-//            (
-//                ".foo = \"bar\"",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(Literal::from(Value::from("bar"))),
-//                ))]),
-//            ),
-//            (
-//                r#".foo = "bar\t\n\\\n and also \\n""#,
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(Literal::from(Value::from("bar\t\n\\\n and also \\n"))),
-//                ))]),
-//            ),
-//            (
-//                ".foo.\"bar baz\".\"buz.bev\"[5].quz = \"bar\"",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo.bar baz.buz\\.bev[5].quz".to_string(),
-//                    Box::new(Literal::from(Value::from("bar"))),
-//                ))]),
-//            ),
-//            (
-//                ".foo = (\"bar\")",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(Literal::from(Value::from("bar"))),
-//                ))]),
-//            ),
-//            (
-//                ".foo = \"bar\\\"escaped\\\" stuff\"",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(Literal::from(Value::from("bar\"escaped\" stuff"))),
-//                ))]),
-//            ),
-//            (
-//                ".foo = true",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(Literal::from(Value::from(true))),
-//                ))]),
-//            ),
-//            (
-//                ".foo = false",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(Literal::from(Value::from(false))),
-//                ))]),
-//            ),
-//            (
-//                ".foo = null",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(Literal::from(Value::Null)),
-//                ))]),
-//            ),
-//            (
-//                ".foo = 50.5",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(Literal::from(Value::from(50.5))),
-//                ))]),
-//            ),
-//            (
-//                ".foo = .bar",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(QueryPath::from(vec![vec!["bar"]])),
-//                ))]),
-//            ),
-//            (
-//                ".foo = .bar[0].baz",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(QueryPath::from(vec![vec!["bar[0]"], vec!["baz"]])),
-//                ))]),
-//            ),
-//            (
-//                ".foo = .foo.\"bar baz\".\"buz.bev\"[5].quz",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(QueryPath::from(vec![
-//                        vec!["foo"],
-//                        vec!["bar baz"],
-//                        vec!["buz.bev[5]"],
-//                        vec!["quz"],
-//                    ])),
-//                ))]),
-//            ),
-//            (
-//                ".foo = .bar\n.bar.buz = .qux.quz",
-//                Mapping::new(vec![
-//                    Box::new(Assignment::new(
-//                        "foo".to_string(),
-//                        Box::new(QueryPath::from(vec![vec!["bar"]])),
-//                    )),
-//                    Box::new(Assignment::new(
-//                        "bar.buz".to_string(),
-//                        Box::new(QueryPath::from(vec![vec!["qux"], vec!["quz"]])),
-//                    )),
-//                ]),
-//            ),
-//            (
-//                ".foo = .bar\n\t\n.bar.buz = .qux.quz\n.qux = .bev",
-//                Mapping::new(vec![
-//                    Box::new(Assignment::new(
-//                        "foo".to_string(),
-//                        Box::new(QueryPath::from(vec![vec!["bar"]])),
-//                    )),
-//                    Box::new(Assignment::new(
-//                        "bar.buz".to_string(),
-//                        Box::new(QueryPath::from(vec![vec!["qux"], vec!["quz"]])),
-//                    )),
-//                    Box::new(Assignment::new(
-//                        "qux".to_string(),
-//                        Box::new(QueryPath::from(vec![vec!["bev"]])),
-//                    )),
-//                ]),
-//            ),
-//            (
-//                ".foo = .(bar | baz)\n",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(QueryPath::from(vec![vec!["bar", "baz"]])),
-//                ))]),
-//            ),
-//            (
-//                ".foo = .(bar | \"baz buz\")\n",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(QueryPath::from(vec![vec!["bar", "baz buz"]])),
-//                ))]),
-//            ),
-//            (
-//                ".foo = .foo.(bar | baz)\n \n",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(QueryPath::from(vec![vec!["foo"], vec!["bar", "baz"]])),
-//                ))]),
-//            ),
-//            (
-//                ".foo = .(foo | zap).(bar | baz | buz)",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(QueryPath::from(vec![
-//                        vec!["foo", "zap"],
-//                        vec!["bar", "baz", "buz"],
-//                    ])),
-//                ))]),
-//            ),
-//            (
-//                ".foo = !.bar",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(NotFn::new(Box::new(QueryPath::from(vec![vec!["bar"]])))),
-//                ))]),
-//            ),
-//            (
-//                ".foo = !!.bar",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(NotFn::new(Box::new(NotFn::new(Box::new(QueryPath::from(
-//                        vec![vec!["bar"]],
-//                    )))))),
-//                ))]),
-//            ),
-//            (
-//                ".foo = 5 + 15 / 10",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(Arithmetic::new(
-//                        Box::new(Literal::from(Value::from(5.0))),
-//                        Box::new(Arithmetic::new(
-//                            Box::new(Literal::from(Value::from(15.0))),
-//                            Box::new(Literal::from(Value::from(10.0))),
-//                            Operator::Divide,
-//                        )),
-//                        Operator::Add,
-//                    )),
-//                ))]),
-//            ),
-//            (
-//                ".foo = (5 + 15) / 10",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(Arithmetic::new(
-//                        Box::new(Arithmetic::new(
-//                            Box::new(Literal::from(Value::from(5.0))),
-//                            Box::new(Literal::from(Value::from(15.0))),
-//                            Operator::Add,
-//                        )),
-//                        Box::new(Literal::from(Value::from(10.0))),
-//                        Operator::Divide,
-//                    )),
-//                ))]),
-//            ),
-//            (
-//                ".foo = 1 || 2 > 3 * 4 + 5",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(Arithmetic::new(
-//                        Box::new(Literal::from(Value::from(1.0))),
-//                        Box::new(Arithmetic::new(
-//                            Box::new(Literal::from(Value::from(2.0))),
-//                            Box::new(Arithmetic::new(
-//                                Box::new(Arithmetic::new(
-//                                    Box::new(Literal::from(Value::from(3.0))),
-//                                    Box::new(Literal::from(Value::from(4.0))),
-//                                    Operator::Multiply,
-//                                )),
-//                                Box::new(Literal::from(Value::from(5.0))),
-//                                Operator::Add,
-//                            )),
-//                            Operator::Greater,
-//                        )),
-//                        Operator::Or,
-//                    )),
-//                ))]),
-//            ),
-//            // function: del
-//            (
-//                "del(.foo)",
-//                Mapping::new(vec![Box::new(Deletion::new(vec!["foo".to_string()]))]),
-//            ),
-//            (
-//                "del(.\"foo bar\")",
-//                Mapping::new(vec![Box::new(Deletion::new(vec!["foo bar".to_string()]))]),
-//            ),
-//            (
-//                "del(.foo)\ndel(.bar.baz)",
-//                Mapping::new(vec![
-//                    Box::new(Deletion::new(vec!["foo".to_string()])),
-//                    Box::new(Deletion::new(vec!["bar.baz".to_string()])),
-//                ]),
-//            ),
-//            (
-//                "del(.foo, .bar.baz)",
-//                Mapping::new(vec![Box::new(Deletion::new(vec![
-//                    "foo".to_string(),
-//                    "bar.baz".to_string(),
-//                ]))]),
-//            ),
-//            //
-//            (
-//                r#"if .foo == 5 {
-//                    .foo = .bar
-//                  } else {
-//                    del(.buz)
-//                  }"#,
-//                Mapping::new(vec![Box::new(IfStatement::new(
-//                    Box::new(Arithmetic::new(
-//                        Box::new(QueryPath::from("foo")),
-//                        Box::new(Literal::from(Value::from(5.0))),
-//                        Operator::Equal,
-//                    )),
-//                    Box::new(Assignment::new(
-//                        "foo".to_string(),
-//                        Box::new(QueryPath::from("bar")),
-//                    )),
-//                    Box::new(Deletion::new(vec!["buz".to_string()])),
-//                ))]),
-//            ),
-//            (
-//                "if .foo > .buz { .thing = .foo }",
-//                Mapping::new(vec![Box::new(IfStatement::new(
-//                    Box::new(Arithmetic::new(
-//                        Box::new(QueryPath::from("foo")),
-//                        Box::new(QueryPath::from("buz")),
-//                        Operator::Greater,
-//                    )),
-//                    Box::new(Assignment::new(
-//                        "thing".to_string(),
-//                        Box::new(QueryPath::from("foo")),
-//                    )),
-//                    Box::new(Noop {}),
-//                ))]),
-//            ),
-//            // function: only_fields
-//            (
-//                "only_fields(.foo)",
-//                Mapping::new(vec![Box::new(OnlyFields::new(vec!["foo".to_string()]))]),
-//            ),
-//            (
-//                "only_fields(.foo.bar, .baz)",
-//                Mapping::new(vec![Box::new(OnlyFields::new(vec![
-//                    "foo.bar".to_string(),
-//                    "baz".to_string(),
-//                ]))]),
-//            ),
-//            // function: to_string
-//            (
-//                ".foo = to_string(.foo, \"bar\")",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(ToStringFn::new(
-//                        Box::new(QueryPath::from("foo")),
-//                        Some(Value::from("bar")),
-//                    )),
-//                ))]),
-//            ),
-//            (
-//                ".foo = to_string(.bar)",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(ToStringFn::new(Box::new(QueryPath::from("bar")), None)),
-//                ))]),
-//            ),
-//            (
-//                ".foo = to_int(.foo, 5)",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(ToIntegerFn::new(
-//                        Box::new(QueryPath::from("foo")),
-//                        Some(Value::Integer(5)),
-//                    )),
-//                ))]),
-//            ),
-//            (
-//                ".foo = to_int(.foo, 5.0)",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(ToIntegerFn::new(
-//                        Box::new(QueryPath::from("foo")),
-//                        Some(Value::Integer(5)),
-//                    )),
-//                ))]),
-//            ),
-//            (
-//                ".foo = to_int(.bar)",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(ToIntegerFn::new(Box::new(QueryPath::from("bar")), None)),
-//                ))]),
-//            ),
-//            (
-//                ".foo = to_float(.foo, 5.5)",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(ToFloatFn::new(
-//                        Box::new(QueryPath::from("foo")),
-//                        Some(Value::Float(5.5)),
-//                    )),
-//                ))]),
-//            ),
-//            (
-//                ".foo = to_float(.bar)",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(ToFloatFn::new(Box::new(QueryPath::from("bar")), None)),
-//                ))]),
-//            ),
-//            (
-//                ".foo = to_bool(.foo, true)",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(ToBooleanFn::new(
-//                        Box::new(QueryPath::from("foo")),
-//                        Some(Value::Boolean(true)),
-//                    )),
-//                ))]),
-//            ),
-//            (
-//                ".foo = to_bool(.bar)",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(ToBooleanFn::new(Box::new(QueryPath::from("bar")), None)),
-//                ))]),
-//            ),
-//            (
-//                ".foo = to_timestamp(.foo, 10)",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(ToTimestampFn::new(
-//                        Box::new(QueryPath::from("foo")),
-//                        Some(Value::Integer(10)),
-//                    )),
-//                ))]),
-//            ),
-//            (
-//                ".foo = to_timestamp(.foo, \"2020-09-14T12:51:12+00:00\")",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(ToTimestampFn::new(
-//                        Box::new(QueryPath::from("foo")),
-//                        Some(Value::from("2020-09-14T12:51:12+00:00")),
-//                    )),
-//                ))]),
-//            ),
-//            (
-//                ".foo = to_timestamp(.bar)",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(ToTimestampFn::new(Box::new(QueryPath::from("bar")), None)),
-//                ))]),
-//            ),
-//            (
-//                ".foo = parse_timestamp(.foo, \"%d %m %Y\")",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(
-//                        ParseTimestampFn::new("%d %m %Y", Box::new(QueryPath::from("foo")), None)
-//                            .unwrap(),
-//                    ),
-//                ))]),
-//            ),
-//            (
-//                ".foo = upcase(.foo)",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(UpcaseFn::new(Box::new(QueryPath::from("foo")))),
-//                ))]),
-//            ),
-//            (
-//                ".foo = downcase(.foo)",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(DowncaseFn::new(Box::new(QueryPath::from("foo")))),
-//                ))]),
-//            ),
-//            (
-//                ".foo = strip_whitespace(.foo)",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(StripWhitespaceFn::new(Box::new(QueryPath::from("foo")))),
-//                ))]),
-//            ),
-//            (
-//                ".foo = strip_whitespace(.foo)",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(StripWhitespaceFn::new(Box::new(QueryPath::from("foo")))),
-//                ))]),
-//            ),
-//            (
-//                ".foo = truncate(.foo, .limit)",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(TruncateFn::new(
-//                        Box::new(QueryPath::from("foo")),
-//                        Box::new(QueryPath::from("limit")),
-//                        None,
-//                    )),
-//                ))]),
-//            ),
-//            (
-//                ".foo = truncate(.foo, 5, true)",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(TruncateFn::new(
-//                        Box::new(QueryPath::from("foo")),
-//                        Box::new(Literal::from(Value::Float(5.0))),
-//                        Some(Value::Boolean(true)),
-//                    )),
-//                ))]),
-//            ),
-//            (
-//                ".foo = parse_json(.foo)",
-//                Mapping::new(vec![Box::new(Assignment::new(
-//                    "foo".to_string(),
-//                    Box::new(ParseJsonFn::new(Box::new(QueryPath::from("foo")))),
-//                ))]),
-//            ),
-//            (
-//                "merge(.bar, .baz)",
-//                Mapping::new(vec![Box::new(MergeFn::new(
-//                    "bar".into(),
-//                    Box::new(QueryPath::from("baz")),
-//                    None,
-//                ))]),
-//            ),
-//            (
-//                "merge(.bar, .baz, .boz)",
-//                Mapping::new(vec![Box::new(MergeFn::new(
-//                    "bar".into(),
-//                    Box::new(QueryPath::from("baz")),
-//                    Some(Box::new(QueryPath::from("boz"))),
-//                ))]),
-//            ),
-//            (
-//                "merge(.bar, .baz, true)",
-//                Mapping::new(vec![Box::new(MergeFn::new(
-//                    "bar".into(),
-//                    Box::new(QueryPath::from("baz")),
-//                    Some(Box::new(Literal::from(Value::Boolean(true)))),
-//                ))]),
-//            ),
-//        ];
+    #[test]
+    fn check_parser() {
+        let cases = vec![
+            (
+                ".foo = \"bar\"",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Literal::from(Value::from("bar"))),
+                ))]),
+            ),
+            (
+                r#".foo = "bar\t\n\\\n and also \\n""#,
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Literal::from(Value::from("bar\t\n\\\n and also \\n"))),
+                ))]),
+            ),
+            (
+                ".foo.\"bar baz\".\"buz.bev\"[5].quz = \"bar\"",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo.bar baz.buz\\.bev[5].quz".to_string(),
+                    Box::new(Literal::from(Value::from("bar"))),
+                ))]),
+            ),
+            (
+                ".foo = (\"bar\")",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Literal::from(Value::from("bar"))),
+                ))]),
+            ),
+            (
+                ".foo = \"bar\\\"escaped\\\" stuff\"",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Literal::from(Value::from("bar\"escaped\" stuff"))),
+                ))]),
+            ),
+            (
+                ".foo = true",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Literal::from(Value::from(true))),
+                ))]),
+            ),
+            (
+                ".foo = false",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Literal::from(Value::from(false))),
+                ))]),
+            ),
+            (
+                ".foo = null",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Literal::from(Value::Null)),
+                ))]),
+            ),
+            (
+                ".foo = 50.5",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Literal::from(Value::from(50.5))),
+                ))]),
+            ),
+            (
+                ".foo = .bar",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(QueryPath::from(vec![vec!["bar"]])),
+                ))]),
+            ),
+            (
+                ".foo = .bar[0].baz",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(QueryPath::from(vec![vec!["bar[0]"], vec!["baz"]])),
+                ))]),
+            ),
+            (
+                ".foo = .foo.\"bar baz\".\"buz.bev\"[5].quz",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(QueryPath::from(vec![
+                        vec!["foo"],
+                        vec!["bar baz"],
+                        vec!["buz.bev[5]"],
+                        vec!["quz"],
+                    ])),
+                ))]),
+            ),
+            (
+                ".foo = .bar\n.bar.buz = .qux.quz",
+                Mapping::new(vec![
+                    Box::new(Assignment::new(
+                        "foo".to_string(),
+                        Box::new(QueryPath::from(vec![vec!["bar"]])),
+                    )),
+                    Box::new(Assignment::new(
+                        "bar.buz".to_string(),
+                        Box::new(QueryPath::from(vec![vec!["qux"], vec!["quz"]])),
+                    )),
+                ]),
+            ),
+            (
+                ".foo = .bar\n\t\n.bar.buz = .qux.quz\n.qux = .bev",
+                Mapping::new(vec![
+                    Box::new(Assignment::new(
+                        "foo".to_string(),
+                        Box::new(QueryPath::from(vec![vec!["bar"]])),
+                    )),
+                    Box::new(Assignment::new(
+                        "bar.buz".to_string(),
+                        Box::new(QueryPath::from(vec![vec!["qux"], vec!["quz"]])),
+                    )),
+                    Box::new(Assignment::new(
+                        "qux".to_string(),
+                        Box::new(QueryPath::from(vec![vec!["bev"]])),
+                    )),
+                ]),
+            ),
+            (
+                ".foo = .(bar | baz)\n",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(QueryPath::from(vec![vec!["bar", "baz"]])),
+                ))]),
+            ),
+            (
+                ".foo = .(bar | \"baz buz\")\n",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(QueryPath::from(vec![vec!["bar", "baz buz"]])),
+                ))]),
+            ),
+            (
+                ".foo = .foo.(bar | baz)\n \n",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(QueryPath::from(vec![vec!["foo"], vec!["bar", "baz"]])),
+                ))]),
+            ),
+            (
+                ".foo = .(foo | zap).(bar | baz | buz)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(QueryPath::from(vec![
+                        vec!["foo", "zap"],
+                        vec!["bar", "baz", "buz"],
+                    ])),
+                ))]),
+            ),
+            (
+                ".foo = !.bar",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(NotFn::new(Box::new(QueryPath::from(vec![vec!["bar"]])))),
+                ))]),
+            ),
+            (
+                ".foo = !!.bar",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(NotFn::new(Box::new(NotFn::new(Box::new(QueryPath::from(
+                        vec![vec!["bar"]],
+                    )))))),
+                ))]),
+            ),
+            (
+                ".foo = 5 + 15 / 10",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Arithmetic::new(
+                        Box::new(Literal::from(Value::from(5))),
+                        Box::new(Arithmetic::new(
+                            Box::new(Literal::from(Value::from(15))),
+                            Box::new(Literal::from(Value::from(10))),
+                            Operator::Divide,
+                        )),
+                        Operator::Add,
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = (5 + 15) / 10",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Arithmetic::new(
+                        Box::new(Arithmetic::new(
+                            Box::new(Literal::from(Value::from(5))),
+                            Box::new(Literal::from(Value::from(15))),
+                            Operator::Add,
+                        )),
+                        Box::new(Literal::from(Value::from(10))),
+                        Operator::Divide,
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = 1 || 2 > 3 * 4 + 5",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Arithmetic::new(
+                        Box::new(Literal::from(Value::from(1))),
+                        Box::new(Arithmetic::new(
+                            Box::new(Literal::from(Value::from(2))),
+                            Box::new(Arithmetic::new(
+                                Box::new(Arithmetic::new(
+                                    Box::new(Literal::from(Value::from(3))),
+                                    Box::new(Literal::from(Value::from(4))),
+                                    Operator::Multiply,
+                                )),
+                                Box::new(Literal::from(Value::from(5))),
+                                Operator::Add,
+                            )),
+                            Operator::Greater,
+                        )),
+                        Operator::Or,
+                    )),
+                ))]),
+            ),
+            // function: del
+            (
+                "del(.foo)",
+                Mapping::new(vec![Box::new(Deletion::new(vec!["foo".to_string()]))]),
+            ),
+            (
+                "del(.\"foo bar\")",
+                Mapping::new(vec![Box::new(Deletion::new(vec!["foo bar".to_string()]))]),
+            ),
+            (
+                "del(.foo)\ndel(.bar.baz)",
+                Mapping::new(vec![
+                    Box::new(Deletion::new(vec!["foo".to_string()])),
+                    Box::new(Deletion::new(vec!["bar.baz".to_string()])),
+                ]),
+            ),
+            (
+                "del(.foo, .bar.baz)",
+                Mapping::new(vec![Box::new(Deletion::new(vec![
+                    "foo".to_string(),
+                    "bar.baz".to_string(),
+                ]))]),
+            ),
+            //
+            (
+                r#"if .foo == 5 {
+                    .foo = .bar
+                  } else {
+                    del(.buz)
+                  }"#,
+                Mapping::new(vec![Box::new(IfStatement::new(
+                    Box::new(Arithmetic::new(
+                        Box::new(QueryPath::from("foo")),
+                        Box::new(Literal::from(Value::from(5))),
+                        Operator::Equal,
+                    )),
+                    Box::new(Assignment::new(
+                        "foo".to_string(),
+                        Box::new(QueryPath::from("bar")),
+                    )),
+                    Box::new(Deletion::new(vec!["buz".to_string()])),
+                ))]),
+            ),
+            (
+                "if .foo > .buz { .thing = .foo }",
+                Mapping::new(vec![Box::new(IfStatement::new(
+                    Box::new(Arithmetic::new(
+                        Box::new(QueryPath::from("foo")),
+                        Box::new(QueryPath::from("buz")),
+                        Operator::Greater,
+                    )),
+                    Box::new(Assignment::new(
+                        "thing".to_string(),
+                        Box::new(QueryPath::from("foo")),
+                    )),
+                    Box::new(Noop {}),
+                ))]),
+            ),
+            // function: only_fields
+            (
+                "only_fields(.foo)",
+                Mapping::new(vec![Box::new(OnlyFields::new(vec!["foo".to_string()]))]),
+            ),
+            (
+                "only_fields(.foo.bar, .baz)",
+                Mapping::new(vec![Box::new(OnlyFields::new(vec![
+                    "foo.bar".to_string(),
+                    "baz".to_string(),
+                ]))]),
+            ),
+            // function: to_string
+            (
+                ".foo = to_string(.foo, \"bar\")",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToStringFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Some(Value::from("bar")),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = to_string(.bar)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToStringFn::new(Box::new(QueryPath::from("bar")), None)),
+                ))]),
+            ),
+            (
+                ".foo = to_int(.foo, 5)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToIntegerFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Some(Value::Integer(5)),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = to_int(.foo, 5.0)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToIntegerFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Some(Value::Float(5.0)),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = to_int(.bar)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToIntegerFn::new(Box::new(QueryPath::from("bar")), None)),
+                ))]),
+            ),
+            (
+                ".foo = to_float(.foo, 5.5)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToFloatFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Some(Value::Float(5.5)),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = to_float(.bar)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToFloatFn::new(Box::new(QueryPath::from("bar")), None)),
+                ))]),
+            ),
+            (
+                ".foo = to_bool(.foo, true)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToBooleanFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Some(Value::Boolean(true)),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = to_bool(.bar)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToBooleanFn::new(Box::new(QueryPath::from("bar")), None)),
+                ))]),
+            ),
+            (
+                ".foo = to_timestamp(.foo, 10)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToTimestampFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Some(Value::Integer(10)),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = to_timestamp(.foo, \"2020-09-14T12:51:12+00:00\")",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToTimestampFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Some(Value::from("2020-09-14T12:51:12+00:00")),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = to_timestamp(.bar)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ToTimestampFn::new(Box::new(QueryPath::from("bar")), None)),
+                ))]),
+            ),
+            (
+                ".foo = parse_timestamp(.foo, \"%d %m %Y\")",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ParseTimestampFn::new(
+                        "%d %m %Y",
+                        Box::new(QueryPath::from("foo")),
+                        None,
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = upcase(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(UpcaseFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                ".foo = downcase(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(DowncaseFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                ".foo = strip_whitespace(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(StripWhitespaceFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                ".foo = strip_whitespace(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(StripWhitespaceFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                ".foo = truncate(.foo, .limit)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(TruncateFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Box::new(QueryPath::from("limit")),
+                        None,
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = truncate(.foo, 5, true)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(TruncateFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Box::new(Literal::from(Value::Integer(5))),
+                        Some(Value::Boolean(true)),
+                    )),
+                ))]),
+            ),
+            (
+                ".foo = parse_json(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ParseJsonFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                "merge(.bar, .baz)",
+                Mapping::new(vec![Box::new(MergeFn::new(
+                    "bar".into(),
+                    Box::new(QueryPath::from("baz")),
+                    None,
+                ))]),
+            ),
+            (
+                "merge(.bar, .baz, .boz)",
+                Mapping::new(vec![Box::new(MergeFn::new(
+                    "bar".into(),
+                    Box::new(QueryPath::from("baz")),
+                    Some(Box::new(QueryPath::from("boz"))),
+                ))]),
+            ),
+            (
+                "merge(.bar, .baz, true)",
+                Mapping::new(vec![Box::new(MergeFn::new(
+                    "bar".into(),
+                    Box::new(QueryPath::from("baz")),
+                    Some(Box::new(Literal::from(Value::Boolean(true)))),
+                ))]),
+            ),
+        ];
 
-//        for (mapping, exp) in cases {
-//            match parse(mapping) {
-//                Ok(p) => assert_eq!(format!("{:?}", p), format!("{:?}", exp), "{}", mapping),
-//                Err(e) => panic!("{}, mapping: {}", e, mapping),
-//            }
-//        }
-//    }
-//}
+        for (mapping, exp) in cases {
+            match parse(mapping) {
+                Ok(p) => assert_eq!(format!("{:?}", p), format!("{:?}", exp), "{}", mapping),
+                Err(e) => panic!("{}, mapping: {}", e, mapping),
+            }
+        }
+    }
+}
