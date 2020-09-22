@@ -84,7 +84,7 @@ inventory::submit! {
 
 impl GenerateConfig for JournaldConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -530,6 +530,11 @@ mod checkpointer_tests {
     use std::io::Read;
     use std::path::Path;
     use tempfile::tempdir;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<JournaldConfig>();
+    }
 
     fn open_read_close<F: AsRef<Path> + Debug>(path: F) -> Vec<u8> {
         let mut file = File::open(&path).unwrap_or_else(|_| panic!("Could not open {:?}", path));
