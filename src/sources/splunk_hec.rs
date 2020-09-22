@@ -55,7 +55,7 @@ inventory::submit! {
 
 impl GenerateConfig for SplunkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -787,6 +787,11 @@ mod tests {
     use futures::{compat::Future01CompatExt, future, stream, StreamExt};
     use futures01::sync::mpsc;
     use std::net::SocketAddr;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SplunkConfig>();
+    }
 
     /// Splunk token
     const TOKEN: &str = "token";
