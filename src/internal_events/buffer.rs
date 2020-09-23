@@ -13,8 +13,6 @@ impl InternalEvent for BufferEventDropped {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "events_dropped", 1,
-        );
+        counter!("events_dropped", 1,);
     }
 }

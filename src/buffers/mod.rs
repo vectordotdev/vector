@@ -1,3 +1,4 @@
+use crate::internal_events::BufferEventDropped;
 use crate::Event;
 use futures01::{sync::mpsc, task::AtomicTask, AsyncSink, Poll, Sink, StartSend, Stream};
 use serde::{Deserialize, Serialize};
@@ -6,7 +7,6 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
-use crate::internal_events::BufferEventDropped;
 
 #[cfg(feature = "leveldb")]
 pub mod disk;
@@ -179,7 +179,7 @@ impl<S: Sink> Sink for DropWhenFull<S> {
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         match self.inner.start_send(item) {
             Ok(AsyncSink::NotReady(_)) => {
-                emit!(BufferEventDropped{});
+                emit!(BufferEventDropped {});
                 Ok(AsyncSink::Ready)
             }
             other => other,

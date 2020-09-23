@@ -24,6 +24,9 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 #[macro_use]
 pub mod internal_events;
 
+#[cfg(feature = "api")]
+pub mod api;
+pub mod async_read;
 pub mod buffers;
 pub mod conditions;
 pub mod config;
@@ -31,11 +34,6 @@ pub mod dns;
 pub mod event;
 pub mod expiring_hash_map;
 pub mod generate;
-#[cfg(feature = "wasm")]
-pub mod wasm;
-#[cfg(feature = "api")]
-pub mod api;
-pub mod async_read;
 pub mod heartbeat;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
@@ -61,6 +59,8 @@ pub mod transforms;
 pub mod types;
 pub mod unit_test;
 pub mod validate;
+#[cfg(feature = "wasm")]
+pub mod wasm;
 
 pub use event::Event;
 pub use pipeline::Pipeline;
