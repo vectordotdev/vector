@@ -70,6 +70,14 @@ impl Display for Lookup {
 }
 
 impl Lookup {
+    pub fn push(&mut self, segment: Segment) {
+        self.segments.push(segment)
+    }
+
+    pub fn pop(&mut self) -> Option<Segment> {
+        self.segments.pop()
+    }
+    
     pub fn iter(&self) -> Iter<'_, Segment> {
         self.segments.iter()
     }

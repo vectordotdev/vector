@@ -143,3 +143,15 @@ impl Display for Segment {
         }
     }
 }
+
+impl From<String> for Segment {
+    fn from(s: String) -> Self {
+        Self::Field(s)
+    }
+}
+
+impl From<usize> for Segment {
+    fn from(u: usize) -> Self {
+        Self::index(u)
+    }
+}

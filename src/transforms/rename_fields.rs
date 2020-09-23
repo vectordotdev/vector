@@ -10,7 +10,6 @@ use crate::{
 };
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::convert::TryInto;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -33,7 +32,7 @@ impl TransformConfig for RenameFieldsConfig {
     fn build(&self, _exec: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let mut fields = IndexMap::default();
         for (key, value) in self.fields.clone().all_fields() {
-            fields.insert(key.to_string().try_into()?, value.to_string().try_into()?);
+            fields.insert(key.to_string().parse::<Lookup>()?, value.to_string().parse::<Lookup>()?);
         }
         Ok(Box::new(RenameFields::new(
             fields,

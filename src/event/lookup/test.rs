@@ -35,11 +35,42 @@ fn simple() {
     assert_eq!(lookup.to_string(), input);
 }
 
+
+#[test]
+fn push() {
+    crate::test_util::trace_init();
+    let input = "some_key";
+    let mut lookup = Lookup::from_str(input).unwrap();
+    lookup.push(Segment::field(String::from(input)));
+    assert_eq!(lookup[0], Segment::from(String::from("some_key")));
+    assert_eq!(lookup[1], Segment::from(String::from("some_key")));
+}
+
+#[test]
+fn pop() {
+    crate::test_util::trace_init();
+    let input = "some_key";
+    let mut lookup = Lookup::from_str(input).unwrap();
+    let out = lookup.pop();
+    assert_eq!(out, Some(Segment::field(String::from("some_key"))));
+}
+
+
 #[test]
 fn array() {
     crate::test_util::trace_init();
     let input = "foo[0]";
     let lookup = Lookup::from_str(input).unwrap();
+    assert_eq!(lookup[0], Segment::field(String::from("foo")));
+    assert_eq!(lookup[1], Segment::index(0));
+    assert_eq!(lookup.to_string(), input);
+}
+
+#[test]
+fn via_parse() {
+    crate::test_util::trace_init();
+    let input = "foo[0]";
+    let lookup = input.parse::<Lookup>().unwrap();
     assert_eq!(lookup[0], Segment::field(String::from("foo")));
     assert_eq!(lookup[1], Segment::index(0));
     assert_eq!(lookup.to_string(), input);

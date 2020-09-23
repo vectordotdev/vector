@@ -18,7 +18,7 @@ use vector::{
     config::{self, ConfigDiff},
     generate, heartbeat,
     internal_events::{
-        VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed,
+        self, VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed,
         VectorReloaded, VectorStarted, VectorStopped,
     },
     list, metrics,

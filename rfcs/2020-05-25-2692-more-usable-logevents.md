@@ -184,7 +184,7 @@ This RFC ultimately proposes the following steps:
 
 1. Add UX improvements on `LogEvent`, particularly turning JSON into or from `LogEvent`.
 1. Refactor the `PathIter` to make `vector::event::Lookup` type.
-1. Add UX improvements on `Lookup` , particularly an internal `String` ↔ `Lookup` with an `Into`/`From` that does not do path parsing, as well as a `Lookup::parse(s: String)` that does.
+1. Add UX improvements on `Lookup` , particularly an internal `String` ↔ `Lookup` with an `Into`/`From` that does not do path parsing, as well as a `<Lookup as std::str::FromStr>::from_str(s: String)` that does. (This also enables `"foo.bar".parse::<Lookup>()?`)
 1. Refactor all `LogEvent` to accept `Into<Lookup>` values.
     1. Remove obsolete functionality like `insert_path` since the new `Lookup` type covers this.
     2. Refactor the `keys` function to return an `Iterator<Lookup>`
