@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Benchmark, BenchmarkId, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Throughput, Benchmark, BenchmarkId, Criterion};
 use serde_json::Value;
 use std::{collections::HashMap, fs, io::Read, path::Path};
 use vector::{
@@ -40,8 +40,9 @@ fn lookup_to_string(c: &mut Criterion) {
             _ => panic!("This test should never read Err'ing test fixtures."),
         });
 
-    let mut group_from_elem = c.benchmark_group("from_elem");
+    let mut group_from_elem = c.benchmark_group("from_string");
     for (_path, fixture) in fixtures.iter() {
+        group_from_elem.throughput(Throughput::Bytes(fixture.clone().into_bytes().len() as u64));
         group_from_elem.bench_with_input(
             BenchmarkId::from_parameter(&fixture),
             &fixture.clone(),
@@ -61,6 +62,7 @@ fn lookup_to_string(c: &mut Criterion) {
 
     let mut group_to_string = c.benchmark_group("to_string");
     for (_path, fixture) in fixtures.iter() {
+        group_to_string.throughput(Throughput::Bytes(fixture.clone().into_bytes().len() as u64));
         group_to_string.bench_with_input(
             BenchmarkId::from_parameter(&fixture),
             &fixture.clone(),
@@ -80,6 +82,7 @@ fn lookup_to_string(c: &mut Criterion) {
 
     let mut group_serialize = c.benchmark_group("serialize");
     for (_path, fixture) in fixtures.iter() {
+        group_serialize.throughput(Throughput::Bytes(fixture.clone().into_bytes().len() as u64));
         group_serialize.bench_with_input(
             BenchmarkId::from_parameter(&fixture),
             &fixture.clone(),
@@ -96,6 +99,26 @@ fn lookup_to_string(c: &mut Criterion) {
         );
     }
     group_serialize.finish();
+
+    let mut group_deserialize = c.benchmark_group("deserialize");
+    for (_path, fixture) in fixtures.iter() {
+        group_deserialize.throughput(Throughput::Bytes(fixture.clone().into_bytes().len() as u64));
+        group_deserialize.bench_with_input(
+            BenchmarkId::from_parameter(&fixture),
+            &fixture.clone(),
+            move |b, ref param| {
+                let input = param.clone();
+                b.iter_with_setup(
+                    || serde_json::to_string(&Lookup::try_from(input.clone()).unwrap()).unwrap(),
+                    |input| {
+                        let lookup: Lookup = serde_json::from_str(&input).unwrap();
+                        black_box(lookup)
+                    },
+                )
+            }
+        );
+    }
+    group_deserialize.finish();
 }
 
 
