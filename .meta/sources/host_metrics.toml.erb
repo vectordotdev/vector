@@ -22,9 +22,10 @@ required = false
 description = "The list of host metric collector services to use. Defaults to all collectors."
 
 [sources.host_metrics.options.collectors.enum]
-cpu = "Metrics related to CPU usage."
+cpu = "Metrics related to CPU utilization."
 load = "Load average metrics (UNIX only)."
-memory = "Metrics related to memory usage."
+memory = "Metrics related to memory utilization."
+network = "Metrics related to network utilization."
 
 [sources.host_metrics.options.scrape_interval_secs]
 type = "integer"

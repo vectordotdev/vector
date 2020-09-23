@@ -14,12 +14,14 @@ use futures::{
     stream::{self, StreamExt},
 };
 use futures01::Sink;
-#[cfg(target_os = "linux")]
-use heim::cpu::os::linux::CpuTimeExt;
 #[cfg(target_os = "macos")]
 use heim::memory::os::macos::MemoryExt;
 #[cfg(not(target_os = "windows"))]
 use heim::memory::os::SwapExt;
+#[cfg(target_os = "windows")]
+use heim::net::os::windows::IoCountersExt;
+#[cfg(target_os = "linux")]
+use heim::{cpu::os::linux::CpuTimeExt, net::os::linux::IoCountersExt};
 use heim::{
     units::{information::byte, ratio::ratio, time::second},
     Error,
@@ -43,6 +45,7 @@ enum Collector {
     Cpu,
     Load,
     Memory,
+    Network,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -128,6 +131,9 @@ impl HostMetricsConfig {
             metrics.extend(add_collector("memory", memory_metrics().await));
             metrics.extend(add_collector("memory", swap_metrics().await));
         }
+        if self.has_collector(Collector::Network) {
+            metrics.extend(add_collector("network", net_metrics().await));
+        }
         if let Ok(hostname) = &hostname {
             for metric in &mut metrics {
                 (metric.tags.as_mut().unwrap()).insert("host".into(), hostname.into());
@@ -138,19 +144,19 @@ impl HostMetricsConfig {
 }
 
 macro_rules! counter {
-    ( $name:expr, $timestamp:expr, $value:expr $( , $tag:literal => $tagval:literal )* ) => {
+    ( $name:expr, $timestamp:expr, $value:expr $( , $tag:literal => $tagval:expr )* ) => {
         metric!($name, $timestamp, Counter, $value $( , $tag => $tagval )* )
     };
 }
 
 macro_rules! gauge {
-    ( $name:expr, $timestamp:expr, $value:expr $( , $tag:literal => $tagval:literal )* ) => {
+    ( $name:expr, $timestamp:expr, $value:expr $( , $tag:literal => $tagval:expr )* ) => {
         metric!($name, $timestamp, Gauge, $value $( , $tag => $tagval )* )
     };
 }
 
 macro_rules! metric {
-    ( $name:expr, $timestamp:expr, $type:ident, $value:expr $( , $tag:literal => $tagval:literal )* ) => {
+    ( $name:expr, $timestamp:expr, $type:ident, $value:expr $( , $tag:literal => $tagval:expr )* ) => {
         Metric {
             name: $name.into(),
             timestamp: $timestamp,
@@ -169,7 +175,15 @@ async fn cpu_metrics() -> Vec<Metric> {
     match heim::cpu::times().await {
         Ok(times) => {
             times
-                .map(Result::unwrap)
+                .filter_map(|result| async {
+                    match result {
+                        Ok(times) => Some(times),
+                        Err(error) => {
+                            error!(message = "Failed to load/parse CPU time", %error, rate_limit_secs = 60);
+                            None
+                        }
+                    }
+                })
                 .map(|times| {
                     let timestamp = Some(Utc::now());
                     let name = "host_cpu_seconds_total";
@@ -307,6 +321,82 @@ async fn loadavg_metrics() -> Vec<Metric> {
     let result = vec![];
 
     result
+}
+
+async fn net_metrics() -> Vec<Metric> {
+    match heim::net::io_counters().await {
+        Ok(counters) => {
+            counters
+                .filter_map(|result| async {
+                    match result {
+                        Ok(counters) => Some(counters),
+                        Err(error) => {
+                            error!(message = "Failed to load/parse network I/O counter", %error, rate_limit_secs = 60);
+                            None
+                        }
+                    }
+                })
+                .map(|counter| {
+                    let timestamp = Some(Utc::now());
+                    let interface = counter.interface();
+                    stream::iter(
+                        vec![
+                            counter!(
+                                "host_network_receive_bytes_total",
+                                timestamp,
+                                counter.bytes_recv().get::<byte>(),
+                                "device" => interface
+                            ),
+                            counter!(
+                                "host_network_receive_errs_total",
+                                timestamp,
+                                counter.errors_recv(),
+                                "device" => interface
+                            ),
+                            counter!(
+                                "host_network_receive_packets_drop_total",
+                                timestamp,
+                                counter.drop_sent(),
+                                "device" => interface
+                            ),
+                            counter!(
+                                "host_network_receive_packets_total",
+                                timestamp,
+                                counter.drop_recv(),
+                                "device" => interface
+                            ),
+                            counter!(
+                                "host_network_transmit_bytes_total",
+                                timestamp,
+                                counter.bytes_sent().get::<byte>(),
+                                "device" => interface
+                            ),
+                            counter!(
+                                "host_network_transmit_errs_total",
+                                timestamp,
+                                counter.errors_sent(),
+                                "device" => interface
+                            ),
+                            #[cfg(any(target_os = "windows", target_os = "linux"))]
+                            counter!(
+                                "host_network_transmit_packets_total",
+                                timestamp,
+                                counter.packets_sent(),
+                                "device" => interface
+                            ),
+                        ]
+                        .into_iter(),
+                    )
+                })
+                .flatten()
+                .collect::<Vec<_>>()
+                .await
+        }
+        Err(error) => {
+            error!(message = "Failed to load network I/O counters", %error, rate_limit_secs = 60);
+            vec![]
+        }
+    }
 }
 
 fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
