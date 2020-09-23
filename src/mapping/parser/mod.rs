@@ -297,9 +297,6 @@ fn positional_item_from_pair(
     let keyword = parameter.keyword.to_owned();
     let argument = Argument::new(resolver, parameter);
 
-    // TODO(jean): I think we can get rid of the `ArgumentList` wrapper, as we
-    // always apply a keyword to an argument, even if a positional argument was
-    // given.
     list.push(argument, Some(keyword));
 
     Ok(())
