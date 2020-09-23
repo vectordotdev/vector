@@ -1,6 +1,8 @@
 use futures01::Future;
 use snafu::Snafu;
 
+#[cfg(feature = "sources-apache_metrics")]
+pub mod apache_metrics;
 #[cfg(feature = "sources-docker")]
 pub mod docker;
 #[cfg(feature = "sources-file")]

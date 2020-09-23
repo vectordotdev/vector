@@ -101,3 +101,11 @@ sort = 4
 description = """\
 Event field for Pod labels.\
 """
+
+[sources.kubernetes_logs.options.annotation_fields.children.container_name]
+type = "string"
+default = "kubernetes.container_name"
+sort = 5
+description = """\
+Event field for container name.\
+"""

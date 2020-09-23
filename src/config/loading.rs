@@ -126,7 +126,7 @@ fn load(mut input: impl std::io::Read) -> Result<ConfigBuilder, Vec<String>> {
 
     let mut vars = std::env::vars().collect::<HashMap<_, _>>();
     if !vars.contains_key("HOSTNAME") {
-        if let Some(hostname) = hostname::get_hostname() {
+        if let Ok(hostname) = crate::get_hostname() {
             vars.insert("HOSTNAME".into(), hostname);
         }
     }
