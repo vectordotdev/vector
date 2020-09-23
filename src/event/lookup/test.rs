@@ -134,12 +134,7 @@ fn lookup_to_string_and_serialize() {
                 tracing::trace!(?path, "Opening.");
                 let buf = parse_artifact(&path).unwrap();
                 let lookup = Lookup::try_from(buf.clone()).unwrap();
-                tracing::trace!(
-                        ?path,
-                        ?lookup,
-                        ?buf,
-                        "Asserting equal."
-                    );
+                tracing::trace!(?path, ?lookup, ?buf, "Asserting equal.");
                 assert_eq!(lookup.to_string(), buf);
                 // Ensure serialization doesn't clobber.
                 let serialized = serde_json::to_string(&lookup.to_string()).unwrap();

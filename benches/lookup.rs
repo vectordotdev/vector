@@ -1,12 +1,8 @@
-use criterion::{black_box, criterion_group, criterion_main, Throughput, Benchmark, BenchmarkId, Criterion};
-use serde_json::Value;
-use std::{collections::HashMap, fs, io::Read, path::Path};
-use vector::{
-    event::Lookup,
-};
-use tracing::trace;
-use std::convert::TryFrom;
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use indexmap::map::IndexMap;
+use std::convert::TryFrom;
+use std::{fs, io::Read, path::Path};
+use vector::event::Lookup;
 
 const FIXTURE_ROOT: &str = "tests/data/fixtures/lookup";
 
@@ -55,7 +51,7 @@ fn lookup_to_string(c: &mut Criterion) {
                         black_box(lookup)
                     },
                 )
-            }
+            },
         );
     }
     group_from_elem.finish();
@@ -75,7 +71,7 @@ fn lookup_to_string(c: &mut Criterion) {
                         black_box(string)
                     },
                 )
-            }
+            },
         );
     }
     group_to_string.finish();
@@ -95,7 +91,7 @@ fn lookup_to_string(c: &mut Criterion) {
                         black_box(string)
                     },
                 )
-            }
+            },
         );
     }
     group_serialize.finish();
@@ -115,12 +111,11 @@ fn lookup_to_string(c: &mut Criterion) {
                         black_box(lookup)
                     },
                 )
-            }
+            },
         );
     }
     group_deserialize.finish();
 }
-
 
 criterion_group!(lookup, lookup_to_string);
 criterion_main!(lookup);

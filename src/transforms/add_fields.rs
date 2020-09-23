@@ -2,13 +2,13 @@ use super::Transform;
 use crate::serde::Fields;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::Lookup,
     event::{Event, Value},
     internal_events::{
         AddFieldsEventProcessed, AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten,
         AddFieldsTemplateRenderingError,
     },
     template::Template,
-    event::Lookup,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -76,17 +76,16 @@ impl TransformConfig for AddFieldsConfig {
 
 impl AddFields {
     pub fn new(mut fields: IndexMap<Atom, TomlValue>, overwrite: bool) -> crate::Result<Self> {
-        let mut set = Lookup::from_indexmap(fields.drain(..).map(|(k, v)| (k.to_string(), v)).collect())?;
+        let mut set =
+            Lookup::from_indexmap(fields.drain(..).map(|(k, v)| (k.to_string(), v)).collect())?;
         let mut with_templates = IndexMap::with_capacity(set.len());
         for (k, v) in set.drain(..) {
             let maybe_template = match v {
-                Value::Bytes(s) => {
-                    match Template::try_from(String::from_utf8(s.to_vec())?) {
-                        Ok(t) => TemplateOrValue::from(t),
-                        Err(_) => TemplateOrValue::from(Value::Bytes(s)),
-                    }
+                Value::Bytes(s) => match Template::try_from(String::from_utf8(s.to_vec())?) {
+                    Ok(t) => TemplateOrValue::from(t),
+                    Err(_) => TemplateOrValue::from(Value::Bytes(s)),
                 },
-                v => TemplateOrValue::from(v)
+                v => TemplateOrValue::from(v),
             };
             with_templates.insert(k, maybe_template);
         }

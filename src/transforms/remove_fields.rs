@@ -1,13 +1,13 @@
 use super::Transform;
+use crate::event::Lookup;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     internal_events::{RemoveFieldsEventProcessed, RemoveFieldsFieldMissing},
     Event,
 };
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
-use crate::event::Lookup;
 use std::convert::TryFrom;
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -54,7 +54,10 @@ impl RemoveFields {
             let string = field.to_string();
             lookups.push(Lookup::try_from(string)?);
         }
-        Ok(RemoveFields { fields: lookups, drop_empty })
+        Ok(RemoveFields {
+            fields: lookups,
+            drop_empty,
+        })
     }
 }
 
@@ -88,7 +91,8 @@ mod tests {
         event.as_mut_log().insert("to_remove", "some value");
         event.as_mut_log().insert("to_keep", "another value");
 
-        let mut transform = RemoveFields::new(vec!["to_remove".into(), "unknown".into()], false).unwrap();
+        let mut transform =
+            RemoveFields::new(vec!["to_remove".into(), "unknown".into()], false).unwrap();
 
         let new_event = transform.transform(event).unwrap();
 

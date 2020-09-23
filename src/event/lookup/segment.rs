@@ -1,7 +1,7 @@
 use crate::mapping::parser::Rule;
+use nom::lib::std::fmt::Formatter;
 use pest::iterators::Pair;
 use std::fmt::Display;
-use nom::lib::std::fmt::Formatter;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub enum Segment {
@@ -119,7 +119,7 @@ impl Segment {
             Rule::inner_quoted_string => {
                 tracing::trace!(segment = segment.as_str(), rule = ?segment.as_rule(), action = %"push");
                 Ok(Segment::field(
-                    String::from(r#"""#) + segment.as_str() + r#"""#
+                    String::from(r#"""#) + segment.as_str() + r#"""#,
                 ))
             }
             _ => {

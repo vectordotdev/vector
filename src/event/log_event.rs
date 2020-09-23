@@ -138,7 +138,8 @@ impl std::ops::Index<&DefaultAtom> for LogEvent {
     type Output = Value;
 
     fn index(&self, key: &DefaultAtom) -> &Value {
-        self.get(key).expect(&*format!("Key is not found: {:?}", key))
+        self.get(key)
+            .expect(&*format!("Key is not found: {:?}", key))
     }
 }
 
