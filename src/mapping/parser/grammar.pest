@@ -64,7 +64,7 @@ keyword_item = { ident ~ "=" ~ query_arithmetic }
 
 group = { "(" ~ query_arithmetic ~ ")" }
 
-value = _{ string | number | boolean | null }
+value = _{ string | float | integer | boolean | null }
 
 boolean = { "true" | "false" }
 
@@ -80,13 +80,17 @@ char = {
     // | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
 
-number = @{
+integer = @{
     "-"?
     ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)
-    ~ ("." ~ ASCII_DIGIT*)?
-    ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?
 }
 
+float = @{
+    "-"?
+    ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)
+    ~ ((("." ~ ASCII_DIGIT*) ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?)
+        | (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+))
+}
 
 not_operator = { "!" ~ query_leaf }
 

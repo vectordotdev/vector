@@ -375,12 +375,12 @@ fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
             inner_quoted_string_escaped_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?,
         ))),
         Rule::null => Box::new(Literal::from(Value::Null)),
-        Rule::number => Box::new(Literal::from(
-            pair.as_str()
-                .parse::<i64>()
-                .map(Value::from)
-                .unwrap_or_else(|_| Value::from(pair.as_str().parse::<f64>().unwrap())),
-        )),
+        Rule::float => Box::new(Literal::from(Value::from(
+            pair.as_str().parse::<f64>().unwrap(),
+        ))),
+        Rule::integer => Box::new(Literal::from(Value::from(
+            pair.as_str().parse::<i64>().unwrap(),
+        ))),
         Rule::boolean => {
             let v = pair.as_str() == "true";
             Box::new(Literal::from(Value::from(v)))
@@ -524,7 +524,7 @@ mod tests {
             ),
             (
                 ".foo = !",
-                vec![" 1:9\n", "= expected dot_path, ident, group, boolean, null, string, number, or not_operator"],
+                vec![" 1:9\n", "= expected dot_path, ident, group, boolean, null, string, integer, float, or not_operator"],
             ),
             (
                 ".foo = to_string",
@@ -829,6 +829,27 @@ mod tests {
                         )),
                         Operator::Or,
                     )),
+                ))]),
+            ),
+            (
+                ".foo = 5.0e2",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Literal::from(Value::from(500.0))),
+                ))]),
+            ),
+            (
+                ".foo = 5e2",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Literal::from(Value::from(500.0))),
+                ))]),
+            ),
+            (
+                ".foo = -5e-2",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Literal::from(Value::from(-0.05))),
                 ))]),
             ),
             // function: del
