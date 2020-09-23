@@ -38,16 +38,6 @@ data_dir = "/var/lib/vector"
 data_dir = "/var/local/lib/vector/"
 data_dir = "/home/user/vector/"
 
-# The list of DNS servers Vector will use to resolve DNS requests. When set
-# Vector will ignore the system configuration and use only the list of DNS
-# servers provided. If this option is not set then Vector will attempt to use
-# the system configuration.
-#
-# * optional
-# * no default
-# * type: [string]
-dns_servers = ["0.0.0.0:53"]
-
 #
 # Log schema
 #
@@ -144,6 +134,14 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   partial_event_marker_field = "_partial"
 
+  # The amount of time to wait before retrying after an error.
+  #
+  # * optional
+  # * default: 2
+  # * type: uint
+  # * unit: seconds
+  retry_backoff_secs = 2
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -206,6 +204,18 @@ dns_servers = ["0.0.0.0:53"]
   # * type: uint
   # * unit: bytes
   max_line_bytes = 102400
+
+  # Timeout from reaching `eof` after which file will be removed from filesystem,
+  # unless new data is written in the meantime. If not specified, files will not
+  # be removed.
+  #
+  # * optional
+  # * no default
+  # * type: uint
+  # * unit: seconds
+  remove_after = 0
+  remove_after = 5
+  remove_after = 60
 
   # For files with a stored checkpoint at startup, setting this option to `true`
   # will tell Vector to read from the beginning of the file instead of the stored
@@ -536,6 +546,16 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   journalctl_path = "/usr/local/bin/journalctl"
 
+  # If the record from journald contains a `PRIORITY` field, it will be remapped
+  # into the equivalent syslog priority level name using the standard
+  # (abbreviated) all-capitals names such as `EMERG` or `ERR`.
+  #
+  # * optional
+  # * default: false
+  # * type: bool
+  remap_priority = false
+  remap_priority = true
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -571,6 +591,16 @@ dns_servers = ["0.0.0.0:53"]
   # * required
   # * type: string
   bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+
+  # The frequency that the consumer offsets are committed (written) to offset
+  # storage.
+  #
+  # * optional
+  # * default: 5000
+  # * type: uint
+  # * unit: milliseconds
+  commit_interval_ms = 5000
+  commit_interval_ms = 10000
 
   # Maximum time the broker may wait to fill the response.
   #
@@ -642,6 +672,42 @@ dns_servers = ["0.0.0.0:53"]
     "client.id" = "${ENV_VAR}"
     "fetch.error.backoff.ms" = "1000"
     "socket.send.buffer.bytes" = "100"
+
+  #
+  # SASL
+  #
+
+  [sources.kafka.sasl]
+    # Enable SASL/SCRAM authentication to the remote. (Not supported on Windows at
+    # this time.)
+    #
+    # * optional
+    # * no default
+    # * type: bool
+    enabled = true
+    enabled = false
+
+    # The Kafka SASL/SCRAM mechanisms.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    mechanism = "SCRAM-SHA-256"
+    mechanism = "SCRAM-SHA-512"
+
+    # The Kafka SASL/SCRAM authentication password.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    password = "password"
+
+    # The Kafka SASL/SCRAM authentication username.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    username = "username"
 
   #
   # TLS
@@ -817,6 +883,7 @@ dns_servers = ["0.0.0.0:53"]
   # * default: 102400
   # * type: uint
   # * unit: bytes
+  # * relevant when mode = "tcp" or mode = "unix"
   max_length = 102400
 
   # The type of socket to use.
@@ -1610,13 +1677,16 @@ dns_servers = ["0.0.0.0:53"]
     type = "is_log"
     type = "is_metric"
 
-    # Check whether a fields contents exactly matches the value specified.
+    # Check whether a fields contents exactly matches the value specified. This may
+    # be a single string or a list of strings, in which case this evaluates to true
+    # if any of the list matches.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when type = "check_fields"
     "message.eq" = "this is the content to match against"
+    "message.eq" = ["match this", "or this"]
 
     # Check whether a field exists or does not exist, depending on the provided
     # value being `true` or `false` respectively.
@@ -1627,13 +1697,16 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when type = "check_fields"
     "host.exists" = true
 
-    # Check whether a fields contents does not match the value specified.
+    # Check whether a fields contents does not match the value specified. This may
+    # be a single string or a list of strings, in which case this evaluates to
+    # false if any of the list matches.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when type = "check_fields"
     "method.neq" = "POST"
+    "method.neq" = ["POST", "GET"]
 
     # Check if the given `[condition]` does not match.
     #
@@ -1645,21 +1718,39 @@ dns_servers = ["0.0.0.0:53"]
     "unit.not_starts_with" = "sys-"
     "unit.not_ends_with" = ".device"
 
-    # Checks whether a string field contains a string argument.
+    # Checks whether a string field contains a string argument. This may be a
+    # single string or a list of strings, in which case this evaluates to true if
+    # any of the list matches.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when type = "check_fields"
     "message.contains" = "foo"
+    "message.contains" = ["foo", "bar"]
 
-    # Checks whether a string field ends with a string argument.
+    # Checks whether a string field ends with a string argument. This may be a
+    # single string or a list of strings, in which case this evaluates to true if
+    # any of the list matches.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when type = "check_fields"
     "environment.ends_with" = "-staging"
+    "environment.ends_with" = ["-staging", "-running"]
+
+    # Checks whether an IP field is contained within a given IP CIDR (works with
+    # IPv4 and IPv6). This may be a single string or a list of strings, in which
+    # case this evaluates to true if the IP field is contained within any of the
+    # CIDRs in the list.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "message.ip_cidr_contains" = "10.0.0.0/8"
+    "message.ip_cidr_contains" = ["2000::/10", "192.168.0.0/16"]
 
     # Checks whether a string field matches a regular expression. Vector uses the
     # documented Rust Regex syntax. Note that this condition is considerably more
@@ -1672,13 +1763,16 @@ dns_servers = ["0.0.0.0:53"]
     # * relevant when type = "check_fields"
     "message.regex" = " (any|of|these|five|words) "
 
-    # Checks whether a string field starts with a string argument.
+    # Checks whether a string field starts with a string argument. This may be a
+    # single string or a list of strings, in which case this evaluates to true if
+    # any of the list matches.
     #
     # * optional
     # * no default
     # * type: string
     # * relevant when type = "check_fields"
     "environment.starts_with" = "staging-"
+    "environment.starts_with" = ["staging-", "running-"]
 
   #
   # General
@@ -1698,11 +1792,11 @@ dns_servers = ["0.0.0.0:53"]
   # * must be: "filter"
   type = "filter"
 
-# Accepts and outputs `log` events, allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
+# Accepts and outputs `log` events, allowing you to enrich events with geolocation data from the MaxMind GeoIP2-City, GeoLite2-City, GeoIP2-ISP and GeoLite2-ASN databases.
 [transforms.geoip]
-  # Path to the MaxMind GeoIP2 or GeoLite2 binary city database file
-  # (`GeoLite2-City.mmdb`). Other databases, such as the the country database are
-  # not supported.
+  # Path to the MaxMind GeoIP2-City, GeoLite2-City, GeoIP2-ISP or GeoLite2-ASN
+  # binary database file (`GeoLite2-City.mmdb` or `GeoLite2-ISP.mmdb`). Other
+  # databases, such as the the country database, are not supported.
   #
   # * required
   # * type: string
@@ -2183,6 +2277,179 @@ require('custom_module')
   # * must be: "merge"
   type = "merge"
 
+# Accepts and outputs `log` events, allowing you to combine multiple events into a single event based on a set of identifiers.
+[transforms.reduce]
+  #
+  # Ends when
+  #
+
+  [transforms.reduce.ends_when]
+    # The type of the condition to execute.
+    #
+    # * optional
+    # * default: "check_fields"
+    # * type: string
+    # * enum: "check_fields", "is_log", and "is_metric"
+    type = "check_fields"
+    type = "is_log"
+    type = "is_metric"
+
+    # Check whether a fields contents exactly matches the value specified. This may
+    # be a single string or a list of strings, in which case this evaluates to true
+    # if any of the list matches.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "message.eq" = "this is the content to match against"
+    "message.eq" = ["match this", "or this"]
+
+    # Check whether a field exists or does not exist, depending on the provided
+    # value being `true` or `false` respectively.
+    #
+    # * optional
+    # * no default
+    # * type: bool
+    # * relevant when type = "check_fields"
+    "host.exists" = true
+
+    # Check whether a fields contents does not match the value specified. This may
+    # be a single string or a list of strings, in which case this evaluates to
+    # false if any of the list matches.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "method.neq" = "POST"
+    "method.neq" = ["POST", "GET"]
+
+    # Check if the given `[condition]` does not match.
+    #
+    # * optional
+    # * no default
+    # * type: any
+    # * relevant when type = "check_fields"
+    "message.not_contains" = "some phrase to ignore"
+    "unit.not_starts_with" = "sys-"
+    "unit.not_ends_with" = ".device"
+
+    # Checks whether a string field contains a string argument. This may be a
+    # single string or a list of strings, in which case this evaluates to true if
+    # any of the list matches.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "message.contains" = "foo"
+    "message.contains" = ["foo", "bar"]
+
+    # Checks whether a string field ends with a string argument. This may be a
+    # single string or a list of strings, in which case this evaluates to true if
+    # any of the list matches.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "environment.ends_with" = "-staging"
+    "environment.ends_with" = ["-staging", "-running"]
+
+    # Checks whether an IP field is contained within a given IP CIDR (works with
+    # IPv4 and IPv6). This may be a single string or a list of strings, in which
+    # case this evaluates to true if the IP field is contained within any of the
+    # CIDRs in the list.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "message.ip_cidr_contains" = "10.0.0.0/8"
+    "message.ip_cidr_contains" = ["2000::/10", "192.168.0.0/16"]
+
+    # Checks whether a string field matches a regular expression. Vector uses the
+    # documented Rust Regex syntax. Note that this condition is considerably more
+    # expensive than a regular string match (such as `starts_with` or `contains`)
+    # so the use of those conditions are preferred where possible.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "message.regex" = " (any|of|these|five|words) "
+
+    # Checks whether a string field starts with a string argument. This may be a
+    # single string or a list of strings, in which case this evaluates to true if
+    # any of the list matches.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "environment.starts_with" = "staging-"
+    "environment.starts_with" = ["staging-", "running-"]
+
+  #
+  # General
+  #
+
+  # A maximum period of time to wait after the last event is received before a
+  # combined event should be considered complete.
+  #
+  # * optional
+  # * default: 30000
+  # * type: int
+  expire_after_ms = 30000
+
+  # Controls the frequency that Vector checks for (and flushes) expired events.
+  #
+  # * optional
+  # * default: 1000
+  # * type: int
+  flush_period_ms = 1000
+
+  # An ordered list of fields by which to group events. Each group is combined
+  # independently, allowing you to keep independent events separate. When no
+  # fields are specified, all events will be combined in a single group. Events
+  # missing a specified field will be combined in their own group.
+  #
+  # * optional
+  # * default: []
+  # * type: [string]
+  identifier_fields = ["request_id"]
+  identifier_fields = ["user_id", "transaction_id"]
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "reduce"
+  type = "reduce"
+
+  #
+  # Merge strategies
+  #
+
+  [transforms.reduce.merge_strategies]
+    # The custom merge strategy to use for a field.
+    #
+    # * required
+    # * type: string
+    # * enum: "array", "concat", "discard", "sum", "max", and "min"
+    method = "discard"
+    path = "discard"
+    duration_ms = "sum"
+    query = "array"
+
 # Accepts and outputs `log` events, allowing you to parse a log field's value with a Regular Expression.
 [transforms.regex_parser]
   #
@@ -2507,13 +2774,16 @@ require('custom_module')
       type = "is_log"
       type = "is_metric"
 
-      # Check whether a fields contents exactly matches the value specified.
+      # Check whether a fields contents exactly matches the value specified. This may
+      # be a single string or a list of strings, in which case this evaluates to true
+      # if any of the list matches.
       #
       # * optional
       # * no default
       # * type: string
       # * relevant when type = "check_fields"
       "message.eq" = "this is the content to match against"
+      "message.eq" = ["match this", "or this"]
 
       # Check whether a field exists or does not exist, depending on the provided
       # value being `true` or `false` respectively.
@@ -2524,13 +2794,16 @@ require('custom_module')
       # * relevant when type = "check_fields"
       "host.exists" = true
 
-      # Check whether a fields contents does not match the value specified.
+      # Check whether a fields contents does not match the value specified. This may
+      # be a single string or a list of strings, in which case this evaluates to
+      # false if any of the list matches.
       #
       # * optional
       # * no default
       # * type: string
       # * relevant when type = "check_fields"
       "method.neq" = "POST"
+      "method.neq" = ["POST", "GET"]
 
       # Check if the given `[condition]` does not match.
       #
@@ -2542,21 +2815,39 @@ require('custom_module')
       "unit.not_starts_with" = "sys-"
       "unit.not_ends_with" = ".device"
 
-      # Checks whether a string field contains a string argument.
+      # Checks whether a string field contains a string argument. This may be a
+      # single string or a list of strings, in which case this evaluates to true if
+      # any of the list matches.
       #
       # * optional
       # * no default
       # * type: string
       # * relevant when type = "check_fields"
       "message.contains" = "foo"
+      "message.contains" = ["foo", "bar"]
 
-      # Checks whether a string field ends with a string argument.
+      # Checks whether a string field ends with a string argument. This may be a
+      # single string or a list of strings, in which case this evaluates to true if
+      # any of the list matches.
       #
       # * optional
       # * no default
       # * type: string
       # * relevant when type = "check_fields"
       "environment.ends_with" = "-staging"
+      "environment.ends_with" = ["-staging", "-running"]
+
+      # Checks whether an IP field is contained within a given IP CIDR (works with
+      # IPv4 and IPv6). This may be a single string or a list of strings, in which
+      # case this evaluates to true if the IP field is contained within any of the
+      # CIDRs in the list.
+      #
+      # * optional
+      # * no default
+      # * type: string
+      # * relevant when type = "check_fields"
+      "message.ip_cidr_contains" = "10.0.0.0/8"
+      "message.ip_cidr_contains" = ["2000::/10", "192.168.0.0/16"]
 
       # Checks whether a string field matches a regular expression. Vector uses the
       # documented Rust Regex syntax. Note that this condition is considerably more
@@ -2569,13 +2860,16 @@ require('custom_module')
       # * relevant when type = "check_fields"
       "message.regex" = " (any|of|these|five|words) "
 
-      # Checks whether a string field starts with a string argument.
+      # Checks whether a string field starts with a string argument. This may be a
+      # single string or a list of strings, in which case this evaluates to true if
+      # any of the list matches.
       #
       # * optional
       # * no default
       # * type: string
       # * relevant when type = "check_fields"
       "environment.starts_with" = "staging-"
+      "environment.starts_with" = ["staging-", "running-"]
 
 # Accepts and outputs `metric` events, allowing you to limit the cardinality of metric tags to prevent downstream disruption of metrics services.
 [transforms.tag_cardinality_limit]
@@ -2692,6 +2986,47 @@ require('custom_module')
     timestamp = "timestamp|%a %b %e %T %Y"
     parent = {child = "int"}
 
+# Accepts and outputs `log` events, allowing you to execute **experimental** WASM plugins.
+[transforms.wasm]
+  # The directory where Vector should store the artifact it builds of this WASM
+  # module. Typically, all WASM modules share this.
+  #
+  # * required
+  # * type: string
+  artifact_cache = "/etc/vector/artifacts"
+  artifact_cache = "/var/lib/vector/artifacts"
+  artifact_cache = "C:\\vector\\artifacts"
+
+  # The maximum size of the heap of this module, in bytes. (This includes the
+  # module itself, default is 10 MB.)
+  #
+  # * optional
+  # * default: 10485760
+  # * type: int
+  heap_max_size = 10485760
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The file path of the `.wasm` or `.wat` module.
+  #
+  # * required
+  # * type: string
+  module = "./modules/example.wasm"
+  module = "/example.wat"
+  module = "example.wasm"
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "wasm"
+  type = "wasm"
+
 
 # ------------------------------------------------------------------------------
 # Sinks
@@ -2710,6 +3045,16 @@ require('custom_module')
   # * no default
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
+
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
 
   # Dynamically create a log group if it does not already exist. This will ignore
   # `create_missing_stream` directly after creating the group and will create the
@@ -2788,13 +3133,21 @@ require('custom_module')
   #
 
   [sinks.aws_cloudwatch_logs.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * optional
+    # * default: 1048576
+    # * type: uint
+    # * unit: bytes
+    max_bytes = 1048576
+
     # The maximum size of a batch, in events, before it is flushed.
     #
     # * optional
-    # * default: 1000
+    # * default: 10000
     # * type: uint
     # * unit: events
-    max_events = 1000
+    max_events = 10000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -2959,6 +3312,16 @@ require('custom_module')
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
 
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
+
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
   #
@@ -3037,6 +3400,16 @@ require('custom_module')
   # * no default
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
+
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
 
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
@@ -3258,6 +3631,16 @@ require('custom_module')
   # * no default
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
+
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
 
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
@@ -3597,10 +3980,18 @@ require('custom_module')
     # The maximum size of a batch, in bytes, before it is flushed.
     #
     # * optional
-    # * default: 10490000
+    # * default: 10000000
     # * type: uint
     # * unit: bytes
-    max_size = 10490000
+    max_bytes = 10000000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * no default
+    # * type: uint
+    # * unit: events
+    max_events = 1000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -3651,13 +4042,35 @@ require('custom_module')
     when_full = "drop_newest"
 
   #
+  # Content Type
+  #
+
+  # Specifies what content encodings have been applied to the object and thus
+  # what decoding mechanisms must be applied to obtain the media-type referenced
+  # by the Content-Type header field. By default calculated from `compression`
+  # value.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  content_encoding = "gzip"
+
+  # A standard MIME type describing the format of the contents.
+  #
+  # * optional
+  # * default: "text/x-log"
+  # * type: string
+  content_type = "text/x-log"
+
+  #
   # Encoding
   #
 
   [sinks.aws_s3.encoding]
     # The encoding codec used to serialize the events before outputting.
     #
-    # * required
+    # * optional
+    # * default: "text"
     # * type: string
     # * enum: "ndjson" or "text"
     codec = "ndjson"
@@ -4141,7 +4554,15 @@ require('custom_module')
     # * default: 1049000
     # * type: uint
     # * unit: bytes
-    max_size = 1049000
+    max_bytes = 1049000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * no default
+    # * type: uint
+    # * unit: events
+    max_events = 1000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -4797,6 +5218,14 @@ require('custom_module')
   #
 
   [sinks.elasticsearch.auth]
+    # The ARN of an IAM role to assume at startup.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when strategy = "aws"
+    assume_role = "arn:aws:iam::123456789098:role/my_role"
+
     # The basic authentication password.
     #
     # * required
@@ -4848,7 +5277,15 @@ require('custom_module')
     # * default: 10490000
     # * type: uint
     # * unit: bytes
-    max_size = 10490000
+    max_bytes = 10490000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * no default
+    # * type: uint
+    # * unit: events
+    max_events = 1000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -4961,6 +5398,13 @@ require('custom_module')
   # * required
   # * type: [string]
   inputs = ["my-source-or-transform-id"]
+
+  # Name of the pipeline to apply.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  pipeline = "pipeline-name"
 
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -5276,7 +5720,15 @@ require('custom_module')
     # * default: 10485760
     # * type: uint
     # * unit: bytes
-    max_size = 10485760
+    max_bytes = 10485760
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * no default
+    # * type: uint
+    # * unit: events
+    max_events = 1000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -5656,7 +6108,15 @@ require('custom_module')
     # * default: 10485760
     # * type: uint
     # * unit: bytes
-    max_size = 10485760
+    max_bytes = 10485760
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * default: 1000
+    # * type: uint
+    # * unit: events
+    max_events = 1000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -5872,7 +6332,15 @@ require('custom_module')
     # * default: 5242880
     # * type: uint
     # * unit: bytes
-    max_size = 5242880
+    max_bytes = 5242880
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * no default
+    # * type: uint
+    # * unit: events
+    max_events = 1000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -5962,6 +6430,24 @@ require('custom_module')
   # * required
   # * type: string
   project_id = "vector-123456"
+
+  # The field of the log event from which to take the outgoing log's `severity`
+  # field. The named field is removed from the log event if present, and must be
+  # either an integer between 0 and 800 or a string containing one of the
+  # severity level names (case is ignored) or a common prefix such as `err`. This
+  # could be added by an `add_fields` transform or extracted from a field from
+  # the source.
+  #
+  # If no severity key is specified, the severity of outgoing records will be set
+  # to 0 (`DEFAULT`).
+  #
+  # See the GCP Stackdriver Logging LogSeverity description for more details on
+  # the value of the `severity` field.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  severity_key = "severity"
 
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
@@ -6244,7 +6730,15 @@ require('custom_module')
     # * default: 5242880
     # * type: uint
     # * unit: bytes
-    max_size = 5242880
+    max_bytes = 5242880
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * no default
+    # * type: uint
+    # * unit: events
+    max_events = 1000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -6410,7 +6904,15 @@ require('custom_module')
     # * default: 1049000
     # * type: uint
     # * unit: bytes
-    max_size = 1049000
+    max_bytes = 1049000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * no default
+    # * type: uint
+    # * unit: events
+    max_events = 1000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -6697,7 +7199,15 @@ require('custom_module')
     # * default: 1049000
     # * type: uint
     # * unit: bytes
-    max_size = 1049000
+    max_bytes = 1049000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * no default
+    # * type: uint
+    # * unit: events
+    max_events = 1000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -6914,10 +7424,18 @@ require('custom_module')
     # The maximum size of a batch, in bytes, before it is flushed.
     #
     # * optional
-    # * default: 10490000
+    # * default: 1049000
     # * type: uint
     # * unit: bytes
-    max_size = 10490000
+    max_bytes = 1049000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * no default
+    # * type: uint
+    # * unit: events
+    max_events = 1000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -7510,7 +8028,8 @@ require('custom_module')
   [sinks.kafka.encoding]
     # The encoding codec used to serialize the events before outputting.
     #
-    # * required
+    # * optional
+    # * default: "text"
     # * type: string
     # * enum: "json" or "text"
     codec = "json"
@@ -7552,6 +8071,42 @@ require('custom_module')
     "client.id" = "${ENV_VAR}"
     "fetch.error.backoff.ms" = "1000"
     "socket.send.buffer.bytes" = "100"
+
+  #
+  # SASL
+  #
+
+  [sinks.kafka.sasl]
+    # Enable SASL/SCRAM authentication to the remote. (Not supported on Windows at
+    # this time.)
+    #
+    # * optional
+    # * no default
+    # * type: bool
+    enabled = true
+    enabled = false
+
+    # The Kafka SASL/SCRAM mechanisms.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    mechanism = "SCRAM-SHA-256"
+    mechanism = "SCRAM-SHA-512"
+
+    # The Kafka SASL/SCRAM authentication password.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    password = "password"
+
+    # The Kafka SASL/SCRAM authentication username.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    username = "username"
 
   #
   # TLS
@@ -7692,7 +8247,15 @@ require('custom_module')
     # * default: 10490000
     # * type: uint
     # * unit: bytes
-    max_size = 10490000
+    max_bytes = 10490000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * no default
+    # * type: uint
+    # * unit: events
+    max_events = 1000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -7882,13 +8445,13 @@ require('custom_module')
   #
 
   [sinks.loki.batch]
-    # The maximum size of a batch, in bytes, before it is flushed.
+    # The maximum size of a batch, in events, before it is flushed.
     #
     # * optional
-    # * default: 10490000
+    # * default: 100000
     # * type: uint
-    # * unit: bytes
-    max_size = 10490000
+    # * unit: events
+    max_events = 100000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -8184,10 +8747,18 @@ require('custom_module')
     # The maximum size of a batch, in bytes, before it is flushed.
     #
     # * optional
-    # * default: 524000
+    # * default: 5240000
     # * type: uint
     # * unit: bytes
-    max_size = 524000
+    max_bytes = 5240000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * no default
+    # * type: uint
+    # * unit: events
+    max_events = 1000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -8569,7 +9140,7 @@ require('custom_module')
   #
   # * required
   # * type: string
-  address = "127.0.0.1:6650"
+  address = "pulsar://127.0.0.1:6650"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -8627,7 +9198,8 @@ require('custom_module')
   [sinks.pulsar.encoding]
     # The encoding codec used to serialize the events before outputting.
     #
-    # * required
+    # * optional
+    # * default: "text"
     # * type: string
     # * enum: "json" or "text"
     codec = "json"
@@ -8669,7 +9241,15 @@ require('custom_module')
     # * default: 10490000
     # * type: uint
     # * unit: bytes
-    max_size = 10490000
+    max_bytes = 10490000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * no default
+    # * type: uint
+    # * unit: events
+    max_events = 1000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -9071,7 +9651,15 @@ require('custom_module')
     # * default: 1049000
     # * type: uint
     # * unit: bytes
-    max_size = 1049000
+    max_bytes = 1049000
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * no default
+    # * type: uint
+    # * unit: events
+    max_events = 1000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -9142,7 +9730,8 @@ require('custom_module')
   [sinks.splunk_hec.encoding]
     # The encoding codec used to serialize the events before outputting.
     #
-    # * required
+    # * optional
+    # * default: "text"
     # * type: string
     # * enum: "json" or "text"
     codec = "json"

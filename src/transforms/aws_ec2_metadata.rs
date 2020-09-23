@@ -1,19 +1,16 @@
 use super::Transform;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     sinks::util::http::HttpClient,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use bytes::Bytes;
-use futures::compat::Future01CompatExt;
-use futures01::Stream;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
-use hyper::Body;
+use hyper::{body::to_bytes as body_to_bytes, Body};
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::RandomState, HashSet};
-use std::time::{Duration, Instant};
 use string_cache::DefaultAtom as Atom;
-use tokio01::timer::Delay;
+use tokio::time::{delay_for, Duration, Instant};
 use tracing_futures::Instrument;
 
 type WriteHandle = evmap::WriteHandle<Atom, Bytes, (), RandomState>;
@@ -82,7 +79,9 @@ lazy_static::lazy_static! {
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Ec2Metadata {
-    host: Option<String>,
+    // Deprecated name
+    #[serde(alias = "host")]
+    endpoint: Option<String>,
     namespace: Option<String>,
     refresh_interval_secs: Option<u64>,
     fields: Option<Vec<String>>,
@@ -112,9 +111,14 @@ inventory::submit! {
     TransformDescription::new_without_default::<Ec2Metadata>("aws_ec2_metadata")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
-    fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+        unimplemented!()
+    }
+
+    async fn build_async(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let (read, write) = evmap::new();
 
         // Check if the namespace is set to `""` which should mean that we do
@@ -130,10 +134,10 @@ impl TransformConfig for Ec2Metadata {
         let keys = Keys::new(&namespace);
 
         let host = self
-            .host
+            .endpoint
             .clone()
-            .map(|s| Uri::from_shared(s.into()).unwrap())
-            .unwrap_or(HOST.clone());
+            .map(|s| Uri::from_maybe_shared(s).unwrap())
+            .unwrap_or_else(|| HOST.clone());
 
         let refresh_interval = self
             .refresh_interval_secs
@@ -147,11 +151,13 @@ impl TransformConfig for Ec2Metadata {
 
         let http_client = HttpClient::new(cx.resolver(), None)?;
 
-        cx.executor().spawn_std(
-            async move {
-                let mut client =
-                    MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);
+        let mut client =
+            MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);
 
+        client.refresh_metadata().await?;
+
+        tokio::spawn(
+            async move {
                 client.run().await;
             }
             // TODO: Once #1338 is done we can fetch the current span
@@ -178,11 +184,13 @@ impl Transform for Ec2MetadataTransform {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
 
-        self.state.for_each(|k, v| {
-            if let Some(value) = v.get(0) {
-                log.insert(k.clone(), value.clone());
-            }
-        });
+        if let Some(read_ref) = self.state.read() {
+            read_ref.into_iter().for_each(|(k, v)| {
+                if let Some(value) = v.get_one() {
+                    log.insert(k.clone(), value.clone());
+                }
+            });
+        }
 
         Some(event)
     }
@@ -234,19 +242,12 @@ impl MetadataClient {
     async fn run(&mut self) {
         loop {
             if let Err(error) = self.refresh_metadata().await {
-                error!(message="Unable to fetch EC2 metadata; Retrying.", %error);
-
-                Delay::new(Instant::now() + Duration::from_secs(1))
-                    .compat()
-                    .await
-                    .expect("Timer not set.");
-
+                error!(message = "Unable to fetch EC2 metadata; Retrying.", %error);
+                delay_for(Duration::from_secs(1)).await;
                 continue;
             }
 
-            let deadline = Instant::now() + self.refresh_interval;
-
-            Delay::new(deadline).compat().await.expect("Timer not set.");
+            delay_for(self.refresh_interval).await;
         }
     }
 
@@ -274,8 +275,7 @@ impl MetadataClient {
             return Err(Ec2MetadataError::UnableToFetchToken.into());
         }
 
-        let body = res.into_body().concat2().compat().await?;
-        let token = body.into_bytes();
+        let token = body_to_bytes(res.into_body()).await?;
 
         let next_refresh = Instant::now() + Duration::from_secs(21600);
         self.token = Some((token.clone(), next_refresh));
@@ -291,7 +291,7 @@ impl MetadataClient {
         let uri = Uri::from_parts(parts)?;
 
         let req = Request::get(uri)
-            .header(TOKEN_HEADER.clone(), token)
+            .header(TOKEN_HEADER.as_ref(), token.as_ref())
             .body(Body::empty())?;
 
         let res = self.client.send(req).await?;
@@ -301,7 +301,7 @@ impl MetadataClient {
             return Ok(None);
         }
 
-        let body = res.into_body().concat2().compat().await?;
+        let body = body_to_bytes(res.into_body()).await?;
 
         serde_json::from_slice(&body[..])
             .map_err(Into::into)
@@ -323,7 +323,7 @@ impl MetadataClient {
         debug!(message = "Sending metadata request.", %uri);
 
         let req = Request::get(uri)
-            .header(TOKEN_HEADER.clone(), token)
+            .header(TOKEN_HEADER.as_ref(), token.as_ref())
             .body(Body::empty())?;
 
         let res = self.client.send(req).await?;
@@ -333,9 +333,9 @@ impl MetadataClient {
             return Ok(None);
         }
 
-        let body = res.into_body().concat2().compat().await?;
+        let body = body_to_bytes(res.into_body()).await?;
 
-        Ok(Some(body.into_bytes()))
+        Ok(Some(body))
     }
 
     pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
@@ -437,7 +437,7 @@ impl MetadataClient {
                 for (i, role_name) in role_names.lines().enumerate() {
                     self.state.update(
                         format!("{}[{}]", self.keys.role_name_key, i).into(),
-                        role_name.into(),
+                        role_name.to_string().into(),
                     );
                 }
             }
@@ -495,31 +495,31 @@ enum Ec2MetadataError {
     UnableToFetchToken,
 }
 
+#[cfg(feature = "aws-ec2-metadata-integration-tests")]
 #[cfg(test)]
-#[cfg(feature = "aws-integration-tests")]
-mod tests {
+mod integration_tests {
     use super::*;
-    use crate::{event::Event, test_util::runtime};
+    use crate::{event::Event, test_util::trace_init};
 
     lazy_static::lazy_static! {
         static ref HOST: String = "http://localhost:8111".to_string();
     }
 
-    #[test]
-    fn enrich() {
-        crate::test_util::trace_init();
-        let rt = runtime();
+    #[tokio::test]
+    async fn enrich() {
+        trace_init();
 
         let config = Ec2Metadata {
-            host: Some(HOST.clone()),
+            endpoint: Some(HOST.clone()),
             ..Default::default()
         };
         let mut transform = config
-            .build(TransformContext::new_test(rt.executor()))
+            .build_async(TransformContext::new_test())
+            .await
             .unwrap();
 
         // We need to sleep to let the background task fetch the data.
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        delay_for(Duration::from_secs(1)).await;
 
         let event = Event::new_empty_log();
 
@@ -555,21 +555,20 @@ mod tests {
         assert_eq!(log.get(&"role-name[0]".into()), Some(&"mock-user".into()));
     }
 
-    #[test]
-    fn fields() {
-        let rt = runtime();
-
+    #[tokio::test]
+    async fn fields() {
         let config = Ec2Metadata {
-            host: Some(HOST.clone()),
+            endpoint: Some(HOST.clone()),
             fields: Some(vec!["public-ipv4".into(), "region".into()]),
             ..Default::default()
         };
         let mut transform = config
-            .build(TransformContext::new_test(rt.executor()))
+            .build_async(TransformContext::new_test())
+            .await
             .unwrap();
 
         // We need to sleep to let the background task fetch the data.
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        delay_for(Duration::from_secs(1)).await;
 
         let event = Event::new_empty_log();
 
@@ -587,21 +586,20 @@ mod tests {
         assert_eq!(log.get(&"region".into()), Some(&"us-east-1".into()));
     }
 
-    #[test]
-    fn namespace() {
-        let rt = runtime();
-
+    #[tokio::test]
+    async fn namespace() {
         let config = Ec2Metadata {
-            host: Some(HOST.clone()),
+            endpoint: Some(HOST.clone()),
             namespace: Some("ec2.metadata".into()),
             ..Default::default()
         };
         let mut transform = config
-            .build(TransformContext::new_test(rt.executor()))
+            .build_async(TransformContext::new_test())
+            .await
             .unwrap();
 
         // We need to sleep to let the background task fetch the data.
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        delay_for(Duration::from_secs(1)).await;
 
         let event = Event::new_empty_log();
 
@@ -619,16 +617,17 @@ mod tests {
 
         // Set an empty namespace to ensure we don't prepend one.
         let config = Ec2Metadata {
-            host: Some(HOST.clone()),
+            endpoint: Some(HOST.clone()),
             namespace: Some("".into()),
             ..Default::default()
         };
         let mut transform = config
-            .build(TransformContext::new_test(rt.executor()))
+            .build_async(TransformContext::new_test())
+            .await
             .unwrap();
 
         // We need to sleep to let the background task fetch the data.
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        delay_for(Duration::from_secs(1)).await;
 
         let event = Event::new_empty_log();
 

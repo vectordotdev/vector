@@ -1,7 +1,8 @@
 use super::Transform;
 use crate::{
-    event::{self, Event, PathComponent, PathIter},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::{Event, PathComponent, PathIter},
+    internal_events::{TokenizerConvertFailed, TokenizerEventProcessed, TokenizerFieldMissing},
     types::{parse_check_conversion_map, Conversion},
 };
 use nom::{
@@ -36,7 +37,7 @@ impl TransformConfig for TokenizerConfig {
         let field = self
             .field
             .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+            .unwrap_or(&crate::config::log_schema().message_key());
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)?;
 
@@ -65,7 +66,7 @@ impl TransformConfig for TokenizerConfig {
 }
 
 pub struct Tokenizer {
-    field_names: Vec<(String, Vec<PathComponent>, Conversion)>,
+    field_names: Vec<(Atom, Vec<PathComponent>, Conversion)>,
     field: Atom,
     drop_field: bool,
 }
@@ -82,7 +83,7 @@ impl Tokenizer {
             .map(|name| {
                 let conversion = types.get(&name).unwrap_or(&Conversion::Bytes).clone();
                 let path: Vec<PathComponent> = PathIter::new(&name).collect();
-                (name.to_string(), path, conversion)
+                (name, path, conversion)
             })
             .collect();
 
@@ -102,17 +103,12 @@ impl Transform for Tokenizer {
             for ((name, path, conversion), value) in
                 self.field_names.iter().zip(parse(value).into_iter())
             {
-                match conversion.convert(value.as_bytes().into()) {
+                match conversion.convert(value.as_bytes().to_vec().into()) {
                     Ok(value) => {
                         event.as_mut_log().insert_path(path.clone(), value);
                     }
                     Err(error) => {
-                        debug!(
-                            message = "Could not convert types.",
-                            path = &name[..],
-                            %error,
-                            rate_limit_secs = 30
-                        );
+                        emit!(TokenizerConvertFailed { field: name, error });
                     }
                 }
             }
@@ -120,11 +116,10 @@ impl Transform for Tokenizer {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            debug!(
-                message = "Field does not exist.",
-                field = self.field.as_ref(),
-            );
+            emit!(TokenizerFieldMissing { field: &self.field });
         };
+
+        emit!(TokenizerEventProcessed);
 
         Some(event)
     }
@@ -162,8 +157,7 @@ mod tests {
     use super::TokenizerConfig;
     use crate::event::{LogEvent, Value};
     use crate::{
-        test_util::runtime,
-        topology::config::{TransformConfig, TransformContext},
+        config::{TransformConfig, TransformContext},
         Event,
     };
     use string_cache::DefaultAtom as Atom;
@@ -266,7 +260,6 @@ mod tests {
         drop_field: bool,
         types: &[(&str, &str)],
     ) -> LogEvent {
-        let rt = runtime();
         let event = Event::from(text);
         let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<Atom>>();
         let field = field.map(|f| f.into());
@@ -275,9 +268,8 @@ mod tests {
             field,
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
-            ..Default::default()
         }
-        .build(TransformContext::new_test(rt.executor()))
+        .build(TransformContext::new_test())
         .unwrap();
 
         parser.transform(event).unwrap().into_log()

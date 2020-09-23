@@ -1,7 +1,10 @@
 ---
 name: Bug Report
 about: Let us know about an unexpected error, a crash, or an incorrect behavior.
-labels: Type: Bug
+labels: 'type: bug'
+assignees: ''
+title: ''
+
 ---
 
 <!--
@@ -11,6 +14,7 @@ Thank you for opening an issue. Please note that we try to keep the Vector issue
 -->
 
 ### Vector Version
+
 <!---
 Run `vector --version` to show the version, and paste the result between the ``` marks below.
 
@@ -22,6 +26,7 @@ If you are not running the latest version of Vector, please try upgrading becaus
 ```
 
 ### Vector Configuration File
+
 <!--
 Paste the relevant parts of your `vector.toml` configuration between the ``` marks below.
 
@@ -33,6 +38,7 @@ Paste the relevant parts of your `vector.toml` configuration between the ``` mar
 ```
 
 ### Debug Output
+
 <!--
 Full debug output can be obtained by running Vector with the following:
 
@@ -47,16 +53,19 @@ Please create a GitHub Gist containing the debug output. Please do _not_ paste t
 
 
 ### Expected Behavior
+
 <!--
 What should have happened?
 -->
 
 ### Actual Behavior
+
 <!--
 What actually happened?
 -->
 
 ### Example Data
+
 <!--
 Please provide any example data that will help debug the issue, for example:
 
@@ -66,11 +75,13 @@ Please provide any example data that will help debug the issue, for example:
 -->
 
 ### Additional Context
+
 <!--
-Are there anything atypical about your situation that we should know? For example: is Vector running in Kubernetes? Are you passing any unusual command line options or environment variables to opt-in to non-default behavior?
+Is there anything atypical about your situation that we should know? For example: is Vector running in Kubernetes? Are you passing any unusual command line options or environment variables to opt-in to non-default behavior?
 -->
 
 ### References
+
 <!--
 Are there any other GitHub issues (open or closed) or Pull Requests that should be linked here? For example:
 

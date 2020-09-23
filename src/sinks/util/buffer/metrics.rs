@@ -1,6 +1,8 @@
 use crate::event::metric::{Metric, MetricKind, MetricValue};
 use crate::event::Event;
-use crate::sinks::util::Batch;
+use crate::sinks::util::batch::{
+    Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
+};
 use std::cmp::Ordering;
 use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::{Hash, Hasher};
@@ -59,11 +61,12 @@ impl PartialEq for MetricEntry {
 pub struct MetricBuffer {
     state: HashSet<MetricEntry>,
     metrics: HashSet<MetricEntry>,
+    max_events: usize,
 }
 
 impl MetricBuffer {
     // Metric buffer is a data structure for creating normalised
-    // batched metrics data from the flow of datapoints.
+    // batched metrics data from the flow of data points.
     //
     // Batching mostly means that we will aggregate away timestamp information, and
     // apply metric-specific compression to improve the performance of the pipeline.
@@ -75,9 +78,9 @@ impl MetricBuffer {
     // produce absolute values gauges that are well supported by Datadog.
     //
     // Another example of normalisation is disaggregation of counters. Most sinks would expect we send
-    // them delta counters (e.g. how many events occured during the flush period). And most sources are
-    // producting exactly this kind of counters, with Prometheus being a notable exception. If the counter
-    // comes allready aggregated inside the source, the buffer will compare it's values with the previous
+    // them delta counters (e.g. how many events occurred during the flush period). And most sources are
+    // producing exactly these kind of counters, with Prometheus being a notable exception. If the counter
+    // comes already aggregated inside the source, the buffer will compare it's values with the previous
     // known and calculate the delta.
     //
     // This table will summarise how metrics are transforming inside the buffer:
@@ -96,10 +99,15 @@ impl MetricBuffer {
     //   Absolute AggregatedHistogram => Absolute AggregatedHistogram
     //   Absolute AggregatedSummary   => Absolute AggregatedSummary
     //
-    pub fn new() -> Self {
+    pub fn new(settings: BatchSize<Self>) -> Self {
+        Self::new_with_state(settings.events, HashSet::new())
+    }
+
+    fn new_with_state(max_events: usize, state: HashSet<MetricEntry>) -> Self {
         Self {
-            state: HashSet::new(),
-            metrics: HashSet::new(),
+            state,
+            metrics: HashSet::with_capacity(max_events),
+            max_events,
         }
     }
 }
@@ -108,83 +116,94 @@ impl Batch for MetricBuffer {
     type Input = Event;
     type Output = Vec<Metric>;
 
-    fn len(&self) -> usize {
-        self.num_items()
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
+        Ok(config
+            .disallow_max_bytes()?
+            .use_size_as_events()?
+            .get_settings_or_default(defaults))
     }
 
-    fn push(&mut self, item: Self::Input) {
-        let item = item.into_metric();
+    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
+        if self.num_items() >= self.max_events {
+            PushResult::Overflow(item)
+        } else {
+            let item = item.into_metric();
 
-        match &item.value {
-            MetricValue::Counter { value } if item.kind.is_absolute() => {
-                let new = MetricEntry(item.clone());
-                if let Some(MetricEntry(Metric {
-                    value: MetricValue::Counter { value: value0, .. },
-                    ..
-                })) = self.state.get(&new)
-                {
-                    // Counters are disaggregated. We take the previoud value from the state
-                    // and emit the difference between previous and current as a Counter
-                    let delta = MetricEntry(Metric {
-                        name: item.name.to_string(),
-                        timestamp: item.timestamp,
-                        tags: item.tags.clone(),
-                        kind: MetricKind::Incremental,
-                        value: MetricValue::Counter {
-                            value: value - value0,
-                        },
-                    });
-
-                    // The resulting Counters could be added up normally
-                    if let Some(MetricEntry(mut existing)) = self.metrics.take(&delta) {
-                        existing.add(&item);
-                        self.metrics.insert(MetricEntry(existing));
-                    } else {
-                        self.metrics.insert(delta);
-                    }
-                    self.state.replace(new);
-                } else {
-                    self.state.insert(new);
-                }
-            }
-            MetricValue::Gauge { .. } if item.kind.is_incremental() => {
-                let new = MetricEntry(item.clone().into_absolute());
-                if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
-                    existing.add(&item);
-                    self.metrics.insert(MetricEntry(existing));
-                } else {
-                    // If the metric is not present in active batch,
-                    // then we look it up in permanent state, where we keep track
-                    // of its values throughout the entire application uptime
-                    let mut initial = if let Some(default) = self.state.get(&new) {
-                        default.0.clone()
-                    } else {
-                        // Otherwise we start from zero value
-                        Metric {
+            match &item.value {
+                MetricValue::Counter { value } if item.kind.is_absolute() => {
+                    let new = MetricEntry(item.clone());
+                    if let Some(MetricEntry(Metric {
+                        value: MetricValue::Counter { value: value0, .. },
+                        ..
+                    })) = self.state.get(&new)
+                    {
+                        // Counters are disaggregated. We take the previous value from the state
+                        // and emit the difference between previous and current as a Counter
+                        let delta = MetricEntry(Metric {
                             name: item.name.to_string(),
                             timestamp: item.timestamp,
                             tags: item.tags.clone(),
-                            kind: MetricKind::Absolute,
-                            value: MetricValue::Gauge { value: 0.0 },
+                            kind: MetricKind::Incremental,
+                            value: MetricValue::Counter {
+                                value: value - value0,
+                            },
+                        });
+
+                        // The resulting Counters could be added up normally
+                        if let Some(MetricEntry(mut existing)) = self.metrics.take(&delta) {
+                            existing.add(&item);
+                            self.metrics.insert(MetricEntry(existing));
+                        } else {
+                            self.metrics.insert(delta);
                         }
-                    };
-                    initial.add(&item);
-                    self.metrics.insert(MetricEntry(initial));
+                        self.state.replace(new);
+                    } else {
+                        self.state.insert(new);
+                    }
+                }
+                MetricValue::Gauge { .. } if item.kind.is_incremental() => {
+                    let new = MetricEntry(item.clone().to_absolute());
+                    if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
+                        existing.add(&item);
+                        self.metrics.insert(MetricEntry(existing));
+                    } else {
+                        // If the metric is not present in active batch,
+                        // then we look it up in permanent state, where we keep track
+                        // of its values throughout the entire application uptime
+                        let mut initial = if let Some(default) = self.state.get(&new) {
+                            default.0.clone()
+                        } else {
+                            // Otherwise we start from zero value
+                            Metric {
+                                name: item.name.to_string(),
+                                timestamp: item.timestamp,
+                                tags: item.tags.clone(),
+                                kind: MetricKind::Absolute,
+                                value: MetricValue::Gauge { value: 0.0 },
+                            }
+                        };
+                        initial.add(&item);
+                        self.metrics.insert(MetricEntry(initial));
+                    }
+                }
+                _metric if item.kind.is_absolute() => {
+                    let new = MetricEntry(item);
+                    self.metrics.replace(new);
+                }
+                _ => {
+                    let new = MetricEntry(item.clone());
+                    if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
+                        existing.add(&item);
+                        self.metrics.insert(MetricEntry(existing));
+                    } else {
+                        self.metrics.insert(new);
+                    }
                 }
             }
-            _metric if item.kind.is_absolute() => {
-                let new = MetricEntry(item);
-                self.metrics.replace(new);
-            }
-            _ => {
-                let new = MetricEntry(item.clone());
-                if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
-                    existing.add(&item);
-                    self.metrics.insert(MetricEntry(existing));
-                } else {
-                    self.metrics.insert(new);
-                }
-            }
+            PushResult::Ok(self.num_items() >= self.max_events)
         }
     }
 
@@ -202,10 +221,7 @@ impl Batch for MetricBuffer {
             }
         }
 
-        Self {
-            state,
-            metrics: HashSet::new(),
-        }
+        Self::new_with_state(self.max_events, state)
     }
 
     fn finish(self) -> Self::Output {
@@ -216,12 +232,14 @@ impl Batch for MetricBuffer {
                 if let MetricValue::Distribution {
                     values,
                     sample_rates,
+                    statistic,
                 } = metric.value
                 {
                     let compressed = compress_distribution(values, sample_rates);
                     metric.value = MetricValue::Distribution {
                         values: compressed.0,
                         sample_rates: compressed.1,
+                        statistic,
                     };
                 };
                 metric
@@ -266,20 +284,20 @@ fn compress_distribution(values: Vec<f64>, sample_rates: Vec<u32>) -> (Vec<f64>,
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::sinks::util::{BatchSettings, BatchSink};
+    use crate::sinks::util::BatchSink;
     use crate::{
         buffers::Acker,
-        event::metric::{Metric, MetricValue},
-        runtime::Runtime,
-        test_util::runtime,
+        event::metric::{Metric, MetricValue, StatisticKind},
         Event,
     };
-    use futures01::{future, Future, Sink};
+    use futures::{compat::Future01CompatExt, future};
+    use futures01::Sink;
     use pretty_assertions::assert_eq;
-    use std::collections::BTreeMap;
-    use std::sync::{Arc, Mutex};
-    use std::time::Duration;
-    use tokio01_test::clock::MockClock;
+    use std::{
+        collections::BTreeMap,
+        sync::{Arc, Mutex},
+    };
+    use tokio::time::Duration;
 
     fn tag(name: &str) -> BTreeMap<String, String> {
         vec![(name.to_owned(), "true".to_owned())]
@@ -287,49 +305,39 @@ mod test {
             .collect()
     }
 
-    fn sorted(buffer: &Vec<Metric>) -> Vec<Metric> {
-        let mut buffer = buffer.clone();
+    fn sorted(buffer: &[Metric]) -> Vec<Metric> {
+        let mut buffer = buffer.to_owned();
         buffer.sort_by_key(|k| format!("{:?}", k));
         buffer
     }
 
     fn sink() -> (
         impl Sink<SinkItem = Event, SinkError = crate::Error>,
-        Runtime,
-        MockClock,
         Arc<Mutex<Vec<Vec<Metric>>>>,
     ) {
-        let rt = runtime();
-        let clock = MockClock::new();
-
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
-        let sent_requests1 = sent_requests.clone();
+        let sent_requests1 = Arc::clone(&sent_requests);
 
         let svc = tower::service_fn(move |req| {
-            let sent_requests = sent_requests1.clone();
-
+            let sent_requests = Arc::clone(&sent_requests1);
             sent_requests.lock().unwrap().push(req);
-
             future::ok::<_, std::io::Error>(())
         });
-        let buffered = BatchSink::with_executor(
+        let batch_size = BatchSettings::default().bytes(9999).events(6).size;
+        let buffered = BatchSink::new(
             svc,
-            MetricBuffer::new(),
-            BatchSettings {
-                timeout: Duration::from_secs(0),
-                size: 6,
-            },
+            MetricBuffer::new(batch_size),
+            Duration::from_secs(0),
             acker,
-            rt.executor(),
         );
 
-        (buffered, rt, clock, sent_requests)
+        (buffered, sent_requests)
     }
 
-    #[test]
-    fn metric_buffer_counters() {
-        let (sink, _rt, mut clock, sent_batches) = sink();
+    #[tokio::test]
+    async fn metric_buffer_counters() {
+        let (sink, sent_batches) = sink();
 
         let mut events = Vec::new();
         for i in 0..4 {
@@ -365,13 +373,12 @@ mod test {
             events.push(event);
         }
 
-        let (sink, _) = clock.enter(|_| {
-            sink.sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(events.into_iter()))
-                .wait()
-                .unwrap()
-        });
-        drop(sink);
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(events.into_iter()))
+            .compat()
+            .await
+            .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 
@@ -380,7 +387,7 @@ mod test {
         assert_eq!(buffer[1].len(), 2);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "counter-0".into(),
@@ -428,7 +435,7 @@ mod test {
         );
 
         assert_eq!(
-            sorted(&buffer[1].clone().finish()),
+            sorted(&buffer[1].clone()),
             [
                 Metric {
                     name: "counter-2".into(),
@@ -448,9 +455,9 @@ mod test {
         );
     }
 
-    #[test]
-    fn metric_buffer_aggregated_counters() {
-        let (sink, _rt, mut clock, sent_batches) = sink();
+    #[tokio::test]
+    async fn metric_buffer_aggregated_counters() {
+        let (sink, sent_batches) = sink();
 
         let mut events = Vec::new();
         for i in 0..4 {
@@ -477,13 +484,12 @@ mod test {
             events.push(event);
         }
 
-        let (sink, _) = clock.enter(|_| {
-            sink.sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(events.into_iter()))
-                .wait()
-                .unwrap()
-        });
-        drop(sink);
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(events.into_iter()))
+            .compat()
+            .await
+            .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 
@@ -491,7 +497,7 @@ mod test {
         assert_eq!(buffer[0].len(), 4);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "counter-0".into(),
@@ -525,9 +531,9 @@ mod test {
         );
     }
 
-    #[test]
-    fn metric_buffer_gauges() {
-        let (sink, _rt, mut clock, sent_batches) = sink();
+    #[tokio::test]
+    async fn metric_buffer_gauges() {
+        let (sink, sent_batches) = sink();
 
         let mut events = Vec::new();
         for i in 1..5 {
@@ -552,13 +558,12 @@ mod test {
             events.push(event);
         }
 
-        let (sink, _) = clock.enter(|_| {
-            sink.sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(events.into_iter()))
-                .wait()
-                .unwrap()
-        });
-        drop(sink);
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(events.into_iter()))
+            .compat()
+            .await
+            .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 
@@ -566,7 +571,7 @@ mod test {
         assert_eq!(buffer[0].len(), 4);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "gauge-1".into(),
@@ -600,9 +605,9 @@ mod test {
         );
     }
 
-    #[test]
-    fn metric_buffer_aggregated_gauges() {
-        let (sink, _rt, mut clock, sent_batches) = sink();
+    #[tokio::test]
+    async fn metric_buffer_aggregated_gauges() {
+        let (sink, sent_batches) = sink();
 
         let mut events = Vec::new();
         for i in 3..6 {
@@ -642,13 +647,12 @@ mod test {
             events.push(event);
         }
 
-        let (sink, _) = clock.enter(|_| {
-            sink.sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(events.into_iter()))
-                .wait()
-                .unwrap()
-        });
-        drop(sink);
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(events.into_iter()))
+            .compat()
+            .await
+            .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 
@@ -656,7 +660,7 @@ mod test {
         assert_eq!(buffer[0].len(), 5);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "gauge-1".into(),
@@ -697,9 +701,9 @@ mod test {
         );
     }
 
-    #[test]
-    fn metric_buffer_sets() {
-        let (sink, _rt, mut clock, sent_batches) = sink();
+    #[tokio::test]
+    async fn metric_buffer_sets() {
+        let (sink, sent_batches) = sink();
 
         let mut events = Vec::new();
         for i in 0..4 {
@@ -728,20 +732,19 @@ mod test {
             events.push(event);
         }
 
-        let (sink, _) = clock.enter(|_| {
-            sink.sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(events.into_iter()))
-                .wait()
-                .unwrap()
-        });
-        drop(sink);
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(events.into_iter()))
+            .compat()
+            .await
+            .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [Metric {
                 name: "set-0".into(),
                 timestamp: None,
@@ -756,9 +759,9 @@ mod test {
         );
     }
 
-    #[test]
-    fn metric_buffer_distributions() {
-        let (sink, _rt, mut clock, sent_batches) = sink();
+    #[tokio::test]
+    async fn metric_buffer_distributions() {
+        let (sink, sent_batches) = sink();
 
         let mut events = Vec::new();
         for _ in 2..6 {
@@ -770,6 +773,7 @@ mod test {
                 value: MetricValue::Distribution {
                     values: vec![2.0],
                     sample_rates: vec![10],
+                    statistic: StatisticKind::Histogram,
                 },
             });
             events.push(event);
@@ -784,25 +788,25 @@ mod test {
                 value: MetricValue::Distribution {
                     values: vec![i as f64],
                     sample_rates: vec![10],
+                    statistic: StatisticKind::Histogram,
                 },
             });
             events.push(event);
         }
 
-        let (sink, _) = clock.enter(|_| {
-            sink.sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(events.into_iter()))
-                .wait()
-                .unwrap()
-        });
-        drop(sink);
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(events.into_iter()))
+            .compat()
+            .await
+            .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "dist-2".into(),
@@ -812,6 +816,7 @@ mod test {
                     value: MetricValue::Distribution {
                         values: vec![2.0],
                         sample_rates: vec![50],
+                        statistic: StatisticKind::Histogram
                     },
                 },
                 Metric {
@@ -822,6 +827,7 @@ mod test {
                     value: MetricValue::Distribution {
                         values: vec![3.0],
                         sample_rates: vec![10],
+                        statistic: StatisticKind::Histogram
                     },
                 },
                 Metric {
@@ -832,6 +838,7 @@ mod test {
                     value: MetricValue::Distribution {
                         values: vec![4.0],
                         sample_rates: vec![10],
+                        statistic: StatisticKind::Histogram
                     },
                 },
                 Metric {
@@ -842,6 +849,7 @@ mod test {
                     value: MetricValue::Distribution {
                         values: vec![5.0],
                         sample_rates: vec![10],
+                        statistic: StatisticKind::Histogram
                     }
                 },
             ]
@@ -859,9 +867,9 @@ mod test {
         );
     }
 
-    #[test]
-    fn metric_buffer_aggregated_histograms_absolute() {
-        let (sink, _rt, mut clock, sent_batches) = sink();
+    #[tokio::test]
+    async fn metric_buffer_aggregated_histograms_absolute() {
+        let (sink, sent_batches) = sink();
 
         let mut events = Vec::new();
         for _ in 2..5 {
@@ -888,7 +896,7 @@ mod test {
                 kind: MetricKind::Absolute,
                 value: MetricValue::AggregatedHistogram {
                     buckets: vec![1.0, 2.0, 4.0],
-                    counts: vec![1 * i, 2 * i, 4 * i],
+                    counts: vec![i, 2 * i, 4 * i],
                     count: 6 * i,
                     sum: 10.0,
                 },
@@ -896,20 +904,19 @@ mod test {
             events.push(event);
         }
 
-        let (sink, _) = clock.enter(|_| {
-            sink.sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(events.into_iter()))
-                .wait()
-                .unwrap()
-        });
-        drop(sink);
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(events.into_iter()))
+            .compat()
+            .await
+            .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "buckets-2".into(),
@@ -951,9 +958,9 @@ mod test {
         );
     }
 
-    #[test]
-    fn metric_buffer_aggregated_histograms_incremental() {
-        let (sink, _rt, mut clock, sent_batches) = sink();
+    #[tokio::test]
+    async fn metric_buffer_aggregated_histograms_incremental() {
+        let (sink, sent_batches) = sink();
 
         let mut events = Vec::new();
         for _ in 0..3 {
@@ -980,7 +987,7 @@ mod test {
                 kind: MetricKind::Incremental,
                 value: MetricValue::AggregatedHistogram {
                     buckets: vec![1.0, 4.0, 16.0],
-                    counts: vec![1 * i, 2 * i, 4 * i],
+                    counts: vec![i, 2 * i, 4 * i],
                     count: 6 * i,
                     sum: 10.0,
                 },
@@ -988,20 +995,19 @@ mod test {
             events.push(event);
         }
 
-        let (sink, _) = clock.enter(|_| {
-            sink.sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(events.into_iter()))
-                .wait()
-                .unwrap()
-        });
-        drop(sink);
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(events.into_iter()))
+            .compat()
+            .await
+            .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "buckets-2".into(),
@@ -1031,9 +1037,9 @@ mod test {
         );
     }
 
-    #[test]
-    fn metric_buffer_aggregated_summaries() {
-        let (sink, _rt, mut clock, sent_batches) = sink();
+    #[tokio::test]
+    async fn metric_buffer_aggregated_summaries() {
+        let (sink, sent_batches) = sink();
 
         let mut events = Vec::new();
         for _ in 0..10 {
@@ -1045,7 +1051,7 @@ mod test {
                     kind: MetricKind::Absolute,
                     value: MetricValue::AggregatedSummary {
                         quantiles: vec![0.0, 0.5, 1.0],
-                        values: vec![(1 * i) as f64, (2 * i) as f64, (4 * i) as f64],
+                        values: vec![i as f64, (2 * i) as f64, (4 * i) as f64],
                         count: 6 * i,
                         sum: 10.0,
                     },
@@ -1054,20 +1060,19 @@ mod test {
             }
         }
 
-        let (sink, _) = clock.enter(|_| {
-            sink.sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(events.into_iter()))
-                .wait()
-                .unwrap()
-        });
-        drop(sink);
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(events.into_iter()))
+            .compat()
+            .await
+            .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 
         assert_eq!(buffer.len(), 1);
 
         assert_eq!(
-            sorted(&buffer[0].clone().finish()),
+            sorted(&buffer[0].clone()),
             [
                 Metric {
                     name: "quantiles-2".into(),

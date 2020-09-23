@@ -13,10 +13,10 @@ use string_cache::DefaultAtom as Atom;
 // See also: https://internals.rust-lang.org/t/f32-f64-should-implement-hash/5436/32
 
 /// An event discriminant identifies a distinguishable subset of events.
-/// Intended for disecting streams of events to substreams, for instance to
-/// be able to allocate a buffer per substream.
+/// Intended for dissecting streams of events to sub-streams, for instance to
+/// be able to allocate a buffer per sub-stream.
 /// Implements `PartialEq`, `Eq` and `Hash` to enable use as a `HashMap` key.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Discriminant {
     values: Vec<Option<Value>>,
 }
@@ -59,7 +59,7 @@ fn value_eq(this: &Value, other: &Value) -> bool {
         (Value::Null, Value::Null) => true,
         // Non-trivial.
         (Value::Float(this), Value::Float(other)) => f64_eq(this, other),
-        (Value::Array(this), Value::Array(other)) => array_eq(this, other),
+        (Value::Array(this), Value::Array(other)) => array_eq(&this, &other),
         (Value::Map(this), Value::Map(other)) => map_eq(this, other),
         // Type mismatch.
         _ => false,
@@ -82,7 +82,7 @@ fn f64_eq(this: &f64, other: &f64) -> bool {
     true
 }
 
-fn array_eq(this: &Vec<Value>, other: &Vec<Value>) -> bool {
+fn array_eq(this: &[Value], other: &[Value]) -> bool {
     if this.len() != other.len() {
         return false;
     }
@@ -126,7 +126,7 @@ fn hash_value<H: Hasher>(hasher: &mut H, value: &Value) {
         Value::Timestamp(val) => val.hash(hasher),
         // Non-trivial.
         Value::Float(val) => hash_f64(hasher, val),
-        Value::Array(val) => hash_array(hasher, val),
+        Value::Array(val) => hash_array(hasher, &val),
         Value::Map(val) => hash_map(hasher, val),
         Value::Null => hash_null(hasher),
     }
@@ -137,7 +137,7 @@ fn hash_f64<H: Hasher>(hasher: &mut H, value: &f64) {
     hasher.write(&value.to_ne_bytes());
 }
 
-fn hash_array<H: Hasher>(hasher: &mut H, array: &Vec<Value>) {
+fn hash_array<H: Hasher>(hasher: &mut H, array: &[Value]) {
     for val in array.iter() {
         hash_value(hasher, val);
     }
@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn equal() {
-        let mut event_1 = LogEvent::new();
+        let mut event_1 = LogEvent::default();
         event_1.insert("hostname", "localhost");
         event_1.insert("irrelevant", "not even used");
         let mut event_2 = event_1.clone();
@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn not_equal() {
-        let mut event_1 = LogEvent::new();
+        let mut event_1 = LogEvent::default();
         event_1.insert("hostname", "localhost");
         event_1.insert("container_id", "abc");
         let mut event_2 = event_1.clone();
@@ -202,10 +202,10 @@ mod tests {
 
     #[test]
     fn field_order() {
-        let mut event_1 = LogEvent::new();
+        let mut event_1 = LogEvent::default();
         event_1.insert("a", "a");
         event_1.insert("b", "b");
-        let mut event_2 = LogEvent::new();
+        let mut event_2 = LogEvent::default();
         event_2.insert("b", "b");
         event_2.insert("a", "a");
 
@@ -220,10 +220,10 @@ mod tests {
 
     #[test]
     fn map_values_key_order() {
-        let mut event_1 = LogEvent::new();
+        let mut event_1 = LogEvent::default();
         event_1.insert("nested.a", "a");
         event_1.insert("nested.b", "b");
-        let mut event_2 = LogEvent::new();
+        let mut event_2 = LogEvent::default();
         event_2.insert("nested.b", "b");
         event_2.insert("nested.a", "a");
 
@@ -238,10 +238,10 @@ mod tests {
 
     #[test]
     fn array_values_insertion_order() {
-        let mut event_1 = LogEvent::new();
+        let mut event_1 = LogEvent::default();
         event_1.insert("array[0]", "a");
         event_1.insert("array[1]", "b");
-        let mut event_2 = LogEvent::new();
+        let mut event_2 = LogEvent::default();
         event_2.insert("array[1]", "b");
         event_2.insert("array[0]", "a");
 
@@ -256,9 +256,9 @@ mod tests {
 
     #[test]
     fn map_values_matter_1() {
-        let mut event_1 = LogEvent::new();
+        let mut event_1 = LogEvent::default();
         event_1.insert("nested.a", "a"); // `nested` is a `Value::Map`
-        let event_2 = LogEvent::new(); // empty event
+        let event_2 = LogEvent::default(); // empty event
 
         let discriminant_fields = vec![Atom::from("nested")];
 
@@ -271,9 +271,9 @@ mod tests {
 
     #[test]
     fn map_values_matter_2() {
-        let mut event_1 = LogEvent::new();
+        let mut event_1 = LogEvent::default();
         event_1.insert("nested.a", "a"); // `nested` is a `Value::Map`
-        let mut event_2 = LogEvent::new();
+        let mut event_2 = LogEvent::default();
         event_2.insert("nested", "x"); // `nested` is a `Value::String`
 
         let discriminant_fields = vec![Atom::from("nested")];
@@ -290,23 +290,22 @@ mod tests {
         let mut map: HashMap<Discriminant, usize> = HashMap::new();
 
         let event_stream_1 = {
-            let mut event = LogEvent::new();
+            let mut event = LogEvent::default();
             event.insert("hostname", "a.test");
             event.insert("container_id", "abc");
             event
         };
 
         let event_stream_2 = {
-            let mut event = LogEvent::new();
+            let mut event = LogEvent::default();
             event.insert("hostname", "b.test");
             event.insert("container_id", "def");
             event
         };
 
         let event_stream_3 = {
-            let event = LogEvent::new();
             // no `hostname` or `container_id`
-            event
+            LogEvent::default()
         };
 
         let discriminant_fields = vec![Atom::from("hostname"), Atom::from("container_id")];
@@ -355,7 +354,7 @@ mod tests {
             assert_eq!(process_event(event), 1);
         }
 
-        // Now assert the amount of events processed per descriminant.
+        // Now assert the amount of events processed per discriminant.
         assert_eq!(process_event(event_stream_1), 2);
         assert_eq!(process_event(event_stream_2), 2);
         assert_eq!(process_event(event_stream_3), 2);

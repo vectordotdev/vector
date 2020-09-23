@@ -36,8 +36,8 @@ write_to_description = "[InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_
   "_partials/fields/_batch_options.toml",
   common: false,
   groups: ["v1", "v2"],
+  max_bytes: 1049000,
   max_events: nil,
-  max_size: 10490000,
   namespace: "sinks.influxdb_logs.options",
   timeout_secs: 1
 ) %>

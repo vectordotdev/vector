@@ -14,7 +14,7 @@ impl<'a> ToLua<'a> for Value {
             Value::Boolean(b) => Ok(LuaValue::Boolean(b)),
             Value::Timestamp(t) => timestamp_to_table(ctx, t).map(LuaValue::Table),
             Value::Map(m) => ctx
-                .create_table_from(m.into_iter().map(|(k, v)| (k.to_string(), v)))
+                .create_table_from(m.into_iter().map(|(k, v)| (k, v)))
                 .map(LuaValue::Table),
             Value::Array(a) => ctx.create_sequence_from(a.into_iter()).map(LuaValue::Table),
             Value::Null => ctx.create_string("").map(LuaValue::String),
@@ -25,7 +25,7 @@ impl<'a> ToLua<'a> for Value {
 impl<'a> FromLua<'a> for Value {
     fn from_lua(value: LuaValue<'a>, _: LuaContext<'a>) -> LuaResult<Self> {
         match value {
-            LuaValue::String(s) => Ok(Value::Bytes(s.as_bytes().into())),
+            LuaValue::String(s) => Ok(Value::Bytes(Vec::from(s.as_bytes()).into())),
             LuaValue::Integer(i) => Ok(Value::Integer(i)),
             LuaValue::Number(f) => Ok(Value::Float(f)),
             LuaValue::Boolean(b) => Ok(Value::Boolean(b)),
@@ -193,16 +193,17 @@ mod test {
 
         Lua::new().context(move |ctx| {
             for (value, test_src) in pairs.into_iter() {
-                let test_fn: LuaFunction = ctx.load(test_src).eval().expect(&format!(
-                    "failed to load {} for value {:?}",
-                    test_src, value
-                ));
+                let test_fn: LuaFunction = ctx.load(test_src).eval().unwrap_or_else(|_| {
+                    panic!("Failed to load {} for value {:?}", test_src, value)
+                });
                 assert!(
-                    test_fn.call::<_, bool>(value.clone()).expect(&format!(
-                        "failed to call {} for value {:?}",
-                        test_src, value
-                    )),
-                    "test function: {}, value: {:?}",
+                    test_fn
+                        .call::<_, bool>(value.clone())
+                        .unwrap_or_else(|_| panic!(
+                            "Failed to call {} for value {:?}",
+                            test_src, value
+                        )),
+                    "Test function: {}, value: {:?}",
                     test_src,
                     value
                 );

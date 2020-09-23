@@ -2,26 +2,31 @@ use super::util::{SocketListenAddr, TcpSource};
 #[cfg(unix)]
 use crate::sources::util::build_unix_source;
 use crate::{
-    event::{self, Event, Value},
-    internal_events::{SyslogEventReceived, SyslogUdpReadError},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    event::{Event, Value},
+    internal_events::{SyslogEventReceived, SyslogUdpReadError, SyslogUdpUtf8Error},
     shutdown::ShutdownSignal,
-    stream::StreamExt,
     tls::{MaybeTlsSettings, TlsConfig},
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    Pipeline,
 };
-use bytes::Bytes;
+use bytes::{Buf, Bytes, BytesMut};
 use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use futures01::{future, sync::mpsc, Future, Sink, Stream};
+use futures::{
+    compat::{Future01CompatExt, Sink01CompatExt},
+    FutureExt, StreamExt, TryFutureExt,
+};
+use futures01::Sink;
 use serde::{Deserialize, Serialize};
+use std::io;
 use std::net::SocketAddr;
 #[cfg(unix)]
 use std::path::PathBuf;
-use syslog_loose::{self, IncompleteDate, Message, ProcId, Protocol};
-use tokio01::{
-    self,
-    codec::{BytesCodec, LinesCodec},
-    net::{UdpFramed, UdpSocket},
+use syslog_loose::{IncompleteDate, Message, ProcId, Protocol};
+use tokio::net::UdpSocket;
+use tokio_util::{
+    codec::{BytesCodec, Decoder, LinesCodec, LinesCodecError},
+    udp::UdpFramed,
 };
 use tracing::field;
 
@@ -53,7 +58,7 @@ pub enum Mode {
     },
 }
 
-fn default_max_length() -> usize {
+pub fn default_max_length() -> usize {
     bytesize::kib(100u64) as usize
 }
 
@@ -78,12 +83,12 @@ impl SourceConfig for SyslogConfig {
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let host_key = self
             .host_key
             .clone()
-            .unwrap_or(event::log_schema().host_key().to_string());
+            .unwrap_or_else(|| log_schema().host_key().to_string());
 
         match self.mode.clone() {
             Mode::Tcp { address, tls } => {
@@ -99,7 +104,7 @@ impl SourceConfig for SyslogConfig {
             #[cfg(unix)]
             Mode::Unix { path } => Ok(build_unix_source(
                 path,
-                self.max_length,
+                SyslogDecoder::new(self.max_length),
                 host_key,
                 shutdown,
                 out,
@@ -124,21 +129,117 @@ struct SyslogTcpSource {
 }
 
 impl TcpSource for SyslogTcpSource {
-    type Decoder = LinesCodec;
+    type Error = LinesCodecError;
+    type Decoder = SyslogDecoder;
 
     fn decoder(&self) -> Self::Decoder {
-        LinesCodec::new_with_max_length(self.max_length)
+        SyslogDecoder::new(self.max_length)
     }
 
     fn build_event(&self, frame: String, host: Bytes) -> Option<Event> {
-        event_from_str(&self.host_key, Some(host), &frame).map(|event| {
-            trace!(
-                message = "Received one event.",
-                event = field::debug(&event)
-            );
+        event_from_str(&self.host_key, Some(host), &frame)
+    }
+}
 
-            event
-        })
+/// Decodes according to `Octet Counting` in https://tools.ietf.org/html/rfc6587
+#[derive(Clone, Debug)]
+struct SyslogDecoder {
+    other: LinesCodec,
+}
+
+impl SyslogDecoder {
+    fn new(max_length: usize) -> Self {
+        Self {
+            other: LinesCodec::new_with_max_length(max_length),
+        }
+    }
+
+    fn octet_decode(&self, src: &mut BytesMut) -> Result<Option<String>, LinesCodecError> {
+        // Encoding scheme:
+        //
+        // len ' ' data
+        // |    |  | len number of bytes that contain syslog message
+        // |    |
+        // |    | Separating whitespace
+        // |
+        // | ASCII decimal number of unknown length
+
+        if let Some(i) = src.iter().position(|&b| b == b' ') {
+            let len: usize = std::str::from_utf8(&src[..i])
+                .map_err(|_| ())
+                .and_then(|num| num.parse().map_err(|_| ()))
+                .map_err(|_| {
+                    LinesCodecError::Io(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Unable to decode message len as number",
+                    ))
+                })?;
+
+            let from = i + 1;
+            let to = from + len;
+
+            if let Some(msg) = src.get(from..to) {
+                let s = std::str::from_utf8(msg)
+                    .map_err(|_| {
+                        LinesCodecError::Io(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "Unable to decode message as UTF8",
+                        ))
+                    })?
+                    .to_string();
+                src.advance(to);
+                Ok(Some(s))
+            } else {
+                Ok(None)
+            }
+        } else if src.len() < self.other.max_length() {
+            Ok(None)
+        } else {
+            // This is certainly malformed, and there is no recovering from this.
+            Err(LinesCodecError::Io(io::Error::new(
+                io::ErrorKind::Other,
+                "Frame length limit exceeded",
+            )))
+        }
+    }
+
+    /// None if this is not octet counting encoded
+    fn checked_decode(
+        &self,
+        src: &mut BytesMut,
+    ) -> Option<Result<Option<String>, LinesCodecError>> {
+        if let Some(&first_byte) = src.get(0) {
+            if 49 <= first_byte && first_byte <= 57 {
+                // First character is non zero number so we can assume that
+                // octet count framing is used.
+                trace!("Octet counting encoded event detected.");
+                return Some(self.octet_decode(src));
+            }
+        }
+        None
+    }
+}
+
+impl Decoder for SyslogDecoder {
+    type Item = String;
+    type Error = LinesCodecError;
+
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        if let Some(ret) = self.checked_decode(src) {
+            ret
+        } else {
+            // Octet counting isn't used so fallback to newline codec.
+            self.other.decode(src)
+        }
+    }
+
+    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        if let Some(ret) = self.checked_decode(buf) {
+            ret
+        } else {
+            // Octet counting isn't used so fallback to newline codec.
+            self.other.decode_eof(buf)
+        }
     }
 }
 
@@ -147,39 +248,52 @@ pub fn udp(
     _max_length: usize,
     host_key: String,
     shutdown: ShutdownSignal,
-    out: mpsc::Sender<Event>,
+    out: Pipeline,
 ) -> super::Source {
-    let out = out.sink_map_err(|e| error!("error sending line: {:?}", e));
+    let out = out.sink_map_err(|e| error!("Error sending line: {:?}.", e));
 
     Box::new(
-        future::lazy(move || {
-            let socket = UdpSocket::bind(&addr).expect("failed to bind to udp listener socket");
-
+        async move {
+            let socket = UdpSocket::bind(&addr)
+                .await
+                .expect("Failed to bind to UDP listener socket");
             info!(
-                message = "listening.",
+                message = "Listening.",
                 addr = &field::display(addr),
                 r#type = "udp"
             );
 
-            future::ok(socket)
-        })
-        .and_then(move |socket| {
-            let host_key = host_key.clone();
-
-            let lines_in = UdpFramed::new(socket, BytesCodec::new())
-                .take_until(shutdown)
-                .filter_map(move |(bytes, received_from)| {
+            let _ = UdpFramed::new(socket, BytesCodec::new())
+                .take_until(shutdown.compat())
+                .filter_map(|frame| {
                     let host_key = host_key.clone();
-                    let received_from = received_from.to_string().into();
+                    async move {
+                        match frame {
+                            Ok((bytes, received_from)) => {
+                                let received_from = received_from.to_string().into();
 
-                    std::str::from_utf8(&bytes)
-                        .ok()
-                        .and_then(|s| event_from_str(&host_key, Some(received_from), s))
+                                std::str::from_utf8(&bytes)
+                                    .map_err(|error| emit!(SyslogUdpUtf8Error { error }))
+                                    .ok()
+                                    .and_then(|s| {
+                                        event_from_str(&host_key, Some(received_from), s).map(Ok)
+                                    })
+                            }
+                            Err(error) => {
+                                emit!(SyslogUdpReadError { error });
+                                None
+                            }
+                        }
+                    }
                 })
-                .map_err(|error| emit!(SyslogUdpReadError { error }));
+                .forward(out.sink_compat())
+                .await;
 
-            lines_in.forward(out).map(|_| info!("finished sending"))
-        }),
+            info!("Finished sending.");
+            Ok(())
+        }
+        .boxed()
+        .compat(),
     )
 }
 
@@ -203,10 +317,6 @@ fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
 // octet framing (i.e. num bytes as ascii string prefix) with and without delimiters
 // null byte delimiter in place of newline
 fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Option<Event> {
-    emit!(SyslogEventReceived {
-        byte_size: line.len()
-    });
-
     let line = line.trim();
     let parsed = syslog_loose::parse_message_with_year(line, resolve_year);
     let mut event = Event::from(&parsed.msg[..]);
@@ -214,13 +324,14 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
     // Add source type
     event
         .as_mut_log()
-        .insert(event::log_schema().source_type_key(), "syslog");
+        .insert(log_schema().source_type_key(), Bytes::from("syslog"));
 
     if let Some(default_host) = default_host.clone() {
         event.as_mut_log().insert("source_ip", default_host);
     }
 
-    if let Some(parsed_host) = parsed.hostname.map(Bytes::from).or(default_host) {
+    let parsed_hostname = parsed.hostname.map(|x| Bytes::from(x.to_owned()));
+    if let Some(parsed_host) = parsed_hostname.or(default_host) {
         event.as_mut_log().insert(host_key, parsed_host);
     }
 
@@ -230,9 +341,13 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
         .unwrap_or_else(Utc::now);
     event
         .as_mut_log()
-        .insert(event::log_schema().timestamp_key().clone(), timestamp);
+        .insert(log_schema().timestamp_key().clone(), timestamp);
 
     insert_fields_from_syslog(&mut event, parsed);
+
+    emit!(SyslogEventReceived {
+        byte_size: line.len()
+    });
 
     trace!(
         message = "processing one event.",
@@ -246,35 +361,35 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
     let log = event.as_mut_log();
 
     if let Some(host) = parsed.hostname {
-        log.insert("hostname", host);
+        log.insert("hostname", host.to_string());
     }
     if let Some(severity) = parsed.severity {
-        log.insert("severity", severity.as_str());
+        log.insert("severity", severity.as_str().to_owned());
     }
     if let Some(facility) = parsed.facility {
-        log.insert("facility", facility.as_str());
+        log.insert("facility", facility.as_str().to_owned());
     }
     if let Protocol::RFC5424(version) = parsed.protocol {
         log.insert("version", version as i64);
     }
     if let Some(app_name) = parsed.appname {
-        log.insert("appname", app_name);
+        log.insert("appname", app_name.to_owned());
     }
     if let Some(msg_id) = parsed.msgid {
-        log.insert("msgid", msg_id);
+        log.insert("msgid", msg_id.to_owned());
     }
     if let Some(procid) = parsed.procid {
         let value: Value = match procid {
             ProcId::PID(pid) => pid.into(),
-            ProcId::Name(name) => name.into(),
+            ProcId::Name(name) => name.to_string().into(),
         };
         log.insert("procid", value);
     }
 
-    for element in parsed.structured_data.iter() {
-        for (name, value) in element.params.iter() {
+    for element in parsed.structured_data.into_iter() {
+        for (name, value) in element.params.into_iter() {
             let key = format!("{}.{}", element.id, name);
-            log.insert(key, value.clone());
+            log.insert(key, value.to_string());
         }
     }
 }
@@ -282,8 +397,8 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
 #[cfg(test)]
 mod test {
     use super::{event_from_str, SyslogConfig};
-    use crate::event::{self, Event};
-    use chrono::TimeZone;
+    use crate::{config::log_schema, event::Event};
+    use chrono::prelude::*;
 
     #[test]
     fn config_tcp() {
@@ -339,10 +454,10 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                event::log_schema().timestamp_key().clone(),
+                log_schema().timestamp_key().clone(),
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
-            expected.insert(event::log_schema().source_type_key().clone(), "syslog");
+            expected.insert(log_schema().source_type_key().clone(), "syslog");
             expected.insert("host", "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
 
@@ -377,12 +492,12 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                event::log_schema().timestamp_key().clone(),
+                log_schema().timestamp_key().clone(),
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
-            expected.insert(event::log_schema().host_key().clone(), "74794bfb6795");
+            expected.insert(log_schema().host_key().clone(), "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
-            expected.insert(event::log_schema().source_type_key().clone(), "syslog");
+            expected.insert(log_schema().source_type_key().clone(), "syslog");
             expected.insert("severity", "notice");
             expected.insert("facility", "user");
             expected.insert("version", 1);
@@ -467,12 +582,11 @@ mod test {
         let mut expected = Event::from(msg);
         {
             let expected = expected.as_mut_log();
-            expected.insert(
-                event::log_schema().timestamp_key().clone(),
-                chrono::Utc.ymd(2020, 2, 13).and_hms(20, 7, 26),
-            );
-            expected.insert(event::log_schema().host_key().clone(), "74794bfb6795");
-            expected.insert(event::log_schema().source_type_key().clone(), "syslog");
+            let expected_date: DateTime<Utc> =
+                chrono::Local.ymd(2020, 2, 13).and_hms(20, 7, 26).into();
+            expected.insert(log_schema().timestamp_key().clone(), expected_date);
+            expected.insert(log_schema().host_key().clone(), "74794bfb6795");
+            expected.insert(log_schema().source_type_key().clone(), "syslog");
             expected.insert("hostname", "74794bfb6795");
             expected.insert("severity", "notice");
             expected.insert("facility", "user");
@@ -497,11 +611,10 @@ mod test {
         let mut expected = Event::from(msg);
         {
             let expected = expected.as_mut_log();
-            expected.insert(
-                event::log_schema().timestamp_key().clone(),
-                chrono::Utc.ymd(2020, 2, 13).and_hms(21, 31, 56),
-            );
-            expected.insert(event::log_schema().source_type_key().clone(), "syslog");
+            let expected_date: DateTime<Utc> =
+                chrono::Local.ymd(2020, 2, 13).and_hms(21, 31, 56).into();
+            expected.insert(log_schema().timestamp_key().clone(), expected_date);
+            expected.insert(log_schema().source_type_key().clone(), "syslog");
             expected.insert("host", "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
             expected.insert("severity", "info");
@@ -531,12 +644,12 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                event::log_schema().timestamp_key().clone(),
+                log_schema().timestamp_key().clone(),
                 chrono::Utc
                     .ymd(2019, 2, 13)
                     .and_hms_micro(21, 53, 30, 605_850),
             );
-            expected.insert(event::log_schema().source_type_key().clone(), "syslog");
+            expected.insert(log_schema().source_type_key().clone(), "syslog");
             expected.insert("host", "74794bfb6795");
             expected.insert("hostname", "74794bfb6795");
             expected.insert("severity", "info");

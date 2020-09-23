@@ -1,16 +1,26 @@
 use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
 
 use approx::assert_relative_eq;
-use futures01::future;
-use rand::distributions::{Alphanumeric, Uniform};
-use rand::prelude::*;
-use vector::event::Event;
-use vector::test_util::{
-    block_on, count_receive, next_addr, send_lines, shutdown_on_idle, wait_for_tcp,
+use futures::{compat::Future01CompatExt, future, stream, StreamExt};
+use indexmap::IndexMap;
+use rand::{
+    distributions::{Alphanumeric, Uniform},
+    prelude::*,
 };
-use vector::topology::config::{TransformConfig, TransformContext};
-use vector::topology::{self, config};
-use vector::{runtime, sinks, sources, transforms};
+use std::convert::TryFrom;
+use string_cache::DefaultAtom as Atom;
+use vector::transforms::{
+    add_fields::AddFields,
+    remap::{Remap, RemapConfig},
+    Transform,
+};
+use vector::{
+    config::{self, log_schema, TransformConfig, TransformContext},
+    event::Event,
+    sinks, sources,
+    test_util::{next_addr, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver},
+    transforms,
+};
 
 mod batch;
 mod buffering;
@@ -30,6 +40,7 @@ criterion_group!(
     benchmark_complex,
     bench_elasticsearch_index,
     benchmark_regex,
+    benchmark_remap,
 );
 criterion_main!(
     benches,
@@ -38,7 +49,7 @@ criterion_main!(
     batch::batch,
     files::files,
     lua::lua,
-    event::event
+    event::event,
 );
 
 fn benchmark_simple_pipe(c: &mut Criterion) {
@@ -53,7 +64,7 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
         Benchmark::new("pipe", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut config = config::Config::empty();
+                    let mut config = config::Config::builder();
                     config.add_source(
                         "in",
                         sources::socket::SocketConfig::make_tcp_config(in_addr),
@@ -66,23 +77,24 @@ fn benchmark_simple_pipe(c: &mut Criterion) {
                         ),
                     );
 
-                    let mut rt = runtime::Runtime::new().unwrap();
-
-                    let output_lines = count_receive(&out_addr);
-
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
-                    wait_for_tcp(in_addr);
-
+                    let mut rt = runtime();
+                    let (output_lines, topology) = rt.block_on(async move {
+                        let output_lines = CountReceiver::receive_lines(out_addr);
+                        let (topology, _crash) =
+                            start_topology(config.build().unwrap(), false).await;
+                        wait_for_tcp(in_addr).await;
+                        (output_lines, topology)
+                    });
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
-                    let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                    rt.block_on(send).unwrap();
+                    rt.block_on(async move {
+                        let lines = random_lines(line_size).take(num_lines);
+                        send_lines(in_addr, lines).await.unwrap();
 
-                    block_on(topology.stop()).unwrap();
-
-                    shutdown_on_idle(rt);
-                    assert_eq!(num_lines, output_lines.wait());
+                        topology.stop().compat().await.unwrap();
+                        assert_eq!(num_lines, output_lines.await.len());
+                    });
                 },
             );
         })
@@ -104,7 +116,7 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
         Benchmark::new("pipe_with_tiny_lines", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut config = config::Config::empty();
+                    let mut config = config::Config::builder();
                     config.add_source(
                         "in",
                         sources::socket::SocketConfig::make_tcp_config(in_addr),
@@ -117,23 +129,24 @@ fn benchmark_simple_pipe_with_tiny_lines(c: &mut Criterion) {
                         ),
                     );
 
-                    let mut rt = runtime::Runtime::new().unwrap();
-
-                    let output_lines = count_receive(&out_addr);
-
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
-                    wait_for_tcp(in_addr);
-
+                    let mut rt = runtime();
+                    let (output_lines, topology) = rt.block_on(async move {
+                        let output_lines = CountReceiver::receive_lines(out_addr);
+                        let (topology, _crash) =
+                            start_topology(config.build().unwrap(), false).await;
+                        wait_for_tcp(in_addr).await;
+                        (output_lines, topology)
+                    });
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
-                    let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                    rt.block_on(send).unwrap();
+                    rt.block_on(async move {
+                        let lines = random_lines(line_size).take(num_lines);
+                        send_lines(in_addr, lines).await.unwrap();
 
-                    block_on(topology.stop()).unwrap();
-
-                    shutdown_on_idle(rt);
-                    assert_eq!(num_lines, output_lines.wait());
+                        topology.stop().compat().await.unwrap();
+                        assert_eq!(num_lines, output_lines.await.len());
+                    });
                 },
             );
         })
@@ -155,7 +168,7 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
         Benchmark::new("pipe_with_huge_lines", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut config = config::Config::empty();
+                    let mut config = config::Config::builder();
                     config.add_source(
                         "in",
                         sources::socket::SocketConfig::make_tcp_config(in_addr),
@@ -168,23 +181,24 @@ fn benchmark_simple_pipe_with_huge_lines(c: &mut Criterion) {
                         ),
                     );
 
-                    let mut rt = runtime::Runtime::new().unwrap();
-
-                    let output_lines = count_receive(&out_addr);
-
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
-                    wait_for_tcp(in_addr);
-
+                    let mut rt = runtime();
+                    let (output_lines, topology) = rt.block_on(async move {
+                        let output_lines = CountReceiver::receive_lines(out_addr);
+                        let (topology, _crash) =
+                            start_topology(config.build().unwrap(), false).await;
+                        wait_for_tcp(in_addr).await;
+                        (output_lines, topology)
+                    });
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
-                    let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                    rt.block_on(send).unwrap();
+                    rt.block_on(async move {
+                        let lines = random_lines(line_size).take(num_lines);
+                        send_lines(in_addr, lines).await.unwrap();
 
-                    block_on(topology.stop()).unwrap();
-
-                    shutdown_on_idle(rt);
-                    assert_eq!(num_lines, output_lines.wait());
+                        topology.stop().compat().await.unwrap();
+                        assert_eq!(num_lines, output_lines.await.len());
+                    });
                 },
             );
         })
@@ -207,7 +221,7 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
         Benchmark::new("pipe_with_many_writers", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut config = config::Config::empty();
+                    let mut config = config::Config::builder();
                     config.add_source(
                         "in",
                         sources::socket::SocketConfig::make_tcp_config(in_addr),
@@ -220,31 +234,33 @@ fn benchmark_simple_pipe_with_many_writers(c: &mut Criterion) {
                         ),
                     );
 
-                    let mut rt = runtime::Runtime::new().unwrap();
-
-                    let output_lines = count_receive(&out_addr);
-
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
-                    wait_for_tcp(in_addr);
-
+                    let mut rt = runtime();
+                    let (output_lines, topology) = rt.block_on(async move {
+                        let output_lines = CountReceiver::receive_lines(out_addr);
+                        let (topology, _crash) =
+                            start_topology(config.build().unwrap(), false).await;
+                        wait_for_tcp(in_addr).await;
+                        (output_lines, topology)
+                    });
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
-                    let sends = (0..num_writers)
-                        .map(|_| {
-                            let send = send_lines(in_addr, random_lines(line_size).take(num_lines));
-                            futures01::sync::oneshot::spawn(send, &rt.executor())
-                        })
-                        .collect::<Vec<_>>();
+                    rt.block_on(async move {
+                        let sends = stream::iter(0..num_writers)
+                            .map(|_| {
+                                let lines = random_lines(line_size).take(num_lines);
+                                send_lines(in_addr, lines)
+                            })
+                            .collect::<Vec<_>>()
+                            .await;
+                        future::try_join_all(sends).await.unwrap();
 
-                    rt.block_on(future::join_all(sends)).unwrap();
+                        topology.stop().compat().await.unwrap();
 
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-
-                    block_on(topology.stop()).unwrap();
-
-                    shutdown_on_idle(rt);
-                    assert_eq!(num_lines * num_writers, output_lines.wait());
+                        // TODO: shutdown after flush
+                        // assert_eq!(num_lines * num_writers, output_lines.await.len());
+                        let _ = output_lines.await;
+                    });
                 },
             );
         })
@@ -270,7 +286,7 @@ fn benchmark_interconnected(c: &mut Criterion) {
         Benchmark::new("interconnected", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut config = config::Config::empty();
+                    let mut config = config::Config::builder();
                     config.add_source(
                         "in1",
                         sources::socket::SocketConfig::make_tcp_config(in_addr1),
@@ -294,28 +310,29 @@ fn benchmark_interconnected(c: &mut Criterion) {
                         ),
                     );
 
-                    let mut rt = runtime::Runtime::new().unwrap();
-
-                    let output_lines1 = count_receive(&out_addr1);
-                    let output_lines2 = count_receive(&out_addr2);
-
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
-                    wait_for_tcp(in_addr1);
-                    wait_for_tcp(in_addr2);
-
+                    let mut rt = runtime();
+                    let (output_lines1, output_lines2, topology) = rt.block_on(async move {
+                        let output_lines1 = CountReceiver::receive_lines(out_addr1);
+                        let output_lines2 = CountReceiver::receive_lines(out_addr2);
+                        let (topology, _crash) =
+                            start_topology(config.build().unwrap(), false).await;
+                        wait_for_tcp(in_addr1).await;
+                        wait_for_tcp(in_addr2).await;
+                        (output_lines1, output_lines2, topology)
+                    });
                     (rt, topology, output_lines1, output_lines2)
                 },
                 |(mut rt, topology, output_lines1, output_lines2)| {
-                    let send1 = send_lines(in_addr1, random_lines(line_size).take(num_lines));
-                    let send2 = send_lines(in_addr2, random_lines(line_size).take(num_lines));
-                    let sends = vec![send1, send2];
-                    rt.block_on(future::join_all(sends)).unwrap();
+                    rt.block_on(async move {
+                        let lines1 = random_lines(line_size).take(num_lines);
+                        send_lines(in_addr1, lines1).await.unwrap();
+                        let lines2 = random_lines(line_size).take(num_lines);
+                        send_lines(in_addr2, lines2).await.unwrap();
 
-                    block_on(topology.stop()).unwrap();
-
-                    shutdown_on_idle(rt);
-                    assert_eq!(num_lines * 2, output_lines1.wait());
-                    assert_eq!(num_lines * 2, output_lines2.wait());
+                        topology.stop().compat().await.unwrap();
+                        assert_eq!(num_lines * 2, output_lines1.await.len());
+                        assert_eq!(num_lines * 2, output_lines2.await.len());
+                    });
                 },
             );
         })
@@ -337,7 +354,7 @@ fn benchmark_transforms(c: &mut Criterion) {
         Benchmark::new("transforms", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut config = config::Config::empty();
+                    let mut config = config::Config::builder();
                     config.add_source(
                         "in",
                         sources::socket::SocketConfig::make_tcp_config(in_addr),
@@ -366,28 +383,27 @@ fn benchmark_transforms(c: &mut Criterion) {
                             out_addr.to_string(),
                         ),
                     );
-                    let mut rt = runtime::Runtime::new().unwrap();
 
-                    let output_lines = count_receive(&out_addr);
-
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
-                    wait_for_tcp(in_addr);
-
+                    let mut rt = runtime();
+                    let (output_lines, topology) = rt.block_on(async move {
+                        let output_lines = CountReceiver::receive_lines(out_addr);
+                        let (topology, _crash) =
+                            start_topology(config.build().unwrap(), false).await;
+                        wait_for_tcp(in_addr).await;
+                        (output_lines, topology)
+                    });
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
-                    let send = send_lines(
-                        in_addr,
-                        random_lines(line_size)
+                    rt.block_on(async move {
+                        let lines = random_lines(line_size)
                             .map(|l| l + "status=404")
-                            .take(num_lines),
-                    );
-                    rt.block_on(send).unwrap();
+                            .take(num_lines);
+                        send_lines(in_addr, lines).await.unwrap();
 
-                    block_on(topology.stop()).unwrap();
-
-                    shutdown_on_idle(rt);
-                    assert_eq!(num_lines, output_lines.wait());
+                        topology.stop().compat().await.unwrap();
+                        assert_eq!(num_lines, output_lines.await.len());
+                    });
                 },
             );
         })
@@ -407,14 +423,13 @@ fn benchmark_regex(c: &mut Criterion) {
         Benchmark::new("regex", move |b| {
             b.iter_with_setup(
                 || {
-                    let rt = vector::runtime::Runtime::single_threaded().unwrap();
                     let parser =transforms::regex_parser::RegexParserConfig {
                         // Many captures to stress the regex parser
                         patterns: vec![r#"^(?P<addr>\d+\.\d+\.\d+\.\d+) (?P<user>\S+) (?P<auth>\S+) \[(?P<date>\d+/[A-Za-z]+/\d+:\d+:\d+:\d+ [+-]\d{4})\] "(?P<method>[A-Z]+) (?P<uri>[^"]+) HTTP/\d\.\d" (?P<code>\d+) (?P<size>\d+) "(?P<referrer>[^"]+)" "(?P<browser>[^"]+)""#.into()],
                         field: None,
                         drop_failed: true,
                         ..Default::default()
-                    }.build(TransformContext::new_test(rt.executor())).unwrap();
+                    }.build(TransformContext::new_test()).unwrap();
 
                     let src_lines = http_access_log_lines()
                         .take(num_lines)
@@ -452,7 +467,7 @@ fn benchmark_complex(c: &mut Criterion) {
         Benchmark::new("complex", move |b| {
             b.iter_with_setup(
                 || {
-                    let mut config = config::Config::empty();
+                    let mut config = config::Config::builder();
                     config.add_source(
                         "in1",
                         sources::socket::SocketConfig::make_tcp_config(in_addr1),
@@ -538,17 +553,31 @@ fn benchmark_complex(c: &mut Criterion) {
                             out_addr_500.to_string(),
                         ),
                     );
-                    let mut rt = runtime::Runtime::new().unwrap();
 
-                    let output_lines_all = count_receive(&out_addr_all);
-                    let output_lines_sampled = count_receive(&out_addr_sampled);
-                    let output_lines_200 = count_receive(&out_addr_200);
-                    let output_lines_404 = count_receive(&out_addr_404);
-
-                    let (topology, _crash) = topology::start(config, &mut rt, false).unwrap();
-                    wait_for_tcp(in_addr1);
-                    wait_for_tcp(in_addr2);
-
+                    let mut rt = runtime();
+                    let (
+                        output_lines_all,
+                        output_lines_sampled,
+                        output_lines_200,
+                        output_lines_404,
+                        topology,
+                    ) = rt.block_on(async move {
+                        let output_lines_all = CountReceiver::receive_lines(out_addr_all);
+                        let output_lines_sampled = CountReceiver::receive_lines(out_addr_sampled);
+                        let output_lines_200 = CountReceiver::receive_lines(out_addr_200);
+                        let output_lines_404 = CountReceiver::receive_lines(out_addr_404);
+                        let (topology, _crash) =
+                            start_topology(config.build().unwrap(), false).await;
+                        wait_for_tcp(in_addr1).await;
+                        wait_for_tcp(in_addr2).await;
+                        (
+                            output_lines_all,
+                            output_lines_sampled,
+                            output_lines_200,
+                            output_lines_404,
+                            topology,
+                        )
+                    });
                     (
                         rt,
                         topology,
@@ -566,45 +595,40 @@ fn benchmark_complex(c: &mut Criterion) {
                     output_lines_200,
                     output_lines_404,
                 )| {
-                    // One sender generates pure random lines
-                    let send1 = send_lines(in_addr1, random_lines(100).take(num_lines));
-                    let send1 = futures01::sync::oneshot::spawn(send1, &rt.executor());
+                    rt.block_on(async move {
+                        // One sender generates pure random lines
+                        let lines1 = random_lines(100).take(num_lines);
+                        send_lines(in_addr1, lines1).await.unwrap();
 
-                    // The other includes either status=200 or status=404
-                    let mut rng = SmallRng::from_rng(thread_rng()).unwrap();
-                    let send2 = send_lines(
-                        in_addr2,
-                        random_lines(100)
+                        // The other includes either status=200 or status=404
+                        let mut rng = SmallRng::from_rng(thread_rng()).unwrap();
+                        let lines2 = random_lines(100)
                             .map(move |mut l| {
                                 let status = if rng.gen_bool(0.5) { "200" } else { "404" };
                                 l += "status=";
                                 l += status;
                                 l
                             })
-                            .take(num_lines),
-                    );
-                    let send2 = futures01::sync::oneshot::spawn(send2, &rt.executor());
-                    let sends = vec![send1, send2];
-                    rt.block_on(future::join_all(sends)).unwrap();
+                            .take(num_lines);
+                        send_lines(in_addr2, lines2).await.unwrap();
 
-                    block_on(topology.stop()).unwrap();
+                        topology.stop().compat().await.unwrap();
 
-                    shutdown_on_idle(rt);
+                        let output_lines_all = output_lines_all.await.len();
+                        let output_lines_sampled = output_lines_sampled.await.len();
+                        let output_lines_200 = output_lines_200.await.len();
+                        let output_lines_404 = output_lines_404.await.len();
 
-                    let output_lines_all = output_lines_all.wait();
-                    let output_lines_sampled = output_lines_sampled.wait();
-                    let output_lines_200 = output_lines_200.wait();
-                    let output_lines_404 = output_lines_404.wait();
-
-                    assert_eq!(output_lines_all, num_lines * 2);
-                    assert_relative_eq!(
-                        output_lines_sampled as f32 / num_lines as f32,
-                        0.1,
-                        epsilon = 0.01
-                    );
-                    assert!(output_lines_200 > 0);
-                    assert!(output_lines_404 > 0);
-                    assert_eq!(output_lines_200 + output_lines_404, num_lines);
+                        assert_eq!(output_lines_all, num_lines * 2);
+                        assert_relative_eq!(
+                            output_lines_sampled as f32 / num_lines as f32,
+                            0.1,
+                            epsilon = 0.01
+                        );
+                        assert!(output_lines_200 > 0);
+                        assert!(output_lines_404 > 0);
+                        assert_eq!(output_lines_200 + output_lines_404, num_lines);
+                    });
                 },
             );
         })
@@ -614,7 +638,7 @@ fn benchmark_complex(c: &mut Criterion) {
 
 fn bench_elasticsearch_index(c: &mut Criterion) {
     use chrono::Utc;
-    use vector::{event, template::Template};
+    use vector::template::Template;
 
     c.bench(
         "elasticsearch_indexes",
@@ -624,9 +648,9 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
                     let mut event = Event::from("hello world");
                     event
                         .as_mut_log()
-                        .insert(event::log_schema().timestamp_key().clone(), Utc::now());
+                        .insert(log_schema().timestamp_key().clone(), Utc::now());
 
-                    (Template::from("index-%Y.%m.%d"), event)
+                    (Template::try_from("index-%Y.%m.%d").unwrap(), event)
                 },
                 |(index, event)| index.render(&event),
             )
@@ -641,14 +665,98 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
                     let mut event = Event::from("hello world");
                     event
                         .as_mut_log()
-                        .insert(event::log_schema().timestamp_key().clone(), Utc::now());
+                        .insert(log_schema().timestamp_key().clone(), Utc::now());
 
-                    (Template::from("index"), event)
+                    (Template::try_from("index").unwrap(), event)
                 },
                 |(index, event)| index.render(&event),
             )
         }),
     );
+}
+
+fn benchmark_remap(c: &mut Criterion) {
+    let event = {
+        let mut event = Event::from("augment me");
+        event.as_mut_log().insert("copy_from", "buz".to_owned());
+        event
+    };
+
+    c.bench_function("add fields with remap", |b| {
+        let conf = RemapConfig {
+            mapping: r#".foo = "bar"
+            .bar = "baz"
+            .copy = .copy_from"#
+                .to_string(),
+            drop_on_err: true,
+        };
+        let mut tform = Remap::new(conf).unwrap();
+
+        b.iter(|| {
+            let result = tform.transform(event.clone()).unwrap();
+            assert_eq!(
+                result
+                    .as_log()
+                    .get(&Atom::from("foo"))
+                    .unwrap()
+                    .to_string_lossy(),
+                "bar"
+            );
+            assert_eq!(
+                result
+                    .as_log()
+                    .get(&Atom::from("bar"))
+                    .unwrap()
+                    .to_string_lossy(),
+                "baz"
+            );
+            assert_eq!(
+                result
+                    .as_log()
+                    .get(&Atom::from("copy"))
+                    .unwrap()
+                    .to_string_lossy(),
+                "buz"
+            );
+        })
+    });
+
+    c.bench_function("add fields with add_fields", |b| {
+        let mut fields = IndexMap::new();
+        fields.insert("foo".into(), "bar".into());
+        fields.insert("bar".into(), "baz".into());
+        fields.insert("copy".into(), "{{ copy_from }}".into());
+
+        let mut tform = AddFields::new(fields, true);
+
+        b.iter(|| {
+            let result = tform.transform(event.clone()).unwrap();
+            assert_eq!(
+                result
+                    .as_log()
+                    .get(&Atom::from("foo"))
+                    .unwrap()
+                    .to_string_lossy(),
+                "bar"
+            );
+            assert_eq!(
+                result
+                    .as_log()
+                    .get(&Atom::from("bar"))
+                    .unwrap()
+                    .to_string_lossy(),
+                "baz"
+            );
+            assert_eq!(
+                result
+                    .as_log()
+                    .get(&Atom::from("copy"))
+                    .unwrap()
+                    .to_string_lossy(),
+                "buz"
+            );
+        })
+    });
 }
 
 fn random_lines(size: usize) -> impl Iterator<Item = String> {

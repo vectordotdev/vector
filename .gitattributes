@@ -1,5 +1,5 @@
+*.erb linguist-detectable=false
 distribution/* linguist-detectable=false
 lib/* linguist-vendored
 scripts/* linguist-detectable=false
-website/* linguist-detectable=false
 Makefile linguist-detectable=false

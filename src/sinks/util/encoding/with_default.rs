@@ -115,7 +115,7 @@ where
 impl<E: Default + PartialEq> From<E> for EncodingConfigWithDefault<E> {
     fn from(codec: E) -> Self {
         Self {
-            codec: codec,
+            codec,
             only_fields: Default::default(),
             except_fields: Default::default(),
             timestamp_format: Default::default(),
@@ -191,9 +191,7 @@ where
             timestamp_format: inner.timestamp_format,
         };
 
-        concrete
-            .validate()
-            .map_err(|e| serde::de::Error::custom(e))?;
+        concrete.validate().map_err(serde::de::Error::custom)?;
         Ok(concrete)
     }
 }

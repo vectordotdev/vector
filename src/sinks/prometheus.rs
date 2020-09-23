@@ -1,14 +1,17 @@
 use crate::{
     buffers::Acker,
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue},
-    sinks::util::MetricEntry,
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    sinks::util::{encode_namespace, MetricEntry},
     Event,
 };
 use chrono::Utc;
-use futures01::{future, Async, AsyncSink, Future, Sink};
+use futures::{compat::Future01CompatExt, future, FutureExt, TryFutureExt};
+use futures01::{Async, AsyncSink, Future, Sink};
 use hyper::{
-    header::HeaderValue, service::service_fn, Body, Method, Request, Response, Server, StatusCode,
+    header::HeaderValue,
+    service::{make_service_fn, service_fn},
+    Body, Method, Request, Response, Server, StatusCode,
 };
 use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
@@ -32,7 +35,7 @@ enum BuildError {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusSinkConfig {
-    pub namespace: String,
+    pub namespace: Option<String>,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
     #[serde(default = "default_histogram_buckets")]
@@ -63,7 +66,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "prometheus")]
 impl SinkConfig for PrometheusSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         if self.flush_period_secs < MIN_FLUSH_PERIOD_SECS {
             return Err(Box::new(BuildError::FlushPeriodTooShort {
                 min: MIN_FLUSH_PERIOD_SECS,
@@ -71,9 +74,9 @@ impl SinkConfig for PrometheusSinkConfig {
         }
 
         let sink = Box::new(PrometheusSink::new(self.clone(), cx.acker()));
-        let healthcheck = Box::new(future::ok(()));
+        let healthcheck = future::ok(()).boxed();
 
-        Ok((sink, healthcheck))
+        Ok((super::VectorSink::Futures01Sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -91,14 +94,6 @@ struct PrometheusSink {
     metrics: Arc<RwLock<IndexSet<MetricEntry>>>,
     last_flush_timestamp: Arc<RwLock<i64>>,
     acker: Acker,
-}
-
-fn encode_namespace(namespace: &str, name: &str) -> String {
-    if !namespace.is_empty() {
-        format!("{}_{}", namespace, name)
-    } else {
-        name.to_string()
-    }
 }
 
 fn encode_tags(tags: &Option<BTreeMap<String, String>>) -> String {
@@ -133,15 +128,15 @@ fn encode_tags_with_extra(
     format!("{{{}}}", parts.join(","))
 }
 
-fn encode_metric_header(namespace: &str, metric: &Metric) -> String {
+fn encode_metric_header(namespace: Option<&str>, metric: &Metric) -> String {
     let mut s = String::new();
     let name = &metric.name;
-    let fullname = encode_namespace(namespace, name);
+    let fullname = encode_namespace(namespace, '_', name);
 
     let r#type = match &metric.value {
         MetricValue::Counter { .. } => "counter",
         MetricValue::Gauge { .. } => "gauge",
-        MetricValue::Distribution { .. } => "histogram",
+        MetricValue::Distribution { statistic: _, .. } => "histogram",
         MetricValue::Set { .. } => "gauge",
         MetricValue::AggregatedHistogram { .. } => "histogram",
         MetricValue::AggregatedSummary { .. } => "summary",
@@ -152,9 +147,14 @@ fn encode_metric_header(namespace: &str, metric: &Metric) -> String {
     s
 }
 
-fn encode_metric_datum(namespace: &str, buckets: &[f64], expired: bool, metric: &Metric) -> String {
+fn encode_metric_datum(
+    namespace: Option<&str>,
+    buckets: &[f64],
+    expired: bool,
+    metric: &Metric,
+) -> String {
     let mut s = String::new();
-    let fullname = encode_namespace(namespace, &metric.name);
+    let fullname = encode_namespace(namespace, '_', &metric.name);
 
     if metric.kind.is_absolute() {
         let tags = &metric.tags;
@@ -174,15 +174,16 @@ fn encode_metric_datum(namespace: &str, buckets: &[f64], expired: bool, metric: 
             MetricValue::Distribution {
                 values,
                 sample_rates,
+                statistic: _,
             } => {
-                // convert ditributions into aggregated histograms
+                // convert distributions into aggregated histograms
                 let mut counts = Vec::new();
                 for _ in buckets {
                     counts.push(0);
                 }
                 let mut sum = 0.0;
                 let mut count = 0;
-                for (v, c) in values.into_iter().zip(sample_rates.into_iter()) {
+                for (v, c) in values.iter().zip(sample_rates.iter()) {
                     buckets
                         .iter()
                         .enumerate()
@@ -263,7 +264,7 @@ fn encode_metric_datum(namespace: &str, buckets: &[f64], expired: bool, metric: 
 
 fn handle(
     req: Request<Body>,
-    namespace: &str,
+    namespace: Option<&str>,
     buckets: &[f64],
     expired: bool,
     metrics: &IndexSet<MetricEntry>,
@@ -279,10 +280,10 @@ fn handle(
 
             for metric in metrics {
                 let name = &metric.0.name;
-                let frame = encode_metric_datum(&namespace, &buckets, expired, &metric.0);
+                let frame = encode_metric_datum(namespace, &buckets, expired, &metric.0);
 
                 if !processed_headers.contains(&name) {
-                    let header = encode_metric_header(&namespace, &metric.0);
+                    let header = encode_metric_header(namespace, &metric.0);
                     s.push_str(&header);
                     processed_headers.insert(name);
                 };
@@ -303,10 +304,10 @@ fn handle(
     }
 
     info!(
-        message = "request complete",
+        message = "Request complete",
         response_code = field::debug(response.status())
     );
-    Box::new(future::ok(response))
+    Box::new(futures01::future::ok(response))
 }
 
 impl PrometheusSink {
@@ -329,37 +330,40 @@ impl PrometheusSink {
         let namespace = self.config.namespace.clone();
         let buckets = self.config.buckets.clone();
         let last_flush_timestamp = Arc::clone(&self.last_flush_timestamp);
-        let flush_period_secs = self.config.flush_period_secs.clone();
+        let flush_period_secs = self.config.flush_period_secs;
 
-        let new_service = move || {
+        let new_service = make_service_fn(move |_| {
             let metrics = Arc::clone(&metrics);
             let namespace = namespace.clone();
             let buckets = buckets.clone();
             let last_flush_timestamp = Arc::clone(&last_flush_timestamp);
-            let flush_period_secs = flush_period_secs.clone();
+            let flush_period_secs = flush_period_secs;
 
-            service_fn(move |req| {
-                let metrics = metrics.read().unwrap();
-                let last_flush_timestamp = last_flush_timestamp.read().unwrap();
-                let interval = (Utc::now().timestamp() - *last_flush_timestamp) as u64;
-                let expired = interval > flush_period_secs;
-                info_span!(
-                    "prometheus_server",
-                    method = field::debug(req.method()),
-                    path = field::debug(req.uri().path()),
-                )
-                .in_scope(|| handle(req, &namespace, &buckets, expired, &metrics))
-            })
-        };
+            async move {
+                Ok::<_, crate::Error>(service_fn(move |req| {
+                    let metrics = metrics.read().unwrap();
+                    let last_flush_timestamp = last_flush_timestamp.read().unwrap();
+                    let interval = (Utc::now().timestamp() - *last_flush_timestamp) as u64;
+                    let expired = interval > flush_period_secs;
+                    info_span!(
+                        "prometheus_server",
+                        method = field::debug(req.method()),
+                        path = field::debug(req.uri().path()),
+                    )
+                    .in_scope(|| handle(req, namespace.as_deref(), &buckets, expired, &metrics))
+                    .compat()
+                }))
+            }
+        });
 
         let (trigger, tripwire) = Tripwire::new();
 
         let server = Server::bind(&self.config.address)
             .serve(new_service)
-            .with_graceful_shutdown(tripwire.clone())
+            .with_graceful_shutdown(tripwire.compat().map(|_| ()))
             .map_err(|e| eprintln!("server error: {}", e));
 
-        tokio01::spawn(server);
+        tokio::spawn(server);
         self.server_shutdown_trigger = Some(trigger);
     }
 }
@@ -379,7 +383,7 @@ impl Sink for PrometheusSink {
 
         match item.kind {
             MetricKind::Incremental => {
-                let new = MetricEntry(item.clone().into_absolute());
+                let new = MetricEntry(item.to_absolute());
                 if let Some(MetricEntry(mut existing)) = metrics.take(&new) {
                     if item.value.is_set() {
                         // sets need to be expired from time to time
@@ -418,7 +422,7 @@ impl Sink for PrometheusSink {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use pretty_assertions::assert_eq;
 
     fn tags() -> BTreeMap<String, String> {
@@ -437,8 +441,8 @@ mod tests {
             value: MetricValue::Counter { value: 10.0 },
         };
 
-        let header = encode_metric_header("vector", &metric);
-        let frame = encode_metric_datum("vector", &[], false, &metric);
+        let header = encode_metric_header(Some("vector"), &metric);
+        let frame = encode_metric_datum(Some("vector"), &[], false, &metric);
 
         assert_eq!(
             header,
@@ -457,8 +461,8 @@ mod tests {
             value: MetricValue::Gauge { value: -1.1 },
         };
 
-        let header = encode_metric_header("vector", &metric);
-        let frame = encode_metric_datum("vector", &[], false, &metric);
+        let header = encode_metric_header(Some("vector"), &metric);
+        let frame = encode_metric_datum(Some("vector"), &[], false, &metric);
 
         assert_eq!(
             header,
@@ -479,8 +483,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("", &metric);
-        let frame = encode_metric_datum("", &[], false, &metric);
+        let header = encode_metric_header(None, &metric);
+        let frame = encode_metric_datum(None, &[], false, &metric);
 
         assert_eq!(
             header,
@@ -501,8 +505,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("", &metric);
-        let frame = encode_metric_datum("", &[], true, &metric);
+        let header = encode_metric_header(None, &metric);
+        let frame = encode_metric_datum(None, &[], true, &metric);
 
         assert_eq!(
             header,
@@ -521,11 +525,12 @@ mod tests {
             value: MetricValue::Distribution {
                 values: vec![1.0, 2.0, 3.0],
                 sample_rates: vec![3, 3, 2],
+                statistic: StatisticKind::Histogram,
             },
         };
 
-        let header = encode_metric_header("", &metric);
-        let frame = encode_metric_datum("", &[0.0, 2.5, 5.0], false, &metric);
+        let header = encode_metric_header(None, &metric);
+        let frame = encode_metric_datum(None, &[0.0, 2.5, 5.0], false, &metric);
 
         assert_eq!(
             header,
@@ -549,8 +554,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("", &metric);
-        let frame = encode_metric_datum("", &[], false, &metric);
+        let header = encode_metric_header(None, &metric);
+        let frame = encode_metric_datum(None, &[], false, &metric);
 
         assert_eq!(
             header,
@@ -574,8 +579,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("", &metric);
-        let frame = encode_metric_datum("", &[], false, &metric);
+        let header = encode_metric_header(None, &metric);
+        let frame = encode_metric_datum(None, &[], false, &metric);
 
         assert_eq!(
             header,

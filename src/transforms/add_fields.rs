@@ -1,14 +1,18 @@
 use super::Transform;
 use crate::serde::Fields;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
-    internal_events::AddFieldsEventProcessed,
+    internal_events::{
+        AddFieldsEventProcessed, AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten,
+        AddFieldsTemplateInvalid, AddFieldsTemplateRenderingError,
+    },
     template::Template,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
 use string_cache::DefaultAtom as Atom;
 use toml::value::Value as TomlValue;
 
@@ -51,11 +55,7 @@ inventory::submit! {
 impl TransformConfig for AddFieldsConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(AddFields::new(
-            self.fields
-                .clone()
-                .all_fields()
-                .map(|(k, v)| (k.into(), v.into()))
-                .collect(),
+            self.fields.clone().all_fields().collect(),
             self.overwrite,
         )))
     }
@@ -78,7 +78,7 @@ impl AddFields {
         let mut new_fields = IndexMap::new();
 
         for (k, v) in fields {
-            flatten_field(k.into(), v, &mut new_fields);
+            flatten_field(k, v, &mut new_fields);
         }
 
         AddFields {
@@ -97,10 +97,9 @@ impl Transform for AddFields {
                 TemplateOrValue::Template(v) => match v.render_string(&event) {
                     Ok(v) => v,
                     Err(_) => {
-                        warn!(
-                            "Failed to render templated value at key `{}`, dropping.",
-                            key
-                        );
+                        emit!(AddFieldsTemplateRenderingError {
+                            field: key.as_ref()
+                        });
                         continue;
                     }
                 }
@@ -108,23 +107,17 @@ impl Transform for AddFields {
                 TemplateOrValue::Value(v) => v,
             };
             if self.overwrite {
-                if let Some(_) = event.as_mut_log().insert(&key, value) {
-                    debug!(
-                        message = "Field overwritten",
-                        field = key.as_ref(),
-                        rate_limit_secs = 30,
-                    )
+                if event.as_mut_log().insert(&key, value).is_some() {
+                    emit!(AddFieldsFieldOverwritten {
+                        field: key.as_ref()
+                    });
                 }
+            } else if event.as_mut_log().contains(&key) {
+                emit!(AddFieldsFieldNotOverwritten {
+                    field: key.as_ref()
+                });
             } else {
-                if event.as_mut_log().contains(&key) {
-                    debug!(
-                        message = "Field not overwritten",
-                        field = key.as_ref(),
-                        rate_limit_secs = 30,
-                    )
-                } else {
-                    event.as_mut_log().insert(key, value);
-                }
+                event.as_mut_log().insert(key, value);
             }
         }
 
@@ -134,10 +127,16 @@ impl Transform for AddFields {
 
 fn flatten_field(key: Atom, value: TomlValue, new_fields: &mut IndexMap<Atom, TemplateOrValue>) {
     match value {
-        TomlValue::String(s) => {
-            let t = Template::from(s);
-            new_fields.insert(key, t.into())
-        }
+        TomlValue::String(s) => match Template::try_from(s.as_str()) {
+            Ok(t) => new_fields.insert(key, t.into()),
+            Err(error) => {
+                emit!(AddFieldsTemplateInvalid {
+                    field: key.as_ref(),
+                    error
+                });
+                new_fields.insert(key, Value::from(s).into())
+            }
+        },
         TomlValue::Integer(i) => {
             let i = Value::from(i);
             new_fields.insert(key, i.into())
@@ -235,7 +234,7 @@ mod tests {
     }
 
     #[test]
-    fn add_fields_preseves_types() {
+    fn add_fields_preserves_types() {
         let event = Event::from("hello world");
 
         let mut fields = IndexMap::new();

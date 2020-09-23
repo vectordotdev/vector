@@ -1,20 +1,23 @@
 use super::{
-    AddCertToStore, AddExtraChainCert, DerExportError, FileOpenFailed, FileReadFailed, MaybeTls,
-    NewStoreBuilder, ParsePkcs12, Pkcs12Error, PrivateKeyParseError, Result, SetCertificate,
-    SetPrivateKey, SetVerifyCert, TlsError, TlsIdentityError, X509ParseError,
+    AddCertToStore, AddExtraChainCert, CaStackPush, DerExportError, FileOpenFailed, FileReadFailed,
+    MaybeTls, NewCaStack, NewStoreBuilder, ParsePkcs12, Pkcs12Error, PrivateKeyParseError, Result,
+    SetCertificate, SetPrivateKey, SetVerifyCert, TlsError, TlsIdentityError, X509ParseError,
 };
 use openssl::{
     pkcs12::{ParsedPkcs12, Pkcs12},
     pkey::{PKey, Private},
     ssl::{ConnectConfiguration, SslContextBuilder, SslVerifyMode},
+    stack::Stack,
     x509::{store::X509StoreBuilder, X509},
 };
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::fmt::{self, Debug, Formatter};
-use std::fs::File;
-use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::{
+    fmt,
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 const PEM_START_MARKER: &str = "-----BEGIN ";
 
@@ -23,6 +26,15 @@ pub struct TlsConfig {
     pub enabled: Option<bool>,
     #[serde(flatten)]
     pub options: TlsOptions,
+}
+
+impl TlsConfig {
+    pub fn enabled() -> Self {
+        Self {
+            enabled: Some(true),
+            ..Self::default()
+        }
+    }
 }
 
 /// Standard TLS options
@@ -119,7 +131,7 @@ impl TlsSettings {
                 }
             }
         }
-        if self.authorities.len() > 0 {
+        if !self.authorities.is_empty() {
             let mut store = X509StoreBuilder::new().context(NewStoreBuilder)?;
             for authority in &self.authorities {
                 store.add_cert(authority.clone()).context(AddCertToStore)?;
@@ -167,7 +179,7 @@ impl TlsOptions {
 
     fn load_identity(&self) -> Result<Option<IdentityStore>> {
         match (&self.crt_file, &self.key_file) {
-            (None, Some(_)) => Err(TlsError::MissingCrtKeyFile.into()),
+            (None, Some(_)) => Err(TlsError::MissingCrtKeyFile),
             (None, None) => Ok(None),
             (Some(filename), _) => {
                 let (data, filename) = open_read(filename, "certificate")?;
@@ -186,12 +198,23 @@ impl TlsOptions {
             None => Err(TlsError::MissingKey),
             Some(key_file) => {
                 let name = crt_file.to_string_lossy().to_string();
-                let crt = X509::from_pem(pem.as_bytes())
-                    .with_context(|| X509ParseError { filename: crt_file })?;
+                let mut crt_stack = X509::stack_from_pem(pem.as_bytes())
+                    .with_context(|| X509ParseError { filename: crt_file })?
+                    .into_iter();
+
+                let crt = crt_stack
+                    .next()
+                    .ok_or_else(|| TlsError::MissingCertificate)?;
                 let key = load_key(&key_file, &self.key_pass)?;
-                let pkcs12 = Pkcs12::builder()
-                    .build("", &name, &key, &crt)
-                    .context(Pkcs12Error)?;
+
+                let mut ca_stack = Stack::new().context(NewCaStack)?;
+                for intermediate in crt_stack {
+                    ca_stack.push(intermediate).context(CaStackPush)?;
+                }
+
+                let mut builder = Pkcs12::builder();
+                builder.ca(ca_stack);
+                let pkcs12 = builder.build("", &name, &key, &crt).context(Pkcs12Error)?;
                 let identity = pkcs12.to_der().context(DerExportError)?;
 
                 // Build the resulting parsed PKCS#12 archive,
@@ -208,7 +231,7 @@ impl TlsOptions {
     fn parse_pkcs12_identity(&self, der: Vec<u8>) -> Result<Option<IdentityStore>> {
         let pkcs12 = Pkcs12::from_der(&der).context(ParsePkcs12)?;
         // Verify password
-        let key_pass = self.key_pass.as_ref().map(|s| s.as_str()).unwrap_or("");
+        let key_pass = self.key_pass.as_deref().unwrap_or("");
         pkcs12.parse(&key_pass).context(ParsePkcs12)?;
         Ok(Some(IdentityStore(der, key_pass.to_string())))
     }
@@ -298,8 +321,8 @@ fn load_mac_certs(builder: &mut SslContextBuilder) -> Result<()> {
     Ok(())
 }
 
-impl Debug for TlsSettings {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+impl fmt::Debug for TlsSettings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TlsSettings")
             .field("verify_certificate", &self.verify_certificate)
             .field("verify_hostname", &self.verify_hostname)
@@ -324,18 +347,19 @@ impl MaybeTlsSettings {
     pub fn from_config(config: &Option<TlsConfig>, for_server: bool) -> Result<Self> {
         match config {
             None => Ok(Self::Raw(())), // No config, no TLS settings
-            Some(config) => match config.enabled.unwrap_or(false) {
-                false => Ok(Self::Raw(())), // Explicitly disabled, still no TLS settings
-                true => {
+            Some(config) => {
+                if config.enabled.unwrap_or(false) {
                     let tls =
                         TlsSettings::from_options_base(&Some(config.options.clone()), for_server)?;
                     match (for_server, &tls.identity) {
                         // Servers require an identity certificate
-                        (true, None) => Err(TlsError::MissingRequiredIdentity.into()),
+                        (true, None) => Err(TlsError::MissingRequiredIdentity),
                         _ => Ok(Self::Tls(tls)),
                     }
+                } else {
+                    Ok(Self::Raw(())) // Explicitly disabled, still no TLS settings
                 }
-            },
+            }
         }
     }
 }
@@ -385,7 +409,7 @@ fn der_or_pem<T>(data: Vec<u8>, der_fn: impl Fn(Vec<u8>) -> T, pem_fn: impl Fn(S
 /// inline data and is used directly instead of opening a file.
 fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> {
     if let Some(filename) = filename.to_str() {
-        if let Some(_) = filename.find(PEM_START_MARKER) {
+        if filename.find(PEM_START_MARKER).is_some() {
             return Ok((Vec::from(filename), "inline text".into()));
         }
     }
@@ -475,6 +499,18 @@ mod test {
             .expect("Failed to load authority certificate");
         assert!(settings.identity.is_none());
         assert_eq!(settings.authorities.len(), 1);
+    }
+
+    #[test]
+    fn from_options_intermediate_ca() {
+        let options = TlsOptions {
+            ca_file: Some("tests/data/Chain_with_intermediate.crt".into()),
+            ..Default::default()
+        };
+        let settings = TlsSettings::from_options(&Some(options))
+            .expect("Failed to load authority certificate");
+        assert!(settings.identity.is_none());
+        assert_eq!(settings.authorities.len(), 3);
     }
 
     #[test]
@@ -570,9 +606,10 @@ mod test {
     // This can be eliminated once the `bool_to_option` feature migrates
     // out of nightly.
     fn and_some<T>(src: bool, value: T) -> Option<T> {
-        match src {
-            true => Some(value),
-            false => None,
+        if src {
+            Some(value)
+        } else {
+            None
         }
     }
 }

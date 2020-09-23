@@ -1,8 +1,9 @@
+use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion};
 use indexmap::IndexMap;
 use transforms::lua::v2::LuaConfig;
 use vector::{
-    topology::config::{TransformConfig, TransformContext},
+    config::{TransformConfig, TransformContext},
     transforms::{self, Transform},
     Event,
 };
@@ -14,11 +15,11 @@ fn add_fields(c: &mut Criterion) {
     let value = "this is the value";
 
     let key_atom_native = key.into();
-    let value_bytes_native = value.into();
+    let value_bytes_native = Bytes::from(value).into();
     let key_atom_v1 = key.into();
-    let value_bytes_v1 = value.into();
+    let value_bytes_v1 = Bytes::from(value).into();
     let key_atom_v2 = key.into();
-    let value_bytes_v2 = value.into();
+    let value_bytes_v2 = Bytes::from(value).into();
 
     c.bench(
         "lua_add_fields",
@@ -26,7 +27,10 @@ fn add_fields(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut map = IndexMap::new();
-                    map.insert(key.into(), toml::value::Value::String(value.to_owned()));
+                    map.insert(
+                        key.to_string().into(),
+                        toml::value::Value::String(value.to_string()),
+                    );
                     transforms::add_fields::AddFields::new(map, true)
                 },
                 |mut transform| {
@@ -90,12 +94,11 @@ fn field_filter(c: &mut Criterion) {
         Benchmark::new("native", move |b| {
             b.iter_with_setup(
                 || {
-                    let rt = vector::runtime::Runtime::single_threaded().unwrap();
                     transforms::field_filter::FieldFilterConfig {
                         field: "the_field".to_string(),
                         value: "0".to_string(),
                     }
-                    .build(TransformContext::new_test(rt.executor()))
+                    .build(TransformContext::new_test())
                     .unwrap()
                 },
                 |mut transform| {

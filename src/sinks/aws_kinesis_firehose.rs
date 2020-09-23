@@ -1,29 +1,34 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
-    event::{self, Event},
+    event::Event,
     region::RegionOrEndpoint,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
-        rusoto2::{self, AwsCredentialsProvider},
+        rusoto,
         sink::Response,
-        BatchEventsConfig, TowerRequestConfig,
+        BatchConfig, BatchSettings, Compression, EncodedLength, TowerRequestConfig, VecBuffer,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
-use futures01::{stream::iter_ok, Future, Poll, Sink};
+use futures::{future::BoxFuture, FutureExt};
+use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
-use rusoto_core::{Region, RusotoError, RusotoFuture};
+use rusoto_core::RusotoError;
 use rusoto_firehose::{
-    DescribeDeliveryStreamInput, KinesisFirehose, KinesisFirehoseClient, PutRecordBatchError,
-    PutRecordBatchInput, PutRecordBatchOutput, Record,
+    DescribeDeliveryStreamError, DescribeDeliveryStreamInput, KinesisFirehose,
+    KinesisFirehoseClient, PutRecordBatchError, PutRecordBatchInput, PutRecordBatchOutput, Record,
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::{convert::TryInto, fmt};
+use std::{
+    convert::TryInto,
+    fmt,
+    task::{Context, Poll},
+};
 use tower::Service;
-use tracing_futures::{Instrument, Instrumented};
+use tracing_futures::Instrument;
 
 #[derive(Clone)]
 pub struct KinesisFirehoseService {
@@ -39,7 +44,9 @@ pub struct KinesisFirehoseSinkConfig {
     pub region: RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
-    pub batch: BatchEventsConfig,
+    pub compression: Compression,
+    #[serde(default)]
+    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub assume_role: Option<String>,
@@ -65,11 +72,14 @@ inventory::submit! {
 
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let config = self.clone();
-        let healthcheck = healthcheck(self.clone(), cx.resolver())?;
-        let sink = KinesisFirehoseService::new(config, cx)?;
-        Ok((Box::new(sink), healthcheck))
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let client = self.create_client(cx.resolver())?;
+        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
+        let sink = KinesisFirehoseService::new(self.clone(), client, cx)?;
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -81,18 +91,51 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
     }
 }
 
+impl KinesisFirehoseSinkConfig {
+    async fn healthcheck(self, client: KinesisFirehoseClient) -> crate::Result<()> {
+        let stream_name = self.stream_name;
+
+        let req = client.describe_delivery_stream(DescribeDeliveryStreamInput {
+            delivery_stream_name: stream_name.clone(),
+            exclusive_start_destination_id: None,
+            limit: Some(1),
+        });
+
+        match req.await {
+            Ok(resp) => {
+                let name = resp.delivery_stream_description.delivery_stream_name;
+                if name == stream_name {
+                    Ok(())
+                } else {
+                    Err(HealthcheckError::StreamNamesMismatch { name, stream_name }.into())
+                }
+            }
+            Err(source) => Err(HealthcheckError::DescribeDeliveryStreamFailed { source }.into()),
+        }
+    }
+
+    fn create_client(&self, resolver: Resolver) -> crate::Result<KinesisFirehoseClient> {
+        let region = (&self.region).try_into()?;
+
+        let client = rusoto::client(resolver)?;
+        let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
+
+        let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
+        Ok(KinesisFirehoseClient::new_with_client(client, region))
+    }
+}
+
 impl KinesisFirehoseService {
     pub fn new(
         config: KinesisFirehoseSinkConfig,
+        client: KinesisFirehoseClient,
         cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
-        let client = create_client(
-            config.region.clone().try_into()?,
-            config.assume_role.clone(),
-            cx.resolver(),
-        )?;
-
-        let batch = config.batch.unwrap_or(500, 1);
+        let batch = BatchSettings::default()
+            .bytes(4_000_000)
+            .events(500)
+            .timeout(1)
+            .parse_config(config.batch)?;
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
@@ -102,8 +145,8 @@ impl KinesisFirehoseService {
             .batch_sink(
                 KinesisFirehoseRetryLogic,
                 kinesis,
-                Vec::new(),
-                batch,
+                VecBuffer::new(batch.size),
+                batch.timeout,
                 cx.acker(),
             )
             .sink_map_err(|e| error!("Fatal kinesis firehose sink error: {}", e))
@@ -116,10 +159,10 @@ impl KinesisFirehoseService {
 impl Service<Vec<Record>> for KinesisFirehoseService {
     type Response = PutRecordBatchOutput;
     type Error = RusotoError<PutRecordBatchError>;
-    type Future = Instrumented<RusotoFuture<PutRecordBatchOutput, PutRecordBatchError>>;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self) -> Poll<(), Self::Error> {
-        Ok(().into())
+    fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, records: Vec<Record>) -> Self::Future {
@@ -128,14 +171,22 @@ impl Service<Vec<Record>> for KinesisFirehoseService {
             events = %records.len(),
         );
 
+        let client = self.client.clone();
         let request = PutRecordBatchInput {
             records,
             delivery_stream_name: self.config.stream_name.clone(),
         };
 
-        self.client
-            .put_record_batch(request)
-            .instrument(info_span!("request"))
+        Box::pin(
+            async move { client.put_record_batch(request).await }.instrument(info_span!("request")),
+        )
+    }
+}
+
+impl EncodedLength for Record {
+    fn encoded_length(&self) -> usize {
+        // data is simply base64 encoded, quoted, and comma separated
+        (self.data.len() + 2) / 3 * 4 + 3
     }
 }
 
@@ -170,47 +221,10 @@ impl RetryLogic for KinesisFirehoseRetryLogic {
 enum HealthcheckError {
     #[snafu(display("DescribeDeliveryStream failed: {}", source))]
     DescribeDeliveryStreamFailed {
-        source: RusotoError<rusoto_firehose::DescribeDeliveryStreamError>,
+        source: RusotoError<DescribeDeliveryStreamError>,
     },
     #[snafu(display("Stream name does not match, got {}, expected {}", name, stream_name))]
     StreamNamesMismatch { name: String, stream_name: String },
-}
-
-fn healthcheck(
-    config: KinesisFirehoseSinkConfig,
-    resolver: Resolver,
-) -> crate::Result<super::Healthcheck> {
-    let client = create_client(config.region.try_into()?, config.assume_role, resolver)?;
-    let stream_name = config.stream_name;
-
-    let fut = client
-        .describe_delivery_stream(DescribeDeliveryStreamInput {
-            delivery_stream_name: stream_name.clone(),
-            exclusive_start_destination_id: None,
-            limit: Some(1),
-        })
-        .map_err(|source| HealthcheckError::DescribeDeliveryStreamFailed { source }.into())
-        .and_then(move |res| Ok(res.delivery_stream_description.delivery_stream_name))
-        .and_then(move |name| {
-            if name == stream_name {
-                Ok(())
-            } else {
-                Err(HealthcheckError::StreamNamesMismatch { name, stream_name }.into())
-            }
-        });
-
-    Ok(Box::new(fut))
-}
-
-fn create_client(
-    region: Region,
-    assume_role: Option<String>,
-    resolver: Resolver,
-) -> crate::Result<KinesisFirehoseClient> {
-    let client = rusoto2::client(resolver)?;
-    let creds = AwsCredentialsProvider::new(&region, assume_role)?;
-
-    Ok(KinesisFirehoseClient::new_with(client, creds, region))
 }
 
 fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<Record> {
@@ -220,7 +234,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
         Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
 
         Encoding::Text => log
-            .get(&event::log_schema().message_key())
+            .get(&crate::config::log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };
@@ -233,7 +247,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{self, Event};
+    use crate::event::Event;
     use std::collections::BTreeMap;
 
     #[test]
@@ -253,7 +267,10 @@ mod tests {
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
-        assert_eq!(map[&event::log_schema().message_key().to_string()], message);
+        assert_eq!(
+            map[&crate::config::log_schema().message_key().to_string()],
+            message
+        );
         assert_eq!(map["key"], "value".to_string());
     }
 }
@@ -263,25 +280,25 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        config::SinkContext,
         region::RegionOrEndpoint,
         sinks::{
             elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
-            util::BatchEventsConfig,
+            util::BatchConfig,
         },
-        test_util::{random_events_with_stream, random_string, runtime},
-        topology::config::SinkContext,
+        test_util::{random_events_with_stream, random_string},
     };
-    use futures01::Sink;
+    use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
     use rusoto_core::Region;
     use rusoto_firehose::{
         CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration, KinesisFirehose,
         KinesisFirehoseClient,
     };
     use serde_json::{json, Value};
-    use std::{thread, time::Duration};
+    use tokio::time::{delay_for, Duration};
 
-    #[test]
-    fn firehose_put_records() {
+    #[tokio::test]
+    async fn firehose_put_records() {
         let stream = gen_stream();
 
         let region = Region::Custom {
@@ -289,15 +306,16 @@ mod integration_tests {
             endpoint: "http://localhost:4573".into(),
         };
 
-        ensure_stream(region.clone(), stream.clone());
+        ensure_stream(region, stream.clone()).await;
 
         let config = KinesisFirehoseSinkConfig {
             stream_name: stream.clone(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4573".into()),
             encoding: EncodingConfig::from(Encoding::Json), // required for ES destination w/ localstack
-            batch: BatchEventsConfig {
+            compression: Compression::None,
+            batch: BatchConfig {
                 max_events: Some(2),
-                timeout_secs: None,
+                ..Default::default()
             },
             request: TowerRequestConfig {
                 timeout_secs: Some(10),
@@ -307,21 +325,21 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
 
-        let sink = KinesisFirehoseService::new(config, cx).unwrap();
+        let client = config.create_client(cx.resolver()).unwrap();
+        let sink = KinesisFirehoseService::new(config, client, cx).unwrap();
 
         let (input, events) = random_events_with_stream(100, 100);
+        let mut events = events.map(Ok);
 
-        let pump = sink.send_all(events);
-        let _ = rt.block_on(pump).unwrap();
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 
-        thread::sleep(Duration::from_secs(1));
+        delay_for(Duration::from_secs(1)).await;
 
         let config = ElasticSearchConfig {
-            auth: Some(ElasticSearchAuth::Aws),
-            host: "http://localhost:4571".into(),
+            auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
+            endpoint: "http://localhost:4571".into(),
             index: Some(stream.clone()),
             ..Default::default()
         };
@@ -337,8 +355,10 @@ mod integration_tests {
                 "query": { "query_string": { "query": "*" } }
             }))
             .send()
+            .await
             .unwrap()
             .json::<elastic_responses::search::SearchResponse<Value>>()
+            .await
             .unwrap();
 
         assert_eq!(input.len() as u64, response.total());
@@ -352,14 +372,14 @@ mod integration_tests {
         }
     }
 
-    fn ensure_stream(region: Region, delivery_stream_name: String) {
+    async fn ensure_stream(region: Region, delivery_stream_name: String) {
         let client = KinesisFirehoseClient::new(region);
 
         let es_config = ElasticsearchDestinationConfiguration {
             index_name: delivery_stream_name.clone(),
-            domain_arn: "doesn't matter".into(),
+            domain_arn: Some("doesn't matter".into()),
             role_arn: "doesn't matter".into(),
-            type_name: "doesn't matter".into(),
+            type_name: Some("doesn't matter".into()),
             ..Default::default()
         };
 
@@ -369,7 +389,7 @@ mod integration_tests {
             ..Default::default()
         };
 
-        match client.create_delivery_stream(req).sync() {
+        match client.create_delivery_stream(req).await {
             Ok(_) => (),
             Err(e) => println!("Unable to create the delivery stream {:?}", e),
         };

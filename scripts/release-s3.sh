@@ -7,7 +7,7 @@ set -euo pipefail
 #
 #   Uploads archives and packages to S3
 
-CHANNEL="${CHANNEL:-"$(scripts/util/release-channel.sh)"}"
+CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
 VERSION="${VERSION:-"$(scripts/version.sh)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
 VERIFY_TIMEOUT="${VERIFY_TIMEOUT:-"30"}" # seconds
@@ -58,7 +58,7 @@ if [[ "$CHANNEL" == "nightly" ]]; then
     "$td/vector-x86_64-unknown-linux-musl.tar.gz"
   verify_artifact \
     "https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-gnu.tar.gz" \
-    "$td/vector-x86_64-unknown-linux-musl.tar.gz"
+    "$td/vector-x86_64-unknown-linux-gnu.tar.gz"
 elif [[ "$CHANNEL" == "latest" ]]; then
   VERSION_EXACT="$VERSION"
   # shellcheck disable=SC2001
@@ -82,8 +82,8 @@ elif [[ "$CHANNEL" == "latest" ]]; then
       "$td/vector-x86_64-unknown-linux-musl.tar.gz"
   done
   verify_artifact \
-    "https://packages.timber.io/vector/latest/vector-x86_64-unknown-linux-gnu.tar.gz" --fail \
-    "$td/vector-x86_64-unknown-linux-musl.tar.gz"
+    "https://packages.timber.io/vector/latest/vector-x86_64-unknown-linux-gnu.tar.gz" \
+    "$td/vector-x86_64-unknown-linux-gnu.tar.gz"
 fi
 
 #

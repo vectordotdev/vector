@@ -1,20 +1,19 @@
 use crate::{
-    dns::Resolver,
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http2::{Auth, BatchedHttpSink, HttpClient, HttpRetryLogic, HttpSink, Response},
-        retries2::{RetryAction, RetryLogic},
-        service2::TowerRequestConfig,
-        BatchBytesConfig, Buffer, Compression,
+        http::{Auth, BatchedHttpSink, HttpClient, HttpRetryLogic, HttpSink},
+        retries::{RetryAction, RetryLogic},
+        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
     },
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{FutureExt, TryFutureExt};
+use bytes::Bytes;
+use futures::FutureExt;
 use futures01::Sink;
-use http02::{Method, Request, StatusCode, Uri};
-use hyper13::Body;
+use http::{Request, StatusCode, Uri};
+use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -22,7 +21,9 @@ use snafu::ResultExt;
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ClickhouseConfig {
-    pub host: String,
+    // Deprecated name
+    #[serde(alias = "host")]
+    pub endpoint: String,
     pub table: String,
     pub database: Option<String>,
     #[serde(default = "Compression::default_gzip")]
@@ -33,7 +34,7 @@ pub struct ClickhouseConfig {
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
-    pub batch: BatchBytesConfig,
+    pub batch: BatchConfig,
     pub auth: Option<Auth>,
     #[serde(default)]
     pub request: TowerRequestConfig,
@@ -60,24 +61,31 @@ pub enum Encoding {
 
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let batch = self.batch.unwrap_or(bytesize::mib(10u64), 1);
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let batch = BatchSettings::default()
+            .bytes(bytesize::mib(10u64))
+            .timeout(1)
+            .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(cx.resolver(), tls_settings)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            Buffer::new(self.compression),
+            Buffer::new(batch.size, self.compression),
             request,
-            batch,
-            tls_settings,
-            &cx,
+            batch.timeout,
+            client.clone(),
+            cx.acker(),
         )
         .sink_map_err(|e| error!("Fatal clickhouse sink error: {}", e));
 
-        let healthcheck = healthcheck(cx.resolver(), self.clone()).boxed().compat();
+        let healthcheck = healthcheck(client, self.clone()).boxed();
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -89,6 +97,7 @@ impl SinkConfig for ClickhouseConfig {
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for ClickhouseConfig {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
@@ -103,19 +112,16 @@ impl HttpSink for ClickhouseConfig {
         Some(body)
     }
 
-    fn build_request(&self, events: Self::Output) -> http02::Request<Vec<u8>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let database = if let Some(database) = &self.database {
             database.as_str()
         } else {
             "default"
         };
 
-        let uri = encode_uri(&self.host, database, &self.table).expect("Unable to encode uri");
+        let uri = encode_uri(&self.endpoint, database, &self.table).expect("Unable to encode uri");
 
-        let mut builder = Request::builder()
-            .method(Method::POST)
-            .uri(uri.clone())
-            .header("Content-Type", "application/x-ndjson");
+        let mut builder = Request::post(&uri).header("Content-Type", "application/x-ndjson");
 
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header("Content-Encoding", ce);
@@ -127,27 +133,24 @@ impl HttpSink for ClickhouseConfig {
             auth.apply(&mut request);
         }
 
-        request
+        Ok(request)
     }
 }
 
-async fn healthcheck(resolver: Resolver, config: ClickhouseConfig) -> crate::Result<()> {
+async fn healthcheck(mut client: HttpClient, config: ClickhouseConfig) -> crate::Result<()> {
     // TODO: check if table exists?
-    let uri = format!("{}/?query=SELECT%201", config.host);
+    let uri = format!("{}/?query=SELECT%201", config.endpoint);
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
 
     if let Some(auth) = &config.auth {
         auth.apply(&mut request);
     }
 
-    let tls = TlsSettings::from_options(&config.tls)?;
-    let mut client = HttpClient::new(resolver, tls)?;
-
     let response = client.send(request).await?;
 
     match response.status() {
         StatusCode::OK => Ok(()),
-        status => Err(super::HealthcheckError::UnexpectedStatus2 { status }.into()),
+        status => Err(super::HealthcheckError::UnexpectedStatus { status }.into()),
     }
 }
 
@@ -170,7 +173,7 @@ fn encode_uri(host: &str, database: &str, table: &str) -> crate::Result<Uri> {
         format!("{}/?{}", host, query)
     };
 
-    Ok(url.parse::<Uri>().context(super::UriParseError2)?)
+    Ok(url.parse::<Uri>().context(super::UriParseError)?)
 }
 
 #[derive(Clone)]
@@ -179,8 +182,8 @@ struct ClickhouseRetryLogic {
 }
 
 impl RetryLogic for ClickhouseRetryLogic {
-    type Response = Response;
-    type Error = hyper13::Error;
+    type Response = http::Response<Bytes>;
+    type Error = hyper::Error;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         self.inner.is_retriable_error(error)
@@ -202,7 +205,7 @@ impl RetryLogic for ClickhouseRetryLogic {
                 } else if body.starts_with(b"Code: 53") {
                     RetryAction::DontRetry("type mismatch".into())
                 } else {
-                    RetryAction::Retry(String::from_utf8_lossy(body).to_string().into())
+                    RetryAction::Retry(String::from_utf8_lossy(body).to_string())
                 }
             }
             _ => self.inner.should_retry_response(response),
@@ -234,32 +237,29 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        event,
+        config::{log_schema, SinkConfig, SinkContext},
         event::Event,
         sinks::util::encoding::TimestampFormat,
-        test_util::{random_string, runtime},
-        topology::config::{SinkConfig, SinkContext},
+        test_util::{random_string, trace_init},
     };
-    use futures01::Sink;
+    use futures::{future, stream};
     use serde_json::Value;
-    use std::time::Duration;
-    use tokio01::util::FutureExt;
+    use tokio::time::{timeout, Duration};
 
-    #[test]
-    fn insert_events() {
-        crate::test_util::trace_init();
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn insert_events() {
+        trace_init();
 
         let table = gen_table();
         let host = String::from("http://localhost:8123");
 
         let config = ClickhouseConfig {
-            host: host.clone(),
+            endpoint: host.clone(),
             table: table.clone(),
             compression: Compression::None,
-            batch: BatchBytesConfig {
-                max_size: Some(1),
-                timeout_secs: None,
+            batch: BatchConfig {
+                max_events: Some(1),
+                ..Default::default()
             },
             request: TowerRequestConfig {
                 retry_attempts: Some(1),
@@ -269,27 +269,29 @@ mod integration_tests {
         };
 
         let client = ClickhouseClient::new(host);
-        client.create_table(&table, "host String, timestamp String, message String");
+        client
+            .create_table(&table, "host String, timestamp String, message String")
+            .await;
 
-        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+        let (sink, _hc) = config.build(SinkContext::new_test()).unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        let pump = sink.send(input_event.clone());
-        rt.block_on(pump).unwrap();
+        sink.run(stream::once(future::ready(input_event.clone())))
+            .await
+            .unwrap();
 
-        let output = client.select_all(&table);
+        let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
 
         let expected = serde_json::to_value(input_event.into_log().all_fields()).unwrap();
         assert_eq!(expected, output.data[0]);
     }
 
-    #[test]
-    fn insert_events_unix_timestamps() {
-        crate::test_util::trace_init();
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn insert_events_unix_timestamps() {
+        trace_init();
 
         let table = gen_table();
         let host = String::from("http://localhost:8123");
@@ -297,13 +299,13 @@ mod integration_tests {
         encoding.timestamp_format = Some(TimestampFormat::Unix);
 
         let config = ClickhouseConfig {
-            host: host.clone(),
+            endpoint: host.clone(),
             table: table.clone(),
             compression: Compression::None,
             encoding,
-            batch: BatchBytesConfig {
-                max_size: Some(1),
-                timeout_secs: None,
+            batch: BatchConfig {
+                max_events: Some(1),
+                ..Default::default()
             },
             request: TowerRequestConfig {
                 retry_attempts: Some(1),
@@ -313,29 +315,32 @@ mod integration_tests {
         };
 
         let client = ClickhouseClient::new(host);
-        client.create_table(
-            &table,
-            "host String, timestamp DateTime('UTC'), message String",
-        );
+        client
+            .create_table(
+                &table,
+                "host String, timestamp DateTime('UTC'), message String",
+            )
+            .await;
 
-        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+        let (sink, _hc) = config.build(SinkContext::new_test()).unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        let pump = sink.send(input_event.clone());
-        rt.block_on(pump).unwrap();
+        sink.run(stream::once(future::ready(input_event.clone())))
+            .await
+            .unwrap();
 
-        let output = client.select_all(&table);
+        let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            event::log_schema().timestamp_key().clone(),
+            log_schema().timestamp_key().clone(),
             format!(
                 "{}",
                 exp_event
-                    .get(&event::log_schema().timestamp_key())
+                    .get(&log_schema().timestamp_key())
                     .unwrap()
                     .as_timestamp()
                     .unwrap()
@@ -347,10 +352,9 @@ mod integration_tests {
         assert_eq!(expected, output.data[0]);
     }
 
-    #[test]
-    fn insert_events_unix_timestamps_toml_config() {
-        crate::test_util::trace_init();
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn insert_events_unix_timestamps_toml_config() {
+        trace_init();
 
         let table = gen_table();
         let host = String::from("http://localhost:8123");
@@ -361,39 +365,42 @@ host = "{}"
 table = "{}"
 compression = "none"
 [request]
-  retry_attempts = 1
+retry_attempts = 1
 [batch]
-  max_size = 1
+max_events = 1
 [encoding]
-  timestamp_format = "unix""#,
+timestamp_format = "unix""#,
             host, table
         ))
         .unwrap();
 
         let client = ClickhouseClient::new(host);
-        client.create_table(
-            &table,
-            "host String, timestamp DateTime('UTC'), message String",
-        );
+        client
+            .create_table(
+                &table,
+                "host String, timestamp DateTime('UTC'), message String",
+            )
+            .await;
 
-        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+        let (sink, _hc) = config.build(SinkContext::new_test()).unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        let pump = sink.send(input_event.clone());
-        rt.block_on(pump).unwrap();
+        sink.run(stream::once(future::ready(input_event.clone())))
+            .await
+            .unwrap();
 
-        let output = client.select_all(&table);
+        let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            event::log_schema().timestamp_key().clone(),
+            log_schema().timestamp_key().clone(),
             format!(
                 "{}",
                 exp_event
-                    .get(&event::log_schema().timestamp_key())
+                    .get(&log_schema().timestamp_key())
                     .unwrap()
                     .as_timestamp()
                     .unwrap()
@@ -405,40 +412,45 @@ compression = "none"
         assert_eq!(expected, output.data[0]);
     }
 
-    #[test]
-    fn no_retry_on_incorrect_data() {
-        crate::test_util::trace_init();
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn no_retry_on_incorrect_data() {
+        trace_init();
 
         let table = gen_table();
         let host = String::from("http://localhost:8123");
 
         let config = ClickhouseConfig {
-            host: host.clone(),
+            endpoint: host.clone(),
             table: table.clone(),
             compression: Compression::None,
-            batch: BatchBytesConfig {
-                max_size: Some(1),
-                timeout_secs: None,
+            batch: BatchConfig {
+                max_events: Some(1),
+                ..Default::default()
             },
             ..Default::default()
         };
 
         let client = ClickhouseClient::new(host);
-        // the event contains a message field, but its being omited to
+        // the event contains a message field, but its being omitted to
         // fail the request.
-        client.create_table(&table, "host String, timestamp String");
+        client
+            .create_table(&table, "host String, timestamp String")
+            .await;
 
-        let (sink, _hc) = config.build(SinkContext::new_test(rt.executor())).unwrap();
+        let (sink, _hc) = config.build(SinkContext::new_test()).unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        let pump = sink.send(input_event.clone());
-
         // Retries should go on forever, so if we are retrying incorrectly
         // this timeout should trigger.
-        rt.block_on(pump.timeout(Duration::from_secs(5))).unwrap();
+        timeout(
+            Duration::from_secs(5),
+            sink.run(stream::once(future::ready(input_event))),
+        )
+        .await
+        .unwrap()
+        .unwrap();
     }
 
     struct ClickhouseClient {
@@ -454,8 +466,8 @@ compression = "none"
             }
         }
 
-        fn create_table(&self, table: &str, schema: &str) {
-            let mut response = self
+        async fn create_table(&self, table: &str, schema: &str) {
+            let response = self
                 .client
                 .post(&self.host)
                 //
@@ -467,26 +479,30 @@ compression = "none"
                     table, schema
                 ))
                 .send()
+                .await
                 .unwrap();
+
             if !response.status().is_success() {
-                panic!("create table failed: {}", response.text().unwrap())
+                panic!("create table failed: {}", response.text().await.unwrap())
             }
         }
 
-        fn select_all(&self, table: &str) -> QueryResponse {
-            let mut response = self
+        async fn select_all(&self, table: &str) -> QueryResponse {
+            let response = self
                 .client
                 .post(&self.host)
                 .body(format!("SELECT * FROM {} FORMAT JSON", table))
                 .send()
+                .await
                 .unwrap();
+
             if !response.status().is_success() {
-                panic!("select all failed: {}", response.text().unwrap())
+                panic!("select all failed: {}", response.text().await.unwrap())
             } else {
-                if let Ok(value) = response.json() {
-                    value
-                } else {
-                    panic!("json failed: {:?}", response.text().unwrap());
+                let text = response.text().await.unwrap();
+                match serde_json::from_str(&text) {
+                    Ok(value) => value,
+                    Err(_) => panic!("json failed: {:?}", text),
                 }
             }
         }

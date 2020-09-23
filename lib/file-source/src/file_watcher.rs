@@ -60,7 +60,7 @@ impl FileWatcher {
                 // the entire thing, so for now we simply refuse to read gzipped files for which we
                 // already have a stored file position from a previous run.
                 debug!(
-                    message = "Not re-reading gzipped file with existing stored offset",
+                    message = "Not re-reading gzipped file with existing stored offset.",
                     ?path,
                     %file_position
                 );
@@ -88,10 +88,10 @@ impl FileWatcher {
             findable: true,
             reader,
             file_position,
-            devno: devno,
+            devno,
             inode: ino,
             is_dead: false,
-            last_read_attempt: ts.clone(),
+            last_read_attempt: ts,
             last_read_success: ts,
         })
     }
@@ -180,6 +180,10 @@ impl FileWatcher {
         self.last_read_success = Instant::now();
     }
 
+    pub fn last_read_success(&self) -> Instant {
+        self.last_read_success
+    }
+
     pub fn should_read(&self) -> bool {
         self.last_read_success.elapsed() < Duration::from_secs(10)
             || self.last_read_attempt.elapsed() > Duration::from_secs(10)
@@ -238,7 +242,7 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
 
         if !discarding && buf.len() > max_size {
             warn!(
-                message = "Found line that exceeds max_line_bytes; discarding.",
+                message = "found line that exceeds max_line_bytes; discarding.",
                 rate_limit_secs = 30
             );
             discarding = true;

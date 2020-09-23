@@ -1,17 +1,14 @@
 use crate::{
-    dns::Resolver,
-    event::{log_schema, Event, Value},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    event::{Event, Value},
     sinks::util::{
-        http2::{BatchedHttpSink, HttpClient, HttpSink},
-        service2::TowerRequestConfig,
-        BatchBytesConfig, BoxedRawValue, JsonArrayBuffer, UriSerde,
+        http::{BatchedHttpSink, HttpClient, HttpSink},
+        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
     },
-    tls::TlsSettings,
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::TryFutureExt;
+use futures::FutureExt;
 use futures01::Sink;
-use http02::{Request, StatusCode, Uri};
+use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -28,7 +25,7 @@ pub struct HoneycombConfig {
     dataset: String,
 
     #[serde(default)]
-    batch: BatchBytesConfig,
+    batch: BatchConfig,
 
     #[serde(default)]
     request: TowerRequestConfig,
@@ -40,23 +37,31 @@ inventory::submit! {
 
 #[typetag::serde(name = "honeycomb")]
 impl SinkConfig for HoneycombConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        let batch_settings = self.batch.unwrap_or(bytesize::mib(5u64), 1);
+        let batch_settings = BatchSettings::default()
+            .bytes(bytesize::kib(100u64))
+            .timeout(1)
+            .parse_config(self.batch)?;
+
+        let client = HttpClient::new(cx.resolver(), None)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            JsonArrayBuffer::default(),
+            JsonArrayBuffer::new(batch_settings.size),
             request_settings,
-            batch_settings,
-            None,
-            &cx,
+            batch_settings.timeout,
+            client.clone(),
+            cx.acker(),
         )
         .sink_map_err(|e| error!("Fatal honeycomb sink error: {}", e));
 
-        let healthcheck = Box::new(Box::pin(healthcheck(self.clone(), cx.resolver())).compat());
+        let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((Box::new(sink), healthcheck))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -68,6 +73,7 @@ impl SinkConfig for HoneycombConfig {
     }
 }
 
+#[async_trait::async_trait]
 impl HttpSink for HoneycombConfig {
     type Input = serde_json::Value;
     type Output = Vec<BoxedRawValue>;
@@ -88,13 +94,13 @@ impl HttpSink for HoneycombConfig {
         }))
     }
 
-    fn build_request(&self, events: Self::Output) -> http02::Request<Vec<u8>> {
+    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let uri = self.build_uri();
         let request = Request::post(uri).header("X-Honeycomb-Team", self.api_key.clone());
 
         let buf = serde_json::to_vec(&events).unwrap();
 
-        request.body(buf).unwrap()
+        request.body(buf).map_err(Into::into)
     }
 }
 
@@ -102,20 +108,21 @@ impl HoneycombConfig {
     fn build_uri(&self) -> Uri {
         let uri = format!("{}/{}", HOST.clone(), self.dataset);
 
-        uri.parse::<http02::Uri>()
+        uri.parse::<http::Uri>()
             .expect("This should be a valid uri")
     }
 }
 
-async fn healthcheck(config: HoneycombConfig, resolver: Resolver) -> crate::Result<()> {
-    let mut client = HttpClient::new(resolver, TlsSettings::from_options(&None)?)?;
-
-    let req = config.build_request(Vec::new()).map(hyper13::Body::from);
+async fn healthcheck(config: HoneycombConfig, mut client: HttpClient) -> crate::Result<()> {
+    let req = config
+        .build_request(Vec::new())
+        .await?
+        .map(hyper::Body::from);
 
     let res = client.send(req).await?;
 
     let status = res.status();
-    let body = hyper13::body::to_bytes(res.into_body()).await?;
+    let body = hyper::body::to_bytes(res.into_body()).await?;
 
     if status == StatusCode::BAD_REQUEST {
         Ok(())

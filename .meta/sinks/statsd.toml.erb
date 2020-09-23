@@ -29,13 +29,13 @@ description = "The UDP socket address to send stats to."
 type = "string"
 common = true
 examples = ["service"]
-required = true
+required = false
 description = "A prefix that will be added to all metric names."
 
 [[sinks.statsd.examples]]
 label = "Generic"
 body = """\
 ```text
-gorets:1|c\nglork:320|ms\ngaugor:333|g\nuniques:765|s
+gorets:1|c\nglork:320|ms\ngaugor:333|g\nuniques:765|s\nrequest:4|d
 ```\
 """

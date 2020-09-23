@@ -5,10 +5,12 @@ extern crate tracing;
 
 mod file_server;
 mod file_watcher;
+mod internal_events;
 mod metadata_ext;
 pub mod paths_provider;
 
 pub use self::file_server::{FileServer, Fingerprinter, Shutdown as FileServerShutdown};
+pub use self::internal_events::FileSourceInternalEvents;
 
 type FileFingerprint = u64;
 type FilePosition = u64;
@@ -135,7 +137,7 @@ mod test {
                 start_idx = self.read_idx;
                 end_idx = self.read_idx;
             }
-            // Seek end_idx foward until we hit the newline character.
+            // Seek end_idx forward until we hit the newline character.
             while self.contents[end_idx] != b'\n' {
                 end_idx += 1;
                 if end_idx == max {
@@ -153,9 +155,9 @@ mod test {
             // cause trimmed reads and the only remaining character in the
             // line is the newline. Womp womp
             if !ret.is_empty() {
-                return Some(ret.to_string());
+                Some(ret.to_string())
             } else {
-                return None;
+                None
             }
         }
     }
@@ -240,7 +242,7 @@ mod test {
                 FWAction::WriteLine(ref s) => {
                     fwfiles[0].write_line(s);
                     assert!(fp.write(s.as_bytes()).is_ok());
-                    assert!(fp.write("\n".as_bytes()).is_ok());
+                    assert!(fp.write(b"\n").is_ok());
                     assert!(fp.flush().is_ok());
                     writes += 1;
                 }
@@ -312,7 +314,7 @@ mod test {
                 FWAction::WriteLine(ref s) => {
                     fwfiles[0].write_line(s);
                     assert!(fp.write(s.as_bytes()).is_ok());
-                    assert!(fp.write("\n".as_bytes()).is_ok());
+                    assert!(fp.write(b"\n").is_ok());
                     assert!(fp.flush().is_ok());
                 }
                 FWAction::RotateFile => {

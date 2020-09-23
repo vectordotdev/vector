@@ -1,0 +1,34 @@
+name: Benchmark Suite
+
+on:
+  push:
+    branches:
+      - bench-*
+
+env:
+  VERBOSE: true
+  ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+  AWS_ACCESS_KEY_ID: "dummy"
+  AWS_SECRET_ACCESS_KEY: "dummy"
+
+jobs:
+  cancel-previous:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    if: github.ref != 'refs/heads/master'
+    steps:
+      - uses: styfle/cancel-workflow-action@0.4.1
+        with:
+          access_token: ${{ secrets.GITHUB_TOKEN }}
+
+  bench:
+    name: All - Linux
+    # Full CI suites for this platform were only recently introduced.
+    # Some failures are permitted until we can properly correct them.
+    continue-on-error: true
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make bench

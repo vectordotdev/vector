@@ -1,7 +1,7 @@
 use crate::{
+    config::{DataType, TransformContext},
     event::{Event, Value},
     internal_events::{LuaEventProcessed, LuaGcTriggered, LuaScriptError},
-    topology::config::{DataType, TransformContext},
     transforms::Transform,
 };
 use serde::{Deserialize, Serialize};
@@ -147,7 +147,9 @@ impl rlua::UserData for LuaEvent {
             |_ctx, this, (key, value): (String, Option<rlua::Value<'lua>>)| {
                 match value {
                     Some(rlua::Value::String(string)) => {
-                        this.inner.as_mut_log().insert(key, string.as_bytes());
+                        this.inner
+                            .as_mut_log()
+                            .insert(key, string.as_bytes().to_vec());
                     }
                     Some(rlua::Value::Integer(integer)) => {
                         this.inner.as_mut_log().insert(key, Value::Integer(integer));
@@ -188,9 +190,7 @@ impl rlua::UserData for LuaEvent {
         methods.add_meta_function(rlua::MetaMethod::Pairs, |ctx, event: LuaEvent| {
             let state = ctx.create_table()?;
             {
-                let keys = ctx.create_table_from(
-                    event.inner.as_log().keys().map(|k| (k.to_string(), true)),
-                )?;
+                let keys = ctx.create_table_from(event.inner.as_log().keys().map(|k| (k, true)))?;
                 state.set("event", event)?;
                 state.set("keys", keys)?;
             }
@@ -230,6 +230,7 @@ mod tests {
 
     #[test]
     fn lua_add_field() {
+        crate::test_util::trace_init();
         let mut transform = Lua::new(
             r#"
               event["hello"] = "goodbye"
@@ -247,6 +248,7 @@ mod tests {
 
     #[test]
     fn lua_read_field() {
+        crate::test_util::trace_init();
         let mut transform = Lua::new(
             r#"
               _, _, name = string.find(event["message"], "Hello, my name is (%a+).")
@@ -265,6 +267,7 @@ mod tests {
 
     #[test]
     fn lua_remove_field() {
+        crate::test_util::trace_init();
         let mut transform = Lua::new(
             r#"
               event["name"] = nil
@@ -299,6 +302,7 @@ mod tests {
 
     #[test]
     fn lua_read_empty_field() {
+        crate::test_util::trace_init();
         let mut transform = Lua::new(
             r#"
               if event["non-existant"] == nil then
@@ -319,6 +323,7 @@ mod tests {
 
     #[test]
     fn lua_integer_value() {
+        crate::test_util::trace_init();
         let mut transform = Lua::new(
             r#"
               event["number"] = 3
@@ -333,6 +338,7 @@ mod tests {
 
     #[test]
     fn lua_numeric_value() {
+        crate::test_util::trace_init();
         let mut transform = Lua::new(
             r#"
               event["number"] = 3.14159
@@ -347,6 +353,7 @@ mod tests {
 
     #[test]
     fn lua_boolean_value() {
+        crate::test_util::trace_init();
         let mut transform = Lua::new(
             r#"
               event["bool"] = true
@@ -361,6 +368,7 @@ mod tests {
 
     #[test]
     fn lua_non_coercible_value() {
+        crate::test_util::trace_init();
         let mut transform = Lua::new(
             r#"
               event["junk"] = {"asdf"}
@@ -375,6 +383,7 @@ mod tests {
 
     #[test]
     fn lua_non_string_key_write() {
+        crate::test_util::trace_init();
         let mut transform = Lua::new(
             r#"
               event[false] = "hello"
@@ -390,6 +399,7 @@ mod tests {
 
     #[test]
     fn lua_non_string_key_read() {
+        crate::test_util::trace_init();
         let mut transform = Lua::new(
             r#"
               print(event[false])
@@ -405,6 +415,7 @@ mod tests {
 
     #[test]
     fn lua_script_error() {
+        crate::test_util::trace_init();
         let mut transform = Lua::new(
             r#"
               error("this is an error")
@@ -420,6 +431,7 @@ mod tests {
 
     #[test]
     fn lua_syntax_error() {
+        crate::test_util::trace_init();
         let err = Lua::new(
             r#"
               1234 = sadf <>&*!#@
@@ -437,6 +449,7 @@ mod tests {
     fn lua_load_file() {
         use std::fs::File;
         use std::io::Write;
+        crate::test_util::trace_init();
 
         let dir = tempfile::tempdir().unwrap();
 
@@ -471,6 +484,7 @@ mod tests {
 
     #[test]
     fn lua_pairs() {
+        crate::test_util::trace_init();
         let mut transform = Lua::new(
             r#"
               for k,v in pairs(event) do

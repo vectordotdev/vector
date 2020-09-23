@@ -20,7 +20,10 @@ requirements.kafka = ">= 0.8"
 service_providers = ["AWS", "Confluent"]
 write_to_description = "[Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol]"
 
-<%= render("_partials/fields/_component_options.toml", type: "sink", name: "kafka") %>
+<%= render("_partials/fields/_component_options.toml",
+  type: "sink",
+  name: "kafka"
+) %>
 
 <%= render(
   "_partials/fields/_buffer_options.toml",
@@ -28,7 +31,9 @@ write_to_description = "[Apache Kafka][urls.kafka] via the [Kafka protocol][urls
   common: false
 ) %>
 
-<%= render("_partials/fields/_kafka_options.toml", namespace: "sinks.kafka.options") %>
+<%= render("_partials/fields/_kafka_options.toml",
+  namespace: "sinks.kafka.options"
+) %>
 
 <%= render("_partials/fields/_compression_options.toml",
   namespace: "sinks.kafka.options",
@@ -41,7 +46,8 @@ write_to_description = "[Apache Kafka][urls.kafka] via the [Kafka protocol][urls
 
 <%= render("_partials/fields/_encoding_options.toml",
   namespace: "sinks.kafka.options",
-  encodings: ["json", "text"]
+  encodings: ["json", "text"],
+  default: "text"
 ) %>
 
 [sinks.kafka.options.key_field]
@@ -54,8 +60,6 @@ The log field name to use for the topic key. If unspecified, the key will be \
 randomly generated. If the field does not exist on the log, a blank value \
 will be used.\
 """
-
-<%= render("_partials/fields/_tls_connector_options.toml", namespace: "sinks.kafka.options", can_enable: true, can_verify_certificate: false, can_verify_hostname: false) %>
 
 [sinks.kafka.options.topic]
 type = "string"

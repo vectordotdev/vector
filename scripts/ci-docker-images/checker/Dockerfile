@@ -4,6 +4,7 @@ RUN apt-get update && \
   apt-get install -y \
   build-essential \
   curl \
+  cmake \
   git
 
 # Install Rust
@@ -13,7 +14,7 @@ ENV RUSTUP_HOME="$RUST_PREFIX/rustup"
 ENV CARGO_HOME="$RUST_PREFIX/cargo"
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain "$(cat /tmp/rust-toolchain)"
 ENV PATH="$RUSTUP_HOME/bin:$CARGO_HOME/bin:$PATH"
-RUN rustup component add rustfmt
+RUN rustup component add clippy rustfmt
 
 # Install Ruby dependencies
 ENV LC_ALL C.UTF-8

@@ -13,17 +13,17 @@
 //! type should be used when you do not want to batch events but you want
 //! to _stream_ them to the downstream service. `BatchSink` and `PartitonBatchSink`
 //! are similar in the sense that they both take some `tower::Service`, `Batch` and
-//! `Acker` and will provide full batching, request dipstaching and acking based on
+//! `Acker` and will provide full batching, request dispatching and acking based on
 //! the settings passed.
 //!
-//! For more advanced use cases like http based sinks, one should use the
+//! For more advanced use cases like HTTP based sinks, one should use the
 //! `BatchedHttpSink` type, which is a wrapper for `BatchSink` and `HttpSink`.
 //!
 //! # Driving to completetion
 //!
 //! Each sink utility provided here strictly follows the patterns described in
 //! the `futures01::Sink` docs. Each sink utility must be polled from a valid
-//! tokio context wether that may be an actual runtime or using any of the
+//! tokio context whether that may be an actual runtime or using any of the
 //! `tokio01-test` utilities.
 //!
 //! For service based sinks like `BatchSink` and `PartitionBatchSink` they also
@@ -32,30 +32,33 @@
 //! driven independently from the sink. A oneshot channel is used to tie them back into
 //! the sink to allow it to notify the consumer that the request has succeeded.
 
-use super::batch::{Batch, BatchSettings};
-use super::buffer::partition::Partition;
-use crate::buffers::Acker;
+use super::{
+    batch::{Batch, PushResult, StatefulBatch},
+    buffer::partition::Partition,
+};
+use crate::{buffers::Acker, Event};
+use async_trait::async_trait;
+use futures::{
+    compat::{Compat, Future01CompatExt},
+    stream::BoxStream,
+    FutureExt, TryFutureExt,
+};
 use futures01::{
-    future::Either,
-    stream::FuturesUnordered,
-    sync::oneshot::{self, Receiver},
-    try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream,
+    future::Either, stream::FuturesUnordered, sync::oneshot, try_ready, Async, AsyncSink, Future,
+    Poll, Sink, StartSend, Stream,
 };
 use std::{
     collections::{HashMap, VecDeque},
+    convert::Infallible,
     fmt,
     hash::Hash,
     marker::PhantomData,
-    time::Instant,
 };
-use tokio01::{
-    executor::{DefaultExecutor, Executor},
-    timer::Delay,
-};
+use tokio::time::{delay_for, Duration};
 use tower::Service;
 use tracing_futures::Instrument;
 
-// === StreamSink ===
+// === StreamSinkOld ===
 
 const STREAM_SINK_MAX: usize = 10_000;
 
@@ -66,32 +69,34 @@ const STREAM_SINK_MAX: usize = 10_000;
 /// will also attempt to fully flush if the amount of
 /// in flight acks is larger than `STREAM_SINK_MAX`.
 #[derive(Debug)]
-pub struct StreamSink<T> {
+pub struct StreamSinkOld<T> {
     inner: T,
     acker: Acker,
     pending: usize,
+    closing_inner: bool,
 }
 
-impl<T> StreamSink<T> {
+impl<T> StreamSinkOld<T> {
     pub fn new(inner: T, acker: Acker) -> Self {
         Self {
             inner,
             acker,
             pending: 0,
+            closing_inner: false,
         }
     }
 }
 
-impl<T: Sink> Sink for StreamSink<T> {
+impl<T: Sink> Sink for StreamSinkOld<T> {
     type SinkItem = T::SinkItem;
     type SinkError = T::SinkError;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        trace!("sending item.");
+        trace!("Sending item.");
         match self.inner.start_send(item)? {
             AsyncSink::Ready => {
                 self.pending += 1;
-                trace!(message = "submit successful.", pending_acks = self.pending);
+                trace!(message = "Submit successful.", pending_acks = self.pending);
 
                 if self.pending >= STREAM_SINK_MAX {
                     self.poll_complete()?;
@@ -116,6 +121,23 @@ impl<T: Sink> Sink for StreamSink<T> {
 
         Ok(().into())
     }
+
+    fn close(&mut self) -> Poll<(), Self::SinkError> {
+        if !self.closing_inner {
+            if let Async::NotReady = self.poll_complete()? {
+                return Ok(Async::NotReady);
+            }
+            self.closing_inner = true;
+        }
+        self.inner.close()
+    }
+}
+
+// === StreamSink ===
+
+#[async_trait]
+pub trait StreamSink {
+    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()>;
 }
 
 // === BatchSink ===
@@ -134,17 +156,17 @@ impl<T: Sink> Sink for StreamSink<T> {
 /// batches have been acked. This means if sequential requests r1, r2,
 /// and r3 are dispatched and r2 and r3 complete, all events contained
 /// in all requests will not be acked until r1 has completed.
-pub struct BatchSink<S, B, Request, E = DefaultExecutor> {
+pub struct BatchSink<S, B, Request> {
     service: ServiceSink<S, Request>,
-    batch: B,
-    settings: BatchSettings,
-    linger: Option<Delay>,
+    batch: StatefulBatch<B>,
+    timeout: Duration,
+    linger: Option<SafeLinger>,
     closing: bool,
-    exec: E,
+    service_was_not_ready: bool,
     _pd: PhantomData<Request>,
 }
 
-impl<S, B, Request> BatchSink<S, B, Request, DefaultExecutor>
+impl<S, B, Request> BatchSink<S, B, Request>
 where
     S: Service<Request>,
     S::Future: Send + 'static,
@@ -152,100 +174,113 @@ where
     S::Response: Response,
     B: Batch<Output = Request>,
 {
-    pub fn new(service: S, batch: B, settings: BatchSettings, acker: Acker) -> Self {
-        BatchSink::with_executor(service, batch, settings, acker, DefaultExecutor::current())
-    }
-}
-
-impl<S, B, Request, E> BatchSink<S, B, Request, E>
-where
-    S: Service<Request>,
-    S::Future: Send + 'static,
-    S::Error: Into<crate::Error> + Send + 'static,
-    S::Response: Response,
-    B: Batch<Output = Request>,
-    E: Executor,
-{
-    pub fn with_executor(
-        service: S,
-        batch: B,
-        settings: BatchSettings,
-        acker: Acker,
-        exec: E,
-    ) -> Self {
+    pub fn new(service: S, batch: B, timeout: Duration, acker: Acker) -> Self {
         let service = ServiceSink::new(service, acker);
 
         Self {
             service,
-            batch,
-            settings,
+            batch: batch.into(),
+            timeout,
             linger: None,
             closing: false,
-            exec,
+            service_was_not_ready: false,
             _pd: PhantomData,
         }
     }
 
     fn should_send(&mut self) -> bool {
-        self.closing || self.batch.len() >= self.settings.size || self.linger_elapsed()
+        self.closing || self.batch.was_full() || self.linger_elapsed()
     }
 
     fn linger_elapsed(&mut self) -> bool {
-        if let Some(delay) = &mut self.linger {
-            delay.poll().expect("timer error").is_ready()
-        } else {
-            false
+        let clue = self.capture_clue("linger_elapsed");
+        match &mut self.linger {
+            Some(delay) => delay.poll_with_clue(clue).expect("timer error").is_ready(),
+            None => false,
+        }
+    }
+
+    fn capture_clue(&self, caller: &'static str) -> Clue {
+        Clue {
+            caller,
+            closing: self.closing,
+            batch_was_full: self.batch.was_full(),
+            batch_is_empty: self.batch.is_empty(),
+            service_was_not_ready: self.service_was_not_ready,
         }
     }
 }
 
-impl<S, B, Request, E> Sink for BatchSink<S, B, Request, E>
+impl<S, B, R> BatchSink<S, B, R> {
+    pub fn get_ref(&self) -> &S {
+        &self.service.service
+    }
+
+    pub fn get_mut(&mut self) -> &mut S {
+        &mut self.service.service
+    }
+}
+
+impl<S, B, Request> Sink for BatchSink<S, B, Request>
 where
     S: Service<Request>,
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
     S::Response: Response,
     B: Batch<Output = Request>,
-    E: Executor,
 {
     type SinkItem = B::Input;
     type SinkError = crate::Error;
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        if self.batch.len() >= self.settings.size {
-            trace!("batch full.");
+        if self.batch.was_full() {
+            trace!("Batch full.");
             self.poll_complete()?;
 
-            if self.batch.len() > self.settings.size {
-                debug!(message = "Batch full; applying back pressure.", size = %self.settings.size, rate_limit_secs = 10);
+            if !self.batch.is_empty() {
+                debug!(
+                    message = "Batch buffer full; applying back pressure.",
+                    rate_limit_secs = 10
+                );
                 return Ok(AsyncSink::NotReady(item));
             }
         }
 
-        if self.batch.len() == 0 {
-            trace!("Creating new batch.");
+        if self.linger.is_none() {
+            trace!("Starting new batch timer.");
             // We just inserted the first item of a new batch, so set our delay to the longest time
             // we want to allow that item to linger in the batch before being flushed.
-            let deadline = Instant::now() + self.settings.timeout;
-            self.linger = Some(Delay::new(deadline));
+            let delay = SafeLinger::new(self.timeout);
+            self.linger = Some(delay);
         }
 
-        self.batch.push(item);
-
-        Ok(AsyncSink::Ready)
+        match self.batch.push(item) {
+            PushResult::Ok(false) => Ok(AsyncSink::Ready),
+            PushResult::Ok(true) => {
+                self.poll_complete()?;
+                Ok(AsyncSink::Ready)
+            }
+            PushResult::Overflow(item) => self.start_send(item),
+        }
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
         loop {
             if self.batch.is_empty() {
-                trace!("no batches; driving service to completion.");
+                trace!("No batches; driving service to completion.");
                 return self.service.poll_complete();
             } else {
                 // We have data to send, so check if we should send it and either attempt the send
                 // or return that we're not ready to send. If we send and it works, loop to poll or
                 // close inner instead of prematurely returning Ready
                 if self.should_send() {
+                    // If we have a non-full batch that hits linger while the inner service is not
+                    // ready, should_send will poll linger and get Ready, then this try_ready will
+                    // return, then poll_complete gets called again, causing a double-poll of
+                    // linger via should_send.
+                    self.service_was_not_ready = true;
                     try_ready!(self.service.poll_ready());
+                    self.service_was_not_ready = false;
 
                     trace!("Service ready; Sending batch.");
                     let batch = self.batch.fresh_replace();
@@ -253,22 +288,38 @@ where
                     let batch_size = batch.num_items();
                     let request = batch.finish();
 
-                    let fut = self.service.call(request, batch_size);
+                    let fut = self.service.call(request, batch_size).compat();
+                    tokio::spawn(fut);
 
-                    self.exec.spawn(fut).expect("Spawn service future");
-
-                    // Disable linger timeout
-                    self.linger.take();
+                    // Remove the now-sent batch's linger timeout
+                    self.linger = None;
                 } else {
-                    // We have a batch but we can't send any items
-                    // most likely because we have not hit either
-                    // our batch size or the timeout. Here we want
-                    // to poll the inner futures but still return
-                    // NotReady if the linger timeout is not complete yet.
+                    // We have data but not a full batch and the linger time has not elapsed, so do
+                    // not sent a request yet. Instead, poll the inner service to drive progress
+                    // and defer readiness to the linger timeout if present.
+                    let clue = self.capture_clue("should_not_send");
                     if let Some(linger) = &mut self.linger {
-                        trace!("polling batch linger.");
                         self.service.poll_complete()?;
-                        try_ready!(linger.poll());
+
+                        // It's unlikely that we get past `try_ready` here because there's no way
+                        // for `should_send` to return false without polling a present `linger`. If
+                        // we do get past it, that means the timer expired within the tiny window
+                        // between the two `poll` calls and we should loop again because it's
+                        // probably time to send a batch.
+                        //
+                        // But then things get tricky. As noted above, `should_send` calls `poll` on
+                        // `linger`. But we just called `poll` on `linger` ourselves and it
+                        // returned `Ready`. Normally, it's a contract violation to re-poll
+                        // a future that has returned `Ready`. But we also can't reset `linger`,
+                        // because then `should_send` would not know that it had expired and we
+                        // might not send a batch when we should.
+                        //
+                        // Our (temporary) solution here is the SafeLinger wrapper type, which
+                        // quacks like a future but doesn't mind being polled again after it
+                        // returns `Ready`. It's also instrumented to collect some clues as to the
+                        // circumstances of the double poll.
+                        trace!("Polling batch linger.");
+                        try_ready!(linger.poll_with_clue(clue));
                     } else {
                         try_ready!(self.service.poll_complete());
                     }
@@ -278,7 +329,7 @@ where
     }
 
     fn close(&mut self) -> Poll<(), Self::SinkError> {
-        trace!("closing batch sink.");
+        trace!("Closing batch sink.");
         self.closing = true;
         self.poll_complete()
     }
@@ -293,9 +344,51 @@ where
         f.debug_struct("BatchSink")
             .field("service", &self.service)
             .field("batch", &self.batch)
-            .field("settings", &self.settings)
+            .field("timeout", &self.timeout)
             .finish()
     }
+}
+
+struct SafeLinger {
+    inner: Box<dyn Future<Item = (), Error = Infallible> + Send>,
+    finished: bool,
+    clues: Vec<Clue>,
+}
+
+impl SafeLinger {
+    fn new(timeout: Duration) -> Self {
+        SafeLinger {
+            inner: Box::new(delay_for(timeout).never_error().boxed().compat()),
+            finished: false,
+            clues: Vec::new(),
+        }
+    }
+
+    fn poll_with_clue(&mut self, clue: Clue) -> Poll<(), Infallible> {
+        if self.finished {
+            self.clues.push(clue);
+            warn!(message = "Linger polled after ready.", clues = ?self.clues);
+            Ok(Async::Ready(()))
+        } else {
+            match self.inner.poll() {
+                Ok(Async::Ready(())) => {
+                    self.finished = true;
+                    self.clues.push(clue);
+                    Ok(Async::Ready(()))
+                }
+                anything_else => anything_else,
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Clue {
+    caller: &'static str,
+    closing: bool,
+    batch_was_full: bool,
+    batch_is_empty: bool,
+    service_was_not_ready: bool,
 }
 
 // === PartitionBatchSink ===
@@ -316,12 +409,11 @@ type LingerDelay<K> = Box<dyn Future<Item = LingerState<K>, Error = ()> + Send +
 /// batches have been acked. This means if sequential requests r1, r2,
 /// and r3 are dispatched and r2 and r3 complete, all events contained
 /// in all requests will not be acked until r1 has completed.
-pub struct PartitionBatchSink<B, S, K, Request, E = DefaultExecutor> {
-    batch: B,
+pub struct PartitionBatchSink<B, S, K, Request> {
+    batch: StatefulBatch<B>,
     service: ServiceSink<S, Request>,
-    exec: E,
-    partitions: HashMap<K, B>,
-    settings: BatchSettings,
+    partitions: HashMap<K, StatefulBatch<B>>,
+    timeout: Duration,
     closing: bool,
     sending: VecDeque<B>,
     lingers: FuturesUnordered<LingerDelay<K>>,
@@ -333,7 +425,7 @@ enum LingerState<K> {
     Canceled,
 }
 
-impl<B, S, K, Request> PartitionBatchSink<B, S, K, Request, DefaultExecutor>
+impl<B, S, K, Request> PartitionBatchSink<B, S, K, Request>
 where
     B: Batch<Output = Request>,
     B::Input: Partition<K>,
@@ -343,43 +435,14 @@ where
     S::Error: Into<crate::Error> + Send + 'static,
     S::Response: Response,
 {
-    pub fn new(service: S, batch: B, settings: BatchSettings, acker: Acker) -> Self {
-        PartitionBatchSink::with_executor(
-            service,
-            batch,
-            settings,
-            acker,
-            DefaultExecutor::current(),
-        )
-    }
-}
-
-impl<B, S, K, Request, E> PartitionBatchSink<B, S, K, Request, E>
-where
-    B: Batch<Output = Request>,
-    B::Input: Partition<K>,
-    K: Hash + Eq + Clone + Send + 'static,
-    S: Service<Request>,
-    S::Future: Send + 'static,
-    S::Error: Into<crate::Error> + Send + 'static,
-    S::Response: Response,
-    E: Executor,
-{
-    pub fn with_executor(
-        service: S,
-        batch: B,
-        settings: BatchSettings,
-        acker: Acker,
-        exec: E,
-    ) -> Self {
+    pub fn new(service: S, batch: B, timeout: Duration, acker: Acker) -> Self {
         let service = ServiceSink::new(service, acker);
 
         Self {
-            batch,
+            batch: batch.into(),
             service,
-            exec,
             partitions: HashMap::new(),
-            settings,
+            timeout,
             closing: false,
             sending: VecDeque::new(),
             lingers: FuturesUnordered::new(),
@@ -391,8 +454,10 @@ where
         let (tx, rx) = oneshot::channel();
         let partition_clone = partition.clone();
 
-        let deadline = Instant::now() + self.settings.timeout;
-        let delay = Delay::new(deadline)
+        let delay = delay_for(self.timeout)
+            .unit_error()
+            .boxed()
+            .compat()
             .map(move |_| LingerState::Elapsed(partition_clone))
             .map_err(|_| ());
 
@@ -413,20 +478,56 @@ where
     fn poll_send(&mut self, batch: B) -> Poll<(), crate::Error> {
         if let Async::NotReady = self.service.poll_ready()? {
             self.sending.push_front(batch);
-            Ok(Async::NotReady)
         } else {
             let batch_size = batch.num_items();
             let batch = batch.finish();
-            let fut = self.service.call(batch, batch_size);
 
-            self.exec.spawn(fut).expect("Spawn service future");
+            let fut = self.service.call(batch, batch_size).compat();
+            tokio::spawn(fut);
+        }
 
-            self.service.poll_complete()
+        self.service.poll_complete()
+    }
+
+    fn handle_full_batch(&mut self, item: B::Input, partition: &K) -> FullBatchResult<B::Input> {
+        trace!("Batch full; driving service to completion.");
+        if let Err(error) = self.poll_complete() {
+            return FullBatchResult::Result(Err(error));
+        }
+
+        match self.partitions.get_mut(partition) {
+            Some(batch) => {
+                if !batch.is_empty() {
+                    debug!(
+                        message = "Send buffer full; applying back pressure.",
+                        rate_limit_secs = 10
+                    );
+                    FullBatchResult::Result(Ok(AsyncSink::NotReady(item)))
+                } else {
+                    match batch.push(item) {
+                        PushResult::Ok(full) => {
+                            if full {
+                                if let Err(error) = self.poll_complete() {
+                                    return FullBatchResult::Result(Err(error));
+                                }
+                            }
+                            FullBatchResult::Result(Ok(AsyncSink::Ready))
+                        }
+                        PushResult::Overflow(_) => unreachable!("Empty buffer overflowed"),
+                    }
+                }
+            }
+            None => FullBatchResult::Continue(item),
         }
     }
 }
 
-impl<B, S, K, Request, E> Sink for PartitionBatchSink<B, S, K, Request, E>
+enum FullBatchResult<T> {
+    Continue(T),
+    Result(StartSend<T, crate::Error>),
+}
+
+impl<B, S, K, Request> Sink for PartitionBatchSink<B, S, K, Request>
 where
     B: Batch<Output = Request>,
     B::Input: Partition<K>,
@@ -435,7 +536,6 @@ where
     S::Future: Send + 'static,
     S::Error: Into<crate::Error> + Send + 'static,
     S::Response: Response,
-    E: Executor,
 {
     type SinkItem = B::Input;
     type SinkError = crate::Error;
@@ -463,60 +563,72 @@ where
 
         let partition = item.partition();
 
-        if let Some(batch) = self.partitions.get_mut(&partition) {
-            if batch.len() >= self.settings.size {
-                trace!("Batch full; driving service to completion.");
-                self.poll_complete()?;
-
-                if let Some(batch) = self.partitions.get_mut(&partition) {
-                    if batch.len() >= self.settings.size {
-                        debug!(
-                            message = "Buffer full; applying back pressure.",
-                            max_size = %self.settings.size,
-                            rate_limit_secs = 10
-                        );
-                        return Ok(AsyncSink::NotReady(item));
-                    } else {
-                        batch.push(item);
-                        return Ok(AsyncSink::Ready);
+        let item = match self.partitions.get_mut(&partition) {
+            Some(batch) => {
+                if batch.was_full() {
+                    match self.handle_full_batch(item, &partition) {
+                        FullBatchResult::Result(result) => return result,
+                        FullBatchResult::Continue(item) => item,
+                    }
+                } else {
+                    trace!("Adding event to batch.");
+                    match batch.push(item) {
+                        PushResult::Ok(full) => {
+                            if full {
+                                self.poll_complete()?;
+                            }
+                            return Ok(AsyncSink::Ready);
+                        }
+                        PushResult::Overflow(item) => {
+                            match self.handle_full_batch(item, &partition) {
+                                FullBatchResult::Result(result) => return result,
+                                FullBatchResult::Continue(item) => item,
+                            }
+                        }
                     }
                 }
-            } else {
-                trace!("adding event to batch.");
-                batch.push(item);
-                return Ok(AsyncSink::Ready);
             }
-        }
+            None => item,
+        };
 
-        trace!("replacing batch.");
+        trace!("Replacing batch.");
         // We fall through to this case, when there is no batch already
         // or the batch got submitted by polling_complete above.
         let mut batch = self.batch.fresh();
 
-        batch.push(item);
-        self.set_linger(partition.clone());
+        match batch.push(item) {
+            PushResult::Overflow(_) => unreachable!("Empty buffer overflowed"),
+            PushResult::Ok(full) => {
+                self.set_linger(partition.clone());
 
-        self.partitions.insert(partition, batch);
+                self.partitions.insert(partition, batch);
 
-        Ok(AsyncSink::Ready)
+                if full {
+                    self.poll_complete()?;
+                }
+
+                Ok(AsyncSink::Ready)
+            }
+        }
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
         self.service.poll_complete()?;
 
         while let Some(batch) = self.sending.pop_front() {
-            self.poll_send(batch)?;
+            if self.poll_send(batch)? == Async::Ready(()) {
+                break;
+            }
         }
 
         let closing = self.closing;
-        let max_size = self.settings.size;
 
         let mut partitions = Vec::new();
 
         while let Ok(Async::Ready(Some(linger))) = self.lingers.poll() {
             // Only if the linger has elapsed trigger the removal
             if let LingerState::Elapsed(partition) = linger {
-                trace!("batch linger expired.");
+                trace!("Batch linger expired.");
                 self.linger_handles.remove(&partition);
 
                 if let Some(batch) = self.partitions.remove(&partition) {
@@ -528,7 +640,7 @@ where
         let ready = self
             .partitions
             .iter()
-            .filter(|(_, b)| closing || b.len() >= max_size)
+            .filter(|(_, b)| closing || b.was_full())
             .map(|(p, _)| p.clone())
             .collect::<Vec<_>>();
 
@@ -536,7 +648,7 @@ where
         for partition in ready {
             if let Some(batch) = self.partitions.remove(&partition) {
                 if let Some(linger_cancel) = self.linger_handles.remove(&partition) {
-                    // XXX: had to remove the expect here, a cancaellation should
+                    // XXX: had to remove the expect here, a cancellation should
                     // always be a best effort.
                     let _ = linger_cancel.send(partition.clone());
                 }
@@ -544,19 +656,21 @@ where
                 ready_batches.push(batch);
             }
         }
-
-        for batch in ready_batches.into_iter().chain(partitions) {
-            self.poll_send(batch)?;
-        }
-
-        // If we still have an inflight partition then
-        // we should have a linger associated with it that
-        // will wake up this task when it is ready to be flushed.
         if !self.partitions.is_empty() {
             assert!(
                 !self.lingers.is_empty(),
                 "If partitions are not empty, then there must be a linger"
             );
+        }
+
+        for batch in ready_batches.into_iter().chain(partitions) {
+            self.poll_send(batch.into_inner())?;
+        }
+
+        // If we still have an inflight partition then
+        // we should have a linger associated with it that
+        // will wake up this task when it is ready to be flushed.
+        if !self.partitions.is_empty() || !self.sending.is_empty() {
             self.service.poll_complete()?;
             Ok(Async::NotReady)
         } else {
@@ -565,7 +679,7 @@ where
     }
 
     fn close(&mut self) -> Poll<(), Self::SinkError> {
-        trace!("closing partition batch sink.");
+        trace!("Closing partition batch sink.");
         self.closing = true;
         self.poll_complete()
     }
@@ -580,7 +694,7 @@ where
         f.debug_struct("PartitionedBatchSink")
             .field("batch", &self.batch)
             .field("service", &self.service)
-            .field("settings", &self.settings)
+            .field("timeout", &self.timeout)
             .finish()
     }
 }
@@ -589,7 +703,7 @@ where
 
 struct ServiceSink<S, Request> {
     service: S,
-    in_flight: FuturesUnordered<Receiver<(usize, usize)>>,
+    in_flight: FuturesUnordered<oneshot::Receiver<(usize, usize)>>,
     acker: Acker,
     seq_head: usize,
     seq_tail: usize,
@@ -619,7 +733,8 @@ where
     }
 
     fn poll_ready(&mut self) -> Poll<(), crate::Error> {
-        self.service.poll_ready().map_err(Into::into)
+        let p = task_compat::with_context(|cx| self.service.poll_ready(cx));
+        task_compat::poll_03_to_01(p).map_err(Into::into)
     }
 
     fn call(
@@ -634,15 +749,14 @@ where
 
         self.in_flight.push(rx);
 
-        let request_id = self.next_request_id.wrapping_add(1);
+        let request_id = self.next_request_id;
+        self.next_request_id = request_id.wrapping_add(1);
 
         trace!(
             message = "submitting service request.",
             in_flight_requests = self.in_flight.len()
         );
-        let response = self
-            .service
-            .call(req)
+        let response = Compat::new(Box::pin(self.service.call(req)))
             .map_err(Into::into)
             .then(move |result| {
                 match result {
@@ -723,104 +837,104 @@ impl<'a> Response for &'a str {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::buffers::Acker;
-    use crate::sinks::util::{buffer::partition::Partition, BatchSettings, Buffer, Compression};
-    use crate::test_util::runtime;
+    use crate::{
+        buffers::Acker,
+        sinks::util::{buffer::partition::Partition, BatchSettings, EncodedLength, VecBuffer},
+    };
     use bytes::Bytes;
-    use futures01::{future, Sink};
-    use std::{
-        sync::{atomic::Ordering::Relaxed, Arc, Mutex},
-        time::Duration,
-    };
-    use tokio01_test::clock::MockClock;
+    use futures::{compat::Future01CompatExt, future};
+    use futures01::{future as future01, Sink};
+    use std::sync::{atomic::Ordering::Relaxed, Arc, Mutex};
+    use tokio::task::yield_now;
 
-    const SETTINGS: BatchSettings = BatchSettings {
-        size: 10,
-        timeout: Duration::from_secs(10),
-    };
+    const TIMEOUT: Duration = Duration::from_secs(10);
 
-    #[test]
-    fn batch_sink_acking_sequential() {
-        let rt = runtime();
+    impl EncodedLength for usize {
+        fn encoded_length(&self) -> usize {
+            22
+        }
+    }
 
-        let mut clock = MockClock::new();
+    // If we try poll future in tokio:0.2 Runtime directly we get `no Task is currently running`.
+    async fn run_as_future01<F: std::future::Future + std::marker::Send>(
+        f: F,
+    ) -> <F as std::future::Future>::Output {
+        future01::lazy(|| f.never_error().boxed().compat())
+            .compat()
+            .await
+            .unwrap()
+    }
 
+    async fn advance_time(duration: Duration) {
+        tokio::time::pause();
+        tokio::time::advance(duration).await;
+        tokio::time::resume();
+    }
+
+    #[tokio::test]
+    async fn batch_sink_acking_sequential() {
         let (acker, ack_counter) = Acker::new_for_testing();
 
         let svc = tower::service_fn(|_| future::ok::<_, std::io::Error>(()));
-        let buffered = BatchSink::with_executor(svc, Vec::new(), SETTINGS, acker, rt.executor());
+        let batch = BatchSettings::default().events(10).bytes(9999);
+        let buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
-        let _ = clock.enter(|_| {
-            buffered
-                .sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(0..22))
-                .wait()
-                .unwrap()
-        });
+        let _ = buffered
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(0..22))
+            .compat()
+            .await
+            .unwrap();
 
         assert_eq!(ack_counter.load(Relaxed), 22);
     }
 
-    #[test]
-    fn batch_sink_acking_unordered() {
-        // We need a mock executor here because we need to ensure
-        // that we poll the service futures within the mock clock
-        // context. This allows us to manually advance the time on the
-        // "spawned" futures.
-        let mut exec = MockExec::default();
-        let mut clock = MockClock::new();
+    #[tokio::test]
+    async fn batch_sink_acking_unordered() {
+        run_as_future01(async {
+            // Services future will be spawned and work between `yield_now` calls.
+            let (acker, ack_counter) = Acker::new_for_testing();
 
-        let (acker, ack_counter) = Acker::new_for_testing();
+            let svc = tower::service_fn(|req: Vec<usize>| async move {
+                let duration = match req[0] {
+                    0 => Duration::from_secs(1),
+                    1 => Duration::from_secs(1),
+                    2 => Duration::from_secs(1),
 
-        let svc = tower::service_fn(|req: Vec<usize>| {
-            let dur = match req[0] {
-                0 => Duration::from_secs(1),
-                1 => Duration::from_secs(1),
-                2 => Duration::from_secs(1),
+                    // The 4th request will introduce some sort of
+                    // latency spike to ensure later events don't
+                    // get acked.
+                    3 => Duration::from_secs(5),
+                    4 => Duration::from_secs(1),
+                    5 => Duration::from_secs(1),
+                    _ => unreachable!(),
+                };
 
-                // The 4th request will introduce some sort of
-                // latency spike to ensure later events don't
-                // get acked.
-                3 => Duration::from_secs(5),
-                4 => Duration::from_secs(1),
-                5 => Duration::from_secs(1),
-                _ => unreachable!(),
-            };
+                delay_for(duration).await;
+                Ok::<(), Infallible>(())
+            });
 
-            let deadline = Instant::now() + dur;
+            let batch = BatchSettings::default().bytes(9999).events(1);
 
-            Delay::new(deadline).map(drop)
-        });
+            let mut sink = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
-        let settings = BatchSettings {
-            size: 1,
-            ..SETTINGS
-        };
-
-        let mut sink = BatchSink::with_executor(svc, Vec::new(), settings, acker, exec.clone());
-
-        let _ = clock.enter(|handle| {
             assert!(sink.start_send(0).unwrap().is_ready());
             assert!(sink.start_send(1).unwrap().is_ready());
+            assert!(sink.start_send(2).unwrap().is_ready());
+            yield_now().await;
 
             assert_eq!(ack_counter.load(Relaxed), 0);
 
-            handle.advance(Duration::from_secs(2));
+            advance_time(Duration::from_secs(3)).await;
 
             // We must first poll so that we send the messages
-            // then we must pull the mock executor to set the timers
-            // then poll again to ack.
+            // then we must yield and then poll again to ack.
             sink.poll_complete().unwrap();
-            exec.poll().unwrap();
+            yield_now().await;
             sink.poll_complete().unwrap();
-
-            assert_eq!(ack_counter.load(Relaxed), 2);
-
-            assert!(sink.start_send(2).unwrap().is_ready());
-
+            yield_now().await;
             sink.poll_complete().unwrap();
-            exec.poll().unwrap();
-            sink.poll_complete().unwrap();
+            yield_now().await;
 
             assert_eq!(ack_counter.load(Relaxed), 3);
 
@@ -828,192 +942,47 @@ mod tests {
             assert!(sink.start_send(4).unwrap().is_ready());
             assert!(sink.start_send(5).unwrap().is_ready());
 
-            handle.advance(Duration::from_secs(2));
+            advance_time(Duration::from_secs(2)).await;
 
             sink.poll_complete().unwrap();
-            exec.poll().unwrap();
+            yield_now().await;
             sink.poll_complete().unwrap();
+            yield_now().await;
 
             // Check that events 3,4,6 have not been acked yet
             // only the three previous should be acked.
             assert_eq!(ack_counter.load(Relaxed), 3);
 
-            handle.advance(Duration::from_secs(5));
+            advance_time(Duration::from_secs(5)).await;
 
-            exec.poll().unwrap();
-            sink.flush().wait().unwrap();
+            yield_now().await;
+            sink.flush().compat().await.unwrap();
 
             assert_eq!(ack_counter.load(Relaxed), 6);
-        });
+        })
+        .await;
     }
 
-    #[test]
-    fn batch_sink_buffers_messages_until_limit() {
-        let rt = runtime();
-        let mut clock = MockClock::new();
-
+    #[tokio::test]
+    async fn batch_sink_buffers_messages_until_limit() {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
+            let sent_requests = Arc::clone(&sent_requests);
 
             sent_requests.lock().unwrap().push(req);
 
             future::ok::<_, std::io::Error>(())
         });
-        let buffered = BatchSink::with_executor(svc, Vec::new(), SETTINGS, acker, rt.executor());
+        let batch = BatchSettings::default().bytes(9999).events(10);
+        let buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
-        let _ = clock.enter(|_| {
-            buffered
-                .sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(0..22))
-                .wait()
-                .unwrap()
-        });
-
-        let output = sent_requests.lock().unwrap();
-        assert_eq!(
-            &*output,
-            &vec![
-                vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                vec![10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
-                vec![20, 21]
-            ]
-        );
-    }
-
-    #[test]
-    fn batch_sink_flushes_below_min_on_close() {
-        let rt = runtime();
-        let mut clock = MockClock::new();
-
-        let (acker, _) = Acker::new_for_testing();
-        let sent_requests = Arc::new(Mutex::new(Vec::new()));
-
-        let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
-
-            sent_requests.lock().unwrap().push(req);
-
-            future::ok::<_, std::io::Error>(())
-        });
-        let mut buffered =
-            BatchSink::with_executor(svc, Vec::new(), SETTINGS, acker, rt.executor());
-
-        clock.enter(|_| {
-            assert!(buffered.start_send(0).unwrap().is_ready());
-            assert!(buffered.start_send(1).unwrap().is_ready());
-
-            future::poll_fn(|| buffered.close()).wait().unwrap()
-        });
-
-        let output = sent_requests.lock().unwrap();
-        assert_eq!(&*output, &vec![vec![0, 1]]);
-    }
-
-    #[test]
-    fn batch_sink_expired_linger() {
-        let rt = runtime();
-        let mut clock = MockClock::new();
-
-        let (acker, _) = Acker::new_for_testing();
-        let sent_requests = Arc::new(Mutex::new(Vec::new()));
-
-        let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
-
-            sent_requests.lock().unwrap().push(req);
-
-            future::ok::<_, std::io::Error>(())
-        });
-        let mut buffered =
-            BatchSink::with_executor(svc, Vec::new(), SETTINGS, acker, rt.executor());
-
-        clock.enter(|handle| {
-            assert!(buffered.start_send(0).unwrap().is_ready());
-            assert!(buffered.start_send(1).unwrap().is_ready());
-
-            // Move clock forward by linger timeout + 1 sec
-            handle.advance(SETTINGS.timeout + Duration::from_secs(1));
-
-            future::poll_fn(|| buffered.poll_complete()).wait().unwrap();
-        });
-
-        let output = sent_requests.lock().unwrap();
-        assert_eq!(&*output, &vec![vec![0, 1]]);
-    }
-
-    #[test]
-    fn batch_sink_allows_the_final_item_to_exceed_the_buffer_size() {
-        let rt = runtime();
-        let mut clock = MockClock::new();
-
-        let (acker, _) = Acker::new_for_testing();
-        let sent_requests = Arc::new(Mutex::new(Vec::new()));
-
-        let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
-
-            sent_requests.lock().unwrap().push(req);
-
-            future::ok::<_, std::io::Error>(())
-        });
-        let buffered = BatchSink::with_executor(
-            svc,
-            Buffer::new(Compression::None),
-            SETTINGS,
-            acker,
-            rt.executor(),
-        );
-
-        let input = vec![
-            vec![0, 1, 2],
-            vec![3, 4, 5],
-            vec![6, 7, 8],
-            vec![9, 10, 11],
-            vec![12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
-            vec![24],
-        ];
-        let _ = clock.enter(|_| {
-            buffered
-                .sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(input))
-                .wait()
-                .unwrap()
-        });
-
-        let output = sent_requests.lock().unwrap();
-        assert_eq!(
-            &*output,
-            &vec![
-                vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-                vec![12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
-                vec![24],
-            ]
-        );
-    }
-
-    #[test]
-    fn partition_batch_sink_buffers_messages_until_limit() {
-        let rt = runtime();
-        let (acker, _) = Acker::new_for_testing();
-        let sent_requests = Arc::new(Mutex::new(Vec::new()));
-
-        let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
-
-            sent_requests.lock().unwrap().push(req);
-
-            future::ok::<_, std::io::Error>(())
-        });
-        let buffered =
-            PartitionBatchSink::with_executor(svc, Vec::new(), SETTINGS, acker, rt.executor());
-
-        let (_buffered, _) = buffered
+        let _ = buffered
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(0..22))
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         let output = sent_requests.lock().unwrap();
@@ -1027,34 +996,115 @@ mod tests {
         );
     }
 
-    #[test]
-    fn partition_batch_sink_buffers_by_partition_buffer_size_one() {
-        let rt = runtime();
+    #[tokio::test]
+    async fn batch_sink_flushes_below_min_on_close() {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
-
+            let sent_requests = Arc::clone(&sent_requests);
             sent_requests.lock().unwrap().push(req);
-
             future::ok::<_, std::io::Error>(())
         });
 
-        let settings = BatchSettings {
-            size: 1,
-            ..SETTINGS
-        };
+        let batch = BatchSettings::default().bytes(9999).events(10);
+        let mut buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
-        let buffered =
-            PartitionBatchSink::with_executor(svc, Vec::new(), settings, acker, rt.executor());
+        assert!(buffered.start_send(0).unwrap().is_ready());
+        assert!(buffered.start_send(1).unwrap().is_ready());
 
-        let input = vec![Partitions::A, Partitions::B];
+        futures01::future::poll_fn(|| buffered.close())
+            .compat()
+            .await
+            .unwrap();
+
+        let output = sent_requests.lock().unwrap();
+        assert_eq!(&*output, &vec![vec![0, 1]]);
+    }
+
+    #[tokio::test]
+    async fn batch_sink_expired_linger() {
+        run_as_future01(async {
+            let (acker, _) = Acker::new_for_testing();
+            let sent_requests = Arc::new(Mutex::new(Vec::new()));
+
+            let svc = tower::service_fn(|req| {
+                let sent_requests = Arc::clone(&sent_requests);
+                sent_requests.lock().unwrap().push(req);
+                future::ok::<_, std::io::Error>(())
+            });
+
+            let batch = BatchSettings::default().bytes(9999).events(10);
+            let mut buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+
+            assert!(buffered.start_send(0).unwrap().is_ready());
+            assert!(buffered.start_send(1).unwrap().is_ready());
+
+            // Move clock forward by linger timeout + 1 sec
+            advance_time(TIMEOUT + Duration::from_secs(1)).await;
+
+            while buffered.poll_complete().unwrap() == Async::NotReady {
+                yield_now().await;
+            }
+
+            let output = sent_requests.lock().unwrap();
+            assert_eq!(&*output, &vec![vec![0, 1]]);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn partition_batch_sink_buffers_messages_until_limit() {
+        let (acker, _) = Acker::new_for_testing();
+        let sent_requests = Arc::new(Mutex::new(Vec::new()));
+
+        let svc = tower::service_fn(|req| {
+            let sent_requests = Arc::clone(&sent_requests);
+            sent_requests.lock().unwrap().push(req);
+            future::ok::<_, std::io::Error>(())
+        });
+
+        let batch = BatchSettings::default().bytes(9999).events(10);
+        let buffered = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
         let (_buffered, _) = buffered
             .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(0..22))
+            .compat()
+            .await
+            .unwrap();
+
+        let output = sent_requests.lock().unwrap();
+        assert_eq!(
+            &*output,
+            &vec![
+                vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+                vec![10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+                vec![20, 21]
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn partition_batch_sink_buffers_by_partition_buffer_size_one() {
+        let (acker, _) = Acker::new_for_testing();
+        let sent_requests = Arc::new(Mutex::new(Vec::new()));
+
+        let svc = tower::service_fn(|req| {
+            let sent_requests = Arc::clone(&sent_requests);
+            sent_requests.lock().unwrap().push(req);
+            future::ok::<_, std::io::Error>(())
+        });
+
+        let batch = BatchSettings::default().bytes(9999).events(1);
+        let buffered = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+
+        let input = vec![Partitions::A, Partitions::B];
+        let (_buffered, _) = buffered
+            .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(input))
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         let mut output = sent_requests.lock().unwrap();
@@ -1062,34 +1112,26 @@ mod tests {
         assert_eq!(&*output, &vec![vec![Partitions::A], vec![Partitions::B]]);
     }
 
-    #[test]
-    fn partition_batch_sink_buffers_by_partition_buffer_size_two() {
-        let rt = runtime();
+    #[tokio::test]
+    async fn partition_batch_sink_buffers_by_partition_buffer_size_two() {
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
-
+            let sent_requests = Arc::clone(&sent_requests);
             sent_requests.lock().unwrap().push(req);
-
             future::ok::<_, std::io::Error>(())
         });
 
-        let settings = BatchSettings {
-            size: 2,
-            ..SETTINGS
-        };
-
-        let buffered =
-            PartitionBatchSink::with_executor(svc, Vec::new(), settings, acker, rt.executor());
+        let batch = BatchSettings::default().bytes(9999).events(2);
+        let buffered = PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
         let input = vec![Partitions::A, Partitions::B, Partitions::A, Partitions::B];
-
         let (_buffered, _) = buffered
             .sink_map_err(drop)
             .send_all(futures01::stream::iter_ok(input))
-            .wait()
+            .compat()
+            .await
             .unwrap();
 
         let mut output = sent_requests.lock().unwrap();
@@ -1103,51 +1145,55 @@ mod tests {
         );
     }
 
-    #[test]
-    fn partition_batch_sink_submits_after_linger() {
-        let mut clock = MockClock::new();
-        let rt = runtime();
-        let (acker, _) = Acker::new_for_testing();
-        let sent_requests = Arc::new(Mutex::new(Vec::new()));
+    #[tokio::test]
+    async fn partition_batch_sink_submits_after_linger() {
+        run_as_future01(async {
+            let (acker, _) = Acker::new_for_testing();
+            let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
-        let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
+            let svc = tower::service_fn(|req| {
+                let sent_requests = Arc::clone(&sent_requests);
+                sent_requests.lock().unwrap().push(req);
+                future::ok::<_, std::io::Error>(())
+            });
 
-            sent_requests.lock().unwrap().push(req);
+            let batch = BatchSettings::default().bytes(9999).events(10);
+            let mut buffered =
+                PartitionBatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
-            future::ok::<_, std::io::Error>(())
-        });
-
-        let mut buffered =
-            PartitionBatchSink::with_executor(svc, Vec::new(), SETTINGS, acker, rt.executor());
-
-        clock.enter(|handle| {
             buffered.start_send(1 as usize).unwrap();
             buffered.poll_complete().unwrap();
 
-            handle.advance(Duration::from_secs(11));
+            advance_time(TIMEOUT + Duration::from_secs(1)).await;
 
-            buffered.poll_complete().unwrap();
-        });
+            while buffered.poll_complete().unwrap() == Async::NotReady {
+                yield_now().await;
+            }
 
-        let output = sent_requests.lock().unwrap();
-        assert_eq!(&*output, &vec![vec![1]]);
+            let output = sent_requests.lock().unwrap();
+            assert_eq!(&*output, &vec![vec![1]]);
+        })
+        .await;
     }
 
-    #[test]
-    fn service_sink_doesnt_propagate_error() {
-        // We need a mock executor here because we need to ensure
-        // that we poll the service futures within the mock clock
-        // context. This allows us to manually advance the time on the
-        // "spawned" futures.
-        let (acker, ack_counter) = Acker::new_for_testing();
+    #[tokio::test]
+    async fn service_sink_doesnt_propagate_error() {
+        run_as_future01(async {
+            // We need a mock executor here because we need to ensure
+            // that we poll the service futures within the mock clock
+            // context. This allows us to manually advance the time on the
+            // "spawned" futures.
+            let (acker, ack_counter) = Acker::new_for_testing();
 
-        let svc = tower::service_fn(|req: u8| if req == 3 { Err("bad") } else { Ok("good") });
+            let svc = tower::service_fn(|req: u8| {
+                if req == 3 {
+                    future::err("bad")
+                } else {
+                    future::ok("good")
+                }
+            });
+            let mut sink = ServiceSink::new(svc, acker);
 
-        let mut sink = ServiceSink::new(svc, acker);
-
-        let mut clock = MockClock::new();
-        clock.enter(|_handle| {
             // send some initial requests
             let mut fut1 = sink.call(1, 1);
             let mut fut2 = sink.call(2, 2);
@@ -1169,54 +1215,20 @@ mod tests {
             assert!(fut4.poll().unwrap().is_ready());
             assert!(sink.poll_complete().unwrap().is_ready());
             assert_eq!(ack_counter.load(Relaxed), 10);
-        });
-    }
-
-    #[derive(Default, Clone)]
-    struct MockExec(
-        Arc<
-            Mutex<
-                Vec<(
-                    Box<dyn Future<Item = (), Error = ()> + Send + 'static>,
-                    bool,
-                )>,
-            >,
-        >,
-    );
-
-    impl tokio01::executor::Executor for MockExec {
-        fn spawn(
-            &mut self,
-            fut: Box<dyn Future<Item = (), Error = ()> + Send + 'static>,
-        ) -> Result<(), tokio01::executor::SpawnError> {
-            let mut futs = self.0.lock().unwrap();
-            Ok(futs.push((fut, false)))
-        }
-    }
-
-    impl MockExec {
-        pub fn poll(&mut self) -> futures01::Poll<(), ()> {
-            let mut futs = self.0.lock().unwrap();
-
-            for (fut, is_done) in &mut *futs {
-                if !*is_done {
-                    if let Async::Ready(_) = fut.poll()? {
-                        *is_done = true;
-                    }
-                }
-            }
-
-            // XXX: We don't really use this beyond polling a group
-            // of futures, it is expected that the user manually keeps
-            // polling this. Its not very useful but it works for now.
-            Ok(Async::Ready(()))
-        }
+        })
+        .await;
     }
 
     #[derive(Debug, PartialEq, Eq, Ord, PartialOrd)]
     enum Partitions {
         A,
         B,
+    }
+
+    impl EncodedLength for Partitions {
+        fn encoded_length(&self) -> usize {
+            10 // Dummy value
+        }
     }
 
     impl Partition<Bytes> for Partitions {

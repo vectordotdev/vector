@@ -21,7 +21,7 @@ pub enum ConversionError {
 /// `Conversion` is a place-holder for a type conversion operation, to
 /// convert from a plain (`Bytes`) `Value` into another type. Every
 /// variant of `Value` is represented here.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Conversion {
     Bytes,
     Integer,
@@ -291,7 +291,7 @@ mod tests {
     fn convert(fmt: &str, value: &str) -> Result<Value, Error> {
         std::env::set_var("TZ", TIMEZONE);
         fmt.parse::<Conversion>()
-            .expect(&format!("Invalid conversion {:?}", fmt))
+            .unwrap_or_else(|_| panic!("Invalid conversion {:?}", fmt))
             .convert(value.into())
     }
 

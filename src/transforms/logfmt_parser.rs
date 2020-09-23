@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
-    event::{self, Event},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::Event,
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -27,7 +27,7 @@ impl TransformConfig for LogfmtConfig {
         let field = self
             .field
             .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+            .unwrap_or(&crate::config::log_schema().message_key());
         let conversions = parse_conversion_map(&self.types)?;
 
         Ok(Box::new(Logfmt {
@@ -73,7 +73,7 @@ impl Transform for Logfmt {
                 }
 
                 if let Some(conv) = self.conversions.get(&key) {
-                    match conv.convert(val.as_bytes().into()) {
+                    match conv.convert(val.into_bytes().into()) {
                         Ok(value) => {
                             event.as_mut_log().insert(key, value);
                         }
@@ -110,22 +110,20 @@ impl Transform for Logfmt {
 mod tests {
     use super::LogfmtConfig;
     use crate::{
+        config::{TransformConfig, TransformContext},
         event::{LogEvent, Value},
-        test_util,
-        topology::config::{TransformConfig, TransformContext},
         Event,
     };
 
     fn parse_log(text: &str, drop_field: bool, types: &[(&str, &str)]) -> LogEvent {
         let event = Event::from(text);
 
-        let rt = test_util::runtime();
         let mut parser = LogfmtConfig {
             field: None,
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build(TransformContext::new_test(rt.executor()))
+        .build(TransformContext::new_test())
         .unwrap();
 
         parser.transform(event).unwrap().into_log()

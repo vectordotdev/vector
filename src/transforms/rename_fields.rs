@@ -1,8 +1,11 @@
 use super::Transform;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
+    internal_events::{
+        RenameFieldsEventProcessed, RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten,
+    },
     serde::Fields,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -31,7 +34,7 @@ impl TransformConfig for RenameFieldsConfig {
             self.fields
                 .clone()
                 .all_fields()
-                .map(|(k, v)| (k.into(), v.into()))
+                .map(|(k, v)| (k, v.into()))
                 .collect(),
             self.drop_empty.unwrap_or(false),
         )?))
@@ -58,24 +61,22 @@ impl RenameFields {
 
 impl Transform for RenameFields {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
+        emit!(RenameFieldsEventProcessed);
+
         for (old_key, new_key) in &self.fields {
             let log = event.as_mut_log();
             match log.remove_prune(&old_key, self.drop_empty) {
                 Some(v) => {
-                    if let Some(_) = event.as_mut_log().insert(&new_key.clone(), v) {
-                        debug!(
-                            message = "Field overwritten",
-                            field = old_key.as_ref(),
-                            rate_limit_secs = 30,
-                        )
+                    if event.as_mut_log().insert(&new_key.clone(), v).is_some() {
+                        emit!(RenameFieldsFieldOverwritten {
+                            field: old_key.as_ref()
+                        });
                     }
                 }
                 None => {
-                    debug!(
-                        message = "Field did not exist",
-                        field = old_key.as_ref(),
-                        rate_limit_secs = 30,
-                    );
+                    emit!(RenameFieldsFieldDoesNotExist {
+                        field: old_key.as_ref()
+                    });
                 }
             }
         }

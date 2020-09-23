@@ -1,13 +1,10 @@
 pub mod logs;
 pub mod metrics;
 
-pub(self) use super::{Healthcheck, RouterSink};
-
-use crate::{dns::Resolver, sinks::util::http::HttpClient};
+use crate::sinks::util::{encode_namespace, http::HttpClient};
 use chrono::{DateTime, Utc};
-use futures01::Future;
+use futures::FutureExt;
 use http::{StatusCode, Uri};
-use hyper;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use snafu::Snafu;
@@ -25,6 +22,12 @@ pub enum Field {
     Int(i64),
     /// boolean
     Bool(bool),
+}
+
+#[derive(Clone, Copy, Debug)]
+enum ProtocolVersion {
+    V1,
+    V2,
 }
 
 #[derive(Debug, Snafu)]
@@ -58,16 +61,11 @@ pub struct InfluxDB2Settings {
     token: String,
 }
 
-trait InfluxDBSettings {
+trait InfluxDBSettings: std::fmt::Debug {
     fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
-    fn write_uri2(self: &Self, endpoint: String) -> crate::Result<http02::Uri> {
-        let uri = self.write_uri(endpoint)?;
-        Ok(format!("{}", uri)
-            .parse::<http02::Uri>()
-            .context(super::UriParseError2)?)
-    }
     fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
     fn token(self: &Self) -> String;
+    fn protocol_version(self: &Self) -> ProtocolVersion;
 }
 
 impl InfluxDBSettings for InfluxDB1Settings {
@@ -93,6 +91,10 @@ impl InfluxDBSettings for InfluxDB1Settings {
     fn token(self: &Self) -> String {
         "".to_string()
     }
+
+    fn protocol_version(self: &Self) -> ProtocolVersion {
+        ProtocolVersion::V1
+    }
 }
 
 impl InfluxDBSettings for InfluxDB2Settings {
@@ -115,28 +117,25 @@ impl InfluxDBSettings for InfluxDB2Settings {
     fn token(self: &Self) -> String {
         self.token.clone()
     }
+
+    fn protocol_version(self: &Self) -> ProtocolVersion {
+        ProtocolVersion::V2
+    }
 }
 
 fn influxdb_settings(
     influxdb1_settings: Option<InfluxDB1Settings>,
     influxdb2_settings: Option<InfluxDB2Settings>,
 ) -> Result<Box<dyn InfluxDBSettings>, crate::Error> {
-    if influxdb1_settings.is_some() & influxdb2_settings.is_some() {
-        return Err(ConfigError::BothConfiguration {
-            v1_settings: influxdb1_settings.unwrap(),
-            v2_settings: influxdb2_settings.unwrap(),
+    match (influxdb1_settings, influxdb2_settings) {
+        (Some(v1_settings), Some(v2_settings)) => Err(ConfigError::BothConfiguration {
+            v1_settings,
+            v2_settings,
         }
-        .into());
-    }
-
-    if influxdb1_settings.is_none() & influxdb2_settings.is_none() {
-        return Err(ConfigError::MissingConfiguration.into());
-    }
-
-    if let Some(settings) = influxdb1_settings {
-        Ok(Box::new(settings))
-    } else {
-        Ok(Box::new(influxdb2_settings.unwrap()))
+        .into()),
+        (None, None) => Err(ConfigError::MissingConfiguration.into()),
+        (Some(settings), _) => Ok(Box::new(settings)),
+        (_, Some(settings)) => Ok(Box::new(settings)),
     }
 }
 
@@ -146,32 +145,31 @@ fn healthcheck(
     endpoint: String,
     influxdb1_settings: Option<InfluxDB1Settings>,
     influxdb2_settings: Option<InfluxDB2Settings>,
-    resolver: Resolver,
+    mut client: HttpClient,
 ) -> crate::Result<super::Healthcheck> {
-    let settings = influxdb_settings(influxdb1_settings.clone(), influxdb2_settings.clone())?;
-
-    let endpoint = endpoint.clone();
+    let settings = influxdb_settings(influxdb1_settings, influxdb2_settings)?;
 
     let uri = settings.healthcheck_uri(endpoint)?;
 
     let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
-    let mut client = HttpClient::new(resolver, None)?;
-
-    let healthcheck = client
-        .call(request)
-        .map_err(|err| err.into())
-        .and_then(|response| match response.status() {
-            StatusCode::OK => Ok(()),
-            StatusCode::NO_CONTENT => Ok(()),
-            other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
-        });
-
-    Ok(Box::new(healthcheck))
+    Ok(async move {
+        client
+            .call(request)
+            .await
+            .map_err(|err| err.into())
+            .and_then(|response| match response.status() {
+                StatusCode::OK => Ok(()),
+                StatusCode::NO_CONTENT => Ok(()),
+                other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
+            })
+    }
+    .boxed())
 }
 
 // https://v2.docs.influxdata.com/v2.0/reference/syntax/line-protocol/
 fn influx_line_protocol(
+    protocol_version: ProtocolVersion,
     measurement: String,
     metric_type: &str,
     tags: Option<BTreeMap<String, String>>,
@@ -180,7 +178,7 @@ fn influx_line_protocol(
     line_protocol: &mut String,
 ) {
     // Fields
-    let unwrapped_fields = fields.unwrap_or_else(|| HashMap::new());
+    let unwrapped_fields = fields.unwrap_or_else(HashMap::new);
     // LineProtocol should have a field
     if unwrapped_fields.is_empty() {
         return;
@@ -190,13 +188,13 @@ fn influx_line_protocol(
     line_protocol.push(',');
 
     // Tags
-    let mut unwrapped_tags = tags.unwrap_or_else(|| BTreeMap::new());
+    let mut unwrapped_tags = tags.unwrap_or_else(BTreeMap::new);
     unwrapped_tags.insert("metric_type".to_owned(), metric_type.to_owned());
     encode_tags(unwrapped_tags, line_protocol);
     line_protocol.push(' ');
 
     // Fields
-    encode_fields(unwrapped_fields, line_protocol);
+    encode_fields(protocol_version, unwrapped_fields, line_protocol);
     line_protocol.push(' ');
 
     // Timestamp
@@ -224,7 +222,11 @@ fn encode_tags(tags: BTreeMap<String, String>, output: &mut String) {
     output.pop();
 }
 
-fn encode_fields(fields: HashMap<String, Field>, output: &mut String) {
+fn encode_fields(
+    protocol_version: ProtocolVersion,
+    fields: HashMap<String, Field>,
+    output: &mut String,
+) {
     for (key, value) in fields.into_iter() {
         encode_string(key.to_string(), output);
         output.push('=');
@@ -242,7 +244,11 @@ fn encode_fields(fields: HashMap<String, Field>, output: &mut String) {
             Field::Float(f) => output.push_str(&f.to_string()),
             Field::UnsignedInt(i) => {
                 output.push_str(&i.to_string());
-                output.push('u');
+                let c = match protocol_version {
+                    ProtocolVersion::V1 => 'i',
+                    ProtocolVersion::V2 => 'u',
+                };
+                output.push(c);
             }
             Field::Int(i) => {
                 output.push_str(&i.to_string());
@@ -276,14 +282,6 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     }
 }
 
-fn encode_namespace(namespace: &str, name: &str) -> String {
-    if !namespace.is_empty() {
-        format!("{}.{}", namespace, name)
-    } else {
-        name.to_string()
-    }
-}
-
 fn encode_uri(endpoint: &str, path: &str, pairs: &[(&str, Option<String>)]) -> crate::Result<Uri> {
     let mut serializer = url::form_urlencoded::Serializer::new(String::new());
 
@@ -299,7 +297,7 @@ fn encode_uri(endpoint: &str, path: &str, pairs: &[(&str, Option<String>)]) -> c
         format!("{}/{}?{}", endpoint, path, serializer.finish())
     };
 
-    if url.ends_with("?") {
+    if url.ends_with('?') {
         url.pop();
     }
 
@@ -359,10 +357,10 @@ pub mod test_util {
 
         split = split[1].splitn(3, ' ').collect::<Vec<&str>>();
 
-        return (measurement, split[0], split[1].to_string(), split[2]);
+        (measurement, split[0], split[1].to_string(), split[2])
     }
 
-    pub(crate) fn onboarding_v2() {
+    pub(crate) async fn onboarding_v2() {
         let mut body = std::collections::HashMap::new();
         body.insert("username", "my-user");
         body.insert("password", "my-password");
@@ -380,12 +378,13 @@ pub mod test_util {
             .json(&body)
             .header("accept", "application/json")
             .send()
+            .await
             .unwrap();
 
         let status = res.status();
 
         assert!(
-            status == http::StatusCode::CREATED || status == http::StatusCode::UNPROCESSABLE_ENTITY,
+            status == StatusCode::CREATED || status == StatusCode::UNPROCESSABLE_ENTITY,
             format!("UnexpectedStatus: {}", status)
         );
     }
@@ -415,10 +414,10 @@ mod tests {
     "#;
         let config: InfluxDBTestConfig = toml::from_str(&config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
-        match settings {
-            Ok(_) => assert!(false, "Expected error"),
-            Err(e) => assert_eq!(format!("{}",e), "Unclear settings. Both version configured v1: InfluxDB1Settings { database: \"my-database\", consistency: None, retention_policy_name: None, username: None, password: None }, v2: InfluxDB2Settings { org: \"my-org\", bucket: \"my-bucket\", token: \"my-token\" }.".to_owned())
-        }
+        assert_eq!(
+            format!("{}", settings.expect_err("expected error")),
+            "Unclear settings. Both version configured v1: InfluxDB1Settings { database: \"my-database\", consistency: None, retention_policy_name: None, username: None, password: None }, v2: InfluxDB2Settings { org: \"my-org\", bucket: \"my-bucket\", token: \"my-token\" }.".to_owned()
+        );
     }
 
     #[test]
@@ -427,13 +426,10 @@ mod tests {
     "#;
         let config: InfluxDBTestConfig = toml::from_str(&config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
-        match settings {
-            Ok(_) => assert!(false, "Expected error"),
-            Err(e) => assert_eq!(
-                format!("{}", e),
-                "InfluxDB v1 or v2 should be configured as endpoint.".to_owned()
-            ),
-        }
+        assert_eq!(
+            format!("{}", settings.expect_err("expected error")),
+            "InfluxDB v1 or v2 should be configured as endpoint.".to_owned()
+        );
     }
 
     #[test]
@@ -544,6 +540,45 @@ mod tests {
     }
 
     #[test]
+    fn test_encode_fields_v1() {
+        let fields = vec![
+            (
+                "field_string".to_owned(),
+                Field::String("string value".to_owned()),
+            ),
+            (
+                "field_string_escape".to_owned(),
+                Field::String("string\\val\"ue".to_owned()),
+            ),
+            ("field_float".to_owned(), Field::Float(123.45)),
+            ("field_unsigned_int".to_owned(), Field::UnsignedInt(657)),
+            ("field_int".to_owned(), Field::Int(657646)),
+            ("field_bool_true".to_owned(), Field::Bool(true)),
+            ("field_bool_false".to_owned(), Field::Bool(false)),
+            ("escape key".to_owned(), Field::Float(10.0)),
+        ]
+        .into_iter()
+        .collect();
+
+        let mut value = String::new();
+        encode_fields(ProtocolVersion::V1, fields, &mut value);
+        assert_fields(
+            value,
+            [
+                "escape\\ key=10",
+                "field_float=123.45",
+                "field_string=\"string value\"",
+                "field_string_escape=\"string\\\\val\\\"ue\"",
+                "field_unsigned_int=657i",
+                "field_int=657646i",
+                "field_bool_true=true",
+                "field_bool_false=false",
+            ]
+            .to_vec(),
+        )
+    }
+
+    #[test]
     fn test_encode_fields() {
         let fields = vec![
             (
@@ -565,7 +600,7 @@ mod tests {
         .collect();
 
         let mut value = String::new();
-        encode_fields(fields, &mut value);
+        encode_fields(ProtocolVersion::V2, fields, &mut value);
         assert_fields(
             value,
             [
@@ -606,12 +641,6 @@ mod tests {
         let start = Utc::now().timestamp_nanos();
         assert_eq!(encode_timestamp(Some(ts())), 1542182950000000011);
         assert!(encode_timestamp(None) >= start)
-    }
-
-    #[test]
-    fn test_encode_namespace() {
-        assert_eq!(encode_namespace("services", "status"), "services.status");
-        assert_eq!(encode_namespace("", "status"), "status")
     }
 
     #[test]
@@ -678,17 +707,21 @@ mod tests {
 #[cfg(feature = "influxdb-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use crate::sinks::influxdb::test_util::{onboarding_v2, BUCKET, DATABASE, ORG, TOKEN};
-    use crate::sinks::influxdb::{healthcheck, InfluxDB1Settings, InfluxDB2Settings};
-    use crate::test_util::runtime;
-    use crate::topology::SinkContext;
+    use crate::{
+        config::SinkContext,
+        sinks::influxdb::{
+            healthcheck,
+            test_util::{onboarding_v2, BUCKET, DATABASE, ORG, TOKEN},
+            InfluxDB1Settings, InfluxDB2Settings,
+        },
+        sinks::util::http::HttpClient,
+    };
 
-    #[test]
-    fn influxdb2_healthchecks_ok() {
-        onboarding_v2();
+    #[tokio::test]
+    async fn influxdb2_healthchecks_ok() {
+        onboarding_v2().await;
 
-        let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let endpoint = "http://localhost:9999".to_string();
         let influxdb1_settings = None;
         let influxdb2_settings = Some(InfluxDB2Settings {
@@ -696,23 +729,19 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
         });
+        let client = HttpClient::new(cx.resolver(), None).unwrap();
 
-        let healthcheck = healthcheck(
-            endpoint,
-            influxdb1_settings,
-            influxdb2_settings,
-            cx.resolver(),
-        )
-        .unwrap();
-        rt.block_on(healthcheck).unwrap();
+        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+            .unwrap()
+            .await
+            .unwrap();
     }
 
-    #[test]
-    fn influxdb2_healthchecks_fail() {
-        onboarding_v2();
+    #[tokio::test]
+    async fn influxdb2_healthchecks_fail() {
+        onboarding_v2().await;
 
-        let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let endpoint = "http://not_exist:9999".to_string();
         let influxdb1_settings = None;
         let influxdb2_settings = Some(InfluxDB2Settings {
@@ -720,20 +749,17 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
         });
-        let healthcheck = healthcheck(
-            endpoint,
-            influxdb1_settings,
-            influxdb2_settings,
-            cx.resolver(),
-        )
-        .unwrap();
-        rt.block_on(healthcheck).unwrap_err();
+        let client = HttpClient::new(cx.resolver(), None).unwrap();
+
+        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+            .unwrap()
+            .await
+            .unwrap_err();
     }
 
-    #[test]
-    fn influxdb1_healthchecks_ok() {
-        let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+    #[tokio::test]
+    async fn influxdb1_healthchecks_ok() {
+        let cx = SinkContext::new_test();
         let endpoint = "http://localhost:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {
             database: DATABASE.to_string(),
@@ -743,21 +769,17 @@ mod integration_tests {
             password: None,
         });
         let influxdb2_settings = None;
+        let client = HttpClient::new(cx.resolver(), None).unwrap();
 
-        let healthcheck = healthcheck(
-            endpoint,
-            influxdb1_settings,
-            influxdb2_settings,
-            cx.resolver(),
-        )
-        .unwrap();
-        rt.block_on(healthcheck).unwrap();
+        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+            .unwrap()
+            .await
+            .unwrap();
     }
 
-    #[test]
-    fn influxdb1_healthchecks_fail() {
-        let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+    #[tokio::test]
+    async fn influxdb1_healthchecks_fail() {
+        let cx = SinkContext::new_test();
         let endpoint = "http://not_exist:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {
             database: DATABASE.to_string(),
@@ -767,14 +789,11 @@ mod integration_tests {
             password: None,
         });
         let influxdb2_settings = None;
+        let client = HttpClient::new(cx.resolver(), None).unwrap();
 
-        let healthcheck = healthcheck(
-            endpoint,
-            influxdb1_settings,
-            influxdb2_settings,
-            cx.resolver(),
-        )
-        .unwrap();
-        rt.block_on(healthcheck).unwrap_err();
+        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+            .unwrap()
+            .await
+            .unwrap_err();
     }
 }

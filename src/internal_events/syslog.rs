@@ -8,7 +8,7 @@ pub struct SyslogEventReceived {
 
 impl InternalEvent for SyslogEventReceived {
     fn emit_logs(&self) {
-        trace!(message = "received line.", byte_size = %self.byte_size);
+        trace!(message = "Received line.", byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {
@@ -30,11 +30,30 @@ pub struct SyslogUdpReadError {
 
 impl InternalEvent for SyslogUdpReadError {
     fn emit_logs(&self) {
-        error!(message = "error reading datagram.", error = %self.error);
+        error!(message = "Error reading datagram.", error = %self.error, rate_limit_secs = 10);
     }
 
     fn emit_metrics(&self) {
-        counter!("syslog_udp_read_errors", 1,
+        counter!("udp_read_errors", 1,
+            "component_kind" => "source",
+            "component_type" => "syslog",
+            "mode" => "udp",
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct SyslogUdpUtf8Error {
+    pub error: std::str::Utf8Error,
+}
+
+impl InternalEvent for SyslogUdpUtf8Error {
+    fn emit_logs(&self) {
+        error!(message = "Error converting bytes to UTF8 string in UDP mode.", error = %self.error, rate_limit_secs = 10);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("udp_utf8_convert_errors", 1,
             "component_kind" => "source",
             "component_type" => "syslog",
             "mode" => "udp",

@@ -13,7 +13,7 @@ use tracing::{field, span, Event, Id, Metadata};
 use tracing_limit::Limit;
 use tracing_subscriber::layer::SubscriberExt;
 
-const INPUTS: &'static [usize] = &[1, 100, 500, 1000];
+const INPUTS: &[usize] = &[1, 100, 500, 1000];
 
 fn bench(c: &mut Criterion) {
     c.bench_function_over_inputs(

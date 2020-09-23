@@ -18,7 +18,7 @@ fn main() {
         // This should print every 2 events
         for i in 0..40 {
             info!(message = "hello, world!", count = &i, rate_limit_secs = 5);
-            trace!("this field is not rate limited!");
+            trace!("This field is not rate limited!");
             std::thread::sleep(std::time::Duration::from_millis(1000));
         }
     })

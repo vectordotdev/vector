@@ -1,8 +1,9 @@
 use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    internal_events::{SwimlanesEventDiscarded, SwimlanesEventProcessed},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -48,8 +49,10 @@ impl Swimlane {
 impl Transform for Swimlane {
     fn transform(&mut self, event: Event) -> Option<Event> {
         if self.condition.check(&event) {
+            emit!(SwimlanesEventProcessed);
             Some(event)
         } else {
+            emit!(SwimlanesEventDiscarded);
             None
         }
     }

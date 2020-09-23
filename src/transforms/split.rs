@@ -1,7 +1,8 @@
 use super::Transform;
 use crate::{
-    event::{self, Event},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::Event,
+    internal_events::{SplitConvertFailed, SplitEventProcessed, SplitFieldMissing},
     types::{parse_check_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -29,7 +30,7 @@ impl TransformConfig for SplitConfig {
         let field = self
             .field
             .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+            .unwrap_or(&crate::config::log_schema().message_key());
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)
             .map_err(|err| format!("{}", err))?;
@@ -101,16 +102,12 @@ impl Transform for Split {
                 .iter()
                 .zip(split(value, self.separator.clone()).into_iter())
             {
-                match conversion.convert(value.as_bytes().into()) {
+                match conversion.convert(value.as_bytes().to_vec().into()) {
                     Ok(value) => {
                         event.as_mut_log().insert(name.clone(), value);
                     }
                     Err(error) => {
-                        debug!(
-                            message = "Could not convert types.",
-                            name = &name[..],
-                            %error
-                        );
+                        emit!(SplitConvertFailed { field: name, error });
                     }
                 }
             }
@@ -118,11 +115,10 @@ impl Transform for Split {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            debug!(
-                message = "Field does not exist.",
-                field = self.field.as_ref(),
-            );
+            emit!(SplitFieldMissing { field: &self.field });
         };
+
+        emit!(SplitEventProcessed);
 
         Some(event)
     }
@@ -143,8 +139,7 @@ mod tests {
     use super::SplitConfig;
     use crate::event::{LogEvent, Value};
     use crate::{
-        test_util::runtime,
-        topology::config::{TransformConfig, TransformContext},
+        config::{TransformConfig, TransformContext},
         Event,
     };
     use string_cache::DefaultAtom as Atom;
@@ -178,7 +173,6 @@ mod tests {
         drop_field: bool,
         types: &[(&str, &str)],
     ) -> LogEvent {
-        let rt = runtime();
         let event = Event::from(text);
         let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<Atom>>();
         let field = field.map(|f| f.into());
@@ -188,9 +182,8 @@ mod tests {
             field,
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
-            ..Default::default()
         }
-        .build(TransformContext::new_test(rt.executor()))
+        .build(TransformContext::new_test())
         .unwrap();
 
         parser.transform(event).unwrap().into_log()

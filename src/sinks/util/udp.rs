@@ -1,25 +1,18 @@
-use super::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSink};
+use super::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSinkOld};
 use crate::{
+    config::SinkContext,
     dns::{Resolver, ResolverFuture},
-    sinks::{Healthcheck, RouterSink},
-    topology::config::SinkContext,
+    sinks::{Healthcheck, VectorSink},
 };
 use bytes::Bytes;
-use futures01::{future, stream::iter_ok, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use futures::{future, FutureExt, TryFutureExt};
+use futures01::{stream::iter_ok, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::io;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
-use std::time::{Duration, Instant};
-use tokio01::timer::Delay;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket};
+use std::time::Duration;
+use tokio::time::{delay_for, Delay};
 use tokio_retry::strategy::ExponentialBackoff;
 use tracing::field;
-
-#[derive(Debug, Snafu)]
-pub enum UdpBuildError {
-    #[snafu(display("failed to create UDP listener socket, error = {:?}", source))]
-    SocketBind { source: io::Error },
-}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -33,34 +26,24 @@ impl UdpSinkConfig {
         Self { address, encoding }
     }
 
-    pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    pub fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
 
-        let sink = raw_udp(host, port, self.encoding.clone(), cx)?;
+        let encoding = self.encoding.clone();
+        let sink = UdpSink::new(host, port, cx.resolver());
+        let sink = StreamSinkOld::new(sink, cx.acker())
+            .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
         let healthcheck = udp_healthcheck();
 
-        Ok((sink, healthcheck))
+        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
 }
 
-pub fn raw_udp(
-    host: String,
-    port: u16,
-    encoding: EncodingConfig<Encoding>,
-    cx: SinkContext,
-) -> Result<RouterSink, UdpBuildError> {
-    let sink = UdpSink::new(host, port, cx.resolver())?;
-    let sink = StreamSink::new(sink, cx.acker());
-    Ok(Box::new(sink.with_flat_map(move |event| {
-        iter_ok(encode_event(event, &encoding))
-    })))
-}
-
 fn udp_healthcheck() -> Healthcheck {
-    Box::new(future::ok(()))
+    future::ok(()).boxed()
 }
 
 pub struct UdpSink {
@@ -70,29 +53,27 @@ pub struct UdpSink {
     state: State,
     span: tracing::Span,
     backoff: ExponentialBackoff,
-    socket: UdpSocket,
 }
 
 enum State {
     Initializing,
     ResolvingDns(ResolverFuture),
     ResolvedDns(SocketAddr),
-    Backoff(Delay),
+    Backoff(Box<dyn Future<Item = (), Error = ()> + Send>),
+    Connected(UdpSocket),
 }
 
 impl UdpSink {
-    pub fn new(host: String, port: u16, resolver: Resolver) -> Result<Self, UdpBuildError> {
-        let from = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0);
+    pub fn new(host: String, port: u16, resolver: Resolver) -> Self {
         let span = info_span!("connection", %host, %port);
-        Ok(Self {
+        Self {
             host,
             port,
             resolver,
             state: State::Initializing,
             span,
             backoff: Self::fresh_backoff(),
-            socket: UdpSocket::bind(&from).context(SocketBind)?,
-        })
+        }
     }
 
     fn fresh_backoff() -> ExponentialBackoff {
@@ -103,15 +84,20 @@ impl UdpSink {
     }
 
     fn next_delay(&mut self) -> Delay {
-        Delay::new(Instant::now() + self.backoff.next().unwrap())
+        delay_for(self.backoff.next().unwrap())
     }
 
-    fn poll_inner(&mut self) -> Result<Async<SocketAddr>, ()> {
+    fn next_delay01(&mut self) -> Box<dyn Future<Item = (), Error = ()> + Send> {
+        let delay = self.next_delay();
+        Box::new(async move { Ok(delay.await) }.boxed().compat())
+    }
+
+    fn poll_inner(&mut self) -> Result<Async<&mut UdpSocket>, ()> {
         loop {
             self.state = match self.state {
                 State::Initializing => {
-                    debug!(message = "resolving dns", host = %self.host);
-                    State::ResolvingDns(self.resolver.lookup_ip(&self.host))
+                    debug!(message = "resolving DNS", host = %self.host);
+                    State::ResolvingDns(self.resolver.lookup_ip_01(self.host.clone()))
                 }
                 State::ResolvingDns(ref mut dns) => match dns.poll() {
                     Ok(Async::Ready(mut addrs)) => match addrs.next() {
@@ -122,24 +108,46 @@ impl UdpSink {
                         }
                         None => {
                             error!(message = "DNS resolved no addresses", host = %self.host);
-                            State::Backoff(self.next_delay())
+                            State::Backoff(self.next_delay01())
                         }
                     },
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Err(error) => {
                         error!(message = "unable to resolve DNS", host = %self.host, %error);
-                        State::Backoff(self.next_delay())
+                        State::Backoff(self.next_delay01())
                     }
                 },
-                State::ResolvedDns(addr) => return Ok(Async::Ready(addr)),
+                State::ResolvedDns(addr) => {
+                    let bind_address = find_bind_address(&addr);
+                    match UdpSocket::bind(bind_address) {
+                        Ok(socket) => match socket.connect(addr) {
+                            Ok(()) => State::Connected(socket),
+                            Err(error) => {
+                                error!(message = "unable to connect UDP socket", %addr, %error);
+                                State::Backoff(self.next_delay01())
+                            }
+                        },
+                        Err(error) => {
+                            error!(message = "unable to bind local address", addr = %bind_address, %error);
+                            State::Backoff(self.next_delay01())
+                        }
+                    }
+                }
+                State::Connected(ref mut socket) => return Ok(Async::Ready(socket)),
                 State::Backoff(ref mut delay) => match delay.poll() {
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
-                    // Err can only occur if the tokio runtime has been shutdown or if more than 2^63 timers have been created
-                    Err(err) => unreachable!(err),
                     Ok(Async::Ready(())) => State::Initializing,
+                    Err(_) => unreachable!(),
                 },
             }
         }
+    }
+}
+
+fn find_bind_address(remote_addr: &SocketAddr) -> SocketAddr {
+    match remote_addr {
+        SocketAddr::V4(_) => SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0),
+        SocketAddr::V6(_) => SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0),
     }
 }
 
@@ -152,15 +160,16 @@ impl Sink for UdpSink {
         let _enter = span.enter();
 
         match self.poll_inner() {
-            Ok(Async::Ready(address)) => {
+            Ok(Async::Ready(socket)) => {
                 debug!(
                     message = "sending event.",
                     bytes = &field::display(line.len())
                 );
-                match self.socket.send_to(&line, address) {
+                match socket.send(&line) {
                     Err(error) => {
+                        self.state = State::Backoff(self.next_delay01());
                         error!(message = "send failed", %error);
-                        Err(())
+                        Ok(AsyncSink::NotReady(line))
                     }
                     Ok(_) => Ok(AsyncSink::Ready),
                 }

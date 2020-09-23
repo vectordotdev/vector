@@ -1,10 +1,10 @@
 use bytes::{BufMut, BytesMut};
 use codec::BytesDelimitedCodec;
 use std::collections::HashMap;
-use tokio_codec::{Decoder, Encoder};
+use tokio_util::codec::{Decoder, Encoder};
 
 #[test]
-fn bytes_delim_decod() {
+fn bytes_delim_decode() {
     let mut codec = BytesDelimitedCodec::new(b'\n');
     let buf = &mut BytesMut::new();
     buf.put_slice(b"abc\n");
@@ -16,7 +16,7 @@ fn bytes_delim_encode() {
     let mut codec = BytesDelimitedCodec::new(b'\n');
 
     let mut buf = BytesMut::new();
-    codec.encode("abc".into(), &mut buf).unwrap();
+    codec.encode(b"abc", &mut buf).unwrap();
 
     assert_eq!(b"abc\n", &buf[..]);
 }
@@ -48,9 +48,9 @@ fn bytes_decoder_discard_repeat() {
     let buf = &mut BytesMut::new();
 
     buf.reserve(200);
-    buf.put("aa");
+    buf.put(&b"aa"[..]);
     assert!(codec.decode(buf).unwrap().is_none());
-    buf.put("a");
+    buf.put(&b"a"[..]);
     assert!(codec.decode(buf).unwrap().is_none());
 }
 
@@ -137,7 +137,7 @@ fn bytes_decode_json_multiline() {
     buf.extend(events.to_string().as_bytes());
 
     let mut i = 0;
-    while let Some(_) = codec.decode(buf).unwrap() {
+    while codec.decode(buf).unwrap().is_some() {
         i += 1;
     }
 

@@ -1,16 +1,18 @@
 use crate::{
-    event,
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::{Event, LogEvent, Value},
+    internal_events::{JournaldEventReceived, JournaldInvalidRecord},
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    Pipeline,
 };
+use bytes::Bytes;
 use chrono::TimeZone;
 use futures::{
     compat::Future01CompatExt,
     executor::block_on,
     future::{select, Either, FutureExt, TryFutureExt},
 };
-use futures01::{future, sync::mpsc, Future, Sink};
+use futures01::{future, Future, Sink};
 use lazy_static::lazy_static;
 use nix::{
     sys::signal::{kill, Signal},
@@ -25,12 +27,17 @@ use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::iter::FromIterator;
 use std::path::PathBuf;
 use std::process::{Child, ChildStdout, Command, Stdio};
-use std::time;
+use std::str::FromStr;
 use string_cache::DefaultAtom as Atom;
-use tokio::{task::spawn_blocking, time::delay_for};
+use tokio::{
+    task::spawn_blocking,
+    time::{delay_for, Duration},
+};
 use tracing::{dispatcher, field};
 
 const DEFAULT_BATCH_SIZE: usize = 16;
+
+const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
 
 lazy_static! {
     static ref CURSOR: Atom = Atom::from("__CURSOR");
@@ -65,6 +72,8 @@ pub struct JournaldConfig {
     pub data_dir: Option<PathBuf>,
     pub batch_size: Option<usize>,
     pub journalctl_path: Option<PathBuf>,
+    #[serde(default)]
+    pub remap_priority: bool,
 }
 
 inventory::submit! {
@@ -80,7 +89,7 @@ impl SourceConfig for JournaldConfig {
         name: &str,
         globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
@@ -94,19 +103,22 @@ impl SourceConfig for JournaldConfig {
             (false, _) => &self.include_units,
         };
 
-        let include_units: HashSet<String> = include_units.iter().map(fixup_unit).collect();
-        let exclude_units: HashSet<String> = self.exclude_units.iter().map(fixup_unit).collect();
+        let include_units: HashSet<String> = include_units.iter().map(|s| fixup_unit(&s)).collect();
+        let exclude_units: HashSet<String> =
+            self.exclude_units.iter().map(|s| fixup_unit(&s)).collect();
         if let Some(unit) = include_units
             .iter()
-            .filter(|unit| exclude_units.contains(&unit[..]))
-            .next()
+            .find(|unit| exclude_units.contains(&unit[..]))
         {
             let unit = unit.into();
             return Err(BuildError::DuplicatedUnit { unit }.into());
         }
 
-        let checkpointer = Checkpointer::new(data_dir)
-            .map_err(|err| format!("Unable to open checkpoint file: {}", err))?;
+        let mut checkpoint = data_dir;
+        checkpoint.push(CHECKPOINT_FILENAME);
+        let checkpointer = Checkpointer::new(checkpoint.clone()).map_err(|error| {
+            format!("Unable to open checkpoint file {:?}: {}", checkpoint, error)
+        })?;
 
         self.source::<Journalctl>(
             out,
@@ -115,6 +127,7 @@ impl SourceConfig for JournaldConfig {
             include_units,
             exclude_units,
             batch_size,
+            self.remap_priority,
         )
     }
 
@@ -130,12 +143,13 @@ impl SourceConfig for JournaldConfig {
 impl JournaldConfig {
     fn source<J>(
         &self,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
         shutdown: ShutdownSignal,
         mut checkpointer: Checkpointer,
         include_units: HashSet<String>,
         exclude_units: HashSet<String>,
         batch_size: usize,
+        remap_priority: bool,
     ) -> crate::Result<super::Source>
     where
         J: JournalSource + Send + 'static,
@@ -169,6 +183,7 @@ impl JournaldConfig {
                 shutdown: shutdown.clone(),
                 checkpointer,
                 batch_size,
+                remap_priority,
             };
             let span = info_span!("journald-server");
             let dispatcher = dispatcher::get_default(|d| d.clone());
@@ -177,7 +192,7 @@ impl JournaldConfig {
             })
             .boxed()
             .compat()
-            .map_err(|error| error!(message="Journald server unexpectedly stopped.",%error))
+            .map_err(|error| error!(message = "Journald server unexpectedly stopped.", %error))
             .select(shutdown.map(move |_| close()))
             .map(|_| ())
             .map_err(|_| ())
@@ -189,10 +204,10 @@ fn create_event(record: Record) -> Event {
     let mut log = LogEvent::from_iter(record);
     // Convert some journald-specific field names into Vector standard ones.
     if let Some(message) = log.remove(&MESSAGE) {
-        log.insert(event::log_schema().message_key().clone(), message);
+        log.insert(log_schema().message_key().clone(), message);
     }
     if let Some(host) = log.remove(&HOSTNAME) {
-        log.insert(event::log_schema().host_key().clone(), host);
+        log.insert(log_schema().host_key().clone(), host);
     }
     // Translate the timestamp, and so leave both old and new names.
     if let Some(timestamp) = log
@@ -206,24 +221,25 @@ fn create_event(record: Record) -> Event {
                     (timestamp % 1_000_000) as u32 * 1_000,
                 );
                 log.insert(
-                    event::log_schema().timestamp_key().clone(),
+                    log_schema().timestamp_key().clone(),
                     Value::Timestamp(timestamp),
                 );
             }
         }
     }
     // Add source type
-    log.try_insert(event::log_schema().source_type_key(), "journald");
+    log.try_insert(log_schema().source_type_key(), Bytes::from("journald"));
 
     log.into()
 }
 
 /// Map the given unit name into a valid systemd unit
 /// by appending ".service" if no extension is present.
-fn fixup_unit(unit: &String) -> String {
-    match unit.contains('.') {
-        true => unit.into(),
-        false => format!("{}.service", unit),
+fn fixup_unit(unit: &str) -> String {
+    if unit.contains('.') {
+        unit.into()
+    } else {
+        format!("{}.service", unit)
     }
 }
 
@@ -307,6 +323,7 @@ struct JournaldServer<J, T> {
     shutdown: ShutdownSignal,
     checkpointer: Checkpointer,
     batch_size: usize,
+    remap_priority: bool,
 }
 
 impl<J, T> JournaldServer<J, T>
@@ -315,7 +332,7 @@ where
     T: Sink<SinkItem = Record, SinkError = ()>,
 {
     pub fn run(mut self) {
-        let timeout = time::Duration::from_millis(500); // arbitrary timeout
+        let timeout = Duration::from_millis(500); // arbitrary timeout
         let channel = &mut self.channel;
         let mut shutdown = self.shutdown.compat();
 
@@ -340,10 +357,10 @@ where
                     }
                 };
 
-                let mut record = match decode_record(&text) {
+                let mut record = match decode_record(&text, self.remap_priority) {
                     Ok(record) => record,
                     Err(error) => {
-                        error!(message = "Invalid record from journald, discarding", %error, %text);
+                        emit!(JournaldInvalidRecord { error, text });
                         continue;
                     }
                 };
@@ -358,6 +375,10 @@ where
                     continue;
                 }
 
+                emit!(JournaldEventReceived {
+                    byte_size: text.len()
+                });
+
                 match channel.send(record).wait() {
                     Ok(_) => {}
                     Err(()) => error!(message = "Could not send journald log"),
@@ -369,7 +390,8 @@ where
                     if let Err(err) = self.checkpointer.set(&cursor) {
                         error!(
                             message = "Could not set journald checkpoint.",
-                            error = field::display(&err)
+                            error = field::display(&err),
+                            filename = ?self.checkpointer.filename,
                         );
                     }
                 }
@@ -390,25 +412,28 @@ where
     }
 }
 
-fn decode_record(text: &str) -> Result<Record, JsonError> {
+fn decode_record(text: &str, remap: bool) -> Result<Record, JsonError> {
     let mut record = serde_json::from_str::<JsonValue>(&text)?;
     // journalctl will output non-ASCII messages using an array
     // of integers. Look for those messages and re-parse them.
     record.get_mut("MESSAGE").and_then(|message| {
         message
             .as_array()
-            .and_then(decode_array)
+            .and_then(|v| decode_array(&v))
             .map(|decoded| *message = decoded)
     });
+    if remap {
+        record.get_mut("PRIORITY").map(remap_priority);
+    }
     serde_json::from_value(record)
 }
 
-fn decode_array(array: &Vec<JsonValue>) -> Option<JsonValue> {
+fn decode_array(array: &[JsonValue]) -> Option<JsonValue> {
     // From the array of values, turn all the numbers into bytes, and
     // then the bytes into a string, but return None if any value in the
     // array was not a valid byte.
     array
-        .into_iter()
+        .iter()
         .map(|item| {
             item.as_u64().and_then(|num| match num {
                 num if num <= u8::max_value() as u64 => Some(num as u8),
@@ -417,6 +442,23 @@ fn decode_array(array: &Vec<JsonValue>) -> Option<JsonValue> {
         })
         .collect::<Option<Vec<u8>>>()
         .map(|array| String::from_utf8_lossy(&array).into())
+}
+
+fn remap_priority(priority: &mut JsonValue) {
+    if let Some(num) = priority.as_str().and_then(|s| usize::from_str(s).ok()) {
+        let text = match num {
+            0 => "EMERG",
+            1 => "ALERT",
+            2 => "CRIT",
+            3 => "ERR",
+            4 => "WARNING",
+            5 => "NOTICE",
+            6 => "INFO",
+            7 => "DEBUG",
+            _ => "UNKNOWN",
+        };
+        *priority = JsonValue::String(text.into());
+    }
 }
 
 /// Should the given unit name be filtered (excluded)?
@@ -434,21 +476,19 @@ fn filter_unit(
     }
 }
 
-const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
-
 struct Checkpointer {
     file: File,
+    filename: PathBuf,
 }
 
 impl Checkpointer {
-    fn new(mut filename: PathBuf) -> Result<Self, io::Error> {
-        filename.push(CHECKPOINT_FILENAME);
+    fn new(filename: PathBuf) -> Result<Self, io::Error> {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
-            .open(filename)?;
-        Ok(Checkpointer { file })
+            .open(&filename)?;
+        Ok(Checkpointer { file, filename })
     }
 
     fn set(&mut self, token: &str) -> Result<(), io::Error> {
@@ -484,10 +524,10 @@ mod checkpointer_tests {
     use tempfile::tempdir;
 
     fn open_read_close<F: AsRef<Path> + Debug>(path: F) -> Vec<u8> {
-        let mut file = File::open(&path).expect(&format!("Could not open {:?}", path));
+        let mut file = File::open(&path).unwrap_or_else(|_| panic!("Could not open {:?}", path));
         let mut buf = Vec::<u8>::new();
         file.read_to_end(&mut buf)
-            .expect(&format!("Could not read {:?}", path));
+            .unwrap_or_else(|_| panic!("Could not read {:?}", path));
         buf
     }
 
@@ -497,7 +537,7 @@ mod checkpointer_tests {
         let mut filename = tempdir.path().to_path_buf();
         filename.push(CHECKPOINT_FILENAME);
         let mut checkpointer =
-            Checkpointer::new(tempdir.path().to_path_buf()).expect("Creating checkpointer failed!");
+            Checkpointer::new(filename.clone()).expect("Creating checkpointer failed!");
 
         assert!(checkpointer.get().unwrap().is_none());
 
@@ -520,19 +560,20 @@ mod checkpointer_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::{block_on, runtime, shutdown_on_idle};
+    use crate::Pipeline;
     use futures01::stream::Stream;
-    use std::io::{self, BufReader, Cursor};
-    use std::iter::FromIterator;
-    use std::time::Duration;
+    use std::{
+        io::{self, BufReader, Cursor},
+        iter::FromIterator,
+    };
     use tempfile::tempdir;
-    use tokio01::util::FutureExt;
+    use tokio::time::timeout;
 
-    const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001"}
-{"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002"}
-{"_SYSTEMD_UNIT":"badunit.service","MESSAGE":[194,191,72,101,108,108,111,63],"__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140003"}
-{"_SYSTEMD_UNIT":"stdout","MESSAGE":"Missing timestamp","__CURSOR":"3","__REALTIME_TIMESTAMP":"1578529839140004"}
-{"_SYSTEMD_UNIT":"stdout","MESSAGE":"Different timestamps","__CURSOR":"4","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004"}
+    const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
+{"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}
+{"_SYSTEMD_UNIT":"badunit.service","MESSAGE":[194,191,72,101,108,108,111,63],"__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140003","PRIORITY":"5"}
+{"_SYSTEMD_UNIT":"stdout","MESSAGE":"Missing timestamp","__CURSOR":"3","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"2"}
+{"_SYSTEMD_UNIT":"stdout","MESSAGE":"Different timestamps","__CURSOR":"4","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"3"}
 "#;
 
     struct FakeJournal {
@@ -575,14 +616,15 @@ mod tests {
         }
     }
 
-    fn run_journal(iunits: &[&str], xunits: &[&str], cursor: Option<&str>) -> Vec<Event> {
-        let (tx, rx) = futures01::sync::mpsc::channel(10);
+    async fn run_journal(iunits: &[&str], xunits: &[&str], cursor: Option<&str>) -> Vec<Event> {
+        let (tx, rx) = Pipeline::new_test();
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
         let tempdir = tempdir().unwrap();
-        let mut checkpointer =
-            Checkpointer::new(tempdir.path().to_path_buf()).expect("Creating checkpointer failed!");
-        let include_units = HashSet::<String>::from_iter(iunits.into_iter().map(|&s| s.into()));
-        let exclude_units = HashSet::<String>::from_iter(xunits.into_iter().map(|&s| s.into()));
+        let mut filename = tempdir.path().to_path_buf();
+        filename.push(CHECKPOINT_FILENAME);
+        let mut checkpointer = Checkpointer::new(filename).expect("Creating checkpointer failed!");
+        let include_units = HashSet::<String>::from_iter(iunits.iter().map(|&s| s.into()));
+        let exclude_units = HashSet::<String>::from_iter(xunits.iter().map(|&s| s.into()));
 
         if let Some(cursor) = cursor {
             checkpointer.set(cursor).expect("Could not set checkpoint");
@@ -597,46 +639,50 @@ mod tests {
                 include_units,
                 exclude_units,
                 DEFAULT_BATCH_SIZE,
+                true,
             )
             .expect("Creating journald source failed");
-        let mut rt = runtime();
-        rt.spawn(source);
+        tokio::spawn(source.compat());
 
-        std::thread::sleep(Duration::from_millis(100));
+        delay_for(Duration::from_millis(100)).await;
         drop(trigger);
-        shutdown_on_idle(rt);
 
-        block_on(rx.collect().timeout(Duration::from_secs(1))).expect("Unclosed channel")
+        timeout(Duration::from_secs(1), rx.collect().compat())
+            .await
+            .expect("Unclosed channel")
+            .unwrap()
     }
 
-    #[test]
-    fn reads_journal() {
-        let received = run_journal(&[], &[], None);
+    #[tokio::test]
+    async fn reads_journal() {
+        let received = run_journal(&[], &[], None).await;
         assert_eq!(received.len(), 5);
         assert_eq!(
             message(&received[0]),
             Value::Bytes("System Initialization".into())
         );
         assert_eq!(
-            received[0].as_log()[event::log_schema().source_type_key()],
+            received[0].as_log()[log_schema().source_type_key()],
             "journald".into()
         );
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140001000));
+        assert_eq!(priority(&received[0]), Value::Bytes("INFO".into()));
         assert_eq!(message(&received[1]), Value::Bytes("unit message".into()));
         assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140002000));
+        assert_eq!(priority(&received[1]), Value::Bytes("DEBUG".into()));
     }
 
-    #[test]
-    fn includes_units() {
-        let received = run_journal(&["unit.service"], &[], None);
+    #[tokio::test]
+    async fn includes_units() {
+        let received = run_journal(&["unit.service"], &[], None).await;
         assert_eq!(received.len(), 1);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
 
-    #[test]
-    fn excludes_units() {
-        let received = run_journal(&[], &["unit.service", "badunit.service"], None);
+    #[tokio::test]
+    async fn excludes_units() {
+        let received = run_journal(&[], &["unit.service", "badunit.service"], None).await;
         assert_eq!(received.len(), 3);
         assert_eq!(
             message(&received[0]),
@@ -652,24 +698,24 @@ mod tests {
         );
     }
 
-    #[test]
-    fn handles_checkpoint() {
-        let received = run_journal(&[], &[], Some("1"));
+    #[tokio::test]
+    async fn handles_checkpoint() {
+        let received = run_journal(&[], &[], Some("1")).await;
         assert_eq!(received.len(), 4);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
 
-    #[test]
-    fn parses_array_messages() {
-        let received = run_journal(&["badunit.service"], &[], None);
+    #[tokio::test]
+    async fn parses_array_messages() {
+        let received = run_journal(&["badunit.service"], &[], None).await;
         assert_eq!(received.len(), 1);
         assert_eq!(message(&received[0]), Value::Bytes("¿Hello?".into()));
     }
 
-    #[test]
-    fn handles_missing_timestamp() {
-        let received = run_journal(&["stdout"], &[], None);
+    #[tokio::test]
+    async fn handles_missing_timestamp() {
+        let received = run_journal(&["stdout"], &[], None).await;
         assert_eq!(received.len(), 2);
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140004000));
         assert_eq!(timestamp(&received[1]), value_ts(1578529839, 140005000));
@@ -690,22 +736,26 @@ mod tests {
         assert_eq!(filter_unit(Some(&one), &includes, &empty), false);
         assert_eq!(filter_unit(Some(&one), &empty, &excludes), false);
         assert_eq!(filter_unit(Some(&one), &includes, &excludes), false);
-        let bar = String::from("bar");
-        assert_eq!(filter_unit(Some(&bar), &empty, &empty), false);
-        assert_eq!(filter_unit(Some(&bar), &includes, &empty), true);
-        assert_eq!(filter_unit(Some(&bar), &empty, &excludes), true);
-        assert_eq!(filter_unit(Some(&bar), &includes, &excludes), true);
+        let two = String::from("bar");
+        assert_eq!(filter_unit(Some(&two), &empty, &empty), false);
+        assert_eq!(filter_unit(Some(&two), &includes, &empty), true);
+        assert_eq!(filter_unit(Some(&two), &empty, &excludes), true);
+        assert_eq!(filter_unit(Some(&two), &includes, &excludes), true);
     }
 
     fn message(event: &Event) -> Value {
-        event.as_log()[&event::log_schema().message_key()].clone()
+        event.as_log()[&log_schema().message_key()].clone()
     }
 
     fn timestamp(event: &Event) -> Value {
-        event.as_log()[&event::log_schema().timestamp_key()].clone()
+        event.as_log()[&log_schema().timestamp_key()].clone()
     }
 
     fn value_ts(secs: i64, usecs: u32) -> Value {
         Value::Timestamp(chrono::Utc.timestamp(secs, usecs))
+    }
+
+    fn priority(event: &Event) -> Value {
+        event.as_log()[&"PRIORITY".into()].clone()
     }
 }

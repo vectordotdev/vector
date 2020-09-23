@@ -1,8 +1,11 @@
 use super::Transform;
 use crate::{
-    event::{self, Event, Value},
-    internal_events::{RegexEventProcessed, RegexFailedMatch, RegexMissingField},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::{Event, Value},
+    internal_events::{
+        RegexParserConversionFailed, RegexParserEventProcessed, RegexParserFailedMatch,
+        RegexParserMissingField, RegexParserTargetExists,
+    },
     types::{parse_check_conversion_map, Conversion},
 };
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
@@ -50,20 +53,82 @@ impl TransformConfig for RegexParserConfig {
     }
 
     fn transform_type(&self) -> &'static str {
-        "regex"
+        "regex_parser"
     }
 }
 
 pub struct RegexParser {
     regexset: RegexSet,
-    patterns: Vec<Regex>,
+    patterns: Vec<CompiledRegex>, // indexes correspend to RegexSet
     field: Atom,
     drop_field: bool,
     drop_failed: bool,
     target_field: Option<Atom>,
     overwrite_target: bool,
+}
+
+struct CompiledRegex {
+    regex: Regex,
     capture_names: Vec<(usize, Atom, Conversion)>,
-    capture_locs: Vec<CaptureLocations>,
+    capture_locs: CaptureLocations,
+}
+
+impl CompiledRegex {
+    fn new(regex: Regex, types: &HashMap<Atom, Conversion>) -> CompiledRegex {
+        // Calculate the location (index into the capture locations) of
+        // each named capture, and the required type coercion.
+        let capture_names = regex
+            .capture_names()
+            .enumerate()
+            .filter_map(|(idx, cn)| {
+                cn.map(|cn| {
+                    let cn = Atom::from(cn);
+                    let conv = types.get(&cn).unwrap_or(&Conversion::Bytes);
+                    (idx, cn, conv.clone())
+                })
+            })
+            .collect::<Vec<_>>();
+        let capture_locs = regex.capture_locations();
+        CompiledRegex {
+            regex,
+            capture_names,
+            capture_locs,
+        }
+    }
+
+    /// Returns a list of captures (name, value) or None if the regex does not
+    /// match
+    fn captures<'a>(
+        &'a mut self,
+        value: &'a [u8],
+    ) -> Option<impl Iterator<Item = (Atom, Value)> + 'a> {
+        match self.regex.captures_read(&mut self.capture_locs, value) {
+            Some(_) => {
+                let capture_locs = &self.capture_locs;
+                let values =
+                    self.capture_names
+                        .iter()
+                        .filter_map(move |(idx, name, conversion)| {
+                            capture_locs.get(*idx).and_then(|(start, end)| {
+                                let capture: Value = value[start..end].to_vec().into();
+
+                                match conversion.convert(capture) {
+                                    Ok(value) => Some((name.clone(), value)),
+                                    Err(error) => {
+                                        emit!(RegexParserConversionFailed { name, error });
+                                        None
+                                    }
+                                }
+                            })
+                        });
+                Some(values)
+            }
+            None => {
+                emit!(RegexParserFailedMatch { value });
+                None
+            }
+        }
+    }
 }
 
 impl RegexParser {
@@ -71,7 +136,7 @@ impl RegexParser {
         let field = config
             .field
             .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+            .unwrap_or(&crate::config::log_schema().message_key());
 
         let patterns = match (&config.regex, &config.patterns.len()) {
             (None, 0) => {
@@ -143,36 +208,20 @@ impl RegexParser {
         overwrite_target: bool,
         types: HashMap<Atom, Conversion>,
     ) -> Self {
-        // Build a buffer of the regex capture locations to avoid
+        // Build a buffer of the regex capture locations and names to avoid
         // repeated allocations.
-        let capture_locs = patterns
-            .iter()
-            .map(|regex| regex.capture_locations())
-            .collect();
-
-        // Calculate the location (index into the capture locations) of
-        // each named capture, and the required type coercion.
-        let capture_names: Vec<(usize, Atom, Conversion)> = patterns
-            .iter()
-            .map(|regex| {
-                let capture_names: Vec<(usize, Atom, Conversion)> = regex
-                    .capture_names()
-                    .enumerate()
-                    .filter_map(|(idx, cn)| {
-                        cn.map(|cn| {
-                            let cn: Atom = cn.into();
-                            let conv = types.get(&cn).unwrap_or(&Conversion::Bytes);
-                            (idx, cn, conv.clone())
-                        })
-                    })
-                    .collect();
-                capture_names
-            })
-            .flatten()
+        let patterns: Vec<CompiledRegex> = patterns
+            .into_iter()
+            .map(|regex| CompiledRegex::new(regex, &types))
             .collect();
 
         // Pre-calculate if the source field name should be dropped.
-        drop_field = drop_field && !capture_names.iter().any(|(_, f, _)| *f == field);
+        drop_field = drop_field
+            && !patterns
+                .iter()
+                .map(|p| &p.capture_names)
+                .flatten()
+                .any(|(_, f, _)| *f == field);
 
         Self {
             regexset,
@@ -182,8 +231,6 @@ impl RegexParser {
             drop_failed,
             target_field,
             overwrite_target,
-            capture_names,
-            capture_locs,
         }
     }
 }
@@ -192,77 +239,51 @@ impl Transform for RegexParser {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
         let value = log.get(&self.field).map(|s| s.as_bytes());
-        emit!(RegexEventProcessed);
+        emit!(RegexParserEventProcessed);
 
         if let Some(value) = &value {
-            let regex_id = self.regexset.matches(&value).into_iter().nth(0);
+            let regex_id = self.regexset.matches(&value).into_iter().next();
             let id = match regex_id {
                 Some(id) => id,
                 None => {
-                    emit!(RegexFailedMatch { value });
-                    if self.drop_failed {
-                        return None;
-                    } else {
-                        return Some(event);
-                    }
+                    emit!(RegexParserFailedMatch { value });
+                    return if self.drop_failed { None } else { Some(event) };
                 }
             };
 
-            let mut capture_locs = match self.capture_locs.get_mut(id) {
-                Some(capture_locs) => capture_locs,
-                None => {
-                    error!(message = "Cannot find capture locations for pattern", %id, rate_limit_secs = 30);
-                    return None;
-                }
-            };
+            let target_field = self.target_field.as_ref();
 
-            if self.patterns[id]
-                .captures_read(&mut capture_locs, &value)
-                .is_some()
-            {
+            let pattern = self
+                .patterns
+                .get_mut(id)
+                .expect("Mismatch between capture patterns and regexset");
+
+            if let Some(captures) = pattern.captures(&value) {
                 // Handle optional overwriting of the target field
-                if let Some(target_field) = &self.target_field {
+                if let Some(target_field) = target_field {
                     if log.contains(target_field) {
                         if self.overwrite_target {
                             log.remove(target_field);
                         } else {
-                            error!(message = "target field already exists", %target_field, rate_limit_secs = 30);
+                            emit!(RegexParserTargetExists { target_field });
                             return Some(event);
                         }
                     }
                 }
 
-                for (idx, name, conversion) in &self.capture_names {
-                    if let Some((start, end)) = capture_locs.get(*idx) {
-                        let capture: Value = value[start..end].into();
-                        match conversion.convert(capture) {
-                            Ok(value) => {
-                                let name = match &self.target_field {
-                                    Some(target) => Atom::from(format!("{}.{}", target, name)),
-                                    None => name.clone(),
-                                };
-                                log.insert(name, value);
-                            }
-                            Err(error) => {
-                                debug!(
-                                    message = "Could not convert types.",
-                                    name = &name[..],
-                                    %error,
-                                    rate_limit_secs = 30
-                                );
-                            }
-                        }
-                    }
-                }
+                log.extend(captures.map(|(name, value)| {
+                    let name = target_field
+                        .map(|target| Atom::from(format!("{}.{}", target, name)))
+                        .unwrap_or_else(|| name.clone());
+                    (name, value)
+                }));
                 if self.drop_field {
                     log.remove(&self.field);
                 }
                 return Some(event);
-            } else {
-                emit!(RegexFailedMatch { value });
             }
         } else {
-            emit!(RegexMissingField { field: &self.field });
+            emit!(RegexParserMissingField { field: &self.field });
         }
 
         if self.drop_failed {
@@ -278,13 +299,11 @@ mod tests {
     use super::RegexParserConfig;
     use crate::event::{LogEvent, Value};
     use crate::{
-        test_util::runtime,
-        topology::config::{TransformConfig, TransformContext},
+        config::{TransformConfig, TransformContext},
         Event,
     };
 
     fn do_transform(event: &str, patterns: &str, config: &str) -> Option<LogEvent> {
-        let rt = runtime();
         let event = Event::from(event);
         let mut parser = toml::from_str::<RegexParserConfig>(&format!(
             r#"
@@ -294,7 +313,7 @@ mod tests {
             patterns, config
         ))
         .unwrap()
-        .build(TransformContext::new_test(rt.executor()))
+        .build(TransformContext::new_test())
         .unwrap();
 
         parser.transform(event).map(|event| event.into_log())
@@ -476,24 +495,53 @@ mod tests {
     }
 
     #[test]
-    fn supports_multiple_patterns() {
+    fn chooses_first_of_multiple_matching_patterns() {
         let log = do_transform(
             "1234 235.42 true",
             r#"[
-                '^(?P<id>\d+)$',
-                '^(?P<id>\d+) (?P<time>[\d.]+) (?P<check>\S+)$',
+                '^(?P<id1>\d+)',
+                '^(?P<id2>\d+) (?P<time>[\d.]+) (?P<check>\S+)$',
             ]"#,
             r#"
             drop_field = false
             [types]
-            id = "int"
+            id1 = "int"
+            id2 = "int"
             time = "float"
             check = "boolean"
             "#,
         )
         .unwrap();
 
-        assert_eq!(log[&"id".into()], Value::Integer(1234));
+        assert_eq!(log[&"id1".into()], Value::Integer(1234));
+        assert_eq!(log.get(&"id2".into()), None);
+        assert_eq!(log.get(&"time".into()), None);
+        assert_eq!(log.get(&"check".into()), None);
+        assert!(log.get(&"message".into()).is_some());
+    }
+
+    #[test]
+    // https://github.com/timberio/vector/issues/3096
+    fn correctly_maps_capture_groups_if_matching_pattern_is_not_first() {
+        let log = do_transform(
+            "match1234 235.42 true",
+            r#"[
+                '^nomatch(?P<id1>\d+)$',
+                '^match(?P<id2>\d+) (?P<time>[\d.]+) (?P<check>\S+)$',
+            ]"#,
+            r#"
+            drop_field = false
+            [types]
+            id1 = "int"
+            id2 = "int"
+            time = "float"
+            check = "boolean"
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(log.get(&"id1".into()), None);
+        assert_eq!(log[&"id2".into()], Value::Integer(1234));
         assert_eq!(log[&"time".into()], Value::Float(235.42));
         assert_eq!(log[&"check".into()], Value::Boolean(true));
         assert!(log.get(&"message".into()).is_some());

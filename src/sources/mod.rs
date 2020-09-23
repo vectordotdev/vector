@@ -1,6 +1,8 @@
 use futures01::Future;
 use snafu::Snafu;
 
+#[cfg(feature = "sources-apache_metrics")]
+pub mod apache_metrics;
 #[cfg(feature = "sources-docker")]
 pub mod docker;
 #[cfg(feature = "sources-file")]
@@ -11,10 +13,12 @@ pub mod generator;
 pub mod http;
 #[cfg(feature = "sources-internal_metrics")]
 pub mod internal_metrics;
-#[cfg(all(feature = "sources-journald", feature = "unix"))]
+#[cfg(all(unix, feature = "sources-journald"))]
 pub mod journald;
 #[cfg(all(feature = "sources-kafka", feature = "rdkafka"))]
 pub mod kafka;
+#[cfg(feature = "sources-kubernetes-logs")]
+pub mod kubernetes_logs;
 #[cfg(feature = "sources-logplex")]
 pub mod logplex;
 #[cfg(feature = "sources-prometheus")]

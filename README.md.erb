@@ -7,7 +7,7 @@
 ---
 
 <p align="center">
-  <img src="./website/static/img/readme_diagram.svg" alt="Vector">
+  <img src="https://vector.dev/img/readme_diagram.svg" alt="Vector">
 </p>
 
 <%- if metadata.new_post -%>
@@ -124,10 +124,9 @@ To learn more about our correctness tests, please see the [Vector test harness][
 
 * **Hot reload** - [Reload configuration on the fly][docs.process-management#reloading] without disrupting data flow.
 * **Zero delay start** - [Starts and restarts][docs.administration.process-management] without a delay.
-* **Multi-platform** - [Linux, MacOS, Windows, x86_64, ARM64, and ARMv7][docs.installation].
-* **CI friendly** - [Config linting][docs.administration.validating], [dry runs][docs.administration.validating], and [unit tests][guides.advanced.unit-testing] make Vector CI friendly.
+* **Multi-platform** - [Linux, MacOS, Windows, x86_64, ARM64][docs.installation].
+* **CI friendly** - [Config validating][docs.administration.validating] and [unit tests][guides.advanced.unit-testing] make Vector CI friendly.
 * **Configurable concurrency** - All CPU cores ([service][docs.strategies#service]) or just one ([daemon][docs.strategies#daemon]) via the [`--threads` flag][docs.process-management#starting].
-* **Custom DNS** - [Custom DNS][docs.global-options#dns_servers] makes service discovery possible.
 * **Optional static binary** - [Optional MUSL static binaries][pages.releases] mean zero required dependencies.
 * **TLS support** - All relevant Vector components offer TLS options for secure communication.
 
@@ -135,7 +134,7 @@ To learn more about our correctness tests, please see the [Vector test harness][
 
 * **Memory safety** - Vector is built in Rust and is [memory safe][urls.rust_memory_safety], avoiding a large class of memory related errors.
 * **Decoupled buffer design** - Buffers are per-[sink][docs.sinks]; a bad sink won't bring the entire pipeline to a halt.
-* **Intelligent retries** - A fibonacci backoff algorithsm with jitter makes Vector a good citizen during outages.
+* **Intelligent retries** - A fibonacci backoff algorithms with jitter makes Vector a good citizen during outages.
 * **Backpressure & load shedding** - Buffers can be configured to provide backpressure or shed load.
 * **Rate-limited internal logging** - Vector's internal logging is rate-limited avoiding IO saturation if errors occur.
 * **Sink healthchecks** - Healthchecks provide startup safety and prevent deploys with bad configuration.

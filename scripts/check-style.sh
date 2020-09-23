@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # check-style.sh
@@ -29,11 +29,10 @@ for FILE in $(git ls-files); do
   case "$FILE" in
     *png) continue;;
     *svg) continue;;
+    *gif) continue;;
     *ico) continue;;
     *sig) continue;;
     tests/data*) continue;;
-    website/plugins/*) continue;;
-    website/sidebars.js) continue;;
   esac
 
   # check that the file contains trailing newline

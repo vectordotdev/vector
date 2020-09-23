@@ -1,0 +1,16 @@
+{
+  "artifact_cache": "target/artifacts",
+  "max_heap_memory_size": 10485760,
+  "options": {
+    "takes_array":[1, 2, 3],
+    "takes_bool": true,
+    "takes_map": {
+      "one": "a",
+      "two": "b"
+    },
+    "takes_number": 123,
+    "takes_string": "test"
+  },
+  "path": "target/wasm32-wasi/release/assert_config.wasm",
+  "role": "Transform"
+}

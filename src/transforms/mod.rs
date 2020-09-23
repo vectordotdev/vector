@@ -1,7 +1,7 @@
 use crate::Event;
 use snafu::Snafu;
 
-mod util;
+pub mod util;
 
 #[cfg(feature = "transforms-add_fields")]
 pub mod add_fields;
@@ -35,8 +35,12 @@ pub mod logfmt_parser;
 pub mod lua;
 #[cfg(feature = "transforms-merge")]
 pub mod merge;
+#[cfg(feature = "transforms-reduce")]
+pub mod reduce;
 #[cfg(feature = "transforms-regex_parser")]
 pub mod regex_parser;
+#[cfg(feature = "transforms-remap")]
+pub mod remap;
 #[cfg(feature = "transforms-remove_fields")]
 pub mod remove_fields;
 #[cfg(feature = "transforms-remove_tags")]
@@ -53,6 +57,8 @@ pub mod swimlanes;
 pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-tokenizer")]
 pub mod tokenizer;
+#[cfg(feature = "wasm")]
+pub mod wasm;
 
 use futures01::Stream;
 

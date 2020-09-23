@@ -1,18 +1,21 @@
 use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
-use futures01::{future, Sink, Stream};
-use std::convert::Infallible;
-use std::time::Duration;
-use vector::buffers::Acker;
-use vector::sinks::util::{
-    Batch, BatchSettings, BatchSink, Buffer, Compression, Partition, PartitionBatchSink,
+use futures::{compat::Future01CompatExt, future};
+use futures01::{Sink, Stream};
+use std::{convert::Infallible, time::Duration};
+use vector::{
+    buffers::Acker,
+    sinks::util::{
+        batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
+        BatchSink, Buffer, Compression, Partition, PartitionBatchSink,
+    },
+    test_util::{random_lines, runtime},
 };
-use vector::test_util::random_lines;
 
 fn batching(
     bench_name: &'static str,
     compression: Compression,
-    max_size: usize,
+    max_bytes: usize,
     num_events: usize,
     event_len: usize,
 ) -> Benchmark {
@@ -26,20 +29,21 @@ fn batching(
                 futures01::stream::iter_ok::<_, ()>(input.into_iter())
             },
             |input| {
-                let mut rt = vector::test_util::runtime();
+                let mut rt = runtime();
                 let (acker, _) = Acker::new_for_testing();
+                let batch = BatchSettings::default()
+                    .bytes(max_bytes as u64)
+                    .events(num_events)
+                    .size;
                 let batch_sink = BatchSink::new(
                     tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                    Buffer::new(compression),
-                    BatchSettings {
-                        size: max_size,
-                        timeout: Duration::from_secs(1),
-                    },
+                    Buffer::new(batch, compression),
+                    Duration::from_secs(1),
                     acker,
                 )
                 .sink_map_err(|e| panic!(e));
 
-                let _ = rt.block_on(input.forward(batch_sink)).unwrap();
+                let _ = rt.block_on(input.forward(batch_sink).compat()).unwrap();
             },
         )
     })
@@ -51,7 +55,7 @@ fn batching(
 fn partitioned_batching(
     bench_name: &'static str,
     compression: Compression,
-    max_size: usize,
+    max_bytes: usize,
     num_events: usize,
     event_len: usize,
 ) -> Benchmark {
@@ -70,20 +74,21 @@ fn partitioned_batching(
                 futures01::stream::iter_ok::<_, ()>(input.into_iter())
             },
             |input| {
-                let mut rt = vector::test_util::runtime();
+                let mut rt = runtime();
                 let (acker, _) = Acker::new_for_testing();
+                let batch = BatchSettings::default()
+                    .bytes(max_bytes as u64)
+                    .events(num_events)
+                    .size;
                 let batch_sink = PartitionBatchSink::new(
                     tower::service_fn(|_| future::ok::<_, Infallible>(())),
-                    PartitionedBuffer::new(compression),
-                    BatchSettings {
-                        size: max_size,
-                        timeout: Duration::from_secs(1),
-                    },
+                    PartitionedBuffer::new(batch, compression),
+                    Duration::from_secs(1),
                     acker,
                 )
                 .sink_map_err(|e| panic!(e));
 
-                let _ = rt.block_on(input.forward(batch_sink)).unwrap();
+                let _ = rt.block_on(input.forward(batch_sink).compat()).unwrap();
             },
         )
     })
@@ -166,9 +171,9 @@ impl Partition<Bytes> for InnerBuffer {
 }
 
 impl PartitionedBuffer {
-    pub fn new(compression: Compression) -> Self {
+    pub fn new(batch: BatchSize<Buffer>, compression: Compression) -> Self {
         Self {
-            inner: Buffer::new(compression),
+            inner: Buffer::new(batch, compression),
             key: None,
         }
     }
@@ -178,14 +183,22 @@ impl Batch for PartitionedBuffer {
     type Input = InnerBuffer;
     type Output = InnerBuffer;
 
-    fn len(&self) -> usize {
-        self.inner.len()
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
+        Ok(Buffer::get_settings_defaults(config, defaults.into())?.into())
     }
 
-    fn push(&mut self, item: Self::Input) {
-        let partition = item.partition();
-        self.key = Some(partition);
-        self.inner.push(&item.inner[..])
+    fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
+        let key = item.key;
+        match Batch::push(&mut self.inner, item.inner) {
+            PushResult::Ok(full) => {
+                self.key = Some(key);
+                PushResult::Ok(full)
+            }
+            PushResult::Overflow(inner) => PushResult::Overflow(InnerBuffer { inner, key }),
+        }
     }
 
     fn is_empty(&self) -> bool {

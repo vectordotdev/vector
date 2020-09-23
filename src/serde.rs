@@ -41,7 +41,6 @@ impl<V: 'static> Fields<V> {
                     FieldsOrValue::Value(v) => Box::new(std::iter::once((k.into(), v))),
                     FieldsOrValue::Fields(f) => Box::new(
                         f.all_fields()
-                            .into_iter()
                             .map(move |(nested_k, v)| (format!("{}.{}", k, nested_k).into(), v)),
                     ),
                 }
