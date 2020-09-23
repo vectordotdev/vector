@@ -11,6 +11,7 @@ use std::convert::TryFrom;
 use string_cache::DefaultAtom as Atom;
 use vector::transforms::{
     add_fields::AddFields,
+    json_parser::{JsonParser, JsonParserConfig},
     remap::{Remap, RemapConfig},
     Transform,
 };
@@ -754,6 +755,74 @@ fn benchmark_remap(c: &mut Criterion) {
                     .unwrap()
                     .to_string_lossy(),
                 "buz"
+            );
+        })
+    });
+
+    let event = {
+        let mut event = Event::from("parse me");
+        event
+            .as_mut_log()
+            .insert("foo", r#"{"key": "value"}"#.to_owned());
+        event
+    };
+
+    c.bench_function("parse JSON with remap", |b| {
+        let conf = RemapConfig {
+            mapping: ".bar = parse_json(.foo)".to_owned(),
+            drop_on_err: false,
+        };
+        let mut tform = Remap::new(conf).unwrap();
+
+        b.iter(|| {
+            let result = tform.transform(event.clone()).unwrap();
+            assert_eq!(
+                result
+                    .as_log()
+                    .get(&Atom::from("foo"))
+                    .unwrap()
+                    .to_string_lossy(),
+                r#"{"key": "value"}"#
+            );
+            assert_eq!(
+                result
+                    .as_log()
+                    .get(&Atom::from("bar"))
+                    .unwrap()
+                    .to_string_lossy(),
+                r#"{"key":"value"}"#
+            );
+        })
+    });
+
+    c.bench_function("parse JSON with json_parser", |b| {
+        let cfg = JsonParserConfig {
+            field: Some(Atom::from("foo")),
+            target_field: Some("bar".to_owned()),
+            drop_field: false,
+            drop_invalid: false,
+            overwrite_target: None,
+        };
+
+        let mut tform = JsonParser::from(cfg);
+
+        b.iter(|| {
+            let result = tform.transform(event.clone()).unwrap();
+            assert_eq!(
+                result
+                    .as_log()
+                    .get(&Atom::from("foo"))
+                    .unwrap()
+                    .to_string_lossy(),
+                r#"{"key": "value"}"#
+            );
+            assert_eq!(
+                result
+                    .as_log()
+                    .get(&Atom::from("bar"))
+                    .unwrap()
+                    .to_string_lossy(),
+                r#"{"key":"value"}"#
             );
         })
     });
