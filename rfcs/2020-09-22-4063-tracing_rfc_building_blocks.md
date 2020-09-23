@@ -59,15 +59,25 @@ SpanContext:
 
 We want Vector to receive incoming traces from applications. In order to do this Vector needs to understand the concept of tracing. This RFC will define the basic internal objects and building blocks for tracing in Vector in a similar manner to how Event includes logs and metrics.
 
-To implement those building blocks this RFC will propose an OpenTelemetry source and sink.
+Most of the tracing providers provide [an agent and a collector](https://github.com/open-telemetry/opentelemetry-collector/blob/master/README.md). Jaeger defines this as:
+
+- Agent is a sidecar / host agent that receives telemetry from the client library in a standardized format and forwards it to collector.
+- Collector translates the data into the format understood by a specific tracing backend and sends it there. 
+
+For Vector, the agent broadly falls into the concept of `source` and the `collector` into the concept of `sink`. The OpenTelemetry Collector can be deployed in both modes and supports collecting traces, metrics, and logs (RSN). 
+
+To implement those building blocks this RFC will propose implementing a source and a sink.
 
 ### Source
 
-Source modelled on [the OTLP Receiver](https://github.com/open-telemetry/opentelemetry-collector/blob/master/receiver/otlpreceiver/README.md).
+Source modelled on [the OTLP Receiver](https://github.com/open-telemetry/opentelemetry-collector/blob/master/receiver/otlpreceiver/README.md). This will initially only receive traces but should be extensible to add support for metrics and logs as these mature.
 
 ### Sink
 
-Sink modelled on [the OTLP exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/master/exporter/otlpexporter/otlp.go) that supports outputting traces, metrics, and logs.
+Sink modelled on [the OTLP exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/master/exporter/otlpexporter/otlp.go) that supports outputting traces (again with metrics and logs as a future option). The sink would export in multiple formats. Initially recommended is:
+
+- Jaeger
+- Zipkin
 
 ## Prior Art
 
@@ -96,12 +106,12 @@ Sink modelled on [the OTLP exporter](https://github.com/open-telemetry/opentelem
 
 ### Traces
 
-- Jaeger Source
-- OpenCensus Source
+Should we consider tracing sources for additional platforms or assume all will converge onto OT?
+
 - Zipkin Source
 - Kafka Source
 
-### Metrics
+### Metrics & Logs
 
-- OpenCensus Metrics Source
 - OpenTelemetry Metrics Source
+- Additional export formats for the Sink.
