@@ -32,7 +32,10 @@ impl TransformConfig for RenameFieldsConfig {
     fn build(&self, _exec: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let mut fields = IndexMap::default();
         for (key, value) in self.fields.clone().all_fields() {
-            fields.insert(key.to_string().parse::<Lookup>()?, value.to_string().parse::<Lookup>()?);
+            fields.insert(
+                key.to_string().parse::<Lookup>()?,
+                value.to_string().parse::<Lookup>()?,
+            );
         }
         Ok(Box::new(RenameFields::new(
             fields,
@@ -55,10 +58,7 @@ impl TransformConfig for RenameFieldsConfig {
 
 impl RenameFields {
     pub fn new(fields: IndexMap<Lookup, Lookup>, drop_empty: bool) -> crate::Result<Self> {
-        Ok(RenameFields {
-            fields,
-            drop_empty,
-        })
+        Ok(RenameFields { fields, drop_empty })
     }
 }
 

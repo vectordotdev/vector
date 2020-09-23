@@ -77,7 +77,7 @@ impl Lookup {
     pub fn pop(&mut self) -> Option<Segment> {
         self.segments.pop()
     }
-    
+
     pub fn iter(&self) -> Iter<'_, Segment> {
         self.segments.iter()
     }
@@ -103,7 +103,8 @@ impl Lookup {
             _ => Err(format!(
                 "A TOML table must be passed to the `from_toml_table` function. Passed: {:?}",
                 value
-            ).into()),
+            )
+            .into()),
         }
     }
 
@@ -182,7 +183,6 @@ impl From<string_cache::DefaultAtom> for Lookup {
         }
     }
 }
-    
 
 impl Index<usize> for Lookup {
     type Output = Segment;

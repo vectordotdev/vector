@@ -35,7 +35,6 @@ fn simple() {
     assert_eq!(lookup.to_string(), input);
 }
 
-
 #[test]
 fn push() {
     crate::test_util::trace_init();
@@ -54,7 +53,6 @@ fn pop() {
     let out = lookup.pop();
     assert_eq!(out, Some(Segment::field(String::from("some_key"))));
 }
-
 
 #[test]
 fn array() {
@@ -173,7 +171,8 @@ fn lookup_to_string_and_serialize() {
                 let path = fixture_file.path();
                 tracing::trace!(?path, "Opening.");
                 let buf = parse_artifact(&path).unwrap();
-                let buf_serialized = serde_json::to_string(&serde_json::to_value(&buf).unwrap()).unwrap();
+                let buf_serialized =
+                    serde_json::to_string(&serde_json::to_value(&buf).unwrap()).unwrap();
                 let lookup = Lookup::from_str(&buf).unwrap();
                 tracing::trace!(?path, ?lookup, ?buf, "Asserting equal.");
                 assert_eq!(lookup.to_string(), buf);
