@@ -31,7 +31,7 @@ OpenTelemetry has adopted [some semantic conventions](https://github.com/open-te
 Here is an example of a span from [the OpenTelemetry docs](https://opentracing.io/docs/overview/spans/):
 
 ```text
-   t=0            operation name: db_query               t=x 
+   t=0            operation name: db_query               t=x
 
      +-----------------------------------------------------+
      | · · · · · · · · · ·    Span     · · · · · · · · · · |
