@@ -21,6 +21,9 @@ extern crate pest_derive;
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
+#[macro_use]
+pub mod internal_events;
+
 pub mod buffers;
 pub mod conditions;
 pub mod config;
@@ -30,8 +33,6 @@ pub mod expiring_hash_map;
 pub mod generate;
 #[cfg(feature = "wasm")]
 pub mod wasm;
-#[macro_use]
-pub mod internal_events;
 #[cfg(feature = "api")]
 pub mod api;
 pub mod async_read;

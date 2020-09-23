@@ -10,6 +10,7 @@ mod api;
 mod auto_concurrency;
 mod aws_kinesis_streams;
 mod blackhole;
+mod buffer;
 #[cfg(feature = "transforms-coercer")]
 mod coercer;
 #[cfg(feature = "transforms-concat")]
@@ -90,6 +91,7 @@ pub use self::api::*;
 pub use self::auto_concurrency::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
+pub use self::buffer::*;
 #[cfg(feature = "transforms-coercer")]
 pub(crate) use self::coercer::*;
 #[cfg(feature = "transforms-concat")]

@@ -6,6 +6,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
+use crate::internal_events::BufferEventDropped;
 
 #[cfg(feature = "leveldb")]
 pub mod disk;
@@ -178,10 +179,7 @@ impl<S: Sink> Sink for DropWhenFull<S> {
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         match self.inner.start_send(item) {
             Ok(AsyncSink::NotReady(_)) => {
-                debug!(
-                    message = "Shedding load; dropping event.",
-                    rate_limit_secs = 10
-                );
+                emit!(BufferEventDropped{});
                 Ok(AsyncSink::Ready)
             }
             other => other,
