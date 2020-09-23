@@ -1090,6 +1090,27 @@ mod tests {
                 ))]),
             ),
             (
+                ".foo = md5(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Md5Fn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                ".foo = sha1(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Sha1Fn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                ".foo = now()",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(NowFn::new()),
+                ))]),
+            ),
+            (
                 ".foo = parse_json(.foo)",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
