@@ -79,7 +79,7 @@ impl Lookup {
     ) -> crate::Result<IndexMap<Lookup, Value>> {
         let mut discoveries = IndexMap::new();
         for (key, value) in values {
-            Self::from_recursive_step(Lookup::try_from(key)?, value, &mut discoveries)?;
+            Self::recursive_step(Lookup::try_from(key)?, value, &mut discoveries)?;
         }
         Ok(discoveries)
     }
@@ -88,27 +88,27 @@ impl Lookup {
         match value {
             TomlValue::Table(map) => {
                 for (key, value) in map {
-                    Self::from_recursive_step(Lookup::try_from(key)?, value, &mut discoveries)?;
+                    Self::recursive_step(Lookup::try_from(key)?, value, &mut discoveries)?;
                 }
                 Ok(discoveries)
             }
             _ => Err(format!(
                 "A TOML table must be passed to the `from_toml_table` function. Passed: {:?}",
                 value
-            ))?,
+            ).into()),
         }
     }
 
-    fn from_recursive_step(
+    fn recursive_step(
         lookup: Lookup,
         value: TomlValue,
         discoveries: &mut IndexMap<Lookup, Value>,
     ) -> crate::Result<()> {
         match value {
-            TomlValue::String(s) => discoveries.insert(Lookup::from(lookup), Value::from(s)),
-            TomlValue::Integer(i) => discoveries.insert(Lookup::from(lookup), Value::from(i)),
-            TomlValue::Float(f) => discoveries.insert(Lookup::from(lookup), Value::from(f)),
-            TomlValue::Boolean(b) => discoveries.insert(Lookup::from(lookup), Value::from(b)),
+            TomlValue::String(s) => discoveries.insert(lookup, Value::from(s)),
+            TomlValue::Integer(i) => discoveries.insert(lookup, Value::from(i)),
+            TomlValue::Float(f) => discoveries.insert(lookup, Value::from(f)),
+            TomlValue::Boolean(b) => discoveries.insert(lookup, Value::from(b)),
             TomlValue::Datetime(dt) => {
                 let dt = dt.to_string();
                 discoveries.insert(Lookup::try_from(lookup)?, Value::from(dt))
@@ -116,14 +116,14 @@ impl Lookup {
             TomlValue::Array(vals) => {
                 for (i, val) in vals.into_iter().enumerate() {
                     let key = format!("{}[{}]", lookup, i);
-                    Self::from_recursive_step(Lookup::try_from(key)?, val, discoveries)?;
+                    Self::recursive_step(Lookup::try_from(key)?, val, discoveries)?;
                 }
                 None
             }
             TomlValue::Table(map) => {
                 for (table_key, value) in map {
                     let key = format!("{}.{}", lookup, table_key);
-                    Self::from_recursive_step(Lookup::try_from(key)?, value, discoveries)?;
+                    Self::recursive_step(Lookup::try_from(key)?, value, discoveries)?;
                 }
                 None
             }

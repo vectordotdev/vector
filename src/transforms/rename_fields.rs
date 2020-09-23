@@ -2,10 +2,10 @@ use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
+    event::Lookup,
     internal_events::{
         RenameFieldsEventProcessed, RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten,
     },
-    event::Lookup,
     serde::Fields,
 };
 use indexmap::map::IndexMap;
@@ -35,7 +35,10 @@ impl TransformConfig for RenameFieldsConfig {
         for (key, value) in self.fields.clone().all_fields() {
             fields.insert(key.to_string().try_into()?, value.to_string().try_into()?);
         }
-        Ok(Box::new(RenameFields::new(fields, self.drop_empty.unwrap_or(false))?))
+        Ok(Box::new(RenameFields::new(
+            fields,
+            self.drop_empty.unwrap_or(false),
+        )?))
     }
 
     fn input_type(&self) -> DataType {
@@ -53,7 +56,10 @@ impl TransformConfig for RenameFieldsConfig {
 
 impl RenameFields {
     pub fn new(fields: IndexMap<Lookup, Lookup>, drop_empty: bool) -> crate::Result<Self> {
-        Ok(RenameFields { fields: fields, drop_empty })
+        Ok(RenameFields {
+            fields,
+            drop_empty,
+        })
     }
 }
 
@@ -62,7 +68,6 @@ impl Transform for RenameFields {
         emit!(RenameFieldsEventProcessed);
 
         for (old_key, new_key) in &self.fields {
-            
             let old_key_string = old_key.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
             let new_key_string = new_key.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
             let log = event.as_mut_log();
@@ -97,8 +102,14 @@ mod tests {
         event.as_mut_log().insert("to_move", "some value");
         event.as_mut_log().insert("do_not_move", "not moved");
         let mut fields = IndexMap::new();
-        fields.insert(Lookup::try_from("to_move").unwrap(), Lookup::try_from("moved").unwrap());
-        fields.insert(Lookup::try_from("not_present").unwrap(), Lookup::try_from("should_not_exist").unwrap());
+        fields.insert(
+            Lookup::try_from("to_move").unwrap(),
+            Lookup::try_from("moved").unwrap(),
+        );
+        fields.insert(
+            Lookup::try_from("not_present").unwrap(),
+            Lookup::try_from("should_not_exist").unwrap(),
+        );
 
         let mut transform = RenameFields::new(fields, false).unwrap();
 

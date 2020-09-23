@@ -65,7 +65,7 @@ impl TryFrom<TomlValue> for Value {
             TomlValue::Integer(i) => Self::from(i),
             TomlValue::Array(a) => Self::from(
                 a.into_iter()
-                    .map(|v| Value::try_from(v))
+                    .map(Value::try_from)
                     .collect::<Result<Vec<_>>>()?,
             ),
             TomlValue::Table(t) => Self::from(
