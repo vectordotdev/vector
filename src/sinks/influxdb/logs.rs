@@ -659,6 +659,7 @@ mod integration_tests {
             encoding: Default::default(),
             batch: Default::default(),
             request: Default::default(),
+            tls: None,
         };
 
         let (sink, _) = config.build(cx).unwrap();
