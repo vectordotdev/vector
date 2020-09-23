@@ -1,4 +1,4 @@
-# RFC #403 - Tracing: building blocks.
+# RFC #4063 - Tracing: building blocks.
 
 This RFC covers the introduction of traces to Vector using the [OpenTelemetry specification](https://github.com/open-telemetry/opentelemetry-specification) as a base for that introduction.
 
@@ -53,13 +53,21 @@ SpanContext:
 
 ## Out of Scope
 
-- ???
+- Adding tracing support to existing sinks that could receive them.
 
 ## Proposal
 
 We want Vector to receive incoming traces from applications. In order to do this Vector needs to understand the concept of tracing. This RFC will define the basic internal objects and building blocks for tracing in Vector in a similar manner to how Event includes logs and metrics.
 
-To implement those building blocks the RFC will propose an OpenTelemetry source and sink.
+To implement those building blocks this RFC will propose an OpenTelemetry source and sink.
+
+### Source
+
+Source modelled on [the OTLP Receiver](https://github.com/open-telemetry/opentelemetry-collector/blob/master/receiver/otlpreceiver/README.md).
+
+### Sink
+
+Sink modelled on [the OTLP exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/master/exporter/otlpexporter/otlp.go) that supports outputting traces, metrics, and logs.
 
 ## Prior Art
 
@@ -80,3 +88,21 @@ To implement those building blocks the RFC will propose an OpenTelemetry source 
 ## Plan of Attack
 
 ## Decisions
+
+* OpenTelmetry supports traces, metrics, and potentially logs. Do we want to support all incoming? Does this mean three sources?
+
+* Do we want to add [an exporter](https://github.com/open-telemetry/opentelemetry-collector/tree/master/exporter) to OpenTelemetry?
+
+## Follow up work
+
+### Traces
+
+* Jaeger Source
+* OpenCensus Source
+* Zipkin Source
+* Kafka Source
+
+### Metrics
+
+* OpenCensus Metrics Source
+* OpenTelemetry Metrics Source
