@@ -69,7 +69,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "aws_sqs")]
 impl SinkConfig for SqsSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let config = self.clone();
         let healthcheck = healthcheck(self.clone(), cx.resolver())?;
         let sink = SqsService::new(config, cx)?;

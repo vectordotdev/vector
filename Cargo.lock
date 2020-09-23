@@ -4163,17 +4163,7 @@ dependencies = [
  "xml-rs",
 ]
 
-name = "rusoto_sqs"
-version = "0.45.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa9872f121567fe90f790a8ac9b5f14c4c7df2e039848d9d56e4e7db438635ad"
-dependencies = [
- "bytes 0.4.12",
- "futures 0.1.29",
- "rusoto_core",
- "serde_urlencoded 0.5.5",
- "xml-rs",
-
+[[package]]
 name = "rusoto_signature"
 version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4196,6 +4186,20 @@ dependencies = [
  "sha2",
  "time 0.2.16",
  "tokio",
+]
+
+[[package]]
+name = "rusoto_sqs"
+version = "0.45.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcd228a1b4ce3f3a40541ee8cef526ff3702b58a4779fb05c31e739174efda5e"
+dependencies = [
+ "async-trait",
+ "bytes 0.5.6",
+ "futures 0.3.5",
+ "rusoto_core",
+ "serde_urlencoded",
+ "xml-rs",
 ]
 
 [[package]]
@@ -5860,8 +5864,8 @@ dependencies = [
  "rusoto_kinesis",
  "rusoto_logs",
  "rusoto_s3",
- "rusoto_sqs",
  "rusoto_signature",
+ "rusoto_sqs",
  "rusoto_sts",
  "schannel",
  "seahash",

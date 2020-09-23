@@ -73,12 +73,12 @@ metrics-runtime = "0.13.0"
 # Aws
 rusoto_core = { version = "0.45.0", features = ["encoding"], optional = true }
 rusoto_s3 = { version = "0.45.0", optional = true }
+rusoto_sqs = { version = "0.45.0", optional = true }
 rusoto_logs = { version = "0.45.0", optional = true }
 rusoto_cloudwatch = { version = "0.45.0", optional = true }
 rusoto_kinesis = { version = "0.45.0", optional = true }
 rusoto_credential = { version = "0.45.0", optional = true }
 rusoto_firehose = { version = "0.45.0", optional = true }
-rusoto_sqs = { version = "0.45.0", optional = true }
 rusoto_sts = { version = "0.45.0", optional = true }
 rusoto_signature = { version = "0.45.0", optional = true }
 
@@ -392,7 +392,7 @@ sinks-aws_cloudwatch_metrics = ["rusoto_core", "rusoto_credential", "rusoto_sign
 sinks-aws_kinesis_firehose = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_kinesis"]
 sinks-aws_s3 = ["bytesize", "rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_s3"]
-sinks-aws_sqs = ["bytesize", "rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_sqs", "uuid", "rusoto_logs"]
+sinks-aws_sqs = ["bytesize", "rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_sqs"]
 sinks-blackhole = []
 sinks-clickhouse = ["bytesize"]
 sinks-console = []
@@ -444,7 +444,7 @@ aws-integration-tests = [
   "aws-kinesis-firehose-integration-tests",
   "aws-kinesis-streams-integration-tests",
   "aws-s3-integration-tests",
-  "aws-sqs-interation-tests",
+  "aws-sqs-integration-tests",
 ]
 aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
 aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
@@ -495,3 +495,4 @@ required-features = ["kubernetes-e2e-tests"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
+
