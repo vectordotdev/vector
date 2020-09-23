@@ -2,6 +2,8 @@ use crate::mapping::parser::Rule;
 use pest::iterators::Pair;
 use std::fmt::{Display, Formatter};
 
+/// Segments are chunks of a lookup. They represent either a field or an index.
+/// A sequence of Segments can become a lookup.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub enum Segment {
     Field(String),

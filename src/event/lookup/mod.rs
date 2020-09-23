@@ -24,7 +24,7 @@ use std::fmt::{Display, Formatter};
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
 
-/// Lookups are precomputed event lookup paths.
+/// Lookups are pre-validated event lookup paths.
 ///
 /// They are intended to handle user input from a configuration.
 ///
