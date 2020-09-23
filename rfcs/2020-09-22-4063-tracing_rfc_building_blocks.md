@@ -1,4 +1,4 @@
-# RFC #4063 - Tracing: building blocks.
+# RFC #4063 - Tracing: building blocks
 
 This RFC covers the introduction of traces to Vector using the [OpenTelemetry specification](https://github.com/open-telemetry/opentelemetry-specification) as a base for that introduction.
 
@@ -8,11 +8,11 @@ Vector intends to be the best tool for working with logs, metrics, and traces. L
 
 ## Background
 
-A distributed trace is a set of events, linked by a single logical operation, for example clicking the `Buy` button on a website. This operation would trigger a trace. The trace would combine all of the events represented in the operation, for example in this case it might be: button click, request to backend service, credit card auth to payments service, update to inventory, generation of shipping label, return of CC auth, return of result to end user site. 
+A distributed trace is a set of events, linked by a single logical operation, for example clicking the `Buy` button on a website. This operation would trigger a trace. The trace would combine all of the events represented in the operation, for example in this case it might be: button click, request to backend service, credit card auth to payments service, update to inventory, generation of shipping label, return of CC auth, return of result to end user site.
 
 These events cross process, network, and service boundaries. The start and end of each event is recorded and potentially metadata or other information is attached to it.  Then, when combined as a trace, this allows an engineer to track the operation across boundaries and identify issues, performance bottlenecks or latency, and even potential security exposures by examining the end-to-end flow.
 
-Inside a trace, the primary component is called [a `span`](https://opentracing.io/docs/overview/spans/). A span represents an individual unit of work done in a distributed system. Spans have a start and an end timestamp, they measure the latency of a particular operation. A trace contains a single `root` span, which represents the latency of the entire request operation, and one or more `child` spans, which represent operations taking place as part of the request. 
+Inside a trace, the primary component is called [a `span`](https://opentracing.io/docs/overview/spans/). A span represents an individual unit of work done in a distributed system. Spans have a start and an end timestamp, they measure the latency of a particular operation. A trace contains a single `root` span, which represents the latency of the entire request operation, and one or more `child` spans, which represent operations taking place as part of the request.
 
 The spans in a trace are linked together via a reference, for example a trace ID. OpenTelemetry defines a trace like so:
 
@@ -22,7 +22,7 @@ The reference, or unique ID is contained in a field called the "span context". T
 
 Each span contains metadata about the operation, such as its name, start and end timestamps, attributes, events, and status.
 
-The metadata of a span could include [tags](https://opentracing.io/docs/overview/tags-logs-baggage/), to allow you to add metadata to the span to provide assistance in understanding where the trace is from and the context in which it was generated. 
+The metadata of a span could include [tags](https://opentracing.io/docs/overview/tags-logs-baggage/), to allow you to add metadata to the span to provide assistance in understanding where the trace is from and the context in which it was generated.
 
 Spans can also [carry logs](https://opentracing.io/docs/overview/tags-logs-baggage/) in the form of `key:value pairs`, useful for informational output from the application that sets some context or documents some specific aspect of the event.
 
@@ -71,12 +71,12 @@ Sink modelled on [the OTLP exporter](https://github.com/open-telemetry/opentelem
 
 ## Prior Art
 
-* [Sample exporters to other platforms](https://github.com/open-telemetry/opentelemetry-collector/tree/master/exporter)
-* [Rust sample app for OpenTelemetry](https://github.com/open-telemetry/opentelemetry-rust/tree/0fa4e7d506cb52520607fa5da70d0efa15e1f6cb/examples/basic)
-* [Jaeger](https://www.jaegertracing.io/).
-* There are currently two Rust client language implementations for OpenTelemetry:
-  * https://github.com/open-telemetry/opentelemetry-rust / https://crates.io/crates/opentelemetry
-  * https://github.com/jtescher/opentelemetry-rust / https://crates.io/crates/tracing-opentelemetry
+- [Sample exporters to other platforms](https://github.com/open-telemetry/opentelemetry-collector/tree/master/exporter)
+- [Rust sample app for OpenTelemetry](https://github.com/open-telemetry/opentelemetry-rust/tree/0fa4e7d506cb52520607fa5da70d0efa15e1f6cb/examples/basic)
+- [Jaeger](https://www.jaegertracing.io/).
+- There are currently two Rust client language implementations for OpenTelemetry:
+  - https://github.com/open-telemetry/opentelemetry-rust / https://crates.io/crates/opentelemetry
+  - https://github.com/jtescher/opentelemetry-rust / https://crates.io/crates/tracing-opentelemetry
 
 
 ## Drawbacks
@@ -89,20 +89,19 @@ Sink modelled on [the OTLP exporter](https://github.com/open-telemetry/opentelem
 
 ## Decisions
 
-* OpenTelmetry supports traces, metrics, and potentially logs. Do we want to support all incoming? Does this mean three sources?
-
-* Do we want to add [an exporter](https://github.com/open-telemetry/opentelemetry-collector/tree/master/exporter) to OpenTelemetry?
+- OpenTelmetry supports traces, metrics, and potentially logs. Do we want to support all incoming? Does this mean three sources?
+- Do we want to add [an exporter](https://github.com/open-telemetry/opentelemetry-collector/tree/master/exporter) to OpenTelemetry?
 
 ## Follow up work
 
 ### Traces
 
-* Jaeger Source
-* OpenCensus Source
-* Zipkin Source
-* Kafka Source
+- Jaeger Source
+- OpenCensus Source
+- Zipkin Source
+- Kafka Source
 
 ### Metrics
 
-* OpenCensus Metrics Source
-* OpenTelemetry Metrics Source
+- OpenCensus Metrics Source
+- OpenTelemetry Metrics Source
