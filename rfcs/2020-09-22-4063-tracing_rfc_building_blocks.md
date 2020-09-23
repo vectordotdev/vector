@@ -84,10 +84,21 @@ Sink modelled on [the OTLP exporter](https://github.com/open-telemetry/opentelem
 - [Sample exporters to other platforms](https://github.com/open-telemetry/opentelemetry-collector/tree/master/exporter)
 - [Rust sample app for OpenTelemetry](https://github.com/open-telemetry/opentelemetry-rust/tree/0fa4e7d506cb52520607fa5da70d0efa15e1f6cb/examples/basic)
 - [Jaeger](https://www.jaegertracing.io/).
-- There are currently two Rust client language implementations for OpenTelemetry:
-  - https://github.com/open-telemetry/opentelemetry-rust / https://crates.io/crates/opentelemetry
-  - https://github.com/jtescher/opentelemetry-rust / https://crates.io/crates/tracing-opentelemetry
 
+### Client libraries
+
+- There are currently several Rust client language implementations for OpenTelemetry:
+  - The [official OpenTelemetry client](https://crates.io/crates/opentelemetry)
+  - An [unofficial client](https://crates.io/crates/tracing-opentelemetry)
+  - Another [unoffocial client](https://crates.io/crates/opentelemetry-otlp)
+### Other reference materials
+
+- [Jaeger exporter for OpenTelemetry](https://crates.io/crates/opentelemetry-jaeger)
+- [Zipkin expoter for OpenTelemetry](https://crates.io/crates/opentelemetry-zipkin)
+- Jaeger client [rustracing_jaeger](https://github.com/sile/rustracing_jaeger) for Rust
+- [OpenTelemetry integration for Actix Web](https://crates.io/crates/actix-web-opentelemetry)
+- [OpenTelemetry integration for the `tracing` crate](https://crates.io/crates/tracing-opentelemetry)
+- [OpeneTelemetry integration for `tracing-distributed`](https://crates.io/crates/tracing-jaeger)
 
 ## Drawbacks
 
