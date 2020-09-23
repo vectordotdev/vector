@@ -72,6 +72,27 @@ To implement those building blocks this RFC will propose implementing a source a
 
 Source modelled on [the OTLP Receiver](https://github.com/open-telemetry/opentelemetry-collector/blob/master/receiver/otlpreceiver/README.md). This will initially only receive traces but should be extensible to add support for metrics and logs as these mature.
 
+The reference OTLP receiver receives traces and/or metrics via gRPC or HTTP/JSON using OpenTelemetry format. It is configured like so:
+
+- endpoint: host:port to which the receiver is going to receive traces or metrics, using the gRPC (TCP or Unix) or HTTP/JSON.
+
+The OTLP receiver has additional options we should support
+
+- cors_allowed_origins (default = unset): allowed CORS origins for HTTP/JSON requests.
+- keepalive: see [here](godoc.org/google.golang.org/grpc/keepalive#ServerParameters) for more information
+- MaxConnectionIdle (default = infinity)
+- MaxConnectionAge (default = infinity)
+- MaxConnectionAgeGrace (default = infinity)
+- Time (default = 2h)
+- Timeout (default = 20s)
+- max_recv_msg_size_mib (default = 4MB): sets the maximum size of messages accepted
+- max_concurrent_streams: sets the limit on the number of concurrent streams
+- tls_credentials (default = unset): configures the receiver to use TLS. 
+
+The OpenTelemetry receiver can receive trace export calls via HTTP/JSON in addition to gRPC. The HTTP/JSON address is the same as gRPC as the protocol is recognized and processed accordingly. For the receiver using HTTP/JSON the format needs to be [protobuf JSON serialization](https://developers.google.com/protocol-buffers/docs/proto3#json) and bytes fields are encoded as base64 strings. The HTTP/JSON endpoint can also optionally configure CORS.
+
+To write traces with HTTP/JSON the OTLP uses a `POST` to [address]/v1/trace. The default port is 55681.
+
 ### Sink
 
 Sink modelled on [the OTLP exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/master/exporter/otlpexporter/otlp.go) that supports outputting traces (again with metrics and logs as a future option). The sink would export in multiple formats. Initially recommended is:
