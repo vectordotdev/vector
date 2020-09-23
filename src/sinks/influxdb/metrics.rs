@@ -3,8 +3,8 @@ use crate::{
     event::metric::{Metric, MetricValue, StatisticKind},
     sinks::{
         influxdb::{
-            encode_timestamp, healthcheck, influx_line_protocol,
-            influxdb_settings, Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
+            encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
+            InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
         },
         util::{
             encode_namespace,
@@ -20,7 +20,7 @@ use futures01::Sink;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{BTreeMap, HashMap};
 use std::task::Poll;
 use tower::Service;
 
@@ -146,7 +146,7 @@ impl Service<Vec<Metric>> for InfluxDBSvc {
             self.protocol_version,
             items,
             self.config.namespace.as_deref(),
-            self.config.tags.clone()
+            self.config.tags.clone(),
         );
         let body: Vec<u8> = input.into_bytes();
 
@@ -173,27 +173,21 @@ fn create_build_request(
 
 fn merge_tags(
     event: &Metric,
-    tags: Option<HashMap<String, String>>
+    tags: Option<HashMap<String, String>>,
 ) -> Option<BTreeMap<String, String>> {
     match (event.tags.clone(), tags.clone()) {
         (Some(mut event_tags), Some(config_tags)) => {
-            event_tags.extend(
-                config_tags
-                    .into_iter()
-                    .map(|(k, v)| (k.clone(), v.clone()))
-            );
+            event_tags.extend(config_tags.into_iter().map(|(k, v)| (k.clone(), v.clone())));
             Some(event_tags)
-        },
-        (Some(event_tags), None) => Some(event_tags),
-        (None, Some(config_tags)) => {
-            Some(
-                config_tags
-                    .into_iter()
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect()
-            )
         }
-        (None, None) => None
+        (Some(event_tags), None) => Some(event_tags),
+        (None, Some(config_tags)) => Some(
+            config_tags
+                .into_iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+        ),
+        (None, None) => None,
     }
 }
 
@@ -843,7 +837,7 @@ mod tests {
                 tags: Some(tags()),
                 kind: MetricKind::Absolute,
                 value: MetricValue::Gauge { value: 1000.0 },
-            }
+            },
         ];
 
         let mut tags = HashMap::new();
@@ -862,7 +856,6 @@ mod tests {
             "vector.mem,datacenter=us-east,host=local,metric_type=gauge,normal_tag=value,true_tag=true value=1000 1542182950000000011"
         );
     }
-
 }
 
 #[cfg(feature = "influxdb-integration-tests")]
