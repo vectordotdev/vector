@@ -1,5 +1,5 @@
 use crate::{
-    event::{Event, Value, ValueKind},
+    event::{Event, Value},
     mapping::Result,
 };
 use std::collections::HashMap;
@@ -9,7 +9,7 @@ pub mod functions;
 pub mod path;
 
 /// A parameter definition accepted by a function.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(in crate::mapping) struct Parameter {
     /// The keyword of the parameter.
     ///
@@ -17,14 +17,25 @@ pub(in crate::mapping) struct Parameter {
     /// argument.
     pub keyword: &'static str,
 
-    /// The list of value kinds accepted for this parameter.
-    pub kinds: &'static [ValueKind],
+    /// The parser calls this method to determine if a given argument value is
+    /// accepted by the parameter.
+    pub accepts: fn(&Value) -> bool,
 
     /// Whether or not this is a required parameter.
     ///
     /// If it isn't, the function can be called without errors, even if the
     /// argument matching this parameter is missing.
     pub required: bool,
+}
+
+impl std::fmt::Debug for Parameter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Parameter")
+            .field("keyword", &self.keyword)
+            .field("required", &self.required)
+            .field("accepts", &"fn(&Value) -> bool".to_owned())
+            .finish()
+    }
 }
 
 pub(in crate::mapping) trait Function: Send + core::fmt::Debug {
@@ -113,13 +124,13 @@ impl Argument {
 impl Function for Argument {
     fn execute(&self, ctx: &Event) -> Result<Value> {
         let value = self.resolver.execute(ctx)?;
-        let kind = value.to_value_kind();
 
-        // Validate argument value types, unless no requirements are defined.
-        if !self.parameter.kinds.is_empty() && !self.parameter.kinds.contains(&kind) {
+        // Ask the parameter if it accepts the given value.
+        if !(self.parameter.accepts)(&value) {
             return Err(format!(
                 "invalid argument type '{}' for parameter '{}'",
-                kind, self.parameter.keyword
+                value.kind(),
+                self.parameter.keyword
             ));
         }
 

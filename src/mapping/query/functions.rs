@@ -2,7 +2,7 @@
 use super::Literal;
 use super::{ArgumentList, Function, Parameter};
 use crate::{
-    event::{Event, Value, ValueKind},
+    event::{Event, Value},
     mapping::Result,
     types::Conversion,
 };
@@ -15,7 +15,7 @@ use std::str::FromStr;
 // function as expected. This is a bug in the implementation.
 macro_rules! unexpected_type {
     ($value:expr) => {
-        unreachable!("unexpected value type: '{}'", $value.to_value_kind());
+        unreachable!("unexpected value type: '{}'", $value.kind());
     };
 }
 
@@ -148,12 +148,12 @@ impl Function for ToStringFn {
         &[
             Parameter {
                 keyword: "value",
-                kinds: &[],
+                accepts: |_| true,
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                kinds: &[],
+                accepts: |_| true,
                 required: false,
             },
         ]
@@ -210,24 +210,12 @@ impl Function for ToIntegerFn {
         &[
             Parameter {
                 keyword: "value",
-                kinds: &[
-                    ValueKind::Integer,
-                    ValueKind::Float,
-                    ValueKind::Bytes,
-                    ValueKind::Boolean,
-                    ValueKind::Timestamp,
-                ],
+                accepts: is_scalar_value,
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                kinds: &[
-                    ValueKind::Integer,
-                    ValueKind::Float,
-                    ValueKind::Bytes,
-                    ValueKind::Boolean,
-                    ValueKind::Timestamp,
-                ],
+                accepts: is_scalar_value,
                 required: false,
             },
         ]
@@ -284,24 +272,12 @@ impl Function for ToFloatFn {
         &[
             Parameter {
                 keyword: "value",
-                kinds: &[
-                    ValueKind::Integer,
-                    ValueKind::Float,
-                    ValueKind::Bytes,
-                    ValueKind::Boolean,
-                    ValueKind::Timestamp,
-                ],
+                accepts: is_scalar_value,
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                kinds: &[
-                    ValueKind::Integer,
-                    ValueKind::Float,
-                    ValueKind::Bytes,
-                    ValueKind::Boolean,
-                    ValueKind::Timestamp,
-                ],
+                accepts: is_scalar_value,
                 required: false,
             },
         ]
@@ -357,22 +333,12 @@ impl Function for ToBooleanFn {
         &[
             Parameter {
                 keyword: "value",
-                kinds: &[
-                    ValueKind::Integer,
-                    ValueKind::Float,
-                    ValueKind::Bytes,
-                    ValueKind::Boolean,
-                ],
+                accepts: |v| matches!(v, Value::Integer(_) | Value::Float(_) | Value::Bytes(_) | Value::Boolean(_)),
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                kinds: &[
-                    ValueKind::Integer,
-                    ValueKind::Float,
-                    ValueKind::Bytes,
-                    ValueKind::Boolean,
-                ],
+                accepts: |v| matches!(v, Value::Integer(_) | Value::Float(_) | Value::Bytes(_) | Value::Boolean(_)),
                 required: false,
             },
         ]
@@ -424,12 +390,12 @@ impl Function for ToTimestampFn {
         &[
             Parameter {
                 keyword: "value",
-                kinds: &[ValueKind::Integer, ValueKind::Bytes, ValueKind::Timestamp],
+                accepts: |v| matches!(v, Value::Integer(_) | Value::Bytes(_) | Value::Timestamp(_)),
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                kinds: &[ValueKind::Integer, ValueKind::Bytes, ValueKind::Timestamp],
+                accepts: |v| matches!(v, Value::Integer(_) | Value::Bytes(_) | Value::Timestamp(_)),
                 required: false,
             },
         ]
@@ -444,17 +410,6 @@ impl TryFrom<ArgumentList> for ToTimestampFn {
         let default = arguments.optional("default");
 
         Ok(Self { query, default })
-    }
-}
-
-fn to_timestamp(value: Value) -> Result<Value> {
-    match value {
-        Value::Bytes(_) => Conversion::Timestamp
-            .convert(value)
-            .map_err(|e| e.to_string()),
-        Value::Integer(i) => Ok(Value::Timestamp(Utc.timestamp(i, 0))),
-        Value::Timestamp(_) => Ok(value),
-        _ => Err("unable to parse non-string or integer type to timestamp".to_string()),
     }
 }
 
@@ -520,17 +475,17 @@ impl Function for ParseTimestampFn {
         &[
             Parameter {
                 keyword: "value",
-                kinds: &[ValueKind::Bytes, ValueKind::Timestamp],
+                accepts: |v| matches!(v, Value::Bytes(_) | Value::Timestamp(_)),
                 required: true,
             },
             Parameter {
                 keyword: "format",
-                kinds: &[ValueKind::Bytes],
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                kinds: &[ValueKind::Bytes, ValueKind::Timestamp],
+                accepts: |v| matches!(v, Value::Bytes(_) | Value::Timestamp(_)),
                 required: false,
             },
         ]
@@ -582,7 +537,7 @@ impl Function for StripWhitespaceFn {
     fn parameters() -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            kinds: &[ValueKind::Bytes],
+            accepts: |v| matches!(v, Value::Bytes(_)),
             required: true,
         }]
     }
@@ -625,7 +580,7 @@ impl Function for UpcaseFn {
     fn parameters() -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            kinds: &[ValueKind::Bytes],
+            accepts: |v| matches!(v, Value::Bytes(_)),
             required: true,
         }]
     }
@@ -668,7 +623,7 @@ impl Function for DowncaseFn {
     fn parameters() -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            kinds: &[ValueKind::Bytes],
+            accepts: |v| matches!(v, Value::Bytes(_)),
             required: true,
         }]
     }
@@ -743,7 +698,7 @@ impl Function for Sha1Fn {
     fn parameters() -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            kinds: &[ValueKind::Bytes],
+            accepts: |v| matches!(v, Value::Bytes(_)),
             required: true,
         }]
     }
@@ -789,7 +744,7 @@ impl Function for Md5Fn {
     fn parameters() -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            kinds: &[ValueKind::Bytes],
+            accepts: |v| matches!(v, Value::Bytes(_)),
             required: true,
         }]
     }
@@ -911,17 +866,17 @@ impl Function for TruncateFn {
         &[
             Parameter {
                 keyword: "value",
-                kinds: &[ValueKind::Bytes],
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "limit",
-                kinds: &[ValueKind::Integer, ValueKind::Float],
+                accepts: |v| matches!(v, Value::Integer(_) | Value::Float(_)),
                 required: true,
             },
             Parameter {
                 keyword: "ellipsis",
-                kinds: &[ValueKind::Boolean],
+                accepts: |v| matches!(v, Value::Boolean(_)),
                 required: false,
             },
         ]
@@ -971,7 +926,7 @@ impl Function for ParseJsonFn {
     fn parameters() -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            kinds: &[ValueKind::Bytes],
+            accepts: |v| matches!(v, Value::Bytes(_)),
             required: true,
         }]
     }
@@ -984,6 +939,30 @@ impl TryFrom<ArgumentList> for ParseJsonFn {
         let query = arguments.required("value")?;
 
         Ok(Self { query })
+    }
+}
+
+//------------------------------------------------------------------------------
+
+fn is_scalar_value(value: &Value) -> bool {
+    match value {
+        Value::Integer(_)
+        | Value::Float(_)
+        | Value::Bytes(_)
+        | Value::Boolean(_)
+        | Value::Timestamp(_) => true,
+        Value::Map(_) | Value::Array(_) | Value::Null => false,
+    }
+}
+
+fn to_timestamp(value: Value) -> Result<Value> {
+    match value {
+        Value::Bytes(_) => Conversion::Timestamp
+            .convert(value)
+            .map_err(|e| e.to_string()),
+        Value::Integer(i) => Ok(Value::Timestamp(Utc.timestamp(i, 0))),
+        Value::Timestamp(_) => Ok(value),
+        _ => Err("unable to parse non-string or integer type to timestamp".to_string()),
     }
 }
 
