@@ -524,7 +524,7 @@ mod tests {
             (".foo = {\"bar\"}", vec![" 1:8\n", "= expected query"]),
             (
                 ". = \"bar\"",
-                vec![" 1:2\n", "= expected path_segment or quoted_path_segment"],
+                vec![" 1:2\n", "= expected path_field_name or quoted_path_segment"],
             ),
             (
                 ".foo = !",
@@ -544,7 +544,7 @@ mod tests {
             (".foo.bar = \"baz\" +", vec![" 1:19", "= expected query"]),
             (
                 ".foo.bar = .foo.(bar |)",
-                vec![" 1:23\n", "= expected path_segment"],
+                vec![" 1:23\n", "= expected path_field_name or quoted_path_segment"],
             ),
             (
                 "if .foo > 0 { .foo = \"bar\" } else",
@@ -591,7 +591,7 @@ mod tests {
             (
                 // Same here as above.
                 r#".foo."invalid \k escape".sequence = "foo""#,
-                vec![" 1:6\n", "= expected path_segment or quoted_path_segment"],
+                vec![" 1:6\n", "= expected path_field_name or quoted_path_segment"],
             ),
         ];
 

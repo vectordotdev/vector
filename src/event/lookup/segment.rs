@@ -1,7 +1,6 @@
 use crate::mapping::parser::Rule;
-use nom::lib::std::fmt::Formatter;
 use pest::iterators::Pair;
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub enum Segment {

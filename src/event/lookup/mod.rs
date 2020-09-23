@@ -17,12 +17,12 @@ use toml::Value as TomlValue;
 
 use core::fmt;
 use indexmap::map::IndexMap;
-use nom::lib::std::fmt::Formatter;
 pub use segment::Segment;
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 use std::ops::{Index, IndexMut};
+use std::str::FromStr;
 
 /// Lookups are precomputed event lookup paths.
 ///
@@ -83,7 +83,7 @@ impl Lookup {
         }
         Ok(discoveries)
     }
-    pub fn from_toml(value: TomlValue) -> crate::Result<IndexMap<Lookup, Value>> {
+    pub fn from_toml_table(value: TomlValue) -> crate::Result<IndexMap<Lookup, Value>> {
         let mut discoveries = IndexMap::new();
         match value {
             TomlValue::Table(map) => {
@@ -132,6 +132,16 @@ impl Lookup {
     }
 }
 
+impl FromStr for Lookup {
+    type Err = crate::Error;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        let mut pairs = MappingParser::parse(Rule::lookup, input)?;
+        let pair = pairs.next().ok_or("No tokens found.")?;
+        Self::try_from(pair)
+    }
+}
+
 impl IntoIterator for Lookup {
     type Item = Segment;
     type IntoIter = std::vec::IntoIter<Self::Item>;
@@ -141,35 +151,30 @@ impl IntoIterator for Lookup {
     }
 }
 
-impl TryFrom<String> for Lookup {
-    type Error = crate::Error;
-
-    fn try_from(input: String) -> Result<Self, Self::Error> {
-        let mut pairs = MappingParser::parse(Rule::lookup, &input)?;
-        let pair = pairs.next().ok_or("No tokens found.")?;
-        Self::try_from(pair)
+impl From<String> for Lookup {
+    fn from(input: String) -> Self {
+        Self {
+            segments: vec![Segment::field(input)],
+        }
     }
 }
 
-impl TryFrom<&str> for Lookup {
-    type Error = crate::Error;
-
-    fn try_from(input: &str) -> Result<Self, Self::Error> {
-        let mut pairs = MappingParser::parse(Rule::lookup, input)?;
-        let pair = pairs.next().ok_or("No tokens found.")?;
-        Self::try_from(pair)
+impl From<&str> for Lookup {
+    fn from(input: &str) -> Self {
+        Self {
+            segments: vec![Segment::field(input.to_owned())],
+        }
     }
 }
 
-impl TryFrom<string_cache::DefaultAtom> for Lookup {
-    type Error = crate::Error;
-
-    fn try_from(input: string_cache::DefaultAtom) -> Result<Self, Self::Error> {
-        let mut pairs = MappingParser::parse(Rule::lookup, &input)?;
-        let pair = pairs.next().ok_or("No tokens found.")?;
-        Self::try_from(pair)
+impl From<string_cache::DefaultAtom> for Lookup {
+    fn from(input: string_cache::DefaultAtom) -> Self {
+        Self {
+            segments: vec![Segment::field(input.to_string())],
+        }
     }
 }
+    
 
 impl Index<usize> for Lookup {
     type Output = Segment;
@@ -248,13 +253,13 @@ impl<'de> Visitor<'de> for LookupVisitor {
     where
         E: de::Error,
     {
-        Lookup::try_from(value.to_owned()).map_err(de::Error::custom)
+        Lookup::from_str(value).map_err(de::Error::custom)
     }
 
     fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
     where
         E: de::Error,
     {
-        Lookup::try_from(value).map_err(de::Error::custom)
+        Lookup::from_str(&value).map_err(de::Error::custom)
     }
 }
