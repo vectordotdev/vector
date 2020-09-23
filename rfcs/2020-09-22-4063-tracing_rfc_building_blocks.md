@@ -61,8 +61,6 @@ We want Vector to receive incoming traces from applications. In order to do this
 
 To implement those building blocks the RFC will propose an OpenTelemetry source and sink.
 
-And some exa
-
 ## Prior Art
 
 * [Sample exporters to other platforms](https://github.com/open-telemetry/opentelemetry-collector/tree/master/exporter)
