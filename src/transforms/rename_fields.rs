@@ -5,21 +5,22 @@ use crate::{
     internal_events::{
         RenameFieldsEventProcessed, RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten,
     },
+    event::Lookup,
     serde::Fields,
 };
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
+use std::convert::TryInto;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RenameFieldsConfig {
-    pub fields: Fields<String>,
+    pub fields: Fields<Lookup>,
     drop_empty: Option<bool>,
 }
 
 pub struct RenameFields {
-    fields: IndexMap<Atom, Atom>,
+    fields: IndexMap<Lookup, Lookup>,
     drop_empty: bool,
 }
 
@@ -30,14 +31,11 @@ inventory::submit! {
 #[typetag::serde(name = "rename_fields")]
 impl TransformConfig for RenameFieldsConfig {
     fn build(&self, _exec: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(RenameFields::new(
-            self.fields
-                .clone()
-                .all_fields()
-                .map(|(k, v)| (k, v.into()))
-                .collect(),
-            self.drop_empty.unwrap_or(false),
-        )?))
+        let mut fields = IndexMap::default();
+        for (key, value) in self.fields.clone().all_fields() {
+            fields.insert(key.to_string().try_into()?, value.to_string().try_into()?);
+        }
+        Ok(Box::new(RenameFields::new(fields, self.drop_empty.unwrap_or(false))?))
     }
 
     fn input_type(&self) -> DataType {
@@ -54,8 +52,8 @@ impl TransformConfig for RenameFieldsConfig {
 }
 
 impl RenameFields {
-    pub fn new(fields: IndexMap<Atom, Atom>, drop_empty: bool) -> crate::Result<Self> {
-        Ok(RenameFields { fields, drop_empty })
+    pub fn new(fields: IndexMap<Lookup, Lookup>, drop_empty: bool) -> crate::Result<Self> {
+        Ok(RenameFields { fields: fields, drop_empty })
     }
 }
 
@@ -64,18 +62,21 @@ impl Transform for RenameFields {
         emit!(RenameFieldsEventProcessed);
 
         for (old_key, new_key) in &self.fields {
+            
+            let old_key_string = old_key.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
+            let new_key_string = new_key.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
             let log = event.as_mut_log();
-            match log.remove_prune(&old_key, self.drop_empty) {
+            match log.remove_prune(&old_key_string, self.drop_empty) {
                 Some(v) => {
-                    if event.as_mut_log().insert(&new_key.clone(), v).is_some() {
+                    if event.as_mut_log().insert(&new_key_string, v).is_some() {
                         emit!(RenameFieldsFieldOverwritten {
-                            field: old_key.as_ref()
+                            field: &old_key_string
                         });
                     }
                 }
                 None => {
                     emit!(RenameFieldsFieldDoesNotExist {
-                        field: old_key.as_ref()
+                        field: &old_key_string
                     });
                 }
             }
@@ -87,9 +88,8 @@ impl Transform for RenameFields {
 
 #[cfg(test)]
 mod tests {
-    use super::RenameFields;
-    use crate::{event::Event, transforms::Transform};
-    use indexmap::map::IndexMap;
+    use super::*;
+    use std::convert::TryFrom;
 
     #[test]
     fn rename_fields() {
@@ -97,8 +97,8 @@ mod tests {
         event.as_mut_log().insert("to_move", "some value");
         event.as_mut_log().insert("do_not_move", "not moved");
         let mut fields = IndexMap::new();
-        fields.insert("to_move".into(), "moved".into());
-        fields.insert("not_present".into(), "should_not_exist".into());
+        fields.insert(Lookup::try_from("to_move").unwrap(), Lookup::try_from("moved").unwrap());
+        fields.insert(Lookup::try_from("not_present").unwrap(), Lookup::try_from("should_not_exist").unwrap());
 
         let mut transform = RenameFields::new(fields, false).unwrap();
 
