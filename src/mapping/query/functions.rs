@@ -15,7 +15,7 @@ use std::str::FromStr;
 // function as expected. This is a bug in the implementation.
 macro_rules! unexpected_type {
     ($value:expr) => {
-        unimplemented!("unexpected value type: '{}'", $value.to_value_kind());
+        unreachable!("unexpected value type: '{}'", $value.to_value_kind());
     };
 }
 
@@ -125,10 +125,8 @@ pub(in crate::mapping) struct ToStringFn {
 impl ToStringFn {
     #[cfg(test)]
     pub(in crate::mapping) fn new(query: Box<dyn Function>, default: Option<Value>) -> Self {
-        Self {
-            query,
-            default: default.map(|v| Box::new(Literal::from(v)) as _),
-        }
+        let default = default.map(|v| Box::new(Literal::from(v)) as _);
+        Self { query, default }
     }
 }
 
@@ -184,10 +182,8 @@ pub(in crate::mapping) struct ToIntegerFn {
 impl ToIntegerFn {
     #[cfg(test)]
     pub(in crate::mapping) fn new(query: Box<dyn Function>, default: Option<Value>) -> Self {
-        Self {
-            query,
-            default: default.map(|v| Box::new(Literal::from(v)) as _),
-        }
+        let default = default.map(|v| Box::new(Literal::from(v)) as _);
+        Self { query, default }
     }
 }
 
@@ -260,10 +256,8 @@ pub(in crate::mapping) struct ToFloatFn {
 impl ToFloatFn {
     #[cfg(test)]
     pub(in crate::mapping) fn new(query: Box<dyn Function>, default: Option<Value>) -> Self {
-        Self {
-            query,
-            default: default.map(|v| Box::new(Literal::from(v)) as _),
-        }
+        let default = default.map(|v| Box::new(Literal::from(v)) as _);
+        Self { query, default }
     }
 }
 
@@ -336,10 +330,8 @@ pub(in crate::mapping) struct ToBooleanFn {
 impl ToBooleanFn {
     #[cfg(test)]
     pub(in crate::mapping) fn new(query: Box<dyn Function>, default: Option<Value>) -> Self {
-        Self {
-            query,
-            default: default.map(|v| Box::new(Literal::from(v)) as _),
-        }
+        let default = default.map(|v| Box::new(Literal::from(v)) as _);
+        Self { query, default }
     }
 }
 
@@ -409,10 +401,8 @@ pub(in crate::mapping) struct ToTimestampFn {
 impl ToTimestampFn {
     #[cfg(test)]
     pub(in crate::mapping) fn new(query: Box<dyn Function>, default: Option<Value>) -> Self {
-        Self {
-            query,
-            default: default.map(|v| Box::new(Literal::from(v)) as _),
-        }
+        let default = default.map(|v| Box::new(Literal::from(v)) as _);
+        Self { query, default }
     }
 }
 
@@ -484,10 +474,13 @@ impl ParseTimestampFn {
         query: Box<dyn Function>,
         default: Option<Value>,
     ) -> Self {
+        let format = Box::new(Literal::from(Value::from(format)));
+        let default = default.map(|v| Box::new(Literal::from(v)) as _);
+
         Self {
             query,
-            format: Box::new(Literal::from(Value::from(format))),
-            default: default.map(|v| Box::new(Literal::from(v)) as _),
+            format,
+            default,
         }
     }
 }
@@ -854,10 +847,12 @@ impl TruncateFn {
         limit: Box<dyn Function>,
         ellipsis: Option<Value>,
     ) -> Self {
+        let ellipsis = ellipsis.map(|b| Box::new(Literal::from(b)) as _);
+
         Self {
             query,
             limit,
-            ellipsis: ellipsis.map(|b| Box::new(Literal::from(b)) as _),
+            ellipsis,
         }
     }
 }
