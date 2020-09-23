@@ -67,9 +67,7 @@ done
 
 # Init support data
 mkdir -p \
-  "$RPMBUILD_DIR/SOURCES/init.d" \
   "$RPMBUILD_DIR/SOURCES/systemd"
-cp -av distribution/init.d/. "$RPMBUILD_DIR/SOURCES/init.d"
 cp -av distribution/systemd/. "$RPMBUILD_DIR/SOURCES/systemd"
 
 # Copy the archive into the sources dir
