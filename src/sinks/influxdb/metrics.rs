@@ -914,6 +914,7 @@ mod integration_tests {
             }),
             batch: Default::default(),
             request: Default::default(),
+            tags: None
         };
 
         let metric = format!("counter-{}", Utc::now().timestamp_nanos());
