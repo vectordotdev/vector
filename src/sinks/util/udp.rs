@@ -174,9 +174,10 @@ impl Sink for UdpSink {
                     Ok(sent) => {
                         if sent != line.len() {
                             warn!(
-                                "Could not send all data in one UDP packet, data length: {}, sent: {}.",
+                                "Could not send all data in one UDP packet, data length: {}, sent: {}; dropping {} bytes.",
                                 line.len(),
-                                sent
+                                sent,
+                                line.len() - sent,
                             );
                         }
                         Ok(AsyncSink::Ready)
