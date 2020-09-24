@@ -191,7 +191,7 @@ mod filters {
     async fn handle_firehose_rejection(
         err: warp::Rejection,
     ) -> Result<impl warp::Reply, Infallible> {
-        let request_id: Option<&String>;
+        let request_id: Option<String>;
         let message: String;
         let code: StatusCode;
 
@@ -200,68 +200,33 @@ mod filters {
                 AccessKeyError::Invalid { request_id: ref id } => {
                     code = StatusCode::UNAUTHORIZED;
                     message = "invalid access key".to_string();
-                    request_id = Some(id);
+                    request_id = Some(id.clone());
                 }
                 AccessKeyError::Missing { request_id: ref id } => {
                     code = StatusCode::UNAUTHORIZED;
                     message = "missing access key".to_string();
-                    request_id = Some(id);
+                    request_id = Some(id.clone());
                 }
             }
         } else if let Some(e) = err.find::<RequestError>() {
             message = format!("{}", e);
-            match e {
-                RequestError::Parse {
-                    source: _source,
-                    request_id: ref id,
-                } => {
-                    code = StatusCode::BAD_REQUEST;
-                    request_id = Some(id);
-                }
-                RequestError::UnsupportedEncoding {
-                    encoding: _encoding,
-                    request_id: ref id,
-                } => {
-                    code = StatusCode::BAD_REQUEST;
-                    request_id = Some(id);
-                }
-                RequestError::ParseRecords {
-                    source: _source,
-                    request_id: ref id,
-                } => {
-                    code = StatusCode::BAD_REQUEST;
-                    request_id = Some(id);
-                }
-                RequestError::Decode {
-                    source: _source,
-                    request_id: ref id,
-                } => {
-                    code = StatusCode::BAD_REQUEST;
-                    request_id = Some(id);
-                }
-                RequestError::ShuttingDown {
-                    source: _source,
-                    request_id: ref id,
-                } => {
-                    code = StatusCode::SERVICE_UNAVAILABLE;
-                    request_id = Some(id);
-                }
-            }
+            code = e.status();
+            request_id = Some(e.request_id());
         } else {
             code = StatusCode::INTERNAL_SERVER_ERROR;
             message = format!("{:?}", err);
             request_id = None;
         }
 
-        let json = warp::reply::json(&FirehoseResponse {
-            request_id: request_id.map(|s| s.to_owned()).unwrap_or_default(),
-            timestamp: Utc::now(),
-            error_message: Some(message.clone()),
+        emit!(AwsKinesisFirehoseRequestError {
+            request_id: request_id.as_deref(),
+            error: message.as_str(),
         });
 
-        emit!(AwsKinesisFirehoseRequestError {
-            request_id: request_id,
-            error: message.as_str(),
+        let json = warp::reply::json(&FirehoseResponse {
+            request_id: request_id.unwrap_or_default(),
+            timestamp: Utc::now(),
+            error_message: Some(message.clone()),
         });
 
         Ok(warp::reply::with_status(json, code))
@@ -407,6 +372,7 @@ mod models {
 pub mod errors {
     use crate::event::Event;
     use snafu::Snafu;
+    use warp::http::StatusCode;
 
     #[derive(Clone, Debug)]
     pub enum AccessKeyError {
@@ -455,6 +421,29 @@ pub mod errors {
     }
 
     impl warp::reject::Reject for RequestError {}
+
+    impl RequestError {
+        pub fn status(&self) -> StatusCode {
+            match *self {
+                RequestError::Parse { .. } => StatusCode::BAD_REQUEST,
+                RequestError::UnsupportedEncoding { .. } => StatusCode::BAD_REQUEST,
+                RequestError::ParseRecords { .. } => StatusCode::BAD_REQUEST,
+                RequestError::Decode { .. } => StatusCode::BAD_REQUEST,
+                RequestError::ShuttingDown { .. } => StatusCode::SERVICE_UNAVAILABLE,
+            }
+        }
+
+        pub fn request_id(&self) -> String {
+            match *self {
+                RequestError::Parse { ref request_id, .. } => request_id,
+                RequestError::UnsupportedEncoding { ref request_id, .. } => request_id,
+                RequestError::ParseRecords { ref request_id, .. } => request_id,
+                RequestError::Decode { ref request_id, .. } => request_id,
+                RequestError::ShuttingDown { ref request_id, .. } => request_id,
+            }
+            .clone()
+        }
+    }
 
     impl From<RequestError> for warp::reject::Rejection {
         fn from(error: RequestError) -> Self {

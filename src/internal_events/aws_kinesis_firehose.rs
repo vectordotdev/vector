@@ -27,7 +27,7 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestReceived<'a> {
 
 #[derive(Debug)]
 pub struct AwsKinesisFirehoseRequestError<'a> {
-    pub request_id: Option<&'a String>,
+    pub request_id: Option<&'a str>,
     pub error: &'a str,
 }
 
