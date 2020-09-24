@@ -62,9 +62,9 @@ We want Vector to receive incoming traces from applications. In order to do this
 Most of the tracing providers provide [an agent and a collector](https://github.com/open-telemetry/opentelemetry-collector/blob/master/README.md). Jaeger defines this as:
 
 - Agent is a sidecar / host agent that receives telemetry from the client library in a standardized format and forwards it to collector.
-- Collector translates the data into the format understood by a specific tracing backend and sends it there. 
+- Collector translates the data into the format understood by a specific tracing backend and sends it there.
 
-For Vector, the agent broadly falls into the concept of `source` and the `collector` into the concept of `sink`. The OpenTelemetry Collector can be deployed in both modes and supports collecting traces, metrics, and logs (RSN). 
+For Vector, the agent broadly falls into the concept of `source` and the `collector` into the concept of `sink`. The OpenTelemetry Collector can be deployed in both modes and supports collecting traces, metrics, and logs (RSN).
 
 To implement those building blocks this RFC will propose implementing a source and a sink.
 
@@ -87,7 +87,7 @@ The OTLP receiver has additional options we should support
 - Timeout (default = 20s)
 - max_recv_msg_size_mib (default = 4MB): sets the maximum size of messages accepted
 - max_concurrent_streams: sets the limit on the number of concurrent streams
-- tls_credentials (default = unset): configures the receiver to use TLS. 
+- tls_credentials (default = unset): configures the receiver to use TLS.
 
 The receiver also supports [batching](https://github.com/open-telemetry/opentelemetry-collector/blob/master/processor/batchprocessor/README.md).
 
@@ -142,6 +142,7 @@ Additionally, there'd be support for TLS and Batching options.
   - The [official OpenTelemetry client](https://crates.io/crates/opentelemetry)
   - An [unofficial client](https://crates.io/crates/tracing-opentelemetry)
   - Another [unoffocial client](https://crates.io/crates/opentelemetry-otlp)
+
 ### Other reference materials
 
 - [Jaeger exporter for OpenTelemetry](https://crates.io/crates/opentelemetry-jaeger)
