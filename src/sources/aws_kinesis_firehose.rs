@@ -11,7 +11,6 @@ use std::net::SocketAddr;
 
 // TODO:
 // * Consider additional context for record that could not be decoded
-// * Verify gzip content-encoding support
 // * See about returning the default warp status code for standard warp rejections
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -75,16 +74,20 @@ inventory::submit! {
 
 mod filters {
     use super::{
-        errors::{AccessKeyError, RequestError},
+        errors::{AccessKeyError, Parse, RequestError},
         handlers,
-        models::FirehoseResponse,
+        models::{FirehoseRequest, FirehoseResponse},
     };
     use crate::{
         internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
         Pipeline,
     };
+    use bytes::{buf::BufExt, Bytes};
     use chrono::Utc;
+    use flate2::read::GzDecoder;
+    use snafu::ResultExt;
     use std::convert::Infallible;
+    use std::io;
     use warp::http::StatusCode;
     use warp::Filter;
 
@@ -102,10 +105,44 @@ mod filters {
                 "X-Amz-Firehose-Protocol-Version",
                 "1.0",
             ))
-            .and(warp::body::json())
+            .and(parse_body())
             .and(warp::any().map(move || out.clone()))
             .and_then(handlers::firehose)
             .recover(handle_firehose_rejection)
+    }
+
+    /// Decode (if needed) and parse request body
+    ///
+    /// Firehose can be configured to gzip compress messages so we handle this here
+    fn parse_body(
+    ) -> impl Filter<Extract = (FirehoseRequest,), Error = warp::reject::Rejection> + Clone {
+        warp::any()
+            .and(warp::header::optional::<String>("Content-Encoding"))
+            .and(warp::header("X-Amz-Firehose-Request-Id"))
+            .and(warp::body::bytes())
+            .and_then(
+                |encoding: Option<String>, request_id: String, body: Bytes| async move {
+                    match encoding {
+                        Some(s) if s.as_bytes() == b"gzip" => {
+                            Ok(Box::new(GzDecoder::new(body.reader())) as Box<dyn io::Read>)
+                        }
+                        Some(s) => Err(warp::reject::Rejection::from(
+                            RequestError::UnsupportedEncoding {
+                                encoding: s,
+                                request_id: request_id.clone(),
+                            },
+                        )),
+                        None => Ok(Box::new(body.reader()) as Box<dyn io::Read>),
+                    }
+                    .and_then(|r| {
+                        serde_json::from_reader(r)
+                            .context(Parse {
+                                request_id: request_id.clone(),
+                            })
+                            .map_err(|e| warp::reject::custom(e))
+                    })
+                },
+            )
     }
 
     fn emit_received() -> impl Filter<Extract = (), Error = warp::reject::Rejection> + Clone {
@@ -181,6 +218,20 @@ mod filters {
                     code = StatusCode::BAD_REQUEST;
                     request_id = Some(id);
                 }
+                RequestError::UnsupportedEncoding {
+                    encoding: _encoding,
+                    request_id: ref id,
+                } => {
+                    code = StatusCode::BAD_REQUEST;
+                    request_id = Some(id);
+                }
+                RequestError::ParseRecords {
+                    source: _source,
+                    request_id: ref id,
+                } => {
+                    code = StatusCode::BAD_REQUEST;
+                    request_id = Some(id);
+                }
                 RequestError::Decode {
                     source: _source,
                     request_id: ref id,
@@ -218,7 +269,7 @@ mod filters {
 }
 
 mod handlers {
-    use super::errors::{Parse, RequestError};
+    use super::errors::{ParseRecords, RequestError};
     use super::models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse};
     use crate::{config::log_schema, event::Event, Pipeline};
     use chrono::Utc;
@@ -236,8 +287,8 @@ mod handlers {
         request: FirehoseRequest,
         out: Pipeline,
     ) -> Result<impl warp::Reply, reject::Rejection> {
-        match parse_request(request, request_id.as_str(), source_arn.as_str()).with_context(|| {
-            Parse {
+        match parse_records(request, request_id.as_str(), source_arn.as_str()).with_context(|| {
+            ParseRecords {
                 request_id: request_id.clone(),
             }
         }) {
@@ -270,7 +321,7 @@ mod handlers {
     }
 
     /// Parses out events from the FirehoseRequest
-    fn parse_request(
+    fn parse_records(
         request: FirehoseRequest,
         request_id: &str,
         source_arn: &str,
@@ -370,6 +421,15 @@ pub mod errors {
     pub enum RequestError {
         #[snafu(display("Could not parse incoming request {}: {}", request_id, source))]
         Parse {
+            source: serde_json::error::Error,
+            request_id: String,
+        },
+        #[snafu(display(
+            "Could not parse records from incoming request {}: {}",
+            request_id,
+            source
+        ))]
+        ParseRecords {
             source: std::io::Error,
             request_id: String,
         },
@@ -385,6 +445,11 @@ pub mod errors {
         ))]
         ShuttingDown {
             source: futures01::sync::mpsc::SendError<Event>,
+            request_id: String,
+        },
+        #[snafu(display("Unsupported encoding: {}", encoding))]
+        UnsupportedEncoding {
+            encoding: String,
             request_id: String,
         },
     }
@@ -410,10 +475,11 @@ mod tests {
         Pipeline,
     };
     use chrono::{DateTime, SubsecRound, Utc};
+    use flate2::{read::GzEncoder, Compression};
     use futures::compat::Future01CompatExt;
     use futures01::sync::mpsc;
     use pretty_assertions::assert_eq;
-    use std::io::Read;
+    use std::io::{Cursor, Read};
     use std::net::SocketAddr;
 
     async fn source(access_key: Option<String>) -> (mpsc::Receiver<Event>, SocketAddr) {
@@ -451,6 +517,7 @@ mod tests {
         key: Option<&str>,
         request_id: &str,
         source_arn: &str,
+        gzip: bool,
     ) -> reqwest::Result<reqwest::Response> {
         let request = models::FirehoseRequest {
             request_id: request_id.to_string(),
@@ -474,11 +541,22 @@ mod tests {
             .header("x-amz-firehose-request-id", request_id.to_string())
             .header("x-amz-firehose-source-arn", source_arn.to_string())
             .header("user-agent", "Amazon Kinesis Data Firehose Agent/1.0")
-            .header("content-type", "application/json")
-            .json(&request);
+            .header("content-type", "application/json");
 
         if let Some(key) = key {
             builder = builder.header("x-amz-firehose-access-key", key);
+        }
+
+        if gzip {
+            let mut gz = GzEncoder::new(
+                Cursor::new(serde_json::to_vec(&request).unwrap()),
+                Compression::fast(),
+            );
+            let mut buffer = Vec::new();
+            gz.read_to_end(&mut buffer).unwrap();
+            builder = builder.header("content-encoding", "gzip").body(buffer);
+        } else {
+            builder = builder.json(&request);
         }
 
         builder.send().await
@@ -486,9 +564,6 @@ mod tests {
 
     /// Encodes record data to mach AWS's representation: base64 encoded, gzip'd data
     fn encode_record(record: &str) -> std::io::Result<String> {
-        use flate2::read::GzEncoder;
-        use flate2::Compression;
-
         let mut buffer = Vec::new();
 
         let mut gz = GzEncoder::new(record.as_bytes(), Compression::fast());
@@ -530,9 +605,78 @@ mod tests {
         let request_id = "e17265d6-97af-4938-982e-90d5614c4242";
         let timestamp: DateTime<Utc> = Utc::now();
 
-        let res = send(addr, timestamp, vec![record], None, request_id, source_arn)
-            .await
-            .unwrap();
+        let res = send(
+            addr,
+            timestamp,
+            vec![record],
+            None,
+            request_id,
+            source_arn,
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(200, res.status().as_u16());
+
+        let events = collect_ready(rx).await.unwrap();
+        assert_eq!(
+            events,
+            vec![log_event! {
+                "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
+                "message"=> record,
+                "request_id" => request_id,
+                "source_arn" => source_arn,
+            },]
+        );
+
+        let response: models::FirehoseResponse = res.json().await.unwrap();
+        assert_eq!(response.request_id, request_id);
+    }
+
+    #[tokio::test]
+    async fn aws_kinesis_firehose_forwards_events_gzip() {
+        // example CloudWatch Logs subscription event
+        let record = r#"
+{
+  "messageType": "DATA_MESSAGE",
+  "owner": "071959437513",
+  "logGroup": "/jesse/test",
+  "logStream": "test",
+  "subscriptionFilters": [
+    "Destination"
+  ],
+  "logEvents": [
+    {
+      "id": "35683658089614582423604394983260738922885519999578275840",
+      "timestamp": 1600110569039,
+      "message": "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-platform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}"
+    },
+    {
+      "id": "35683658089659183914001456229543810359430816722590236673",
+      "timestamp": 1600110569041,
+      "message": "{\"bytes\":17707,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"109.81.244.252\",\"method\":\"GET\",\"protocol\":\"HTTP/2.0\",\"referer\":\"http://www.investormission-critical.io/24/7/vortals\",\"request\":\"/scale/functionalities/optimize\",\"source_type\":\"stdin\",\"status\":502,\"user-identifier\":\"feeney1708\"}"
+    }
+  ]
+}
+"#;
+
+        let (rx, addr) = source(None).await;
+
+        let source_arn = "arn:aws:firehose:us-east-1:111111111111:deliverystream/test";
+        let request_id = "e17265d6-97af-4938-982e-90d5614c4242";
+        let timestamp: DateTime<Utc> = Utc::now();
+
+        let res = send(
+            addr,
+            timestamp,
+            vec![record],
+            None,
+            request_id,
+            source_arn,
+            true,
+        )
+        .await
+        .unwrap();
         assert_eq!(200, res.status().as_u16());
 
         let events = collect_ready(rx).await.unwrap();
@@ -563,6 +707,7 @@ mod tests {
             Some("bad access key"),
             request_id,
             "",
+            false,
         )
         .await
         .unwrap();
