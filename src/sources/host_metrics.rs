@@ -27,6 +27,7 @@ use heim::{
     Error,
 };
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::time::Duration;
 use tokio::{select, time};
 
@@ -43,9 +44,17 @@ macro_rules! btreemap {
 #[serde(rename_all = "lowercase")]
 enum Collector {
     Cpu,
+    Filesystem,
     Load,
     Memory,
     Network,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+struct FilesystemConfig {
+    devices: Option<Vec<PathBuf>>,
+    filesystems: Option<Vec<String>>,
+    mountpoints: Option<Vec<PathBuf>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -60,6 +69,8 @@ struct HostMetricsConfig {
 
     collectors: Option<Vec<Collector>>,
 
+    #[serde(default)]
+    filesystem: FilesystemConfig,
     #[serde(default)]
     network: NetworkConfig,
 }
@@ -132,6 +143,12 @@ impl HostMetricsConfig {
         if self.has_collector(Collector::Cpu) {
             metrics.extend(add_collector("cpu", cpu_metrics().await));
         }
+        if self.has_collector(Collector::Filesystem) {
+            metrics.extend(add_collector(
+                "filesystem",
+                filesystem_metrics(&self.filesystem).await,
+            ));
+        }
         if self.has_collector(Collector::Load) {
             metrics.extend(add_collector("load", loadavg_metrics().await));
         }
@@ -140,10 +157,7 @@ impl HostMetricsConfig {
             metrics.extend(add_collector("memory", swap_metrics().await));
         }
         if self.has_collector(Collector::Network) {
-            metrics.extend(add_collector(
-                "network",
-                net_metrics(&self.network.devices).await,
-            ));
+            metrics.extend(add_collector("network", net_metrics(&self.network).await));
         }
         if let Ok(hostname) = &hostname {
             for metric in &mut metrics {
@@ -156,18 +170,24 @@ impl HostMetricsConfig {
 
 macro_rules! counter {
     ( $name:expr, $timestamp:expr, $value:expr $( , $tag:literal => $tagval:expr )* ) => {
-        metric!($name, $timestamp, Counter, $value $( , $tag => $tagval )* )
+        metric!($name, $timestamp, Counter, $value, btreemap![ $( $tag.into() => $tagval.into() ),* ] )
+    };
+    ( $name:expr, $timestamp:expr, $value:expr, $tags:expr ) => {
+        metric!($name, $timestamp, Counter, $value, $tags)
     };
 }
 
 macro_rules! gauge {
     ( $name:expr, $timestamp:expr, $value:expr $( , $tag:literal => $tagval:expr )* ) => {
-        metric!($name, $timestamp, Gauge, $value $( , $tag => $tagval )* )
+        metric!($name, $timestamp, Gauge, $value, btreemap![ $( $tag.into() => $tagval.into() ),* ] )
+    };
+    ( $name:expr, $timestamp:expr, $value:expr, $tags:expr ) => {
+        metric!($name, $timestamp, Gauge, $value, $tags)
     };
 }
 
 macro_rules! metric {
-    ( $name:expr, $timestamp:expr, $type:ident, $value:expr $( , $tag:literal => $tagval:expr )* ) => {
+    ( $name:expr, $timestamp:expr, $type:ident, $value:expr, $tags:expr ) => {
         Metric {
             name: $name.into(),
             timestamp: $timestamp,
@@ -175,9 +195,7 @@ macro_rules! metric {
             value: MetricValue::$type {
                 value: $value as f64,
             },
-            tags: Some(btreemap![
-                $( $tag.into() => $tagval.into() ),*
-            ]),
+            tags: Some($tags),
         }
     };
 }
@@ -326,7 +344,7 @@ async fn loadavg_metrics() -> Vec<Metric> {
     result
 }
 
-async fn net_metrics(devices: &Option<Vec<String>>) -> Vec<Metric> {
+async fn net_metrics(config: &NetworkConfig) -> Vec<Metric> {
     match heim::net::io_counters().await {
         Ok(counters) => {
             counters
@@ -334,7 +352,7 @@ async fn net_metrics(devices: &Option<Vec<String>>) -> Vec<Metric> {
                 // The following pair should be possible to do in one
                 // .filter_map, but it results in a strange "one type is
                 // more general than the other" error.
-                .map(|counter| vec_contains(devices, counter.interface()).map(|()| counter))
+                .map(|counter| vec_contains(&config.devices, counter.interface()).map(|()| counter))
                 .filter_map(|counter| async { counter })
                 .map(|counter| {
                     let timestamp = Some(Utc::now());
@@ -399,18 +417,91 @@ async fn net_metrics(devices: &Option<Vec<String>>) -> Vec<Metric> {
     }
 }
 
+async fn filesystem_metrics(config: &FilesystemConfig) -> Vec<Metric> {
+    match heim::disk::partitions().await {
+        Ok(partitions) => {
+            partitions
+                .filter_map(|result| filter_result(result, "Failed to load/parse partition data"))
+                .map(|partition| {
+                    vec_contains(&config.mountpoints, partition.mount_point()).map(|()| partition)
+                })
+                .filter_map(|partition| async { partition })
+                .map(|partition| match partition.device() {
+                    Some(device) => vec_contains(&config.devices, device).map(|()| partition),
+                    None => Some(partition),
+                })
+                .filter_map(|partition| async { partition })
+                .map(|partition| {
+                    vec_contains(&config.filesystems, partition.file_system().as_str())
+                        .map(|()| partition)
+                })
+                .filter_map(|partition| async { partition })
+                .filter_map(|partition| async {
+                    heim::disk::usage(partition.mount_point())
+                        .await
+                        .map(|usage| (partition, usage))
+                        .map_err(|error| {
+                            error!(message = "Failed to load partition usage data", %error, rate_limit_secs = 60)
+                        })
+                        .ok()
+                })
+                .map(|(partition, usage)| {
+                    let timestamp = Some(Utc::now());
+                    let fs = partition.file_system();
+                    let mut tags = btreemap![
+                        "filesystem".to_string() => fs.as_str().to_string(),
+                        "mountpoint".into() => partition.mount_point().to_string_lossy().into()
+                    ];
+                    if let Some(device) = partition.device() {
+                        tags.insert("device".into(), device.to_string_lossy().into());
+                    }
+                    stream::iter(
+                        vec![
+                            gauge!(
+                                "host_filesystem_free_bytes",
+                                timestamp,
+                                usage.free().get::<byte>(),
+                                tags.clone()
+                            ),
+                            gauge!(
+                                "host_filesystem_total_bytes",
+                                timestamp,
+                                usage.total().get::<byte>(),
+                                tags.clone()
+                            ),
+                            gauge!(
+                                "host_filesystem_used_bytes",
+                                timestamp,
+                                usage.used().get::<byte>(),
+                                tags
+                            ),
+                        ]
+                        .into_iter(),
+                    )
+                })
+                .flatten()
+                .collect::<Vec<_>>()
+                .await
+        }
+        Err(error) => {
+            error!(message = "Failed to load partitions info", %error, rate_limit_secs = 60);
+            vec![]
+        }
+    }
+}
+
 async fn filter_result<T>(result: Result<T, Error>, message: &'static str) -> Option<T> {
     result
         .map_err(|error| error!(message, %error, rate_limit_secs = 60))
         .ok()
 }
 
-fn vec_contains(vec: &Option<Vec<String>>, value: &str) -> Option<()> {
+fn vec_contains<T: PartialEq<V>, V>(vec: &Option<Vec<T>>, value: V) -> Option<()> {
     match vec {
         // Empty vector matches everything
         None => Some(()),
         // Otherwise find the given value
-        Some(vec) => vec.iter().find(|v| *v == value).map(|_| ()),
+        Some(vec) => vec.iter().find(|&v| *v == value).map(|_| ()),
     }
 }
 
