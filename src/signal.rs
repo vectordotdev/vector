@@ -34,6 +34,7 @@ pub fn signals() -> impl Stream<Item = SignalTo> {
 /// Signals from OS/user.
 #[cfg(windows)]
 pub fn signals() -> impl Stream<Item = SignalTo> {
+    use futures::future::FutureExt;
     let ctrl_c = tokio::signal::ctrl_c();
 
     ctrl_c.map(|_| SignalTo::Shutdown).into_stream()
