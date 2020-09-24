@@ -13,12 +13,12 @@ use futures::{
 use std::cmp::max;
 use tokio::{runtime, select};
 #[cfg(feature = "api")]
-use vector::api;
+use vector::{api, internal_events::ApiStarted};
 use vector::{
     config::{self, ConfigDiff},
     generate, heartbeat,
     internal_events::{
-        self, VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed,
+        VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed,
         VectorReloaded, VectorStarted, VectorStopped,
     },
     list, metrics,
@@ -132,7 +132,7 @@ fn main() {
         #[cfg(feature = "api")]
         // assigned to prevent the API terminating when falling out of scope
         let _api = if config.api.enabled {
-            emit!(internal_events::ApiStarted{
+            emit!(ApiStarted{
                 addr: config.api.bind.unwrap(),
                 playground: config.api.playground
             });
