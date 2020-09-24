@@ -93,12 +93,42 @@ The receiver also supports [batching](https://github.com/open-telemetry/opentele
 
 The OpenTelemetry receiver can receive trace export calls via HTTP/JSON in addition to gRPC. The HTTP/JSON address is the same as gRPC as the protocol is recognized and processed accordingly. For the receiver using HTTP/JSON the format needs to be [protobuf JSON serialization](https://developers.google.com/protocol-buffers/docs/proto3#json) and bytes fields are encoded as base64 strings. The HTTP/JSON endpoint can also optionally configure CORS. To write traces with HTTP/JSON the OTLP uses a `POST` to [address]/v1/trace. The default port is 55681.
 
-### Sink
+### Sinks
 
-Sink modelled on [the OTLP exporter](https://github.com/open-telemetry/opentelemetry-collector/blob/master/exporter/otlpexporter/otlp.go) that supports outputting traces (again with metrics and logs as a future option). The sink would export in multiple formats. Initially recommended is:
+Sinks modelled on [the OTLP exporters](https://github.com/open-telemetry/opentelemetry-collector/blob/master/exporter/otlpexporter/otlp.go) that supports outputting traces (again with metrics and logs as a future option). We would need sinks for several tracing backends. Initially recommended is:
 
-- Jaeger
-- Zipkin
+- [Jaeger](https://github.com/open-telemetry/opentelemetry-collector/tree/master/exporter/jaegerexporter)
+- [Zipkin](https://github.com/open-telemetry/opentelemetry-collector/tree/master/exporter/zipkinexporter)
+
+#### Jaeger sink
+
+Exports trace data to Jaeger collectors.
+
+The following settings are required:
+
+- endpoint (no default): host:port to which the exporter is going to send Jaeger trace data, using the gRPC protocol.
+
+The following settings can be optionally configured:
+
+- server_name_override If set to a non-empty string, it will override the virtual host name of authority (e.g. :authority header field) in requests (typically used for testing).
+- balancer_name(default = pick_first): Sets the balancer in grpclb_policy to discover the servers. See grpc loadbalancing example.
+
+Additionally, there'd be support for TLS and Batching options.
+
+#### Zipkin sink
+
+Exports trace data to a Zipkin back-end.
+
+The following settings are required:
+
+- endpoint (no default): URL to which the exporter is going to send Zipkin trace data.
+- format (default = JSON): The format to sent events in. Can be set to JSON or proto.
+
+The following settings can be optionally configured:
+
+- default_service_name (default = ""): What to name services missing this information.
+
+Additionally, there'd be support for TLS and Batching options.
 
 ## Prior Art
 
@@ -121,11 +151,11 @@ Sink modelled on [the OTLP exporter](https://github.com/open-telemetry/opentelem
 - [OpenTelemetry integration for the `tracing` crate](https://crates.io/crates/tracing-opentelemetry)
 - [OpeneTelemetry integration for `tracing-distributed`](https://crates.io/crates/tracing-jaeger)
 
-## Drawbacks
-
-
 ## Rationale
 
+Tracing is key to modern application monitoring, especially for microservices and distributed systems. If we do not support ingesting traces, it is likely to push people to use another tool to forward traces to the desired sink.
+
+As part of Vector's vision to be the "one tool" for ingesting and shipping observability data, it makes sense to add as many sources as possible to reduce the likelihood that a user will not be able to ingesttraces from their tools.
 
 ## Plan of Attack
 
@@ -146,4 +176,4 @@ Should we consider tracing sources for additional platforms or assume all will c
 ### Metrics & Logs
 
 - OpenTelemetry Metrics Source
-- Additional export formats for the Sink.
+- Additional export formats for the Sink including enabling trace sending to Elasticsearch and Kafka.
