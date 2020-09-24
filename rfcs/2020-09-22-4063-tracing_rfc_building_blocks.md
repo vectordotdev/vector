@@ -89,9 +89,9 @@ The OTLP receiver has additional options we should support
 - max_concurrent_streams: sets the limit on the number of concurrent streams
 - tls_credentials (default = unset): configures the receiver to use TLS. 
 
-The OpenTelemetry receiver can receive trace export calls via HTTP/JSON in addition to gRPC. The HTTP/JSON address is the same as gRPC as the protocol is recognized and processed accordingly. For the receiver using HTTP/JSON the format needs to be [protobuf JSON serialization](https://developers.google.com/protocol-buffers/docs/proto3#json) and bytes fields are encoded as base64 strings. The HTTP/JSON endpoint can also optionally configure CORS.
+The receiver also supports [batching](https://github.com/open-telemetry/opentelemetry-collector/blob/master/processor/batchprocessor/README.md).
 
-To write traces with HTTP/JSON the OTLP uses a `POST` to [address]/v1/trace. The default port is 55681.
+The OpenTelemetry receiver can receive trace export calls via HTTP/JSON in addition to gRPC. The HTTP/JSON address is the same as gRPC as the protocol is recognized and processed accordingly. For the receiver using HTTP/JSON the format needs to be [protobuf JSON serialization](https://developers.google.com/protocol-buffers/docs/proto3#json) and bytes fields are encoded as base64 strings. The HTTP/JSON endpoint can also optionally configure CORS. To write traces with HTTP/JSON the OTLP uses a `POST` to [address]/v1/trace. The default port is 55681.
 
 ### Sink
 
