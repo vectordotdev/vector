@@ -1076,6 +1076,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b72465f46d518f6015d9cf07f7f3013a95dd6b9c2747c3d65ae0cce43929d14f"
 
 [[package]]
+name = "db-key"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13d81b1999ae2c0acc98a9a8e0211e1247c11914f363588020bc54383949c479"
+
+[[package]]
 name = "debug-helper"
 version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2204,7 +2210,7 @@ version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32651baaaa5596b3a6e0bee625e73fd0334c167db0ea5ac68750ef9a629a2d6a"
 dependencies = [
- "db-key",
+ "db-key 0.0.5",
  "leveldb-sys",
  "libc",
 ]
@@ -5771,7 +5777,7 @@ dependencies = [
  "codec",
  "colored",
  "criterion",
- "db-key",
+ "db-key 0.1.0",
  "derivative 1.0.4",
  "derive_is_enum_variant",
  "dirs 2.0.2",
