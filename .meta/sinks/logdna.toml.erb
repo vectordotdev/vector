@@ -81,6 +81,13 @@ required = false
 examples = [["tag1", "tag2"]]
 description = "The tags that will be attached to each batch of events."
 
+[sinks.logdna.options.default_env]
+type = "string"
+required = false
+examples = ["staging", "production"]
+default = "production"
+description = "The default environment that will be set for events that do not contain an `env` field."
+
 [sinks.logdna.options.default_app]
 type = "string"
 required = false

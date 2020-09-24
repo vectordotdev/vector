@@ -39,6 +39,7 @@ pub struct LogdnaConfig {
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
     default_app: Option<String>,
+    default_env: Option<String>,
 
     #[serde(default)]
     batch: BatchConfig,
@@ -117,12 +118,24 @@ impl HttpSink for LogdnaConfig {
         map.insert("line".to_string(), json!(line));
         map.insert("timestamp".to_string(), json!(timestamp));
 
+        if let Some(env) = log.remove(&"env".into()) {
+            map.insert("env".to_string(), json!(env));
+        }
+
         if let Some(app) = log.remove(&"app".into()) {
             map.insert("app".to_string(), json!(app));
         }
 
         if let Some(file) = log.remove(&"file".into()) {
             map.insert("file".to_string(), json!(file));
+        }
+
+        if !map.contains_key("env") {
+            if let Some(default_env) = &self.default_env {
+                map.insert("env".to_string(), json!(default_env.as_str()));
+            } else {
+                map.insert("env".to_string(), json!("production"));
+            }
         }
 
         if !map.contains_key("app") && !map.contains_key("file") {
@@ -238,6 +251,7 @@ mod tests {
             r#"
             api_key = "mylogtoken"
             hostname = "vector"
+            default_env = "acceptance"
             codec.except_fields = ["magic"]
         "#,
         )
@@ -252,16 +266,23 @@ mod tests {
 
         let event3 = Event::from("hello world");
 
+        let mut event4 = Event::from("hello world");
+        event4.as_mut_log().insert("env", "staging");
+
         let event1_out = config.encode_event(event1).unwrap();
         let event1_out = event1_out.as_object().unwrap();
         let event2_out = config.encode_event(event2).unwrap();
         let event2_out = event2_out.as_object().unwrap();
         let event3_out = config.encode_event(event3).unwrap();
         let event3_out = event3_out.as_object().unwrap();
+        let event4_out = config.encode_event(event4).unwrap();
+        let event4_out = event4_out.as_object().unwrap();
 
         assert_eq!(event1_out.get("app").unwrap(), &json!("notvector"));
         assert_eq!(event2_out.get("file").unwrap(), &json!("log.txt"));
         assert_eq!(event3_out.get("app").unwrap(), &json!("vector"));
+        assert_eq!(event3_out.get("env").unwrap(), &json!("acceptance"));
+        assert_eq!(event4_out.get("env").unwrap(), &json!("staging"));
     }
 
     #[tokio::test]
@@ -336,6 +357,7 @@ mod tests {
             let line = line.as_object().unwrap();
 
             assert_eq!(line.get("app").unwrap(), &json!("vector"));
+            assert_eq!(line.get("env").unwrap(), &json!("production"));
             assert_eq!(line.get("line").unwrap(), &json!(lines[i]));
 
             if i == 0 {
