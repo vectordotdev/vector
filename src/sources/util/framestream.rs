@@ -17,8 +17,8 @@ use futures::{
 use futures01::Sink as Sink01;
 use std::convert::TryInto;
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::marker::{Send, Sync};
+use std::os::unix::fs::PermissionsExt;
 use std::{
     path::PathBuf,
     sync::{
@@ -379,17 +379,20 @@ pub fn build_framestream_unix_source(
 
     let fut = async move {
         let mut listener = UnixListener::bind(&path).expect("failed to bind to listener socket");
-        
+
         // the permissions to unix socket are restricted from 0o700 to 0o777, which are 448 and 511 in decimal
         if let Some(socket_permission) = frame_handler.socket_file_mode() {
-            if socket_permission < 448 || socket_permission > 511 { 
+            if socket_permission < 448 || socket_permission > 511 {
                 panic!("Invalid Socket permission");
             }
             match fs::set_permissions(&path, fs::Permissions::from_mode(socket_permission)) {
                 Ok(_) => {
                     info!("socket permissions updated to {:o}", socket_permission);
                 }
-                Err(e) => error!("failed to update listener socket permissions; error = {:?}", e),
+                Err(e) => error!(
+                    "failed to update listener socket permissions; error = {:?}",
+                    e
+                ),
             };
         };
 
@@ -469,36 +472,29 @@ pub fn build_framestream_unix_source(
                 tokio::spawn(handler.instrument(span));
             } else {
                 let handler = async move {
-                    frames
-                        .for_each(move |f| {
-                            future::ready({
-                                let max_frame_handling_tasks =
-                                    frame_handler_copy.max_frame_handling_tasks();
-                                let f_handler = frame_handler_copy.clone();
-                                let received_from_copy = received_from.clone();
-                                let event_sink_copy = event_sink.clone();
-                                let task_counter_copy = Arc::clone(&task_counter);
+                    frames.for_each(move |f| {
+                        let max_frame_handling_tasks =
+                            frame_handler_copy.max_frame_handling_tasks();
+                        let f_handler = frame_handler_copy.clone();
+                        let received_from_copy = received_from.clone();
+                        let event_sink_copy = event_sink.clone();
+                        let task_counter_copy = Arc::clone(&task_counter);
 
-                                let event_handler = move || {
-                                    if let Some(evt) = f_handler.handle_event(received_from_copy, f)
-                                    {
-                                        if let Err(err) = event_sink_copy.wait().send(evt) {
-                                            error!(
-                                                "Encountered error '{:#?}' while sending event",
-                                                err
-                                            );
-                                        }
-                                    }
-                                };
+                        let event_handler = move || {
+                            if let Some(evt) = f_handler.handle_event(received_from_copy, f) {
+                                if let Err(err) = event_sink_copy.wait().send(evt) {
+                                    error!("Encountered error '{:#?}' while sending event", err);
+                                }
+                            }
+                        };
 
-                                spawn_event_handling_tasks(
-                                    event_handler,
-                                    task_counter_copy,
-                                    max_frame_handling_tasks,
-                                );
-                            })
-                        })
-                        .await;
+                        spawn_event_handling_tasks(
+                            event_handler,
+                            task_counter_copy,
+                            max_frame_handling_tasks,
+                        );
+                        future::ready(())
+                    }).await;
                     info!("finished sending");
                 };
                 tokio::spawn(handler.instrument(span));
@@ -582,7 +578,6 @@ mod test {
         multithreaded: bool,
         max_frame_handling_tasks: i32,
         socket_file_mode: Option<u32>,
-        
     }
 
     impl MockFrameHandler {
