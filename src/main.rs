@@ -12,6 +12,8 @@ use futures::{
 };
 use std::cmp::max;
 use tokio::{runtime, select};
+#[cfg(feature = "api")]
+use vector::{api, internal_events::ApiStarted};
 use vector::{
     config::{self, ConfigDiff},
     generate, heartbeat,
@@ -127,6 +129,19 @@ fn main() {
             std::process::exit(exitcode::CONFIG);
         });
 
+        #[cfg(feature = "api")]
+        // assigned to prevent the API terminating when falling out of scope
+        let _api = if config.api.enabled {
+            emit!(ApiStarted{
+                addr: config.api.bind.unwrap(),
+                playground: config.api.playground
+            });
+
+            Some(api::Server::start(config.api))
+        } else {
+            None
+        };
+
         let result =
             topology::start_validated(config, diff, pieces, opts.require_healthy).await;
         let (mut topology, graceful_crash) = result.unwrap_or_else(|| {
@@ -161,6 +176,7 @@ fn main() {
                                     break SignalTo::Shutdown;
                                 }
                             }
+                            sources_finished = topology.sources_finished().compat();
                         } else {
                             emit!(VectorConfigLoadFailed);
                         }
