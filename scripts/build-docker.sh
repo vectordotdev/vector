@@ -25,7 +25,11 @@ build() {
   local BASE="$1"
   local VERSION="$2"
 
+if [ -n $VERSION ]
   local TAG="$REPO:$VERSION-$BASE"
+else
+  local TAG="$REPO:$BASE"
+fi
   local DOCKERFILE="distribution/docker/$BASE/Dockerfile"
 
   if [ -n "$PLATFORM" ]; then
@@ -70,7 +74,7 @@ if [[ "$CHANNEL" == "latest" ]]; then
     build debian "$VERSION_TAG"
   done
 elif [[ "$CHANNEL" == "nightly" ]]; then
-  for VERSION_TAG in "nightly-$DATE" nightly; do
+  for VERSION_TAG in "$DATE" ""; do
     build alpine "$VERSION_TAG"
     build debian "$VERSION_TAG"
   done
