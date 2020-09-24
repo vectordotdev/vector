@@ -461,8 +461,3 @@ required-features = ["kubernetes-e2e-tests"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
-
-[patch.crates-io]
-# TODO: Update to `https://github.com/skade/leveldb-sys.git` when https://github.com/skade/leveldb-sys/pull/18 is closed.
-# TODO: Remove when https://github.com/skade/leveldb-sys/pull/18 is released.
-leveldb-sys = { git = "https://github.com/timberio/leveldb-sys.git", branch = "msvc-support" }
