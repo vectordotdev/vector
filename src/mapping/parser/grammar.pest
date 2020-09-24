@@ -14,7 +14,7 @@ if_statement = {
 
 // Paths
 path_index = ${ "[" ~ ('0'..'9')+ ~ "]" }
-path_segment = ${ ('a'..'z' | 'A'..'Z' | "_" | "-" )+ ~ path_index? }
+path_segment = ${ (ASCII_ALPHA | "_" | "-" )+ ~ path_index? }
 quoted_path_segment = ${ "\"" ~ inner_quoted_string ~ "\"" ~ path_index? }
 
 target_path = @{ ("." ~ (path_segment | quoted_path_segment))+ }
@@ -44,47 +44,27 @@ path_coalesce = !{ "(" ~ (path_segment | quoted_path_segment) ~ ("|" ~ (path_seg
 
 dot_path = ${ ("." ~ (path_segment | quoted_path_segment | path_coalesce))+ }
 
-// Query functions
-//
-// NOTE: Not including delete here yet, but there's no reason we can't slot it
-// in at some point and get `.nested = del(.foo)`, same with `only_fields`.
-query_function = {
-    to_string |
-    to_int |
-    to_float |
-    to_bool |
-    to_timestamp |
-    parse_timestamp |
-    upcase |
-    downcase |
-    uuid_v4 |
-    sha1 |
-    md5 |
-    now |
-    strip_whitespace |
-    truncate |
-    parse_json
-}
+ident = @{ ASCII_ALPHANUMERIC ~ ( ASCII_ALPHANUMERIC | "_" )* }
 
-to_string = { "to_string(" ~ query_arithmetic ~ ("," ~ (string | null) )? ~ ")"}
-to_int = { "to_int(" ~ query_arithmetic ~ ("," ~ (number | null) )? ~ ")"}
-to_float = { "to_float(" ~ query_arithmetic ~ ("," ~ (number | null) )? ~ ")"}
-to_bool = { "to_bool(" ~ query_arithmetic ~ ("," ~ (boolean | null) )? ~ ")"}
-to_timestamp = { "to_timestamp(" ~ query_arithmetic ~ ("," ~ (string | number) )? ~ ")" }
-parse_timestamp = { "parse_timestamp(" ~ query_arithmetic ~ "," ~ string ~ ")"}
-upcase = { "upcase(" ~ query_arithmetic ~ ")"}
-downcase = { "downcase(" ~ query_arithmetic ~ ")"}
-uuid_v4 = { "uuid_v4()" }
-sha1 = { "sha1(" ~ query_arithmetic ~ ")" }
-md5 = { "md5(" ~ query_arithmetic ~ ")" }
-now = { "now()" }
-strip_whitespace = { "strip_whitespace(" ~ query_arithmetic ~ ")"}
-truncate = { "truncate(" ~ query_arithmetic ~ "," ~ query_arithmetic ~ ("," ~ boolean)? ~ ")" }
-parse_json = { "parse_json(" ~ query_arithmetic ~ ")" }
+// Functions
+
+query_function = ${ ident ~ "(" ~ inner_function? ~ ")"  }
+
+inner_function = !{ argument_list }
+
+argument_list = _{ argument ~ ("," ~ argument)* }
+
+argument = { positional_item | keyword_item }
+
+positional_item = { query_arithmetic }
+
+keyword_item = { ident ~ "=" ~ query_arithmetic }
+
+// end: Functions
 
 group = { "(" ~ query_arithmetic ~ ")" }
 
-value = _{ string | number | boolean | null }
+value = _{ string | float | integer | boolean | null }
 
 boolean = { "true" | "false" }
 
@@ -100,13 +80,17 @@ char = {
     // | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
 }
 
-number = @{
+integer = @{
     "-"?
     ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)
-    ~ ("." ~ ASCII_DIGIT*)?
-    ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?
 }
 
+float = @{
+    "-"?
+    ~ ("0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)
+    ~ ((("." ~ ASCII_DIGIT*) ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?)
+        | (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+))
+}
 
 not_operator = { "!" ~ query_leaf }
 

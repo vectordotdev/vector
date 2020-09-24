@@ -201,6 +201,19 @@ impl Value {
             _ => None,
         }
     }
+
+    pub fn kind(&self) -> &str {
+        match self {
+            Value::Bytes(_) => "string",
+            Value::Timestamp(_) => "timestamp",
+            Value::Integer(_) => "integer",
+            Value::Float(_) => "float",
+            Value::Boolean(_) => "boolean",
+            Value::Map(_) => "map",
+            Value::Array(_) => "array",
+            Value::Null => "null",
+        }
+    }
 }
 
 #[cfg(test)]
