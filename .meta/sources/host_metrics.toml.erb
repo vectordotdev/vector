@@ -23,6 +23,7 @@ description = "The list of host metric collector services to use. Defaults to al
 
 [sources.host_metrics.options.collectors.enum]
 cpu = "Metrics related to CPU utilization."
+disk = "Metrics related to disk I/O utilization."
 filesystem = "Metrics related to filesystem space utilization."
 load = "Load average metrics (UNIX only)."
 memory = "Metrics related to memory utilization."
@@ -34,6 +35,20 @@ common = false
 required = false
 default = 15
 description = "The interval between metric gathering, in seconds."
+
+[sources.host_metrics.options.disk]
+type = "table"
+category = "Filesystem"
+description = "Options for the \"disk\" metrics collector."
+
+[sources.host_metrics.options.disk.options.devices]
+type = "[string]"
+required = false
+examples = [["sda"], ["sd*"]]
+description = """\
+The list of devices for which to gather I/O metrics. \
+Defaults to all devices.\
+"""
 
 [sources.host_metrics.options.filesystem]
 type = "table"

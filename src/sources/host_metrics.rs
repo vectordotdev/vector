@@ -49,10 +49,16 @@ macro_rules! btreemap {
 #[serde(rename_all = "lowercase")]
 enum Collector {
     Cpu,
+    Disk,
     Filesystem,
     Load,
     Memory,
     Network,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+struct DiskConfig {
+    devices: Option<Vec<PatternWrapper>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -74,6 +80,8 @@ struct HostMetricsConfig {
 
     collectors: Option<Vec<Collector>>,
 
+    #[serde(default)]
+    disk: DiskConfig,
     #[serde(default)]
     filesystem: FilesystemConfig,
     #[serde(default)]
@@ -147,6 +155,9 @@ impl HostMetricsConfig {
         let mut metrics = Vec::new();
         if self.has_collector(Collector::Cpu) {
             metrics.extend(add_collector("cpu", cpu_metrics().await));
+        }
+        if self.has_collector(Collector::Disk) {
+            metrics.extend(add_collector("disk", disk_metrics(&self.disk).await));
         }
         if self.has_collector(Collector::Filesystem) {
             metrics.extend(add_collector(
@@ -492,6 +503,62 @@ async fn filesystem_metrics(config: &FilesystemConfig) -> Vec<Metric> {
         }
         Err(error) => {
             error!(message = "Failed to load partitions info", %error, rate_limit_secs = 60);
+            vec![]
+        }
+    }
+}
+
+async fn disk_metrics(config: &DiskConfig) -> Vec<Metric> {
+    match heim::disk::io_counters().await {
+        Ok(counters) => {
+            counters
+                .filter_map(|result| filter_result(result, "Failed to load/parse disk I/O data"))
+                .map(|counter| {
+                    vec_contains_path(&config.devices, counter.device_name().as_ref())
+                        .map(|()| counter)
+                })
+                .filter_map(|counter| async { counter })
+                .map(|counter| {
+                    let timestamp = Some(Utc::now());
+                    let tags = btreemap![
+                        "device".into() => counter.device_name().to_string_lossy().to_string()
+                    ];
+                    stream::iter(
+                        vec![
+                            gauge!(
+                                "host_disk_read_bytes_total",
+                                timestamp,
+                                counter.read_bytes().get::<byte>(),
+                                tags.clone()
+                            ),
+                            gauge!(
+                                "host_disk_reads_completed_total",
+                                timestamp,
+                                counter.read_count(),
+                                tags.clone()
+                            ),
+                            gauge!(
+                                "host_disk_written_bytes_total",
+                                timestamp,
+                                counter.write_bytes().get::<byte>(),
+                                tags.clone()
+                            ),
+                            gauge!(
+                                "host_disk_writes_completed_total",
+                                timestamp,
+                                counter.write_count(),
+                                tags
+                            ),
+                        ]
+                        .into_iter(),
+                    )
+                })
+                .flatten()
+                .collect::<Vec<_>>()
+                .await
+        }
+        Err(error) => {
+            error!(message = "Failed to load disk I/O info", %error, rate_limit_secs = 60);
             vec![]
         }
     }
