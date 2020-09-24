@@ -186,15 +186,7 @@ async fn cpu_metrics() -> Vec<Metric> {
     match heim::cpu::times().await {
         Ok(times) => {
             times
-                .filter_map(|result| async {
-                    match result {
-                        Ok(times) => Some(times),
-                        Err(error) => {
-                            error!(message = "Failed to load/parse CPU time", %error, rate_limit_secs = 60);
-                            None
-                        }
-                    }
-                })
+                .filter_map(|result| filter_result(result, "Failed to load/parse CPU time"))
                 .map(|times| {
                     let timestamp = Some(Utc::now());
                     let name = "host_cpu_seconds_total";
@@ -338,15 +330,7 @@ async fn net_metrics(devices: &Option<Vec<String>>) -> Vec<Metric> {
     match heim::net::io_counters().await {
         Ok(counters) => {
             counters
-                .filter_map(|result| async {
-                    match result {
-                        Ok(counters) => Some(counters),
-                        Err(error) => {
-                            error!(message = "Failed to load/parse network I/O counter", %error, rate_limit_secs = 60);
-                            None
-                        }
-                    }
-                })
+                .filter_map(|result| filter_result(result, "Failed to load/parse network data"))
                 // The following pair should be possible to do in one
                 // .filter_map, but it results in a strange "one type is
                 // more general than the other" error.
@@ -413,6 +397,12 @@ async fn net_metrics(devices: &Option<Vec<String>>) -> Vec<Metric> {
             vec![]
         }
     }
+}
+
+async fn filter_result<T>(result: Result<T, Error>, message: &'static str) -> Option<T> {
+    result
+        .map_err(|error| error!(message, %error, rate_limit_secs = 60))
+        .ok()
 }
 
 fn vec_contains(vec: &Option<Vec<String>>, value: &str) -> Option<()> {
