@@ -919,8 +919,8 @@ Trivial changes, such as spelling fixes, do not need to be signed.
 
 ### Granted rights and copyright assignment
 
-This is covered by the DCO. Contributions are covered by DCO and do not require
-a CLA.
+This is covered by the DCO. Contributions are covered by the DCO and do not
+require a CLA.
 
 ## FAQ
 
