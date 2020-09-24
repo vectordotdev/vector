@@ -14,6 +14,7 @@ use futures::{
     stream::{self, StreamExt},
 };
 use futures01::Sink;
+use glob::Pattern;
 #[cfg(target_os = "macos")]
 use heim::memory::os::macos::MemoryExt;
 #[cfg(not(target_os = "windows"))]
@@ -26,8 +27,12 @@ use heim::{
     units::{information::byte, ratio::ratio, time::second},
     Error,
 };
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use serde::{
+    de::{self, Visitor},
+    Deserialize, Deserializer, Serialize, Serializer,
+};
+use std::fmt;
+use std::path::Path;
 use std::time::Duration;
 use tokio::{select, time};
 
@@ -52,14 +57,14 @@ enum Collector {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct FilesystemConfig {
-    devices: Option<Vec<PathBuf>>,
-    filesystems: Option<Vec<String>>,
-    mountpoints: Option<Vec<PathBuf>>,
+    devices: Option<Vec<PatternWrapper>>,
+    filesystems: Option<Vec<PatternWrapper>>,
+    mountpoints: Option<Vec<PatternWrapper>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct NetworkConfig {
-    devices: Option<Vec<String>>,
+    devices: Option<Vec<PatternWrapper>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -352,7 +357,9 @@ async fn net_metrics(config: &NetworkConfig) -> Vec<Metric> {
                 // The following pair should be possible to do in one
                 // .filter_map, but it results in a strange "one type is
                 // more general than the other" error.
-                .map(|counter| vec_contains(&config.devices, counter.interface()).map(|()| counter))
+                .map(|counter| {
+                    vec_contains_str(&config.devices, counter.interface()).map(|()| counter)
+                })
                 .filter_map(|counter| async { counter })
                 .map(|counter| {
                     let timestamp = Some(Utc::now());
@@ -423,16 +430,16 @@ async fn filesystem_metrics(config: &FilesystemConfig) -> Vec<Metric> {
             partitions
                 .filter_map(|result| filter_result(result, "Failed to load/parse partition data"))
                 .map(|partition| {
-                    vec_contains(&config.mountpoints, partition.mount_point()).map(|()| partition)
+                    vec_contains_path(&config.mountpoints, partition.mount_point()).map(|()| partition)
                 })
                 .filter_map(|partition| async { partition })
                 .map(|partition| match partition.device() {
-                    Some(device) => vec_contains(&config.devices, device).map(|()| partition),
+                    Some(device) => vec_contains_path(&config.devices, device.as_ref()).map(|()| partition),
                     None => Some(partition),
                 })
                 .filter_map(|partition| async { partition })
                 .map(|partition| {
-                    vec_contains(&config.filesystems, partition.file_system().as_str())
+                    vec_contains_str(&config.filesystems, partition.file_system().as_str())
                         .map(|()| partition)
                 })
                 .filter_map(|partition| async { partition })
@@ -496,12 +503,27 @@ async fn filter_result<T>(result: Result<T, Error>, message: &'static str) -> Op
         .ok()
 }
 
-fn vec_contains<T: PartialEq<V>, V>(vec: &Option<Vec<T>>, value: V) -> Option<()> {
+fn vec_contains_path(vec: &Option<Vec<PatternWrapper>>, value: &Path) -> Option<()> {
     match vec {
-        // Empty vector matches everything
+        // No patterns list matches everything
         None => Some(()),
         // Otherwise find the given value
-        Some(vec) => vec.iter().find(|&v| *v == value).map(|_| ()),
+        Some(vec) => vec
+            .iter()
+            .find(|&pattern| pattern.matches_path(value))
+            .map(|_| ()),
+    }
+}
+
+fn vec_contains_str(vec: &Option<Vec<PatternWrapper>>, value: &str) -> Option<()> {
+    match vec {
+        // No patterns list matches everything
+        None => Some(()),
+        // Otherwise find the given value
+        Some(vec) => vec
+            .iter()
+            .find(|&pattern| pattern.matches(value))
+            .map(|_| ()),
     }
 }
 
@@ -510,4 +532,47 @@ fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
         (metric.tags.as_mut().unwrap()).insert("collector".into(), collector.into());
     }
     metrics
+}
+
+// Pattern doesn't implement Deserialize or Serialize, and we can't
+// implement them ourselves due the orphan rules, so make a wrapper.
+#[derive(Clone, Debug)]
+struct PatternWrapper(Pattern);
+
+impl PatternWrapper {
+    fn matches(&self, s: &str) -> bool {
+        self.0.matches(s)
+    }
+
+    fn matches_path(&self, p: &Path) -> bool {
+        self.0.matches_path(p)
+    }
+}
+
+impl<'de> Deserialize<'de> for PatternWrapper {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_str(PatternVisitor)
+    }
+}
+
+struct PatternVisitor;
+
+impl<'de> Visitor<'de> for PatternVisitor {
+    type Value = PatternWrapper;
+
+    fn expecting(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "a string")
+    }
+
+    fn visit_str<E: de::Error>(self, s: &str) -> Result<Self::Value, E> {
+        Pattern::new(s)
+            .map(PatternWrapper)
+            .map_err(de::Error::custom)
+    }
+}
+
+impl Serialize for PatternWrapper {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.0.as_str())
+    }
 }

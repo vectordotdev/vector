@@ -61,7 +61,7 @@ Defaults to all types.\
 [sources.host_metrics.options.filesystem.options.mountpoints]
 type = "[string]"
 required = false
-examples = [["/"], ["/home"]]
+examples = [["/"], ["/home*"]]
 description = """\
 The list of filesystem mount points for which to gather metrics. \
 Defaults to all mount points.\
@@ -75,7 +75,7 @@ description = "Options for the \"network\" metrics collector."
 [sources.host_metrics.options.network.options.devices]
 type = "[string]"
 required = false
-examples = [["eth0"], ["enp5s0"]]
+examples = [["eth0"], ["en*"]]
 description = """\
 The list of network devices for which to gather metrics. \
 Defaults to all local network devices.\
