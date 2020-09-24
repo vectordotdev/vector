@@ -9,10 +9,6 @@ use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
-// TODO:
-// * Consider additional context for record that could not be decoded
-// * See about returning the default warp status code for standard warp rejections
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct AwsKinesisFirehoseConfig {
     address: SocketAddr,
@@ -74,7 +70,7 @@ inventory::submit! {
 
 mod filters {
     use super::{
-        errors::{AccessKeyError, Parse, RequestError},
+        errors::{Parse, RequestError},
         handlers,
         models::{FirehoseRequest, FirehoseResponse},
     };
@@ -176,10 +172,14 @@ mod filters {
                             Ok(())
                         }
                         (Some(_), Some(_)) => {
-                            Err(warp::reject::custom(AccessKeyError::Invalid { request_id }))
+                            Err(warp::reject::custom(RequestError::AccessKeyInvalid {
+                                request_id,
+                            }))
                         }
                         (None, Some(_)) => {
-                            Err(warp::reject::custom(AccessKeyError::Missing { request_id }))
+                            Err(warp::reject::custom(RequestError::AccessKeyMissing {
+                                request_id,
+                            }))
                         }
                     }
                 }
@@ -195,20 +195,7 @@ mod filters {
         let message: String;
         let code: StatusCode;
 
-        if let Some(e) = err.find::<AccessKeyError>() {
-            match e {
-                AccessKeyError::Invalid { request_id: ref id } => {
-                    code = StatusCode::UNAUTHORIZED;
-                    message = "invalid access key".to_string();
-                    request_id = Some(id.clone());
-                }
-                AccessKeyError::Missing { request_id: ref id } => {
-                    code = StatusCode::UNAUTHORIZED;
-                    message = "missing access key".to_string();
-                    request_id = Some(id.clone());
-                }
-            }
-        } else if let Some(e) = err.find::<RequestError>() {
+        if let Some(e) = err.find::<RequestError>() {
             message = format!("{}", e);
             code = e.status();
             request_id = Some(e.request_id());
@@ -374,17 +361,16 @@ pub mod errors {
     use snafu::Snafu;
     use warp::http::StatusCode;
 
-    #[derive(Clone, Debug)]
-    pub enum AccessKeyError {
-        Missing { request_id: String },
-        Invalid { request_id: String },
-    }
-
-    impl warp::reject::Reject for AccessKeyError {}
-
     #[derive(Debug, Snafu)]
     #[snafu(visibility = "pub")]
     pub enum RequestError {
+        #[snafu(display("X-Amz-Firehose-Access-Key required for request: {}", request_id))]
+        AccessKeyMissing { request_id: String },
+        #[snafu(display(
+            "X-Amz-Firehose-Access-Key does not match configured key for request: {}",
+            request_id
+        ))]
+        AccessKeyInvalid { request_id: String },
         #[snafu(display("Could not parse incoming request {}: {}", request_id, source))]
         Parse {
             source: serde_json::error::Error,
@@ -425,7 +411,9 @@ pub mod errors {
     impl RequestError {
         pub fn status(&self) -> StatusCode {
             match *self {
-                RequestError::Parse { .. } => StatusCode::BAD_REQUEST,
+                RequestError::AccessKeyMissing { .. } => StatusCode::UNAUTHORIZED,
+                RequestError::AccessKeyInvalid { .. } => StatusCode::UNAUTHORIZED,
+                RequestError::Parse { .. } => StatusCode::UNAUTHORIZED,
                 RequestError::UnsupportedEncoding { .. } => StatusCode::BAD_REQUEST,
                 RequestError::ParseRecords { .. } => StatusCode::BAD_REQUEST,
                 RequestError::Decode { .. } => StatusCode::BAD_REQUEST,
@@ -435,6 +423,8 @@ pub mod errors {
 
         pub fn request_id(&self) -> String {
             match *self {
+                RequestError::AccessKeyMissing { ref request_id, .. } => request_id,
+                RequestError::AccessKeyInvalid { ref request_id, .. } => request_id,
                 RequestError::Parse { ref request_id, .. } => request_id,
                 RequestError::UnsupportedEncoding { ref request_id, .. } => request_id,
                 RequestError::ParseRecords { ref request_id, .. } => request_id,
