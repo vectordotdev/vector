@@ -163,6 +163,7 @@ As part of Vector's vision to be the "one tool" for ingesting and shipping obser
 
 - OpenTelmetry supports traces, metrics, and potentially logs. Do we want to support all incoming? Does this mean three sources?
 - Do we want to add [an exporter](https://github.com/open-telemetry/opentelemetry-collector/tree/master/exporter) to OpenTelemetry?
+- OpenTelemetry Collectors generally allow exposing performance data on the collectors via [extensions](https://github.com/open-telemetry/opentelemetry-collector/tree/master/extension) locally. Do we want to do this as an extension of our internal metrics work via the GraphQL interface?
 
 ## Follow up work
 
