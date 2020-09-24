@@ -1,6 +1,5 @@
 use crate::{
     config::{DataType, GlobalOptions, SinkDescription, SourceConfig},
-    internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
@@ -11,13 +10,9 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
 // TODO:
-// * Try to refactor reading encoded records to stream contents rather than copying into
-//   intermediate buffers
-// * Try avoiding intermediate collections while processing request
-// * Should configuration take an endpoint rather than an address?
 // * Consider additional context for record that could not be decoded
-// * Readd internal events
 // * Verify gzip content-encoding support
+// * See about returning the default warp status code for standard warp rejections
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct AwsKinesisFirehoseConfig {
@@ -79,12 +74,15 @@ inventory::submit! {
 }
 
 mod filters {
-    use super::models::FirehoseResponse;
     use super::{
         errors::{AccessKeyError, RequestError},
         handlers,
+        models::FirehoseResponse,
     };
-    use crate::Pipeline;
+    use crate::{
+        internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
+        Pipeline,
+    };
     use chrono::Utc;
     use std::convert::Infallible;
     use warp::http::StatusCode;
@@ -96,6 +94,7 @@ mod filters {
         out: Pipeline,
     ) -> impl Filter<Extract = impl warp::Reply, Error = Infallible> + Clone {
         warp::post()
+            .and(emit_received())
             .and(authenticate(access_key))
             .and(warp::header("X-Amz-Firehose-Request-Id"))
             .and(warp::header("X-Amz-Firehose-Source-Arn"))
@@ -109,13 +108,55 @@ mod filters {
             .recover(handle_firehose_rejection)
     }
 
+    fn emit_received() -> impl Filter<Extract = (), Error = warp::reject::Rejection> + Clone {
+        warp::any()
+            .and(warp::header::optional("X-Amz-Firehose-Request-Id"))
+            .and(warp::header::optional("X-Amz-Firehose-Source-Arn"))
+            .map(|request_id: Option<String>, source_arn: Option<String>| {
+                emit!(AwsKinesisFirehoseRequestReceived {
+                    request_id: request_id.as_deref(),
+                    source_arn: source_arn.as_deref(),
+                });
+            })
+            .untuple_one()
+    }
+
+    /// If there is a configured access key, validate that the request key matches it
+    fn authenticate(
+        configured_access_key: Option<String>,
+    ) -> impl Filter<Extract = (), Error = warp::Rejection> + Clone {
+        warp::any()
+            .and(warp::header("X-Amz-Firehose-Request-Id"))
+            .and(warp::header::optional("X-Amz-Firehose-Access-Key"))
+            .and_then(move |request_id: String, access_key: Option<String>| {
+                let configured_access_key = configured_access_key.clone();
+                async move {
+                    match (access_key, configured_access_key) {
+                        (_, None) => Ok(()),
+                        (Some(configured_access_key), Some(access_key))
+                            if configured_access_key == access_key =>
+                        {
+                            Ok(())
+                        }
+                        (Some(_), Some(_)) => {
+                            Err(warp::reject::custom(AccessKeyError::Invalid { request_id }))
+                        }
+                        (None, Some(_)) => {
+                            Err(warp::reject::custom(AccessKeyError::Missing { request_id }))
+                        }
+                    }
+                }
+            })
+            .untuple_one()
+    }
+
     /// Maps RequestError and warp errors to AWS Kinesis Firehose response structure
     async fn handle_firehose_rejection(
         err: warp::Rejection,
     ) -> Result<impl warp::Reply, Infallible> {
-        let request_id;
-        let message;
-        let code;
+        let request_id: Option<&String>;
+        let message: String;
+        let code: StatusCode;
 
         if let Some(e) = err.find::<AccessKeyError>() {
             match e {
@@ -162,51 +203,24 @@ mod filters {
         }
 
         let json = warp::reply::json(&FirehoseResponse {
-            request_id: request_id.cloned().unwrap_or_default(),
+            request_id: request_id.map(|s| s.to_owned()).unwrap_or_default(),
             timestamp: Utc::now(),
-            error_message: Some(message),
+            error_message: Some(message.clone()),
+        });
+
+        emit!(AwsKinesisFirehoseRequestError {
+            request_id: request_id,
+            error: message.as_str(),
         });
 
         Ok(warp::reply::with_status(json, code))
-    }
-
-    /// If there is a configured access key, validate that the request key matches it
-    fn authenticate(
-        configured_access_key: Option<String>,
-    ) -> impl Filter<Extract = (), Error = warp::Rejection> + Clone {
-        warp::any()
-            .and(warp::header("X-Amz-Firehose-Request-Id"))
-            .and(warp::header::optional("X-Amz-Firehose-Access-Key"))
-            .and_then(move |request_id: String, access_key: Option<String>| {
-                let configured_access_key = configured_access_key.clone();
-                async move {
-                    match (access_key, configured_access_key) {
-                        (_, None) => Ok(()),
-                        (Some(configured_access_key), Some(access_key))
-                            if configured_access_key == access_key =>
-                        {
-                            Ok(())
-                        }
-                        (Some(_), Some(_)) => {
-                            Err(warp::reject::custom(AccessKeyError::Invalid { request_id }))
-                        }
-                        (None, Some(_)) => {
-                            Err(warp::reject::custom(AccessKeyError::Missing { request_id }))
-                        }
-                    }
-                }
-            })
-            .untuple_one()
     }
 }
 
 mod handlers {
     use super::errors::{Parse, RequestError};
     use super::models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse};
-    use crate::{
-        config::log_schema, event::Event, internal_events::AwsKinesisFirehoseRequestReceived,
-        Pipeline,
-    };
+    use crate::{config::log_schema, event::Event, Pipeline};
     use chrono::Utc;
     use flate2::read::GzDecoder;
     use futures::{compat::Future01CompatExt, TryFutureExt};
@@ -222,11 +236,6 @@ mod handlers {
         request: FirehoseRequest,
         out: Pipeline,
     ) -> Result<impl warp::Reply, reject::Rejection> {
-        emit!(AwsKinesisFirehoseRequestReceived {
-            request_id: request_id.as_str(),
-            source_arn: source_arn.as_str(),
-        });
-
         match parse_request(request, request_id.as_str(), source_arn.as_str()).with_context(|| {
             Parse {
                 request_id: request_id.clone(),
