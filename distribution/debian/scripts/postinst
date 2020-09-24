@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-usermod -aG systemd-journal vector
+usermod -aG systemd-journal vector || true
 
 if command -v systemctl >/dev/null 2>&1
 then
