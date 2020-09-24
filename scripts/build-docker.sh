@@ -70,7 +70,7 @@ if [[ "$CHANNEL" == "latest" ]]; then
     build debian "$VERSION_TAG"
   done
 elif [[ "$CHANNEL" == "nightly" ]]; then
-  for VERSION_TAG in "$DATE" latest; do
+  for VERSION_TAG in nightly; do
     build alpine "$VERSION_TAG"
     build debian "$VERSION_TAG"
   done
