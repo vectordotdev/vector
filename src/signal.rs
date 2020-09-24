@@ -37,5 +37,8 @@ pub fn signals() -> impl Stream<Item = SignalTo> {
     use futures::future::FutureExt;
     let ctrl_c = tokio::signal::ctrl_c();
 
-    ctrl_c.map(|_| SignalTo::Shutdown).into_stream()
+    async_stream::stream! {
+        let signal = ctrl_c.map(|_| SignalTo::Shutdown).await;
+        yield signal;
+    }
 }
