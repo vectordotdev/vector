@@ -203,7 +203,7 @@ pretty_assertions = "0.6.1"
 tokio01-test = "0.1.1"
 tower-test = "0.3.0"
 serde_yaml = "0.8.9"
-dirs = "2.0.2"
+dirs = "3.0.1"
 tokio-test = "0.2"
 tokio = { version = "0.2", features = ["test-util"] }
 assert_cmd = "1.0"

@@ -5693,7 +5693,7 @@ dependencies = [
  "db-key",
  "derivative 1.0.4",
  "derive_is_enum_variant",
- "dirs 2.0.2",
+ "dirs 3.0.1",
  "elastic_responses",
  "evmap",
  "exitcode",
