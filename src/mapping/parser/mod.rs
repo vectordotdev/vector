@@ -7,9 +7,9 @@ use crate::{
             self,
             arithmetic::Arithmetic,
             arithmetic::Operator,
-            functions::{FunctionSignature, NotFn},
+            function::{Argument, ArgumentList, FunctionSignature, NotFn},
             path::Path as QueryPath,
-            Argument, ArgumentList, Literal,
+            Literal,
         },
         Assignment, Deletion, Function, IfStatement, Mapping, MergeFn, Noop, OnlyFields, Result,
     },
@@ -505,7 +505,7 @@ pub fn parse(input: &str) -> Result<Mapping> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapping::query::functions::{
+    use crate::mapping::query::function::{
         DowncaseFn, Md5Fn, NowFn, ParseJsonFn, ParseTimestampFn, Sha1Fn, StripWhitespaceFn,
         ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn, TruncateFn, UpcaseFn,
         UuidV4Fn,
