@@ -1,6 +1,5 @@
 use futures::{
-    future::{select_all, BoxFuture},
-    FutureExt, Stream,
+    Stream,
 };
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -15,7 +14,7 @@ pub enum SignalTo {
 
 /// Signals from OS/user.
 #[cfg(unix)]
-pub fn signals() -> impl Stream<Item = SignalTo> {
+pub fn signals() -> impl Stream<Item = SignalTo> + 'static {
     use tokio::signal::unix::{signal, SignalKind};
 
     let mut sigint = signal(SignalKind::interrupt()).expect("Signal handlers should not panic.");
@@ -23,16 +22,15 @@ pub fn signals() -> impl Stream<Item = SignalTo> {
     let mut sigquit = signal(SignalKind::quit()).expect("Signal handlers should not panic.");
     let mut sighup = signal(SignalKind::hangup()).expect("Signal handlers should not panic.");
 
-    let set: Vec<BoxFuture<SignalTo>> = vec![
-        Box::pin(async move { sigint.recv().map(|_| SignalTo::Shutdown).await }),
-        Box::pin(async move { sigterm.recv().map(|_| SignalTo::Shutdown).await }),
-        Box::pin(async move { sigquit.recv().map(|_| SignalTo::Quit).await }),
-        Box::pin(async move { sighup.recv().map(|_| SignalTo::Reload).await }),
-    ];
-
-    let selection = select_all(set.into_iter()).map(|(val, _, _)| val);
-
-    selection.into_stream()
+    async_stream::stream! {
+        let signal = tokio::select! {
+            _ = sigint.recv() => SignalTo::Shutdown,
+            _ = sigterm.recv() => SignalTo::Shutdown,
+            _ = sigquit.recv() => SignalTo::Quit,
+            _ = sighup.recv() => SignalTo::Reload,
+        };
+        yield signal;
+    }
 }
 
 /// Signals from OS/user.
