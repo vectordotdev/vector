@@ -1,5 +1,4 @@
-use futures::{compat::Stream01CompatExt, Stream, StreamExt, TryStreamExt};
-use futures01::{Future as Future01, Stream as Stream01};
+use futures::Stream;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum SignalTo {
@@ -14,35 +13,33 @@ pub enum SignalTo {
 /// Signals from OS/user.
 #[cfg(unix)]
 pub fn signals() -> impl Stream<Item = SignalTo> {
-    use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
+    use tokio::signal::unix::{signal, SignalKind};
 
-    let sigint = Signal::new(SIGINT).flatten_stream();
-    let sigterm = Signal::new(SIGTERM).flatten_stream();
-    let sigquit = Signal::new(SIGQUIT).flatten_stream();
-    let sighup = Signal::new(SIGHUP).flatten_stream();
+    let mut sigint = signal(SignalKind::interrupt()).expect("Signal handlers should not panic.");
+    let mut sigterm = signal(SignalKind::terminate()).expect("Signal handlers should not panic.");
+    let mut sigquit = signal(SignalKind::quit()).expect("Signal handlers should not panic.");
+    let mut sighup = signal(SignalKind::hangup()).expect("Signal handlers should not panic.");
 
-    let signals = sigint.select(sigterm.select(sigquit.select(sighup)));
-
-    signals
-        .map(|signal| match signal {
-            SIGHUP => SignalTo::Reload,
-            SIGINT | SIGTERM => SignalTo::Shutdown,
-            SIGQUIT => SignalTo::Quit,
-            _ => unreachable!(),
-        })
-        .compat()
-        .into_stream()
-        .map(|result| result.expect("Neither stream errors"))
+    async_stream::stream! {
+        let signal = tokio::select! {
+            _ = sigint.recv() => SignalTo::Shutdown,
+            _ = sigterm.recv() => SignalTo::Shutdown,
+            _ = sigquit.recv() => SignalTo::Quit,
+            _ = sighup.recv() => SignalTo::Reload,
+        };
+        yield signal;
+    }
 }
 
 /// Signals from OS/user.
 #[cfg(windows)]
 pub fn signals() -> impl Stream<Item = SignalTo> {
-    let ctrl_c = tokio_signal::ctrl_c().flatten_stream();
+    use futures::future::FutureExt;
 
-    ctrl_c
-        .map(|_| SignalTo::Shutdown)
-        .compat()
-        .into_stream()
-        .map(|result| result.expect("Shouldn't error"))
+    async_stream::stream! {
+        loop {
+            let signal = tokio::signal::ctrl_c().map(|_| SignalTo::Shutdown).await;
+            yield signal;
+        }
+    }
 }
