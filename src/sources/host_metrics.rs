@@ -49,11 +49,19 @@ enum Collector {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
+struct NetworkConfig {
+    devices: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct HostMetricsConfig {
     #[serde(default = "scrape_interval_default")]
     scrape_interval_secs: u64,
 
     collectors: Option<Vec<Collector>>,
+
+    #[serde(default)]
+    network: NetworkConfig,
 }
 
 const fn scrape_interval_default() -> u64 {
@@ -132,7 +140,10 @@ impl HostMetricsConfig {
             metrics.extend(add_collector("memory", swap_metrics().await));
         }
         if self.has_collector(Collector::Network) {
-            metrics.extend(add_collector("network", net_metrics().await));
+            metrics.extend(add_collector(
+                "network",
+                net_metrics(&self.network.devices).await,
+            ));
         }
         if let Ok(hostname) = &hostname {
             for metric in &mut metrics {
@@ -323,7 +334,7 @@ async fn loadavg_metrics() -> Vec<Metric> {
     result
 }
 
-async fn net_metrics() -> Vec<Metric> {
+async fn net_metrics(devices: &Option<Vec<String>>) -> Vec<Metric> {
     match heim::net::io_counters().await {
         Ok(counters) => {
             counters
@@ -336,6 +347,11 @@ async fn net_metrics() -> Vec<Metric> {
                         }
                     }
                 })
+                // The following pair should be possible to do in one
+                // .filter_map, but it results in a strange "one type is
+                // more general than the other" error.
+                .map(|counter| vec_contains(devices, counter.interface()).map(|()| counter))
+                .filter_map(|counter| async { counter })
                 .map(|counter| {
                     let timestamp = Some(Utc::now());
                     let interface = counter.interface();
@@ -396,6 +412,15 @@ async fn net_metrics() -> Vec<Metric> {
             error!(message = "Failed to load network I/O counters", %error, rate_limit_secs = 60);
             vec![]
         }
+    }
+}
+
+fn vec_contains(vec: &Option<Vec<String>>, value: &str) -> Option<()> {
+    match vec {
+        // Empty vector matches everything
+        None => Some(()),
+        // Otherwise find the given value
+        Some(vec) => vec.iter().find(|v| *v == value).map(|_| ()),
     }
 }
 

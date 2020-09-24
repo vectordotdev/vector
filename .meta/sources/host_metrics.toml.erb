@@ -33,3 +33,17 @@ common = false
 required = false
 default = 15
 description = "The interval between metric gathering, in seconds."
+
+[sources.host_metrics.options.network]
+type = "table"
+category = "Network"
+description = "Options for the \"network\" metrics collector."
+
+[sources.host_metrics.options.network.options.devices]
+type = "[string]"
+required = false
+examples = [["eth0"], ["enp5s0"]]
+description = """\
+The list of network devices for which to gather metrics. \
+Defaults to all local network devices.\
+"""
