@@ -10,6 +10,18 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::str::FromStr;
 
+/// Commonly used types when building new functions.
+mod prelude {
+    pub(super) use super::{is_scalar_value, ArgumentList, Parameter};
+    pub(super) use crate::event::{Event, Value};
+    pub(super) use crate::mapping::query::Function;
+    #[cfg(test)]
+    pub(super) use crate::mapping::query::Literal;
+    pub(super) use crate::mapping::Result;
+    pub(super) use crate::types::Conversion;
+    pub(super) use std::convert::TryFrom;
+}
+
 // If this macro triggers, it means the logic to detect invalid types did not
 // function as expected. This is a bug in the implementation.
 macro_rules! unexpected_type {
@@ -83,18 +95,6 @@ build_signatures! {
     now => NowFn,
     truncate => TruncateFn,
     parse_json => ParseJsonFn,
-}
-
-/// Commonly used types when building new functions.
-mod prelude {
-    pub(super) use super::{is_scalar_value, ArgumentList, Parameter};
-    pub(super) use crate::event::{Event, Value};
-    pub(super) use crate::mapping::query::Function;
-    #[cfg(test)]
-    pub(super) use crate::mapping::query::Literal;
-    pub(super) use crate::mapping::Result;
-    pub(super) use crate::types::Conversion;
-    pub(super) use std::convert::TryFrom;
 }
 
 /// A parameter definition accepted by a function.
