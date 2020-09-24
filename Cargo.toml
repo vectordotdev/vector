@@ -122,7 +122,7 @@ toml = "0.4"
 syslog = "5"
 syslog_loose = { version = "0.4.0", optional = true }
 derive_is_enum_variant = "0.1.1"
-leveldb = { git = "https://github.com/timberio/leveldb", optional = true, default-features = false }
+leveldb = { version = "0.8", optional = true, default-features = false }
 db-key = "0.0.5"
 headers = "0.3"
 rdkafka = { version = "0.24.0", features = ["libz", "ssl", "zstd"], optional = true }
@@ -213,19 +213,19 @@ k8s-test-framework = { version = "0.1", path = "lib/k8s-test-framework" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb-plain", "rdkafka-plain"]
-default-musl = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb-cmake", "rdkafka-cmake"]
+default = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+default-musl = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb-cmake", "rdkafka-cmake"]
+default-cmake = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb-cmake", "rdkafka-cmake"]
+default-msvc = ["api", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
 
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
-target-x86_64-unknown-linux-gnu = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb-cmake", "rdkafka-cmake"]
-target-aarch64-unknown-linux-gnu = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "leveldb-cmake", "rdkafka-cmake"]
+target-x86_64-unknown-linux-gnu = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
+target-aarch64-unknown-linux-gnu = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "leveldb", "rdkafka-cmake"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["jemallocator"]
@@ -241,10 +241,6 @@ rdkafka-plain = ["rdkafka"]
 # This feature is more portable, but requires `cmake` as build dependency. Use it if `rdkafka-plain` doesn't work.
 # The `sasl` feature has to be added because of the limitations of `librdkafka` build scripts for `cmake`.
 rdkafka-cmake = ["rdkafka", "rdkafka/cmake_build"]
-# This feature is less portable, but doesn't require `cmake` as build dependency
-leveldb-plain = ["leveldb", "leveldb/leveldb-sys-2"]
-# This feature is more portable, but requires `cmake` as build dependency. Use it if `leveldb-plain` doesn't work.
-leveldb-cmake = ["leveldb", "leveldb/leveldb-sys-3"]
 # This feature enables the WASM foreign module support.
 wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm", "anyhow"]
 
