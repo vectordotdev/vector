@@ -72,7 +72,7 @@ impl StandardOpts {
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
 enum SubCommand {
-    /// Install vector as a service.
+    /// Install the service.
     Install(InstallOpts),
     /// Uninstall the service.
     Uninstall(StandardOpts),

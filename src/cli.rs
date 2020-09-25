@@ -109,7 +109,7 @@ pub enum SubCommand {
     /// For guidance on how to write unit tests check out: https://vector.dev/docs/setup/guides/unit-testing/
     Test(unit_test::Opts),
 
-    /// Control the state of the vector service (windows only)
+    /// Manage the vector service.
     #[cfg(windows)]
     Service(service::Opts),
 }

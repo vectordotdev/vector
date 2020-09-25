@@ -2,14 +2,16 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct WindowsServiceStart {
+pub struct WindowsServiceStart<'a> {
     pub already_started: bool,
+    pub name: &'a str,
 }
 
-impl InternalEvent for WindowsServiceStart {
+impl<'a> InternalEvent for WindowsServiceStart<'a> {
     fn emit_logs(&self) {
         info!(
             already_started = %self.already_started,
+            name = self.name,
             "Started Windows Service.",
         );
     }
@@ -22,14 +24,16 @@ impl InternalEvent for WindowsServiceStart {
 }
 
 #[derive(Debug)]
-pub struct WindowsServiceStop {
+pub struct WindowsServiceStop<'a> {
     pub already_stopped: bool,
+    pub name: &'a str,
 }
 
-impl InternalEvent for WindowsServiceStop {
+impl<'a> InternalEvent for WindowsServiceStop<'a> {
     fn emit_logs(&self) {
         info!(
             already_stopped = %self.already_stopped,
+            name = ?self.name,
             "Stopped Windows Service.",
         );
     }
@@ -42,40 +46,58 @@ impl InternalEvent for WindowsServiceStop {
 }
 
 #[derive(Debug)]
-pub struct WindowsServiceInstall;
+pub struct WindowsServiceInstall<'a> {
+    pub name: &'a str,
+}
 
-impl InternalEvent for WindowsServiceInstall {
+impl<'a> InternalEvent for WindowsServiceInstall<'a> {
     fn emit_logs(&self) {
-        info!("Installed Windows Service.");
+        info!(
+            name = ?self.name,
+            "Installed Windows Service.",
+        );
     }
 
     fn emit_metrics(&self) {
-        counter!("windows_service_install", 1);
+        counter!("windows_service_install", 1,
+        );
     }
 }
 
 #[derive(Debug)]
-pub struct WindowsServiceUninstall;
+pub struct WindowsServiceUninstall<'a> {
+    pub name: &'a str,
+}
 
-impl InternalEvent for WindowsServiceUninstall {
+impl<'a> InternalEvent for WindowsServiceUninstall<'a> {
     fn emit_logs(&self) {
-        info!("Uninstalled Windows Service.");
+        info!(
+            name = ?self.name,
+            "Uninstalled Windows Service.",
+        );
     }
 
     fn emit_metrics(&self) {
-        counter!("windows_service_uninstall", 1);
+        counter!("windows_service_uninstall", 1,
+        );
     }
 }
 
 #[derive(Debug)]
-pub struct WindowsServiceDoesNotExist;
+pub struct WindowsServiceDoesNotExist<'a> {
+    pub name: &'a str,
+}
 
-impl InternalEvent for WindowsServiceDoesNotExist {
+impl<'a> InternalEvent for WindowsServiceDoesNotExist<'a> {
     fn emit_logs(&self) {
-        error!("Windows service does not exist. Maybe it needs to be installed?");
+        error!(
+            name = self.name,
+            "Windows service does not exist. Maybe it needs to be installed?",
+        );
     }
 
     fn emit_metrics(&self) {
-        counter!("windows_service_does_not_exist", 1);
+        counter!("windows_service_does_not_exist", 1,
+        );
     }
 }
