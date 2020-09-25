@@ -46,8 +46,8 @@ pub fn process_paths(config_paths: &[PathBuf]) -> Option<Vec<PathBuf>> {
 
     paths.sort();
     paths.dedup();
-    // Ignore poisoned and let the current main thread continue running to do the cleanup.
-    let _ = CONFIG_PATHS.lock().map(|mut guard| *guard = paths.clone());
+    // Ignore poison error and let the current main thread continue running to do the cleanup.
+    std::mem::drop(CONFIG_PATHS.lock().map(|mut guard| *guard = paths.clone()));
 
     Some(paths)
 }
