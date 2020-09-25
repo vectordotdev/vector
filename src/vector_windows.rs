@@ -1,4 +1,6 @@
-use crate::app::Application;
+use crate::{
+    app::Application,
+};
 use futures::compat::Future01CompatExt;
 use std::{ffi::OsString, sync::mpsc, time::Duration};
 use windows_service::service::{
@@ -24,6 +26,13 @@ pub mod service_control {
     use std::ffi::OsString;
     use std::time::Duration;
     use std::{fmt, thread};
+    use crate::internal_events::{
+        WindowsServiceInstall,
+        WindowsServiceStart,
+        WindowsServiceStop,
+        WindowsServiceUninstall,
+        WindowsServiceDoesNotExist,
+    };
 
     #[derive(Debug, Clone, PartialEq)]
     pub enum ControlAction {
@@ -80,6 +89,9 @@ pub mod service_control {
             || service_status.current_state != ServiceState::Running
         {
             service.start(&[] as &[OsString])?;
+            emit!(WindowsServiceStart { name: &service.name, already_started: false, });
+        } else {
+            emit!(WindowsServiceStart { name: &service.name, already_started: true, });
         }
 
         Ok(())
@@ -94,6 +106,9 @@ pub mod service_control {
             || service_status.current_state != ServiceState::Stopped
         {
             service.stop()?;
+            emit!(WindowsServiceStop { name: &service.name, already_stopped: false, });
+        } else {
+            emit!(WindowsServiceStop { name: &service.name, already_stopped: true, });
         }
 
         Ok(())
@@ -116,12 +131,10 @@ pub mod service_control {
             account_password: None,
         };
 
-        debug!(
-            message = "Registering service.",
-            service_info = format!("{:?}", service_info).as_str(),
-        );
-
         service_manager.create_service(&service_info, ServiceAccess::empty())?;
+
+        emit!(WindowsServiceInstall { name: &service.name, });
+
         // TODO: It is currently not possible to change the description of the service.
         // Waiting for the following PR to get merged in
         // https://github.com/mullvad/windows-service-rs/pull/32
@@ -138,10 +151,13 @@ pub mod service_control {
         let service_status = service.query_status()?;
         if service_status.current_state != ServiceState::Stopped {
             service.stop()?;
+            emit!(WindowsServiceStop { name: &service.name, already_stopped: false, });
             thread::sleep(Duration::from_secs(1));
         }
 
         service.delete()?;
+
+        emit!(WindowsServiceUninstall { name: &service.name, });
         Ok(())
     }
 
@@ -152,7 +168,11 @@ pub mod service_control {
         let manager_access = ServiceManagerAccess::CONNECT;
         let service_manager = ServiceManager::local_computer(None::<&str>, manager_access)?;
 
-        let service = service_manager.open_service(&service.name, access)?;
+        let service = service_manager.open_service(&service.name, access)
+            .map_err(|e| {
+                emit!(WindowsServiceDoesNotExist);
+                e
+            })?;
         Ok(service)
     }
 }
