@@ -124,12 +124,12 @@ impl SourceConfig for SplunkConfig {
             .or_else(finish_err);
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
-        let mut listener = tls.bind(&self.address).await?;
+        let listener = tls.bind(&self.address).await?;
 
         let fut = async move {
             let _ = warp::serve(services)
                 .serve_incoming_with_graceful_shutdown(
-                    listener.incoming(),
+                    listener.accept_stream(),
                     shutdown.clone().compat().map(|_| ()),
                 )
                 .await;
