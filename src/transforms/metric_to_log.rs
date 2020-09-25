@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, LogEvent, Value as EventValue},
+    event::{self, Event, LogEvent},
     internal_events::{
         MetricToLogEventProcessed, MetricToLogFailedDeserialize, MetricToLogFailedSerialize,
     },
@@ -82,7 +82,7 @@ impl Transform for MetricToLog {
                     let timestamp = log
                         .remove(&self.timestamp_key)
                         .and_then(|value| Conversion::Timestamp.convert(value).ok())
-                        .unwrap_or_else(|| EventValue::Timestamp(Utc::now()));
+                        .unwrap_or_else(|| event::Value::Timestamp(Utc::now()));
                     log.insert(&log_schema().timestamp_key(), timestamp);
 
                     if let Some(host) = log.remove_prune(&self.host_tag, true) {
@@ -165,7 +165,7 @@ mod tests {
         let gauge = Metric {
             name: "gauge".into(),
             timestamp: Some(ts()),
-            tags: Some(tags()),
+            tags: None,
             kind: MetricKind::Absolute,
             value: MetricValue::Gauge { value: 1.0 },
         };
@@ -177,10 +177,8 @@ mod tests {
             collected,
             vec![
                 (String::from("gauge.value"), &Value::from(1.0)),
-                (String::from("host"), &Value::from("localhost")),
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("gauge")),
-                (String::from("tags.some_tag"), &Value::from("some_value")),
                 (String::from("timestamp"), &Value::from(ts())),
             ]
         );
@@ -191,7 +189,7 @@ mod tests {
         let set = Metric {
             name: "set".into(),
             timestamp: Some(ts()),
-            tags: Some(tags()),
+            tags: None,
             kind: MetricKind::Absolute,
             value: MetricValue::Set {
                 values: vec!["one".into(), "two".into()].into_iter().collect(),
@@ -204,12 +202,10 @@ mod tests {
         assert_eq!(
             collected,
             vec![
-                (String::from("host"), &Value::from("localhost")),
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("set")),
                 (String::from("set.values[0]"), &Value::from("one")),
                 (String::from("set.values[1]"), &Value::from("two")),
-                (String::from("tags.some_tag"), &Value::from("some_value")),
                 (String::from("timestamp"), &Value::from(ts())),
             ]
         );
@@ -220,7 +216,7 @@ mod tests {
         let distro = Metric {
             name: "distro".into(),
             timestamp: Some(ts()),
-            tags: Some(tags()),
+            tags: None,
             kind: MetricKind::Absolute,
             value: MetricValue::Distribution {
                 values: vec![1.0, 2.0],
@@ -249,10 +245,8 @@ mod tests {
                 ),
                 (String::from("distribution.values[0]"), &Value::from(1.0)),
                 (String::from("distribution.values[1]"), &Value::from(2.0)),
-                (String::from("host"), &Value::from("localhost")),
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("distro")),
-                (String::from("tags.some_tag"), &Value::from("some_value")),
                 (String::from("timestamp"), &Value::from(ts())),
             ]
         );
@@ -263,7 +257,7 @@ mod tests {
         let histo = Metric {
             name: "histo".into(),
             timestamp: Some(ts()),
-            tags: Some(tags()),
+            tags: None,
             kind: MetricKind::Absolute,
             value: MetricValue::AggregatedHistogram {
                 buckets: vec![1.0, 2.0],
@@ -297,10 +291,8 @@ mod tests {
                     &Value::from(20)
                 ),
                 (String::from("aggregated_histogram.sum"), &Value::from(50.0)),
-                (String::from("host"), &Value::from("localhost")),
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("histo")),
-                (String::from("tags.some_tag"), &Value::from("some_value")),
                 (String::from("timestamp"), &Value::from(ts())),
             ]
         );
@@ -311,7 +303,7 @@ mod tests {
         let summary = Metric {
             name: "summary".into(),
             timestamp: Some(ts()),
-            tags: Some(tags()),
+            tags: None,
             kind: MetricKind::Absolute,
             value: MetricValue::AggregatedSummary {
                 quantiles: vec![50.0, 90.0],
@@ -345,10 +337,8 @@ mod tests {
                     String::from("aggregated_summary.values[1]"),
                     &Value::from(20.0)
                 ),
-                (String::from("host"), &Value::from("localhost")),
                 (String::from("kind"), &Value::from("absolute")),
                 (String::from("name"), &Value::from("summary")),
-                (String::from("tags.some_tag"), &Value::from("some_value")),
                 (String::from("timestamp"), &Value::from(ts())),
             ]
         );
