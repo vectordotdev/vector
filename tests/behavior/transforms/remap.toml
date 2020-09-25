@@ -514,3 +514,32 @@
       "b.equals" = "f"
       "c.equals" = "ar"
       "d.equals" = "ooba"
+
+[transforms.remap_function_tokenize]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = tokenize(.a)
+    .b = tokenize(.b)
+  """
+[[tests]]
+  name = "remap_function_tokenize"
+  [tests.input]
+    insert_at = "remap_function_tokenize"
+    type = "log"
+    [tests.input.log_fields]
+      a = "217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\" 205 11881"
+      b = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_tokenize"
+    [[tests.outputs.conditions]]
+      "a.length_eq" = 7
+      "a[0].equals" = "217.250.207.207"
+      "a[1].equals" = "<null>"
+      "a[2].equals" = "<null>"
+      "a[3].equals" = "07/Sep/2020:16:38:00 -0400"
+      "a[4].equals" = "DELETE /deliverables/next-generation/user-centric HTTP/1.1"
+      "a[5].equals" = "205"
+      "a[6].equals" = "11881"
+      "b.length_eq" = 1
+      "b[0].equals" = "bar"

@@ -119,6 +119,7 @@ build_signatures! {
     format_timestamp => FormatTimestampFn,
     contains => ContainsFn,
     slice => SliceFn,
+    tokenize => TokenizeFn,
 }
 
 /// A parameter definition accepted by a function.
