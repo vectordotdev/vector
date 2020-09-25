@@ -10,11 +10,14 @@ use crate::{
 use chrono::{serde::ts_milliseconds, DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::iter;
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
-pub struct AwsCloudwatchLogsSubscriptionParserConfig {}
+pub struct AwsCloudwatchLogsSubscriptionParserConfig {
+    pub field: Option<Atom>,
+}
 
 inventory::submit! {
     TransformDescription::new::<AwsCloudwatchLogsSubscriptionParserConfig>("aws_cloudwatch_logs_subscription_parser")
@@ -42,13 +45,22 @@ impl TransformConfig for AwsCloudwatchLogsSubscriptionParserConfig {
 }
 
 #[derive(Debug)]
-pub struct AwsCloudwatchLogsSubscriptionParser {}
+pub struct AwsCloudwatchLogsSubscriptionParser {
+    field: Atom,
+}
 
 impl From<AwsCloudwatchLogsSubscriptionParserConfig> for AwsCloudwatchLogsSubscriptionParser {
     fn from(
-        _config: AwsCloudwatchLogsSubscriptionParserConfig,
+        config: AwsCloudwatchLogsSubscriptionParserConfig,
     ) -> AwsCloudwatchLogsSubscriptionParser {
-        AwsCloudwatchLogsSubscriptionParser {}
+        let field = if let Some(field) = &config.field {
+            field
+        } else {
+            &log_schema().message_key()
+        };
+        AwsCloudwatchLogsSubscriptionParser {
+            field: field.clone(),
+        }
     }
 }
 
@@ -64,7 +76,7 @@ impl Transform for AwsCloudwatchLogsSubscriptionParser {
         emit!(AwsCloudwatchLogsSubscriptionParserEventProcessed);
 
         let message = log
-            .get(log_schema().message_key())
+            .get(&self.field)
             .map(|s| s.as_bytes())
             .and_then(|to_parse| {
                 serde_json::from_slice::<AwsCloudWatchLogsSubscriptionMessage>(to_parse.as_ref())
@@ -150,7 +162,9 @@ mod test {
     #[test]
     fn aws_cloudwatch_logs_subscription_parser_emits_events() {
         let mut parser =
-            AwsCloudwatchLogsSubscriptionParser::from(AwsCloudwatchLogsSubscriptionParserConfig {});
+            AwsCloudwatchLogsSubscriptionParser::from(AwsCloudwatchLogsSubscriptionParserConfig {
+                field: None,
+            });
 
         let mut event = Event::from(
             r#"
@@ -214,7 +228,9 @@ mod test {
     #[test]
     fn aws_cloudwatch_logs_subscription_parser_ignores_control_messages() {
         let mut parser =
-            AwsCloudwatchLogsSubscriptionParser::from(AwsCloudwatchLogsSubscriptionParserConfig {});
+            AwsCloudwatchLogsSubscriptionParser::from(AwsCloudwatchLogsSubscriptionParserConfig {
+                field: None,
+            });
 
         let event = Event::from(
             r#"
