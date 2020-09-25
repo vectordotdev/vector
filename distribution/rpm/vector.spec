@@ -22,7 +22,7 @@ URL: %{_url}
 
 %prep
 # We are currently in the BUILD dir
-tar -xvf %{_sourcedir}/%{_source} --strip-components=1
+tar -xvf %{_sourcedir}/%{_source} --strip-components=2
 cp -a %{_sourcedir}/systemd/. systemd
 
 %install
@@ -45,6 +45,7 @@ getent passwd %{_username} > /dev/null || \
   useradd -r -d %{_sharedstatedir}/%{_name} -g %{_username} -s /sbin/nologin \
   -c "Vector observability data router" %{_username}
 chown %{_username} %{_sharedstatedir}/%{_name}
+usermod -aG systemd-journal %{_username}  || true
 
 %clean
 rm -rf %{buildroot}

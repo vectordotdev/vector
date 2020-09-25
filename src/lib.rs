@@ -32,6 +32,8 @@ pub mod generate;
 pub mod wasm;
 #[macro_use]
 pub mod internal_events;
+#[cfg(feature = "api")]
+pub mod api;
 pub mod async_read;
 pub mod heartbeat;
 #[cfg(feature = "rdkafka")]
@@ -87,4 +89,8 @@ pub fn get_version() -> String {
 #[allow(unused)]
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
+}
+
+pub fn get_hostname() -> std::io::Result<String> {
+    Ok(hostname::get()?.to_string_lossy().into())
 }

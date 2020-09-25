@@ -120,23 +120,6 @@ define ENVIRONMENT_EXEC
 			$(ENVIRONMENT_UPSTREAM)
 endef
 
-define ENVIRONMENT_COPY_ARTIFACTS
-	@echo "Copying artifacts off volumes... (Docker errors below are totally okay)"
-	@mkdir -p ./target/release
-	@mkdir -p ./target/debug
-	@mkdir -p ./target/criterion
-	@$(CONTAINER_TOOL) rm -f vector-build-outputs || true
-	@$(CONTAINER_TOOL) run \
-		-d \
-		-v vector-target:/target \
-		--name vector-build-outputs \
-		busybox true
-	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/release/vector ./target/release/ || true
-	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/debug/vector ./target/debug/ || true
-	@$(CONTAINER_TOOL) cp vector-build-outputs:/target/criterion ./target/criterion || true
-	@$(CONTAINER_TOOL) rm -f vector-build-outputs
-endef
-
 
 ifeq ($(ENVIRONMENT_AUTOBUILD), true)
 define ENVIRONMENT_PREPARE
@@ -243,25 +226,32 @@ target/%/vector.tar.gz: export PAIR =$(subst /, ,$(@:target/%/vector.tar.gz=%))
 target/%/vector.tar.gz: export TRIPLE ?=$(word 1,${PAIR})
 target/%/vector.tar.gz: export PROFILE ?=$(word 2,${PAIR})
 target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
+	rm -rf target/scratch/vector-${TRIPLE} || true
+	mkdir -p target/scratch/vector-${TRIPLE}/bin target/scratch/vector-${TRIPLE}/etc
+	cp --recursive --force --verbose \
+		target/${TRIPLE}/${PROFILE}/vector \
+		target/scratch/vector-${TRIPLE}/bin/vector
+	cp --recursive --force --verbose \
+		README.md \
+		LICENSE \
+		config \
+		target/scratch/vector-${TRIPLE}/
+	cp --recursive --force --verbose \
+		distribution/systemd \
+		target/scratch/vector-${TRIPLE}/etc/
 	tar --create \
 		--gzip \
 		--verbose \
 		--file target/${TRIPLE}/${PROFILE}/vector.tar.gz \
-		--transform='s|target/${TRIPLE}/${PROFILE}/|bin/|' \
-		--transform='s|distribution/|etc/|' \
-		--transform 's|^|vector-${TRIPLE}/|' \
-		target/${TRIPLE}/${PROFILE}/vector \
-		README.md \
-		LICENSE \
-		config \
-		distribution/init.d \
-		distribution/systemd
+		--directory target/scratch/ \
+		./vector-${TRIPLE}
+	rm -rf target/scratch/
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
 
 .PHONY: test-all
 test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.
@@ -336,7 +326,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-aws
 	sleep 5 # Many services are very slow... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features aws-integration-tests --lib ::aws_ -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features aws-integration-tests --lib ::aws_ -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-aws
 endif
@@ -368,14 +358,14 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-clickhouse
 	sleep 5 # Many services are very slow... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features clickhouse-integration-tests --lib ::clickhouse:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features clickhouse-integration-tests --lib ::clickhouse:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-clickhouse
 endif
 
 .PHONY: test-integration-docker
 test-integration-docker: ## Runs Docker integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features docker-integration-tests --lib ::docker:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features docker-integration-tests --lib ::docker:: -- --nocapture
 
 .PHONY: start-integration-elasticsearch
 start-integration-elasticsearch:
@@ -422,7 +412,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-elasticsearch
 	sleep 60 # Many services are very slow... Give them a sec...
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features es-integration-tests --lib ::elasticsearch:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features es-integration-tests --lib ::elasticsearch:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-elasticsearch
 endif
@@ -456,7 +446,8 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-gcp
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features gcp-integration-tests --lib ::gcp:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "gcp-integration-tests gcp-pubsub-integration-tests gcp-cloud-storage-integration-tests" \
+	 --lib ::gcp:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-gcp
 endif
@@ -488,7 +479,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-humio
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features humio-integration-tests --lib ::humio:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features humio-integration-tests --lib ::humio:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-humio
 endif
@@ -526,7 +517,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-influxdb
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features influxdb-integration-tests --lib ::influxdb::integration_tests:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features influxdb-integration-tests --lib ::influxdb::integration_tests:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-influxdb
 endif
@@ -578,7 +569,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-kafka
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features "kafka-integration-tests rdkafka-plain" --lib ::kafka:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features "kafka-integration-tests rdkafka-plain" --lib ::kafka:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-kafka
 endif
@@ -612,7 +603,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-loki
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features loki-integration-tests --lib ::loki:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features loki-integration-tests --lib ::loki:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-loki
 endif
@@ -646,7 +637,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-pulsar
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features pulsar-integration-tests --lib ::pulsar:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features pulsar-integration-tests --lib ::pulsar:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-pulsar
 endif
@@ -681,7 +672,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-splunk
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features splunk-integration-tests --lib ::splunk_hec:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features splunk-integration-tests --lib ::splunk_hec:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-splunk
 endif
@@ -697,14 +688,14 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-kafka
 	sleep 30 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --features shutdown-tests --test shutdown -- --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features shutdown-tests --test shutdown -- --test-threads 4
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-kafka
 endif
 
 .PHONY: test-cli
 test-cli: ## Runs cli tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-default-features --test cli -- --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --test cli -- --test-threads 4
 
 .PHONY: build-wasm-tests
 test-wasm-build-modules: $(WASM_MODULE_OUTPUTS) ### Build all WASM test modules
@@ -723,7 +714,7 @@ $(WASM_MODULE_OUTPUTS): ### Build a specific WASM module
 test-wasm: export TEST_THREADS=1
 test-wasm: export TEST_LOG=vector=trace
 test-wasm: $(WASM_MODULE_OUTPUTS)  ### Run engine tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test wasm --no-default-features --features "wasm" --lib -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test wasm --no-fail-fast --no-default-features --features "wasm" --lib -- --nocapture
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
@@ -792,27 +783,13 @@ check-helm: ## Check that the Helm Chart passes helm lint
 check-kubernetes-yaml: ## Check that the generated Kubernetes YAML config is up to date
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh check
 
+check-internal-events: ## Check that internal events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-internal-events.sh
+
 ##@ Packaging
 
-.PHONY: package-all
-package-all: package-archive-all package-deb-all package-rpm-all ## Build all packages
-
-.PHONY: package-x86_64-unknown-linux-musl-all
-package-x86_64-unknown-linux-musl-all: package-archive-x86_64-unknown-linux-musl package-deb-x86_64 package-rpm-x86_64 # Build all x86_64 MUSL packages
-
-
-.PHONY: package-x86_64-unknown-linux-musl-all
-package-x86_64-unknown-linux-musl-all: package-archive-x86_64-unknown-linux-musl # Build all x86_64 MUSL packages
-
-.PHONY: package-x86_64-unknown-linux-gnu-all
-package-x86_64-unknown-linux-gnu-all: package-archive-x86_64-unknown-linux-gnu package-deb-x86_64 package-rpm-x86_64 # Build all x86_64 GNU packages
-
-.PHONY: package-aarch64-unknown-linux-musl-all
-package-aarch64-unknown-linux-musl-all: package-archive-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
-
 # archives
-.PHONY: package-archive
-
+.PHONY: package
 target/artifacts/vector-%.tar.gz: export TRIPLE :=$(@:target/artifacts/vector-%.tar.gz=%)
 target/artifacts/vector-%.tar.gz: target/%/release/vector.tar.gz
 	@echo "Built to ${<}, relocating to ${@}"
@@ -821,29 +798,31 @@ target/artifacts/vector-%.tar.gz: target/%/release/vector.tar.gz
 		${<} \
 		${@}
 
-.PHONY: package-archive
-package-archive: build ## Build the Vector archive
+.PHONY: package
+package: build ## Build the Vector archive
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/package-archive.sh
 
-.PHONY: package-archive-all
-package-archive-all: package-archive-x86_64-unknown-linux-musl package-archive-x86_64-unknown-linux-gnu package-archive-aarch64-unknown-linux-musl ## Build all archives
+.PHONY: package-x86_64-unknown-linux-gnu-all
+package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-deb-x86_64 package-rpm-x86_64 # Build all x86_64 GNU packages
 
-.PHONY: package-archive-x86_64-unknown-linux-musl
-package-archive-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## Build the x86_64 archive
-	$(RUN) package-archive-x86_64-unknown-linux-musl
+.PHONY: package-aarch64-unknown-linux-musl-all
+package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
 
-.PHONY: package-archive-x86_64-unknown-linux-gnu
-package-archive-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build an archive of the x86_64-unknown-linux-gnu triple.
+.PHONY: package-x86_64-unknown-linux-gnu
+package-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build an archive of the x86_64-unknown-linux-gnu triple.
 	@echo "Output to ${<}."
 
-.PHONY: package-archive-aarch64-unknown-linux-musl
-package-archive-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## Build an archive of the aarch64-unknown-linux-gnu triple.
-	$(RUN) package-archive-aarch64-unknown-linux-musl
+.PHONY: package-x86_64-unknown-linux-musl
+package-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## Build the x86_64 musl archive
+	$(RUN) package-x86_64-unknown-linux-musl
 
-.PHONY: package-archive-aarch64-unknown-linux-gnu
-package-archive-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build the aarch64 archive
+.PHONY: package-aarch64-unknown-linux-musl
+package-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## Build an archive of the aarch64-unknown-linux-gnu triple.
+	$(RUN) package-aarch64-unknown-linux-musl
+
+.PHONY: package-aarch64-unknown-linux-gnu
+package-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build the aarch64 archive
 	@echo "Output to ${<}."
-
 
 # debs
 
@@ -851,32 +830,22 @@ package-archive-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unkno
 package-deb: ## Build the deb package
 	$(RUN) package-deb
 
-.PHONY: package-deb-all
-package-deb-all: package-deb-x86_64 ## Build all deb packages
-
 .PHONY: package-deb-x86_64
-package-deb-x86_64: package-archive-x86_64-unknown-linux-gnu ## Build the x86_64 deb package
+package-deb-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 deb package
 	$(RUN) package-deb-x86_64
 
 .PHONY: package-deb-aarch64
-package-deb-aarch64: package-archive-aarch64-unknown-linux-musl  ## Build the aarch64 deb package
+package-deb-aarch64: package-aarch64-unknown-linux-musl  ## Build the aarch64 deb package
 	$(RUN) package-deb-aarch64
 
 # rpms
 
-.PHONY: package-rpm
-package-rpm: ## Build the rpm package
-	@scripts/package-rpm.sh
-
-.PHONY: package-rpm-all
-package-rpm-all: package-rpm-x86_64 package-rpm-aarch64 ## Build all rpm packages
-
 .PHONY: package-rpm-x86_64
-package-rpm-x86_64: package-archive-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
+package-rpm-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
 	$(RUN) package-rpm-x86_64
 
 .PHONY: package-rpm-aarch64
-package-rpm-aarch64: package-archive-aarch64-unknown-linux-musl ## Build the aarch64 rpm package
+package-rpm-aarch64: package-aarch64-unknown-linux-musl ## Build the aarch64 rpm package
 	$(RUN) package-rpm-aarch64
 
 ##@ Releasing
@@ -1027,7 +996,7 @@ update-kubernetes-yaml: ## Regenerate the Kubernetes YAML config
 .PHONY: cargo-install-%
 cargo-install-%: override TOOL = $(@:cargo-install-%=%)
 cargo-install-%:
-	$(if $(findstring true,$(AUTOINSTALL)),${MAYBE_ENVIRONMENT_EXEC} cargo install ${TOOL} --quiet,)
+	$(if $(findstring true,$(AUTOINSTALL)),cargo install ${TOOL} --quiet,)
 
 .PHONY: ensure-has-wasm-toolchain ### Configures a wasm toolchain for test artifact building, if required
 ensure-has-wasm-toolchain: target/wasm32-wasi/.obtained
