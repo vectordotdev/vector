@@ -61,9 +61,6 @@ mod tests {
     fn init_metrics() {
         METRIC_INIT.call_once(|| {
             let _ = vector::metrics::init();
-
-            // Spawn the internal 'heartbeat' event, which triggers uptime
-            tokio::spawn(heartbeat::heartbeat());
         })
     }
 
@@ -189,11 +186,15 @@ mod tests {
         assert_matches!(heartbeats.next().await, None);
     }
 
-    async fn new_uptime_subscription(client: &SubscriptionClient, num_results: usize) {
-        // Defaults to a 1 second interval, which we'll leave as-is since uptimeMetrics.seconds
-        // isn't any more granular
+    async fn new_uptime_subscription(
+        client: &SubscriptionClient,
+        num_results: usize,
+        interval: i64,
+    ) {
         let request_body =
-            UptimeMetricsSubscription::build_query(uptime_metrics_subscription::Variables {});
+            UptimeMetricsSubscription::build_query(uptime_metrics_subscription::Variables {
+                interval,
+            });
 
         let subscription = client
             .start::<UptimeMetricsSubscription>(&request_body)
@@ -331,8 +332,9 @@ mod tests {
         let client = new_subscription_client(bind).await;
 
         init_metrics();
+        tokio::spawn(heartbeat::heartbeat());
 
-        new_uptime_subscription(&client, 3).await;
+        new_uptime_subscription(&client, 3, 1200).await;
     }
 
     #[tokio::test]
@@ -357,9 +359,10 @@ mod tests {
         let client = new_subscription_client(bind).await;
 
         init_metrics();
+        tokio::spawn(heartbeat::heartbeat());
 
         futures::join! {
-            new_uptime_subscription(&client, 3),
+            new_uptime_subscription(&client, 3, 1200),
             new_heartbeat_subscription(&client, 3, 500),
         };
     }

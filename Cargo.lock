@@ -160,7 +160,7 @@ dependencies = [
  "mime",
  "multer",
  "once_cell",
- "parking_lot 0.10.2",
+ "parking_lot",
  "regex",
  "serde",
  "serde_json",
