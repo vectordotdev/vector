@@ -299,6 +299,7 @@ api-client = [
 # Sources
 sources = [
   "sources-apache_metrics",
+  "sources-aws_ecs_metrics",
   "sources-aws_kinesis_firehose",
   "sources-aws_s3",
   "sources-docker",
@@ -321,6 +322,7 @@ sources = [
   "sources-kubernetes-logs",
 ]
 sources-apache_metrics = []
+sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "tls", "warp"]
 sources-aws_s3 = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_s3", "rusoto_sqs"]
 sources-docker = ["bollard"]
