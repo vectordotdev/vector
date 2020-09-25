@@ -18,6 +18,9 @@ pub struct Metric {
 
 #[derive(Debug, Hash, Clone, PartialEq, Deserialize, Serialize, is_enum_variant)]
 #[serde(rename_all = "snake_case")]
+/// A metric may be an incremental value, updating the previous value of
+/// the metric, or absolute, which sets the reference for future
+/// increments.
 pub enum MetricKind {
     Incremental,
     Absolute,
@@ -25,27 +28,39 @@ pub enum MetricKind {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, is_enum_variant)]
 #[serde(rename_all = "snake_case")]
+/// A MetricValue is the container for the actual value of a metric.
 pub enum MetricValue {
-    Counter {
-        value: f64,
-    },
-    Gauge {
-        value: f64,
-    },
-    Set {
-        values: BTreeSet<String>,
-    },
+    /// A Counter is a simple value that can not decrease except to
+    /// reset it to zero.
+    Counter { value: f64 },
+    /// A Gauge represents a sampled numerical value.
+    Gauge { value: f64 },
+    /// A Set contains a set of (unordered) unique values for a key.
+    Set { values: BTreeSet<String> },
+    /// A Distribution contains a set of sampled values paired with the
+    /// rate at which they were observed.
     Distribution {
         values: Vec<f64>,
         sample_rates: Vec<u32>,
         statistic: StatisticKind,
     },
+    /// An AggregatedHistogram contains a set of observations which are
+    /// counted into buckets. The value of the bucket is the upper bound
+    /// on the range of values within the bucket. The lower bound on the
+    /// range is just higher than the previous bucket, or zero for the
+    /// first bucket. It also contains the total count of all
+    /// observations and their sum to allow calculating the mean.
     AggregatedHistogram {
         buckets: Vec<f64>,
         counts: Vec<u32>,
         count: u32,
         sum: f64,
     },
+    /// An AggregatedSummary contains a set of observations which are
+    /// counted into a number of quantiles. Each quantile contains the
+    /// upper value of the quantile (0 <= φ <= 1). It also contains the
+    /// total count of all observations and their sum to allow
+    /// calculating the mean.
     AggregatedSummary {
         quantiles: Vec<f64>,
         values: Vec<f64>,
@@ -64,6 +79,7 @@ pub enum StatisticKind {
 }
 
 impl Metric {
+    /// Create a new Metric from this with all the data but marked as absolute.
     pub fn to_absolute(&self) -> Self {
         Self {
             name: self.name.clone(),
@@ -74,6 +90,8 @@ impl Metric {
         }
     }
 
+    /// Add the data from the other metric to this one. The `other` must
+    /// be relative and contain the same value type as this one.
     pub fn add(&mut self, other: &Self) {
         if other.kind.is_absolute() {
             return;
@@ -87,9 +105,7 @@ impl Metric {
                 *value += value2;
             }
             (MetricValue::Set { ref mut values }, MetricValue::Set { values: values2 }) => {
-                for val in values2 {
-                    values.insert(val.to_string());
-                }
+                values.extend(values2.iter().map(Into::into));
             }
             (
                 MetricValue::Distribution {
@@ -132,6 +148,10 @@ impl Metric {
         }
     }
 
+    /// Set all the values of this metric to zero without emptying
+    /// it. This keeps all the bucket/value vectors for the histogram
+    /// and summary metric types intact while zeroing the
+    /// counts. Distribution metrics are emptied of all their values.
     pub fn reset(&mut self) {
         match &mut self.value {
             MetricValue::Counter { ref mut value } => {
@@ -178,6 +198,8 @@ impl Metric {
         }
     }
 
+    /// Convert the metrics_runtime::Measurement value plus the name and
+    /// labels from a Key into our internal Metric format.
     pub fn from_measurement(key: Key, measurement: Measurement) -> Self {
         let value = match measurement {
             Measurement::Counter(v) => MetricValue::Counter { value: v as f64 },
@@ -188,6 +210,9 @@ impl Metric {
                     .into_iter()
                     .map(|i| i as f64)
                     .collect::<Vec<_>>();
+                // Each sample in the source measurement has an
+                // effective sample rate of 1, so create an array of
+                // such of the same length as the values.
                 let sample_rates = vec![1; values.len()];
                 MetricValue::Distribution {
                     values,
