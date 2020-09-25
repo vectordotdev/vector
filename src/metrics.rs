@@ -79,9 +79,9 @@ impl Recorder for VectorRecorder {
 }
 
 #[derive(Debug, Clone)]
-struct ComponentNameFilter;
+struct VectorLabelFilter;
 
-impl LabelFilter for ComponentNameFilter {
+impl LabelFilter for VectorLabelFilter {
     fn should_include_label(&self, label: &Label) -> bool {
         label.key() == "component_name"
     }
