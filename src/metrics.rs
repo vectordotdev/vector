@@ -83,7 +83,8 @@ struct VectorLabelFilter;
 
 impl LabelFilter for VectorLabelFilter {
     fn should_include_label(&self, label: &Label) -> bool {
-        label.key() == "component_name"
+        let key = label.key();
+        key == "topology_component_name" || key == "topology_component_type"
     }
 }
 
@@ -131,8 +132,9 @@ mod tests {
         let span = span!(
             Level::ERROR,
             "my span",
-            component_name = "foo",
-            some_other_label = "bar"
+            topology_component_name = "my_component_name",
+            topology_component_type = "my_component_type",
+            some_other_label = "qwerty"
         );
         // See https://github.com/tokio-rs/tracing/issues/978
         if span.is_disabled() {
@@ -148,9 +150,18 @@ mod tests {
             .unwrap();
 
         let expected_tags = Some(
-            vec![("component_name".to_owned(), "foo".to_owned())]
-                .into_iter()
-                .collect(),
+            vec![
+                (
+                    "topology_component_name".to_owned(),
+                    "my_component_name".to_owned(),
+                ),
+                (
+                    "topology_component_type".to_owned(),
+                    "my_component_type".to_owned(),
+                ),
+            ]
+            .into_iter()
+            .collect(),
         );
 
         assert_eq!(metric.tags, expected_tags);
