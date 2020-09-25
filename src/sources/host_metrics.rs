@@ -22,7 +22,9 @@ use heim::memory::os::SwapExt;
 #[cfg(target_os = "windows")]
 use heim::net::os::windows::IoCountersExt;
 #[cfg(target_os = "linux")]
-use heim::{cpu::os::linux::CpuTimeExt, net::os::linux::IoCountersExt};
+use heim::{
+    cpu::os::linux::CpuTimeExt, memory::os::linux::MemoryExt, net::os::linux::IoCountersExt,
+};
 use heim::{
     units::{information::byte, ratio::ratio, time::second},
     Error,
@@ -266,6 +268,36 @@ async fn memory_metrics() -> Vec<Metric> {
                     timestamp,
                     memory.available().get::<byte>()
                 ),
+                #[cfg(target_os = "linux")]
+                gauge!(
+                    "host_memory_active_bytes",
+                    timestamp,
+                    memory.active().get::<byte>()
+                ),
+                #[cfg(target_os = "linux")]
+                gauge!(
+                    "host_memory_buffers_bytes",
+                    timestamp,
+                    memory.buffers().get::<byte>()
+                ),
+                #[cfg(target_os = "linux")]
+                gauge!(
+                    "host_memory_cached_bytes",
+                    timestamp,
+                    memory.cached().get::<byte>()
+                ),
+                #[cfg(target_os = "linux")]
+                gauge!(
+                    "host_memory_shared_bytes",
+                    timestamp,
+                    memory.shared().get::<byte>()
+                ),
+                #[cfg(target_os = "linux")]
+                gauge!(
+                    "host_memory_used_bytes",
+                    timestamp,
+                    memory.used().get::<byte>()
+                ),
                 #[cfg(target_os = "macos")]
                 gauge!(
                     "host_memory_active_bytes",
@@ -284,10 +316,6 @@ async fn memory_metrics() -> Vec<Metric> {
                     timestamp,
                     memory.wire().get::<byte>()
                 ),
-                // Missing: host_memory_compressed_bytes from ???
-                // Missing: used, buffers, cached, shared, active,
-                // inactive on Linux from
-                // heim::memory::os::linux::MemoryExt
             ]
         }
         Err(error) => {
