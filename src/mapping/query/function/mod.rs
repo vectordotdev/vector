@@ -118,6 +118,7 @@ build_signatures! {
     parse_json => ParseJsonFn,
     format_timestamp => FormatTimestampFn,
     contains => ContainsFn,
+    slice => SliceFn,
 }
 
 /// A parameter definition accepted by a function.
