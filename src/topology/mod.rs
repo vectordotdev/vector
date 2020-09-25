@@ -660,9 +660,6 @@ mod reload_tests {
     use crate::sources::splunk_hec::SplunkConfig;
     use crate::test_util::{next_addr, start_topology};
 
-    // TODO: Run it only on Linux and Mac since it fails on Windows.
-    // TODO: Issue: https://github.com/timberio/vector/issues/3035
-    #[cfg(unix)]
     #[tokio::test]
     async fn topology_reuse_old_port() {
         let address = next_addr();
