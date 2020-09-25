@@ -75,37 +75,41 @@ impl Transform for AwsCloudwatchLogsSubscriptionParser {
             });
 
         let events = message
-            .map(|m| subscription_event_to_events(m))
+            .map(|m| subscription_event_to_events(&event, m))
             .unwrap_or(Box::new(iter::empty()));
 
         output.extend(events);
     }
 }
 
-fn subscription_event_to_events(
+fn subscription_event_to_events<'a>(
+    event: &'a Event,
     message: AwsCloudWatchLogsSubscriptionMessage,
-) -> Box<dyn Iterator<Item = Event>> {
+) -> Box<dyn Iterator<Item = Event> + 'a> {
     match message.message_type {
         AwsCloudWatchLogsSubscriptionMessageType::ControlMessage => {
-            Box::new(iter::empty::<Event>()) as Box<dyn Iterator<Item = Event>>
+            Box::new(iter::empty::<Event>()) as Box<dyn Iterator<Item = Event> + 'a>
         }
         AwsCloudWatchLogsSubscriptionMessageType::DataMessage => {
             let log_group = message.log_group;
             let log_stream = message.log_stream;
             let owner = message.owner;
+            let subscription_filters = message.subscription_filters;
 
             Box::new(message.log_events.into_iter().map(move |log_event| {
-                let mut event = Event::from(log_event.message.as_str());
+                let mut event = event.clone();
                 let log = event.as_mut_log();
 
+                log.insert(log_schema().message_key().clone(), log_event.message);
                 log.insert(log_schema().timestamp_key().clone(), log_event.timestamp);
                 log.insert("id", log_event.id);
                 log.insert("log_group", log_group.clone());
                 log.insert("log_stream", log_stream.clone());
+                log.insert("subscription_filters", subscription_filters.clone());
                 log.insert("owner", owner.clone());
 
                 event
-            })) as Box<dyn Iterator<Item = Event>>
+            })) as Box<dyn Iterator<Item = Event> + 'a>
         }
     }
 }
@@ -141,13 +145,14 @@ mod test {
     use super::{AwsCloudwatchLogsSubscriptionParser, AwsCloudwatchLogsSubscriptionParserConfig};
     use crate::{event::Event, event::LogEvent, log_event, transforms::Transform};
     use chrono::{TimeZone, Utc};
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn aws_cloudwatch_logs_subscription_parser_emits_events() {
         let mut parser =
             AwsCloudwatchLogsSubscriptionParser::from(AwsCloudwatchLogsSubscriptionParserConfig {});
 
-        let event = Event::from(
+        let mut event = Event::from(
             r#"
 {
   "messageType": "DATA_MESSAGE",
@@ -172,6 +177,8 @@ mod test {
 }
 "#,
         );
+        let log = event.as_mut_log();
+        log.insert("keep", "field");
 
         let mut output: Vec<Event> = Vec::new();
 
@@ -187,6 +194,8 @@ mod test {
                     "log_group" => "/jesse/test",
                     "log_stream" => "test",
                     "owner" => "071959437513",
+                    "subscription_filters" => vec![ "Destination" ],
+                    "keep" => "field",
                 },
                 log_event! {
                     "id" => "35683658089659183914001456229543810359430816722590236673",
@@ -195,6 +204,8 @@ mod test {
                     "log_group" => "/jesse/test",
                     "log_stream" => "test",
                     "owner" => "071959437513",
+                    "subscription_filters" => vec![ "Destination" ],
+                    "keep" => "field",
                 },
             ]
         )
