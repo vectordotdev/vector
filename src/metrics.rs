@@ -65,11 +65,8 @@ impl Recorder for VectorRecorder {
     }
     fn update_gauge(&self, key: Key, value: f64) {
         let ckey = CompositeKey::new(MetricKind::Gauge, key);
-        self.registry.op(
-            ckey,
-            |handle| handle.update_gauge(value),
-            Handle::gauge,
-        )
+        self.registry
+            .op(ckey, |handle| handle.update_gauge(value), Handle::gauge)
     }
     fn record_histogram(&self, key: Key, value: u64) {
         let ckey = CompositeKey::new(MetricKind::Histogram, key);
