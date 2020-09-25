@@ -8,6 +8,12 @@ homepage = "https://vector.dev"
 license-file = "LICENSE"
 readme = "README.md"
 publish = false
+default-run = "vector"
+
+[[bin]]
+name = "graphql-schema"
+path = "src/api/schema/gen.rs"
+required-features = ["api"]
 
 [profile.bench]
 debug = true
@@ -98,6 +104,10 @@ smpl_jwt = { version = "0.5.0", optional = true }
 # API
 async-graphql = { version = "1.17.21", optional = true }
 async-graphql-warp = { version = "1.17.18", optional = true }
+graphql_client = { version = "0.9.0", optional = true }
+tokio-tungstenite = {version = "0.11.0", optional = true }
+futures-util = {version = "0.3.5", optional = true }
+weak-table = { version = "0.3.0", optional = true }
 
 # External libs
 derivative = "1.0"
@@ -247,8 +257,15 @@ wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm", "anyhow"]
 # transforms and sinks should depend on this feature.
 kubernetes = ["k8s-openapi", "evmap"]
 
-# This enables the API
-api = ["async-graphql", "async-graphql-warp"]
+# API
+api = [
+  "async-graphql",
+  "async-graphql-warp",
+  "graphql_client",
+  "tokio-tungstenite",
+  "futures-util",
+  "weak-table",
+]
 
 # Sources
 sources = [
