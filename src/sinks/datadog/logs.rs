@@ -12,7 +12,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::TlsConfig,
 };
 use bytes::Bytes;
 use flate2::write::GzEncoder;
@@ -313,6 +313,13 @@ mod tests {
             assert_eq!(val.1, format!("{}\n", expected[i]));
         }
     }
+}
+
+async fn healthcheck(config: DatadogLogsConfig, mut client: HttpClient) -> crate::Result<()> {
+    let req = config
+        .build_request(Vec::new())
+        .await?
+        .map(hyper::Body::from);
 
     #[tokio::test]
     async fn smoke_json() {
