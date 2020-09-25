@@ -126,10 +126,10 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let fut = async move {
-            let mut listener = tls.bind(&address).await.unwrap();
+            let listener = tls.bind(&address).await.unwrap();
             let _ = warp::serve(routes)
                 .serve_incoming_with_graceful_shutdown(
-                    listener.incoming(),
+                    listener.accept_stream(),
                     shutdown.clone().compat().map(|_| ()),
                 )
                 .await;
