@@ -7,7 +7,7 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use futures::{
     compat::Future01CompatExt,
     future::{FutureExt, TryFutureExt},
@@ -33,10 +33,12 @@ use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
 use std::time::Duration;
 use tokio::{select, time};
+//use uom::{Conversion, ConversionFactor, Unit};
 
 macro_rules! btreemap {
     ( $( $key:expr => $value:expr ),* ) => {{
@@ -75,12 +77,32 @@ struct NetworkConfig {
     devices: Option<Vec<PatternWrapper>>,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct Namespace(String);
+
+impl Default for Namespace {
+    fn default() -> Self {
+        Self("host".into())
+    }
+}
+
+impl Namespace {
+    fn encode(&self, word: &str) -> String {
+        match self.0.is_empty() {
+            true => word.into(),
+            false => format!("{}_{}", self.0, word),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct HostMetricsConfig {
-    #[serde(default = "scrape_interval_default")]
+    #[serde(default = "default_scrape_interval")]
     scrape_interval_secs: u64,
 
     collectors: Option<Vec<Collector>>,
+    #[serde(default)]
+    namespace: Namespace,
 
     #[serde(default)]
     disk: DiskConfig,
@@ -90,7 +112,7 @@ struct HostMetricsConfig {
     network: NetworkConfig,
 }
 
-const fn scrape_interval_default() -> u64 {
+const fn default_scrape_interval() -> u64 {
     15
 }
 
@@ -117,6 +139,15 @@ impl SourceConfig for HostMetricsConfig {
     fn source_type(&self) -> &'static str {
         "host_metrics"
     }
+}
+
+macro_rules! tags {
+    ( $( $key:expr => $value:expr ),* ) => {{
+        #[allow(unused_mut)]
+        let mut result = std::collections::BTreeMap::default();
+        $( result.insert($key.to_string(), $value.to_string()); )*
+            result
+    }}
 }
 
 impl HostMetricsConfig {
@@ -156,26 +187,23 @@ impl HostMetricsConfig {
         let hostname = crate::get_hostname();
         let mut metrics = Vec::new();
         if self.has_collector(Collector::Cpu) {
-            metrics.extend(add_collector("cpu", cpu_metrics().await));
+            metrics.extend(add_collector("cpu", self.cpu_metrics().await));
         }
         if self.has_collector(Collector::Disk) {
-            metrics.extend(add_collector("disk", disk_metrics(&self.disk).await));
+            metrics.extend(add_collector("disk", self.disk_metrics().await));
         }
         if self.has_collector(Collector::Filesystem) {
-            metrics.extend(add_collector(
-                "filesystem",
-                filesystem_metrics(&self.filesystem).await,
-            ));
+            metrics.extend(add_collector("filesystem", self.filesystem_metrics().await));
         }
         if self.has_collector(Collector::Load) {
-            metrics.extend(add_collector("load", loadavg_metrics().await));
+            metrics.extend(add_collector("load", self.loadavg_metrics().await));
         }
         if self.has_collector(Collector::Memory) {
-            metrics.extend(add_collector("memory", memory_metrics().await));
-            metrics.extend(add_collector("memory", swap_metrics().await));
+            metrics.extend(add_collector("memory", self.memory_metrics().await));
+            metrics.extend(add_collector("memory", self.swap_metrics().await));
         }
         if self.has_collector(Collector::Network) {
-            metrics.extend(add_collector("network", net_metrics(&self.network).await));
+            metrics.extend(add_collector("network", self.net_metrics().await));
         }
         if let Ok(hostname) = &hostname {
             for metric in &mut metrics {
@@ -184,301 +212,310 @@ impl HostMetricsConfig {
         }
         metrics.into_iter().map(Into::into)
     }
-}
 
-macro_rules! counter {
-    ( $name:expr, $timestamp:expr, $value:expr $( , $tag:literal => $tagval:expr )* ) => {
-        metric!($name, $timestamp, Counter, $value, btreemap![ $( $tag.into() => $tagval.into() ),* ] )
-    };
-    ( $name:expr, $timestamp:expr, $value:expr, $tags:expr ) => {
-        metric!($name, $timestamp, Counter, $value, $tags)
-    };
-}
-
-macro_rules! gauge {
-    ( $name:expr, $timestamp:expr, $value:expr $( , $tag:literal => $tagval:expr )* ) => {
-        metric!($name, $timestamp, Gauge, $value, btreemap![ $( $tag.into() => $tagval.into() ),* ] )
-    };
-    ( $name:expr, $timestamp:expr, $value:expr, $tags:expr ) => {
-        metric!($name, $timestamp, Gauge, $value, $tags)
-    };
-}
-
-macro_rules! metric {
-    ( $name:expr, $timestamp:expr, $type:ident, $value:expr, $tags:expr ) => {
-        Metric {
-            name: $name.into(),
-            timestamp: $timestamp,
-            kind: MetricKind::Absolute,
-            value: MetricValue::$type {
-                value: $value as f64,
-            },
-            tags: Some($tags),
-        }
-    };
-}
-
-async fn cpu_metrics() -> Vec<Metric> {
-    match heim::cpu::times().await {
-        Ok(times) => {
-            times
-                .filter_map(|result| filter_result(result, "Failed to load/parse CPU time"))
-                .map(|times| {
-                    let timestamp = Some(Utc::now());
-                    let name = "host_cpu_seconds_total";
-                    stream::iter(
-                    vec![
-                        counter!(name, timestamp, times.idle().get::<second>(), "mode" => "idle"),
-                        #[cfg(target_os = "linux")]
-                        counter!(name, timestamp, times.nice().get::<second>(), "mode" => "nice"),
-                        counter!(name, timestamp, times.system().get::<second>(), "mode" => "system"),
-                        counter!(name, timestamp, times.user().get::<second>(), "mode" => "user"),
-                    ]
-                    .into_iter(),
-                )
-                })
-                .flatten()
-                .collect::<Vec<_>>()
-                .await
-        }
-        Err(error) => {
-            error!(message = "Failed to load CPU times", %error, rate_limit_secs = 60);
-            vec![]
+    async fn cpu_metrics(&self) -> Vec<Metric> {
+        match heim::cpu::times().await {
+            Ok(times) => {
+                times
+                    .filter_map(|result| filter_result(result, "Failed to load/parse CPU time"))
+                    .map(|times| {
+                        let timestamp = Utc::now();
+                        let name = "cpu_seconds_total";
+                        stream::iter(
+                            vec![
+                                self.counter(
+                                    name,
+                                    timestamp,
+                                    times.idle().get::<second>(),
+                                    tags!["mode" => "idle"],
+                                ),
+                                #[cfg(target_os = "linux")]
+                                self.counter(
+                                    name,
+                                    timestamp,
+                                    times.nice().get::<second>(),
+                                    tags!["mode" => "nice"],
+                                ),
+                                self.counter(
+                                    name,
+                                    timestamp,
+                                    times.system().get::<second>(),
+                                    tags!["mode" => "system"],
+                                ),
+                                self.counter(
+                                    name,
+                                    timestamp,
+                                    times.user().get::<second>(),
+                                    tags!["mode" => "user"],
+                                ),
+                            ]
+                            .into_iter(),
+                        )
+                    })
+                    .flatten()
+                    .collect::<Vec<_>>()
+                    .await
+            }
+            Err(error) => {
+                error!(message = "Failed to load CPU times", %error, rate_limit_secs = 60);
+                vec![]
+            }
         }
     }
-}
 
-async fn memory_metrics() -> Vec<Metric> {
-    match heim::memory::memory().await {
-        Ok(memory) => {
-            let timestamp = Some(Utc::now());
-            vec![
-                gauge!(
-                    "host_memory_total_bytes",
-                    timestamp,
-                    memory.total().get::<byte>()
-                ),
-                gauge!(
-                    "host_memory_free_bytes",
-                    timestamp,
-                    memory.free().get::<byte>()
-                ),
-                gauge!(
-                    "host_memory_available_bytes",
-                    timestamp,
-                    memory.available().get::<byte>()
-                ),
-                #[cfg(target_os = "linux")]
-                gauge!(
-                    "host_memory_active_bytes",
-                    timestamp,
-                    memory.active().get::<byte>()
-                ),
-                #[cfg(target_os = "linux")]
-                gauge!(
-                    "host_memory_buffers_bytes",
-                    timestamp,
-                    memory.buffers().get::<byte>()
-                ),
-                #[cfg(target_os = "linux")]
-                gauge!(
-                    "host_memory_cached_bytes",
-                    timestamp,
-                    memory.cached().get::<byte>()
-                ),
-                #[cfg(target_os = "linux")]
-                gauge!(
-                    "host_memory_shared_bytes",
-                    timestamp,
-                    memory.shared().get::<byte>()
-                ),
-                #[cfg(target_os = "linux")]
-                gauge!(
-                    "host_memory_used_bytes",
-                    timestamp,
-                    memory.used().get::<byte>()
-                ),
-                #[cfg(target_os = "macos")]
-                gauge!(
-                    "host_memory_active_bytes",
-                    timestamp,
-                    memory.active().get::<byte>()
-                ),
-                #[cfg(target_os = "macos")]
-                gauge!(
-                    "host_memory_inactive_bytes",
-                    timestamp,
-                    memory.inactive().get::<byte>()
-                ),
-                #[cfg(target_os = "macos")]
-                gauge!(
-                    "host_memory_wired_bytes",
-                    timestamp,
-                    memory.wire().get::<byte>()
-                ),
-            ]
-        }
-        Err(error) => {
-            error!(message = "Failed to load memory info", %error, rate_limit_secs = 60);
-            vec![]
+    async fn memory_metrics(&self) -> Vec<Metric> {
+        match heim::memory::memory().await {
+            Ok(memory) => {
+                let timestamp = Utc::now();
+                vec![
+                    self.gauge(
+                        "memory_total_bytes",
+                        timestamp,
+                        memory.total().get::<byte>() as f64,
+                        tags![],
+                    ),
+                    self.gauge(
+                        "memory_free_bytes",
+                        timestamp,
+                        memory.free().get::<byte>() as f64,
+                        tags![],
+                    ),
+                    self.gauge(
+                        "memory_available_bytes",
+                        timestamp,
+                        memory.available().get::<byte>() as f64,
+                        tags![],
+                    ),
+                    #[cfg(target_os = "linux")]
+                    self.gauge(
+                        "memory_active_bytes",
+                        timestamp,
+                        memory.active().get::<byte>() as f64,
+                        tags![],
+                    ),
+                    #[cfg(target_os = "linux")]
+                    self.gauge(
+                        "memory_buffers_bytes",
+                        timestamp,
+                        memory.buffers().get::<byte>() as f64,
+                        tags![],
+                    ),
+                    #[cfg(target_os = "linux")]
+                    self.gauge(
+                        "memory_cached_bytes",
+                        timestamp,
+                        memory.cached().get::<byte>() as f64,
+                        tags![],
+                    ),
+                    #[cfg(target_os = "linux")]
+                    self.gauge(
+                        "memory_shared_bytes",
+                        timestamp,
+                        memory.shared().get::<byte>() as f64,
+                        tags![],
+                    ),
+                    #[cfg(target_os = "linux")]
+                    self.gauge(
+                        "memory_used_bytes",
+                        timestamp,
+                        memory.used().get::<byte>() as f64,
+                        tags![],
+                    ),
+                    #[cfg(target_os = "macos")]
+                    self.gauge(
+                        "memory_active_bytes",
+                        timestamp,
+                        memory.active().get::<byte>() as f64,
+                        tags![],
+                    ),
+                    #[cfg(target_os = "macos")]
+                    self.gauge(
+                        "memory_inactive_bytes",
+                        timestamp,
+                        memory.inactive().get::<byte>() as f64,
+                        tags![],
+                    ),
+                    #[cfg(target_os = "macos")]
+                    self.gauge(
+                        "memory_wired_bytes",
+                        timestamp,
+                        memory.wire().get::<byte>() as f64,
+                        tags![],
+                    ),
+                ]
+            }
+            Err(error) => {
+                error!(message = "Failed to load memory info", %error, rate_limit_secs = 60);
+                vec![]
+            }
         }
     }
-}
 
-async fn swap_metrics() -> Vec<Metric> {
-    match heim::memory::swap().await {
-        Ok(swap) => {
-            let timestamp = Some(Utc::now());
-            vec![
-                gauge!(
-                    "host_memory_swap_free_bytes",
-                    timestamp,
-                    swap.free().get::<byte>()
-                ),
-                gauge!(
-                    "host_memory_swap_total_bytes",
-                    timestamp,
-                    swap.total().get::<byte>()
-                ),
-                gauge!(
-                    "host_memory_swap_used_bytes",
-                    timestamp,
-                    swap.used().get::<byte>()
-                ),
-                #[cfg(not(target_os = "windows"))]
-                counter!(
-                    "host_memory_swapped_in_bytes_total",
-                    timestamp,
-                    swap.sin().map(|swap| swap.get::<byte>()).unwrap_or(0)
-                ),
-                #[cfg(not(target_os = "windows"))]
-                counter!(
-                    "host_memory_swapped_out_bytes_total",
-                    timestamp,
-                    swap.sout().map(|swap| swap.get::<byte>()).unwrap_or(0)
-                ),
-            ]
-        }
-        Err(error) => {
-            error!(message = "Failed to load swap info", %error, rate_limit_secs = 60);
-            vec![]
+    async fn swap_metrics(&self) -> Vec<Metric> {
+        match heim::memory::swap().await {
+            Ok(swap) => {
+                let timestamp = Utc::now();
+                vec![
+                    self.gauge(
+                        "memory_swap_free_bytes",
+                        timestamp,
+                        swap.free().get::<byte>() as f64,
+                        tags![],
+                    ),
+                    self.gauge(
+                        "memory_swap_total_bytes",
+                        timestamp,
+                        swap.total().get::<byte>() as f64,
+                        tags![],
+                    ),
+                    self.gauge(
+                        "memory_swap_used_bytes",
+                        timestamp,
+                        swap.used().get::<byte>() as f64,
+                        tags![],
+                    ),
+                    #[cfg(not(target_os = "windows"))]
+                    self.counter(
+                        "memory_swapped_in_bytes_total",
+                        timestamp,
+                        swap.sin().map(|swap| swap.get::<byte>()).unwrap_or(0) as f64,
+                        tags![],
+                    ),
+                    #[cfg(not(target_os = "windows"))]
+                    self.counter(
+                        "memory_swapped_out_bytes_total",
+                        timestamp,
+                        swap.sout().map(|swap| swap.get::<byte>()).unwrap_or(0) as f64,
+                        tags![],
+                    ),
+                ]
+            }
+            Err(error) => {
+                error!(message = "Failed to load swap info", %error, rate_limit_secs = 60);
+                vec![]
+            }
         }
     }
-}
 
-async fn loadavg_metrics() -> Vec<Metric> {
-    #[cfg(unix)]
-    let result = match heim::cpu::os::unix::loadavg().await {
-        Ok(loadavg) => {
-            let timestamp = Some(Utc::now());
-            vec![
-                gauge!("host_load1", timestamp, loadavg.0.get::<ratio>()),
-                gauge!("host_load5", timestamp, loadavg.1.get::<ratio>()),
-                gauge!("host_load15", timestamp, loadavg.2.get::<ratio>()),
-            ]
-        }
-        Err(error) => {
-            error!(message = "Failed to load load average info", %error, rate_limit_secs = 60);
-            vec![]
-        }
-    };
-    #[cfg(not(unix))]
-    let result = vec![];
+    async fn loadavg_metrics(&self) -> Vec<Metric> {
+        #[cfg(unix)]
+        let result = match heim::cpu::os::unix::loadavg().await {
+            Ok(loadavg) => {
+                let timestamp = Utc::now();
+                vec![
+                    self.gauge("load1", timestamp, loadavg.0.get::<ratio>() as f64, tags![]),
+                    self.gauge("load5", timestamp, loadavg.1.get::<ratio>() as f64, tags![]),
+                    self.gauge(
+                        "load15",
+                        timestamp,
+                        loadavg.2.get::<ratio>() as f64,
+                        tags![],
+                    ),
+                ]
+            }
+            Err(error) => {
+                error!(message = "Failed to load load average info", %error, rate_limit_secs = 60);
+                vec![]
+            }
+        };
+        #[cfg(not(unix))]
+        let result = vec![];
 
-    result
-}
+        result
+    }
 
-async fn net_metrics(config: &NetworkConfig) -> Vec<Metric> {
-    match heim::net::io_counters().await {
-        Ok(counters) => {
-            counters
-                .filter_map(|result| filter_result(result, "Failed to load/parse network data"))
-                // The following pair should be possible to do in one
-                // .filter_map, but it results in a strange "one type is
-                // more general than the other" error.
-                .map(|counter| {
-                    vec_contains_str(&config.devices, counter.interface()).map(|()| counter)
-                })
-                .filter_map(|counter| async { counter })
-                .map(|counter| {
-                    let timestamp = Some(Utc::now());
-                    let interface = counter.interface();
-                    stream::iter(
-                        vec![
-                            counter!(
-                                "host_network_receive_bytes_total",
-                                timestamp,
-                                counter.bytes_recv().get::<byte>(),
-                                "device" => interface
-                            ),
-                            counter!(
-                                "host_network_receive_errs_total",
-                                timestamp,
-                                counter.errors_recv(),
-                                "device" => interface
-                            ),
-                            counter!(
-                                "host_network_receive_packets_drop_total",
-                                timestamp,
-                                counter.drop_sent(),
-                                "device" => interface
-                            ),
-                            counter!(
-                                "host_network_receive_packets_total",
-                                timestamp,
-                                counter.drop_recv(),
-                                "device" => interface
-                            ),
-                            counter!(
-                                "host_network_transmit_bytes_total",
-                                timestamp,
-                                counter.bytes_sent().get::<byte>(),
-                                "device" => interface
-                            ),
-                            counter!(
-                                "host_network_transmit_errs_total",
-                                timestamp,
-                                counter.errors_sent(),
-                                "device" => interface
-                            ),
-                            #[cfg(any(target_os = "windows", target_os = "linux"))]
-                            counter!(
-                                "host_network_transmit_packets_total",
-                                timestamp,
-                                counter.packets_sent(),
-                                "device" => interface
-                            ),
-                        ]
-                        .into_iter(),
-                    )
-                })
-                .flatten()
-                .collect::<Vec<_>>()
-                .await
-        }
-        Err(error) => {
-            error!(message = "Failed to load network I/O counters", %error, rate_limit_secs = 60);
-            vec![]
+    async fn net_metrics(&self) -> Vec<Metric> {
+        match heim::net::io_counters().await {
+            Ok(counters) => {
+                counters
+                    .filter_map(|result| filter_result(result, "Failed to load/parse network data"))
+                    // The following pair should be possible to do in one
+                    // .filter_map, but it results in a strange "one type is
+                    // more general than the other" error.
+                    .map(|counter| {
+                        vec_contains_str(&self.network.devices, counter.interface())
+                            .map(|()| counter)
+                    })
+                    .filter_map(|counter| async { counter })
+                    .map(|counter| {
+                        let timestamp = Utc::now();
+                        let interface = counter.interface();
+                        stream::iter(
+                            vec![
+                                self.counter(
+                                    "network_receive_bytes_total",
+                                    timestamp,
+                                    counter.bytes_recv().get::<byte>() as f64,
+                                    tags!["device" => interface],
+                                ),
+                                self.counter(
+                                    "network_receive_errs_total",
+                                    timestamp,
+                                    counter.errors_recv() as f64,
+                                    tags!["device" => interface],
+                                ),
+                                self.counter(
+                                    "network_receive_packets_drop_total",
+                                    timestamp,
+                                    counter.drop_sent() as f64,
+                                    tags!["device" => interface],
+                                ),
+                                self.counter(
+                                    "network_receive_packets_total",
+                                    timestamp,
+                                    counter.drop_recv() as f64,
+                                    tags!["device" => interface],
+                                ),
+                                self.counter(
+                                    "network_transmit_bytes_total",
+                                    timestamp,
+                                    counter.bytes_sent().get::<byte>() as f64,
+                                    tags!["device" => interface],
+                                ),
+                                self.counter(
+                                    "network_transmit_errs_total",
+                                    timestamp,
+                                    counter.errors_sent() as f64,
+                                    tags!["device" => interface],
+                                ),
+                                #[cfg(any(target_os = "windows", target_os = "linux"))]
+                                self.counter(
+                                    "network_transmit_packets_total",
+                                    timestamp,
+                                    counter.packets_sent() as f64,
+                                    tags!["device" => interface],
+                                ),
+                            ]
+                            .into_iter(),
+                        )
+                    })
+                    .flatten()
+                    .collect::<Vec<_>>()
+                    .await
+            }
+            Err(error) => {
+                error!(message = "Failed to load network I/O counters", %error, rate_limit_secs = 60);
+                vec![]
+            }
         }
     }
-}
 
-async fn filesystem_metrics(config: &FilesystemConfig) -> Vec<Metric> {
-    match heim::disk::partitions().await {
+    async fn filesystem_metrics(&self) -> Vec<Metric> {
+        match heim::disk::partitions().await {
         Ok(partitions) => {
             partitions
                 .filter_map(|result| filter_result(result, "Failed to load/parse partition data"))
                 .map(|partition| {
-                    vec_contains_path(&config.mountpoints, partition.mount_point()).map(|()| partition)
+                    vec_contains_path(&self.filesystem.mountpoints, partition.mount_point()).map(|()| partition)
                 })
                 .filter_map(|partition| async { partition })
                 .map(|partition| match partition.device() {
-                    Some(device) => vec_contains_path(&config.devices, device.as_ref()).map(|()| partition),
+                    Some(device) => vec_contains_path(&self.filesystem.devices, device.as_ref()).map(|()| partition),
                     None => Some(partition),
                 })
                 .filter_map(|partition| async { partition })
                 .map(|partition| {
-                    vec_contains_str(&config.filesystems, partition.file_system().as_str())
+                    vec_contains_str(&self.filesystem.filesystems, partition.file_system().as_str())
                         .map(|()| partition)
                 })
                 .filter_map(|partition| async { partition })
@@ -492,7 +529,7 @@ async fn filesystem_metrics(config: &FilesystemConfig) -> Vec<Metric> {
                         .ok()
                 })
                 .map(|(partition, usage)| {
-                    let timestamp = Some(Utc::now());
+                    let timestamp = Utc::now();
                     let fs = partition.file_system();
                     let mut tags = btreemap![
                         "filesystem".to_string() => fs.as_str().to_string(),
@@ -503,22 +540,22 @@ async fn filesystem_metrics(config: &FilesystemConfig) -> Vec<Metric> {
                     }
                     stream::iter(
                         vec![
-                            gauge!(
-                                "host_filesystem_free_bytes",
+                            self.gauge(
+                                "filesystem_free_bytes",
                                 timestamp,
-                                usage.free().get::<byte>(),
+                                usage.free().get::<byte>() as f64,
                                 tags.clone()
                             ),
-                            gauge!(
-                                "host_filesystem_total_bytes",
+                            self.gauge(
+                                "filesystem_total_bytes",
                                 timestamp,
-                                usage.total().get::<byte>(),
+                                usage.total().get::<byte>() as f64,
                                 tags.clone()
                             ),
-                            gauge!(
-                                "host_filesystem_used_bytes",
+                            self.gauge(
+                                "filesystem_used_bytes",
                                 timestamp,
-                                usage.used().get::<byte>(),
+                                usage.used().get::<byte>() as f64,
                                 tags
                             ),
                         ]
@@ -528,66 +565,103 @@ async fn filesystem_metrics(config: &FilesystemConfig) -> Vec<Metric> {
                 .flatten()
                 .collect::<Vec<_>>()
                 .await
-        }
-        Err(error) => {
-            error!(message = "Failed to load partitions info", %error, rate_limit_secs = 60);
-            vec![]
+            }
+            Err(error) => {
+                error!(message = "Failed to load partitions info", %error, rate_limit_secs = 60);
+                vec![]
+            }
         }
     }
-}
 
-async fn disk_metrics(config: &DiskConfig) -> Vec<Metric> {
-    match heim::disk::io_counters().await {
-        Ok(counters) => {
-            counters
-                .filter_map(|result| filter_result(result, "Failed to load/parse disk I/O data"))
-                .map(|counter| {
-                    vec_contains_path(&config.devices, counter.device_name().as_ref())
-                        .map(|()| counter)
-                })
-                .filter_map(|counter| async { counter })
-                .map(|counter| {
-                    let timestamp = Some(Utc::now());
-                    let tags = btreemap![
-                        "device".into() => counter.device_name().to_string_lossy().to_string()
-                    ];
-                    stream::iter(
-                        vec![
-                            gauge!(
-                                "host_disk_read_bytes_total",
-                                timestamp,
-                                counter.read_bytes().get::<byte>(),
-                                tags.clone()
-                            ),
-                            gauge!(
-                                "host_disk_reads_completed_total",
-                                timestamp,
-                                counter.read_count(),
-                                tags.clone()
-                            ),
-                            gauge!(
-                                "host_disk_written_bytes_total",
-                                timestamp,
-                                counter.write_bytes().get::<byte>(),
-                                tags.clone()
-                            ),
-                            gauge!(
-                                "host_disk_writes_completed_total",
-                                timestamp,
-                                counter.write_count(),
-                                tags
-                            ),
-                        ]
-                        .into_iter(),
-                    )
-                })
-                .flatten()
-                .collect::<Vec<_>>()
-                .await
+    async fn disk_metrics(&self) -> Vec<Metric> {
+        match heim::disk::io_counters().await {
+            Ok(counters) => {
+                counters
+                    .filter_map(|result| {
+                        filter_result(result, "Failed to load/parse disk I/O data")
+                    })
+                    .map(|counter| {
+                        vec_contains_path(&self.disk.devices, counter.device_name().as_ref())
+                            .map(|()| counter)
+                    })
+                    .filter_map(|counter| async { counter })
+                    .map(|counter| {
+                        let timestamp = Utc::now();
+                        let tags = btreemap![
+                            "device".into() => counter.device_name().to_string_lossy().to_string()
+                        ];
+                        stream::iter(
+                            vec![
+                                self.gauge(
+                                    "disk_read_bytes_total",
+                                    timestamp,
+                                    counter.read_bytes().get::<byte>() as f64,
+                                    tags.clone(),
+                                ),
+                                self.gauge(
+                                    "disk_reads_completed_total",
+                                    timestamp,
+                                    counter.read_count() as f64,
+                                    tags.clone(),
+                                ),
+                                self.gauge(
+                                    "disk_written_bytes_total",
+                                    timestamp,
+                                    counter.write_bytes().get::<byte>() as f64,
+                                    tags.clone(),
+                                ),
+                                self.gauge(
+                                    "disk_writes_completed_total",
+                                    timestamp,
+                                    counter.write_count() as f64,
+                                    tags,
+                                ),
+                            ]
+                            .into_iter(),
+                        )
+                    })
+                    .flatten()
+                    .collect::<Vec<_>>()
+                    .await
+            }
+            Err(error) => {
+                error!(message = "Failed to load disk I/O info", %error, rate_limit_secs = 60);
+                vec![]
+            }
         }
-        Err(error) => {
-            error!(message = "Failed to load disk I/O info", %error, rate_limit_secs = 60);
-            vec![]
+    }
+
+    fn counter(
+        &self,
+        name: &str,
+        timestamp: DateTime<Utc>,
+        value: f64,
+        tags: BTreeMap<String, String>,
+    ) -> Metric {
+        let value = value.into();
+        Metric {
+            name: self.namespace.encode(name),
+            timestamp: Some(timestamp),
+            kind: MetricKind::Absolute,
+            value: MetricValue::Counter { value },
+            tags: Some(tags),
+        }
+    }
+
+    fn gauge(
+        &self,
+        name: &str,
+        timestamp: DateTime<Utc>,
+        value: f64,
+        tags: BTreeMap<String, String>,
+    ) -> Metric {
+        let value = value as f64;
+        Metric {
+            name: self.namespace.encode(name),
+            timestamp: Some(timestamp),
+            kind: MetricKind::Absolute,
+            value: MetricValue::Gauge { value },
+            tags: Some(tags),
         }
     }
 }

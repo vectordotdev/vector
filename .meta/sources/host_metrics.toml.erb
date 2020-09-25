@@ -29,6 +29,13 @@ load = "Load average metrics (UNIX only)."
 memory = "Metrics related to memory utilization."
 network = "Metrics related to network utilization."
 
+[sources.host_metrics.options.namespace]
+type = "string"
+common = false
+required = false
+default = "host"
+description = "The namespace prefix that will be added to all metric names."
+
 [sources.host_metrics.options.scrape_interval_secs]
 type = "integer"
 common = false
