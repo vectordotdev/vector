@@ -97,10 +97,18 @@ mod filters {
             .and(authenticate(access_key))
             .and(warp::header("X-Amz-Firehose-Request-Id"))
             .and(warp::header("X-Amz-Firehose-Source-Arn"))
-            .and(warp::header::exact(
-                "X-Amz-Firehose-Protocol-Version",
-                "1.0",
-            ))
+            .and(
+                warp::header("X-Amz-Firehose-Protocol-Version")
+                    .and_then(|version: String| async move {
+                        match version.as_str() {
+                            "1.0" => Ok(()),
+                            _ => Err(warp::reject::custom(
+                                RequestError::UnsupportedProtocolVersion { version },
+                            )),
+                        }
+                    })
+                    .untuple_one(),
+            )
             .and(parse_body())
             .and(warp::any().map(move || out.clone()))
             .and_then(handlers::firehose)
@@ -198,7 +206,11 @@ mod filters {
         if let Some(e) = err.find::<RequestError>() {
             message = format!("{}", e);
             code = e.status();
-            request_id = Some(e.request_id());
+            request_id = e.request_id();
+        } else if let Some(e) = err.find::<warp::reject::MissingHeader>() {
+            code = StatusCode::BAD_REQUEST;
+            message = format!("Required header missing: {}", e.name());
+            request_id = None;
         } else {
             code = StatusCode::INTERNAL_SERVER_ERROR;
             message = format!("{:?}", err);
@@ -404,6 +416,8 @@ pub mod errors {
             encoding: String,
             request_id: String,
         },
+        #[snafu(display("Unsupported protocol version: {}", version))]
+        UnsupportedProtocolVersion { version: String },
     }
 
     impl warp::reject::Reject for RequestError {}
@@ -418,20 +432,22 @@ pub mod errors {
                 RequestError::ParseRecords { .. } => StatusCode::BAD_REQUEST,
                 RequestError::Decode { .. } => StatusCode::BAD_REQUEST,
                 RequestError::ShuttingDown { .. } => StatusCode::SERVICE_UNAVAILABLE,
+                RequestError::UnsupportedProtocolVersion { .. } => StatusCode::BAD_REQUEST,
             }
         }
 
-        pub fn request_id(&self) -> String {
+        pub fn request_id(&self) -> Option<String> {
             match *self {
-                RequestError::AccessKeyMissing { ref request_id, .. } => request_id,
-                RequestError::AccessKeyInvalid { ref request_id, .. } => request_id,
-                RequestError::Parse { ref request_id, .. } => request_id,
-                RequestError::UnsupportedEncoding { ref request_id, .. } => request_id,
-                RequestError::ParseRecords { ref request_id, .. } => request_id,
-                RequestError::Decode { ref request_id, .. } => request_id,
-                RequestError::ShuttingDown { ref request_id, .. } => request_id,
+                RequestError::AccessKeyMissing { ref request_id, .. } => Some(request_id),
+                RequestError::AccessKeyInvalid { ref request_id, .. } => Some(request_id),
+                RequestError::Parse { ref request_id, .. } => Some(request_id),
+                RequestError::UnsupportedEncoding { ref request_id, .. } => Some(request_id),
+                RequestError::ParseRecords { ref request_id, .. } => Some(request_id),
+                RequestError::Decode { ref request_id, .. } => Some(request_id),
+                RequestError::ShuttingDown { ref request_id, .. } => Some(request_id),
+                RequestError::UnsupportedProtocolVersion { .. } => None,
             }
-            .clone()
+            .map(|s| s.clone())
         }
     }
 
