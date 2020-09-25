@@ -33,14 +33,14 @@ common = true
 examples = ["A94A8FE5CCB19BA61C4C08"]
 description = """\
 AWS Kinesis Firehose can be configured to pass along an access key to \
-authenticate requests. If configured, the `access_key` should be set to the same \
-value. If not specified, vector will treat all requests as authenticated.
+authenticate requests. If configured, `access_key` should be set to the same \
+value. If not specified, vector will treat all requests as authenticated. \
 """
 
 [[sources.aws_kinesis_firehose.examples]]
 label = "AWS CloudWatch Logs Subscription"
 body = """\
-Given the following input, which encodes events forwarded by an [AWS CloudWatch
+Given the following input, which contains events forwarded by an [AWS CloudWatch
 \ Logs Subscription][urls.aws_cloudwatch_logs_subscription_firehose]:
 
 ```json title="AWS Firehose request"
@@ -67,7 +67,8 @@ A log event will be output with the following structure:
 ```\
 
 You will typically want to pass forwarded CloudWatch Log events, like this, \
-through through the [`aws_cloudwatch_logs_subscription_parser`](). \
+through through the \
+[`aws_cloudwatch_logs_subscription_parser`][vector_transform_aws_cloudwatch_logs_subscription_parser]. \
 """
 
 [sources.aws_kinesis_firehose.fields.log.fields.message]
@@ -91,7 +92,7 @@ type = "timestamp"
 examples = ["2019-11-01T21:15:47.443232Z"]
 required = true
 description = """\
-The timestamp from the AWS Kinesis Firehose request body.
+The timestamp from the AWS Kinesis Firehose request body. \
 """
 
 [sources.aws_kinesis_firehose.fields.log.fields.source_arn]
@@ -100,7 +101,7 @@ examples = ["arn:aws:firehose:us-east-1:111111111111:deliverystream/test"]
 required = true
 description = """\
 The AWS Kinises Firehose delivery stream that issued the request, value of the \
-`X-Amz-Firehose-Source-Arn` header.
+`X-Amz-Firehose-Source-Arn` header. \
 """
 
 <%= render("_partials/fields/_tls_acceptor_options.toml", namespace: "sources.aws_kinesis_firehose.options", relevant: "") %>
