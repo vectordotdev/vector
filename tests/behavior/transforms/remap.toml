@@ -185,6 +185,47 @@
     [[tests.outputs.conditions]]
       "a.b\\.c.equals" = "baz"
 
+[transforms.remap_function_arguments]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = to_string(.in)
+    .b = to_string(value = .in)
+    .c = to_string(.in, 20)
+    .d = to_string(.in, default = 20)
+    .e = to_string(.nope, 20)
+    .f = to_string(.nope, default = 20)
+    .g = to_string(value = .in, default = 20)
+    .h = to_string(value = .in, 20)
+    .i = to_string(default = 20, .in)
+    .j = to_string(default = 20, value = .in)
+    .k = to_string(default = 20, value = .nope)
+    .l = to_string(default = .other, value = .nope)
+  """
+[[tests]]
+  name = "remap_function_arguments"
+  [tests.input]
+    insert_at = "remap_function_arguments"
+    type = "log"
+    [tests.input.log_fields]
+      in = 10
+      other = 30
+  [[tests.outputs]]
+    extract_from = "remap_function_arguments"
+    [[tests.outputs.conditions]]
+      "a.equals" = "10"
+      "b.equals" = "10"
+      "c.equals" = "10"
+      "d.equals" = "10"
+      "e.equals" = "20"
+      "f.equals" = "20"
+      "g.equals" = "10"
+      "h.equals" = "10"
+      "i.equals" = "10"
+      "j.equals" = "10"
+      "k.equals" = "20"
+      "l.equals" = "30"
+
 [transforms.remap_function_upcase]
   inputs = []
   type = "remap"
@@ -406,47 +447,6 @@
     [[tests.outputs.conditions]]
       "a.ends_with" = "Z"
 
-[transforms.remap_function_arguments]
-  inputs = []
-  type = "remap"
-  mapping = """
-    .a = to_string(.in)
-    .b = to_string(value = .in)
-    .c = to_string(.in, 20)
-    .d = to_string(.in, default = 20)
-    .e = to_string(.nope, 20)
-    .f = to_string(.nope, default = 20)
-    .g = to_string(value = .in, default = 20)
-    .h = to_string(value = .in, 20)
-    .i = to_string(default = 20, .in)
-    .j = to_string(default = 20, value = .in)
-    .k = to_string(default = 20, value = .nope)
-    .l = to_string(default = .other, value = .nope)
-  """
-[[tests]]
-  name = "remap_function_arguments"
-  [tests.input]
-    insert_at = "remap_function_arguments"
-    type = "log"
-    [tests.input.log_fields]
-      in = 10
-      other = 30
-  [[tests.outputs]]
-    extract_from = "remap_function_arguments"
-    [[tests.outputs.conditions]]
-      "a.equals" = "10"
-      "b.equals" = "10"
-      "c.equals" = "10"
-      "d.equals" = "10"
-      "e.equals" = "20"
-      "f.equals" = "20"
-      "g.equals" = "10"
-      "h.equals" = "10"
-      "i.equals" = "10"
-      "j.equals" = "10"
-      "k.equals" = "20"
-      "l.equals" = "30"
-
 [transforms.remap_function_format_timestamp]
   inputs = []
   type = "remap"
@@ -464,3 +464,28 @@
     extract_from = "remap_function_format_timestamp"
     [[tests.outputs.conditions]]
       "a.equals" = "1970-01-01T00:00:10+00:00"
+
+[transforms.remap_function_contains]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = contains(.foo, substring = .bar)
+    .b = contains(.bar, substring = "bar")
+    .c = contains(.bar, substring = "BAR", case_sensitive = true)
+    .d = contains(.bar, substring = "BAR", case_sensitive = false)
+  """
+[[tests]]
+  name = "remap_function_contains"
+  [tests.input]
+    insert_at = "remap_function_contains"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "foo"
+      bar = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_contains"
+    [[tests.outputs.conditions]]
+      "a.equals" = false
+      "b.equals" = true
+      "c.equals" = false
+      "d.equals" = true

@@ -202,6 +202,13 @@ impl Value {
         }
     }
 
+    pub fn as_boolean(&self) -> Option<bool> {
+        match &self {
+            Value::Boolean(v) => Some(*v),
+            _ => None,
+        }
+    }
+
     pub fn kind(&self) -> &str {
         match self {
             Value::Bytes(_) => "string",

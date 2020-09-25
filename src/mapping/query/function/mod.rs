@@ -96,6 +96,7 @@ build_signatures! {
     truncate => TruncateFn,
     parse_json => ParseJsonFn,
     format_timestamp => FormatTimestampFn,
+    contains => ContainsFn,
 }
 
 /// A parameter definition accepted by a function.
