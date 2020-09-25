@@ -135,7 +135,7 @@ mod filters {
                             .context(Parse {
                                 request_id: request_id.clone(),
                             })
-                            .map_err(|e| warp::reject::custom(e))
+                            .map_err(warp::reject::custom)
                     })
                 },
             )
@@ -213,7 +213,7 @@ mod filters {
         let json = warp::reply::json(&FirehoseResponse {
             request_id: request_id.unwrap_or_default(),
             timestamp: Utc::now(),
-            error_message: Some(message.clone()),
+            error_message: Some(message),
         });
 
         Ok(warp::reply::with_status(json, code))
@@ -504,7 +504,7 @@ mod tests {
             records: records
                 .into_iter()
                 .map(|record| models::EncodedFirehoseRecord {
-                    data: encode_record(record).unwrap().to_string(),
+                    data: encode_record(record).unwrap(),
                 })
                 .collect(),
         };

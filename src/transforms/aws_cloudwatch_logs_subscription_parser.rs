@@ -88,7 +88,7 @@ impl Transform for AwsCloudwatchLogsSubscriptionParser {
 
         let events = message
             .map(|m| subscription_event_to_events(&event, m))
-            .unwrap_or(Box::new(iter::empty()));
+            .unwrap_or_else(|| Box::new(iter::empty()));
 
         output.extend(events);
     }
