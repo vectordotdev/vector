@@ -263,7 +263,11 @@ mod test {
                             Err(_) => {
                                 unreachable!();
                             }
-                            Ok(line) if line.is_empty() => {
+                            Ok(Some(line)) if line.is_empty() => {
+                                attempts -= 1;
+                                continue;
+                            }
+                            Ok(None) => {
                                 attempts -= 1;
                                 continue;
                             }
@@ -334,12 +338,17 @@ mod test {
                             Err(_) => {
                                 unreachable!();
                             }
-                            Ok(line) if line.is_empty() => {
+                            Ok(Some(line)) if line.is_empty() => {
                                 attempts -= 1;
                                 assert!(fwfiles[read_index].read_line().is_none());
                                 continue;
                             }
-                            Ok(line) => {
+                            Ok(None) => {
+                                attempts -= 1;
+                                assert!(fwfiles[read_index].read_line().is_none());
+                                continue;
+                            }
+                            Ok(Some(line)) => {
                                 let exp =
                                     fwfiles[read_index].read_line().expect("could not readline");
                                 assert_eq!(exp.into_bytes(), line);

@@ -203,7 +203,7 @@ where
                 }
 
                 let mut bytes_read: usize = 0;
-                while let Ok(line) = watcher.read_line() {
+                while let Ok(Some(line)) = watcher.read_line() {
                     if line.is_empty() {
                         break;
                     }

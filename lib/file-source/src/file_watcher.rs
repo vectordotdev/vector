@@ -150,7 +150,7 @@ impl FileWatcher {
     /// This function will attempt to read a new line from its file, blocking,
     /// up to some maximum but unspecified amount of time. `read_line` will open
     /// a new file handler as needed, transparently to the caller.
-    pub fn read_line(&mut self) -> io::Result<Bytes> {
+    pub fn read_line(&mut self) -> io::Result<Option<Bytes>> {
         self.track_read_attempt();
 
         let reader = &mut self.reader;
@@ -162,7 +162,7 @@ impl FileWatcher {
             &mut self.buf,
             self.max_line_bytes,
         ) {
-            Ok(sz) => {
+            Ok(Some(sz)) => {
                 if sz > 0 {
                     self.track_read_success()
                 }
@@ -171,8 +171,9 @@ impl FileWatcher {
                     self.set_dead();
                 }
 
-                Ok(self.buf.split().freeze())
+                Ok(Some(self.buf.split().freeze()))
             }
+            Ok(None) => Ok(None),
             Err(e) => {
                 if let io::ErrorKind::NotFound = e.kind() {
                     self.set_dead();
@@ -218,7 +219,7 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
     delim: u8,
     buf: &mut BytesMut,
     max_size: usize,
-) -> io::Result<usize> {
+) -> io::Result<Option<usize>> {
     let mut total_read = 0;
     let mut discarding = false;
     let mut already_slept = false;
@@ -262,7 +263,7 @@ fn read_until_with_max_size<R: BufRead + ?Sized>(
             discarding = false;
             buf.clear();
         } else if done || (used == 0 && already_slept) {
-            return Ok(total_read);
+            return Ok(Some(total_read));
         } else if used == 0 {
             // We've hit EOF but not yet seen a newline. This can happen when unlucky timing causes
             // us to observe an incomplete write, so a short sleep gives the rest of the write
@@ -284,7 +285,9 @@ mod test {
         let mut buf = Cursor::new(&b"12"[..]);
         let mut pos = 0;
         let mut v = BytesMut::new();
-        let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000).unwrap();
+        let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000)
+            .unwrap()
+            .unwrap();
         assert_eq!(pos, 2);
         assert_eq!(p, 2);
         assert_eq!(&*v, b"12");
@@ -292,17 +295,23 @@ mod test {
         let mut buf = Cursor::new(&b"1233"[..]);
         let mut pos = 0;
         let mut v = BytesMut::new();
-        let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000).unwrap();
+        let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000)
+            .unwrap()
+            .unwrap();
         assert_eq!(pos, 3);
         assert_eq!(p, 3);
         assert_eq!(&*v, b"12");
         v.truncate(0);
-        let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000).unwrap();
+        let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000)
+            .unwrap()
+            .unwrap();
         assert_eq!(pos, 4);
         assert_eq!(p, 1);
         assert_eq!(&*v, b"");
         v.truncate(0);
-        let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000).unwrap();
+        let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000)
+            .unwrap()
+            .unwrap();
         assert_eq!(pos, 4);
         assert_eq!(p, 0);
         assert_eq!(&*v, []);
@@ -310,17 +319,23 @@ mod test {
         let mut buf = Cursor::new(&b"short\nthis is too long\nexact size\n11 eleven11\n"[..]);
         let mut pos = 0;
         let mut v = BytesMut::new();
-        let p = read_until_with_max_size(&mut buf, &mut pos, b'\n', &mut v, 10).unwrap();
+        let p = read_until_with_max_size(&mut buf, &mut pos, b'\n', &mut v, 10)
+            .unwrap()
+            .unwrap();
         assert_eq!(pos, 6);
         assert_eq!(p, 6);
         assert_eq!(&*v, b"short");
         v.truncate(0);
-        let p = read_until_with_max_size(&mut buf, &mut pos, b'\n', &mut v, 10).unwrap();
+        let p = read_until_with_max_size(&mut buf, &mut pos, b'\n', &mut v, 10)
+            .unwrap()
+            .unwrap();
         assert_eq!(pos, 34);
         assert_eq!(p, 28);
         assert_eq!(&*v, b"exact size");
         v.truncate(0);
-        let p = read_until_with_max_size(&mut buf, &mut pos, b'\n', &mut v, 10).unwrap();
+        let p = read_until_with_max_size(&mut buf, &mut pos, b'\n', &mut v, 10)
+            .unwrap()
+            .unwrap();
         assert_eq!(pos, 46);
         assert_eq!(p, 12);
         assert_eq!(&*v, []);
