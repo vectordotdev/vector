@@ -436,7 +436,7 @@ impl RunningTopology {
 
     fn spawn_sink(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
-        let span = info_span!(
+        let span = error_span!(
             "sink",
             topology_component_name = %task.name(),
             topology_component_type = %task.typetag(),
@@ -450,7 +450,7 @@ impl RunningTopology {
 
     fn spawn_transform(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
-        let span = info_span!(
+        let span = error_span!(
             "transform",
             topology_component_name = %task.name(),
             topology_component_type = %task.typetag(),
@@ -464,7 +464,7 @@ impl RunningTopology {
 
     fn spawn_source(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
-        let span = info_span!(
+        let span = error_span!(
             "source",
             topology_component_name = %task.name(),
             topology_component_type = %task.typetag(),
