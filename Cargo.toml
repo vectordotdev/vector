@@ -188,6 +188,7 @@ async-stream = "0.2.1"
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1"
+windows-service = "0.3.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "0.4"

@@ -9,7 +9,13 @@ use std::{
 };
 
 lazy_static! {
-    pub static ref DEFAULT_CONFIG_PATHS: Vec<PathBuf> = vec!["/etc/vector/vector.toml".into()];
+    pub static ref DEFAULT_UNIX_CONFIG_PATHS: Vec<PathBuf> = vec!["/etc/vector/vector.toml".into()];
+    pub static ref DEFAULT_WINDOWS_CONFIG_PATHS: Vec<PathBuf> = {
+        let program_files = std::env::var("ProgramFiles")
+            .expect("%ProgramFiles% environment variable must be defined");
+        let config_path = format!("{}\\Vector\\config\\vector.toml", program_files);
+        vec![PathBuf::from(config_path)]
+    };
 }
 
 pub static CONFIG_PATHS: OnceCell<Vec<PathBuf>> = OnceCell::new();
@@ -17,10 +23,18 @@ pub static CONFIG_PATHS: OnceCell<Vec<PathBuf>> = OnceCell::new();
 /// Expand a list of paths (potentially containing glob patterns) into real
 /// config paths, replacing it with the default paths when empty.
 pub fn process_paths(config_paths: &[PathBuf]) -> Option<Vec<PathBuf>> {
+    let default_paths = if cfg!(unix) {
+        DEFAULT_UNIX_CONFIG_PATHS.clone()
+    } else if cfg!(windows) {
+        DEFAULT_WINDOWS_CONFIG_PATHS.clone()
+    } else {
+        DEFAULT_UNIX_CONFIG_PATHS.clone()
+    };
+
     let starting_paths = if !config_paths.is_empty() {
         config_paths
     } else {
-        &DEFAULT_CONFIG_PATHS
+        &default_paths
     };
 
     let mut paths = Vec::new();
