@@ -27,7 +27,7 @@ pub fn init() -> crate::Result<()> {
         registry: Arc::clone(&registry),
     };
     // Apply a layer to capture tracing span fields as labels.
-    let recorder = TracingContextLayer::all().layer(recorder);
+    let recorder = TracingContextLayer::new(VectorLabelFilter).layer(recorder);
     // Register the recorder globally.
     metrics::set_boxed_recorder(Box::new(recorder)).map_err(|_| "recorder already initialized")?;
 
@@ -128,7 +128,12 @@ mod tests {
         trace_init();
         let _ = super::init();
 
-        let span = span!(Level::ERROR, "my span", component_name = "foobar");
+        let span = span!(
+            Level::ERROR,
+            "my span",
+            component_name = "foo",
+            some_other_label = "bar"
+        );
         // See https://github.com/tokio-rs/tracing/issues/978
         if span.is_disabled() {
             panic!("test is not configured properly, set TEST_LOG=info env var")
@@ -143,7 +148,7 @@ mod tests {
             .unwrap();
 
         let expected_tags = Some(
-            vec![("component_name".to_owned(), "foobar".to_owned())]
+            vec![("component_name".to_owned(), "foo".to_owned())]
                 .into_iter()
                 .collect(),
         );
