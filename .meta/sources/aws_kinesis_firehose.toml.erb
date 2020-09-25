@@ -6,8 +6,8 @@ common = false
 delivery_guarantee = "at_least_once"
 <%= render("_partials/descriptions/_aws_kinesis_firehose.toml") %>
 features = [
-  "Accepts events forwarded by AWS Kinesis Firehose over HTTP."
-  "Agnostic to data formats; can be used to ingest forwarded CloudWatch Log events, arbitrary JSON, text, or more."
+  "Accepts events forwarded by AWS Kinesis Firehose over HTTP.",
+  "Agnostic to data formats; can be used to ingest forwarded CloudWatch Log events, arbitrary JSON, text, or more.",
   "Optionally require authentication on all requests.",
 ]
 function_category = "receive"
