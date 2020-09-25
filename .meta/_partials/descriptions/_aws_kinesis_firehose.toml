@@ -1,0 +1,6 @@
+description = """\
+[AWS KInesis Firehose]([urls.aws_kinesis_firehose] is an AWS managed service \
+that makes it simple to forward and transform data between AWS services or from \
+AWS services to external services. In particular, it is the easist way to \
+forward CloudWatch Logs from AWS to external systems.
+"""
