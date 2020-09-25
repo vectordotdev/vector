@@ -12,7 +12,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::TlsConfig,
 };
 use bytes::Bytes;
 use flate2::write::GzEncoder;
