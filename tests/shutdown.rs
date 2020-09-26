@@ -187,30 +187,42 @@ fn configuration_path_recomputed() {
     );
 
     // Vector command
-    let cmd = vector_with(dir.join("*"), next_addr());
+    let mut cmd = vector_with(dir.join("*"), next_addr());
 
-    // Vector execution
-    let output = test_timely_shutdown_with_sub(cmd, |vector| {
-        // Message to assert, sended to console source and picked up from
-        // console sink, both added in the second configuration file.
-        vector
-            .stdin
-            .as_mut()
-            .unwrap()
-            .write_all("42".as_bytes())
-            .unwrap();
+    // Run vector
+    let mut vector = cmd
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
 
-        // Second configuration file
-        overwrite_file(dir.join("conf2.toml"), STDIO_CONFIG);
+    // Give vector time to start.
+    sleep(Duration::from_secs(1));
 
-        // Signal reload
-        kill(Pid::from_raw(vector.id() as i32), Signal::SIGHUP).unwrap();
+    // Second configuration file
+    overwrite_file(dir.join("conf2.toml"), STDIO_CONFIG);
+    // Clean the first file so to have only the console source.
+    overwrite_file(dir.join("conf1.toml"), &"");
 
-        // Give vector time to pickup data.
-        sleep(Duration::from_secs(2));
-    });
+    // Signal reload
+    kill(Pid::from_raw(vector.id() as i32), Signal::SIGHUP).unwrap();
 
-    assert_eq!(output, "42\n");
+    // Message to assert, sended to console source and picked up from
+    // console sink, both added in the second configuration file.
+    vector
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all("42".as_bytes())
+        .unwrap();
+
+    // Wait for shutdown
+    // Test will hang here if the other config isn't picked up.
+    let output = vector.wait_with_output().unwrap();
+    assert!(output.status.success(), "Vector didn't exit successfully.");
+
+    // Output
+    assert_eq!(output.stdout.as_slice(), "42\n".as_bytes());
 }
 
 #[test]
