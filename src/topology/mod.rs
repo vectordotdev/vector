@@ -223,7 +223,7 @@ impl RunningTopology {
         // Gives windows some time to make available any port
         // released by shutdown componenets.
         // Issue: https://github.com/timberio/vector/issues/3035
-        if cfg!(windows){
+        if cfg!(windows) {
             // This value is guess work.
             tokio::time::delay_for(Duration::from_millis(200)).await;
         }
