@@ -165,7 +165,7 @@ impl Batch for MetricBuffer {
                     }
                 }
                 MetricValue::Gauge { .. } if item.kind.is_incremental() => {
-                    let new = MetricEntry(item.clone().to_absolute());
+                    let new = MetricEntry(item.to_absolute());
                     if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
                         existing.add(&item);
                         self.metrics.insert(MetricEntry(existing));
