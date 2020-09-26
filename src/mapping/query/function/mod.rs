@@ -95,6 +95,7 @@ build_signatures! {
     now => NowFn,
     truncate => TruncateFn,
     parse_json => ParseJsonFn,
+    format_timestamp => FormatTimestampFn,
 }
 
 /// A parameter definition accepted by a function.
