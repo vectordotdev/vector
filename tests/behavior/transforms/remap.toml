@@ -446,3 +446,21 @@
       "j.equals" = "10"
       "k.equals" = "20"
       "l.equals" = "30"
+
+[transforms.remap_function_format_timestamp]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = format_timestamp(to_timestamp(.foo), format = "%+")
+  """
+[[tests]]
+  name = "remap_function_format_timestamp"
+  [tests.input]
+    insert_at = "remap_function_format_timestamp"
+    type = "log"
+    [tests.input.log_fields]
+      foo = 10
+  [[tests.outputs]]
+    extract_from = "remap_function_format_timestamp"
+    [[tests.outputs.conditions]]
+      "a.equals" = "1970-01-01T00:00:10+00:00"
