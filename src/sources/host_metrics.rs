@@ -705,16 +705,20 @@ fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
 
 // Pattern doesn't implement Deserialize or Serialize, and we can't
 // implement them ourselves due the orphan rules, so make a wrapper.
+// This also adds support for negative patterns.
 #[derive(Clone, Debug)]
-struct PatternWrapper(Pattern);
+struct PatternWrapper {
+    negate: bool,
+    pattern: Pattern,
+}
 
 impl PatternWrapper {
     fn matches(&self, s: &str) -> bool {
-        self.0.matches(s)
+        self.pattern.matches(s) ^ self.negate
     }
 
     fn matches_path(&self, p: &Path) -> bool {
-        self.0.matches_path(p)
+        self.pattern.matches_path(p) ^ self.negate
     }
 }
 
@@ -734,14 +738,19 @@ impl<'de> Visitor<'de> for PatternVisitor {
     }
 
     fn visit_str<E: de::Error>(self, s: &str) -> Result<Self::Value, E> {
-        Pattern::new(s)
-            .map(PatternWrapper)
-            .map_err(de::Error::custom)
+        let negate = s.starts_with('!');
+        let s = s.trim_start_matches('!');
+        let pattern = Pattern::new(s).map_err(de::Error::custom)?;
+        Ok(PatternWrapper { negate, pattern })
     }
 }
 
 impl Serialize for PatternWrapper {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(self.0.as_str())
+        if self.negate {
+            serializer.serialize_str(&format!("!{}", self.pattern.as_str()))
+        } else {
+            serializer.serialize_str(self.pattern.as_str())
+        }
     }
 }
