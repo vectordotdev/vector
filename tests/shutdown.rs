@@ -191,15 +191,6 @@ fn configuration_path_recomputed() {
 
     // Vector execution
     let output = test_timely_shutdown_with_sub(cmd, |vector| {
-        // Second configuration file
-        overwrite_file(dir.join("conf2.toml"), STDIO_CONFIG);
-
-        // Signal reload
-        kill(Pid::from_raw(vector.id() as i32), Signal::SIGHUP).unwrap();
-
-        // Give vector time to reload.
-        sleep(Duration::from_secs(1));
-
         // Message to assert, sended to console source and picked up from
         // console sink, both added in the second configuration file.
         vector
@@ -209,8 +200,14 @@ fn configuration_path_recomputed() {
             .write_all("42".as_bytes())
             .unwrap();
 
+        // Second configuration file
+        overwrite_file(dir.join("conf2.toml"), STDIO_CONFIG);
+
+        // Signal reload
+        kill(Pid::from_raw(vector.id() as i32), Signal::SIGHUP).unwrap();
+
         // Give vector time to pickup data.
-        sleep(Duration::from_secs(1));
+        sleep(Duration::from_secs(2));
     });
 
     assert_eq!(output, "42\n");
