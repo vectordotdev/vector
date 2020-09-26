@@ -1,7 +1,5 @@
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use metrics_core::Key;
-use metrics_runtime::Measurement;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Display, Formatter};
@@ -200,16 +198,17 @@ impl Metric {
 
     /// Convert the metrics_runtime::Measurement value plus the name and
     /// labels from a Key into our internal Metric format.
-    pub fn from_measurement(key: Key, measurement: Measurement) -> Self {
-        let value = match measurement {
-            Measurement::Counter(v) => MetricValue::Counter { value: v as f64 },
-            Measurement::Gauge(v) => MetricValue::Gauge { value: v as f64 },
-            Measurement::Histogram(packed) => {
-                let values = packed
-                    .decompress()
-                    .into_iter()
-                    .map(|i| i as f64)
-                    .collect::<Vec<_>>();
+    pub fn from_metric_kv(key: metrics::Key, handle: metrics_util::Handle) -> Self {
+        let value = match handle {
+            metrics_util::Handle::Counter(_) => MetricValue::Counter {
+                value: handle.read_counter() as f64,
+            },
+            metrics_util::Handle::Gauge(_) => MetricValue::Gauge {
+                value: handle.read_gauge() as f64,
+            },
+            metrics_util::Handle::Histogram(_) => {
+                let values = handle.read_histogram();
+                let values = values.into_iter().map(|i| i as f64).collect::<Vec<_>>();
                 // Each sample in the source measurement has an
                 // effective sample rate of 1, so create an array of
                 // such of the same length as the values.

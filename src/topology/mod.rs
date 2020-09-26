@@ -436,7 +436,11 @@ impl RunningTopology {
 
     fn spawn_sink(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
-        let span = info_span!("sink", name = %task.name(), r#type = %task.typetag());
+        let span = error_span!(
+            "sink",
+            topology_component_name = %task.name(),
+            topology_component_type = %task.typetag(),
+        );
         let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task.compat());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
@@ -446,7 +450,11 @@ impl RunningTopology {
 
     fn spawn_transform(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
-        let span = info_span!("transform", name = %task.name(), r#type = %task.typetag());
+        let span = error_span!(
+            "transform",
+            topology_component_name = %task.name(),
+            topology_component_type = %task.typetag(),
+        );
         let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task.compat());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
@@ -456,7 +464,11 @@ impl RunningTopology {
 
     fn spawn_source(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
-        let span = info_span!("source", name = %task.name(), r#type = %task.typetag());
+        let span = error_span!(
+            "source",
+            topology_component_name = %task.name(),
+            topology_component_type = %task.typetag(),
+        );
         let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span.clone());
         let spawned = tokio::spawn(task.compat());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {

@@ -67,7 +67,7 @@ where
 mod tests {
     use super::super::{mock, MaintainedWrite, Write};
     use super::*;
-    use crate::test_util::trace_init;
+    use crate::{event::metric::MetricValue, test_util::trace_init};
     use futures::{channel::mpsc, SinkExt, StreamExt};
     use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
     use once_cell::sync::OnceCell;
@@ -96,50 +96,41 @@ mod tests {
         }
     }
 
-    fn get_metric_value(op_kind: &'static str) -> Option<metrics_runtime::Measurement> {
-        let controller = crate::metrics::CONTROLLER.get().unwrap_or_else(|| {
-            crate::metrics::init().unwrap();
-            crate::metrics::CONTROLLER
-                .get()
-                .expect("failed to init metric container")
-        });
+    fn get_metric_value(op_kind: &'static str) -> Option<MetricValue> {
+        let controller = crate::metrics::get_controller().expect("failed to init metric container");
 
-        let key = metrics_core::Key::from_name_and_labels(
-            "k8s_state_ops",
-            vec![metrics_core::Label::new("op_kind", op_kind)],
+        let tags_to_lookup = Some(
+            vec![("op_kind".to_owned(), op_kind.to_owned())]
+                .into_iter()
+                .collect(),
         );
-        controller
-            .snapshot()
-            .into_measurements()
-            .into_iter()
-            .find_map(|(candidate_key, measurement)| {
-                if candidate_key == key {
-                    Some(measurement)
-                } else {
-                    None
-                }
+
+        crate::metrics::capture_metrics(controller)
+            .find(|event| {
+                let metric = event.as_metric();
+                metric.name == "k8s_state_ops" && metric.tags == tags_to_lookup
             })
+            .map(|event| event.into_metric().value)
     }
 
     fn assert_counter_changed(
-        before: Option<metrics_runtime::Measurement>,
-        after: Option<metrics_runtime::Measurement>,
+        before: Option<MetricValue>,
+        after: Option<MetricValue>,
         expected_difference: u64,
     ) {
-        let before = before.unwrap_or_else(|| metrics_runtime::Measurement::Counter(0));
-        let after = after.unwrap_or_else(|| metrics_runtime::Measurement::Counter(0));
+        let before = before.unwrap_or_else(|| MetricValue::Counter { value: 0.0 });
+        let after = after.unwrap_or_else(|| MetricValue::Counter { value: 0.0 });
 
         let (before, after) = match (before, after) {
-            (
-                metrics_runtime::Measurement::Counter(before),
-                metrics_runtime::Measurement::Counter(after),
-            ) => (before, after),
+            (MetricValue::Counter { value: before }, MetricValue::Counter { value: after }) => {
+                (before, after)
+            }
             _ => panic!("Metrics kind mismatch"),
         };
 
         let difference = after - before;
 
-        assert_eq!(difference, expected_difference);
+        assert_eq!(difference, expected_difference as f64);
     }
 
     /// Guarantees only one test will run at a time.
@@ -147,26 +138,16 @@ mod tests {
     /// want interference.
     fn tests_lock() -> MutexGuard<'static, ()> {
         static INSTANCE: OnceCell<Mutex<()>> = OnceCell::new();
-        INSTANCE.get_or_init(|| Mutex::new(())).lock().unwrap()
+        INSTANCE
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
     }
 
-    // TODO: tests here are ignored because they cause interference with
-    // the metrics tests.
-    // There is no way to assert individual emits, and asserting metrics
-    // directly causes issues:
-    // - these tests break the internal tests at the metrics implementation
-    //   itself, since we end up initializing the metrics controller twice;
-    // - testing metrics introduces unintended coupling between subsystems,
-    //   ideally we only need to assert that we emit, but avoid assumptions on
-    //   what the results of that emit are.
-    // Un-ignore them and/or properly reimplement once the issues above are
-    // resolved.
-
-    #[ignore]
     #[tokio::test]
     async fn add() {
         trace_init();
-
+        let _ = crate::metrics::init();
         let _guard = tests_lock();
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
@@ -194,11 +175,10 @@ mod tests {
         join.await.unwrap();
     }
 
-    #[ignore]
     #[tokio::test]
     async fn update() {
         trace_init();
-
+        let _ = crate::metrics::init();
         let _guard = tests_lock();
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
@@ -226,11 +206,10 @@ mod tests {
         join.await.unwrap();
     }
 
-    #[ignore]
     #[tokio::test]
     async fn delete() {
         trace_init();
-
+        let _ = crate::metrics::init();
         let _guard = tests_lock();
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
@@ -258,11 +237,10 @@ mod tests {
         join.await.unwrap();
     }
 
-    #[ignore]
     #[tokio::test]
     async fn resync() {
         trace_init();
-
+        let _ = crate::metrics::init();
         let _guard = tests_lock();
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();
@@ -286,11 +264,10 @@ mod tests {
         join.await.unwrap();
     }
 
-    #[ignore]
     #[tokio::test]
     async fn request_maintenance_without_maintenance() {
         trace_init();
-
+        let _ = crate::metrics::init();
         let _guard = tests_lock();
 
         let (mut writer, _events_rx, _actions_tx) = prepare_test();
@@ -300,11 +277,10 @@ mod tests {
         assert_counter_changed(before, after, 0);
     }
 
-    #[ignore]
     #[tokio::test]
     async fn request_maintenance_with_maintenance() {
         trace_init();
-
+        let _ = crate::metrics::init();
         let _guard = tests_lock();
 
         let (events_tx, _events_rx) = mpsc::channel(0);
@@ -324,11 +300,10 @@ mod tests {
         assert_counter_changed(before, after, 1);
     }
 
-    #[ignore]
     #[tokio::test]
     async fn perform_maintenance() {
         trace_init();
-
+        let _ = crate::metrics::init();
         let _guard = tests_lock();
 
         let (mut writer, mut events_rx, mut actions_tx) = prepare_test();

@@ -1,7 +1,7 @@
 use super::InternalEvent;
 use crate::sources::apache_metrics;
 use http::Uri;
-use metrics::{counter, timing};
+use metrics::{counter, histogram};
 use std::time::Instant;
 
 #[derive(Debug)]
@@ -45,7 +45,7 @@ impl InternalEvent for ApacheMetricsRequestCompleted {
             "component_kind" => "source",
             "component_type" => "apache_metrics",
         );
-        timing!("request_duration_nanoseconds", self.start, self.end,
+        histogram!("request_duration_nanoseconds", self.end - self.start,
             "component_kind" => "source",
             "component_type" => "apache_metrics",
         );

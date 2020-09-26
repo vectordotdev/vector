@@ -1,5 +1,5 @@
 use super::InternalEvent;
-use metrics::value;
+use metrics::histogram;
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -24,7 +24,7 @@ impl InternalEvent for AutoConcurrencyLimit {
     }
 
     fn emit_metrics(&self) {
-        value!("auto_concurrency_limit", self.concurrency);
+        histogram!("auto_concurrency_limit", self.concurrency);
     }
 }
 
@@ -35,7 +35,7 @@ pub struct AutoConcurrencyInFlight {
 
 impl InternalEvent for AutoConcurrencyInFlight {
     fn emit_metrics(&self) {
-        value!("auto_concurrency_in_flight", self.in_flight);
+        histogram!("auto_concurrency_in_flight", self.in_flight);
     }
 }
 
@@ -46,7 +46,7 @@ pub struct AutoConcurrencyObservedRtt {
 
 impl InternalEvent for AutoConcurrencyObservedRtt {
     fn emit_metrics(&self) {
-        value!("auto_concurrency_observed_rtt", self.rtt);
+        histogram!("auto_concurrency_observed_rtt", self.rtt);
     }
 }
 
@@ -57,6 +57,6 @@ pub struct AutoConcurrencyAveragedRtt {
 
 impl InternalEvent for AutoConcurrencyAveragedRtt {
     fn emit_metrics(&self) {
-        value!("auto_concurrency_averaged_rtt", self.rtt);
+        histogram!("auto_concurrency_averaged_rtt", self.rtt);
     }
 }
