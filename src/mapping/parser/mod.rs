@@ -507,8 +507,8 @@ mod tests {
     use super::*;
     use crate::mapping::query::function::{
         ContainsFn, DowncaseFn, FormatTimestampFn, Md5Fn, NowFn, ParseJsonFn, ParseTimestampFn,
-        Sha1Fn, StripWhitespaceFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn,
-        TruncateFn, UpcaseFn, UuidV4Fn,
+        Sha1Fn, SliceFn, StripWhitespaceFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn,
+        ToTimestampFn, TruncateFn, UpcaseFn, UuidV4Fn,
     };
 
     #[test]
@@ -1164,6 +1164,13 @@ mod tests {
                         "BAR",
                         true,
                     )),
+                ))]),
+            ),
+            (
+                r#".foo = slice(.foo, 0, 1)"#,
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(SliceFn::new(Box::new(QueryPath::from("foo")), 0, Some(1))),
                 ))]),
             ),
         ];
