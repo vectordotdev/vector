@@ -23,27 +23,13 @@ impl SliceFn {
 
 impl Function for SliceFn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
-        let mut start = match self.start.execute(ctx)? {
-            Value::Integer(v) => v,
-            v => unexpected_type!(v),
-        };
+        let range = |len: i64| {
+            let start = match required!(ctx, self.start, Value::Integer(v) => v) {
+                i if i < 0 => i + len,
+                i => i,
+            };
 
-        let end = &self
-            .end
-            .as_ref()
-            .map(|v| v.execute(ctx))
-            .transpose()?
-            .map(|v| match v {
-                Value::Integer(v) => v,
-                v => unexpected_type!(v),
-            });
-
-        let mut range = |len: i64| {
-            if start < 0 {
-                start += len;
-            }
-
-            let end = match *end {
+            let end = match optional!(ctx, self.end, Value::Integer(v) => v) {
                 Some(end) if end < 0 => end + len,
                 Some(end) => end,
                 None => len,
@@ -59,14 +45,14 @@ impl Function for SliceFn {
             }
         };
 
-        match self.query.execute(ctx)? {
+        required! {
+            ctx, self.query,
             Value::Bytes(v) => range(v.len() as i64)
                 .map(|range| v.slice(range))
                 .map(Value::from),
             Value::Array(mut v) => range(v.len() as i64)
                 .map(|range| v.drain(range).collect::<Vec<_>>())
                 .map(Value::from),
-            v => unexpected_type!(v),
         }
     }
 
