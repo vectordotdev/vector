@@ -1,6 +1,4 @@
-use crate::{
-    app::Application,
-};
+use crate::app::Application;
 use futures::compat::Future01CompatExt;
 use std::{ffi::OsString, sync::mpsc, time::Duration};
 use windows_service::service::{
@@ -22,17 +20,14 @@ pub mod service_control {
         Result,
     };
 
+    use crate::internal_events::{
+        WindowsServiceDoesNotExist, WindowsServiceInstall, WindowsServiceStart, WindowsServiceStop,
+        WindowsServiceUninstall,
+    };
     use crate::vector_windows::SERVICE_TYPE;
     use std::ffi::OsString;
     use std::time::Duration;
     use std::{fmt, thread};
-    use crate::internal_events::{
-        WindowsServiceInstall,
-        WindowsServiceStart,
-        WindowsServiceStop,
-        WindowsServiceUninstall,
-        WindowsServiceDoesNotExist,
-    };
 
     #[derive(Debug, Clone, PartialEq)]
     pub enum ControlAction {
@@ -89,9 +84,15 @@ pub mod service_control {
             || service_status.current_state != ServiceState::Running
         {
             service.start(&[] as &[OsString])?;
-            emit!(WindowsServiceStart { name: &*service_def.name.to_string_lossy(), already_started: false, });
+            emit!(WindowsServiceStart {
+                name: &*service_def.name.to_string_lossy(),
+                already_started: false,
+            });
         } else {
-            emit!(WindowsServiceStart { name: &*service_def.name.to_string_lossy(), already_started: true, });
+            emit!(WindowsServiceStart {
+                name: &*service_def.name.to_string_lossy(),
+                already_started: true,
+            });
         }
 
         Ok(())
@@ -106,9 +107,15 @@ pub mod service_control {
             || service_status.current_state != ServiceState::Stopped
         {
             service.stop()?;
-            emit!(WindowsServiceStop { name: &*service_def.name.to_string_lossy(), already_stopped: false, });
+            emit!(WindowsServiceStop {
+                name: &*service_def.name.to_string_lossy(),
+                already_stopped: false,
+            });
         } else {
-            emit!(WindowsServiceStop { name: &*service_def.name.to_string_lossy(), already_stopped: true, });
+            emit!(WindowsServiceStop {
+                name: &*service_def.name.to_string_lossy(),
+                already_stopped: true,
+            });
         }
 
         Ok(())
@@ -133,7 +140,9 @@ pub mod service_control {
 
         service_manager.create_service(&service_info, ServiceAccess::empty())?;
 
-        emit!(WindowsServiceInstall { name: &*service_def.name.to_string_lossy(), });
+        emit!(WindowsServiceInstall {
+            name: &*service_def.name.to_string_lossy(),
+        });
 
         // TODO: It is currently not possible to change the description of the service.
         // Waiting for the following PR to get merged in
@@ -151,13 +160,18 @@ pub mod service_control {
         let service_status = service.query_status()?;
         if service_status.current_state != ServiceState::Stopped {
             service.stop()?;
-            emit!(WindowsServiceStop { name: &*service_def.name.to_string_lossy(), already_stopped: false, });
+            emit!(WindowsServiceStop {
+                name: &*service_def.name.to_string_lossy(),
+                already_stopped: false,
+            });
             thread::sleep(Duration::from_secs(1));
         }
 
         service.delete()?;
 
-        emit!(WindowsServiceUninstall { name: &*service_def.name.to_string_lossy(), });
+        emit!(WindowsServiceUninstall {
+            name: &*service_def.name.to_string_lossy(),
+        });
         Ok(())
     }
 
@@ -168,9 +182,12 @@ pub mod service_control {
         let manager_access = ServiceManagerAccess::CONNECT;
         let service_manager = ServiceManager::local_computer(None::<&str>, manager_access)?;
 
-        let service = service_manager.open_service(&service_def.name, access)
+        let service = service_manager
+            .open_service(&service_def.name, access)
             .map_err(|e| {
-                emit!(WindowsServiceDoesNotExist { name: &*service_def.name.to_string_lossy(), });
+                emit!(WindowsServiceDoesNotExist {
+                    name: &*service_def.name.to_string_lossy(),
+                });
                 e
             })?;
         Ok(service)

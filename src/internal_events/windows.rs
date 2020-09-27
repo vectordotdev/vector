@@ -59,8 +59,7 @@ impl<'a> InternalEvent for WindowsServiceInstall<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("windows_service_install", 1,
-        );
+        counter!("windows_service_install", 1,);
     }
 }
 
@@ -78,8 +77,7 @@ impl<'a> InternalEvent for WindowsServiceUninstall<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("windows_service_uninstall", 1,
-        );
+        counter!("windows_service_uninstall", 1,);
     }
 }
 
@@ -97,7 +95,6 @@ impl<'a> InternalEvent for WindowsServiceDoesNotExist<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("windows_service_does_not_exist", 1,
-        );
+        counter!("windows_service_does_not_exist", 1,);
     }
 }

@@ -1,6 +1,9 @@
-use crate::{generate, get_version, list, service, unit_test, validate};
+use crate::{generate, get_version, list, unit_test, validate};
 use std::path::PathBuf;
 use structopt::{clap::AppSettings, StructOpt};
+
+#[cfg(windows)]
+use crate::service;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]

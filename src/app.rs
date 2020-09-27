@@ -2,8 +2,7 @@ use crate::cli::{handle_config_errors, Color, LogFormat, Opts, RootOpts, SubComm
 use crate::signal::SignalTo;
 use crate::topology::RunningTopology;
 use crate::{
-    config, generate, heartbeat, list, metrics, service, signal, topology, trace, unit_test,
-    validate,
+    config, generate, heartbeat, list, metrics, signal, topology, trace, unit_test, validate,
 };
 use std::cmp::max;
 use std::path::PathBuf;
@@ -16,10 +15,14 @@ use futures01::sync::mpsc;
 
 #[cfg(feature = "api")]
 use crate::api;
+use crate::internal_events::ApiStarted;
+
+#[cfg(windows)]
+use crate::service;
 
 use crate::internal_events::{
-    ApiStarted, VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed,
-    VectorReloaded, VectorStarted, VectorStopped,
+    VectorConfigLoadFailed, VectorQuit, VectorRecoveryFailed, VectorReloadFailed, VectorReloaded,
+    VectorStarted, VectorStopped,
 };
 use tokio::runtime;
 use tokio::runtime::Runtime;
