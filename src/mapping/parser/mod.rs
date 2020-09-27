@@ -506,8 +506,8 @@ pub fn parse(input: &str) -> Result<Mapping> {
 mod tests {
     use super::*;
     use crate::mapping::query::function::{
-        DowncaseFn, FormatTimestampFn, Md5Fn, NowFn, ParseJsonFn, ParseTimestampFn, Sha1Fn,
-        StripWhitespaceFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn,
+        ContainsFn, DowncaseFn, FormatTimestampFn, Md5Fn, NowFn, ParseJsonFn, ParseTimestampFn,
+        Sha1Fn, StripWhitespaceFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn,
         TruncateFn, UpcaseFn, UuidV4Fn,
     };
 
@@ -1152,6 +1152,17 @@ mod tests {
                     Box::new(FormatTimestampFn::new(
                         Box::new(Literal::from(Value::from("500"))),
                         "%s",
+                    )),
+                ))]),
+            ),
+            (
+                r#".foo = contains(.foo, substring = "BAR", case_sensitive = true)"#,
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ContainsFn::new(
+                        Box::new(QueryPath::from("foo")),
+                        "BAR",
+                        true,
                     )),
                 ))]),
             ),
