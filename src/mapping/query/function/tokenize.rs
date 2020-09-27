@@ -15,22 +15,18 @@ impl TokenizeFn {
 
 impl Function for TokenizeFn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
-        self.query
-            .execute(ctx)
-            .map(|v| match v {
-                Value::Bytes(v) => String::from_utf8_lossy(&v).into_owned(),
-                v => unexpected_type!(v),
+        let value = {
+            let bytes = required!(ctx, self.query, Value::Bytes(v) => v);
+            String::from_utf8_lossy(&bytes).into_owned()
+        };
+
+        Ok(tokenize::parse(&value)
+            .into_iter()
+            .map(|token| match token {
+                "" | "-" => Value::Null,
+                _ => Value::from(token.to_owned()),
             })
-            .map(|s| {
-                tokenize::parse(&s)
-                    .into_iter()
-                    .map(|v| match v {
-                        "" | "-" => Value::Null,
-                        _ => Value::from(v.to_owned()),
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .map(Value::from)
+            .collect())
     }
 
     fn parameters() -> &'static [Parameter] {
