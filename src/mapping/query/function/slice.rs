@@ -50,13 +50,11 @@ impl Function for SliceFn {
             };
 
             match () {
-                _ if start < 0 || start >= len => Err(format!(
-                    "'start' must be between '{}' and '{}'",
-                    -len,
-                    len - 1
-                )),
-                _ if end > len => Err(format!("'end' must not be greater than '{}'", len)),
-                _ if end <= start => Err("'end' must be greater than 'start'".to_owned()),
+                _ if start < 0 || start > len => {
+                    Err(format!("'start' must be between '{}' and '{}'", -len, len))
+                }
+                _ if end < start => Err("'end' must be greater or equal to 'start'".to_owned()),
+                _ if end > len => Ok(start as usize..len as usize),
                 _ => Ok(start as usize..end as usize),
             }
         };
@@ -132,6 +130,26 @@ mod tests {
                 Event::from(""),
                 Ok(Value::from("oo")),
                 SliceFn::new(Box::new(Literal::from(Value::from("foo"))), -2, None),
+            ),
+            (
+                Event::from(""),
+                Ok(Value::from("")),
+                SliceFn::new(Box::new(Literal::from(Value::from("foo"))), 3, None),
+            ),
+            (
+                Event::from(""),
+                Ok(Value::from("")),
+                SliceFn::new(Box::new(Literal::from(Value::from("foo"))), 2, Some(2)),
+            ),
+            (
+                Event::from(""),
+                Ok(Value::from("foo")),
+                SliceFn::new(Box::new(Literal::from(Value::from("foo"))), 0, Some(4)),
+            ),
+            (
+                Event::from(""),
+                Ok(Value::from("oo")),
+                SliceFn::new(Box::new(Literal::from(Value::from("foo"))), 1, Some(5)),
             ),
             (
                 Event::from(""),
@@ -227,27 +245,17 @@ mod tests {
             ),
             (
                 Event::from(""),
-                Err("'start' must be between '-3' and '2'".to_owned()),
-                SliceFn::new(Box::new(Literal::from(Value::from("foo"))), 3, None),
+                Err("'start' must be between '-3' and '3'".to_owned()),
+                SliceFn::new(Box::new(Literal::from(Value::from("foo"))), 4, None),
             ),
             (
                 Event::from(""),
-                Err("'start' must be between '-3' and '2'".to_owned()),
+                Err("'start' must be between '-3' and '3'".to_owned()),
                 SliceFn::new(Box::new(Literal::from(Value::from("foo"))), -4, None),
             ),
             (
                 Event::from(""),
-                Err("'end' must not be greater than '3'".to_owned()),
-                SliceFn::new(Box::new(Literal::from(Value::from("foo"))), 0, Some(4)),
-            ),
-            (
-                Event::from(""),
-                Err("'end' must be greater than 'start'".to_owned()),
-                SliceFn::new(Box::new(Literal::from(Value::from("foo"))), 2, Some(2)),
-            ),
-            (
-                Event::from(""),
-                Err("'end' must be greater than 'start'".to_owned()),
+                Err("'end' must be greater or equal to 'start'".to_owned()),
                 SliceFn::new(Box::new(Literal::from(Value::from("foo"))), 2, Some(1)),
             ),
         ];
