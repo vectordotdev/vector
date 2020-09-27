@@ -31,7 +31,7 @@ macro_rules! unexpected_type {
 }
 
 macro_rules! required {
-    ($ctx:expr, $fn:expr, $($pattern:pat => $then:expr),+) => {
+    ($ctx:expr, $fn:expr, $($pattern:pat => $then:expr),+ $(,)?) => {
         match $fn.execute($ctx)? {
             $($pattern => $then,)+
             v => unexpected_type!(v),
@@ -40,7 +40,7 @@ macro_rules! required {
 }
 
 macro_rules! optional {
-    ($ctx:expr, $fn:expr, $($pattern:pat => $then:expr),+) => {
+    ($ctx:expr, $fn:expr, $($pattern:pat => $then:expr),+ $(,)?) => {
         $fn.as_ref()
             .map(|v| v.execute($ctx))
             .transpose()?
@@ -118,6 +118,7 @@ build_signatures! {
     parse_json => ParseJsonFn,
     format_timestamp => FormatTimestampFn,
     contains => ContainsFn,
+    slice => SliceFn,
 }
 
 /// A parameter definition accepted by a function.
