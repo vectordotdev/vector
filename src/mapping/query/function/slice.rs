@@ -43,32 +43,22 @@ impl Function for SliceFn {
                 start += len;
             }
 
-            let mut end = match end {
-                Some(end) => *end,
+            let end = match *end {
+                Some(end) if end < 0 => end + len,
+                Some(end) => end,
                 None => len,
             };
 
-            if end < 0 {
-                end += len;
-            }
-
-            if start < 0 || start >= len {
-                return Err(format!(
+            match () {
+                _ if start < 0 || start >= len => Err(format!(
                     "'start' must be between '{}' and '{}'",
                     -len,
                     len - 1
-                ));
+                )),
+                _ if end > len => Err(format!("'end' must not be greater than '{}'", len)),
+                _ if end <= start => Err("'end' must be greater than 'start'".to_owned()),
+                _ => Ok(start as usize..end as usize),
             }
-
-            if end > len {
-                return Err(format!("'end' must not be greater than '{}'", len));
-            }
-
-            if end <= start {
-                return Err("'end' must be greater than 'start'".to_owned());
-            }
-
-            Ok(start as usize..end as usize)
         };
 
         match self.query.execute(ctx)? {
