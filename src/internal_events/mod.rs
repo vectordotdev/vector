@@ -154,6 +154,8 @@ pub use self::unix::*;
 pub use self::vector::*;
 #[cfg(feature = "wasm")]
 pub use self::wasm::*;
+#[cfg(windows)]
+pub use self::windows::*;
 
 pub trait InternalEvent {
     fn emit_logs(&self) {}
@@ -174,6 +176,7 @@ macro_rules! emit {
 
 // Modules that require emit! macro so they need to be defined after the macro.
 mod file;
+mod windows;
 
 const ELLIPSIS: &str = "[...]";
 

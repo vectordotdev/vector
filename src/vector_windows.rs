@@ -1,4 +1,6 @@
-use crate::app::Application;
+use crate::{
+    app::Application,
+};
 use futures::compat::Future01CompatExt;
 use std::{ffi::OsString, sync::mpsc, time::Duration};
 use windows_service::service::{
@@ -24,6 +26,13 @@ pub mod service_control {
     use std::ffi::OsString;
     use std::time::Duration;
     use std::{fmt, thread};
+    use crate::internal_events::{
+        WindowsServiceInstall,
+        WindowsServiceStart,
+        WindowsServiceStop,
+        WindowsServiceUninstall,
+        WindowsServiceDoesNotExist,
+    };
 
     #[derive(Debug, Clone, PartialEq)]
     pub enum ControlAction {
@@ -62,66 +71,70 @@ pub mod service_control {
         }
     }
 
-    pub fn control(service: &ServiceDefinition, action: ControlAction) -> Result<()> {
+    pub fn control(service_def: &ServiceDefinition, action: ControlAction) -> Result<()> {
         match action {
-            ControlAction::Start => start_service(&service),
-            ControlAction::Stop => stop_service(&service),
-            ControlAction::Install => install_service(&service),
-            ControlAction::Uninstall => uninstall_service(&service),
+            ControlAction::Start => start_service(&service_def),
+            ControlAction::Stop => stop_service(&service_def),
+            ControlAction::Install => install_service(&service_def),
+            ControlAction::Uninstall => uninstall_service(&service_def),
         }
     }
 
-    fn start_service(service: &ServiceDefinition) -> Result<()> {
+    fn start_service(service_def: &ServiceDefinition) -> Result<()> {
         let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::START;
-        let service = open_service(&service, service_access)?;
+        let service = open_service(&service_def, service_access)?;
         let service_status = service.query_status()?;
 
         if service_status.current_state != ServiceState::StartPending
             || service_status.current_state != ServiceState::Running
         {
             service.start(&[] as &[OsString])?;
+            emit!(WindowsServiceStart { name: &*service_def.name.to_string_lossy(), already_started: false, });
+        } else {
+            emit!(WindowsServiceStart { name: &*service_def.name.to_string_lossy(), already_started: true, });
         }
 
         Ok(())
     }
 
-    fn stop_service(service: &ServiceDefinition) -> Result<()> {
+    fn stop_service(service_def: &ServiceDefinition) -> Result<()> {
         let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::STOP;
-        let service = open_service(&service, service_access)?;
+        let service = open_service(&service_def, service_access)?;
         let service_status = service.query_status()?;
 
         if service_status.current_state != ServiceState::StopPending
             || service_status.current_state != ServiceState::Stopped
         {
             service.stop()?;
+            emit!(WindowsServiceStop { name: &*service_def.name.to_string_lossy(), already_stopped: false, });
+        } else {
+            emit!(WindowsServiceStop { name: &*service_def.name.to_string_lossy(), already_stopped: true, });
         }
 
         Ok(())
     }
 
-    fn install_service(service: &ServiceDefinition) -> Result<()> {
+    fn install_service(service_def: &ServiceDefinition) -> Result<()> {
         let manager_access = ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE;
         let service_manager = ServiceManager::local_computer(None::<&str>, manager_access)?;
 
         let service_info = ServiceInfo {
-            name: service.name.clone(),
-            display_name: service.display_name.clone(),
+            name: service_def.name.clone(),
+            display_name: service_def.display_name.clone(),
             service_type: SERVICE_TYPE,
             start_type: ServiceStartType::OnDemand,
             error_control: ServiceErrorControl::Normal,
-            executable_path: service.executable_path.clone(),
-            launch_arguments: service.launch_arguments.clone(),
+            executable_path: service_def.executable_path.clone(),
+            launch_arguments: service_def.launch_arguments.clone(),
             dependencies: vec![],
             account_name: None,
             account_password: None,
         };
 
-        debug!(
-            message = "Registering service.",
-            service_info = format!("{:?}", service_info).as_str(),
-        );
-
         service_manager.create_service(&service_info, ServiceAccess::empty())?;
+
+        emit!(WindowsServiceInstall { name: &*service_def.name.to_string_lossy(), });
+
         // TODO: It is currently not possible to change the description of the service.
         // Waiting for the following PR to get merged in
         // https://github.com/mullvad/windows-service-rs/pull/32
@@ -130,29 +143,36 @@ pub mod service_control {
         Ok(())
     }
 
-    fn uninstall_service(service: &ServiceDefinition) -> Result<()> {
+    fn uninstall_service(service_def: &ServiceDefinition) -> Result<()> {
         let service_access =
             ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE;
-        let service = open_service(&service, service_access)?;
+        let service = open_service(&service_def, service_access)?;
 
         let service_status = service.query_status()?;
         if service_status.current_state != ServiceState::Stopped {
             service.stop()?;
+            emit!(WindowsServiceStop { name: &*service_def.name.to_string_lossy(), already_stopped: false, });
             thread::sleep(Duration::from_secs(1));
         }
 
         service.delete()?;
+
+        emit!(WindowsServiceUninstall { name: &*service_def.name.to_string_lossy(), });
         Ok(())
     }
 
     pub fn open_service(
-        service: &ServiceDefinition,
+        service_def: &ServiceDefinition,
         access: windows_service::service::ServiceAccess,
     ) -> Result<windows_service::service::Service> {
         let manager_access = ServiceManagerAccess::CONNECT;
         let service_manager = ServiceManager::local_computer(None::<&str>, manager_access)?;
 
-        let service = service_manager.open_service(&service.name, access)?;
+        let service = service_manager.open_service(&service_def.name, access)
+            .map_err(|e| {
+                emit!(WindowsServiceDoesNotExist { name: &*service_def.name.to_string_lossy(), });
+                e
+            })?;
         Ok(service)
     }
 }
