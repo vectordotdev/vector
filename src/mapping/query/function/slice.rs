@@ -25,8 +25,8 @@ impl Function for SliceFn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
         let range = |len: i64| {
             let start = match required!(ctx, self.start, Value::Integer(v) => v) {
-                i if i < 0 => i + len,
-                i => i,
+                start if start < 0 => start + len,
+                start => start,
             };
 
             let end = match optional!(ctx, self.end, Value::Integer(v) => v) {
