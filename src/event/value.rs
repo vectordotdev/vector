@@ -127,6 +127,12 @@ impl FromIterator<Value> for Value {
     }
 }
 
+impl FromIterator<(String, Value)> for Value {
+    fn from_iter<I: IntoIterator<Item = (String, Value)>>(iter: I) -> Self {
+        Value::Map(iter.into_iter().collect::<BTreeMap<String, Value>>())
+    }
+}
+
 macro_rules! impl_valuekind_from_integer {
     ($t:ty) => {
         impl From<$t> for Value {

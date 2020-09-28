@@ -12,8 +12,7 @@ use crate::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
-use string_cache::DefaultAtom as Atom;
+use std::{convert::TryFrom, str::FromStr};
 use toml::value::Value as TomlValue;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -55,10 +54,12 @@ inventory::submit! {
 #[typetag::serde(name = "add_fields")]
 impl TransformConfig for AddFieldsConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(AddFields::new(
-            self.fields.clone().all_fields().collect(),
-            self.overwrite,
-        )?))
+        let all_fields = self.fields.clone().all_fields().collect::<IndexMap<_, _>>();
+        let mut fields = IndexMap::with_capacity(all_fields.len());
+        for (key, value) in all_fields {
+            fields.insert(Lookup::from_str(&key)?, Value::try_from(value)?);
+        }
+        Ok(Box::new(AddFields::new(fields, self.overwrite)?))
     }
 
     fn input_type(&self) -> DataType {
@@ -75,11 +76,9 @@ impl TransformConfig for AddFieldsConfig {
 }
 
 impl AddFields {
-    pub fn new(mut fields: IndexMap<Atom, TomlValue>, overwrite: bool) -> crate::Result<Self> {
-        let mut set =
-            Lookup::from_indexmap(fields.drain(..).map(|(k, v)| (k.to_string(), v)).collect())?;
-        let mut with_templates = IndexMap::with_capacity(set.len());
-        for (k, v) in set.drain(..) {
+    pub fn new(mut fields: IndexMap<Lookup, Value>, overwrite: bool) -> crate::Result<Self> {
+        let mut with_templates = IndexMap::with_capacity(fields.len());
+        for (k, v) in fields.drain(..) {
             let maybe_template = match v {
                 Value::Bytes(s) => match Template::try_from(String::from_utf8(s.to_vec())?) {
                     Ok(t) => TemplateOrValue::from(t),
@@ -137,11 +136,8 @@ impl Transform for AddFields {
 
 #[cfg(test)]
 mod tests {
-    use super::AddFields;
-    use crate::{event::Event, transforms::Transform};
-    use indexmap::IndexMap;
-    use std::collections::HashMap;
-    use string_cache::DefaultAtom as Atom;
+    use super::*;
+    use std::{iter::FromIterator, string::ToString};
 
     #[test]
     fn add_fields_event() {
@@ -152,8 +148,8 @@ mod tests {
 
         let new_event = augment.transform(event).unwrap();
 
-        let key = Atom::from("some_key".to_string());
-        let kv = new_event.as_log().get(&key);
+        let key = Lookup::from_str("some_key").unwrap().to_string();
+        let kv = new_event.as_log().get_flat(&key);
 
         let val = "some_val".to_string();
         assert_eq!(kv, Some(&val.into()));
@@ -168,8 +164,8 @@ mod tests {
 
         let new_event = augment.transform(event).unwrap();
 
-        let key = Atom::from("some_key".to_string());
-        let kv = new_event.as_log().get(&key);
+        let key = Lookup::from_str("some_key").unwrap().to_string();
+        let kv = new_event.as_log().get_flat(&key);
 
         let val = "augment me augment me".to_string();
         assert_eq!(kv, Some(&val.into()));
@@ -195,16 +191,22 @@ mod tests {
         let event = Event::from("hello world");
 
         let mut fields = IndexMap::new();
-        fields.insert("float".into(), 4.5.into());
-        fields.insert("int".into(), 4.into());
-        fields.insert("string".into(), "thisisastring".into());
-        fields.insert("bool".into(), true.into());
-        fields.insert("array".into(), vec![1, 2, 3].into());
+        fields.insert(Lookup::from_str("float").unwrap(), Value::from(4.5));
+        fields.insert(Lookup::from_str("int").unwrap(), Value::from(4));
+        fields.insert(
+            Lookup::from_str("string").unwrap(),
+            Value::from("thisisastring"),
+        );
+        fields.insert(Lookup::from_str("bool").unwrap(), Value::from(true));
+        fields.insert(
+            Lookup::from_str("array").unwrap(),
+            Value::from(vec![1, 2, 3]),
+        );
 
-        let mut map = HashMap::new();
-        map.insert("key", "value");
+        let mut map = IndexMap::new();
+        map.insert(String::from("key"), Value::from("value"));
 
-        fields.insert("table".into(), map.into());
+        fields.insert(Lookup::from_str("table").unwrap(), Value::from_iter(map));
 
         let mut transform = AddFields::new(fields, false).unwrap();
 

@@ -122,10 +122,9 @@ fn iter() {
 
     let mut iter = lookup.iter();
     for (index, expected) in SUFFICIENTLY_DECOMPOSED.iter().enumerate() {
-        let parsed = iter.next().expect(&format!(
-            "Expected at index {}: {:?}, got None.",
-            index, expected
-        ));
+        let parsed = iter
+            .next()
+            .unwrap_or_else(|| panic!("Expected at index {}: {:?}, got None.", index, expected));
         assert_eq!(expected, parsed, "Failed at {}", index);
     }
 }
@@ -136,10 +135,9 @@ fn into_iter() {
     let lookup = Lookup::from_str(SUFFICIENTLY_COMPLEX).unwrap();
     let mut iter = lookup.into_iter();
     for (index, expected) in SUFFICIENTLY_DECOMPOSED.iter().cloned().enumerate() {
-        let parsed = iter.next().expect(&format!(
-            "Expected at index {}: {:?}, got None.",
-            index, expected
-        ));
+        let parsed = iter
+            .next()
+            .unwrap_or_else(|| panic!("Expected at index {}: {:?}, got None.", index, expected));
         assert_eq!(expected, parsed, "Failed at {}", index);
     }
 }
