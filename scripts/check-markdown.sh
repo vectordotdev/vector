@@ -10,6 +10,5 @@ set -euo pipefail
 #   entire Vector repo.
 
 markdownlint \
-  --config scripts/.markdownlintrc \
-  --ignore scripts/node_modules \
+  --config scripts/environment/.markdownlintrc \
   .
