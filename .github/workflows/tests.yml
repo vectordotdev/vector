@@ -459,7 +459,7 @@ jobs:
       - run: make slim-builds
       - run: echo "::add-path::/home/runner/.local/bin"
       - run: make check-component-features
-        
+
   ci-success:
     name: ci
     if: github.event_name == 'push' && success()
