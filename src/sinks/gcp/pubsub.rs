@@ -305,7 +305,7 @@ mod integration_tests {
             .json(&json)
             .send()
             .await
-            .expect(&format!("Sending {} request to {} failed", method, url))
+            .unwrap_or_else(|_| panic!("Sending {} request to {} failed", method, url))
     }
 
     async fn pull_messages(subscription: &str, count: usize) -> PullResponse {

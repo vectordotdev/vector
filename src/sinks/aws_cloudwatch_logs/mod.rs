@@ -885,7 +885,7 @@ mod integration_tests {
         sink.run(events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
+        request.log_stream_name = stream_name;
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
@@ -945,7 +945,7 @@ mod integration_tests {
         let _ = sink.run(events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
+        request.log_stream_name = stream_name;
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
@@ -1017,7 +1017,7 @@ mod integration_tests {
         sink.run(stream::iter(events)).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
+        request.log_stream_name = stream_name;
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some((now - Duration::days(30)).timestamp_millis());
 
@@ -1061,7 +1061,7 @@ mod integration_tests {
         sink.run(events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
+        request.log_stream_name = stream_name;
         request.log_group_name = group_name;
         request.start_time = Some(timestamp.timestamp_millis());
 
@@ -1116,8 +1116,8 @@ mod integration_tests {
             .unwrap();
 
         let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
-        request.log_group_name = group_name.into();
+        request.log_stream_name = stream_name;
+        request.log_group_name = group_name;
         request.start_time = Some(timestamp.timestamp_millis());
 
         let response = create_client_test().get_log_events(request).await.unwrap();

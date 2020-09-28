@@ -273,7 +273,7 @@ mod tests {
     }
 }
 
-#[cfg(feature = "docker")]
+#[cfg(feature = "loki-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
     use super::*;
@@ -310,6 +310,7 @@ mod integration_tests {
 
         let events = lines.clone().into_iter().map(Event::from);
         let _ = sink
+            .into_futures01sink()
             .send_all(futures01::stream::iter_ok(events))
             .compat()
             .await
@@ -347,6 +348,7 @@ mod integration_tests {
             .map(Event::from)
             .collect::<Vec<_>>();
         let _ = sink
+            .into_futures01sink()
             .send_all(futures01::stream::iter_ok(events.clone()))
             .compat()
             .await
@@ -394,6 +396,7 @@ mod integration_tests {
         }
 
         let _ = sink
+            .into_futures01sink()
             .send_all(futures01::stream::iter_ok(events))
             .compat()
             .await

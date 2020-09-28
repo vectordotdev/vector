@@ -597,7 +597,7 @@ mod integration_tests {
 
         let config = ElasticSearchConfig {
             endpoint: "http://localhost:9200".into(),
-            index: Some(index.clone()),
+            index: Some(index),
             pipeline: Some(pipeline.clone()),
             ..config()
         };
@@ -742,24 +742,21 @@ mod integration_tests {
         healthcheck.await.expect("Health check failed");
 
         let (input, events) = random_events_with_stream(100, 100);
-        match break_events {
-            true => {
-                // Break all but the first event to simulate some kind of partial failure
-                let mut doit = false;
-                sink.run(events.map(move |mut event| {
-                    if doit {
-                        event.as_mut_log().insert("_type", 1);
-                    }
-                    doit = true;
-                    event
-                }))
-                .await
-                .expect("Sending events failed");
-            }
-            false => {
-                sink.run(events).await.expect("Sending events failed");
-            }
-        };
+        if break_events {
+            // Break all but the first event to simulate some kind of partial failure
+            let mut doit = false;
+            sink.run(events.map(move |mut event| {
+                if doit {
+                    event.as_mut_log().insert("_type", 1);
+                }
+                doit = true;
+                event
+            }))
+            .await
+            .expect("Sending events failed");
+        } else {
+            sink.run(events).await.expect("Sending events failed");
+        }
 
         // make sure writes all all visible
         flush(cx.resolver(), common)
