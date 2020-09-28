@@ -76,12 +76,14 @@ up() {
     --set "image.tag=$CONTAINER_IMAGE_TAG"
   )
 
+  set -x
   $VECTOR_TEST_HELM install \
     --atomic \
     --namespace "$NAMESPACE" \
     "${HELM_VALUES[@]}" \
     "vector" \
     "./distribution/helm/vector"
+  { set +x; } &>/dev/null
 }
 
 down() {
