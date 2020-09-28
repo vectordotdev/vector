@@ -722,7 +722,7 @@ mod integration_tests {
     }
 
     async fn get_keys(prefix: String) -> Vec<String> {
-        let prefix = prefix.split("/").into_iter().next().unwrap().to_string();
+        let prefix = prefix.split('/').next().unwrap().to_string();
 
         let list_res = client()
             .list_objects_v2(rusoto_s3::ListObjectsV2Request {
