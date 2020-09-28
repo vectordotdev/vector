@@ -23,11 +23,13 @@ impl Framework {
         &self,
         namespace: &str,
         custom_resource: &str,
+        custom_helm_values: Option<&str>,
     ) -> Result<up_down::Manager<vector::CommandBuilder>> {
         let mut manager = vector::manager(
             self.interface.deploy_vector_command.as_str(),
             namespace,
             custom_resource,
+            custom_helm_values,
         )?;
         manager.up().await?;
         Ok(manager)
