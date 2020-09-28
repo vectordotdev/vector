@@ -6,6 +6,7 @@ use serde::{Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use toml::value::Value as TomlValue;
+use std::iter::FromIterator;
 
 #[derive(PartialEq, Debug, Clone, is_enum_variant)]
 pub enum Value {
@@ -120,6 +121,12 @@ impl From<Vec<Value>> for Value {
     }
 }
 
+impl FromIterator<Value> for Value {
+    fn from_iter<I: IntoIterator<Item = Value>>(iter: I) -> Self {
+        Value::Array(iter.into_iter().collect::<Vec<Value>>())
+    }
+}
+
 macro_rules! impl_valuekind_from_integer {
     ($t:ty) => {
         impl From<$t> for Value {
@@ -224,6 +231,19 @@ impl Value {
         match &self {
             Value::Timestamp(ts) => Some(ts),
             _ => None,
+        }
+    }
+
+    pub fn kind(&self) -> &str {
+        match self {
+            Value::Bytes(_) => "string",
+            Value::Timestamp(_) => "timestamp",
+            Value::Integer(_) => "integer",
+            Value::Float(_) => "float",
+            Value::Boolean(_) => "boolean",
+            Value::Map(_) => "map",
+            Value::Array(_) => "array",
+            Value::Null => "null",
         }
     }
 }

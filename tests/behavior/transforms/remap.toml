@@ -140,6 +140,7 @@
     .a = to_timestamp(.a)
     .b = to_timestamp(.nope, 10)
     .c = to_timestamp(.nope, "2020-09-14T12:51:12+02:00")
+    .d = parse_timestamp(.quix, format = "%d/%m/%Y:%H:%M:%S %z")
   """
 [[tests]]
   name = "remap_coercion"
@@ -151,6 +152,7 @@
       bar = "20"
       baz = "30.3"
       bev = "true"
+      quix = "19/06/2019:17:20:49 -0400"
       a = "2020-09-14T12:53:44+03:00"
   [[tests.outputs]]
     extract_from = "remap_coercion"
@@ -162,6 +164,7 @@
       "a.equals" = "2020-09-14T09:53:44Z"
       "b.equals" = "1970-01-01T00:00:10Z"
       "c.equals" = "2020-09-14T10:51:12Z"
+      "d.equals" = "2019-06-19T21:20:49Z"
 
 [transforms.remap_quoted_path]
   inputs = []
@@ -181,6 +184,47 @@
     extract_from = "remap_quoted_path"
     [[tests.outputs.conditions]]
       "a.b\\.c.equals" = "baz"
+
+[transforms.remap_function_arguments]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = to_string(.in)
+    .b = to_string(value = .in)
+    .c = to_string(.in, 20)
+    .d = to_string(.in, default = 20)
+    .e = to_string(.nope, 20)
+    .f = to_string(.nope, default = 20)
+    .g = to_string(value = .in, default = 20)
+    .h = to_string(value = .in, 20)
+    .i = to_string(default = 20, .in)
+    .j = to_string(default = 20, value = .in)
+    .k = to_string(default = 20, value = .nope)
+    .l = to_string(default = .other, value = .nope)
+  """
+[[tests]]
+  name = "remap_function_arguments"
+  [tests.input]
+    insert_at = "remap_function_arguments"
+    type = "log"
+    [tests.input.log_fields]
+      in = 10
+      other = 30
+  [[tests.outputs]]
+    extract_from = "remap_function_arguments"
+    [[tests.outputs.conditions]]
+      "a.equals" = "10"
+      "b.equals" = "10"
+      "c.equals" = "10"
+      "d.equals" = "10"
+      "e.equals" = "20"
+      "f.equals" = "20"
+      "g.equals" = "10"
+      "h.equals" = "10"
+      "i.equals" = "10"
+      "j.equals" = "10"
+      "k.equals" = "20"
+      "l.equals" = "30"
 
 [transforms.remap_function_upcase]
   inputs = []
@@ -402,3 +446,100 @@
     extract_from = "remap_function_now"
     [[tests.outputs.conditions]]
       "a.ends_with" = "Z"
+
+[transforms.remap_function_format_timestamp]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = format_timestamp(to_timestamp(.foo), format = "%+")
+  """
+[[tests]]
+  name = "remap_function_format_timestamp"
+  [tests.input]
+    insert_at = "remap_function_format_timestamp"
+    type = "log"
+    [tests.input.log_fields]
+      foo = 10
+  [[tests.outputs]]
+    extract_from = "remap_function_format_timestamp"
+    [[tests.outputs.conditions]]
+      "a.equals" = "1970-01-01T00:00:10+00:00"
+
+[transforms.remap_function_contains]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = contains(.foo, substring = .bar)
+    .b = contains(.bar, substring = "bar")
+    .c = contains(.bar, substring = "BAR", case_sensitive = true)
+    .d = contains(.bar, substring = "BAR", case_sensitive = false)
+  """
+[[tests]]
+  name = "remap_function_contains"
+  [tests.input]
+    insert_at = "remap_function_contains"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "foo"
+      bar = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_contains"
+    [[tests.outputs.conditions]]
+      "a.equals" = false
+      "b.equals" = true
+      "c.equals" = false
+      "d.equals" = true
+
+[transforms.remap_function_slice]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = slice(.foo + .bar, 1)
+    .b = slice(.foo + .bar, 0, 1)
+    .c = slice(.foo + .bar, start = -2)
+    .d = slice(.foo + .bar, start = 1, end = -1)
+  """
+[[tests]]
+  name = "remap_function_slice"
+  [tests.input]
+    insert_at = "remap_function_slice"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "foo"
+      bar = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_slice"
+    [[tests.outputs.conditions]]
+      "a.equals" = "oobar"
+      "b.equals" = "f"
+      "c.equals" = "ar"
+      "d.equals" = "ooba"
+
+[transforms.remap_function_tokenize]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = tokenize(.a)
+    .b = tokenize(.b)
+  """
+[[tests]]
+  name = "remap_function_tokenize"
+  [tests.input]
+    insert_at = "remap_function_tokenize"
+    type = "log"
+    [tests.input.log_fields]
+      a = "217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\" 205 11881"
+      b = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_tokenize"
+    [[tests.outputs.conditions]]
+      "a.length_eq" = 7
+      "a[0].equals" = "217.250.207.207"
+      "a[1].equals" = "<null>"
+      "a[2].equals" = "<null>"
+      "a[3].equals" = "07/Sep/2020:16:38:00 -0400"
+      "a[4].equals" = "DELETE /deliverables/next-generation/user-centric HTTP/1.1"
+      "a[5].equals" = "205"
+      "a[6].equals" = "11881"
+      "b.length_eq" = 1
+      "b[0].equals" = "bar"
