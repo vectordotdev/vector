@@ -120,7 +120,6 @@ define ENVIRONMENT_EXEC
 			$(ENVIRONMENT_UPSTREAM)
 endef
 
-
 ifeq ($(ENVIRONMENT_AUTOBUILD), true)
 define ENVIRONMENT_PREPARE
 	@echo "Building the environment. (ENVIRONMENT_AUTOBUILD=true) This may take a few minutes..."
