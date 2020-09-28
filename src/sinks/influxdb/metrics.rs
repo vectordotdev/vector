@@ -203,7 +203,7 @@ fn encode_events(
     for event in events.into_iter() {
         let fullname = encode_namespace(namespace, '.', &event.name);
         let ts = encode_timestamp(event.timestamp);
-        let tags = merge_tags(&event, tags.clone());
+        let tags = merge_tags(&event, tags);
         match event.value {
             MetricValue::Counter { value } => {
                 let fields = to_fields(value);
