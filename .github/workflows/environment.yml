@@ -17,8 +17,8 @@ jobs:
       ENVIRONMENT_AUTOBUILD: true
     steps:
       - run: |
-        docker login https://docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
-        docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
+          docker login https://docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+          docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
       - uses: actions/checkout@v2
       - name: free disk space
         run: |
