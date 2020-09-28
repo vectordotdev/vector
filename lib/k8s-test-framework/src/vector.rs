@@ -9,7 +9,7 @@ use std::process::{Command, Stdio};
 pub struct CommandBuilder {
     interface_command: String,
     namespace: String,
-    custom_resource_file: ResourceFile,
+    custom_resource_file: Option<ResourceFile>,
     custom_helm_values_file: Option<HelmValuesFile>,
 }
 
@@ -22,11 +22,11 @@ impl up_down::CommandBuilder for CommandBuilder {
                 up_down::CommandToBuild::Down => "down",
             })
             .arg(&self.namespace)
-            .env(
-                "CUSTOM_RESOURCE_CONFIGS_FILE",
-                self.custom_resource_file.path(),
-            )
             .stdin(Stdio::null());
+
+        if let Some(ref custom_resource_file) = self.custom_resource_file {
+            command.env("CUSTOM_RESOURCE_CONFIGS_FILE", custom_resource_file.path());
+        }
 
         if let Some(ref custom_helm_values_file) = self.custom_helm_values_file {
             command.env("CUSTOM_HELM_VALUES_FILE", custom_helm_values_file.path());
@@ -45,7 +45,11 @@ pub fn manager(
     custom_resource: &str,
     custom_helm_values: &str,
 ) -> Result<up_down::Manager<CommandBuilder>> {
-    let custom_resource_file = ResourceFile::new(custom_resource)?;
+    let custom_resource_file = if custom_resource.is_empty() {
+        None
+    } else {
+        Some(ResourceFile::new(custom_resource)?)
+    };
     let custom_helm_values_file = if custom_helm_values.is_empty() {
         None
     } else {
