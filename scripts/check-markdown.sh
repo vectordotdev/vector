@@ -9,7 +9,7 @@ set -euo pipefail
 #   This ensures that markdown is consistent and easy to read across the
 #   entire Vector repo.
 
-scripts/node_modules/.bin/markdownlint \
+./scripts/node_modules/.bin/markdownlint \
   --config scripts/.markdownlintrc \
   --ignore scripts/node_modules \
   .
