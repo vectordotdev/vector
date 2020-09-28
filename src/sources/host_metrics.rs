@@ -88,9 +88,10 @@ impl Default for Namespace {
 
 impl Namespace {
     fn encode(&self, word: &str) -> String {
-        match self.0.is_empty() {
-            true => word.into(),
-            false => format!("{}_{}", self.0, word),
+        if self.0.is_empty() {
+            word.into()
+        } else {
+            format!("{}_{}", self.0, word)
         }
     }
 }
@@ -179,7 +180,7 @@ impl HostMetricsConfig {
     fn has_collector(&self, collector: Collector) -> bool {
         match &self.collectors {
             None => true,
-            Some(collectors) => collectors.iter().find(|&&c| c == collector).is_some(),
+            Some(collectors) => collectors.iter().any(|&c| c == collector),
         }
     }
 
@@ -638,7 +639,6 @@ impl HostMetricsConfig {
         value: f64,
         tags: BTreeMap<String, String>,
     ) -> Metric {
-        let value = value.into();
         Metric {
             name: self.namespace.encode(name),
             timestamp: Some(timestamp),
@@ -655,7 +655,6 @@ impl HostMetricsConfig {
         value: f64,
         tags: BTreeMap<String, String>,
     ) -> Metric {
-        let value = value as f64;
         Metric {
             name: self.namespace.encode(name),
             timestamp: Some(timestamp),
