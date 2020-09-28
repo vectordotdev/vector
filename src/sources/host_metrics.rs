@@ -14,7 +14,7 @@ use futures::{
     stream::{self, StreamExt},
 };
 use futures01::Sink;
-use glob::Pattern;
+use glob::{Pattern, PatternError};
 #[cfg(target_os = "macos")]
 use heim::memory::os::macos::MemoryExt;
 #[cfg(not(target_os = "windows"))]
@@ -38,7 +38,6 @@ use std::fmt;
 use std::path::Path;
 use std::time::Duration;
 use tokio::{select, time};
-//use uom::{Conversion, ConversionFactor, Unit};
 
 macro_rules! btreemap {
     ( $( $key:expr => $value:expr ),* ) => {{
@@ -204,7 +203,7 @@ impl HostMetricsConfig {
             metrics.extend(add_collector("memory", self.swap_metrics().await));
         }
         if self.has_collector(Collector::Network) {
-            metrics.extend(add_collector("network", self.net_metrics().await));
+            metrics.extend(add_collector("network", self.network_metrics().await));
         }
         if let Ok(hostname) = &hostname {
             for metric in &mut metrics {
@@ -425,7 +424,7 @@ impl HostMetricsConfig {
         result
     }
 
-    async fn net_metrics(&self) -> Vec<Metric> {
+    async fn network_metrics(&self) -> Vec<Metric> {
         match heim::net::io_counters().await {
             Ok(counters) => {
                 counters
@@ -503,23 +502,29 @@ impl HostMetricsConfig {
 
     async fn filesystem_metrics(&self) -> Vec<Metric> {
         match heim::disk::partitions().await {
-        Ok(partitions) => {
-            partitions
+            Ok(partitions) => {
+                partitions
                 .filter_map(|result| filter_result(result, "Failed to load/parse partition data"))
+                // Filter on configured mountpoints
                 .map(|partition| {
                     vec_contains_path(&self.filesystem.mountpoints, partition.mount_point()).map(|()| partition)
                 })
                 .filter_map(|partition| async { partition })
-                .map(|partition| match partition.device() {
-                    Some(device) => vec_contains_path(&self.filesystem.devices, device.as_ref()).map(|()| partition),
-                    None => Some(partition),
-                })
+                // Filter on configured devices
+                .map(|partition| match &self.filesystem.devices {
+                    Some(_) => partition
+                        .device()
+                        .and_then(|device| vec_contains_path(&self.filesystem.devices, device.as_ref())),
+                    None => Some(())
+                }.map(|()| partition))
                 .filter_map(|partition| async { partition })
+                // Filter on configured filesystems
                 .map(|partition| {
                     vec_contains_str(&self.filesystem.filesystems, partition.file_system().as_str())
                         .map(|()| partition)
                 })
                 .filter_map(|partition| async { partition })
+                // Load usage from the partition mount point
                 .filter_map(|partition| async {
                     heim::disk::usage(partition.mount_point())
                         .await
@@ -593,25 +598,25 @@ impl HostMetricsConfig {
                         ];
                         stream::iter(
                             vec![
-                                self.gauge(
+                                self.counter(
                                     "disk_read_bytes_total",
                                     timestamp,
                                     counter.read_bytes().get::<byte>() as f64,
                                     tags.clone(),
                                 ),
-                                self.gauge(
+                                self.counter(
                                     "disk_reads_completed_total",
                                     timestamp,
                                     counter.read_count() as f64,
                                     tags.clone(),
                                 ),
-                                self.gauge(
+                                self.counter(
                                     "disk_written_bytes_total",
                                     timestamp,
                                     counter.write_bytes().get::<byte>() as f64,
                                     tags.clone(),
                                 ),
-                                self.gauge(
+                                self.counter(
                                     "disk_writes_completed_total",
                                     timestamp,
                                     counter.write_count() as f64,
@@ -712,6 +717,13 @@ struct PatternWrapper {
 }
 
 impl PatternWrapper {
+    fn new(s: &str) -> Result<PatternWrapper, PatternError> {
+        let negate = s.starts_with('!');
+        let s = s.trim_start_matches('!');
+        let pattern = Pattern::new(s)?;
+        Ok(PatternWrapper { negate, pattern })
+    }
+
     fn matches(&self, s: &str) -> bool {
         self.pattern.matches(s) ^ self.negate
     }
@@ -737,10 +749,7 @@ impl<'de> Visitor<'de> for PatternVisitor {
     }
 
     fn visit_str<E: de::Error>(self, s: &str) -> Result<Self::Value, E> {
-        let negate = s.starts_with('!');
-        let s = s.trim_start_matches('!');
-        let pattern = Pattern::new(s).map_err(de::Error::custom)?;
-        Ok(PatternWrapper { negate, pattern })
+        PatternWrapper::new(s).map_err(de::Error::custom)
     }
 }
 
@@ -751,5 +760,341 @@ impl Serialize for PatternWrapper {
         } else {
             serializer.serialize_str(self.pattern.as_str())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+    use std::future::Future;
+
+    #[tokio::test]
+    async fn filters_on_collectors() {
+        let all_metrics = HostMetricsConfig::default()
+            .capture_metrics()
+            .await
+            .collect::<Vec<_>>();
+
+        for collector in &[
+            Collector::Cpu,
+            Collector::Disk,
+            Collector::Filesystem,
+            Collector::Load,
+            Collector::Memory,
+            Collector::Network,
+        ] {
+            let some_metrics = HostMetricsConfig {
+                collectors: Some(vec![*collector]),
+                ..Default::default()
+            }
+            .capture_metrics()
+            .await
+            .collect::<Vec<_>>();
+
+            assert!(
+                all_metrics.len() > some_metrics.len(),
+                "collector={:?}",
+                collector
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn are_taged_with_hostname() {
+        let metrics = HostMetricsConfig::default()
+            .capture_metrics()
+            .await
+            .collect::<Vec<_>>();
+        let hostname = crate::get_hostname().expect("Broken hostname");
+        assert!(!metrics.into_iter().any(|event| event
+            .into_metric()
+            .tags
+            .expect("Missing tags")
+            .get("host")
+            .expect("Missing \"host\" tag")
+            != &hostname));
+    }
+
+    #[tokio::test]
+    async fn uses_custom_namespace() {
+        let metrics = HostMetricsConfig {
+            namespace: Namespace("other".into()),
+            ..Default::default()
+        }
+        .capture_metrics()
+        .await
+        .collect::<Vec<_>>();
+
+        assert!(!metrics
+            .into_iter()
+            .any(|event| !event.into_metric().name.starts_with("other_")));
+    }
+
+    #[tokio::test]
+    async fn generates_cpu_metrics() {
+        let metrics = HostMetricsConfig::default().cpu_metrics().await;
+        assert!(metrics.len() > 0);
+        assert!(all_counters(&metrics));
+
+        // They should all be named cpu_seconds_total
+        assert_eq!(
+            metrics.len(),
+            count_name(&metrics, "host_cpu_seconds_total")
+        );
+
+        // They should all have a "mode" tag
+        assert_eq!(count_tag(&metrics, "mode"), metrics.len());
+    }
+
+    #[tokio::test]
+    async fn generates_disk_metrics() {
+        let metrics = HostMetricsConfig::default().disk_metrics().await;
+        assert!(metrics.len() > 0);
+        assert!(metrics.len() % 4 == 0);
+        assert!(all_counters(&metrics));
+
+        // There are exactly four disk_* names
+        for name in &[
+            "host_disk_read_bytes_total",
+            "host_disk_reads_completed_total",
+            "host_disk_written_bytes_total",
+            "host_disk_writes_completed_total",
+        ] {
+            assert_eq!(
+                count_name(&metrics, name),
+                metrics.len() / 4,
+                "name={}",
+                name
+            );
+        }
+
+        // They should all have a "device" tag
+        assert_eq!(count_tag(&metrics, "device"), metrics.len());
+    }
+
+    #[tokio::test]
+    async fn filters_disk_metrics_on_device() {
+        assert_filtered_metrics("device", |devices| async {
+            HostMetricsConfig {
+                disk: DiskConfig { devices },
+                ..Default::default()
+            }
+            .disk_metrics()
+            .await
+        })
+        .await;
+    }
+
+    // Run a series of tests using filters to ensure they are obeyed
+    async fn assert_filtered_metrics<'a, Get, Fut>(tag: &str, get_metrics: Get)
+    where
+        Get: Fn(Option<Vec<PatternWrapper>>) -> Fut,
+        Fut: Future<Output = Vec<Metric>>,
+    {
+        let all_metrics = get_metrics(None).await;
+        let keys = collect_tag_values(&all_metrics, tag);
+        // Pick an arbitrary key value
+        let key = keys.into_iter().next().unwrap();
+        let key_prefix = &key[..key.len() - 1];
+
+        let filtered_metrics_with =
+            get_metrics(Some(vec![PatternWrapper::new(&key).unwrap()])).await;
+
+        assert!(filtered_metrics_with.len() < all_metrics.len());
+        assert!(all_tags_match(&filtered_metrics_with, tag, |s| s == key));
+
+        let filtered_metrics_with_match =
+            get_metrics(Some(vec![
+                PatternWrapper::new(&format!("{}*", key_prefix)).unwrap()
+            ]))
+            .await;
+
+        assert!(filtered_metrics_with_match.len() >= filtered_metrics_with.len());
+        assert!(all_tags_match(&filtered_metrics_with_match, tag, |s| {
+            s.starts_with(key_prefix)
+        }));
+
+        let filtered_metrics_without =
+            get_metrics(Some(vec![
+                PatternWrapper::new(&format!("!{}", key)).unwrap()
+            ]))
+            .await;
+
+        assert!(filtered_metrics_without.len() < all_metrics.len());
+        assert!(all_tags_match(&filtered_metrics_without, tag, |s| s != key));
+
+        let filtered_metrics_without_match = get_metrics(Some(vec![PatternWrapper::new(
+            &format!("!{}*", key_prefix),
+        )
+        .unwrap()]))
+        .await;
+
+        assert!(filtered_metrics_without_match.len() <= filtered_metrics_without.len());
+        assert!(all_tags_match(&filtered_metrics_without_match, tag, |s| {
+            !s.starts_with(key_prefix)
+        }));
+    }
+
+    #[tokio::test]
+    async fn generates_filesystem_metrics() {
+        let metrics = HostMetricsConfig::default().filesystem_metrics().await;
+        assert!(metrics.len() > 0);
+        assert!(metrics.len() % 3 == 0);
+        assert!(all_gauges(&metrics));
+
+        // There are exactly three filesystem_* names
+        for name in &[
+            "host_filesystem_free_bytes",
+            "host_filesystem_total_bytes",
+            "host_filesystem_used_bytes",
+        ] {
+            assert_eq!(
+                count_name(&metrics, name),
+                metrics.len() / 3,
+                "name={}",
+                name
+            );
+        }
+
+        // They should all have "filesystem" and "mountpoint" tags
+        assert_eq!(count_tag(&metrics, "filesystem"), metrics.len());
+        assert_eq!(count_tag(&metrics, "mountpoint"), metrics.len());
+    }
+
+    #[tokio::test]
+    async fn filesystem_metrics_filters_on_device() {
+        assert_filtered_metrics("device", |devices| async {
+            HostMetricsConfig {
+                filesystem: FilesystemConfig {
+                    devices,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }
+            .filesystem_metrics()
+            .await
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn filesystem_metrics_filters_on_filesystem() {
+        assert_filtered_metrics("filesystem", |filesystems| async {
+            HostMetricsConfig {
+                filesystem: FilesystemConfig {
+                    filesystems,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }
+            .filesystem_metrics()
+            .await
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn filesystem_metrics_filters_on_mountpoint() {
+        assert_filtered_metrics("mountpoint", |mountpoints| async {
+            HostMetricsConfig {
+                filesystem: FilesystemConfig {
+                    mountpoints,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }
+            .filesystem_metrics()
+            .await
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn generates_network_metrics() {
+        let metrics = HostMetricsConfig::default().network_metrics().await;
+        assert!(metrics.len() > 0);
+        assert!(all_counters(&metrics));
+
+        // All metrics are named network_*
+        assert!(!metrics
+            .iter()
+            .any(|metric| !metric.name.starts_with("host_network_")));
+
+        // They should all have a "device" tag
+        assert_eq!(count_tag(&metrics, "device"), metrics.len());
+    }
+
+    #[tokio::test]
+    async fn network_metrics_filters_on_device() {
+        assert_filtered_metrics("device", |devices| async {
+            HostMetricsConfig {
+                network: NetworkConfig { devices },
+                ..Default::default()
+            }
+            .network_metrics()
+            .await
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn generates_loadavg_metrics() {
+        let metrics = HostMetricsConfig::default().loadavg_metrics().await;
+        assert_eq!(metrics.len(), 3);
+        assert!(all_gauges(&metrics));
+
+        // All metrics are named load*
+        assert!(!metrics
+            .iter()
+            .any(|metric| !metric.name.starts_with("host_load")));
+    }
+
+    fn all_counters(metrics: &[Metric]) -> bool {
+        !metrics
+            .iter()
+            .any(|metric| !matches!(metric.value, MetricValue::Counter { .. }))
+    }
+
+    fn all_gauges(metrics: &[Metric]) -> bool {
+        !metrics
+            .iter()
+            .any(|metric| !matches!(metric.value, MetricValue::Gauge { .. }))
+    }
+
+    fn all_tags_match(metrics: &[Metric], tag: &str, matches: impl Fn(&str) -> bool) -> bool {
+        !metrics.iter().any(|metric| {
+            metric
+                .tags
+                .as_ref()
+                .unwrap()
+                .get(tag)
+                .map(|value| !matches(value))
+                .unwrap_or(false)
+        })
+    }
+
+    fn count_name(metrics: &[Metric], name: &str) -> usize {
+        metrics.iter().filter(|metric| metric.name == name).count()
+    }
+
+    fn count_tag(metrics: &[Metric], tag: &str) -> usize {
+        metrics
+            .iter()
+            .filter(|metric| {
+                metric
+                    .tags
+                    .as_ref()
+                    .expect("Metric is missing tags")
+                    .contains_key(tag)
+            })
+            .count()
+    }
+
+    fn collect_tag_values(metrics: &[Metric], tag: &str) -> HashSet<String> {
+        metrics
+            .iter()
+            .filter_map(|metric| metric.tags.as_ref().unwrap().get(tag).cloned())
+            .collect::<HashSet<_>>()
     }
 }
