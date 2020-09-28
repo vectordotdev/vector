@@ -16,7 +16,9 @@ jobs:
     env:
       ENVIRONMENT_AUTOBUILD: true
     steps:
-      - run: docker login https://docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+      - run: |
+        docker login https://docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+        docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
       - uses: actions/checkout@v2
       - name: free disk space
         run: |
@@ -31,4 +33,4 @@ jobs:
         if: github.event_name != 'workflow_dispatch'
         run: |
           docker push docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-          docker push docker.pkg.github.com/timberio/vector/environment:latest
+          docker push timberio/ci_image:latest

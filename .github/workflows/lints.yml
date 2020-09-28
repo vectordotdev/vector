@@ -10,7 +10,6 @@ env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"
-  ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
   RUST_BACKTRACE: full
   TEST_LOG: vector=debug
   VERBOSE: true
@@ -30,7 +29,7 @@ jobs:
     name: Checks
     runs-on: ubuntu-20.04
     container:
-      image: docker.pkg.github.com/timberio/vector/environment
+      image: timberio/ci_image
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
