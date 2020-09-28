@@ -538,7 +538,7 @@ mod test {
         build_framestream_unix_source, spawn_event_handling_tasks, ControlField, ControlHeader,
         FrameHandler,
     };
-    use crate::test_util::{collect_n, collect_n_stream};
+    use crate::{config::log_schema, test_util::{collect_n, collect_n_stream}};
     use crate::{
         event::{self, Event},
         shutdown::SourceShutdownCoordinator,
@@ -609,7 +609,7 @@ mod test {
             let mut event = Event::from(frame);
             event
                 .as_mut_log()
-                .insert(event::log_schema().source_type_key(), "framestream");
+                .insert(log_schema().source_type_key(), "framestream");
             if let Some(host) = received_from {
                 event.as_mut_log().insert(self.host_key(), host);
             }
@@ -769,11 +769,11 @@ mod test {
         send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Stop)).await;
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&log_schema().message_key()],
             "hello".into(),
         );
         assert_eq!(
-            events[1].as_log()[&event::log_schema().message_key()],
+            events[1].as_log()[&log_schema().message_key()],
             "world".into(),
         );
 
@@ -901,11 +901,11 @@ mod test {
         send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Stop)).await;
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&log_schema().message_key()],
             "hello".into(),
         );
         assert_eq!(
-            events[1].as_log()[&event::log_schema().message_key()],
+            events[1].as_log()[&log_schema().message_key()],
             "world".into(),
         );
 
@@ -944,11 +944,11 @@ mod test {
         send_control_frame(&mut sock_sink, create_control_frame(ControlHeader::Stop)).await;
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&log_schema().message_key()],
             "hello".into(),
         );
         assert_eq!(
-            events[1].as_log()[&event::log_schema().message_key()],
+            events[1].as_log()[&log_schema().message_key()],
             "world".into(),
         );
 

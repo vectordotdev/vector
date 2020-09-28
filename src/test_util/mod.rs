@@ -17,7 +17,7 @@ use std::{
     fs::File,
     future::{ready, Future},
     io::Read,
-    iter,
+    iter, mem,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     path::{Path, PathBuf},
     pin::Pin,
@@ -255,10 +255,7 @@ where
     rx.take(n).collect().await
 }
 
-pub async fn collect_n_stream<T, S: Stream<Item = T> + Unpin>(
-    stream: &mut S,
-    n: usize,
-) -> Vec<T> {
+pub async fn collect_n_stream<T, S: Stream<Item = T> + Unpin>(stream: &mut S, n: usize) -> Vec<T> {
     let mut events = Vec::new();
 
     while events.len() < n {

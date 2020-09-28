@@ -53,7 +53,7 @@ impl<'a> DnstapParser<'a> {
         V: Into<Value>,
     {
         let mut node_path = self.parent_key_path.clone();
-        node_path.push(PathComponent::Key(String::from(key)));
+        node_path.push(PathComponent::Key(key.to_string()));
         self.log_event.insert_path(node_path, value)
     }
 
@@ -126,13 +126,13 @@ impl<'a> DnstapParser<'a> {
         if let Some(socket_family) = dnstap_message.socket_family {
             self.insert(
                 self.event_schema.dnstap_message_schema.socket_family,
-                to_socket_family_name(socket_family)?,
+                to_socket_family_name(socket_family)?.to_string(),
             );
 
             if let Some(socket_protocol) = dnstap_message.socket_protocol {
                 self.insert(
                     self.event_schema.dnstap_message_schema.socket_protocol,
-                    to_socket_protocol_name(socket_protocol)?,
+                    to_socket_protocol_name(socket_protocol)?.to_string(),
                 );
             }
 
@@ -309,8 +309,8 @@ impl<'a> DnstapParser<'a> {
             1..=12 => {
                 if let Some(query_message) = dnstap_message.query_message {
                     let mut query_message_parser = DnsMessageParser::new(query_message);
-                    if let Err(error) =
-                        self.parse_dns_query_message(&request_message_key, &mut query_message_parser)
+                    if let Err(error) = self
+                        .parse_dns_query_message(&request_message_key, &mut query_message_parser)
                     {
                         self.log_raw_dns_message(
                             &request_message_key,
@@ -390,12 +390,12 @@ impl<'a> DnstapParser<'a> {
     ) {
         self.insert(timestamp_key, timestamp);
 
-        self.insert(time_precision_key, time_precision);
+        self.insert(time_precision_key, time_precision.to_string());
     }
 
     fn log_raw_dns_message(&mut self, key_prefix: &str, raw_dns_message: &[u8]) {
         self.parent_key_path
-            .push(PathComponent::Key(String::from(key_prefix)));
+            .push(PathComponent::Key(key_prefix.to_string()));
 
         self.insert(
             self.event_schema.dns_query_message_schema.raw_data,
@@ -413,7 +413,7 @@ impl<'a> DnstapParser<'a> {
         let msg = dns_message_parser.parse_as_query_message()?;
 
         self.parent_key_path
-            .push(PathComponent::Key(String::from(key_prefix)));
+            .push(PathComponent::Key(key_prefix.to_string()));
 
         self.insert(
             self.event_schema.dns_query_message_schema.response_code,
@@ -423,7 +423,7 @@ impl<'a> DnstapParser<'a> {
         if let Some(response) = msg.response {
             self.insert(
                 self.event_schema.dns_query_message_schema.response,
-                response,
+                response.to_string(),
             );
         }
 
@@ -469,7 +469,7 @@ impl<'a> DnstapParser<'a> {
 
     fn log_dns_query_message_header(&mut self, parent_key: &str, header: &QueryHeader) {
         self.parent_key_path
-            .push(PathComponent::Key(String::from(parent_key)));
+            .push(PathComponent::Key(parent_key.to_string()));
 
         self.insert(
             self.event_schema.dns_query_header_schema.id,
@@ -546,7 +546,7 @@ impl<'a> DnstapParser<'a> {
 
     fn log_dns_query_message_query_section(&mut self, key_path: &str, questions: &[QueryQuestion]) {
         self.parent_key_path
-            .push(PathComponent::Key(String::from(key_path)));
+            .push(PathComponent::Key(key_path.to_string()));
 
         for (i, query) in questions.iter().enumerate() {
             self.parent_key_path.push(PathComponent::Index(i));
@@ -586,7 +586,7 @@ impl<'a> DnstapParser<'a> {
         let msg = dns_message_parser.parse_as_update_message()?;
 
         self.parent_key_path
-            .push(PathComponent::Key(String::from(key_prefix)));
+            .push(PathComponent::Key(key_prefix.to_string()));
 
         self.insert(
             self.event_schema.dns_update_message_schema.response_code,
@@ -596,7 +596,7 @@ impl<'a> DnstapParser<'a> {
         if let Some(response) = msg.response {
             self.insert(
                 self.event_schema.dns_update_message_schema.response,
-                response,
+                response.to_string(),
             );
         }
 
@@ -637,7 +637,7 @@ impl<'a> DnstapParser<'a> {
 
     fn log_dns_update_message_header(&mut self, key_prefix: &str, header: &UpdateHeader) {
         self.parent_key_path
-            .push(PathComponent::Key(String::from(key_prefix)));
+            .push(PathComponent::Key(key_prefix.to_string()));
 
         self.insert(
             self.event_schema.dns_update_header_schema.id,
@@ -686,7 +686,7 @@ impl<'a> DnstapParser<'a> {
 
     fn log_dns_update_message_zone_section(&mut self, key_path: &str, zone: &ZoneInfo) {
         self.parent_key_path
-            .push(PathComponent::Key(String::from(key_path)));
+            .push(PathComponent::Key(key_path.to_string()));
 
         self.insert(
             self.event_schema.dns_update_zone_info_schema.zone_name,
@@ -712,7 +712,7 @@ impl<'a> DnstapParser<'a> {
 
     fn log_edns(&mut self, key_prefix: &str, opt_section: &Option<OptPseudoSection>) {
         self.parent_key_path
-            .push(PathComponent::Key(String::from(key_prefix)));
+            .push(PathComponent::Key(key_prefix.to_string()));
 
         if let Some(edns) = opt_section {
             self.insert(
@@ -752,7 +752,7 @@ impl<'a> DnstapParser<'a> {
 
     fn log_edns_options(&mut self, key_path: &str, options: &[EdnsOptionEntry]) {
         self.parent_key_path
-            .push(PathComponent::Key(String::from(key_path)));
+            .push(PathComponent::Key(key_path.to_string()));
 
         options.iter().enumerate().for_each(|(i, opt)| {
             self.parent_key_path.push(PathComponent::Index(i));
@@ -780,7 +780,7 @@ impl<'a> DnstapParser<'a> {
 
     fn log_dns_message_record_section(&mut self, key_path: &str, records: &[DnsRecord]) {
         self.parent_key_path
-            .push(PathComponent::Key(String::from(key_path)));
+            .push(PathComponent::Key(key_path.to_string()));
 
         for (i, record) in records.iter().enumerate() {
             self.parent_key_path.push(PathComponent::Index(i));
@@ -809,7 +809,7 @@ impl<'a> DnstapParser<'a> {
             record.class.clone(),
         );
         if let Some(rdata) = &record.rdata {
-            self.insert(self.event_schema.dns_record_schema.rdata, rdata);
+            self.insert(self.event_schema.dns_record_schema.rdata, rdata.to_string());
         };
         if let Some(rdata_bytes) = &record.rdata_bytes {
             self.insert(

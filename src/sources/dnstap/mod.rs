@@ -1,10 +1,9 @@
 use super::util::framestream::{build_framestream_unix_source, FrameHandler};
 use crate::{
-    event::{self, Event},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    event::Event,
     shutdown::ShutdownSignal,
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    Result,
-    Pipeline,
+    Pipeline, Result,
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
@@ -79,7 +78,7 @@ impl SourceConfig for DnstapConfig {
         let host_key = self
             .host_key
             .clone()
-            .unwrap_or_else(||event::log_schema().host_key().to_string());
+            .unwrap_or_else(|| log_schema().host_key().to_string());
 
         let frame_handler = DnstapFrameHandler::new(
             self.max_length,
@@ -179,7 +178,7 @@ impl FrameHandler for DnstapFrameHandler {
         let mut event = Event::new_empty_log();
 
         let log_event = event.as_mut_log();
-        log_event.insert(event::log_schema().source_type_key(), "dnstap");
+        log_event.insert(log_schema().source_type_key(), String::from("dnstap"));
 
         if let Some(host) = received_from {
             log_event.insert(self.host_key(), host);
