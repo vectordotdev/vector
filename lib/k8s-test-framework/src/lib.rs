@@ -23,6 +23,7 @@ mod log_lookup;
 pub mod namespace;
 mod reader;
 mod resource_file;
+mod temp_file;
 pub mod test_pod;
 mod up_down;
 mod util;
