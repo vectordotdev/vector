@@ -9,8 +9,8 @@ use std::process::{Command, Stdio};
 pub struct CommandBuilder {
     interface_command: String,
     namespace: String,
-    custom_resource_file: Option<ResourceFile>,
     custom_helm_values_file: Option<HelmValuesFile>,
+    custom_resource_file: Option<ResourceFile>,
 }
 
 impl up_down::CommandBuilder for CommandBuilder {
@@ -24,12 +24,12 @@ impl up_down::CommandBuilder for CommandBuilder {
             .arg(&self.namespace)
             .stdin(Stdio::null());
 
-        if let Some(ref custom_resource_file) = self.custom_resource_file {
-            command.env("CUSTOM_RESOURCE_CONFIGS_FILE", custom_resource_file.path());
-        }
-
         if let Some(ref custom_helm_values_file) = self.custom_helm_values_file {
             command.env("CUSTOM_HELM_VALUES_FILE", custom_helm_values_file.path());
+        }
+
+        if let Some(ref custom_resource_file) = self.custom_resource_file {
+            command.env("CUSTOM_RESOURCE_CONFIGS_FILE", custom_resource_file.path());
         }
 
         command
@@ -42,23 +42,23 @@ impl up_down::CommandBuilder for CommandBuilder {
 pub fn manager(
     interface_command: &str,
     namespace: &str,
-    custom_resource: &str,
     custom_helm_values: &str,
+    custom_resource: &str,
 ) -> Result<up_down::Manager<CommandBuilder>> {
-    let custom_resource_file = if custom_resource.is_empty() {
-        None
-    } else {
-        Some(ResourceFile::new(custom_resource)?)
-    };
     let custom_helm_values_file = if custom_helm_values.is_empty() {
         None
     } else {
         Some(HelmValuesFile::new(custom_helm_values)?)
     };
+    let custom_resource_file = if custom_resource.is_empty() {
+        None
+    } else {
+        Some(ResourceFile::new(custom_resource)?)
+    };
     Ok(up_down::Manager::new(CommandBuilder {
         interface_command: interface_command.to_owned(),
         namespace: namespace.to_owned(),
-        custom_resource_file,
         custom_helm_values_file,
+        custom_resource_file,
     }))
 }
