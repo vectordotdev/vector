@@ -10,7 +10,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN echo $TZ > /etc/timezone
 
 # Setup the env
-RUN mkdir -p /git/timberio/vector/{scripts,scripts/environment}
+RUN mkdir -p /git/timberio/vector/scripts
+RUN mkdir -p /git/timberio/vector/scripts/environment
 ADD scripts/environment/bootstrap-ubuntu-20.04.sh /git/timberio/vector/scripts/environment/
 RUN ./git/timberio/vector/scripts/environment/bootstrap-ubuntu-20.04.sh
 
@@ -24,8 +25,8 @@ ADD rust-toolchain \
 RUN ./scripts/environment/prepare.sh
 
 # Setup Kubernetes
-ADD scripts/environment/ci-setup-helm.sh /git/timberio/vector/scripts/environment/
-RUN ./scripts/environment/ci-setup-helm.sh
+ADD scripts/ci-setup-helm.sh /git/timberio/vector/scripts/
+RUN ./scripts/ci-setup-helm.sh
 
 # Declare volumes
 VOLUME /vector
