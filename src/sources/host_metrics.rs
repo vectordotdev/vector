@@ -886,56 +886,6 @@ mod tests {
         .await;
     }
 
-    // Run a series of tests using filters to ensure they are obeyed
-    async fn assert_filtered_metrics<'a, Get, Fut>(tag: &str, get_metrics: Get)
-    where
-        Get: Fn(Option<Vec<PatternWrapper>>) -> Fut,
-        Fut: Future<Output = Vec<Metric>>,
-    {
-        let all_metrics = get_metrics(None).await;
-        let keys = collect_tag_values(&all_metrics, tag);
-        // Pick an arbitrary key value
-        let key = keys.into_iter().next().unwrap();
-        let key_prefix = &key[..key.len() - 1];
-
-        let filtered_metrics_with =
-            get_metrics(Some(vec![PatternWrapper::new(&key).unwrap()])).await;
-
-        assert!(filtered_metrics_with.len() < all_metrics.len());
-        assert!(all_tags_match(&filtered_metrics_with, tag, |s| s == key));
-
-        let filtered_metrics_with_match =
-            get_metrics(Some(vec![
-                PatternWrapper::new(&format!("{}*", key_prefix)).unwrap()
-            ]))
-            .await;
-
-        assert!(filtered_metrics_with_match.len() >= filtered_metrics_with.len());
-        assert!(all_tags_match(&filtered_metrics_with_match, tag, |s| {
-            s.starts_with(key_prefix)
-        }));
-
-        let filtered_metrics_without =
-            get_metrics(Some(vec![
-                PatternWrapper::new(&format!("!{}", key)).unwrap()
-            ]))
-            .await;
-
-        assert!(filtered_metrics_without.len() < all_metrics.len());
-        assert!(all_tags_match(&filtered_metrics_without, tag, |s| s != key));
-
-        let filtered_metrics_without_match = get_metrics(Some(vec![PatternWrapper::new(
-            &format!("!{}*", key_prefix),
-        )
-        .unwrap()]))
-        .await;
-
-        assert!(filtered_metrics_without_match.len() <= filtered_metrics_without.len());
-        assert!(all_tags_match(&filtered_metrics_without_match, tag, |s| {
-            !s.starts_with(key_prefix)
-        }));
-    }
-
     #[tokio::test]
     async fn generates_filesystem_metrics() {
         let metrics = HostMetricsConfig::default().filesystem_metrics().await;
@@ -1096,5 +1046,55 @@ mod tests {
             .iter()
             .filter_map(|metric| metric.tags.as_ref().unwrap().get(tag).cloned())
             .collect::<HashSet<_>>()
+    }
+
+    // Run a series of tests using filters to ensure they are obeyed
+    async fn assert_filtered_metrics<'a, Get, Fut>(tag: &str, get_metrics: Get)
+    where
+        Get: Fn(Option<Vec<PatternWrapper>>) -> Fut,
+        Fut: Future<Output = Vec<Metric>>,
+    {
+        let all_metrics = get_metrics(None).await;
+        let keys = collect_tag_values(&all_metrics, tag);
+        // Pick an arbitrary key value
+        let key = keys.into_iter().next().unwrap();
+        let key_prefix = &key[..key.len() - 1];
+
+        let filtered_metrics_with =
+            get_metrics(Some(vec![PatternWrapper::new(&key).unwrap()])).await;
+
+        assert!(filtered_metrics_with.len() < all_metrics.len());
+        assert!(all_tags_match(&filtered_metrics_with, tag, |s| s == key));
+
+        let filtered_metrics_with_match =
+            get_metrics(Some(vec![
+                PatternWrapper::new(&format!("{}*", key_prefix)).unwrap()
+            ]))
+            .await;
+
+        assert!(filtered_metrics_with_match.len() >= filtered_metrics_with.len());
+        assert!(all_tags_match(&filtered_metrics_with_match, tag, |s| {
+            s.starts_with(key_prefix)
+        }));
+
+        let filtered_metrics_without =
+            get_metrics(Some(vec![
+                PatternWrapper::new(&format!("!{}", key)).unwrap()
+            ]))
+            .await;
+
+        assert!(filtered_metrics_without.len() < all_metrics.len());
+        assert!(all_tags_match(&filtered_metrics_without, tag, |s| s != key));
+
+        let filtered_metrics_without_match = get_metrics(Some(vec![PatternWrapper::new(
+            &format!("!{}*", key_prefix),
+        )
+        .unwrap()]))
+        .await;
+
+        assert!(filtered_metrics_without_match.len() <= filtered_metrics_without.len());
+        assert!(all_tags_match(&filtered_metrics_without_match, tag, |s| {
+            !s.starts_with(key_prefix)
+        }));
     }
 }
