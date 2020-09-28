@@ -27,6 +27,7 @@ use std::{io::Write, time::Duration};
 #[serde(deny_unknown_fields)]
 pub struct DatadogLogsConfig {
     endpoint: Option<String>,
+    region: Option<super::Region>,
     api_key: String,
     encoding: EncodingConfig<Encoding>,
 
