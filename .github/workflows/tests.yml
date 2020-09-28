@@ -29,7 +29,7 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
   test-linux:
-    name: Unit - x86_64-unknown-linux-gnu
+    name: Unit Tests - x86_64-unknown-linux-gnu
     runs-on: ubuntu-20.04
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
@@ -49,7 +49,7 @@ jobs:
   # TODO: Upgrade to test once the tz issues are solved.
   # https://github.com/timberio/vector/issues/3771
   build-x86_64-unknown-linux-gnu:
-    name: Unit - x86_64-unknown-linux-gnu
+    name: Build - x86_64-unknown-linux-gnu
     runs-on: ubuntu-20.04
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
@@ -69,7 +69,7 @@ jobs:
   # TODO: Upgrade to test once the tz issues are solved.
   # https://github.com/timberio/vector/issues/3771
   build-aarch64-unknown-linux-gnu:
-    name: Unit - aarch64-unknown-linux-gnu
+    name: Build - aarch64-unknown-linux-gnu
     runs-on: ubuntu-20.04
     if: |
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
