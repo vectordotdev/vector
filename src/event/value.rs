@@ -5,6 +5,7 @@ use derive_is_enum_variant::is_enum_variant;
 use serde::{Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::convert::TryInto;
+use std::iter::FromIterator;
 
 #[derive(PartialEq, Debug, Clone, is_enum_variant)]
 pub enum Value {
@@ -92,6 +93,12 @@ impl From<BTreeMap<String, Value>> for Value {
 impl From<Vec<Value>> for Value {
     fn from(value: Vec<Value>) -> Self {
         Value::Array(value)
+    }
+}
+
+impl FromIterator<Value> for Value {
+    fn from_iter<I: IntoIterator<Item = Value>>(iter: I) -> Self {
+        Value::Array(iter.into_iter().collect::<Vec<Value>>())
     }
 }
 
@@ -199,6 +206,19 @@ impl Value {
         match &self {
             Value::Timestamp(ts) => Some(ts),
             _ => None,
+        }
+    }
+
+    pub fn kind(&self) -> &str {
+        match self {
+            Value::Bytes(_) => "string",
+            Value::Timestamp(_) => "timestamp",
+            Value::Integer(_) => "integer",
+            Value::Float(_) => "float",
+            Value::Boolean(_) => "boolean",
+            Value::Map(_) => "map",
+            Value::Array(_) => "array",
+            Value::Null => "null",
         }
     }
 }

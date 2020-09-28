@@ -35,7 +35,7 @@ RETVAL=0
 # Start
 start() {
   echo -n $"Starting $prog: "
-  daemon --pidfile=${pidfile} --output=/var/log/vector.log $vector $OPTIONS
+  daemon --pidfile=${pidfile} $vector $OPTIONS
   RETVAL=$?
   echo
   return $RETVAL
