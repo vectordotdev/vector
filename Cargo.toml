@@ -144,7 +144,7 @@ num_cpus = "1.10.0"
 bytesize = { version = "1.0.0", optional = true }
 glob = "0.3.0"
 grok = { version = "~1.0.1", optional = true }
-nom = { version = "5.1.2", optional = true }
+nom = { version = "5.1.2" }
 pest = "2.1.3"
 pest_derive = "2.1.0"
 uuid = { version = "0.7", features = ["serde", "v4"] }
@@ -362,7 +362,7 @@ transforms-sampler = ["seahash"]
 transforms-split = []
 transforms-swimlanes = []
 transforms-tag_cardinality_limit = []
-transforms-tokenizer = ["nom"]
+transforms-tokenizer = []
 transforms-wasm = ["wasm"]
 transforms-reduce = []
 

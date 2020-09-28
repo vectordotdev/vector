@@ -1,17 +1,10 @@
+use super::util::tokenize::parse;
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, PathComponent, PathIter},
     internal_events::{TokenizerConvertFailed, TokenizerEventProcessed, TokenizerFieldMissing},
     types::{parse_check_conversion_map, Conversion},
-};
-use nom::{
-    branch::alt,
-    bytes::complete::{escaped, is_not, tag},
-    character::complete::{one_of, space0},
-    combinator::{all_consuming, map, opt, rest, verify},
-    multi::many0,
-    sequence::{delimited, terminated},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -125,35 +118,8 @@ impl Transform for Tokenizer {
     }
 }
 
-pub fn parse(input: &str) -> Vec<&str> {
-    let simple = is_not::<_, _, (&str, nom::error::ErrorKind)>(" \t[\"");
-    let string = delimited(
-        tag("\""),
-        map(opt(escaped(is_not("\"\\"), '\\', one_of("\"\\"))), |o| {
-            o.unwrap_or("")
-        }),
-        tag("\""),
-    );
-    let bracket = delimited(
-        tag("["),
-        map(opt(escaped(is_not("]\\"), '\\', one_of("]\\"))), |o| {
-            o.unwrap_or("")
-        }),
-        tag("]"),
-    );
-
-    // fall back to returning the rest of the input, if any
-    let remainder = verify(rest, |s: &str| !s.is_empty());
-    let field = alt((bracket, string, simple, remainder));
-
-    all_consuming(many0(terminated(field, space0)))(input)
-        .expect("parser should always succeed")
-        .1
-}
-
 #[cfg(test)]
 mod tests {
-    use super::parse;
     use super::TokenizerConfig;
     use crate::event::{LogEvent, Value};
     use crate::{
@@ -161,97 +127,6 @@ mod tests {
         Event,
     };
     use string_cache::DefaultAtom as Atom;
-
-    #[test]
-    fn basic() {
-        assert_eq!(parse("foo"), &["foo"]);
-    }
-
-    #[test]
-    fn multiple() {
-        assert_eq!(parse("foo bar"), &["foo", "bar"]);
-    }
-
-    #[test]
-    fn more_space() {
-        assert_eq!(parse("foo\t bar"), &["foo", "bar"]);
-    }
-
-    #[test]
-    fn so_much_space() {
-        assert_eq!(parse("foo  \t bar     baz"), &["foo", "bar", "baz"]);
-    }
-
-    #[test]
-    fn quotes() {
-        assert_eq!(parse(r#"foo "bar baz""#), &["foo", r#"bar baz"#]);
-    }
-
-    #[test]
-    fn empty_quotes() {
-        assert_eq!(parse(r#"foo """#), &["foo", ""]);
-    }
-
-    #[test]
-    fn escaped_quotes() {
-        assert_eq!(
-            parse(r#"foo "bar \" \" baz""#),
-            &["foo", r#"bar \" \" baz"#],
-        );
-    }
-
-    #[test]
-    fn unclosed_quotes() {
-        assert_eq!(parse(r#"foo "bar"#), &["foo", "\"bar"],);
-    }
-
-    #[test]
-    fn brackets() {
-        assert_eq!(parse("[foo.bar = baz] quux"), &["foo.bar = baz", "quux"],);
-    }
-
-    #[test]
-    fn empty_brackets() {
-        assert_eq!(parse("[] quux"), &["", "quux"],);
-    }
-
-    #[test]
-    fn escaped_brackets() {
-        assert_eq!(
-            parse(r#"[foo " [[ \] "" bar] baz"#),
-            &[r#"foo " [[ \] "" bar"#, "baz"],
-        );
-    }
-
-    #[test]
-    fn unclosed_brackets() {
-        assert_eq!(parse("foo [bar"), &["foo", "[bar"],);
-    }
-
-    #[test]
-    fn truncated_field() {
-        assert_eq!(
-            parse("foo bar[baz]: quux"),
-            &["foo", "bar", "baz", ":", "quux"]
-        );
-        assert_eq!(parse("foo bar[baz quux"), &["foo", "bar", "[baz quux"]);
-    }
-
-    #[test]
-    fn dash_field() {
-        assert_eq!(parse("foo - bar"), &["foo", "-", "bar"]);
-    }
-
-    #[test]
-    fn from_fuzzing() {
-        assert_eq!(parse("").len(), 0);
-        assert_eq!(parse("f] bar"), &["f]", "bar"]);
-        assert_eq!(parse("f\" bar"), &["f", "\" bar"]);
-        assert_eq!(parse("f[f bar"), &["f", "[f bar"]);
-        assert_eq!(parse("f\"f bar"), &["f", "\"f bar"]);
-        assert_eq!(parse("[][x"), &["", "[x"]);
-        assert_eq!(parse("x[][x"), &["x", "", "[x"]);
-    }
 
     fn parse_log(
         text: &str,
