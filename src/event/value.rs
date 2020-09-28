@@ -5,8 +5,8 @@ use derive_is_enum_variant::is_enum_variant;
 use serde::{Serialize, Serializer};
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
-use toml::value::Value as TomlValue;
 use std::iter::FromIterator;
+use toml::value::Value as TomlValue;
 
 #[derive(PartialEq, Debug, Clone, is_enum_variant)]
 pub enum Value {
