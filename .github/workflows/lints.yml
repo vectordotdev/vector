@@ -7,13 +7,13 @@ on:
   pull_request: {}
 
 env:
-  VERBOSE: true
-  ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-  TEST_LOG: vector=debug
-  RUST_BACKTRACE: full
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"
+  ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+  RUST_BACKTRACE: full
+  TEST_LOG: vector=debug
+  VERBOSE: true
 
 jobs:
   cancel-previous:
@@ -59,22 +59,3 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check advisories
-
-  check-component-features:
-    name: Component Features - Linux
-    runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: make slim-builds
-      - run: echo "::add-path::/home/runner/.local/bin"
-      - run: make check-component-features
