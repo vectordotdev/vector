@@ -318,7 +318,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: Install Helm
-        run: scripts/ci-setup-helm.sh
+        run: scripts/environment/ci-setup-helm.sh
       - name: Release Helm Chart
         env:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
