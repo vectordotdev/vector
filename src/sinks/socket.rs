@@ -250,9 +250,9 @@ mod test {
         // Only accept two connections.
         let jh = tokio::spawn(async move {
             let tls = MaybeTlsSettings::from_config(&config, true).unwrap();
-            let mut listener = tls.bind(&addr).await.unwrap();
+            let listener = tls.bind(&addr).await.unwrap();
             listener
-                .incoming()
+                .accept_stream()
                 .take(2)
                 .for_each(|connection| {
                     let mut close_rx = close_rx.take();
