@@ -43,12 +43,13 @@ pub fn manager(
     interface_command: &str,
     namespace: &str,
     custom_resource: &str,
-    custom_helm_values: Option<&str>,
+    custom_helm_values: &str,
 ) -> Result<up_down::Manager<CommandBuilder>> {
     let custom_resource_file = ResourceFile::new(custom_resource)?;
-    let custom_helm_values_file = match custom_helm_values {
-        Some(data) => Some(HelmValuesFile::new(data)?),
-        None => None,
+    let custom_helm_values_file = if custom_helm_values.is_empty() {
+        None
+    } else {
+        Some(HelmValuesFile::new(custom_helm_values)?)
     };
     Ok(up_down::Manager::new(CommandBuilder {
         interface_command: interface_command.to_owned(),
