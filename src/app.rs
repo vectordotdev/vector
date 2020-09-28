@@ -14,8 +14,7 @@ use futures::{
 use futures01::sync::mpsc;
 
 #[cfg(feature = "api")]
-use crate::api;
-use crate::internal_events::ApiStarted;
+use crate::{api, internal_events::ApiStarted};
 
 #[cfg(windows)]
 use crate::service;
