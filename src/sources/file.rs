@@ -1367,6 +1367,64 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_split_reads() {
+        let (tx, rx) = Pipeline::new_test();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            start_at_beginning: true,
+            max_read_bytes: 1,
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        writeln!(&mut file, "hello i am a normal line").unwrap();
+
+        sleep_500_millis().await;
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        tokio::spawn(source.compat());
+
+        sleep_500_millis().await;
+
+        write!(&mut file, "i am not a full line").unwrap();
+
+        // Longer than the EOF timeout
+        sleep_500_millis().await;
+
+        writeln!(&mut file, " until now").unwrap();
+
+        sleep_500_millis().await;
+
+        drop(trigger_shutdown);
+
+        let received = wait_with_timeout(
+            rx.map(|event| {
+                event
+                    .as_log()
+                    .get(&log_schema().message_key())
+                    .unwrap()
+                    .clone()
+            })
+            .collect()
+            .compat(),
+        )
+        .await;
+
+        assert_eq!(
+            received,
+            vec![
+                "hello i am a normal line".into(),
+                "i am not a full line until now".into(),
+            ]
+        );
+    }
+
+    #[tokio::test]
     async fn test_gzipped_file() {
         let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
