@@ -21,13 +21,15 @@ pub fn signals() -> impl Stream<Item = SignalTo> {
     let mut sighup = signal(SignalKind::hangup()).expect("Signal handlers should not panic.");
 
     async_stream::stream! {
-        let signal = tokio::select! {
-            _ = sigint.recv() => SignalTo::Shutdown,
-            _ = sigterm.recv() => SignalTo::Shutdown,
-            _ = sigquit.recv() => SignalTo::Quit,
-            _ = sighup.recv() => SignalTo::Reload,
-        };
-        yield signal;
+        loop {
+            let signal = tokio::select! {
+                _ = sigint.recv() => SignalTo::Shutdown,
+                _ = sigterm.recv() => SignalTo::Shutdown,
+                _ = sigquit.recv() => SignalTo::Quit,
+                _ = sighup.recv() => SignalTo::Reload,
+            };
+            yield signal;
+        }
     }
 }
 
