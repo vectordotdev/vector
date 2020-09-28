@@ -181,12 +181,12 @@ build-aarch64-unknown-linux-gnu: target/aarch64-unknown-linux-gnu/release/vector
 	@echo "Output to ${<}"
 
 .PHONY: build-x86_64-unknown-linux-musl
-build-x86_64-unknown-linux-musl: ## Build static binary in release mode for the x86_64 architecture
-	$(RUN) build-x86_64-unknown-linux-musl
+build-x86_64-unknown-linux-musl: target/x86_64-unknown-linux-musl/release/vector ## Build a release binary for the aarch64-unknown-linux-gnu triple.
+	@echo "Output to ${<}"
 
 .PHONY: build-aarch64-unknown-linux-musl
-build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in release mode for the aarch64 architecture
-	$(RUN) build-aarch64-unknown-linux-musl
+build-aarch64-unknown-linux-musl: target/aarch64-unknown-linux-musl/release/vector ## Build a release binary for the aarch64-unknown-linux-gnu triple.
+	@echo "Output to ${<}"
 
 ##@ Cross Compiling
 .PHONY: cross-enable
