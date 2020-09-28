@@ -69,7 +69,7 @@ impl Application {
             },
         };
 
-        let color = match root_opts.color.clone() {
+        let color = match root_opts.color {
             #[cfg(unix)]
             Color::Auto => atty::is(atty::Stream::Stdout),
             #[cfg(windows)]
@@ -153,7 +153,7 @@ impl Application {
                     .ok_or(exitcode::CONFIG)?;
 
                 #[cfg(feature = "api")]
-                let api = config.api.clone();
+                let api = config.api;
 
                 let result = topology::start_validated(config, diff, pieces, require_healthy).await;
                 let (topology, graceful_crash) = result.ok_or(exitcode::CONFIG)?;

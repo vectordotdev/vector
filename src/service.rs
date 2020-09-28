@@ -6,7 +6,7 @@ use structopt::StructOpt;
 use crate::cli::handle_config_errors;
 use crate::config;
 
-const DEFAULT_SERVICE_NAME: &'static str = built_info::PKG_NAME;
+const DEFAULT_SERVICE_NAME: &str = built_info::PKG_NAME;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -118,7 +118,7 @@ enum ControlAction {
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let sub_command = &opts.sub_command;
-    let code = match sub_command {
+    match sub_command {
         Some(s) => match s {
             SubCommand::Install(opts) => {
                 control_service(&opts.service_info(), ControlAction::Install)
@@ -136,9 +136,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
             error!("You must specify a sub command. Valid sub commands are [start, stop, restart, install, uninstall]");
             exitcode::USAGE
         }
-    };
-
-    code
+    }
 }
 
 #[cfg(windows)]
@@ -173,7 +171,7 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
         _ => unreachable!(),
     };
 
-    let exit_code = match res {
+    match res {
         Ok(()) => exitcode::OK,
         Err(err) => {
             if let windows_service::Error::Winapi(win_err) = err {
@@ -183,9 +181,7 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
             }
             exitcode::SOFTWARE
         }
-    };
-
-    exit_code
+    }
 }
 
 #[cfg(unix)]
@@ -194,7 +190,7 @@ fn control_service(_service: &ServiceInfo, _action: ControlAction) -> exitcode::
     exitcode::UNAVAILABLE
 }
 
-fn create_service_arguments(config_paths: &Vec<PathBuf>) -> Option<Vec<OsString>> {
+fn create_service_arguments(config_paths: &[PathBuf]) -> Option<Vec<OsString>> {
     let config_paths = config::process_paths(&config_paths)?;
     match config::load_from_paths(&config_paths) {
         Ok(_) => Some(
