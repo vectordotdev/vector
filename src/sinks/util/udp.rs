@@ -2,6 +2,7 @@ use super::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, St
 use crate::{
     config::SinkContext,
     dns::{Resolver, ResolverFuture},
+    internal_events::UdpSendIncomplete,
     sinks::{Healthcheck, VectorSink},
 };
 use bytes::Bytes;
@@ -173,12 +174,10 @@ impl Sink for UdpSink {
                     }
                     Ok(sent) => {
                         if sent != line.len() {
-                            warn!(
-                                "Could not send all data in one UDP packet, data length: {}, sent: {}; dropping {} bytes.",
-                                line.len(),
-                                sent,
-                                line.len() - sent,
-                            );
+                            emit!(UdpSendIncomplete {
+                                data_size: line.len(),
+                                sent: sent,
+                            });
                         }
                         Ok(AsyncSink::Ready)
                     }
