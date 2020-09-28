@@ -78,6 +78,7 @@
 /src/sinks/tcp.rs @lukesteensen
 /src/sinks/util/auto_concurrency @bruceg
 
+/src/sources/apache_metrics/ @jszwedko
 /src/sources/docker.rs @fanatid
 /src/sources/generator.rs @bruceg
 /src/sources/journald.rs @bruceg
