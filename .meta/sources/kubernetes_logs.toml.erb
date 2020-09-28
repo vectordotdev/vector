@@ -102,10 +102,26 @@ description = """\
 Event field for Pod labels.\
 """
 
+[sources.kubernetes_logs.options.annotation_fields.children.pod_node_name]
+type = "string"
+default = "kubernetes.pod_node_name"
+sort = 5
+description = """\
+Event field for Pod node_name.\
+"""
+
 [sources.kubernetes_logs.options.annotation_fields.children.container_name]
 type = "string"
 default = "kubernetes.container_name"
-sort = 5
+sort = 6
 description = """\
-Event field for container name.\
+Event field for Container name.\
+"""
+
+[sources.kubernetes_logs.options.annotation_fields.children.container_image]
+type = "string"
+default = "kubernetes.container_image"
+sort = 7
+description = """\
+Event field for Container image.\
 """

@@ -8,7 +8,10 @@ use crate::{
     kubernetes as k8s, Event,
 };
 use evmap::ReadHandle;
-use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+use k8s_openapi::{
+    api::core::v1::{Container, Pod, PodSpec},
+    apimachinery::pkg::apis::meta::v1::ObjectMeta,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -18,7 +21,9 @@ pub struct FieldsSpec {
     pub pod_namespace: String,
     pub pod_uid: String,
     pub pod_labels: String,
+    pub pod_node_name: String,
     pub container_name: String,
+    pub container_image: String,
 }
 
 impl Default for FieldsSpec {
@@ -28,7 +33,9 @@ impl Default for FieldsSpec {
             pod_namespace: "kubernetes.pod_namespace".to_owned(),
             pod_uid: "kubernetes.pod_uid".to_owned(),
             pod_labels: "kubernetes.pod_labels".to_owned(),
+            pod_node_name: "kubernetes.pod_node_name".to_owned(),
             container_name: "kubernetes.container_name".to_owned(),
+            container_image: "kubernetes.container_image".to_owned(),
         }
     }
 }
@@ -62,8 +69,20 @@ impl PodMetadataAnnotator {
         let guard = self.pods_state_reader.get(file_info.pod_uid)?;
         let entry = guard.get_one()?;
         let pod: &Pod = entry.as_ref();
+
         annotate_from_file_info(log, &self.fields_spec, &file_info);
         annotate_from_metadata(log, &self.fields_spec, &pod.metadata);
+        if let Some(ref pod_spec) = pod.spec {
+            annotate_from_pod_spec(log, &self.fields_spec, pod_spec);
+
+            let container = pod_spec
+                .containers
+                .iter()
+                .find(|c| c.name == file_info.container_name);
+            if let Some(container) = container {
+                annotate_from_container(log, &self.fields_spec, container);
+            }
+        }
         Some(())
     }
 }
@@ -99,6 +118,22 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
             let mut path = prefix_path.clone();
             path.push(PathComponent::Key(key.clone()));
             log.insert_path(path, val.to_owned());
+        }
+    }
+}
+
+fn annotate_from_pod_spec(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_spec: &PodSpec) {
+    for (ref key, ref val) in [(&fields_spec.pod_node_name, &pod_spec.node_name)].iter() {
+        if let Some(val) = val {
+            log.insert(key, val.to_owned());
+        }
+    }
+}
+
+fn annotate_from_container(log: &mut LogEvent, fields_spec: &FieldsSpec, container: &Container) {
+    for (ref key, ref val) in [(&fields_spec.container_image, &container.image)].iter() {
+        if let Some(val) = val {
+            log.insert(key, val.to_owned());
         }
     }
 }
@@ -144,10 +179,10 @@ mod tests {
             (
                 FieldsSpec {
                     pod_name: "name".to_owned(),
-                    container_name: "name".to_string(),
                     pod_namespace: "ns".to_owned(),
                     pod_uid: "uid".to_owned(),
                     pod_labels: "labels".to_owned(),
+                    ..Default::default()
                 },
                 ObjectMeta {
                     name: Some("sandbox0-name".to_owned()),
@@ -223,12 +258,111 @@ mod tests {
                 log.insert("kubernetes.container_name", "sandbox0-container0-name");
                 log
             },
+        ),(
+            FieldsSpec{
+                container_name: "container_name".to_owned(),
+                ..Default::default()
+            },
+            "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/sandbox0-container0-name/1.log",
+            {
+                let mut log = LogEvent::default();
+                log.insert("container_name", "sandbox0-container0-name");
+                log
+            },
         )];
 
         for (fields_spec, file, expected) in cases.into_iter() {
             let mut log = LogEvent::default();
             let file_info = parse_log_file_path(file).unwrap();
             annotate_from_file_info(&mut log, &fields_spec, &file_info);
+            assert_eq!(log, expected);
+        }
+    }
+
+    #[test]
+    fn test_annotate_from_pod_spec() {
+        let cases = vec![
+            (
+                FieldsSpec::default(),
+                PodSpec::default(),
+                LogEvent::default(),
+            ),
+            (
+                FieldsSpec::default(),
+                PodSpec {
+                    node_name: Some("sandbox0-node-name".to_owned()),
+                    ..Default::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    log.insert("kubernetes.pod_node_name", "sandbox0-node-name");
+                    log
+                },
+            ),
+            (
+                FieldsSpec {
+                    pod_node_name: "node_name".to_owned(),
+                    ..Default::default()
+                },
+                PodSpec {
+                    node_name: Some("sandbox0-node-name".to_owned()),
+                    ..Default::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    log.insert("node_name", "sandbox0-node-name");
+                    log
+                },
+            ),
+        ];
+
+        for (fields_spec, pod_spec, expected) in cases.into_iter() {
+            let mut log = LogEvent::default();
+            annotate_from_pod_spec(&mut log, &fields_spec, &pod_spec);
+            assert_eq!(log, expected);
+        }
+    }
+
+    #[test]
+    fn test_annotate_from_container() {
+        let cases = vec![
+            (
+                FieldsSpec::default(),
+                Container::default(),
+                LogEvent::default(),
+            ),
+            (
+                FieldsSpec::default(),
+                Container {
+                    image: Some("sandbox0-container-image".to_owned()),
+                    ..Default::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    log.insert("kubernetes.container_image", "sandbox0-container-image");
+                    log
+                },
+            ),
+            (
+                FieldsSpec {
+                    container_image: "container_image".to_owned(),
+                    ..Default::default()
+                },
+                Container {
+                    image: Some("sandbox0-container-image".to_owned()),
+                    ..Default::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    log.insert("container_image", "sandbox0-container-image");
+                    log
+                },
+            ),
+        ];
+
+        for (fields_spec, container, expected) in cases.into_iter() {
+            let mut log = LogEvent::default();
+            annotate_from_container(&mut log, &fields_spec, &container);
             assert_eq!(log, expected);
         }
     }

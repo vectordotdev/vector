@@ -488,12 +488,19 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
 
         // Assert pod the event is properly annotated with pod metadata.
         assert_eq!(val["kubernetes"]["pod_name"], "test-pod");
-        assert_eq!(val["kubernetes"]["container_name"], "test-pod");
         // We've already asserted this above, but repeat for completeness.
         assert_eq!(val["kubernetes"]["pod_namespace"], "test-vector-test-pod");
         assert_eq!(val["kubernetes"]["pod_uid"].as_str().unwrap().len(), 36); // 36 is a standard UUID string length
         assert_eq!(val["kubernetes"]["pod_labels"]["label1"], "hello");
         assert_eq!(val["kubernetes"]["pod_labels"]["label2"], "world");
+        // We don't have the node name to compare this to, so just assert it's
+        // a non-empty string.
+        assert!(!val["kubernetes"]["pod_node_name"]
+            .as_str()
+            .unwrap()
+            .is_empty());
+        assert_eq!(val["kubernetes"]["container_name"], "test-pod");
+        assert_eq!(val["kubernetes"]["container_image"], BUSYBOX_IMAGE);
 
         // Request to stop the flow.
         FlowControlCommand::Terminate
