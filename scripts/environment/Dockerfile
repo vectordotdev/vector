@@ -23,6 +23,10 @@ ADD rust-toolchain \
     /git/timberio/vector/
 RUN ./scripts/environment/prepare.sh
 
+# Setup Kubernetes
+ADD scripts/ci-setup-helm.sh /git/timberio/vector/scripts/
+RUN ./scripts/ci-setup-helm.sh
+
 # Declare volumes
 VOLUME /vector
 VOLUME /vector/target
