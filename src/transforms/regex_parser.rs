@@ -40,7 +40,7 @@ inventory::submit! {
 
 impl GenerateConfig for RegexParserConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -308,6 +308,11 @@ mod tests {
         config::{TransformConfig, TransformContext},
         Event,
     };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<RegexParserConfig>();
+    }
 
     fn do_transform(event: &str, patterns: &str, config: &str) -> Option<LogEvent> {
         let event = Event::from(event);

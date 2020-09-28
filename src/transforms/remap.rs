@@ -21,7 +21,7 @@ inventory::submit! {
 
 impl GenerateConfig for RemapConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -82,6 +82,11 @@ impl Transform for Remap {
 mod tests {
     use super::*;
     use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<RemapConfig>();
+    }
 
     fn get_field_string(event: &Event, field: &str) -> String {
         event

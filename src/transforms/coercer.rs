@@ -24,7 +24,7 @@ inventory::submit! {
 
 impl GenerateConfig for CoercerConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -103,6 +103,11 @@ mod tests {
         Event,
     };
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<CoercerConfig>();
+    }
 
     fn parse_it(extra: &str) -> LogEvent {
         let mut event = Event::from("dummy message");

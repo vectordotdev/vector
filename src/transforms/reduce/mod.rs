@@ -50,7 +50,7 @@ inventory::submit! {
 
 impl GenerateConfig for ReduceConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -301,6 +301,11 @@ mod test {
         Event,
     };
     use serde_json::json;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ReduceConfig>();
+    }
 
     #[test]
     fn reduce_from_condition() {

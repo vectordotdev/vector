@@ -23,7 +23,7 @@ inventory::submit! {
 
 impl GenerateConfig for LogfmtConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -120,6 +120,11 @@ mod tests {
         event::{LogEvent, Value},
         Event,
     };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<LogfmtConfig>();
+    }
 
     fn parse_log(text: &str, drop_field: bool, types: &[(&str, &str)]) -> LogEvent {
         let event = Event::from(text);

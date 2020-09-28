@@ -36,7 +36,7 @@ inventory::submit! {
 
 impl GenerateConfig for MergeConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -149,6 +149,11 @@ mod test {
     use crate::event::{self, Event};
     use crate::transforms::Transform;
     use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<MergeConfig>();
+    }
 
     fn make_partial(mut event: Event) -> Event {
         event.as_mut_log().insert(event::PARTIAL.clone(), true);

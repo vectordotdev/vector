@@ -41,7 +41,7 @@ inventory::submit! {
 
 impl GenerateConfig for GrokParserConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -142,6 +142,11 @@ mod tests {
     };
     use pretty_assertions::assert_eq;
     use serde_json::json;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<GrokParserConfig>();
+    }
 
     fn parse_log(
         event: &str,

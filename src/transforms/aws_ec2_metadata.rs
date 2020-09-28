@@ -113,7 +113,7 @@ inventory::submit! {
 
 impl GenerateConfig for Ec2Metadata {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -509,6 +509,11 @@ mod integration_tests {
 
     lazy_static::lazy_static! {
         static ref HOST: String = "http://localhost:8111".to_string();
+    }
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<Ec2Metadata>();
     }
 
     #[tokio::test]
