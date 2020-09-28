@@ -146,7 +146,7 @@ impl Service<Vec<Metric>> for InfluxDBSvc {
             self.protocol_version,
             items,
             self.config.namespace.as_deref(),
-            self.config.tags.clone(),
+            self.config.tags.as_ref(),
         );
         let body: Vec<u8> = input.into_bytes();
 
@@ -173,16 +173,18 @@ fn create_build_request(
 
 fn merge_tags(
     event: &Metric,
-    tags: Option<HashMap<String, String>>,
+    tags: Option<&HashMap<String, String>>,
 ) -> Option<BTreeMap<String, String>> {
-    match (event.tags.clone(), tags.clone()) {
-        (Some(mut event_tags), Some(config_tags)) => {
+    match (&event.tags, tags) {
+        (Some(ref event_tags), Some(ref config_tags)) => {
+            let mut event_tags = event_tags.clone();
             event_tags.extend(config_tags.into_iter().map(|(k, v)| (k.clone(), v.clone())));
             Some(event_tags)
         }
-        (Some(event_tags), None) => Some(event_tags),
-        (None, Some(config_tags)) => Some(
+        (Some(ref event_tags), None) => Some(event_tags.clone()),
+        (None, Some(ref config_tags)) => Some(
             config_tags
+                .clone()
                 .into_iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
@@ -195,7 +197,7 @@ fn encode_events(
     protocol_version: ProtocolVersion,
     events: Vec<Metric>,
     namespace: Option<&str>,
-    tags: Option<HashMap<String, String>>,
+    tags: Option<&HashMap<String, String>>,
 ) -> String {
     let mut output = String::new();
     for event in events.into_iter() {
@@ -844,7 +846,12 @@ mod tests {
         tags.insert("host".to_owned(), "local".to_owned());
         tags.insert("datacenter".to_owned(), "us-east".to_owned());
 
-        let line_protocols = encode_events(ProtocolVersion::V1, events, Some("vector"), Some(tags));
+        let line_protocols = encode_events(
+            ProtocolVersion::V1,
+            events,
+            Some("vector"),
+            Some(tags).as_ref(),
+        );
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 2);
         assert_eq!(
@@ -914,7 +921,7 @@ mod integration_tests {
             }),
             batch: Default::default(),
             request: Default::default(),
-            tags: None
+            tags: None,
         };
 
         let metric = format!("counter-{}", Utc::now().timestamp_nanos());
