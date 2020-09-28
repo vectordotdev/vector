@@ -58,6 +58,12 @@ up() {
 
   HELM_VALUES=()
 
+  HELM_VALUES+=(
+    # Set a reasonable log level to avoid issues with internal logs
+    # overwriting console output.
+    --set "env[0].name=LOG,env[0].value=info"
+  )
+
   if [[ -n "$CUSTOM_HELM_VALUES_FILE" ]]; then
     HELM_VALUES+=(
       --values "$CUSTOM_HELM_VALUES_FILE"
