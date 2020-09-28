@@ -6,7 +6,7 @@ use structopt::StructOpt;
 use crate::cli::handle_config_errors;
 use crate::config;
 
-const DEFAULT_SERVICE_NAME: &str = built_info::PKG_NAME;
+const DEFAULT_SERVICE_NAME: &str = crate::built_info::PKG_NAME;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -36,7 +36,7 @@ impl InstallOpts {
     fn service_info(&self) -> ServiceInfo {
         let service_name = self.name.as_deref().unwrap_or(DEFAULT_SERVICE_NAME);
         let display_name = self.display_name.as_deref().unwrap_or("Vector Service");
-        let description = built_info::PKG_DESCRIPTION;
+        let description = crate::built_info::PKG_DESCRIPTION;
 
         let current_exe = ::std::env::current_exe().unwrap();
         let arguments = create_service_arguments(&self.config_paths).unwrap();
@@ -100,7 +100,7 @@ impl Default for ServiceInfo {
         ServiceInfo {
             name: OsString::from(DEFAULT_SERVICE_NAME),
             display_name: OsString::from("Vector Service"),
-            description: OsString::from(built_info::PKG_DESCRIPTION),
+            description: OsString::from(crate::built_info::PKG_DESCRIPTION),
             executable_path: current_exe,
             launch_arguments: vec![],
         }
@@ -204,9 +204,4 @@ fn create_service_arguments(config_paths: &[PathBuf]) -> Option<Vec<OsString>> {
             None
         }
     }
-}
-
-#[allow(unused)]
-mod built_info {
-    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
