@@ -12,7 +12,17 @@ use k8s_test_framework::{
 };
 use std::collections::HashSet;
 
-const VECTOR_CONFIG: &str = r#"
+const HELM_VALUES_STDOUT_SINK: &str = r#"
+sinks:
+  stdout:
+    type: "console"
+    inputs: ["kubernetes_logs"]
+    rawConfig: |
+      target = "stdout"
+      encoding = "json"
+"#;
+
+const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = r#"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -160,7 +170,9 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    let vector = framework
+        .vector("test-vector", HELM_VALUES_STDOUT_SINK, "")
+        .await?;
     framework
         .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
         .await?;
@@ -228,7 +240,9 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    let vector = framework
+        .vector("test-vector", HELM_VALUES_STDOUT_SINK, "")
+        .await?;
     framework
         .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
         .await?;
@@ -319,7 +333,9 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     // Wait for some extra time to ensure pod completes.
     tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    let vector = framework
+        .vector("test-vector", HELM_VALUES_STDOUT_SINK, "")
+        .await?;
     framework
         .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
         .await?;
@@ -368,7 +384,9 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    let vector = framework
+        .vector("test-vector", HELM_VALUES_STDOUT_SINK, "")
+        .await?;
     framework
         .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
         .await?;
@@ -438,7 +456,9 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    let vector = framework
+        .vector("test-vector", HELM_VALUES_STDOUT_SINK, "")
+        .await?;
     framework
         .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
         .await?;
@@ -515,7 +535,9 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    let vector = framework
+        .vector("test-vector", HELM_VALUES_STDOUT_SINK, "")
+        .await?;
     framework
         .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
         .await?;
@@ -655,7 +677,9 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    let vector = framework
+        .vector("test-vector", HELM_VALUES_STDOUT_SINK, "")
+        .await?;
     framework
         .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
         .await?;
