@@ -10,9 +10,3 @@ env:
   # a real deployment.
   - name: LOG
     value: info
-
-tolerations:
-  # This toleration is to have the daemonset runnable on master nodes.
-  # Remove it if your masters can't run pods.
-  - key: node-role.kubernetes.io/master
-    effect: NoSchedule
