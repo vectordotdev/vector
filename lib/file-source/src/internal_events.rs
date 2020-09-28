@@ -1,7 +1,7 @@
 use std::io::Error;
 use std::path::Path;
 
-/// Every internal event in this crate has a coresponding
+/// Every internal event in this crate has a corresponding
 /// method in this trait which should emit the event.
 pub trait FileSourceInternalEvents: Send + 'static {
     fn emit_file_added(&self, path: &Path);

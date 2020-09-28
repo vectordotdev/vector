@@ -1,8 +1,8 @@
-use crate::sinks::RouterSink;
 use crate::Event;
 use futures::compat::Future01CompatExt;
-use futures01::sync::mpsc;
-use futures01::{future, Async, AsyncSink, Poll, Sink, StartSend, Stream};
+use futures01::{future, sync::mpsc, Async, AsyncSink, Poll, Sink, StartSend, Stream};
+
+type RouterSink = Box<dyn Sink<SinkItem = Event, SinkError = ()> + 'static + Send>;
 
 pub struct Fanout {
     sinks: Vec<(String, RouterSink)>,

@@ -89,7 +89,7 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
   else
     # Package a .deb file to build a docker container, unless skipped.
     if [[ -z "${SKIP_PACKAGE_DEB:-}" ]]; then
-      make package-deb-x86_64 USE_CONTAINER="${PACKAGE_DEB_USE_CONTAINER:-"docker"}"
+      make package-deb-x86_64
     fi
 
     # Prepare test image parameters.
@@ -134,6 +134,7 @@ fi
 # Run the tests.
 cargo test \
   --test kubernetes-e2e \
+  --no-fail-fast \
   --no-default-features \
   --features kubernetes-e2e-tests \
   -- \

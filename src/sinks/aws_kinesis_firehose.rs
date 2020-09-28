@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
-    event::{self, Event},
+    event::Event,
     region::RegionOrEndpoint,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -12,7 +12,7 @@ use crate::{
     },
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, FutureExt, TryFutureExt};
+use futures::{future::BoxFuture, FutureExt};
 use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::RusotoError;
@@ -72,11 +72,14 @@ inventory::submit! {
 
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(cx.resolver())?;
-        let healthcheck = self.clone().healthcheck(client.clone()).boxed().compat();
+        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = KinesisFirehoseService::new(self.clone(), client, cx)?;
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -231,7 +234,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
         Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
 
         Encoding::Text => log
-            .get(&event::log_schema().message_key())
+            .get(&crate::config::log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };
@@ -244,7 +247,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{self, Event};
+    use crate::event::Event;
     use std::collections::BTreeMap;
 
     #[test]
@@ -264,7 +267,10 @@ mod tests {
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
-        assert_eq!(map[&event::log_schema().message_key().to_string()], message);
+        assert_eq!(
+            map[&crate::config::log_schema().message_key().to_string()],
+            message
+        );
         assert_eq!(map["key"], "value".to_string());
     }
 }
@@ -282,7 +288,7 @@ mod integration_tests {
         },
         test_util::{random_events_with_stream, random_string},
     };
-    use futures::{compat::Sink01CompatExt, SinkExt};
+    use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
     use rusoto_core::Region;
     use rusoto_firehose::{
         CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration, KinesisFirehose,
@@ -324,7 +330,8 @@ mod integration_tests {
         let client = config.create_client(cx.resolver()).unwrap();
         let sink = KinesisFirehoseService::new(config, client, cx).unwrap();
 
-        let (input, mut events) = random_events_with_stream(100, 100);
+        let (input, events) = random_events_with_stream(100, 100);
+        let mut events = events.map(Ok);
 
         let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 

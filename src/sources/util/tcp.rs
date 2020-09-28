@@ -78,7 +78,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
         let listenfd = ListenFd::from_env();
 
         let fut = async move {
-            let mut listener = match make_listener(addr, listenfd, &tls).await {
+            let listener = match make_listener(addr, listenfd, &tls).await {
                 None => return Err(()),
                 Some(listener) => listener,
             };
@@ -101,7 +101,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
             .shared();
 
             listener
-                .incoming()
+                .accept_stream()
                 .take_until(shutdown.clone().compat())
                 .for_each(|connection| {
                     let shutdown = shutdown.clone();
@@ -179,7 +179,7 @@ async fn handle_stream(
         if let Some(fut) = shutdown.as_mut() {
             match fut.poll_unpin(cx) {
                 Poll::Ready(Ok(token)) => {
-                    debug!("Start gracefull shutdown");
+                    debug!("Start graceful shutdown");
                     // Close our write part of TCP socket to signal the other side
                     // that it should stop writing and close the channel.
                     let socket: Option<&TcpStream> = reader.get_ref().get_ref();

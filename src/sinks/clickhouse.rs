@@ -10,7 +10,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::Sink;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
@@ -61,7 +61,7 @@ pub enum Encoding {
 
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let batch = BatchSettings::default()
             .bytes(bytesize::mib(10u64))
             .timeout(1)
@@ -80,9 +80,12 @@ impl SinkConfig for ClickhouseConfig {
         )
         .sink_map_err(|e| error!("Fatal clickhouse sink error: {}", e));
 
-        let healthcheck = healthcheck(client, self.clone()).boxed().compat();
+        let healthcheck = healthcheck(client, self.clone()).boxed();
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -234,14 +237,12 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::{SinkConfig, SinkContext},
-        event,
+        config::{log_schema, SinkConfig, SinkContext},
         event::Event,
         sinks::util::encoding::TimestampFormat,
         test_util::{random_string, trace_init},
     };
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
+    use futures::{future, stream};
     use serde_json::Value;
     use tokio::time::{timeout, Duration};
 
@@ -277,7 +278,9 @@ mod integration_tests {
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.send(input_event.clone()).compat().await.unwrap();
+        sink.run(stream::once(future::ready(input_event.clone())))
+            .await
+            .unwrap();
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
@@ -324,18 +327,20 @@ mod integration_tests {
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.send(input_event.clone()).compat().await.unwrap();
+        sink.run(stream::once(future::ready(input_event.clone())))
+            .await
+            .unwrap();
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            event::log_schema().timestamp_key().clone(),
+            log_schema().timestamp_key().clone(),
             format!(
                 "{}",
                 exp_event
-                    .get(&event::log_schema().timestamp_key())
+                    .get(&log_schema().timestamp_key())
                     .unwrap()
                     .as_timestamp()
                     .unwrap()
@@ -382,18 +387,20 @@ timestamp_format = "unix""#,
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.send(input_event.clone()).compat().await.unwrap();
+        sink.run(stream::once(future::ready(input_event.clone())))
+            .await
+            .unwrap();
 
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            event::log_schema().timestamp_key().clone(),
+            log_schema().timestamp_key().clone(),
             format!(
                 "{}",
                 exp_event
-                    .get(&event::log_schema().timestamp_key())
+                    .get(&log_schema().timestamp_key())
                     .unwrap()
                     .as_timestamp()
                     .unwrap()
@@ -424,7 +431,7 @@ timestamp_format = "unix""#,
         };
 
         let client = ClickhouseClient::new(host);
-        // the event contains a message field, but its being omited to
+        // the event contains a message field, but its being omitted to
         // fail the request.
         client
             .create_table(&table, "host String, timestamp String")
@@ -439,7 +446,7 @@ timestamp_format = "unix""#,
         // this timeout should trigger.
         timeout(
             Duration::from_secs(5),
-            sink.send(input_event.clone()).compat(),
+            sink.run(stream::once(future::ready(input_event))),
         )
         .await
         .unwrap()

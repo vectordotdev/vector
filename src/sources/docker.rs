@@ -1,6 +1,6 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
     internal_events::{
@@ -31,12 +31,13 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Duration;
 use std::{collections::HashMap, convert::TryFrom, env};
 use string_cache::DefaultAtom as Atom;
 use tokio::sync::mpsc;
 use tracing::field;
 
-/// The begining of image names of vector docker images packaged by vector.
+/// The beginning of image names of vector docker images packaged by vector.
 const VECTOR_IMAGE_NAME: &str = "timberio/vector";
 
 lazy_static! {
@@ -58,6 +59,7 @@ pub struct DockerConfig {
     partial_event_marker_field: Option<Atom>,
     auto_partial_merge: bool,
     multiline: Option<MultilineConfig>,
+    retry_backoff_secs: u64,
 }
 
 impl Default for DockerConfig {
@@ -69,6 +71,7 @@ impl Default for DockerConfig {
             partial_event_marker_field: Some(event::PARTIAL.clone()),
             auto_partial_merge: true,
             multiline: None,
+            retry_backoff_secs: 2,
         }
     }
 }
@@ -198,7 +201,7 @@ impl DockerSourceCore {
     ) -> impl Stream<Item = Result<SystemEventsResponse, DockerError>> + Send {
         let mut filters = HashMap::new();
 
-        // event  | emmited on commands
+        // event  | emitted on commands
         // -------+-------------------
         // start  | docker start, docker run, restart policy, docker restart
         // unpause | docker unpause
@@ -234,7 +237,7 @@ impl DockerSourceCore {
 
 /// Main future which listens for events coming from docker, and maintains
 /// a fan of event_stream futures.
-/// Where each event_stream corresponds to a runing container marked with ContainerLogInfo.
+/// Where each event_stream corresponds to a running container marked with ContainerLogInfo.
 /// While running, event_stream streams Events to out channel.
 /// Once a log stream has ended, it sends ContainerLogInfo back to main.
 ///
@@ -249,12 +252,13 @@ struct DockerSource {
     events: Pin<Box<dyn Stream<Item = Result<SystemEventsResponse, DockerError>> + Send>>,
     ///  mappings of seen container_id to their data
     containers: HashMap<ContainerId, ContainerState>,
-    ///receives ContainerLogInfo comming from event stream futures
+    ///receives ContainerLogInfo coming from event stream futures
     main_recv: mpsc::UnboundedReceiver<Result<ContainerLogInfo, ContainerId>>,
     /// It may contain shortened container id.
     hostname: Option<String>,
     /// True if self needs to be excluded
     exclude_self: bool,
+    backoff_duration: Duration,
 }
 
 impl DockerSource {
@@ -265,7 +269,7 @@ impl DockerSource {
     ) -> crate::Result<DockerSource> {
         // Find out it's own container id, if it's inside a docker container.
         // Since docker doesn't readily provide such information,
-        // various approches need to be made. As such the solution is not
+        // various approaches need to be made. As such the solution is not
         // exact, but probable.
         // This is to be used only if source is in state of catching everything.
         // Or in other words, if includes are used then this is not necessary.
@@ -276,10 +280,12 @@ impl DockerSource {
             .is_empty()
             && config.include_labels.clone().unwrap_or_default().is_empty();
 
+        let backoff_secs = config.retry_backoff_secs;
+
         // Only logs created at, or after this moment are logged.
         let core = DockerSourceCore::new(config)?;
 
-        // main event stream, with whom only newly started/restarted containers will be loged.
+        // main event stream, with whom only newly started/restarted containers will be logged.
         let events = core.docker_event_stream();
         info!(message = "Listening to docker events.");
 
@@ -309,6 +315,7 @@ impl DockerSource {
             main_recv,
             hostname: env::var("HOSTNAME").ok(),
             exclude_self,
+            backoff_duration: Duration::from_secs(backoff_secs),
         })
     }
 
@@ -367,7 +374,7 @@ impl DockerSource {
                 }
 
                 let id = ContainerId::new(id);
-                self.containers.insert(id.clone(), self.esb.start(id));
+                self.containers.insert(id.clone(), self.esb.start(id, None));
             });
 
         Ok(self)
@@ -379,8 +386,8 @@ impl DockerSource {
                 value = self.main_recv.next() => {
                     match value {
                         Some(message) => {
-                            match message{
-                                Ok(info)=> {
+                            match message {
+                                Ok(info) => {
                                     let state = self
                                         .containers
                                         .get_mut(&info.id)
@@ -389,13 +396,14 @@ impl DockerSource {
                                         self.esb.restart(state);
                                     }
                                 },
-                                Err(id)=> {
+                                Err(id) => {
                                     let state = self
                                         .containers
                                         .remove(&id)
                                         .expect("Every started ContainerId has it's ContainerState");
-                                    if state.is_running(){
-                                        self.containers.insert(id.clone(), self.esb.start(id));
+                                    if state.is_running() {
+                                        let backoff = Some(self.backoff_duration);
+                                        self.containers.insert(id.clone(), self.esb.start(id, backoff));
                                     }
                                 }
                             }
@@ -443,7 +451,7 @@ impl DockerSource {
                                         );
 
                                         if include_name && self_check {
-                                            self.containers.insert(id.clone(), self.esb.start(id));
+                                            self.containers.insert(id.clone(), self.esb.start(id, None));
                                         }
                                     }
                                 }
@@ -452,7 +460,7 @@ impl DockerSource {
                         }
                         Some(Err(error)) => emit!(DockerCommunicationError{error,container_id:None}),
                         None => {
-                            // TODO: this could be fixed, but should be tryed with some timeoff and exponential backoff
+                            // TODO: this could be fixed, but should be tried with some timeoff and exponential backoff
                             error!(message = "docker event stream has ended unexpectedly.");
                             info!(message = "shutting down docker source.");
                             return;
@@ -499,10 +507,13 @@ struct EventStreamBuilder {
 }
 
 impl EventStreamBuilder {
-    /// Constructs and runs event stream until shutdown.
-    fn start(&self, id: ContainerId) -> ContainerState {
+    /// Spawn a task to runs event stream until shutdown.
+    fn start(&self, id: ContainerId, backoff: Option<Duration>) -> ContainerState {
         let this = self.clone();
         tokio::spawn(async move {
+            if let Some(duration) = backoff {
+                tokio::time::delay_for(duration).await;
+            }
             match this
                 .core
                 .docker
@@ -512,7 +523,7 @@ impl EventStreamBuilder {
                 Ok(details) => match ContainerMetadata::from_details(details) {
                     Ok(metadata) => {
                         let info = ContainerLogInfo::new(id, metadata, this.core.now_timestamp);
-                        this.start_event_stream(info).await;
+                        this.run_event_stream(info).await;
                         return;
                     }
                     Err(error) => emit!(DockerTimestampParseFailed {
@@ -538,11 +549,11 @@ impl EventStreamBuilder {
     fn restart(&self, container: &mut ContainerState) {
         if let Some(info) = container.take_info() {
             let this = self.clone();
-            tokio::spawn(async move { this.start_event_stream(info).await });
+            tokio::spawn(async move { this.run_event_stream(info).await });
         }
     }
 
-    async fn start_event_stream(&self, mut info: ContainerLogInfo) {
+    async fn run_event_stream(&self, mut info: ContainerLogInfo) {
         // Establish connection
         let options = Some(LogsOptions::<String> {
             follow: true,
@@ -605,10 +616,9 @@ impl EventStreamBuilder {
                 Box::new(events_stream)
             };
 
-        events_stream
+        let result = events_stream
             .map(Ok)
             .forward(self.out.clone().sink_compat().sink_map_err(|_| ()))
-            .map(|_| {})
             .await;
 
         // End of stream
@@ -616,7 +626,11 @@ impl EventStreamBuilder {
             container_id: info.id.as_str()
         });
 
-        if let Err(error) = self.main_send.send(Ok(info)) {
+        let result = match result {
+            Ok(()) => Ok(info),
+            Err(()) => Err(info.id),
+        };
+        if let Err(error) = self.main_send.send(result) {
             error!(message = "unable to return ContainerLogInfo to main.", %error);
         }
     }
@@ -675,7 +689,7 @@ impl ContainerState {
     fn return_info(&mut self, info: ContainerLogInfo) -> bool {
         debug_assert!(self.info.is_none());
         // Generation is the only one strictly necessary,
-        // but with v.running, restarting event_stream is automtically done.
+        // but with v.running, restarting event_stream is automatically done.
         let restart = self.running || info.generation < self.generation;
         self.info = Some(info);
         restart
@@ -725,7 +739,7 @@ impl ContainerLogInfo {
             - 1
     }
 
-    /// Expects timestamp at the begining of message.
+    /// Expects timestamp at the beggining of message.
     /// Expects messages to be ordered by timestamps.
     fn new_event(
         &mut self,
@@ -748,13 +762,13 @@ impl ContainerLogInfo {
             Ok(timestamp) => {
                 // Timestamp check
                 match self.last_log.as_ref() {
-                    // Recieved log has not already been processed
+                    // Received log has not already been processed
                     Some(&(ref last, gen))
                         if *last < timestamp || (*last == timestamp && gen == self.generation) =>
                     {
                         // noop
                     }
-                    // Recieved log is not from before of creation
+                    // Received log is not from before of creation
                     None if self.created <= timestamp.with_timezone(&Utc) => (),
                     _ => {
                         trace!(
@@ -775,7 +789,7 @@ impl ContainerLogInfo {
                 Some(timestamp.with_timezone(&Utc))
             }
             Err(error) => {
-                // Recieved bad timestamp, if any at all.
+                // Received bad timestamp, if any at all.
                 emit!(DockerTimestampParseFailed {
                     error,
                     container_id: self.id.as_str()
@@ -806,17 +820,17 @@ impl ContainerLogInfo {
             let mut log_event = LogEvent::default();
 
             // Source type
-            log_event.insert(event::log_schema().source_type_key(), Bytes::from("docker"));
+            log_event.insert(log_schema().source_type_key(), Bytes::from("docker"));
 
             // The log message.
-            log_event.insert(event::log_schema().message_key().clone(), bytes_message);
+            log_event.insert(log_schema().message_key(), bytes_message);
 
             // Stream we got the message from.
             log_event.insert(STREAM.clone(), stream);
 
             // Timestamp of the event.
             if let Some(timestamp) = timestamp {
-                log_event.insert(event::log_schema().timestamp_key().clone(), timestamp);
+                log_event.insert(log_schema().timestamp_key(), timestamp);
             }
 
             // Container ID.
@@ -854,23 +868,21 @@ impl ContainerLogInfo {
                 // Otherwise, create a new partial event merge state with the
                 // current message being the initial one.
                 if let Some(partial_event_merge_state) = partial_event_merge_state {
-                    partial_event_merge_state.merge_in_next_event(
-                        log_event,
-                        &[event::log_schema().message_key().clone()],
-                    );
+                    partial_event_merge_state
+                        .merge_in_next_event(log_event, &[log_schema().message_key().clone()]);
                 } else {
                     *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
                 };
                 return None;
             };
 
-            // This is not a parial event. If we have a partial event merge
+            // This is not a partial event. If we have a partial event merge
             // state from before, the current event must be a final event, that
             // would give us a merged event we can return.
             // Otherwise it's just a regular event that we return as-is.
             match partial_event_merge_state.take() {
                 Some(partial_event_merge_state) => partial_event_merge_state
-                    .merge_in_final_event(log_event, &[event::log_schema().message_key().clone()]),
+                    .merge_in_final_event(log_event, &[log_schema().message_key().clone()]),
                 None => log_event,
             }
         } else {
@@ -886,7 +898,7 @@ impl ContainerLogInfo {
         };
 
         // Partial or not partial - we return the event we got here, because all
-        // other cases were handeled earlier.
+        // other cases were handled earlier.
         let event = Event::Log(log_event);
 
         emit!(DockerEventReceived {
@@ -960,7 +972,7 @@ fn line_agg_adapter(
         let mut log_event = event.into_log();
 
         let message_value = log_event
-            .remove(event::log_schema().message_key())
+            .remove(log_schema().message_key())
             .expect("message must exist in the event");
         let stream_value = log_event
             .get(&STREAM)
@@ -972,7 +984,7 @@ fn line_agg_adapter(
     });
     let line_agg_out = LineAgg::<_, Bytes, LogEvent>::new(line_agg_in, logic);
     line_agg_out.map(|(_, message, mut log_event)| {
-        log_event.insert(event::log_schema().message_key(), message);
+        log_event.insert(log_schema().message_key(), message);
         Event::Log(log_event)
     })
 }
@@ -1163,7 +1175,7 @@ mod tests {
     async fn container_remove(id: &str, docker: &Docker) {
         trace!("Removing container.");
 
-        // Don't panick, as this is unreleated to test, and there possibly other containers that need to be removed
+        // Don't panic, as this is unrelated to the test, and there are possibly other containers that need to be removed
         let _ = docker
             .remove_container(id, None::<RemoveContainerOptions>)
             .await
@@ -1209,7 +1221,7 @@ mod tests {
         // Wait for before message
         let events = collect_n(out, 1).await.unwrap();
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&log_schema().message_key()],
             "before".into()
         );
 
@@ -1239,14 +1251,14 @@ mod tests {
         container_remove(&id, &docker).await;
 
         let log = events[0].as_log();
-        assert_eq!(log[&event::log_schema().message_key()], message.into());
+        assert_eq!(log[&log_schema().message_key()], message.into());
         assert_eq!(log[&super::CONTAINER], id.into());
         assert!(log.get(&super::CREATED_AT).is_some());
         assert_eq!(log[&super::IMAGE], "busybox".into());
         assert!(log.get(&format!("label.{}", label).into()).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
         assert_eq!(
-            events[0].as_log()[event::log_schema().source_type_key()],
+            events[0].as_log()[log_schema().source_type_key()],
             "docker".into()
         );
     }
@@ -1267,11 +1279,11 @@ mod tests {
         container_remove(&id, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&log_schema().message_key()],
             message.into()
         );
         assert_eq!(
-            events[1].as_log()[&event::log_schema().message_key()],
+            events[1].as_log()[&log_schema().message_key()],
             message.into()
         );
     }
@@ -1295,7 +1307,7 @@ mod tests {
         container_remove(&id1, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&log_schema().message_key()],
             message.into()
         );
     }
@@ -1320,7 +1332,7 @@ mod tests {
         container_remove(&id1, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&log_schema().message_key()],
             message.into()
         );
     }
@@ -1342,14 +1354,14 @@ mod tests {
         container_remove(&id, &docker).await;
 
         let log = events[0].as_log();
-        assert_eq!(log[&event::log_schema().message_key()], message.into());
+        assert_eq!(log[&log_schema().message_key()], message.into());
         assert_eq!(log[&super::CONTAINER], id.into());
         assert!(log.get(&super::CREATED_AT).is_some());
         assert_eq!(log[&super::IMAGE], "busybox".into());
         assert!(log.get(&format!("label.{}", label).into()).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
         assert_eq!(
-            events[0].as_log()[event::log_schema().source_type_key()],
+            events[0].as_log()[log_schema().source_type_key()],
             "docker".into()
         );
     }
@@ -1375,7 +1387,7 @@ mod tests {
         container_remove(&id, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&log_schema().message_key()],
             message.into()
         );
     }
@@ -1449,7 +1461,7 @@ mod tests {
         container_remove(&id, &docker).await;
 
         let log = events[0].as_log();
-        assert_eq!(log[&event::log_schema().message_key()], message.into());
+        assert_eq!(log[&log_schema().message_key()], message.into());
     }
 
     #[tokio::test]
@@ -1502,7 +1514,7 @@ mod tests {
             .map(|event| {
                 event
                     .into_log()
-                    .remove(event::log_schema().message_key())
+                    .remove(crate::config::log_schema().message_key())
                     .unwrap()
                     .to_string_lossy()
             })

@@ -26,14 +26,14 @@ pub(crate) struct RegexParserFailedMatch<'a> {
 impl InternalEvent for RegexParserFailedMatch<'_> {
     fn emit_logs(&self) {
         warn!(
-            message = "regex pattern failed to match.",
+            message = "Regex pattern failed to match.",
             field = &super::truncate_string_at(&String::from_utf8_lossy(&self.value), 60)[..],
             rate_limit_secs = 30
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_error", 1,
+        counter!("processing_errors", 1,
             "component_kind" => "transform",
             "component_type" => "regex_parser",
             "error_type" => "failed_match",
@@ -52,7 +52,7 @@ impl InternalEvent for RegexParserMissingField<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_error", 1,
+        counter!("processing_errors", 1,
             "component_kind" => "transform",
             "component_type" => "regex_parser",
             "error_type" => "missing_field",
@@ -75,7 +75,7 @@ impl<'a> InternalEvent for RegexParserTargetExists<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_error", 1,
+        counter!("processing_errors", 1,
             "component_kind" => "transform",
             "component_type" => "regex_parser",
             "error_type" => "target_field_exists",
@@ -100,7 +100,7 @@ impl<'a> InternalEvent for RegexParserConversionFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_error", 1,
+        counter!("processing_errors", 1,
             "component_kind" => "transform",
             "component_type" => "regex_parser",
             "error_type" => "type_conversion_failed",

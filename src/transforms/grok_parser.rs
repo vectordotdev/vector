@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{self, Event, PathComponent, PathIter},
+    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    event::{Event, PathComponent, PathIter},
     internal_events::{
         GrokParserConversionFailed, GrokParserEventProcessed, GrokParserFailedMatch,
         GrokParserMissingField,
@@ -39,10 +39,7 @@ inventory::submit! {
 #[typetag::serde(name = "grok_parser")]
 impl TransformConfig for GrokParserConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        let field = self
-            .field
-            .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+        let field = self.field.as_ref().unwrap_or(&log_schema().message_key());
 
         let mut grok = grok::Grok::with_patterns();
 
@@ -131,7 +128,7 @@ mod tests {
     use super::GrokParserConfig;
     use crate::event::LogEvent;
     use crate::{
-        config::{TransformConfig, TransformContext},
+        config::{log_schema, TransformConfig, TransformContext},
         event, Event,
     };
     use pretty_assertions::assert_eq;
@@ -195,9 +192,9 @@ mod tests {
         assert_eq!(2, event.keys().count());
         assert_eq!(
             event::Value::from("Help I'm stuck in an HTTP server"),
-            event[&event::log_schema().message_key()]
+            event[&log_schema().message_key()]
         );
-        assert!(!event[&event::log_schema().timestamp_key()]
+        assert!(!event[&log_schema().timestamp_key()]
             .to_string_lossy()
             .is_empty());
     }
@@ -242,9 +239,9 @@ mod tests {
         assert_eq!(2, event.keys().count());
         assert_eq!(
             event::Value::from("i am the only field"),
-            event[&event::log_schema().message_key()]
+            event[&log_schema().message_key()]
         );
-        assert!(!event[&event::log_schema().timestamp_key()]
+        assert!(!event[&log_schema().timestamp_key()]
             .to_string_lossy()
             .is_empty());
     }

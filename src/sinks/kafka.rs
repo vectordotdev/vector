@@ -1,13 +1,13 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{self, Event, Value},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    event::{Event, Value},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
     template::{Template, TemplateError},
 };
-use futures::{compat::Compat, FutureExt, TryFutureExt};
+use futures::{compat::Compat, FutureExt};
 use futures01::{
     future as future01, stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend,
     Stream,
@@ -86,10 +86,10 @@ inventory::submit! {
 
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = KafkaSink::new(self.clone(), cx.acker())?;
-        let hc = healthcheck(self.clone()).boxed().compat();
-        Ok((Box::new(sink), Box::new(hc)))
+        let hc = healthcheck(self.clone()).boxed();
+        Ok((super::VectorSink::Futures01Sink(Box::new(sink)), hc))
     }
 
     fn input_type(&self) -> DataType {
@@ -152,8 +152,7 @@ impl Sink for KafkaSink {
 
         let mut record = FutureRecord::to(&topic).key(&key).payload(&body[..]);
 
-        if let Some(Value::Timestamp(timestamp)) =
-            item.as_log().get(&event::log_schema().timestamp_key())
+        if let Some(Value::Timestamp(timestamp)) = item.as_log().get(&log_schema().timestamp_key())
         {
             record = record.timestamp(timestamp.timestamp_millis());
         }
@@ -256,18 +255,19 @@ fn encode_event(
     key_field: &Option<Atom>,
     encoding: &EncodingConfig<Encoding>,
 ) -> (Vec<u8>, Vec<u8>) {
-    encoding.apply_rules(&mut event);
     let key = key_field
         .as_ref()
         .and_then(|f| event.as_log().get(f))
         .map(|v| v.as_bytes().to_vec())
         .unwrap_or_default();
 
+    encoding.apply_rules(&mut event);
+
     let body = match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&event.as_log()).unwrap(),
         Encoding::Text => event
             .as_log()
-            .get(&event::log_schema().message_key())
+            .get(&log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };
@@ -278,7 +278,7 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{self, Event};
+    use crate::event::Event;
     use std::collections::BTreeMap;
 
     #[test]
@@ -311,9 +311,31 @@ mod tests {
         let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(&key[..], b"value");
-        assert_eq!(map[&event::log_schema().message_key().to_string()], message);
+        assert_eq!(map[&log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
         assert_eq!(map["foo"], "bar".to_string());
+    }
+
+    #[test]
+    fn kafka_encode_event_apply_rules() {
+        let mut event = Event::from("hello");
+        event.as_mut_log().insert("key", "value");
+
+        let (key, bytes) = encode_event(
+            event,
+            &Some("key".into()),
+            &EncodingConfigWithDefault {
+                codec: Encoding::Json,
+                except_fields: Some(vec![Atom::from("key")]),
+                ..Default::default()
+            }
+            .into(),
+        );
+
+        let map: BTreeMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
+
+        assert_eq!(&key[..], b"value");
+        assert!(!map.contains_key("key"));
     }
 }
 
@@ -327,7 +349,7 @@ mod integration_test {
         test_util::{random_lines_with_stream, random_string, wait_for},
         tls::TlsOptions,
     };
-    use futures::{compat::Sink01CompatExt, future, SinkExt};
+    use futures::{compat::Sink01CompatExt, future, SinkExt, StreamExt};
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
         Message, Offset, TopicPartitionList,
@@ -459,7 +481,8 @@ mod integration_test {
         let sink = KafkaSink::new(config, acker).unwrap();
 
         let num_events = 1000;
-        let (input, mut events) = random_lines_with_stream(100, num_events);
+        let (input, events) = random_lines_with_stream(100, num_events);
+        let mut events = events.map(Ok);
 
         let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 

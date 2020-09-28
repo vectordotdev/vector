@@ -42,11 +42,12 @@ env:
   RUST_BACKTRACE: full
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
+  CONTAINER_TOOL: "docker"
 
 jobs:
   cancel-previous:
     name: Cancel redundant jobs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
@@ -112,44 +113,6 @@ jobs:
       - run: make slim-builds
       - run: make build-aarch64-unknown-linux-gnu
 
-  # TODO: Upgrade to test once the tz issues are solved.
-  build-x86_64-unknown-linux-musl:
-    name: Unit - x86_64-unknown-linux-gnu
-    runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: make slim-builds
-      - run: make build-x86_64-unknown-linux-musl
-
-  # TODO: Upgrade to test once the tz issues are solved.
-  build-aarch64-unknown-linux-musl:
-    name: Unit - aarch64-unknown-linux-gnu
-    runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: make slim-builds
-      - run: make build-aarch64-unknown-linux-musl
-
   test-mac:
     name: Unit - Mac
     # Full CI suites for this platform were only recently introduced.
@@ -182,9 +145,8 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - env:
-          USE_CONTAINER: none
           RUSTFLAGS: "-D warnings"
-        run: cargo test --no-default-features --features default-msvc
+        run: cargo test --no-fail-fast --no-default-features --features default-msvc
 
   test-misc:
     name: Shutdown - Linux
@@ -295,6 +257,24 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: make slim-builds
       - run: make test-integration-gcp
+
+  test-integration-humio:
+    name: Integration - Linux, Humio
+    runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: make slim-builds
+      - run: make test-integration-humio
 
   test-integration-influxdb:
     name: Integration - Linux, Influx

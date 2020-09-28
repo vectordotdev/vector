@@ -59,7 +59,7 @@ impl From<Encoding> for splunk_hec::Encoding {
 
 #[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         self.build_hec_config().build(cx)
     }
 
@@ -139,8 +139,7 @@ mod integration_tests {
         Event,
     };
     use chrono::Utc;
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
+    use futures::{future, stream};
     use serde_json::{json, Value as JsonValue};
     use std::{collections::HashMap, convert::TryFrom};
 
@@ -160,7 +159,7 @@ mod integration_tests {
         let message = random_string(100);
         let event = Event::from(message.clone());
 
-        sink.send(event).compat().await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -176,7 +175,9 @@ mod integration_tests {
         assert!(
             entry.error.is_none(),
             "Humio encountered an error parsing this message: {}",
-            entry.error_msg.unwrap_or("no error message".to_string())
+            entry
+                .error_msg
+                .unwrap_or_else(|| "no error message".to_string())
         );
     }
 
@@ -193,7 +194,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.send(event).compat().await.unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -201,7 +202,9 @@ mod integration_tests {
         assert!(
             entry.error.is_none(),
             "Humio encountered an error parsing this message: {}",
-            entry.error_msg.unwrap_or("no error message".to_string())
+            entry
+                .error_msg
+                .unwrap_or_else(|| "no error message".to_string())
         );
     }
 
@@ -224,7 +227,7 @@ mod integration_tests {
                 .as_mut_log()
                 .insert("@timestamp", Utc::now().to_rfc3339());
 
-            sink.send(event).compat().await.unwrap();
+            sink.run(stream::once(future::ready(event))).await.unwrap();
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -232,7 +235,9 @@ mod integration_tests {
             assert!(
                 entry.error.is_none(),
                 "Humio encountered an error parsing this message: {}",
-                entry.error_msg.unwrap_or("no error message".to_string())
+                entry
+                    .error_msg
+                    .unwrap_or_else(|| "no error message".to_string())
             );
         }
 
@@ -245,7 +250,7 @@ mod integration_tests {
             let message = random_string(100);
             let event = Event::from(message.clone());
 
-            sink.send(event).compat().await.unwrap();
+            sink.run(stream::once(future::ready(event))).await.unwrap();
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 

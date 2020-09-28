@@ -1,17 +1,17 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{log_schema, Event, Value},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    event::{Event, Value},
     sinks::{
         influxdb::{
             encode_namespace, encode_timestamp, healthcheck, influx_line_protocol,
             influxdb_settings, Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
         },
         util::{
-            encoding::EncodingConfigWithDefault,
+            encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpClient, HttpSink},
             BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
         },
-        Healthcheck,
+        Healthcheck, VectorSink,
     },
 };
 use futures01::Sink;
@@ -49,6 +49,7 @@ struct InfluxDBLogsSink {
     protocol_version: ProtocolVersion,
     namespace: String,
     tags: HashSet<String>,
+    encoding: EncodingConfig<Encoding>,
 }
 
 lazy_static! {
@@ -72,7 +73,7 @@ inventory::submit! {
 
 #[typetag::serde(name = "influxdb_logs")]
 impl SinkConfig for InfluxDBLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         // let mut config = self.clone();
         let mut tags: HashSet<String> = self.tags.clone().into_iter().collect();
         tags.insert(log_schema().host_key().to_string());
@@ -106,6 +107,7 @@ impl SinkConfig for InfluxDBLogsConfig {
             protocol_version,
             namespace,
             tags,
+            encoding: self.encoding.clone().into(),
         };
 
         let sink = BatchedHttpSink::new(
@@ -118,7 +120,7 @@ impl SinkConfig for InfluxDBLogsConfig {
         )
         .sink_map_err(|e| error!("Fatal influxdb_logs sink error: {}", e));
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -135,12 +137,14 @@ impl HttpSink for InfluxDBLogsSink {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let mut output = String::new();
+
+        self.encoding.apply_rules(&mut event);
         let mut event = event.into_log();
 
         // Measurement
-        let measurement = encode_namespace(&self.namespace, &"vector");
+        let measurement = encode_namespace(Some(&self.namespace), '.', "vector");
 
         // Timestamp
         let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
@@ -192,7 +196,7 @@ impl InfluxDBLogsConfig {
             client,
         )?;
 
-        Ok(Box::new(healthcheck))
+        Ok(healthcheck)
     }
 }
 
@@ -220,8 +224,8 @@ mod tests {
         test_util::next_addr,
     };
     use chrono::{offset::TimeZone, Utc};
-    use futures::{compat::Future01CompatExt, StreamExt};
-    use futures01::Sink;
+    use futures::{stream, StreamExt};
+    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn test_config_without_tags() {
@@ -234,6 +238,31 @@ mod tests {
         "#;
 
         toml::from_str::<InfluxDBLogsConfig>(&config).unwrap();
+    }
+
+    #[test]
+    fn test_encode_event_apply_rules() {
+        let mut event = Event::from("hello");
+        event.as_mut_log().insert("host", "aws.cloud.eur");
+        event.as_mut_log().insert("timestamp", ts());
+
+        let mut sink = create_sink(
+            "http://localhost:9999",
+            "my-token",
+            ProtocolVersion::V1,
+            "ns",
+            vec![],
+        );
+        sink.encoding.except_fields = Some(vec![Atom::from("host")]);
+
+        let bytes = sink.encode_event(event).unwrap();
+        let string = std::str::from_utf8(&bytes).unwrap();
+
+        let line_protocol = split_line_protocol(&string);
+        assert_eq!("ns.vector", line_protocol.0);
+        assert_eq!("metric_type=logs", line_protocol.1);
+        assert_fields(line_protocol.2.to_string(), ["message=\"hello\""].to_vec());
+        assert_eq!("1542182950000000011\n", line_protocol.3);
     }
 
     #[test]
@@ -472,8 +501,7 @@ mod tests {
             events.push(event);
         }
 
-        let pump = sink.send_all(futures01::stream::iter_ok(events));
-        let _ = pump.compat().await.unwrap();
+        sink.run(stream::iter(events)).await.unwrap();
 
         let output = rx.next().await.unwrap();
 
@@ -536,8 +564,7 @@ mod tests {
             events.push(event);
         }
 
-        let pump = sink.send_all(futures01::stream::iter_ok(events));
-        let _ = pump.compat().await.unwrap();
+        sink.run(stream::iter(events)).await.unwrap();
 
         let output = rx.next().await.unwrap();
 
@@ -588,6 +615,7 @@ mod tests {
             protocol_version,
             namespace,
             tags,
+            encoding: EncodingConfigWithDefault::default().into(),
         }
     }
 }
@@ -605,8 +633,7 @@ mod integration_tests {
         },
     };
     use chrono::Utc;
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
+    use futures::stream;
 
     #[tokio::test]
     async fn influxdb2_logs_put_data() {
@@ -646,11 +673,7 @@ mod integration_tests {
         events.push(event1);
         events.push(event2);
 
-        let _ = sink
-            .send_all(futures01::stream::iter_ok(events))
-            .compat()
-            .await
-            .unwrap();
+        sink.run(stream::iter(events)).await.unwrap();
 
         let mut body = std::collections::HashMap::new();
         body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"{}.vector\")", ns.clone()));
@@ -671,10 +694,10 @@ mod integration_tests {
             .unwrap();
         let string = res.text().await.unwrap();
 
-        let lines = string.split("\n").collect::<Vec<&str>>();
-        let header = lines[0].split(",").collect::<Vec<&str>>();
-        let record1 = lines[1].split(",").collect::<Vec<&str>>();
-        let record2 = lines[2].split(",").collect::<Vec<&str>>();
+        let lines = string.split('\n').collect::<Vec<&str>>();
+        let header = lines[0].split(',').collect::<Vec<&str>>();
+        let record1 = lines[1].split(',').collect::<Vec<&str>>();
+        let record2 = lines[2].split(',').collect::<Vec<&str>>();
 
         // measurement
         assert_eq!(

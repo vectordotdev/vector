@@ -32,7 +32,7 @@ impl InternalEvent for GrokParserFailedMatch<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_error", 1,
+        counter!("processing_errors", 1,
             "component_kind" => "transform",
             "component_type" => "grok_parser",
             "error_type" => "failed_match",
@@ -51,7 +51,7 @@ impl InternalEvent for GrokParserMissingField<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_error", 1,
+        counter!("processing_errors", 1,
             "component_kind" => "transform",
             "component_type" => "grok_parser",
             "error_type" => "missing_field",
@@ -76,7 +76,7 @@ impl<'a> InternalEvent for GrokParserConversionFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_error", 1,
+        counter!("processing_errors", 1,
             "component_kind" => "transform",
             "component_type" => "grok_parser",
             "error_type" => "type_conversion_failed",

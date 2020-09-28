@@ -1,0 +1,21 @@
+{
+  "nulled": null,
+  "basic": true,
+  "list": [
+    true,
+    null,
+    [true, null, true],
+    {
+      "basic": true,
+      "buddy": 1.0
+    }
+  ],
+  "map": {
+    "basic": true,
+    "list": [true, null, true],
+    "map": {
+      "basic": true,
+      "buddy": -1
+    }
+  }
+}
