@@ -186,7 +186,9 @@ mod integration_tests {
         assert!(
             entry.error.is_none(),
             "Humio encountered an error parsing this message: {}",
-            entry.error_msg.unwrap_or("no error message".to_string())
+            entry
+                .error_msg
+                .unwrap_or_else(|| "no error message".to_string())
         );
     }
 
@@ -211,7 +213,9 @@ mod integration_tests {
         assert!(
             entry.error.is_none(),
             "Humio encountered an error parsing this message: {}",
-            entry.error_msg.unwrap_or("no error message".to_string())
+            entry
+                .error_msg
+                .unwrap_or_else(|| "no error message".to_string())
         );
     }
 
@@ -242,7 +246,9 @@ mod integration_tests {
             assert!(
                 entry.error.is_none(),
                 "Humio encountered an error parsing this message: {}",
-                entry.error_msg.unwrap_or("no error message".to_string())
+                entry
+                    .error_msg
+                    .unwrap_or_else(|| "no error message".to_string())
             );
         }
 

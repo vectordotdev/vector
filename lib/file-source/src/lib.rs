@@ -203,7 +203,8 @@ mod test {
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
         let mut rotation_count = 0;
-        let mut fw = FileWatcher::new(path.clone(), 0, None).expect("must be able to create");
+        let mut fw =
+            FileWatcher::new(path.clone(), 0, None, 100_000).expect("must be able to create");
 
         let mut writes = 0;
         let mut sut_reads = 0;
@@ -256,14 +257,17 @@ mod test {
                     read_index += 1;
                 }
                 FWAction::Read => {
-                    let mut buf = Vec::new();
                     let mut attempts = 10;
                     while attempts > 0 {
-                        match fw.read_line(&mut buf, 100_000) {
+                        match fw.read_line() {
                             Err(_) => {
                                 unreachable!();
                             }
-                            Ok(0) => {
+                            Ok(Some(line)) if line.is_empty() => {
+                                attempts -= 1;
+                                continue;
+                            }
+                            Ok(None) => {
                                 attempts -= 1;
                                 continue;
                             }
@@ -295,7 +299,8 @@ mod test {
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
         let mut rotation_count = 0;
-        let mut fw = FileWatcher::new(path.clone(), 0, None).expect("must be able to create");
+        let mut fw =
+            FileWatcher::new(path.clone(), 0, None, 100_000).expect("must be able to create");
 
         let mut fwfiles: Vec<FWFile> = vec![];
         fwfiles.push(FWFile::new());
@@ -327,24 +332,27 @@ mod test {
                     read_index += 1;
                 }
                 FWAction::Read => {
-                    let mut buf = Vec::new();
                     let mut attempts = 10;
                     while attempts > 0 {
-                        match fw.read_line(&mut buf, 100_000) {
+                        match fw.read_line() {
                             Err(_) => {
                                 unreachable!();
                             }
-                            Ok(0) => {
+                            Ok(Some(line)) if line.is_empty() => {
                                 attempts -= 1;
                                 assert!(fwfiles[read_index].read_line().is_none());
                                 continue;
                             }
-                            Ok(sz) => {
+                            Ok(None) => {
+                                attempts -= 1;
+                                assert!(fwfiles[read_index].read_line().is_none());
+                                continue;
+                            }
+                            Ok(Some(line)) => {
                                 let exp =
                                     fwfiles[read_index].read_line().expect("could not readline");
-                                assert_eq!(exp.into_bytes(), buf);
-                                assert_eq!(sz, buf.len() + 1);
-                                buf.clear();
+                                assert_eq!(exp.into_bytes(), line);
+                                // assert_eq!(sz, buf.len() + 1);
                                 break;
                             }
                         }
