@@ -8,7 +8,7 @@ lazy_static! {
         Arc::new(RwLock::new(Arc::new(Config::default())));
 }
 
-pub struct Source<'a>(&'a Box<dyn SourceConfig>);
+pub struct Source<'a>(&'a dyn SourceConfig);
 
 #[Object]
 impl Source<'_> {

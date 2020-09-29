@@ -41,7 +41,7 @@ pub struct RunningTopology {
 }
 
 pub async fn start_validated(
-    config: Arc<Config>,
+    config: Config,
     diff: ConfigDiff,
     mut pieces: Pieces,
     require_healthy: bool,
@@ -51,7 +51,7 @@ pub async fn start_validated(
     let mut running_topology = RunningTopology {
         inputs: HashMap::new(),
         outputs: HashMap::new(),
-        config: Arc::new(Config::default()),
+        config: Arc::new(config),
         shutdown_coordinator: SourceShutdownCoordinator::default(),
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
@@ -66,7 +66,6 @@ pub async fn start_validated(
     }
     running_topology.connect_diff(&diff, &mut pieces);
     running_topology.spawn_diff(&diff, pieces);
-    running_topology.config = config;
 
     Some((running_topology, abort_rx))
 }
@@ -208,7 +207,7 @@ impl RunningTopology {
     /// May change componenets even if reload fails.
     pub async fn reload_config_and_respawn(
         &mut self,
-        new_config: Arc<Config>,
+        new_config: Config,
         require_healthy: bool,
     ) -> Result<bool, ()> {
         if self.config.global.data_dir != new_config.global.data_dir {
@@ -229,7 +228,7 @@ impl RunningTopology {
             {
                 self.connect_diff(&diff, &mut new_pieces);
                 self.spawn_diff(&diff, new_pieces);
-                self.config = new_config;
+                self.config = Arc::new(new_config);
                 // We have successfully changed to new config.
                 return Ok(true);
             }
@@ -588,6 +587,11 @@ impl RunningTopology {
 
         self.inputs.insert(name.to_string(), tx);
     }
+
+    /// Returns an Arc-wrapped clone of the current Config
+    pub fn clone_config(&self) -> Arc<Config> {
+        Arc::clone(&self.config)
+    }
 }
 
 fn handle_errors(
@@ -626,7 +630,6 @@ mod tests {
         test_util::{next_addr, start_topology},
     };
     use std::path::Path;
-    use std::sync::Arc;
 
     #[tokio::test]
     async fn topology_doesnt_reload_new_data_dir() {
@@ -648,7 +651,7 @@ mod tests {
         new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
         topology
-            .reload_config_and_respawn(Arc::new(new_config.build().unwrap()), false)
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
             .await
             .unwrap();
 
@@ -665,7 +668,6 @@ mod reload_tests {
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sources::splunk_hec::SplunkConfig;
     use crate::test_util::{next_addr, start_topology};
-    use std::sync::Arc;
 
     // TODO: Run it only on Linux and Mac since it fails on Windows.
     // TODO: Issue: https://github.com/timberio/vector/issues/3035
@@ -698,7 +700,7 @@ mod reload_tests {
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(Arc::new(new_config.build().unwrap()), false)
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
             .await
             .unwrap());
     }
@@ -732,7 +734,7 @@ mod reload_tests {
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(!topology
-            .reload_config_and_respawn(Arc::new(new_config.build().unwrap()), false)
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
             .await
             .unwrap());
     }
@@ -755,7 +757,7 @@ mod reload_tests {
         let (mut topology, _crash) =
             start_topology(old_config.clone().build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(Arc::new(old_config.build().unwrap()), false)
+            .reload_config_and_respawn(old_config.build().unwrap(), false)
             .await
             .unwrap());
     }
@@ -815,7 +817,6 @@ mod transient_state_tests {
     use futures::compat::Future01CompatExt;
     use futures01::Future;
     use serde::{Deserialize, Serialize};
-    use std::sync::Arc;
     use stream_cancel::{Trigger, Tripwire};
 
     #[derive(Debug, Deserialize, Serialize)]
@@ -899,7 +900,7 @@ mod transient_state_tests {
         finished.compat().await.unwrap();
 
         assert!(topology
-            .reload_config_and_respawn(Arc::new(new_config.build().unwrap()), false)
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
             .await
             .unwrap());
     }
@@ -935,7 +936,7 @@ mod transient_state_tests {
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(Arc::new(new_config.build().unwrap()), false)
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
             .await
             .unwrap());
     }
@@ -979,7 +980,7 @@ mod transient_state_tests {
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(topology
-            .reload_config_and_respawn(Arc::new(new_config.build().unwrap()), false)
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
             .await
             .unwrap());
     }

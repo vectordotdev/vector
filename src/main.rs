@@ -11,7 +11,6 @@ use futures::{
     StreamExt,
 };
 use std::cmp::max;
-use std::sync::Arc;
 use tokio::{runtime, select};
 #[cfg(feature = "api")]
 use vector::{api, internal_events::ApiStarted};
@@ -115,11 +114,14 @@ fn main() {
             path = ?config_paths
         );
 
-        let config = Arc::new(config::load_from_paths(&config_paths)
+        let config = config::load_from_paths(&config_paths)
             .map_err(handle_config_errors)
             .unwrap_or_else(|()| {
                 std::process::exit(exitcode::CONFIG);
-            }));
+            });
+
+        #[cfg(feature="api")]
+        let api_enabled = config.api.enabled;
 
         crate::config::LOG_SCHEMA
             .set(config.global.log_schema.clone())
@@ -130,25 +132,26 @@ fn main() {
             std::process::exit(exitcode::CONFIG);
         });
 
+        let result =
+            topology::start_validated(config, diff, pieces, opts.require_healthy).await;
+        let (mut topology, graceful_crash) = result.unwrap_or_else(|| {
+            std::process::exit(exitcode::CONFIG);
+        });
+
         #[cfg(feature = "api")]
         // assigned to prevent the API terminating when falling out of scope
-        let _api = if config.api.enabled {
+        let _api = if api_enabled {
+            let config = topology.clone_config();
+
             emit!(ApiStarted{
                 addr: config.api.bind.unwrap(),
                 playground: config.api.playground
             });
 
-            api::schema::topology::update_config(Arc::clone(&config));
-            Some(api::Server::start(config.api))
+            Some(api::Server::start(config))
         } else {
             None
         };
-
-        let result =
-            topology::start_validated(Arc::clone(&config), diff, pieces, opts.require_healthy).await;
-        let (mut topology, graceful_crash) = result.unwrap_or_else(|| {
-            std::process::exit(exitcode::CONFIG);
-        });
 
         emit!(VectorStarted);
         tokio::spawn(heartbeat::heartbeat());
@@ -166,15 +169,13 @@ fn main() {
                         let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
 
                         if let Some(new_config) = new_config {
-                            let new_config = Arc::new(new_config);
-
                             match topology
-                                .reload_config_and_respawn(Arc::clone(&new_config), opts.require_healthy)
+                                .reload_config_and_respawn(new_config, opts.require_healthy)
                                 .await
                             {
                                 Ok(true) => {
                                     #[cfg(feature="api")]
-                                    api::schema::topology::update_config(Arc::clone(&new_config));
+                                    api::schema::topology::update_config(topology.clone_config());
 
                                     emit!(VectorReloaded { config_paths: &config_paths })
                                 },
