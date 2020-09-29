@@ -131,7 +131,10 @@ fn kafka_source(
                             let mut event = Event::new_empty_log();
                             let log = event.as_mut_log();
 
-                            log.insert(log_schema().message_key().clone(), Value::from(Bytes::from(payload.to_owned())));
+                            log.insert(
+                                log_schema().message_key().clone(),
+                                Value::from(Bytes::from(payload.to_owned())),
+                            );
 
                             // Extract timestamp from kafka message
                             let timestamp = msg
@@ -148,7 +151,10 @@ fn kafka_source(
                                 match msg.key() {
                                     None => (),
                                     Some(key) => {
-                                        log.insert(key_field.clone(), Value::from(String::from_utf8_lossy(key).to_string()));
+                                        log.insert(
+                                            key_field.clone(),
+                                            Value::from(String::from_utf8_lossy(key).to_string()),
+                                        );
                                     }
                                 }
                             }

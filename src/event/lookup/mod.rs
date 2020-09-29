@@ -91,6 +91,7 @@ impl Lookup {
         }
         Ok(discoveries)
     }
+
     pub fn from_toml_table(value: TomlValue) -> crate::Result<IndexMap<Lookup, Value>> {
         let mut discoveries = IndexMap::new();
         match value {

@@ -2,7 +2,7 @@ use super::util::tokenize::parse;
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{Value, Event, PathComponent, PathIter},
+    event::{Event, PathComponent, PathIter, Value},
     internal_events::{TokenizerConvertFailed, TokenizerEventProcessed, TokenizerFieldMissing},
     types::{parse_check_conversion_map, Conversion},
 };
