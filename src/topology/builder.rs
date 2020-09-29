@@ -151,7 +151,7 @@ pub async fn build_pieces(
 
         let cx = SinkContext { resolver, acker };
 
-        let (sink, healthcheck) = match sink.inner.build_async(cx).await {
+        let (sink, healthcheck) = match sink.inner.build(cx).await {
             Err(error) => {
                 errors.push(format!("Sink \"{}\": {}", name, error));
                 continue;

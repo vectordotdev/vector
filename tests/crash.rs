@@ -6,7 +6,7 @@ use futures01::{Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use tokio::time::{delay_for, Duration};
 use vector::{
-    config::{self, GlobalOptions, SinkContext},
+    config::{self, GlobalOptions, SinkConfig, SinkContext, SourceConfig},
     shutdown::ShutdownSignal,
     test_util::{next_addr, random_lines, send_lines, start_topology, wait_for_tcp, CountReceiver},
     Event, Pipeline,
@@ -19,9 +19,10 @@ use vector::{
 #[derive(Debug, Serialize, Deserialize)]
 struct PanicSink;
 
+#[async_trait]
 #[typetag::serde(name = "panic")]
-impl config::SinkConfig for PanicSink {
-    fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
+impl SinkConfig for PanicSink {
+    async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         Ok((
             VectorSink::Futures01Sink(Box::new(PanicSink)),
             future::ok(()).boxed(),
@@ -100,9 +101,10 @@ async fn test_sink_panic() {
 #[derive(Debug, Serialize, Deserialize)]
 struct ErrorSink;
 
+#[async_trait]
 #[typetag::serde(name = "panic")]
-impl config::SinkConfig for ErrorSink {
-    fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
+impl SinkConfig for ErrorSink {
+    async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         Ok((
             VectorSink::Futures01Sink(Box::new(ErrorSink)),
             future::ok(()).boxed(),
@@ -181,7 +183,7 @@ struct ErrorSourceConfig;
 
 #[async_trait]
 #[typetag::serde(name = "tcp")]
-impl config::SourceConfig for ErrorSourceConfig {
+impl SourceConfig for ErrorSourceConfig {
     async fn build(
         &self,
         _name: &str,
@@ -248,7 +250,7 @@ struct PanicSourceConfig;
 
 #[async_trait]
 #[typetag::serde(name = "tcp")]
-impl config::SourceConfig for PanicSourceConfig {
+impl SourceConfig for PanicSourceConfig {
     async fn build(
         &self,
         _name: &str,

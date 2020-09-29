@@ -127,7 +127,7 @@ mod test {
         wait_for_tcp(addr).await;
 
         let cx = SinkContext::new_test();
-        let (sink, _) = sink.build(cx).unwrap();
+        let (sink, _) = sink.build(cx).await.unwrap();
 
         let events = vec![
             Event::from("test"),

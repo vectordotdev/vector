@@ -801,7 +801,7 @@ mod tests {
         (recv, address)
     }
 
-    fn sink(
+    async fn sink(
         address: SocketAddr,
         encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
         compression: Compression,
@@ -814,6 +814,7 @@ mod tests {
             ..HecSinkConfig::default()
         }
         .build(SinkContext::new_test())
+        .await
         .unwrap()
     }
 
@@ -822,7 +823,7 @@ mod tests {
         compression: Compression,
     ) -> (VectorSink, mpsc::Receiver<Event>) {
         let (source, address) = source().await;
-        let (sink, health) = sink(address, encoding, compression);
+        let (sink, health) = sink(address, encoding, compression).await;
         assert!(health.await.is_ok());
         (sink, source)
     }
@@ -1039,7 +1040,7 @@ mod tests {
 
         let message = "no_authorization";
         let (source, address) = source_with(None).await;
-        let (sink, health) = sink(address, Encoding::Text, Compression::Gzip);
+        let (sink, health) = sink(address, Encoding::Text, Compression::Gzip).await;
         assert!(health.await.is_ok());
 
         let event = channel_n(vec![message], sink, source).await.remove(0);

@@ -273,13 +273,14 @@ enum HealthcheckError {
     Unhealthy,
 }
 
+#[async_trait]
 #[typetag::serialize(name = "mock")]
 impl<T> SinkConfig for MockSinkConfig<T>
 where
     T: Sink<SinkItem = Event> + std::fmt::Debug + Clone + Send + Sync + 'static,
     <T as Sink>::SinkError: std::fmt::Debug,
 {
-    fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
+    async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         let sink = self.sink.clone().unwrap();
         let sink = sink.sink_map_err(|error| {
             error!(message = "Ingesting an event failed at mock sink", ?error)

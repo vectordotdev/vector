@@ -164,14 +164,10 @@ pub struct SinkOuter {
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait SinkConfig: core::fmt::Debug + Send + Sync {
-    fn build(&self, cx: SinkContext) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)>;
-
-    async fn build_async(
+    async fn build(
         &self,
         cx: SinkContext,
-    ) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)> {
-        self.build(cx)
-    }
+    ) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)>;
 
     fn input_type(&self) -> DataType;
 
