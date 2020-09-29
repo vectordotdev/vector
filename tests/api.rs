@@ -10,18 +10,20 @@ mod tests {
     use chrono::Utc;
     use futures::StreamExt;
     use graphql_client::*;
-    use std::{sync::Once, time::Duration};
+    use std::{
+        sync::Once,
+        time::{Duration, Instant},
+    };
     use tokio::{select, sync::oneshot};
     use vector::{
         self,
         api::{self, client::subscription::SubscriptionClient},
         config::Config,
-        heartbeat,
-        internal_events::{emit, GeneratorEventProcessed},
+        internal_events::{emit, GeneratorEventProcessed, Heartbeat},
         test_util::{next_addr, retry_until},
     };
 
-    static METRIC_INIT: Once = Once::new();
+    static METRICS_INIT: Once = Once::new();
 
     #[derive(GraphQLQuery)]
     #[graphql(
@@ -58,10 +60,27 @@ mod tests {
     struct EventsProcessedMetricsSubscription;
 
     // Initialize the metrics system. Idempotent.
-    fn init_metrics() {
-        METRIC_INIT.call_once(|| {
+    fn init_metrics() -> oneshot::Sender<()> {
+        METRICS_INIT.call_once(|| {
             let _ = vector::metrics::init();
-        })
+        });
+
+        let (shutdown_tx, mut shutdown_rx) = oneshot::channel::<()>();
+        tokio::spawn(async move {
+            let since = Instant::now();
+            let mut timer = tokio::time::interval(Duration::from_secs(1));
+
+            loop {
+                select! {
+                    _ = &mut shutdown_rx => break,
+                    _ = timer.tick() => {
+                        emit(Heartbeat { since });
+                    }
+                }
+            }
+        });
+
+        shutdown_tx
     }
 
     // Provides a config that enables the API server, assigned to a random port. Implicitly
@@ -186,15 +205,9 @@ mod tests {
         assert_matches!(heartbeats.next().await, None);
     }
 
-    async fn new_uptime_subscription(
-        client: &SubscriptionClient,
-        num_results: usize,
-        interval: i64,
-    ) {
+    async fn new_uptime_subscription(client: &SubscriptionClient) {
         let request_body =
-            UptimeMetricsSubscription::build_query(uptime_metrics_subscription::Variables {
-                interval,
-            });
+            UptimeMetricsSubscription::build_query(uptime_metrics_subscription::Variables);
 
         let subscription = client
             .start::<UptimeMetricsSubscription>(&request_body)
@@ -202,11 +215,10 @@ mod tests {
             .unwrap();
 
         tokio::pin! {
-            let uptime = subscription.stream().skip(num_results);
+            let uptime = subscription.stream().skip(1);
         }
 
-        // Uptime should be at least the number of seconds as the results - 1, to account
-        // for the initial uptime
+        // Uptime should be above zero
         assert!(
             uptime
                 .take(1)
@@ -218,7 +230,7 @@ mod tests {
                 .unwrap()
                 .uptime_metrics
                 .seconds
-                > num_results as f64 - 1.0
+                > 0.00
         )
     }
 
@@ -331,10 +343,9 @@ mod tests {
         let bind = config.api.bind.unwrap();
         let client = new_subscription_client(bind).await;
 
-        init_metrics();
-        tokio::spawn(heartbeat::heartbeat());
+        let _metrics = init_metrics();
 
-        new_uptime_subscription(&client, 3, 1200).await;
+        new_uptime_subscription(&client).await;
     }
 
     #[tokio::test]
@@ -345,7 +356,7 @@ mod tests {
         let bind = config.api.bind.unwrap();
         let client = new_subscription_client(bind).await;
 
-        init_metrics();
+        let _metrics = init_metrics();
 
         new_events_processed_subscription(&client, 3, 100).await;
     }
@@ -358,11 +369,10 @@ mod tests {
         let bind = config.api.bind.unwrap();
         let client = new_subscription_client(bind).await;
 
-        init_metrics();
-        tokio::spawn(heartbeat::heartbeat());
+        let _metrics = init_metrics();
 
         futures::join! {
-            new_uptime_subscription(&client, 3, 1200),
+            new_uptime_subscription(&client),
             new_heartbeat_subscription(&client, 3, 500),
         };
     }

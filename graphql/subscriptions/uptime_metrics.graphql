@@ -1,5 +1,5 @@
-subscription UptimeMetricsSubscription($interval: Int!) {
-  uptimeMetrics(interval: $interval) {
+subscription UptimeMetricsSubscription {
+  uptimeMetrics {
     seconds
   }
 }
