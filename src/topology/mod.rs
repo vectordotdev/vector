@@ -18,10 +18,10 @@ use crate::{
 };
 use futures::{compat::Future01CompatExt, future, FutureExt, StreamExt, TryFutureExt};
 use futures01::{sync::mpsc, Future};
-use std::sync::Arc;
 use std::{
     collections::{HashMap, HashSet},
     panic::AssertUnwindSafe,
+    sync::Arc,
 };
 use tokio::time::{delay_until, interval, Duration, Instant};
 use tracing_futures::Instrument;
