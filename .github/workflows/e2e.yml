@@ -48,6 +48,7 @@ env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"
+  CI: true
 
 jobs:
   cancel-previous:
@@ -147,6 +148,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/download-artifact@v2
         with:
           name: e2e-test-deb-package
