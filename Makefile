@@ -57,7 +57,7 @@ export AWS_ACCESS_KEY_ID ?= "dummy"
 export AWS_SECRET_ACCESS_KEY ?= "dummy"
 
 # Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
-export CI = false
+export CI ?= false
 
 FORMATTING_BEGIN_YELLOW = \033[0;33m
 FORMATTING_BEGIN_BLUE = \033[36m
@@ -980,7 +980,7 @@ signoff: ## Signsoff all previous commits since branch creation
 slim-builds: ## Updates the Cargo config to product disk optimized builds (for CI, not for users)
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/slim-builds.sh
 
-ifeq ($(CI), true)
+ifeq (${CI}, true)
 .PHONY: ci-sweep
 ci-sweep: ## Sweep up the CI to try to get more disk space.
 	@echo "Preparing the CI for build by sweeping up disk space a bit..."
