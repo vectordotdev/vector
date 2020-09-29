@@ -370,6 +370,10 @@ mod tests {
     fn in_flight_limit_works() {
         type TowerRequestConfigTest = TowerRequestConfig<InFlightLimit>;
 
+        let cfg = TowerRequestConfigTest::default();
+        let toml = toml::to_string(&cfg).unwrap();
+        toml::from_str::<TowerRequestConfigTest>(&toml).expect("Default config failed");
+
         let cfg = toml::from_str::<TowerRequestConfigTest>("").expect("Empty config failed");
         assert_eq!(cfg.in_flight_limit, InFlightLimit::None);
 
