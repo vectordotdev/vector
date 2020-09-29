@@ -19,8 +19,8 @@ infrastructure and deployed services in AWS.
 
 ## Internal Proposal
 
-We will add a `aws_cloudwatch_metrics' source that scrapes the AWS API
-([`GetMetricData`](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_GetMetricData.html)
+We will add a `aws_cloudwatch_metrics` source that scrapes the AWS API
+([`GetMetricData`](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_GetMetricData.html))
 on a user-defined interval to collect metrics and forward them through the
 user's pipeline.
 
