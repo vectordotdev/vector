@@ -9,6 +9,7 @@ env:
   AUTOINSTALL: true
   CHANNEL: nightly
   VERBOSE: true
+  CI: true
 
 jobs:
   build-x86_64-unknown-linux-musl-packages:

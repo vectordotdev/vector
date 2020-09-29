@@ -16,6 +16,7 @@ env:
   RUST_TEST_THREADS: 1
   TEST_LOG: vector=debug
   VERBOSE: true
+  CI: true
 
 jobs:
   cancel-previous:
