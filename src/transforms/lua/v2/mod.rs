@@ -55,7 +55,7 @@ pub struct LuaConfig {
 }
 
 fn default_config_paths() -> Vec<PathBuf> {
-    match CONFIG_PATHS.get() {
+    match CONFIG_PATHS.lock().ok() {
         Some(config_paths) => config_paths
             .clone()
             .into_iter()
