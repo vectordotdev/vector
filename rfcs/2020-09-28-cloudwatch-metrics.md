@@ -35,11 +35,11 @@ The configuration of the new `aws_cloudwatch_metrics` source will look like:
   endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
   region = "us-east-1" # required, required when endpoint = ""
 
-  period = "300" # period (s) to aggregate metrics over, optional, can be overridden at metric level, default 300
-  delay = "300" # delay collection by value (s), used to avoid collecting data that has not fully been processed by CloudWatch, optional, default 300
-  interval = "300" # interval to scrape metrics; should be a multiple of "period"; default 300
+  period_secs = 300 # period (s) to aggregate metrics over, optional, can be overridden at metric level, default 300
+  delay_secs = 300 # delay collection by value (s), used to avoid collecting data that has not fully been processed by CloudWatch, optional, default 300
+  interval_secs = 300 # interval to scrape metrics; should be a multiple of "period"; default 300
 
-  metrics_refresh_interval = 900 # interval to refresh available metrics for queried namespaces if globbing or all metrics are used; default 900
+  metrics_refresh_interval_secs = 900 # interval to refresh available metrics for queried namespaces if globbing or all metrics are used; default 900
 
   # Request
   request.in_flight_limit = 25 # optional, default, requests
@@ -54,8 +54,8 @@ The configuration of the new `aws_cloudwatch_metrics` source will look like:
     namespace = "AWS/EC2" # required
     names = ["EBSReadOps", "EBSReadBytes", "Network*"] # optional; defaults to all metrics in namespace, ["*"], (refreshed on interval); supports globbing
     dimensions.InstanceId = "i-05517fbc2e6124dfb" # optional; supported dimensions differ by namespace and metric; supports globbing
-    statistics = [ "average", "sum", "minimum", "maximum", "sample_count" ] # statistics to collect; can also contain extended statistics like p99; default shown
-    period = 300 # period (s) to aggregate metrics over; defaults to top-level `period` setting; top-level interval should be a multiple of this and any other defined periods
+    statistics = [ "average", "sum", "minimum", "maximum", "sample_count" ] # statistics to collect; can also contain extended statistics like p99; default: [ "average", "sum", "minimum", "maximum", "sample_count" ]
+    period_secs = 300 # period (s) to aggregate metrics over; defaults to top-level `period` setting; top-level interval should be a multiple of this and any other defined periods
 ```
 
 We could alternatively model dimensions as another table:
