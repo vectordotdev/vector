@@ -178,14 +178,13 @@ fn merge_tags(
     match (&event.tags, tags) {
         (Some(ref event_tags), Some(ref config_tags)) => {
             let mut event_tags = event_tags.clone();
-            event_tags.extend(config_tags.into_iter().map(|(k, v)| (k.clone(), v.clone())));
+            event_tags.extend(config_tags.iter().map(|(k, v)| (k.clone(), v.clone())));
             Some(event_tags)
         }
         (Some(ref event_tags), None) => Some(event_tags.clone()),
-        (None, Some(ref config_tags)) => Some(
+        (None, Some(config_tags)) => Some(
             config_tags
-                .clone()
-                .into_iter()
+                .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
         ),
