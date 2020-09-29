@@ -1,6 +1,6 @@
 use crate::{
-    event::{self, Event},
-    internal_events::UnixSocketEventReceived,
+    event::Event,
+    internal_events::{SocketEventReceived, SocketMode},
     shutdown::ShutdownSignal,
     sources::{util::build_unix_source, Source},
     Pipeline,
@@ -40,13 +40,17 @@ impl UnixConfig {
 fn build_event(host_key: &str, received_from: Option<Bytes>, line: &str) -> Option<Event> {
     let byte_size = line.len();
     let mut event = Event::from(line);
-    event
-        .as_mut_log()
-        .insert(event::log_schema().source_type_key(), "socket");
+    event.as_mut_log().insert(
+        crate::config::log_schema().source_type_key(),
+        Bytes::from("socket"),
+    );
     if let Some(host) = received_from {
         event.as_mut_log().insert(host_key, host);
     }
-    emit!(UnixSocketEventReceived { byte_size });
+    emit!(SocketEventReceived {
+        byte_size,
+        mode: SocketMode::Unix
+    });
     Some(event)
 }
 

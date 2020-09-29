@@ -4,7 +4,7 @@ Vector's `Makefile` serves a variety of purposes, and this RFC attempts to tame 
 
 It proposes a practical base `environment` container that merges the functionality of our non-integration test containers into one. It then suggests making common dev `make` tasks to rely on the caller environment having all dependencies, done at the same time it suggests adding `make` tasks to run common `make` tasks inside the environment. Finally, it suggests updating documentation to suggest users can use their native toolchains, `docker`.
 
-It proposes these changes such that our team and contributors will have to explicitly **opt in** to virtualization/containerization, and attempts to do it in a convienent, unsurprising way.
+It proposes these changes such that our team and contributors will have to explicitly **opt in** to virtualization/containerization, and attempts to do it in a convenient, unsurprising way.
 
 ## Motivation
 

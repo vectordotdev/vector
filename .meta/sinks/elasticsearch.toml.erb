@@ -124,7 +124,7 @@ relevant_when = {strategy = "aws"}
 required = false
 description = """\
 The [AWS region][urls.aws_regions] of the target service. \
-This defaults to the region named in the host parameter, \
+This defaults to the region named in the endpoint parameter, \
 or the value of the `$AWS_REGION` or `$AWS_DEFAULT_REGION` environment \
 variables if that cannot be determined, or "us-east-1".\
 """
@@ -160,12 +160,12 @@ description = """\
 A custom header to be added to each outgoing Elasticsearch request.\
 """
 
-[sinks.elasticsearch.options.host]
+[sinks.elasticsearch.options.endpoint]
 type = "string"
 common = true
 examples = ["http://10.24.32.122:9000"]
 description = """\
-The host of your Elasticsearch cluster. This should be the full URL as shown \
+The endpoint of your Elasticsearch cluster. This should be the full URL as shown \
 in the example.\
 """
 

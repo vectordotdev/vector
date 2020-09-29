@@ -134,6 +134,14 @@ data_dir = "/home/user/vector/"
   # * type: string
   partial_event_marker_field = "_partial"
 
+  # The amount of time to wait before retrying after an error.
+  #
+  # * optional
+  # * default: 2
+  # * type: uint
+  # * unit: seconds
+  retry_backoff_secs = 2
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -1784,11 +1792,11 @@ data_dir = "/home/user/vector/"
   # * must be: "filter"
   type = "filter"
 
-# Accepts and outputs `log` events, allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
+# Accepts and outputs `log` events, allowing you to enrich events with geolocation data from the MaxMind GeoIP2-City, GeoLite2-City, GeoIP2-ISP and GeoLite2-ASN databases.
 [transforms.geoip]
-  # Path to the MaxMind GeoIP2 or GeoLite2 binary city database file
-  # (`GeoLite2-City.mmdb`). Other databases, such as the the country database are
-  # not supported.
+  # Path to the MaxMind GeoIP2-City, GeoLite2-City, GeoIP2-ISP or GeoLite2-ASN
+  # binary database file (`GeoLite2-City.mmdb` or `GeoLite2-ISP.mmdb`). Other
+  # databases, such as the the country database, are not supported.
   #
   # * required
   # * type: string
@@ -3550,12 +3558,10 @@ require('custom_module')
   #
 
   [sinks.aws_kinesis_firehose.request]
-    # The maximum number of in-flight requests allowed at any given time. If this
-    # is not set, this limit will vary continuously based on the timing and
-    # contents of responses received from the remote service.
+    # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * no default
+    # * default: 5
     # * type: uint
     # * unit: requests
     in_flight_limit = 5
@@ -3782,12 +3788,10 @@ require('custom_module')
   #
 
   [sinks.aws_kinesis_streams.request]
-    # The maximum number of in-flight requests allowed at any given time. If this
-    # is not set, this limit will vary continuously based on the timing and
-    # contents of responses received from the remote service.
+    # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * no default
+    # * default: 5
     # * type: uint
     # * unit: requests
     in_flight_limit = 5
@@ -4479,12 +4483,10 @@ require('custom_module')
   #
 
   [sinks.clickhouse.request]
-    # The maximum number of in-flight requests allowed at any given time. If this
-    # is not set, this limit will vary continuously based on the timing and
-    # contents of responses received from the remote service.
+    # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * no default
+    # * default: 5
     # * type: uint
     # * unit: requests
     in_flight_limit = 5
@@ -4927,12 +4929,10 @@ require('custom_module')
   #
 
   [sinks.datadog_metrics.request]
-    # The maximum number of in-flight requests allowed at any given time. If this
-    # is not set, this limit will vary continuously based on the timing and
-    # contents of responses received from the remote service.
+    # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * no default
+    # * default: 5
     # * type: uint
     # * unit: requests
     in_flight_limit = 5
@@ -5249,12 +5249,10 @@ require('custom_module')
   #
 
   [sinks.elasticsearch.request]
-    # The maximum number of in-flight requests allowed at any given time. If this
-    # is not set, this limit will vary continuously based on the timing and
-    # contents of responses received from the remote service.
+    # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * no default
+    # * default: 5
     # * type: uint
     # * unit: requests
     in_flight_limit = 5
@@ -5698,10 +5696,10 @@ require('custom_module')
     # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * default: 25
+    # * default: 5
     # * type: uint
     # * unit: requests
-    in_flight_limit = 25
+    in_flight_limit = 5
 
     # The time window, in seconds, used for the `rate_limit_num` option.
     #
@@ -5980,12 +5978,10 @@ require('custom_module')
   #
 
   [sinks.gcp_pubsub.request]
-    # The maximum number of in-flight requests allowed at any given time. If this
-    # is not set, this limit will vary continuously based on the timing and
-    # contents of responses received from the remote service.
+    # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * no default
+    # * default: 5
     # * type: uint
     # * unit: requests
     in_flight_limit = 5
@@ -6576,12 +6572,10 @@ require('custom_module')
   #
 
   [sinks.honeycomb.request]
-    # The maximum number of in-flight requests allowed at any given time. If this
-    # is not set, this limit will vary continuously based on the timing and
-    # contents of responses received from the remote service.
+    # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * no default
+    # * default: 5
     # * type: uint
     # * unit: requests
     in_flight_limit = 5
@@ -6851,15 +6845,13 @@ require('custom_module')
   #
 
   [sinks.http.request]
-    # The maximum number of in-flight requests allowed at any given time. If this
-    # is not set, this limit will vary continuously based on the timing and
-    # contents of responses received from the remote service.
+    # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * no default
+    # * default: 10
     # * type: uint
     # * unit: requests
-    in_flight_limit = 5
+    in_flight_limit = 10
 
     # The time window, in seconds, used for the `rate_limit_num` option.
     #
@@ -6873,9 +6865,9 @@ require('custom_module')
     # time window.
     #
     # * optional
-    # * default: 10
+    # * default: 1000
     # * type: uint
-    rate_limit_num = 10
+    rate_limit_num = 1000
 
     # The maximum number of retries to make for failed requests. The default, for
     # all intents and purposes, represents an infinite number of retries.
@@ -7140,15 +7132,13 @@ require('custom_module')
   #
 
   [sinks.humio_logs.request]
-    # The maximum number of in-flight requests allowed at any given time. If this
-    # is not set, this limit will vary continuously based on the timing and
-    # contents of responses received from the remote service.
+    # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * no default
+    # * default: 10
     # * type: uint
     # * unit: requests
-    in_flight_limit = 5
+    in_flight_limit = 10
 
     # The time window, in seconds, used for the `rate_limit_num` option.
     #
@@ -7629,12 +7619,10 @@ require('custom_module')
   #
 
   [sinks.influxdb_metrics.request]
-    # The maximum number of in-flight requests allowed at any given time. If this
-    # is not set, this limit will vary continuously based on the timing and
-    # contents of responses received from the remote service.
+    # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * no default
+    # * default: 5
     # * type: uint
     # * unit: requests
     in_flight_limit = 5
@@ -8129,12 +8117,10 @@ require('custom_module')
   #
 
   [sinks.logdna.request]
-    # The maximum number of in-flight requests allowed at any given time. If this
-    # is not set, this limit will vary continuously based on the timing and
-    # contents of responses received from the remote service.
+    # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * no default
+    # * default: 5
     # * type: uint
     # * unit: requests
     in_flight_limit = 5
@@ -8410,12 +8396,10 @@ require('custom_module')
   #
 
   [sinks.loki.request]
-    # The maximum number of in-flight requests allowed at any given time. If this
-    # is not set, this limit will vary continuously based on the timing and
-    # contents of responses received from the remote service.
+    # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * no default
+    # * default: 5
     # * type: uint
     # * unit: requests
     in_flight_limit = 5
@@ -8709,12 +8693,10 @@ require('custom_module')
   #
 
   [sinks.new_relic_logs.request]
-    # The maximum number of in-flight requests allowed at any given time. If this
-    # is not set, this limit will vary continuously based on the timing and
-    # contents of responses received from the remote service.
+    # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * no default
+    # * default: 5
     # * type: uint
     # * unit: requests
     in_flight_limit = 5
@@ -9180,12 +9162,10 @@ require('custom_module')
   #
 
   [sinks.sematext_logs.request]
-    # The maximum number of in-flight requests allowed at any given time. If this
-    # is not set, this limit will vary continuously based on the timing and
-    # contents of responses received from the remote service.
+    # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * no default
+    # * default: 5
     # * type: uint
     # * unit: requests
     in_flight_limit = 5
@@ -9627,15 +9607,13 @@ require('custom_module')
   #
 
   [sinks.splunk_hec.request]
-    # The maximum number of in-flight requests allowed at any given time. If this
-    # is not set, this limit will vary continuously based on the timing and
-    # contents of responses received from the remote service.
+    # The maximum number of in-flight requests allowed at any given time.
     #
     # * optional
-    # * no default
+    # * default: 10
     # * type: uint
     # * unit: requests
-    in_flight_limit = 5
+    in_flight_limit = 10
 
     # The time window, in seconds, used for the `rate_limit_num` option.
     #

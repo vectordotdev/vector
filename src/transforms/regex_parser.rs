@@ -1,8 +1,11 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{self, Event, Value},
-    internal_events::{RegexEventProcessed, RegexFailedMatch, RegexMissingField},
+    event::{Event, Value},
+    internal_events::{
+        RegexParserConversionFailed, RegexParserEventProcessed, RegexParserFailedMatch,
+        RegexParserMissingField, RegexParserTargetExists,
+    },
     types::{parse_check_conversion_map, Conversion},
 };
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
@@ -50,7 +53,7 @@ impl TransformConfig for RegexParserConfig {
     }
 
     fn transform_type(&self) -> &'static str {
-        "regex"
+        "regex_parser"
     }
 }
 
@@ -107,17 +110,12 @@ impl CompiledRegex {
                         .iter()
                         .filter_map(move |(idx, name, conversion)| {
                             capture_locs.get(*idx).and_then(|(start, end)| {
-                                let capture: Value = value[start..end].into();
+                                let capture: Value = value[start..end].to_vec().into();
 
                                 match conversion.convert(capture) {
                                     Ok(value) => Some((name.clone(), value)),
                                     Err(error) => {
-                                        debug!(
-                                            message = "Could not convert types.",
-                                            name = &name[..],
-                                            %error,
-                                            rate_limit_secs = 30
-                                        );
+                                        emit!(RegexParserConversionFailed { name, error });
                                         None
                                     }
                                 }
@@ -125,7 +123,10 @@ impl CompiledRegex {
                         });
                 Some(values)
             }
-            None => None,
+            None => {
+                emit!(RegexParserFailedMatch { value });
+                None
+            }
         }
     }
 }
@@ -135,7 +136,7 @@ impl RegexParser {
         let field = config
             .field
             .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+            .unwrap_or(&crate::config::log_schema().message_key());
 
         let patterns = match (&config.regex, &config.patterns.len()) {
             (None, 0) => {
@@ -238,19 +239,15 @@ impl Transform for RegexParser {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
         let value = log.get(&self.field).map(|s| s.as_bytes());
-        emit!(RegexEventProcessed);
+        emit!(RegexParserEventProcessed);
 
         if let Some(value) = &value {
             let regex_id = self.regexset.matches(&value).into_iter().next();
             let id = match regex_id {
                 Some(id) => id,
                 None => {
-                    emit!(RegexFailedMatch { value });
-                    if self.drop_failed {
-                        return None;
-                    } else {
-                        return Some(event);
-                    }
+                    emit!(RegexParserFailedMatch { value });
+                    return if self.drop_failed { None } else { Some(event) };
                 }
             };
 
@@ -268,7 +265,7 @@ impl Transform for RegexParser {
                         if self.overwrite_target {
                             log.remove(target_field);
                         } else {
-                            error!(message = "Target field already exists", %target_field, rate_limit_secs = 30);
+                            emit!(RegexParserTargetExists { target_field });
                             return Some(event);
                         }
                     }
@@ -284,11 +281,9 @@ impl Transform for RegexParser {
                     log.remove(&self.field);
                 }
                 return Some(event);
-            } else {
-                emit!(RegexFailedMatch { value });
             }
         } else {
-            emit!(RegexMissingField { field: &self.field });
+            emit!(RegexParserMissingField { field: &self.field });
         }
 
         if self.drop_failed {

@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GlobalOptions},
+    config::{self, GlobalOptions, SourceConfig, SourceDescription},
     internal_events::{
         PrometheusErrorResponse, PrometheusEventReceived, PrometheusHttpError,
         PrometheusParseError, PrometheusRequestCompleted,
@@ -22,7 +22,9 @@ pub mod parser;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 struct PrometheusConfig {
-    hosts: Vec<String>,
+    // Deprecated name
+    #[serde(alias = "hosts")]
+    endpoints: Vec<String>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
 }
@@ -31,8 +33,12 @@ pub fn default_scrape_interval_secs() -> u64 {
     15
 }
 
+inventory::submit! {
+    SourceDescription::new_without_default::<PrometheusConfig>("prometheus")
+}
+
 #[typetag::serde(name = "prometheus")]
-impl crate::config::SourceConfig for PrometheusConfig {
+impl SourceConfig for PrometheusConfig {
     fn build(
         &self,
         _name: &str,
@@ -41,7 +47,7 @@ impl crate::config::SourceConfig for PrometheusConfig {
         out: Pipeline,
     ) -> crate::Result<super::Source> {
         let mut urls = Vec::new();
-        for host in self.hosts.iter() {
+        for host in self.endpoints.iter() {
             let base_uri = host.parse::<http::Uri>().context(super::UriParseError)?;
             urls.push(format!("{}metrics", base_uri));
         }
@@ -152,8 +158,10 @@ mod test {
         Error,
     };
     use futures::compat::Future01CompatExt;
-    use hyper::service::{make_service_fn, service_fn};
-    use hyper::{Body, Client, Response, Server};
+    use hyper::{
+        service::{make_service_fn, service_fn},
+        {Body, Client, Response, Server},
+    };
     use pretty_assertions::assert_eq;
     use tokio::time::{delay_for, Duration};
 
@@ -203,11 +211,11 @@ mod test {
             }
         });
 
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source(
             "in",
             PrometheusConfig {
-                hosts: vec![format!("http://{}", in_addr)],
+                endpoints: vec![format!("http://{}", in_addr)],
                 scrape_interval_secs: 1,
             },
         );
@@ -216,13 +224,13 @@ mod test {
             &["in"],
             PrometheusSinkConfig {
                 address: out_addr,
-                namespace: "vector".into(),
+                namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
                 flush_period_secs: 1,
             },
         );
 
-        let (topology, _crash) = start_topology(config, false).await;
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
         delay_for(Duration::from_secs(1)).await;
 
         let response = Client::new()

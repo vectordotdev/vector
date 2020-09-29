@@ -24,11 +24,13 @@ impl InternalEvent for FileEventReceived<'_> {
             "events_processed", 1,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.file.to_owned(),
         );
         counter!(
             "bytes_processed", self.byte_size as u64,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.file.to_owned(),
         );
     }
 }
@@ -41,7 +43,7 @@ pub struct FileChecksumFailed<'a> {
 impl<'a> InternalEvent for FileChecksumFailed<'a> {
     fn emit_logs(&self) {
         warn!(
-            message = "currently ignoring file too small for fingerprinting.",
+            message = "Currently ignoring file too small for fingerprinting.",
             path = ?self.path,
         );
     }
@@ -51,6 +53,7 @@ impl<'a> InternalEvent for FileChecksumFailed<'a> {
             "checksum_errors", 1,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.path.to_string_lossy().into_owned(),
         );
     }
 }
@@ -64,7 +67,7 @@ pub struct FileFingerprintReadFailed<'a> {
 impl<'a> InternalEvent for FileFingerprintReadFailed<'a> {
     fn emit_logs(&self) {
         error!(
-            message = "failed reading file for fingerprinting.",
+            message = "Failed reading file for fingerprinting.",
             path = ?self.path,
             error = ?self.error,
         );
@@ -75,6 +78,7 @@ impl<'a> InternalEvent for FileFingerprintReadFailed<'a> {
             "fingerprint_read_errors", 1,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.path.to_string_lossy().into_owned(),
         );
     }
 }
@@ -88,7 +92,7 @@ pub struct FileDeleteFailed<'a> {
 impl<'a> InternalEvent for FileDeleteFailed<'a> {
     fn emit_logs(&self) {
         warn!(
-            message = "failed in deleting file.",
+            message = "Failed in deleting file.",
             path = ?self.path,
             error = ?self.error,
             rate_limit_secs = 1
@@ -100,6 +104,7 @@ impl<'a> InternalEvent for FileDeleteFailed<'a> {
             "file_delete_errors", 1,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.path.to_string_lossy().into_owned(),
         );
     }
 }
@@ -112,7 +117,7 @@ pub struct FileDeleted<'a> {
 impl<'a> InternalEvent for FileDeleted<'a> {
     fn emit_logs(&self) {
         info!(
-            message = "file deleted.",
+            message = "File deleted.",
             path = ?self.path,
         );
     }
@@ -122,6 +127,7 @@ impl<'a> InternalEvent for FileDeleted<'a> {
             "files_deleted", 1,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.path.to_string_lossy().into_owned(),
         );
     }
 }
@@ -134,7 +140,7 @@ pub struct FileUnwatched<'a> {
 impl<'a> InternalEvent for FileUnwatched<'a> {
     fn emit_logs(&self) {
         info!(
-            message = "stopped watching file.",
+            message = "Stopped watching file.",
             path = ?self.path,
         );
     }
@@ -144,6 +150,7 @@ impl<'a> InternalEvent for FileUnwatched<'a> {
             "files_unwatched", 1,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.path.to_string_lossy().into_owned(),
         );
     }
 }
@@ -157,7 +164,7 @@ pub struct FileWatchFailed<'a> {
 impl<'a> InternalEvent for FileWatchFailed<'a> {
     fn emit_logs(&self) {
         error!(
-            message = "failed to watch file.",
+            message = "Failed to watch file.",
             path = ?self.path,
             error = ?self.error
         );
@@ -168,6 +175,7 @@ impl<'a> InternalEvent for FileWatchFailed<'a> {
             "file_watch_errors", 1,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.path.to_string_lossy().into_owned(),
         );
     }
 }
@@ -181,7 +189,7 @@ pub struct FileResumed<'a> {
 impl<'a> InternalEvent for FileResumed<'a> {
     fn emit_logs(&self) {
         info!(
-            message = "resuming to watch file.",
+            message = "Resuming to watch file.",
             path = ?self.path,
             file_position = %self.file_position
         );
@@ -192,6 +200,7 @@ impl<'a> InternalEvent for FileResumed<'a> {
             "files_resumed", 1,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.path.to_string_lossy().into_owned(),
         );
     }
 }
@@ -204,7 +213,7 @@ pub struct FileAdded<'a> {
 impl<'a> InternalEvent for FileAdded<'a> {
     fn emit_logs(&self) {
         info!(
-            message = "found new file to watch.",
+            message = "Found new file to watch.",
             path = ?self.path,
         );
     }
@@ -214,6 +223,7 @@ impl<'a> InternalEvent for FileAdded<'a> {
             "files_added", 1,
             "component_kind" => "source",
             "component_type" => "file",
+            "file" => self.path.to_string_lossy().into_owned(),
         );
     }
 }
@@ -225,7 +235,7 @@ pub struct FileCheckpointed {
 
 impl InternalEvent for FileCheckpointed {
     fn emit_logs(&self) {
-        debug!(message = "files checkpointed.", count = %self.count);
+        debug!(message = "Files checkpointed.", count = %self.count);
     }
 
     fn emit_metrics(&self) {
@@ -244,7 +254,7 @@ pub struct FileCheckpointWriteFailed {
 
 impl InternalEvent for FileCheckpointWriteFailed {
     fn emit_logs(&self) {
-        warn!(message = "failed writing checkpoints.", error = ?self.error);
+        warn!(message = "Failed writing checkpoints.", error = ?self.error);
     }
 
     fn emit_metrics(&self) {

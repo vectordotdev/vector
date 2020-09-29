@@ -156,24 +156,4 @@ mod test {
         }"#;
         Lua::new().context(|ctx| ctx.load(lua_event).eval::<Event>().unwrap());
     }
-
-    #[test]
-    #[should_panic]
-    fn from_lua_both_log_and_metric() {
-        let lua_event = r#"{
-            log = {
-                field = "example",
-                nested = {
-                    field = "another example"
-                }
-            },
-            metric = {
-                name = "example counter",
-                counter = {
-                    value = 0.57721566
-                }
-            }
-        }"#;
-        Lua::new().context(|ctx| ctx.load(lua_event).eval::<Event>().unwrap());
-    }
 }

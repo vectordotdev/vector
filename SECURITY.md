@@ -191,7 +191,7 @@ modifications.
 
 All network traffic is secured via TLS and SSH. This includes checking out
 Vector's code from the relevant [protected branch](#protected-branches),
-Docker image retrieval, and publishment of Vector's release artifacts.
+Docker image retrieval, and publishing of Vector's release artifacts.
 
 ### Runtime Isolation
 

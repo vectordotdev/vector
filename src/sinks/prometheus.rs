@@ -2,12 +2,14 @@ use crate::{
     buffers::Acker,
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue},
-    sinks::util::MetricEntry,
+    sinks::util::{encode_namespace, MetricEntry, StreamSink},
     Event,
 };
+use async_trait::async_trait;
 use chrono::Utc;
-use futures::{compat::Future01CompatExt, future::FutureExt, TryFutureExt};
-use futures01::{future, Async, AsyncSink, Future, Sink};
+use futures::{
+    compat::Future01CompatExt, future, stream::BoxStream, FutureExt, StreamExt, TryFutureExt,
+};
 use hyper::{
     header::HeaderValue,
     service::{make_service_fn, service_fn},
@@ -18,6 +20,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
     collections::{BTreeMap, HashSet},
+    convert::Infallible,
     net::SocketAddr,
     sync::{Arc, RwLock},
 };
@@ -35,7 +38,7 @@ enum BuildError {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusSinkConfig {
-    pub namespace: String,
+    pub namespace: Option<String>,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
     #[serde(default = "default_histogram_buckets")]
@@ -66,17 +69,17 @@ inventory::submit! {
 
 #[typetag::serde(name = "prometheus")]
 impl SinkConfig for PrometheusSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         if self.flush_period_secs < MIN_FLUSH_PERIOD_SECS {
             return Err(Box::new(BuildError::FlushPeriodTooShort {
                 min: MIN_FLUSH_PERIOD_SECS,
             }));
         }
 
-        let sink = Box::new(PrometheusSink::new(self.clone(), cx.acker()));
-        let healthcheck = Box::new(future::ok(()));
+        let sink = PrometheusSink::new(self.clone(), cx.acker());
+        let healthcheck = future::ok(()).boxed();
 
-        Ok((sink, healthcheck))
+        Ok((super::VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -94,14 +97,6 @@ struct PrometheusSink {
     metrics: Arc<RwLock<IndexSet<MetricEntry>>>,
     last_flush_timestamp: Arc<RwLock<i64>>,
     acker: Acker,
-}
-
-fn encode_namespace(namespace: &str, name: &str) -> String {
-    if !namespace.is_empty() {
-        format!("{}_{}", namespace, name)
-    } else {
-        name.to_string()
-    }
 }
 
 fn encode_tags(tags: &Option<BTreeMap<String, String>>) -> String {
@@ -136,10 +131,10 @@ fn encode_tags_with_extra(
     format!("{{{}}}", parts.join(","))
 }
 
-fn encode_metric_header(namespace: &str, metric: &Metric) -> String {
+fn encode_metric_header(namespace: Option<&str>, metric: &Metric) -> String {
     let mut s = String::new();
     let name = &metric.name;
-    let fullname = encode_namespace(namespace, name);
+    let fullname = encode_namespace(namespace, '_', name);
 
     let r#type = match &metric.value {
         MetricValue::Counter { .. } => "counter",
@@ -155,9 +150,14 @@ fn encode_metric_header(namespace: &str, metric: &Metric) -> String {
     s
 }
 
-fn encode_metric_datum(namespace: &str, buckets: &[f64], expired: bool, metric: &Metric) -> String {
+fn encode_metric_datum(
+    namespace: Option<&str>,
+    buckets: &[f64],
+    expired: bool,
+    metric: &Metric,
+) -> String {
     let mut s = String::new();
-    let fullname = encode_namespace(namespace, &metric.name);
+    let fullname = encode_namespace(namespace, '_', &metric.name);
 
     if metric.kind.is_absolute() {
         let tags = &metric.tags;
@@ -179,7 +179,7 @@ fn encode_metric_datum(namespace: &str, buckets: &[f64], expired: bool, metric: 
                 sample_rates,
                 statistic: _,
             } => {
-                // convert ditributions into aggregated histograms
+                // convert distributions into aggregated histograms
                 let mut counts = Vec::new();
                 for _ in buckets {
                     counts.push(0);
@@ -267,11 +267,11 @@ fn encode_metric_datum(namespace: &str, buckets: &[f64], expired: bool, metric: 
 
 fn handle(
     req: Request<Body>,
-    namespace: &str,
+    namespace: Option<&str>,
     buckets: &[f64],
     expired: bool,
     metrics: &IndexSet<MetricEntry>,
-) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send> {
+) -> Response<Body> {
     let mut response = Response::new(Body::empty());
 
     match (req.method(), req.uri().path()) {
@@ -283,10 +283,10 @@ fn handle(
 
             for metric in metrics {
                 let name = &metric.0.name;
-                let frame = encode_metric_datum(&namespace, &buckets, expired, &metric.0);
+                let frame = encode_metric_datum(namespace, &buckets, expired, &metric.0);
 
                 if !processed_headers.contains(&name) {
-                    let header = encode_metric_header(&namespace, &metric.0);
+                    let header = encode_metric_header(namespace, &metric.0);
                     s.push_str(&header);
                     processed_headers.insert(name);
                 };
@@ -310,7 +310,8 @@ fn handle(
         message = "Request complete",
         response_code = field::debug(response.status())
     );
-    Box::new(future::ok(response))
+
+    response
 }
 
 impl PrometheusSink {
@@ -343,18 +344,20 @@ impl PrometheusSink {
             let flush_period_secs = flush_period_secs;
 
             async move {
-                Ok::<_, crate::Error>(service_fn(move |req| {
+                Ok::<_, Infallible>(service_fn(move |req| {
                     let metrics = metrics.read().unwrap();
                     let last_flush_timestamp = last_flush_timestamp.read().unwrap();
                     let interval = (Utc::now().timestamp() - *last_flush_timestamp) as u64;
                     let expired = interval > flush_period_secs;
-                    info_span!(
+
+                    let response = info_span!(
                         "prometheus_server",
                         method = field::debug(req.method()),
                         path = field::debug(req.uri().path()),
                     )
-                    .in_scope(|| handle(req, &namespace, &buckets, expired, &metrics))
-                    .compat()
+                    .in_scope(|| handle(req, namespace.as_deref(), &buckets, expired, &metrics));
+
+                    future::ok::<_, Infallible>(response)
                 }))
             }
         });
@@ -371,54 +374,44 @@ impl PrometheusSink {
     }
 }
 
-impl Sink for PrometheusSink {
-    type SinkItem = Event;
-    type SinkError = ();
+#[async_trait]
+impl StreamSink for PrometheusSink {
+    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        while let Some(event) = input.next().await {
+            self.start_server_if_needed();
 
-    fn start_send(
-        &mut self,
-        event: Self::SinkItem,
-    ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
-        self.start_server_if_needed();
+            let item = event.into_metric();
+            let mut metrics = self.metrics.write().unwrap();
 
-        let item = event.into_metric();
-        let mut metrics = self.metrics.write().unwrap();
-
-        match item.kind {
-            MetricKind::Incremental => {
-                let new = MetricEntry(item.to_absolute());
-                if let Some(MetricEntry(mut existing)) = metrics.take(&new) {
-                    if item.value.is_set() {
-                        // sets need to be expired from time to time
-                        // because otherwise they could grow infinitelly
-                        let now = Utc::now().timestamp();
-                        let interval = now - *self.last_flush_timestamp.read().unwrap();
-                        if interval > self.config.flush_period_secs as i64 {
-                            *self.last_flush_timestamp.write().unwrap() = now;
-                            existing.reset();
+            match item.kind {
+                MetricKind::Incremental => {
+                    let new = MetricEntry(item.to_absolute());
+                    if let Some(MetricEntry(mut existing)) = metrics.take(&new) {
+                        if item.value.is_set() {
+                            // sets need to be expired from time to time
+                            // because otherwise they could grow infinitelly
+                            let now = Utc::now().timestamp();
+                            let interval = now - *self.last_flush_timestamp.read().unwrap();
+                            if interval > self.config.flush_period_secs as i64 {
+                                *self.last_flush_timestamp.write().unwrap() = now;
+                                existing.reset();
+                            }
                         }
-                    }
-                    existing.add(&item);
-                    metrics.insert(MetricEntry(existing));
-                } else {
-                    metrics.insert(new);
-                };
-            }
-            MetricKind::Absolute => {
-                let new = MetricEntry(item);
-                metrics.replace(new);
-            }
-        };
+                        existing.add(&item);
+                        metrics.insert(MetricEntry(existing));
+                    } else {
+                        metrics.insert(new);
+                    };
+                }
+                MetricKind::Absolute => {
+                    let new = MetricEntry(item);
+                    metrics.replace(new);
+                }
+            };
 
-        self.acker.ack(1);
-
-        Ok(AsyncSink::Ready)
-    }
-
-    fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
-        self.start_server_if_needed();
-
-        Ok(Async::Ready(()))
+            self.acker.ack(1);
+        }
+        Ok(())
     }
 }
 
@@ -444,8 +437,8 @@ mod tests {
             value: MetricValue::Counter { value: 10.0 },
         };
 
-        let header = encode_metric_header("vector", &metric);
-        let frame = encode_metric_datum("vector", &[], false, &metric);
+        let header = encode_metric_header(Some("vector"), &metric);
+        let frame = encode_metric_datum(Some("vector"), &[], false, &metric);
 
         assert_eq!(
             header,
@@ -464,8 +457,8 @@ mod tests {
             value: MetricValue::Gauge { value: -1.1 },
         };
 
-        let header = encode_metric_header("vector", &metric);
-        let frame = encode_metric_datum("vector", &[], false, &metric);
+        let header = encode_metric_header(Some("vector"), &metric);
+        let frame = encode_metric_datum(Some("vector"), &[], false, &metric);
 
         assert_eq!(
             header,
@@ -486,8 +479,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("", &metric);
-        let frame = encode_metric_datum("", &[], false, &metric);
+        let header = encode_metric_header(None, &metric);
+        let frame = encode_metric_datum(None, &[], false, &metric);
 
         assert_eq!(
             header,
@@ -508,8 +501,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("", &metric);
-        let frame = encode_metric_datum("", &[], true, &metric);
+        let header = encode_metric_header(None, &metric);
+        let frame = encode_metric_datum(None, &[], true, &metric);
 
         assert_eq!(
             header,
@@ -532,8 +525,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("", &metric);
-        let frame = encode_metric_datum("", &[0.0, 2.5, 5.0], false, &metric);
+        let header = encode_metric_header(None, &metric);
+        let frame = encode_metric_datum(None, &[0.0, 2.5, 5.0], false, &metric);
 
         assert_eq!(
             header,
@@ -557,8 +550,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("", &metric);
-        let frame = encode_metric_datum("", &[], false, &metric);
+        let header = encode_metric_header(None, &metric);
+        let frame = encode_metric_datum(None, &[], false, &metric);
 
         assert_eq!(
             header,
@@ -582,8 +575,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("", &metric);
-        let frame = encode_metric_datum("", &[], false, &metric);
+        let header = encode_metric_header(None, &metric);
+        let frame = encode_metric_datum(None, &[], false, &metric);
 
         assert_eq!(
             header,

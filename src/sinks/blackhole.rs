@@ -2,10 +2,12 @@ use crate::{
     buffers::Acker,
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
-    event::{self, Event},
     internal_events::BlackholeEventReceived,
+    sinks::util::StreamSink,
+    Event,
 };
-use futures01::{future, AsyncSink, Future, Poll, Sink, StartSend};
+use async_trait::async_trait;
+use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 
 pub struct BlackholeSink {
@@ -26,11 +28,11 @@ inventory::submit! {
 
 #[typetag::serde(name = "blackhole")]
 impl SinkConfig for BlackholeConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = Box::new(BlackholeSink::new(self.clone(), cx.acker()));
-        let healthcheck = Box::new(healthcheck());
+    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let sink = BlackholeSink::new(self.clone(), cx.acker());
+        let healthcheck = future::ok(()).boxed();
 
-        Ok((sink, healthcheck))
+        Ok((super::VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -40,10 +42,6 @@ impl SinkConfig for BlackholeConfig {
     fn sink_type(&self) -> &'static str {
         "blackhole"
     }
-}
-
-fn healthcheck() -> impl Future<Item = (), Error = crate::Error> {
-    future::ok(())
 }
 
 impl BlackholeSink {
@@ -57,56 +55,51 @@ impl BlackholeSink {
     }
 }
 
-impl Sink for BlackholeSink {
-    type SinkItem = Event;
-    type SinkError = ();
+#[async_trait]
+impl StreamSink for BlackholeSink {
+    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        while let Some(event) = input.next().await {
+            let message_len = match event {
+                Event::Log(log) => log
+                    .get(&crate::config::log_schema().message_key())
+                    .map(|v| v.as_bytes().len())
+                    .unwrap_or(0),
+                Event::Metric(metric) => {
+                    serde_json::to_string(&metric).map(|v| v.len()).unwrap_or(0)
+                }
+            };
 
-    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        let message_len = match item {
-            Event::Log(log) => log
-                .get(&event::log_schema().message_key())
-                .map(|v| v.as_bytes().len())
-                .unwrap_or(0),
-            Event::Metric(metric) => serde_json::to_string(&metric).map(|v| v.len()).unwrap_or(0),
-        };
+            self.total_events += 1;
+            self.total_raw_bytes += message_len;
 
-        self.total_events += 1;
-        self.total_raw_bytes += message_len;
+            emit!(BlackholeEventReceived {
+                byte_size: message_len
+            });
 
-        emit!(BlackholeEventReceived {
-            byte_size: message_len
-        });
+            if self.total_events % self.config.print_amount == 0 {
+                info!({
+                    events = self.total_events,
+                    raw_bytes_collected = self.total_raw_bytes
+                }, "Total events collected");
+            }
 
-        if self.total_events % self.config.print_amount == 0 {
-            info!({
-                events = self.total_events,
-                raw_bytes_collected = self.total_raw_bytes
-            }, "Total events collected");
+            self.acker.ack(1);
         }
-
-        self.acker.ack(1);
-
-        Ok(AsyncSink::Ready)
-    }
-
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        Ok(().into())
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::buffers::Acker;
     use crate::test_util::random_events_with_stream;
 
-    #[test]
-    fn blackhole() {
+    #[tokio::test]
+    async fn blackhole() {
         let config = BlackholeConfig { print_amount: 10 };
-        let sink = BlackholeSink::new(config, Acker::Null);
+        let mut sink = BlackholeSink::new(config, Acker::Null);
 
         let (_input_lines, events) = random_events_with_stream(100, 10);
-
-        let _ = sink.send_all(events).wait().unwrap();
+        let _ = sink.run(Box::pin(events)).await.unwrap();
     }
 }
