@@ -91,7 +91,7 @@ This source will use the default AWS credential chain similar to the
 The output (shown here in prometheus format) will publish metrics in the form
 of:
 
-```
+```text
 <namespace>_<metric_name>_<metric_stat>{<dimension_key>=<dimension_value>*}
 ```
 
@@ -99,7 +99,7 @@ All metrics will be additionally tagged with the region.
 
 For example:
 
-```
+```text
 aws_ec2_cpu_credit_balance_average{instance_id="i-0db9620c0ee32d463",region="us-east-1"} 576
 aws_ec2_cpu_credit_balance_maximum{instance_id="i-0db9620c0ee32d463",region="us-east-1"} 576
 aws_ec2_cpu_credit_balance_minimum{instance_id="i-0db9620c0ee32d463",region="us-east-1"} 576
@@ -119,9 +119,9 @@ data.
 
 ## Prior Art
 
-- [telegraf](https://github.com/influxdata/telegraf/tree/master/plugins/inputs/cloudwatch)
-- [prometheus exporter](https://github.com/prometheus/cloudwatch_exporter)
-- [filebeat](https://www.elastic.co/guide/en/logstash/current/plugins-inputs-cloudwatch.html)
+* [telegraf](https://github.com/influxdata/telegraf/tree/master/plugins/inputs/cloudwatch)
+* [prometheus exporter](https://github.com/prometheus/cloudwatch_exporter)
+* [filebeat](https://www.elastic.co/guide/en/logstash/current/plugins-inputs-cloudwatch.html)
 
 ## Drawbacks
 
@@ -154,21 +154,21 @@ would further advantage `GetMetricData`.
 
 ## Outstanding Questions
 
-- Do we care about providing a different rate limit for refreshing available
-	metrics? It uses a different API (`ListMetrics`) with different limits than
-	`GetMetricData`. Answer: we'll try without for now.
+* Do we care about providing a different rate limit for refreshing available
+  metrics? It uses a different API (`ListMetrics`) with different limits than
+  `GetMetricData`. Answer: we'll try without for now.
 
 ## Plan Of Attack
 
-- [ ] Submit PR with `aws_cloudwatch_metrics` source without any support for
+* [ ] Submit PR with `aws_cloudwatch_metrics` source without any support for
       globbing (which would require listing and caching metrics) and only one
       region
-- [ ] Submit follow-up PR allowing for globbing of metric names
-- [ ] Submit follow-up PR allowing for globbing of dimension value
-- [ ] Submit follow-up PR allowing for globbing of namespace
-- [ ] Submit follow-up PR allowing for multiple regions
+* [ ] Submit follow-up PR allowing for globbing of metric names
+* [ ] Submit follow-up PR allowing for globbing of dimension value
+* [ ] Submit follow-up PR allowing for globbing of namespace
+* [ ] Submit follow-up PR allowing for multiple regions
 
-## Future Work:
+## Future Work
 
 * Support for [metric
   expressions](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/using-metric-math.html#metric-math-syntax).
