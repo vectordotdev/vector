@@ -178,7 +178,9 @@ fn main() {
                             {
                                 Ok(true) => {
                                     #[cfg(feature="api")]
-                                    api::schema::topology::update_config(topology.clone_config());
+                                    if api_enabled {
+                                        api::update_config(topology.clone_config());
+                                    }
 
                                     emit!(VectorReloaded { config_paths: &config_paths })
                                 },

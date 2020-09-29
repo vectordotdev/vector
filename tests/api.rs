@@ -11,7 +11,6 @@ mod tests {
     use futures::StreamExt;
     use graphql_client::*;
     use std::sync::Arc;
-    use std::{sync::Once, time::Duration};
     use std::{
         sync::Once,
         time::{Duration, Instant},
