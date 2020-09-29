@@ -1,4 +1,4 @@
-name: Lint Suite
+name: PR Checks
 
 on:
   push:
