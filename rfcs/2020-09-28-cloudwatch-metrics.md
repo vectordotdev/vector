@@ -177,3 +177,5 @@ would further advantage `GetMetricData`.
   fetching metrics for those instances.
 * Backfilling metrics if `vector` is restarted or offline for a period.
 * Config examples covering common use-cases
+* Warnings when configured dimensions do not match any metrics in `ListMetrics`
+* Caching `ListMetrics` output across vector restarts to speed up initial start
