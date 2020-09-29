@@ -32,8 +32,8 @@ The configuration of the new `aws_cloudwatch_metrics` source will look like:
 [sources.cloudwatch]
   type = "aws_cloudwatch_metrics"
   assume_role = "arn:aws:iam::123456789098:role/my_role" # optional, no default
-  endpoint = "127.0.0.0:5000/path/to/service" # optional, no default, relevant when region = ""
-  region = "us-east-1" # required, required when endpoint = ""
+  endpoints = ["127.0.0.0:5000/path/to/service"] # optional, no default, relevant when regions = []
+  regions = ["us-east-1"] # required, required when endpoints unspecified; no default
 
   period_secs = 300 # period (s) to aggregate metrics over, optional, can be overridden at metric level, default 300
   delay_secs = 300 # delay collection by value (s), used to avoid collecting data that has not fully been processed by CloudWatch, optional, default 300
@@ -51,7 +51,7 @@ The configuration of the new `aws_cloudwatch_metrics` source will look like:
   request.timeout_secs = 30 # optional, default, seconds
 
   [[sources.cloudwatch.metrics]]
-    namespace = "AWS/EC2" # required
+    namespace = "AWS/EC2" # optional; supports globbing
     names = ["EBSReadOps", "EBSReadBytes", "Network*"] # optional; defaults to all metrics in namespace, ["*"], (refreshed on interval); supports globbing
     dimensions.InstanceId = "i-05517fbc2e6124dfb" # optional; supported dimensions differ by namespace and metric; supports globbing
     statistics = [ "average", "sum", "minimum", "maximum", "sample_count" ] # statistics to collect; can also contain extended statistics like p99; default: [ "average", "sum", "minimum", "maximum", "sample_count" ]
@@ -156,17 +156,17 @@ would further advantage `GetMetricData`.
 
 - Do we care about providing a different rate limit for refreshing available
 	metrics? It uses a different API (`ListMetrics`) with different limits than
-	`GetMetricData`.
-- Do we want to allow multiple regions to be specified at once? If so, the
-	`request` parameters should probably be documented as applying to each each
-	region separately.
+	`GetMetricData`. Answer: we'll try without for now.
 
 ## Plan Of Attack
 
 - [ ] Submit PR with `aws_cloudwatch_metrics` source without any support for
-      globbing (which would require listing and caching metrics)
+      globbing (which would require listing and caching metrics) and only one
+      region
 - [ ] Submit follow-up PR allowing for globbing of metric names
 - [ ] Submit follow-up PR allowing for globbing of dimension value
+- [ ] Submit follow-up PR allowing for globbing of namespace
+- [ ] Submit follow-up PR allowing for multiple regions
 
 ## Future Work:
 
