@@ -220,6 +220,14 @@ impl RunningTopology {
         // Checks passed so let's shutdown the difference.
         self.shutdown_diff(&diff).await;
 
+        // Gives windows some time to make available any port
+        // released by shutdown componenets.
+        // Issue: https://github.com/timberio/vector/issues/3035
+        if cfg!(windows) {
+            // This value is guess work.
+            tokio::time::delay_for(Duration::from_millis(200)).await;
+        }
+
         // Now let's actually build the new pieces.
         if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff).await {
             if self
@@ -664,9 +672,6 @@ mod reload_tests {
     use crate::sources::splunk_hec::SplunkConfig;
     use crate::test_util::{next_addr, start_topology};
 
-    // TODO: Run it only on Linux and Mac since it fails on Windows.
-    // TODO: Issue: https://github.com/timberio/vector/issues/3035
-    #[cfg(unix)]
     #[tokio::test]
     async fn topology_reuse_old_port() {
         let address = next_addr();
