@@ -172,10 +172,12 @@ cidr-utils = "0.4.2"
 pin-project = "0.4.23"
 k8s-openapi = { version = "0.9", features = ["v1_15"], optional = true }
 portpicker = "0.1.0"
-sha-1 = "0.9.1"
-md-5 = "0.9.1"
+sha-1 = "0.9"
+sha2 = "0.9"
+md-5 = "0.9"
 hex = "0.4.2"
 chrono-tz = "0.5.3"
+digest = "0.9"
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -184,7 +186,6 @@ lucet-runtime = { git = "https://github.com/bytecodealliance/lucet.git", rev = "
 lucet-wasi = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
 anyhow = { version = "1.0.28", optional = true }
 async-stream = "0.2.1"
-
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1"

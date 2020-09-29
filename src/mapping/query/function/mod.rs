@@ -113,6 +113,7 @@ build_signatures! {
     uuid_v4 => UuidV4Fn,
     md5 => Md5Fn,
     sha1 => Sha1Fn,
+    sha2 => Sha2Fn,
     now => NowFn,
     truncate => TruncateFn,
     parse_json => ParseJsonFn,
