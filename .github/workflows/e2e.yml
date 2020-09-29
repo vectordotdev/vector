@@ -67,6 +67,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - run: make package-deb-x86_64
       - uses: actions/upload-artifact@v2
         with:

@@ -43,6 +43,7 @@ env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"
+  CI: true
 
 jobs:
   cancel-previous:
@@ -62,6 +63,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -82,6 +84,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -102,6 +105,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -155,6 +159,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -175,6 +180,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -193,6 +199,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -211,6 +218,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -229,6 +237,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -247,6 +256,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -265,6 +275,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -283,6 +294,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -301,6 +313,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -319,6 +332,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -337,6 +351,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -355,6 +370,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
