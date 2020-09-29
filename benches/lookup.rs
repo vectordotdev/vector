@@ -103,7 +103,7 @@ fn lookup_to_string(c: &mut Criterion) {
             BenchmarkId::from_parameter(&fixture),
             &fixture.clone(),
             move |b, ref param| {
-                let input = param.clone();
+                let input = &(*param).clone();
                 b.iter_with_setup(
                     || serde_json::to_string(&Lookup::try_from(input.clone()).unwrap()).unwrap(),
                     |input| {

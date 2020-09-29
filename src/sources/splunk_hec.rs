@@ -347,13 +347,13 @@ impl<R: Read> EventStream<R> {
         EventStream {
             data,
             events: 0,
-            channel: channel.map(|value| Value::from(value)),
+            channel: channel.map(Value::from),
             time: Time::Now(Utc::now()),
             extractors: [
                 DefaultExtractor::new_with(
                     "host",
                     &log_schema().host_key(),
-                    host.map(|value| Value::from(value)),
+                    host.map(Value::from),
                 ),
                 DefaultExtractor::new("index", &INDEX),
                 DefaultExtractor::new("source", &SOURCE),
