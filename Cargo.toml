@@ -174,6 +174,7 @@ k8s-openapi = { version = "0.9", features = ["v1_15"], optional = true }
 portpicker = "0.1.0"
 sha-1 = "0.9"
 sha2 = "0.9"
+sha3 = "0.9"
 md-5 = "0.9"
 hex = "0.4.2"
 chrono-tz = "0.5.3"
