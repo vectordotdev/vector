@@ -993,8 +993,7 @@ ci-sweep: ## Sweep up the CI to try to get more disk space.
 	sudo apt-get clean
 	sudo rm -rf "/opt/*" "/usr/local/*"
 	sudo rm -rf "/usr/local/share/boost" && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
-	mapfile -t DOCKER_IMAGES < <(docker image ls -q)
-	docker image rm "${DOCKER_IMAGES[@]}"
+	docker system prune --volumes --all
 	df -h
 endif
 
