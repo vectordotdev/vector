@@ -33,4 +33,5 @@ jobs:
         if: github.event_name != 'workflow_dispatch'
         run: |
           docker push docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
-          docker push timberio/ci_image:latest
+          docker $ENVIRONMENT_UPSTREAM timberio/ci_image
+          docker push timberio/ci_image
