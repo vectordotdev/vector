@@ -4,7 +4,8 @@ use lazy_static::lazy_static;
 use std::sync::{Arc, RwLock};
 
 lazy_static! {
-    static ref CONFIG: Arc<RwLock<Config>> = Arc::new(RwLock::new(Config::default()));
+    static ref CONFIG: Arc<RwLock<Arc<Config>>> =
+        Arc::new(RwLock::new(Arc::new(Config::default())));
 }
 
 pub struct Source<'a>(&'a Box<dyn SourceConfig>);
@@ -33,6 +34,6 @@ impl TopologyQuery {
 }
 
 /// Update the 'global' configuration that will be consumed by topology queries
-pub fn update_config(config: Config) {
+pub fn update_config(config: Arc<Config>) {
     *CONFIG.write().unwrap() = config;
 }

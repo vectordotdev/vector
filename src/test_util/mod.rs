@@ -471,7 +471,7 @@ impl CountReceiver<Event> {
 }
 
 pub async fn start_topology(
-    config: Config,
+    config: Arc<Config>,
     require_healthy: bool,
 ) -> (RunningTopology, mpsc::UnboundedReceiver<()>) {
     let diff = ConfigDiff::initial(&config);
