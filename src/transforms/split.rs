@@ -26,7 +26,7 @@ inventory::submit! {
 
 impl GenerateConfig for SplitConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -149,6 +149,11 @@ mod tests {
         Event,
     };
     use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SplitConfig>();
+    }
 
     #[test]
     fn split_whitespace() {
