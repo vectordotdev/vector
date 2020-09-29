@@ -19,11 +19,11 @@ use vector::test_util::{next_addr, temp_dir, temp_file};
 const STDIO_CONFIG: &'static str = r#"
     data_dir = "${VECTOR_DATA_DIR}"
 
-    [sources.in]
+    [sources.in_console]
         type = "stdin"
 
-    [sinks.out]
-        inputs = ["in"]
+    [sinks.out_console]
+        inputs = ["in_console"]
         type = "console"
         encoding = "text"
 "#;
@@ -117,8 +117,13 @@ fn test_timely_shutdown(cmd: Command) {
     test_timely_shutdown_with_sub(cmd, |_| ());
 }
 
-fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child)) {
-    let mut vector = cmd.stdin(std::process::Stdio::piped()).spawn().unwrap();
+/// Returns stdout output
+fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child)) -> String {
+    let mut vector = cmd
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
 
     // Give vector time to start.
     sleep(Duration::from_secs(1));
@@ -136,16 +141,17 @@ fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child))
     let now = Instant::now();
 
     // Wait for shutdown
-    assert!(
-        vector.wait().unwrap().success(),
-        "Vector didn't exit successfully."
-    );
+    let output = vector.wait_with_output().unwrap();
+    assert!(output.status.success(), "Vector didn't exit successfully.");
 
     // Check if vector has shutdown in a reasonable time
     assert!(
         now.elapsed() < Duration::from_secs(3),
         "Shutdown lasted for more than 3 seconds."
     );
+
+    // Output
+    String::from_utf8_lossy(&output.stdout).into_owned()
 }
 
 #[test]
@@ -162,6 +168,61 @@ fn auto_shutdown() {
     let assert = cmd.write_stdin("42").assert();
 
     assert.success().stdout("42\n");
+}
+
+#[test]
+fn configuration_path_recomputed() {
+    // Directory with configuration files
+    let dir = create_directory();
+
+    // First configuration file
+    overwrite_file(
+        dir.join("conf1.toml"),
+        &source_config(
+            r#"
+        type = "generator"
+        batch_interval = 1.0 # optional, no default
+        lines = []"#,
+        ),
+    );
+
+    // Vector command
+    let mut cmd = vector_with(dir.join("*"), next_addr());
+
+    // Run vector
+    let mut vector = cmd
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    // Give vector time to start.
+    sleep(Duration::from_secs(1));
+
+    // Second configuration file
+    overwrite_file(dir.join("conf2.toml"), STDIO_CONFIG);
+    // Clean the first file so to have only the console source.
+    overwrite_file(dir.join("conf1.toml"), &"");
+
+    // Signal reload
+    kill(Pid::from_raw(vector.id() as i32), Signal::SIGHUP).unwrap();
+
+    // Message to assert, sended to console source and picked up from
+    // console sink, both added in the second configuration file.
+    vector
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all("42".as_bytes())
+        .unwrap();
+
+    // Wait for shutdown
+    // Test will hang here if the other config isn't picked up.
+    let output = vector.wait_with_output().unwrap();
+    assert!(output.status.success(), "Vector didn't exit successfully.");
+
+    // Output
+    assert_eq!(output.stdout.as_slice(), "42\n".as_bytes());
 }
 
 #[test]

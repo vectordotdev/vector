@@ -97,7 +97,7 @@ fn main() {
             })
         };
 
-        let config_paths = config::process_paths(&opts.config_paths).unwrap_or_else(|| {
+        let mut config_paths = config::process_paths(&opts.config_paths).unwrap_or_else(|| {
             std::process::exit(exitcode::CONFIG);
         });
 
@@ -160,6 +160,9 @@ fn main() {
             select! {
                 Some(signal) = signals.next() => {
                     if signal == SignalTo::Reload {
+                        // Reload paths
+                        config_paths = config::process_paths(&opts.config_paths).unwrap_or(config_paths);
+
                         // Reload config
                         let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
 
