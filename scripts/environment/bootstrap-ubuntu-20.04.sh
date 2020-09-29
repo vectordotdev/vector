@@ -61,7 +61,7 @@ dpkg-reconfigure locales
 # Rust
 curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
 
-if [ -x "$(command -v docker)" ]; then
+if ! [ -x "$(command -v docker)" ]; then
     # Docker
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
     add-apt-repository \
