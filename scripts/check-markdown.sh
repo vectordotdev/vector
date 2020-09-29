@@ -11,4 +11,6 @@ set -euo pipefail
 
 markdownlint \
   --config scripts/environment/.markdownlintrc \
+  --ignore scripts/node_modules \
+  --ignore target \
   .
