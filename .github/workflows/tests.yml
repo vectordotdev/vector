@@ -28,48 +28,6 @@ jobs:
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
-  # TODO: Upgrade to test once the tz issues are solved.
-  # https://github.com/timberio/vector/issues/3771
-  build-x86_64-unknown-linux-gnu:
-    name: Build - x86_64-unknown-linux-gnu
-    runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make build-x86_64-unknown-linux-gnu
-
-  # TODO: Upgrade to test once the tz issues are solved.
-  # https://github.com/timberio/vector/issues/3771
-  build-aarch64-unknown-linux-gnu:
-    name: Build - aarch64-unknown-linux-gnu
-    runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make build-aarch64-unknown-linux-gnu
-
   test-linux:
     name: Unit - x86_64-unknown-linux-gnu
     runs-on: ubuntu-20.04
@@ -353,6 +311,48 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test-integration-splunk
+
+  # TODO: Upgrade to test once the tz issues are solved.
+  # https://github.com/timberio/vector/issues/3771
+  build-x86_64-unknown-linux-gnu:
+    name: Build - x86_64-unknown-linux-gnu
+    runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: make build-x86_64-unknown-linux-gnu
+
+  # TODO: Upgrade to test once the tz issues are solved.
+  # https://github.com/timberio/vector/issues/3771
+  build-aarch64-unknown-linux-gnu:
+    name: Build - aarch64-unknown-linux-gnu
+    runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: make build-aarch64-unknown-linux-gnu
 
   build-deb-package:
     name: Build .deb package
