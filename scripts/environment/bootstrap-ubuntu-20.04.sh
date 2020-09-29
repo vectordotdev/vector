@@ -60,12 +60,14 @@ dpkg-reconfigure locales
 # Rust
 curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
 
-# Docker
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-add-apt-repository \
-   "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
-   xenial \
-   stable"
+if [ "${CI}" != "true" ]; then
+    # Docker
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+    add-apt-repository \
+    "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+    xenial \
+    stable"
+fi
 
 # Install those new things
 apt update --yes
