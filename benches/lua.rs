@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 use transforms::lua::v2::LuaConfig;
 use vector::{
     config::{TransformConfig, TransformContext},
+    test_util::runtime,
     transforms::{self, Transform},
     Event,
 };
@@ -94,12 +95,16 @@ fn field_filter(c: &mut Criterion) {
         Benchmark::new("native", move |b| {
             b.iter_with_setup(
                 || {
-                    transforms::field_filter::FieldFilterConfig {
-                        field: "the_field".to_string(),
-                        value: "0".to_string(),
-                    }
-                    .build(TransformContext::new_test())
-                    .unwrap()
+                    let mut rt = runtime();
+                    rt.block_on(async move {
+                        transforms::field_filter::FieldFilterConfig {
+                            field: "the_field".to_string(),
+                            value: "0".to_string(),
+                        }
+                        .build(TransformContext::new_test())
+                        .await
+                        .unwrap()
+                    })
                 },
                 |mut transform| {
                     let num = (0..num_events)

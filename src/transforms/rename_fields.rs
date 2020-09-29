@@ -27,9 +27,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<RenameFieldsConfig>("rename_fields")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "rename_fields")]
 impl TransformConfig for RenameFieldsConfig {
-    fn build(&self, _exec: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _exec: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(RenameFields::new(
             self.fields
                 .clone()

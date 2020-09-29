@@ -21,9 +21,10 @@ inventory::submit! {
     TransformDescription::new::<LogfmtConfig>("logfmt_parser")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
             .as_ref()
@@ -115,7 +116,7 @@ mod tests {
         Event,
     };
 
-    fn parse_log(text: &str, drop_field: bool, types: &[(&str, &str)]) -> LogEvent {
+    async fn parse_log(text: &str, drop_field: bool, types: &[(&str, &str)]) -> LogEvent {
         let event = Event::from(text);
 
         let mut parser = LogfmtConfig {
@@ -124,44 +125,46 @@ mod tests {
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
         .build(TransformContext::new_test())
+        .await
         .unwrap();
 
         parser.transform(event).unwrap().into_log()
     }
 
-    #[test]
-    fn logfmt_adds_parsed_field_to_event() {
-        let log = parse_log("status=1234 time=\"5678\"", false, &[]);
+    #[tokio::test]
+    async fn logfmt_adds_parsed_field_to_event() {
+        let log = parse_log("status=1234 time=\"5678\"", false, &[]).await;
 
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"time".into()], "5678".into());
         assert!(log.get(&"message".into()).is_some());
     }
 
-    #[test]
-    fn logfmt_does_drop_parsed_field() {
-        let log = parse_log("status=1234 time=5678", true, &[]);
+    #[tokio::test]
+    async fn logfmt_does_drop_parsed_field() {
+        let log = parse_log("status=1234 time=5678", true, &[]).await;
 
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"time".into()], "5678".into());
         assert!(log.get(&"message".into()).is_none());
     }
 
-    #[test]
-    fn logfmt_does_not_drop_same_name_parsed_field() {
-        let log = parse_log("status=1234 message=yes", true, &[]);
+    #[tokio::test]
+    async fn logfmt_does_not_drop_same_name_parsed_field() {
+        let log = parse_log("status=1234 message=yes", true, &[]).await;
 
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"message".into()], "yes".into());
     }
 
-    #[test]
-    fn logfmt_coerces_fields_to_types() {
+    #[tokio::test]
+    async fn logfmt_coerces_fields_to_types() {
         let log = parse_log(
             "code=1234 flag=yes number=42.3 rest=word",
             false,
             &[("flag", "bool"), ("code", "integer"), ("number", "float")],
-        );
+        )
+        .await;
 
         assert_eq!(log[&"number".into()], Value::Float(42.3));
         assert_eq!(log[&"flag".into()], Value::Boolean(true));
@@ -169,13 +172,13 @@ mod tests {
         assert_eq!(log[&"rest".into()], Value::Bytes("word".into()));
     }
 
-    #[test]
-    fn heroku_router_message() {
+    #[tokio::test]
+    async fn heroku_router_message() {
         let log = parse_log(
             r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#,
             true,
             &[("status", "integer"), ("bytes", "integer")],
-        );
+        ).await;
 
         assert_eq!(log[&"at".into()], "info".into());
         assert_eq!(log[&"method".into()], "GET".into());
@@ -193,9 +196,9 @@ mod tests {
         assert_eq!(log[&"protocol".into()], "http".into());
     }
 
-    #[test]
-    fn logfmt_handles_herokus_weird_octothorpes() {
-        let log = parse_log("source=web.1 dyno=heroku.2808254.d97d0ea7-cf3d-411b-b453-d2943a50b456 sample#memory_total=21.00MB sample#memory_rss=21.22MB sample#memory_cache=0.00MB sample#memory_swap=0.00MB sample#memory_pgpgin=348836pages sample#memory_pgpgout=343403pages", true, &[]);
+    #[tokio::test]
+    async fn logfmt_handles_herokus_weird_octothorpes() {
+        let log = parse_log("source=web.1 dyno=heroku.2808254.d97d0ea7-cf3d-411b-b453-d2943a50b456 sample#memory_total=21.00MB sample#memory_rss=21.22MB sample#memory_cache=0.00MB sample#memory_swap=0.00MB sample#memory_pgpgin=348836pages sample#memory_pgpgout=343403pages", true, &[]).await;
 
         assert_eq!(log[&"source".into()], "web.1".into());
         assert_eq!(

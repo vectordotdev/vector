@@ -46,9 +46,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<LuaConfig>("lua")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
-    fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         match self {
             LuaConfig::V1(v1) => v1.config.build(cx),
             LuaConfig::V2(v2) => v2.config.build(cx),

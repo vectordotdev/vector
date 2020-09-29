@@ -3,6 +3,7 @@
 // all over the place.
 #![allow(dead_code)]
 
+use async_trait::async_trait;
 use futures::{future, FutureExt};
 use futures01::{sink::Sink, stream, sync::mpsc::Receiver, Async, Future, Stream};
 use serde::{Deserialize, Serialize};
@@ -93,7 +94,7 @@ impl MockSourceConfig {
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 #[typetag::serde(name = "mock")]
 impl SourceConfig for MockSourceConfig {
     async fn build(
@@ -218,9 +219,10 @@ impl MockTransformConfig {
     }
 }
 
+#[async_trait]
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    fn build(&self, _cx: TransformContext) -> Result<Box<dyn Transform>, vector::Error> {
+    async fn build(&self, _cx: TransformContext) -> Result<Box<dyn Transform>, vector::Error> {
         Ok(Box::new(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,

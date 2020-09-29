@@ -92,7 +92,7 @@ fn main() {
             std::process::exit(match s {
                 SubCommand::Validate(v) => validate::validate(&v, color).await,
                 SubCommand::List(l) => list::cmd(&l),
-                SubCommand::Test(t) => unit_test::cmd(&t),
+                SubCommand::Test(t) => unit_test::cmd(&t).await,
                 SubCommand::Generate(g) => generate::cmd(&g),
             })
         };

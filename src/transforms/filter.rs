@@ -16,9 +16,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<FilterConfig>("filter")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Filter::new(self.condition.build()?)))
     }
 

@@ -51,9 +51,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<AddFieldsConfig>("add_fields")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "add_fields")]
 impl TransformConfig for AddFieldsConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(AddFields::new(
             self.fields.clone().all_fields().collect(),
             self.overwrite,
