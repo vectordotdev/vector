@@ -64,14 +64,14 @@ if [ "${CI}" != "true" ]; then
     # Docker
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
     add-apt-repository \
-    "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
-    xenial \
-    stable"
+        "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+        xenial \
+        stable"
+    # Install those new things
+    apt update --yes
+    apt install --yes yarn docker-ce docker-ce-cli containerd.io
 fi
 
-# Install those new things
-apt update --yes
-apt install --yes yarn docker-ce docker-ce-cli containerd.io
 
 # Apt cleanup
 apt clean
