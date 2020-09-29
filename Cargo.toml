@@ -430,7 +430,7 @@ sinks-pulsar = ["pulsar"]
 nightly = []
 
 # Testing-related features
-docker = [
+all-integration-tests = [
   "aws-integration-tests",
   "clickhouse-integration-tests",
   "docker-integration-tests",
