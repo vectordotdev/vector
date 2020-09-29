@@ -59,7 +59,7 @@ pub async fn build_pieces(
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
 
         let server = match source
-            .build_async(&name, &config.global, shutdown_signal, pipeline)
+            .build(&name, &config.global, shutdown_signal, pipeline)
             .await
         {
             Err(error) => {

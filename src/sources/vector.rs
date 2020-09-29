@@ -40,9 +40,10 @@ inventory::submit! {
     SourceDescription::new_without_default::<VectorConfig>("vector")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "vector")]
 impl SourceConfig for VectorConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -119,6 +120,7 @@ mod test {
                 ShutdownSignal::noop(),
                 tx,
             )
+            .await
             .unwrap()
             .compat();
         tokio::spawn(server);

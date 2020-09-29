@@ -1,5 +1,6 @@
 #![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
 
+use async_trait::async_trait;
 use futures::{compat::Future01CompatExt, future, FutureExt};
 use futures01::{Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
@@ -178,9 +179,10 @@ async fn test_sink_error() {
 #[derive(Deserialize, Serialize, Debug)]
 struct ErrorSourceConfig;
 
+#[async_trait]
 #[typetag::serde(name = "tcp")]
 impl config::SourceConfig for ErrorSourceConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -244,9 +246,10 @@ async fn test_source_error() {
 #[derive(Deserialize, Serialize, Debug)]
 struct PanicSourceConfig;
 
+#[async_trait]
 #[typetag::serde(name = "tcp")]
 impl config::SourceConfig for PanicSourceConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,

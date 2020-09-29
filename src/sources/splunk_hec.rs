@@ -9,7 +9,6 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
-use async_trait::async_trait;
 use bytes::{buf::BufExt, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
@@ -75,20 +74,10 @@ fn default_socket_address() -> SocketAddr {
     SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), 8088)
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "splunk_hec")]
-#[async_trait]
 impl SourceConfig for SplunkConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
-        _out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        unimplemented!()
-    }
-
-    async fn build_async(
+    async fn build(
         &self,
         _: &str,
         _: &GlobalOptions,
@@ -796,7 +785,7 @@ mod tests {
                 token,
                 tls: None,
             }
-            .build_async(
+            .build(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),

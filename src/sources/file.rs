@@ -138,9 +138,10 @@ inventory::submit! {
     SourceDescription::new::<FileConfig>("file")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "file")]
 impl SourceConfig for FileConfig {
-    fn build(
+    async fn build(
         &self,
         name: &str,
         globals: &GlobalOptions,
