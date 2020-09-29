@@ -10,16 +10,14 @@ mod tests {
     use chrono::Utc;
     use futures::StreamExt;
     use graphql_client::*;
-    use std::sync::Arc;
     use std::{
-        sync::Once,
+        sync::{Arc, Once},
         time::{Duration, Instant},
     };
     use tokio::{select, sync::oneshot};
-    use vector::api::Server;
     use vector::{
         self,
-        api::{self, client::subscription::SubscriptionClient},
+        api::{self, client::subscription::SubscriptionClient, Server},
         config::Config,
         internal_events::{emit, GeneratorEventProcessed, Heartbeat},
         test_util::{next_addr, retry_until},
