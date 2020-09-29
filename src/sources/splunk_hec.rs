@@ -347,13 +347,13 @@ impl<R: Read> EventStream<R> {
         EventStream {
             data,
             events: 0,
-            channel: channel.map(|value| value.into_bytes().into()),
+            channel: channel.map(|value| Value::from(value)),
             time: Time::Now(Utc::now()),
             extractors: [
                 DefaultExtractor::new_with(
                     "host",
                     &log_schema().host_key(),
-                    host.map(|value| value.into_bytes().into()),
+                    host.map(|value| Value::from(value)),
                 ),
                 DefaultExtractor::new("index", &INDEX),
                 DefaultExtractor::new("source", &SOURCE),
@@ -594,7 +594,7 @@ fn raw_event(
         let mut data = Vec::new();
         match GzDecoder::new(bytes.reader()).read_to_end(&mut data) {
             Ok(0) => return Err(ApiError::NoData.into()),
-            Ok(_) => data.into(),
+            Ok(_) => Value::from(Bytes::from(data)),
             Err(error) => {
                 emit!(SplunkHECRequestBodyInvalid { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
@@ -612,11 +612,11 @@ fn raw_event(
     log.insert(log_schema().message_key().clone(), message);
 
     // Add channel
-    log.insert(CHANNEL.clone(), channel.into_bytes());
+    log.insert(CHANNEL.clone(), channel);
 
     // Add host
     if let Some(host) = host {
-        log.insert(log_schema().host_key().clone(), host.into_bytes());
+        log.insert(log_schema().host_key().clone(), host);
     }
 
     // Add timestamp

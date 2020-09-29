@@ -188,6 +188,7 @@ mod tests {
 
     #[test]
     fn add_fields_preserves_types() {
+        crate::test_util::trace_init();
         let event = Event::from("hello world");
 
         let mut fields = IndexMap::new();
@@ -200,7 +201,7 @@ mod tests {
         fields.insert(Lookup::from_str("bool").unwrap(), Value::from(true));
         fields.insert(
             Lookup::from_str("array").unwrap(),
-            Value::from(vec![1, 2, 3]),
+            Value::from(vec![1_isize, 2, 3]),
         );
 
         let mut map = IndexMap::new();
@@ -212,6 +213,7 @@ mod tests {
 
         let event = transform.transform(event).unwrap().into_log();
 
+        tracing::error!(?event);
         assert_eq!(event[&"float".into()], 4.5.into());
         assert_eq!(event[&"int".into()], 4.into());
         assert_eq!(event[&"string".into()], "thisisastring".into());

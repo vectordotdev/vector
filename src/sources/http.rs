@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::Event,
+    event::{Event, Value},
     shutdown::ShutdownSignal,
     sources::util::{ErrorMessage, HttpSource},
     tls::TlsConfig,
@@ -110,7 +110,7 @@ fn add_headers(
         for event in events.iter_mut() {
             event
                 .as_mut_log()
-                .insert(header_name as &str, value.to_vec());
+                .insert(header_name as &str, Value::from(Bytes::from(value.to_owned())));
         }
     }
 

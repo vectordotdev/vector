@@ -45,9 +45,9 @@ impl From<Bytes> for Value {
     }
 }
 
-impl From<Vec<u8>> for Value {
-    fn from(bytes: Vec<u8>) -> Self {
-        Value::Bytes(bytes.into())
+impl<T: Into<Value>> From<Vec<T>> for Value {
+    fn from(set: Vec<T>) -> Self {
+        Value::from_iter(set.into_iter().map(|v| v.into()))
     }
 }
 
@@ -112,12 +112,6 @@ impl From<f64> for Value {
 impl From<BTreeMap<String, Value>> for Value {
     fn from(value: BTreeMap<String, Value>) -> Self {
         Value::Map(value)
-    }
-}
-
-impl From<Vec<Value>> for Value {
-    fn from(value: Vec<Value>) -> Self {
-        Value::Array(value)
     }
 }
 
