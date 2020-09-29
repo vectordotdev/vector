@@ -1,18 +1,17 @@
 use super::{builder::ConfigBuilder, vars, Config};
 use glob::glob;
 use lazy_static::lazy_static;
-use once_cell::sync::OnceCell;
 use std::{
     collections::HashMap,
     fs::File,
     path::{Path, PathBuf},
+    sync::Mutex,
 };
 
 lazy_static! {
     pub static ref DEFAULT_CONFIG_PATHS: Vec<PathBuf> = vec!["/etc/vector/vector.toml".into()];
+    pub static ref CONFIG_PATHS: Mutex<Vec<PathBuf>> = Mutex::default();
 }
-
-pub static CONFIG_PATHS: OnceCell<Vec<PathBuf>> = OnceCell::new();
 
 /// Expand a list of paths (potentially containing glob patterns) into real
 /// config paths, replacing it with the default paths when empty.
@@ -47,9 +46,8 @@ pub fn process_paths(config_paths: &[PathBuf]) -> Option<Vec<PathBuf>> {
 
     paths.sort();
     paths.dedup();
-    CONFIG_PATHS
-        .set(paths.clone())
-        .expect("Cannot set global config paths");
+    // Ignore poison error and let the current main thread continue running to do the cleanup.
+    std::mem::drop(CONFIG_PATHS.lock().map(|mut guard| *guard = paths.clone()));
 
     Some(paths)
 }

@@ -73,6 +73,7 @@ mod tag_cardinality_limit;
 mod tcp;
 #[cfg(feature = "transforms-tokenizer")]
 mod tokenizer;
+mod udp;
 mod unix;
 mod vector;
 #[cfg(feature = "wasm")]
@@ -150,6 +151,7 @@ pub(crate) use self::tag_cardinality_limit::*;
 pub use self::tcp::*;
 #[cfg(feature = "transforms-tokenizer")]
 pub(crate) use self::tokenizer::*;
+pub use self::udp::*;
 pub use self::unix::*;
 pub use self::vector::*;
 #[cfg(feature = "wasm")]
