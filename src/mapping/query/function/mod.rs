@@ -120,6 +120,7 @@ build_signatures! {
     contains => ContainsFn,
     slice => SliceFn,
     tokenize => TokenizeFn,
+    strip_ansi_escape_codes => StripAnsiEscapeCodesFn,
 }
 
 /// A parameter definition accepted by a function.
