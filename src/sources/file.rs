@@ -155,13 +155,15 @@ impl SourceConfig for FileConfig {
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
 
         // Clippy rule, because async_trait?
-        #[allow(clippy::suspicious_else_formatting)] {
+        #[allow(clippy::suspicious_else_formatting)]
+        {
             if let Some(ref config) = self.multiline {
                 let _: line_agg::Config = config.try_into()?;
             }
 
             if let Some(ref indicator) = self.message_start_indicator {
-                Regex::new(indicator).with_context(|| InvalidMessageStartIndicator { indicator })?;
+                Regex::new(indicator)
+                    .with_context(|| InvalidMessageStartIndicator { indicator })?;
             }
         }
 
