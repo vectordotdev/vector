@@ -90,7 +90,7 @@ impl Namespace {
         if self.0.is_empty() {
             word.into()
         } else {
-            format!("{}_{}", self.0, word)
+            [self.0.as_str(), word].join("_")
         }
     }
 }
