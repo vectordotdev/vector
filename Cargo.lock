@@ -5678,7 +5678,6 @@ dependencies = [
  "db-key",
  "derivative 1.0.4",
  "derive_is_enum_variant",
- "digest 0.9.0",
  "dirs 3.0.1",
  "elastic_responses",
  "evmap",

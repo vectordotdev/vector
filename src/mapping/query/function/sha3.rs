@@ -1,5 +1,4 @@
 use super::prelude::*;
-use digest::DynDigest;
 use sha3::{Digest, Sha3_224, Sha3_256, Sha3_384, Sha3_512};
 
 #[derive(Debug)]
@@ -19,23 +18,23 @@ impl Sha3Fn {
 
 impl Function for Sha3Fn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
-        let bytes = required!(ctx, self.query, Value::Bytes(v) => v);
+        let value = required!(ctx, self.query, Value::Bytes(v) => v);
+        let variant = optional!(ctx, self.variant, Value::Bytes(v) => v);
 
-        let variant = optional!(ctx, self.variant, Value::Bytes(v) => v)
-            .map(|v| String::from_utf8_lossy(&v).into_owned());
-
-        let mut digest: Box<dyn DynDigest> = match variant.as_deref() {
-            Some("SHA3-224") => Box::new(Sha3_224::new()),
-            Some("SHA3-256") => Box::new(Sha3_256::new()),
-            Some("SHA3-384") => Box::new(Sha3_384::new()),
-            Some("SHA3-512") | None => Box::new(Sha3_512::new()),
-            Some(v) => return Err(format!("unknown SHA-3 algorithm variant: '{}'", v)),
+        let hash = match variant.as_deref() {
+            Some(b"SHA3-224") => encode::<Sha3_224>(&value),
+            Some(b"SHA3-256") => encode::<Sha3_256>(&value),
+            Some(b"SHA3-384") => encode::<Sha3_384>(&value),
+            Some(b"SHA3-512") | None => encode::<Sha3_512>(&value),
+            Some(v) => {
+                return Err(format!(
+                    "unknown SHA-3 algorithm variant: '{}'",
+                    String::from_utf8_lossy(v)
+                ))
+            }
         };
 
-        digest.update(&bytes);
-        let sha3 = hex::encode(digest.finalize());
-
-        Ok(Value::Bytes(sha3.into()))
+        Ok(Value::Bytes(hash.into()))
     }
 
     fn parameters() -> &'static [Parameter] {
@@ -63,6 +62,11 @@ impl TryFrom<ArgumentList> for Sha3Fn {
 
         Ok(Self { query, variant })
     }
+}
+
+#[inline]
+fn encode<T: Digest>(value: &[u8]) -> String {
+    hex::encode(T::digest(value))
 }
 
 #[cfg(test)]

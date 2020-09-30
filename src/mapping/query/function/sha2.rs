@@ -55,11 +55,6 @@ impl Function for Sha2Fn {
     }
 }
 
-#[inline(always)]
-fn encode<T: Digest>(value: &[u8]) -> String {
-    hex::encode(T::digest(value))
-}
-
 impl TryFrom<ArgumentList> for Sha2Fn {
     type Error = String;
 
@@ -69,6 +64,11 @@ impl TryFrom<ArgumentList> for Sha2Fn {
 
         Ok(Self { query, variant })
     }
+}
+
+#[inline]
+fn encode<T: Digest>(value: &[u8]) -> String {
+    hex::encode(T::digest(value))
 }
 
 #[cfg(test)]
