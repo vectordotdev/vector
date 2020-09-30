@@ -12,7 +12,9 @@ use std::str::FromStr;
 
 /// Commonly used types when building new functions.
 mod prelude {
-    pub(super) use super::{is_scalar_value, ArgumentList, Parameter};
+    #[cfg(test)]
+    pub(super) use super::RemapRegex;
+    pub(super) use super::{is_scalar_value, ArgumentKind, ArgumentList, Parameter};
     pub(super) use crate::event::{Event, Value};
     pub(super) use crate::mapping::query::Function;
     #[cfg(test)]
@@ -120,6 +122,70 @@ build_signatures! {
     contains => ContainsFn,
     slice => SliceFn,
     tokenize => TokenizeFn,
+    split => SplitFn,
+}
+
+pub(in crate::mapping) struct TypedArgument {
+    pub resolver: Box<dyn Function>,
+    pub parameter: Parameter,
+}
+
+impl TypedArgument {
+    pub fn new(resolver: Box<dyn Function>, parameter: Parameter) -> Self {
+        Self {
+            resolver,
+            parameter,
+        }
+    }
+}
+
+// delegates to resolver to satisfy tests in `mapping::parser`.
+impl std::fmt::Debug for TypedArgument {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.resolver.fmt(f)
+    }
+}
+
+impl Function for TypedArgument {
+    fn execute(&self, ctx: &Event) -> Result<Value> {
+        let value = self.resolver.execute(ctx)?;
+
+        // Ask the parameter if it accepts the given value.
+        if !(self.parameter.accepts)(&value) {
+            return Err(format!(
+                "invalid argument type '{}' for parameter '{}'",
+                value.kind(),
+                self.parameter.keyword
+            ));
+        }
+
+        Ok(value)
+    }
+}
+
+/// Because the Regex object doesn't contain a global flag
+/// (this is determined by calling either replace or replace_all)
+/// we need to wrap the object and store this flag when we parse it.
+#[derive(Debug, Clone)]
+pub(in crate::mapping) struct RemapRegex {
+    pub regex: regex::Regex,
+    pub global: bool,
+}
+
+#[derive(Debug)]
+pub(in crate::mapping) enum ArgumentKind {
+    Value(Box<dyn Function>),
+    Regex(RemapRegex),
+}
+
+impl ArgumentKind {
+    pub fn into_value(self) -> Result<Box<dyn Function>> {
+        if let ArgumentKind::Value(value) = self {
+            Ok(value)
+        } else {
+            Err("expected value".into())
+        }
+    }
 }
 
 /// A parameter definition accepted by a function.
@@ -175,12 +241,13 @@ impl ArgumentList {
         }
     }
 
-    pub fn optional(&mut self, keyword: &str) -> Option<Box<dyn Function>> {
-        self.take(keyword)
+    pub fn optional(&mut self, keyword: &str) -> Option<ArgumentKind> {
+        self.take(keyword).map(|arg| arg.kind)
     }
 
-    pub fn required(&mut self, keyword: &str) -> Result<Box<dyn Function>> {
+    pub fn required(&mut self, keyword: &str) -> Result<ArgumentKind> {
         self.take(keyword)
+            .map(|arg| arg.kind)
             .ok_or(format!("unknown keyword: {}", keyword))
     }
 
@@ -192,7 +259,7 @@ impl ArgumentList {
         self.arguments.len()
     }
 
-    fn take(&mut self, keyword: &str) -> Option<Box<dyn Function>> {
+    fn take(&mut self, keyword: &str) -> Option<Box<Argument>> {
         self.arguments
             .iter()
             .position(|a| a.parameter.keyword == keyword)
@@ -202,40 +269,23 @@ impl ArgumentList {
 }
 
 pub(in crate::mapping) struct Argument {
-    resolver: Box<dyn Function>,
+    kind: ArgumentKind,
     parameter: Parameter,
 }
 
 // delegates to resolver to satisfy tests in `mapping::parser`.
 impl std::fmt::Debug for Argument {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.resolver.fmt(f)
+        match &self.kind {
+            ArgumentKind::Value(value) => value.fmt(f),
+            ArgumentKind::Regex(regex) => regex.fmt(f),
+        }
     }
 }
 
 impl Argument {
-    pub fn new(resolver: Box<dyn Function>, parameter: Parameter) -> Self {
-        Self {
-            resolver,
-            parameter,
-        }
-    }
-}
-
-impl Function for Argument {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
-        let value = self.resolver.execute(ctx)?;
-
-        // Ask the parameter if it accepts the given value.
-        if !(self.parameter.accepts)(&value) {
-            return Err(format!(
-                "invalid argument type '{}' for parameter '{}'",
-                value.kind(),
-                self.parameter.keyword
-            ));
-        }
-
-        Ok(value)
+    pub fn new(kind: ArgumentKind, parameter: Parameter) -> Self {
+        Self { kind, parameter }
     }
 }
 

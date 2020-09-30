@@ -38,7 +38,7 @@ impl TryFrom<ArgumentList> for Md5Fn {
     type Error = String;
 
     fn try_from(mut arguments: ArgumentList) -> Result<Self> {
-        let query = arguments.required("value")?;
+        let query = arguments.required("value")?.into_value()?;
 
         Ok(Self { query })
     }

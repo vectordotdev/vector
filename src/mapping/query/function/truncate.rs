@@ -99,9 +99,12 @@ impl TryFrom<ArgumentList> for TruncateFn {
     type Error = String;
 
     fn try_from(mut arguments: ArgumentList) -> Result<Self> {
-        let query = arguments.required("value")?;
-        let limit = arguments.required("limit")?;
-        let ellipsis = arguments.optional("ellipsis");
+        let query = arguments.required("value")?.into_value()?;
+        let limit = arguments.required("limit")?.into_value()?;
+        let ellipsis = arguments
+            .optional("ellipsis")
+            .map(|v| v.into_value())
+            .transpose()?;
 
         Ok(Self {
             query,

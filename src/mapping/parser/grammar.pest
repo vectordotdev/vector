@@ -56,11 +56,25 @@ argument_list = _{ argument ~ ("," ~ argument)* }
 
 argument = { positional_item | keyword_item }
 
-positional_item = { query_arithmetic }
+positional_item = { argument_item }
 
-keyword_item = { ident ~ "=" ~ query_arithmetic }
+keyword_item = { ident ~ "=" ~ argument_item }
+
+argument_item = { query_arithmetic | regex }
 
 // end: Functions
+
+// Regex
+
+regex = ${ "/" ~ inner_regex_string ~ "/" ~ regex_flags }
+inner_regex_string = @{ regex_char* }
+regex_char = {
+    !("/" | "\\") ~ ANY
+    | "\\" ~ ANY
+}
+regex_flags = @{ ("i" | "g" | "m")* }
+
+// end: Regex
 
 group = { "(" ~ query_arithmetic ~ ")" }
 

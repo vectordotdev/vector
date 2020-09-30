@@ -71,9 +71,12 @@ impl TryFrom<ArgumentList> for ContainsFn {
     type Error = String;
 
     fn try_from(mut arguments: ArgumentList) -> Result<Self> {
-        let query = arguments.required("value")?;
-        let substring = arguments.required("substring")?;
-        let case_sensitive = arguments.optional("case_sensitive");
+        let query = arguments.required("value")?.into_value()?;
+        let substring = arguments.required("substring")?.into_value()?;
+        let case_sensitive = arguments
+            .optional("case_sensitive")
+            .map(|v| v.into_value())
+            .transpose()?;
 
         Ok(Self {
             query,

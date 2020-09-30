@@ -54,8 +54,8 @@ impl TryFrom<ArgumentList> for FormatTimestampFn {
     type Error = String;
 
     fn try_from(mut arguments: ArgumentList) -> Result<Self> {
-        let query = arguments.required("value")?;
-        let format = arguments.required("format")?;
+        let query = arguments.required("value")?.into_value()?;
+        let format = arguments.required("format")?.into_value()?;
 
         Ok(Self { query, format })
     }

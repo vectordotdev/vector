@@ -81,9 +81,12 @@ impl TryFrom<ArgumentList> for SliceFn {
     type Error = String;
 
     fn try_from(mut arguments: ArgumentList) -> Result<Self> {
-        let query = arguments.required("value")?;
-        let start = arguments.required("start")?;
-        let end = arguments.optional("end");
+        let query = arguments.required("value")?.into_value()?;
+        let start = arguments.required("start")?.into_value()?;
+        let end = arguments
+            .optional("end")
+            .map(|v| v.into_value())
+            .transpose()?;
 
         Ok(Self { query, start, end })
     }

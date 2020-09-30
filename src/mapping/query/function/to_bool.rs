@@ -52,8 +52,11 @@ impl TryFrom<ArgumentList> for ToBooleanFn {
     type Error = String;
 
     fn try_from(mut arguments: ArgumentList) -> Result<Self> {
-        let query = arguments.required("value")?;
-        let default = arguments.optional("default");
+        let query = arguments.required("value")?.into_value()?;
+        let default = arguments
+            .optional("default")
+            .map(|v| v.into_value())
+            .transpose()?;
 
         Ok(Self { query, default })
     }

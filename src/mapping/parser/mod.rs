@@ -7,7 +7,10 @@ use crate::{
             self,
             arithmetic::Arithmetic,
             arithmetic::Operator,
-            function::{Argument, ArgumentList, FunctionSignature, NotFn},
+            function::{
+                Argument, ArgumentKind, ArgumentList, FunctionSignature, NotFn, Parameter,
+                RemapRegex, TypedArgument,
+            },
             path::Path as QueryPath,
             Literal,
         },
@@ -19,6 +22,7 @@ use pest::{
     iterators::{Pair, Pairs},
     Parser,
 };
+use regex::RegexBuilder;
 use std::str::FromStr;
 
 // If this macro triggers, it means the parser syntax file (grammar.pest) was
@@ -286,20 +290,64 @@ fn positional_item_from_pair(
     index: usize,
     signature: &FunctionSignature,
 ) -> Result<()> {
-    let resolver = query_arithmetic_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?;
-
     let parameter = signature.parameters().get(index).cloned().ok_or(format!(
         "unknown positional argument '{}' for function: '{}'",
         index,
         signature.as_str()
     ))?;
 
+    let resolver = argument_item_from_pair(
+        parameter.clone(),
+        pair.into_inner().next().ok_or(TOKEN_ERR)?,
+    )?;
     let keyword = parameter.keyword.to_owned();
     let argument = Argument::new(resolver, parameter);
 
     list.push(argument, Some(keyword));
 
     Ok(())
+}
+
+fn argument_item_from_pair(parameter: Parameter, pair: Pair<Rule>) -> Result<ArgumentKind> {
+    let inner = pair.into_inner().next().ok_or(TOKEN_ERR)?;
+    match inner.as_rule() {
+        Rule::query_arithmetic_boolean => query_arithmetic_from_pair(inner)
+            .map(|resolver| ArgumentKind::Value(Box::new(TypedArgument::new(resolver, parameter)))),
+        Rule::regex => regex_from_pair(inner).map(ArgumentKind::Regex),
+        _ => Err(TOKEN_ERR.into()),
+    }
+}
+
+fn regex_from_pair(pair: Pair<Rule>) -> Result<RemapRegex> {
+    match pair.as_rule() {
+        Rule::regex => {
+            let mut inner = pair.into_inner();
+            let regex = inner.next().ok_or(TOKEN_ERR)?;
+            let flags = inner.next().map(|flags| flags.as_str()).unwrap_or("");
+
+            let mut global = false;
+            let mut insensitive = false;
+            let mut multi_line = false;
+            for flag in flags.chars() {
+                if flag == 'i' {
+                    insensitive = true;
+                } else if flag == 'g' {
+                    global = true;
+                } else if flag == 'm' {
+                    multi_line = true;
+                }
+                // Invalid flags shouldn't get picked up by the parser.
+            }
+
+            RegexBuilder::new(&regex.as_str().replace("\\/", "/"))
+                .case_insensitive(insensitive)
+                .multi_line(multi_line)
+                .build()
+                .map(|regex| RemapRegex { regex, global })
+                .map_err(|err| format!("invalid regex {}", err))
+        }
+        _ => Err(TOKEN_ERR.into()),
+    }
 }
 
 fn keyword_item_from_pair(
@@ -309,7 +357,6 @@ fn keyword_item_from_pair(
 ) -> Result<()> {
     let mut pairs = pair.into_inner();
     let keyword = pairs.next().ok_or(TOKEN_ERR)?.as_span().as_str();
-    let resolver = query_arithmetic_from_pair(pairs.next().ok_or(TOKEN_ERR)?)?;
 
     let parameter = signature
         .parameters()
@@ -322,6 +369,7 @@ fn keyword_item_from_pair(
         ))?
         .clone();
 
+    let resolver = argument_item_from_pair(parameter.clone(), pairs.next().ok_or(TOKEN_ERR)?)?;
     let argument = Argument::new(resolver, parameter);
 
     list.push(argument, Some(keyword.to_owned()));
@@ -507,8 +555,8 @@ mod tests {
     use super::*;
     use crate::mapping::query::function::{
         ContainsFn, DowncaseFn, FormatTimestampFn, Md5Fn, NowFn, ParseJsonFn, ParseTimestampFn,
-        Sha1Fn, SliceFn, StripWhitespaceFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn,
-        ToTimestampFn, TokenizeFn, TruncateFn, UpcaseFn, UuidV4Fn,
+        Sha1Fn, SliceFn, SplitFn, StripWhitespaceFn, ToBooleanFn, ToFloatFn, ToIntegerFn,
+        ToStringFn, ToTimestampFn, TokenizeFn, TruncateFn, UpcaseFn, UuidV4Fn,
     };
 
     #[test]
@@ -1178,6 +1226,20 @@ mod tests {
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(TokenizeFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                r#".foo = split(.bar, /\b/i)"#,
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(SplitFn::new(
+                        Box::new(QueryPath::from("bar")),
+                        ArgumentKind::Regex(RemapRegex {
+                            regex: regex::Regex::new(r#"\b"#).unwrap(),
+                            global: false,
+                        }),
+                        None,
+                    )),
                 ))]),
             ),
         ];

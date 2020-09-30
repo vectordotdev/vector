@@ -81,9 +81,12 @@ impl TryFrom<ArgumentList> for ParseTimestampFn {
     type Error = String;
 
     fn try_from(mut arguments: ArgumentList) -> Result<Self> {
-        let query = arguments.required("value")?;
-        let format = arguments.required("format")?;
-        let default = arguments.optional("default");
+        let query = arguments.required("value")?.into_value()?;
+        let format = arguments.required("format")?.into_value()?;
+        let default = arguments
+            .optional("default")
+            .map(|v| v.into_value())
+            .transpose()?;
 
         Ok(Self {
             query,
