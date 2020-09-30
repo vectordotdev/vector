@@ -543,3 +543,27 @@
       "a[6].equals" = "11881"
       "b.length_eq" = 1
       "b[0].equals" = "bar"
+
+[transforms.remap_function_sha2]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = sha2(.a)
+
+    if sha2(.b) == "725eb523fe006a6ee0071380bd3b4c57590abd44b88614cd3eddf594e3afe1ac" {
+        .b = sha2(.a + .b + "baz")
+    }
+  """
+[[tests]]
+  name = "remap_function_sha2"
+  [tests.input]
+    insert_at = "remap_function_sha2"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_sha2"
+    [[tests.outputs.conditions]]
+      "a.equals" = "d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d"
+      "b.equals" = "211adce11372368668b582f2a9420a2df7512856ff62f37b124b82d9f505b42f"
