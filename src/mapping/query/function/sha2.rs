@@ -1,5 +1,4 @@
 use super::prelude::*;
-use digest::DynDigest;
 use sha2::{Digest, Sha224, Sha256, Sha384, Sha512, Sha512Trunc224, Sha512Trunc256};
 
 #[derive(Debug)]
@@ -19,25 +18,25 @@ impl Sha2Fn {
 
 impl Function for Sha2Fn {
     fn execute(&self, ctx: &Event) -> Result<Value> {
-        let bytes = required!(ctx, self.query, Value::Bytes(v) => v);
+        let value = required!(ctx, self.query, Value::Bytes(v) => v);
+        let variant = optional!(ctx, self.variant, Value::Bytes(v) => v);
 
-        let variant = optional!(ctx, self.variant, Value::Bytes(v) => v)
-            .map(|v| String::from_utf8_lossy(&v).into_owned());
-
-        let mut digest: Box<dyn DynDigest> = match variant.as_deref() {
-            Some("SHA-224") => Box::new(Sha224::new()),
-            Some("SHA-256") => Box::new(Sha256::new()),
-            Some("SHA-384") => Box::new(Sha384::new()),
-            Some("SHA-512") => Box::new(Sha512::new()),
-            Some("SHA-512/224") => Box::new(Sha512Trunc224::new()),
-            Some("SHA-512/256") | None => Box::new(Sha512Trunc256::new()),
-            Some(v) => return Err(format!("unknown SHA-2 algorithm variant: '{}'", v)),
+        let hash = match variant.as_deref() {
+            Some(b"SHA-224") => encode::<Sha224>(&value),
+            Some(b"SHA-256") => encode::<Sha256>(&value),
+            Some(b"SHA-384") => encode::<Sha384>(&value),
+            Some(b"SHA-512") => encode::<Sha512>(&value),
+            Some(b"SHA-512/224") => encode::<Sha512Trunc224>(&value),
+            Some(b"SHA-512/256") | None => encode::<Sha512Trunc256>(&value),
+            Some(v) => {
+                return Err(format!(
+                    "unknown SHA-2 algorithm variant: '{}'",
+                    String::from_utf8_lossy(v)
+                ))
+            }
         };
 
-        digest.update(&bytes);
-        let sha2 = hex::encode(digest.finalize());
-
-        Ok(Value::Bytes(sha2.into()))
+        Ok(Value::Bytes(hash.into()))
     }
 
     fn parameters() -> &'static [Parameter] {
@@ -54,6 +53,11 @@ impl Function for Sha2Fn {
             },
         ]
     }
+}
+
+#[inline(always)]
+fn encode<T: Digest>(value: &[u8]) -> String {
+    hex::encode(T::digest(value))
 }
 
 impl TryFrom<ArgumentList> for Sha2Fn {
