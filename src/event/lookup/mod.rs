@@ -51,12 +51,10 @@ impl Display for Lookup {
         let mut maybe_next = peeker.peek();
         while let Some(segment) = next {
             match segment {
-                Segment::Field(_) => {
-                    match maybe_next {
-                        Some(next) if next.is_field() => write!(f, r#"{}."#, segment)?,
-                        None | Some(_) => write!(f, "{}", segment)?,
-                    };
-                }
+                Segment::Field(_) => match maybe_next {
+                    Some(next) if next.is_field() => write!(f, r#"{}."#, segment)?,
+                    None | Some(_) => write!(f, "{}", segment)?,
+                },
                 Segment::Index(_) => match maybe_next {
                     Some(next) if next.is_field() => write!(f, r#"[{}]."#, segment)?,
                     None | Some(_) => write!(f, "[{}]", segment)?,
