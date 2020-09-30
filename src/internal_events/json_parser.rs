@@ -22,6 +22,7 @@ impl InternalEvent for JsonParserEventProcessed {
 #[derive(Debug)]
 pub(crate) struct JsonParserFailedParse<'a> {
     pub field: &'a Atom,
+    pub value: &'a str,
     pub error: Error,
 }
 
@@ -30,6 +31,7 @@ impl<'a> InternalEvent for JsonParserFailedParse<'a> {
         warn!(
             message = "Event failed to parse as JSON.",
             field = %self.field,
+            value = %self.value,
             %self.error,
             rate_limit_secs = 30
         )
