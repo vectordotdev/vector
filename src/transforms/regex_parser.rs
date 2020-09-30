@@ -8,6 +8,7 @@ use crate::{
     },
     types::{parse_check_conversion_map, Conversion},
 };
+use bytes::Bytes;
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -110,7 +111,8 @@ impl CompiledRegex {
                         .iter()
                         .filter_map(move |(idx, name, conversion)| {
                             capture_locs.get(*idx).and_then(|(start, end)| {
-                                let capture: Value = value[start..end].to_vec().into();
+                                let capture: Value =
+                                    Value::from(Bytes::from(value[start..end].to_owned()));
 
                                 match conversion.convert(capture) {
                                     Ok(value) => Some((name.clone(), value)),

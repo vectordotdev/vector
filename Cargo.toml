@@ -487,6 +487,11 @@ name = "isolated_buffering"
 harness = false
 
 [[bench]]
+name = "lookup"
+harness = false
+
+
+[[bench]]
 name = "wasm"
 harness = false
 required-features = ["transforms-wasm", "transforms-lua"]

@@ -1,4 +1,5 @@
 use super::prelude::*;
+use bytes::Bytes;
 
 #[derive(Debug)]
 pub(in crate::mapping) struct StripAnsiEscapeCodesFn {
@@ -17,6 +18,7 @@ impl Function for StripAnsiEscapeCodesFn {
         let bytes = required!(ctx, self.query, Value::Bytes(v) => v);
 
         strip_ansi_escapes::strip(&bytes)
+            .map(Bytes::from)
             .map(Value::from)
             .map_err(|e| e.to_string())
     }

@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::Event,
+    event::{Event, Value},
     internal_events::{SplitConvertFailed, SplitEventProcessed, SplitFieldMissing},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -102,7 +102,7 @@ impl Transform for Split {
                 .iter()
                 .zip(split(value, self.separator.clone()).into_iter())
             {
-                match conversion.convert(value.as_bytes().to_vec().into()) {
+                match conversion.convert(Value::from(value.to_owned())) {
                     Ok(value) => {
                         event.as_mut_log().insert(name.clone(), value);
                     }
