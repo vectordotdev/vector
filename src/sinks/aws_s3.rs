@@ -617,7 +617,7 @@ mod integration_tests {
 
         let config = S3SinkConfig {
             compression: Compression::Gzip,
-            filename_time_format: Some("%S%f".into()),
+            filename_time_format: Some("%s%f".into()),
             ..config(10000).await
         };
 
