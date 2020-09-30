@@ -24,6 +24,9 @@ debug = false
 lto = "fat"
 codegen-units = 1
 
+[profile.test]
+codegen-units = 1
+
 [package.metadata.deb]
 maintainer-scripts = "distribution/debian/scripts/"
 conf-files = ["/etc/vector/vector.toml"]
