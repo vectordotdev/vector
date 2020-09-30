@@ -1,6 +1,7 @@
 // Using a shared mod like this is probably not the best idea, since we have to
 // disable the `dead_code` lint, as we don't need all of the helpers from here
 // all over the place.
+#![allow(clippy::type_complexity)]
 #![allow(dead_code)]
 
 use async_trait::async_trait;

@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity)]
 #![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
 
 use async_trait::async_trait;
