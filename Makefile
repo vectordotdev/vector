@@ -984,10 +984,10 @@ ifeq (${CI}, true)
 ci-sweep: ## Sweep up the CI to try to get more disk space.
 	@echo "Preparing the CI for build by sweeping up disk space a bit..."
 	df -h
-	sudo apt-get --purge autoremove
-	sudo apt-get clean
-	sudo rm -rf "/opt/*" "/usr/local/*"
-	sudo rm -rf "/usr/local/share/boost" && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
+	apt-get --purge autoremove
+	apt-get clean
+	rm -rf "/opt/*" "/usr/local/*"
+	rm -rf "/usr/local/share/boost" && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
 	docker system prune --force
 	df -h
 endif

@@ -80,23 +80,3 @@ jobs:
         with:
           command: check advisories
 
-  check-component-features:
-    name: Component Features - Linux
-    runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
-    steps:
-      - uses: actions/checkout@v2
-      - run: make ci-sweep
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: make slim-builds
-      - run: echo "::add-path::/home/runner/.local/bin"
-      - run: make check-component-features
- 
