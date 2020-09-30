@@ -747,7 +747,7 @@ check-component-features: ## Check that all component features are setup properl
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
-	${MAYBE_ENVIRONMENT_EXEC} cargo clippy --workspace --all-targets --features all-integration-tests -- -D warnings
+	${MAYBE_ENVIRONMENT_EXEC} cargo clippy --workspace --all-targets -- -D warnings
 
 .PHONY: check-fmt
 check-fmt: ## Check that all files are formatted properly
@@ -984,10 +984,10 @@ ifeq (${CI}, true)
 ci-sweep: ## Sweep up the CI to try to get more disk space.
 	@echo "Preparing the CI for build by sweeping up disk space a bit..."
 	df -h
-	apt-get --purge autoremove
-	apt-get clean
-	rm -rf "/opt/*" "/usr/local/*"
-	rm -rf "/usr/local/share/boost" && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
+	sudo apt-get --purge autoremove
+	sudo apt-get clean
+	sudo rm -rf "/opt/*" "/usr/local/*"
+	sudo rm -rf "/usr/local/share/boost" && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
 	docker system prune --force
 	df -h
 endif
