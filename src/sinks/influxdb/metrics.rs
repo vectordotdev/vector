@@ -824,6 +824,8 @@ mod tests {
 
     #[test]
     fn test_encode_with_some_tags() {
+        crate::test_util::trace_init();
+
         let events = vec![
             Metric {
                 name: "cpu".into(),
