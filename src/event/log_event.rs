@@ -1,6 +1,10 @@
-use crate::event::{Lookup, lookup::Segment, util, PathComponent, Value};
+use crate::event::{lookup::Segment, util, Lookup, PathComponent, Value};
 use serde::{Serialize, Serializer};
-use std::{iter::FromIterator, convert::{TryFrom, TryInto}, collections::{BTreeMap, HashMap, btree_map::Entry}};
+use std::{
+    collections::{btree_map::Entry, BTreeMap, HashMap},
+    convert::{TryFrom, TryInto},
+    iter::FromIterator,
+};
 use string_cache::DefaultAtom;
 
 #[derive(PartialEq, Debug, Clone, Default)]
@@ -77,34 +81,38 @@ impl LogEvent {
         self.fields.is_empty()
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self, lookup), fields(lookup = %lookup), err)]
     fn entry<'a>(&'a mut self, lookup: Lookup) -> crate::Result<Entry<'a, String, Value>> {
         trace!("Seeking to entry.");
         let mut walker = lookup.into_iter().enumerate();
+
         let mut current_pointer = if let Some((index, Segment::Field(segment))) = walker.next() {
-            trace!(?segment, index, "Seeking segment.");
+            trace!(%segment, index, "Seeking segment.");
             self.fields.entry(segment)
         } else {
             return Err("Lookups should have at least one segment.".into());
         };
 
-        while let Some((index, segment)) = walker.next() {
-                trace!(?segment, index, "Seeking next segment.");
-                current_pointer = match (segment, current_pointer) {
-                    (Segment::Field(field), Entry::Occupied(entry)) => match entry.into_mut() {
-                        Value::Map(map) => map.entry(field),
-                        v => return Err(format!("Looking up field on a non-map value: {:?}", v).into())
-                    },
-                    (Segment::Field(field), Entry::Vacant(entry)) => match entry.insert(
-                        Value::from(BTreeMap::new())
-                    ) {
+        for (index, segment) in walker {
+            trace!(%segment, index, "Seeking next segment.");
+            current_pointer = match (segment, current_pointer) {
+                (Segment::Field(field), Entry::Occupied(entry)) => match entry.into_mut() {
+                    Value::Map(map) => map.entry(field),
+                    v => return Err(format!("Looking up field on a non-map value: {:?}", v).into()),
+                },
+                (Segment::Field(field), Entry::Vacant(entry)) => {
+                    trace!(segment = %field, index, "Injecting empty map.");
+                    let value = entry.insert(Value::from(BTreeMap::new()));
+                    match value
+                    {
                         Value::Map(ref mut map) => map.entry(field),
-                        v => return Err(format!("Looking up field on a non-map value: {:?}", v).into())
-                    },
-                    _ => return Err("The entry API cannot yet descend into array indices.".into())
-                };
+                        v => return Err(format!("Looking up field on a non-map value: {:?}", v).into()),
+                    }
+                },
+                _ => return Err("The entry API cannot yet descend into array indices.".into()),
+            };
         }
-
+        trace!(entry = ?current_pointer, "Result.");
         Ok(current_pointer)
     }
 }
@@ -211,10 +219,10 @@ impl Serialize for LogEvent {
 #[cfg(test)]
 mod test {
     use super::*;
-    use tracing::trace;
     use crate::test_util::open_fixture;
     use serde_json::json;
     use std::str::FromStr;
+    use tracing::trace;
 
     // This test iterates over the `tests/data/fixtures/log_event` folder and:
     //   * Ensures the EventLog parsed from bytes and turned into a serde_json::Value are equal to the
@@ -256,12 +264,12 @@ mod test {
     #[test]
     fn entry() {
         crate::test_util::trace_init();
-        let fixture = open_fixture("tests/data/fixtures/log_event/motivatingly-complex.json").unwrap();
+        let fixture =
+            open_fixture("tests/data/fixtures/log_event/motivatingly-complex.json").unwrap();
         let mut event = LogEvent::try_from(fixture).unwrap();
 
         let lookup = Lookup::from_str("non-existing").unwrap();
         let entry = event.entry(lookup).unwrap();
-        trace!(?entry);
         let fallback = json!(
             "If you don't see this, the `LogEvent::entry` API is not working on non-existing lookups."
         );
@@ -272,7 +280,6 @@ mod test {
 
         let lookup = Lookup::from_str("nulled").unwrap();
         let entry = event.entry(lookup).unwrap();
-        trace!(?entry);
         let fallback = json!(
             "If you see this, the `LogEvent::entry` API is not working on existing, single segment lookups."
         );
@@ -282,27 +289,30 @@ mod test {
 
         let lookup = Lookup::from_str("map.basic").unwrap();
         let entry = event.entry(lookup).unwrap();
-        trace!(?entry);
         let fallback = json!(
             "If you see this, the `LogEvent::entry` API is not working on existing, double segment lookups."
         );
         entry.or_insert(fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(json.pointer("/map/basic"), Some(&serde_json::Value::Bool(true)));
+        assert_eq!(
+            json.pointer("/map/basic"),
+            Some(&serde_json::Value::Bool(true))
+        );
 
         let lookup = Lookup::from_str("map.map.buddy").unwrap();
         let entry = event.entry(lookup).unwrap();
-        trace!(?entry);
         let fallback = json!(
             "If you see this, the `LogEvent::entry` API is not working on existing, multi-segment lookups."
         );
         entry.or_insert(fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(json.pointer("/map/map/buddy"), Some(&serde_json::Value::Number((-1).into())));
+        assert_eq!(
+            json.pointer("/map/map/buddy"),
+            Some(&serde_json::Value::Number((-1).into()))
+        );
 
         let lookup = Lookup::from_str("map.map.non-existing").unwrap();
         let entry = event.entry(lookup).unwrap();
-        trace!(?entry);
         let fallback = json!(
             "If you don't see this, the `LogEvent::entry` API is not working on non-existing multi-segment lookups."
         );
@@ -312,22 +322,26 @@ mod test {
 
         let lookup = Lookup::from_str("map.non-existing.non-existing").unwrap();
         let entry = event.entry(lookup).unwrap();
-        trace!(?entry);
         let fallback = json!(
             "If you don't see this, the `LogEvent::entry` API is not working on a non-existing middle field in multi-segment lookups."
         );
         entry.or_insert(fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(json.pointer("/map/non-existing/non-existing"), Some(&fallback));
+        assert_eq!(
+            json.pointer("/map/non-existing/non-existing"),
+            Some(&fallback)
+        );
 
         let lookup = Lookup::from_str("map-non-existing.non-existing.non-existing").unwrap();
         let entry = event.entry(lookup).unwrap();
-        trace!(?entry);
         let fallback = json!(
             "If you don't see this, the `LogEvent::entry` API is not working on a non-existing first (and rest) field in multi-segment lookups."
         );
         entry.or_insert(fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(json.pointer("/map-non-existing/non-existing/non-existing"), Some(&fallback));
+        assert_eq!(
+            json.pointer("/map-non-existing/non-existing/non-existing"),
+            Some(&fallback)
+        );
     }
 }
