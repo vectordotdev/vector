@@ -16,10 +16,7 @@ impl Segment {
     }
 
     pub fn is_field(&self) -> bool {
-        match self {
-            Segment::Field(_) => true,
-            Segment::Index(_) => false,
-        }
+        matches!(self, Segment::Field(_))
     }
 
     pub const fn index(v: usize) -> Segment {
@@ -27,10 +24,7 @@ impl Segment {
     }
 
     pub fn is_value(&self) -> bool {
-        match self {
-            Segment::Field(_) => true,
-            Segment::Index(_) => false,
-        }
+        matches!(self, Segment::Index(_))
     }
 
     #[tracing::instrument(skip(segment))]
