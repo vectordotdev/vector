@@ -567,3 +567,27 @@
     [[tests.outputs.conditions]]
       "a.equals" = "d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d"
       "b.equals" = "211adce11372368668b582f2a9420a2df7512856ff62f37b124b82d9f505b42f"
+
+[transforms.remap_function_sha3]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = sha3(.a)
+
+    if sha3(.b) == "03457d23880d7847fc3f58780dd58cda7237a7144ac6758e76d45cec0e06ba69440a855e913ef03790c618777f5b0ec25fc34c4b82d7538151745b120b4f8b37" {
+        .b = sha3(.a + .b + "baz")
+    }
+  """
+[[tests]]
+  name = "remap_function_sha3"
+  [tests.input]
+    insert_at = "remap_function_sha3"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_sha3"
+    [[tests.outputs.conditions]]
+      "a.equals" = "4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7"
+      "b.equals" = "dbae094156f1bf73d9f442f75eb01e52398eb667cd12ba1dcb95748fc0151880ea260310c1451570d60b37bef8655d01f62280e5e24e70cffe3a55c23c2d7351"
