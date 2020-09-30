@@ -87,22 +87,24 @@ impl LogEvent {
         } else {
             return Err("Lookups should have at least one segment.".into());
         };
+
         while let Some((index, segment)) = walker.next() {
-            trace!(?segment, index, "Seeking next segment.");
-            current_pointer = match (segment, current_pointer) {
-                (Segment::Field(field), Entry::Occupied(entry)) => match entry.into_mut() {
-                    Value::Map(map) => map.entry(field),
-                    _ => return Err("Looking up field on a non-map value.".into())
-                },
-                (Segment::Field(field), Entry::Vacant(entry)) => match entry.insert(
-                    Value::from(BTreeMap::new())
-                ) {
-                    Value::Map(ref mut map) => map.entry(field),
-                    _ => return Err("Looking up field on a non-map value.".into())
-                },
-                _ => return Err("The entry API cannot yet descend into array indices.".into())
-            };
-        };
+                trace!(?segment, index, "Seeking next segment.");
+                current_pointer = match (segment, current_pointer) {
+                    (Segment::Field(field), Entry::Occupied(entry)) => match entry.into_mut() {
+                        Value::Map(map) => map.entry(field),
+                        v => return Err(format!("Looking up field on a non-map value: {:?}", v).into())
+                    },
+                    (Segment::Field(field), Entry::Vacant(entry)) => match entry.insert(
+                        Value::from(BTreeMap::new())
+                    ) {
+                        Value::Map(ref mut map) => map.entry(field),
+                        v => return Err(format!("Looking up field on a non-map value: {:?}", v).into())
+                    },
+                    _ => return Err("The entry API cannot yet descend into array indices.".into())
+                };
+        }
+
         Ok(current_pointer)
     }
 }
@@ -308,7 +310,7 @@ mod test {
         let json: serde_json::Value = event.clone().try_into().unwrap();
         assert_eq!(json.pointer("/map/map/non-existing"), Some(&fallback));
 
-        let lookup = Lookup::from_str("map.non-existing.map").unwrap();
+        let lookup = Lookup::from_str("map.non-existing.non-existing").unwrap();
         let entry = event.entry(lookup).unwrap();
         trace!(?entry);
         let fallback = json!(
@@ -316,6 +318,16 @@ mod test {
         );
         entry.or_insert(fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(json.pointer("/map/non-existing/map"), Some(&fallback));
+        assert_eq!(json.pointer("/map/non-existing/non-existing"), Some(&fallback));
+
+        let lookup = Lookup::from_str("map-non-existing.non-existing.non-existing").unwrap();
+        let entry = event.entry(lookup).unwrap();
+        trace!(?entry);
+        let fallback = json!(
+            "If you don't see this, the `LogEvent::entry` API is not working on a non-existing first (and rest) field in multi-segment lookups."
+        );
+        entry.or_insert(fallback.clone().into());
+        let json: serde_json::Value = event.clone().try_into().unwrap();
+        assert_eq!(json.pointer("/map-non-existing/non-existing/non-existing"), Some(&fallback));
     }
 }
