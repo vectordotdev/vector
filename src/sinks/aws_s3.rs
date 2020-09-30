@@ -612,39 +612,6 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn s3_gzip() {
-        let cx = SinkContext::new_test();
-
-        let config = S3SinkConfig {
-            compression: Compression::Gzip,
-            filename_time_format: Some("%S%f".into()),
-            ..config(10000).await
-        };
-
-        let prefix = config.key_prefix.clone();
-        let client = config.create_client(cx.resolver()).unwrap();
-        let sink = config.new(client, cx).unwrap();
-
-        let (lines, events) = random_lines_with_stream(100, 500);
-        sink.run(events).await.unwrap();
-
-        let keys = get_keys(prefix.unwrap()).await;
-        assert_eq!(keys.len(), 6);
-
-        let response_lines = stream::iter(keys).fold(Vec::new(), |mut acc, key| async {
-            assert!(key.ends_with(".log.gz"));
-
-            let obj = get_object(key).await;
-            assert_eq!(obj.content_encoding, Some("gzip".to_string()));
-
-            acc.append(&mut get_gzipped_lines(obj).await);
-            acc
-        });
-
-        assert_eq!(lines, response_lines.await);
-    }
-
-    #[tokio::test]
     async fn s3_healthchecks() {
         let resolver = Resolver;
 
