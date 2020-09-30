@@ -92,7 +92,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
-      - run: make ci-sweep      
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -114,7 +114,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
-      - run: make ci-sweep          
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -173,7 +173,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
-      - run: make ci-sweep      
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -233,7 +233,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
-      - run: make ci-sweep      
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -253,7 +253,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
-      - run: make ci-sweep      
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -313,7 +313,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
-      - run: make ci-sweep      
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |

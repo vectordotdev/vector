@@ -40,7 +40,7 @@ static TOKEN_ERR: &str = "unexpected token sequence";
 
 #[derive(Parser)]
 #[grammar = "./mapping/parser/grammar.pest"]
-struct MappingParser;
+pub(crate) struct MappingParser;
 
 fn target_path_from_pair(pair: Pair<Rule>) -> Result<String> {
     let mut segments = Vec::new();
@@ -507,8 +507,9 @@ mod tests {
     use super::*;
     use crate::mapping::query::function::{
         ContainsFn, DowncaseFn, FormatTimestampFn, Md5Fn, NowFn, ParseJsonFn, ParseTimestampFn,
-        Sha1Fn, SliceFn, StripWhitespaceFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn,
-        ToTimestampFn, TokenizeFn, TruncateFn, UpcaseFn, UuidV4Fn,
+        Sha1Fn, Sha2Fn, Sha3Fn, SliceFn, StripAnsiEscapeCodesFn, StripWhitespaceFn, ToBooleanFn,
+        ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn, TokenizeFn, TruncateFn, UpcaseFn,
+        UuidV4Fn,
     };
 
     #[test]
@@ -517,7 +518,7 @@ mod tests {
             (".foo = {\"bar\"}", vec![" 1:8\n", "= expected query"]),
             (
                 ". = \"bar\"",
-                vec![" 1:2\n", "= expected path_segment or quoted_path_segment"],
+                vec![" 1:2\n", "= expected path_field_name or quoted_path_segment"],
             ),
             (
                 ".foo = !",
@@ -541,7 +542,7 @@ mod tests {
             (".foo.bar = \"baz\" +", vec![" 1:19", "= expected query"]),
             (
                 ".foo.bar = .foo.(bar |)",
-                vec![" 1:23\n", "= expected path_segment"],
+                vec![" 1:23\n", "= expected path_field_name or quoted_path_segment"],
             ),
             (
                 "if .foo > 0 { .foo = \"bar\" } else",
@@ -588,7 +589,7 @@ mod tests {
             (
                 // Same here as above.
                 r#".foo."invalid \k escape".sequence = "foo""#,
-                vec![" 1:6\n", "= expected path_segment or quoted_path_segment"],
+                vec![" 1:6\n", "= expected path_field_name or quoted_path_segment"],
             ),
         ];
 
@@ -1101,6 +1102,26 @@ mod tests {
                 ))]),
             ),
             (
+                r#".foo = sha2(.foo, variant = "SHA-224")"#,
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Sha2Fn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Some("SHA-224"),
+                    )),
+                ))]),
+            ),
+            (
+                r#".foo = sha3(.foo, variant = "SHA3-224")"#,
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(Sha3Fn::new(
+                        Box::new(QueryPath::from("foo")),
+                        Some("SHA3-224"),
+                    )),
+                ))]),
+            ),
+            (
                 ".foo = now()",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
@@ -1178,6 +1199,15 @@ mod tests {
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(TokenizeFn::new(Box::new(QueryPath::from("foo")))),
+                ))]),
+            ),
+            (
+                ".foo = strip_ansi_escape_codes(.foo)",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(StripAnsiEscapeCodesFn::new(Box::new(QueryPath::from(
+                        "foo",
+                    )))),
                 ))]),
             ),
         ];

@@ -459,6 +459,6 @@ mod tests {
 
         // Second event should also get passed through as null is different than missing
         let new_event = transform.transform(event2).unwrap();
-        assert_eq!(false, new_event.as_log().contains(&"matched".into()));
+        assert_eq!(false, new_event.as_log().contains(&"matched"));
     }
 }

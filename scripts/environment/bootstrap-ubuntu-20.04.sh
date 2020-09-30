@@ -73,9 +73,5 @@ if ! [ -x "$(command -v docker)" ]; then
     apt install --yes docker-ce docker-ce-cli containerd.io
 fi
 
-# Install those new things
-apt update --yes
-apt install --yes yarn docker-ce docker-ce-cli containerd.io
-
 # Apt cleanup
 apt clean
