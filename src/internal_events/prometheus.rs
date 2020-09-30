@@ -1,6 +1,6 @@
 use super::InternalEvent;
 use crate::sources::prometheus::parser::ParserError;
-use metrics::{counter, timing};
+use metrics::{counter, histogram};
 use std::borrow::Cow;
 use std::time::Instant;
 
@@ -45,7 +45,7 @@ impl InternalEvent for PrometheusRequestCompleted {
             "component_kind" => "source",
             "component_type" => "prometheus",
         );
-        timing!("request_duration_nanoseconds", self.start, self.end,
+        histogram!("request_duration_nanoseconds", self.end - self.start,
             "component_kind" => "source",
             "component_type" => "prometheus",
         );

@@ -220,6 +220,14 @@ impl RunningTopology {
         // Checks passed so let's shutdown the difference.
         self.shutdown_diff(&diff).await;
 
+        // Gives windows some time to make available any port
+        // released by shutdown componenets.
+        // Issue: https://github.com/timberio/vector/issues/3035
+        if cfg!(windows) {
+            // This value is guess work.
+            tokio::time::delay_for(Duration::from_millis(200)).await;
+        }
+
         // Now let's actually build the new pieces.
         if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff).await {
             if self
@@ -436,7 +444,11 @@ impl RunningTopology {
 
     fn spawn_sink(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
-        let span = info_span!("sink", name = %task.name(), r#type = %task.typetag());
+        let span = error_span!(
+            "sink",
+            topology_component_name = %task.name(),
+            topology_component_type = %task.typetag(),
+        );
         let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task.compat());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
@@ -446,7 +458,11 @@ impl RunningTopology {
 
     fn spawn_transform(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
-        let span = info_span!("transform", name = %task.name(), r#type = %task.typetag());
+        let span = error_span!(
+            "transform",
+            topology_component_name = %task.name(),
+            topology_component_type = %task.typetag(),
+        );
         let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task.compat());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
@@ -456,7 +472,11 @@ impl RunningTopology {
 
     fn spawn_source(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
-        let span = info_span!("source", name = %task.name(), r#type = %task.typetag());
+        let span = error_span!(
+            "source",
+            topology_component_name = %task.name(),
+            topology_component_type = %task.typetag(),
+        );
         let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span.clone());
         let spawned = tokio::spawn(task.compat());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
@@ -652,9 +672,6 @@ mod reload_tests {
     use crate::sources::splunk_hec::SplunkConfig;
     use crate::test_util::{next_addr, start_topology};
 
-    // TODO: Run it only on Linux and Mac since it fails on Windows.
-    // TODO: Issue: https://github.com/timberio/vector/issues/3035
-    #[cfg(unix)]
     #[tokio::test]
     async fn topology_reuse_old_port() {
         let address = next_addr();

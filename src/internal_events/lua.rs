@@ -20,7 +20,7 @@ pub struct LuaGcTriggered {
 
 impl InternalEvent for LuaGcTriggered {
     fn emit_metrics(&self) {
-        gauge!("memory_used", self.used_memory as i64,
+        gauge!("memory_used", self.used_memory as f64,
             "component_kind" => "transform",
             "component_type" => "lua",
         );
