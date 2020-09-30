@@ -57,12 +57,12 @@ Before we can fully grip at our internal `LogEvent` type, let's review a particu
 
 ### Dogma and Intent
 
-Vector has embraced the idea of **Paths**, which are analogous to CSS Selectors or `jq` selectors, that can represent an arbitrary selection of value(s). It is irrelevant to the user how the `LogEvent` is internally structured, so long as they can utilize these paths to work with a `LogEvent`.
+Vector has embraced the idea of **Lookups**, which are analogous to CSS Selectors or `jq` selectors, that can represent an arbitrary selection of value(s). It is irrelevant to the user how the `LogEvent` is internally structured, so long as they can utilize these Lookups to work with a `LogEvent`.
 
 The `LogEvent` variant used under a two primary intents:
 
 * **Programmatically, through our internal code.** When used in this way, the `LogEvent` is being interacted with through static, safe interfaces and we can utilize the full type system available to us.
-* **Through configuration or FFI via knobs or scripts.** When used this way, the configuration format (at this time, TOML) may impact how aesthetic or expressive our configuration is. For example, TOML values like `a.b.c` as defined in a configuration. This is TOML table syntax, and we can't just magically treat it like a `Path`, a conversion step is necessary.
+* **Through configuration or FFI via knobs or scripts.** When used this way, the configuration format (at this time, TOML) may impact how aesthetic or expressive our configuration is. For example, TOML values like `a.b.c` as defined in a configuration. This is TOML table syntax, and we can't just magically treat it like a `Lookup`, a conversion step is necessary.
 
 ### Understanding `LogEvent` in Vector 0.9.0
 
@@ -183,14 +183,14 @@ In the [WASM transform](https://github.com/timberio/vector/pull/2006/files) our 
 This RFC ultimately proposes the following steps:
 
 1. Add UX improvements on `LogEvent`, particularly turning JSON into or from `LogEvent`.
-1. Refactor the `PathIter` to make `vector::Event::Path` type.
-1. Add UX improvements on `Path` , particularly an internal `String` ↔ `Path` with an `Into`/`From` that does not do path parsing, as well as a `Path::parse(s: String)` that does.
-1. Refactor all `LogEvent` to accept `Into<Path>` values.
-    1. Remove obsolete functionality like `insert_path` since the new `Path` type covers this.
-    2. Refactor the `keys` function to return an `Iterator<Path>`
+1. Refactor the `PathIter` to make `vector::event::Lookup` type.
+1. Add UX improvements on `Lookup` , particularly an internal `String` ↔ `Lookup` with an `Into`/`From` that does not do path parsing, as well as a `<Lookup as std::str::FromStr>::from_str(s: String)` that does. (This also enables `"foo.bar".parse::<Lookup>()?`)
+1. Refactor all `LogEvent` to accept `Into<Lookup>` values.
+    1. Remove obsolete functionality like `insert_path` since the new `Lookup` type covers this.
+    2. Refactor the `keys` function to return an `Iterator<Lookup>`
 1. Add an `Entry` style API to `LogEvent`.
     1. Remove functionality rendered obsolete by the Entry API like `try_insert`, moving them to use the new Entry API
-1. Provide `iter` and `iter_mut` functions that yield `(Path, Value)`.
+1. Provide `iter` and `iter_mut` functions that yield `(Lookup, Value)`.
     1. Remove the `all_fields` function, moving them to the new iterator.
 
 We believe these steps will provide a more ergonomic and consistent API.

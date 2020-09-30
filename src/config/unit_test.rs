@@ -295,10 +295,10 @@ fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<String>, Event
                 let mut event = Event::from("");
                 for (path, value) in log_fields {
                     let value: Value = match value {
-                        TestInputValue::String(s) => s.as_bytes().to_vec().into(),
-                        TestInputValue::Boolean(b) => (*b).into(),
-                        TestInputValue::Integer(i) => (*i).into(),
-                        TestInputValue::Float(f) => (*f).into(),
+                        TestInputValue::String(s) => Value::from(s.to_owned()),
+                        TestInputValue::Boolean(b) => Value::from(*b),
+                        TestInputValue::Integer(i) => Value::from(*i),
+                        TestInputValue::Float(f) => Value::from(*f),
                     };
                     event.as_mut_log().insert(path.to_owned(), value);
                 }

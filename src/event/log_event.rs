@@ -23,8 +23,8 @@ impl LogEvent {
         util::log::get_mut(&mut self.fields, key)
     }
 
-    pub fn contains(&self, key: &DefaultAtom) -> bool {
-        util::log::contains(&self.fields, key)
+    pub fn contains(&self, key: impl AsRef<str>) -> bool {
+        util::log::contains(&self.fields, key.as_ref())
     }
 
     pub fn insert<K, V>(&mut self, key: K, value: V) -> Option<Value>
@@ -63,8 +63,8 @@ impl LogEvent {
         util::log::remove(&mut self.fields, &key, false)
     }
 
-    pub fn remove_prune(&mut self, key: &DefaultAtom, prune: bool) -> Option<Value> {
-        util::log::remove(&mut self.fields, &key, prune)
+    pub fn remove_prune(&mut self, key: impl AsRef<str>, prune: bool) -> Option<Value> {
+        util::log::remove(&mut self.fields, key.as_ref(), prune)
     }
 
     pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
@@ -138,7 +138,8 @@ impl std::ops::Index<&DefaultAtom> for LogEvent {
     type Output = Value;
 
     fn index(&self, key: &DefaultAtom) -> &Value {
-        self.get(key).expect("Key is not found")
+        self.get(key)
+            .expect(&*format!("Key is not found: {:?}", key))
     }
 }
 

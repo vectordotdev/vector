@@ -8,7 +8,6 @@ mod path_iter;
 mod remove;
 
 pub(self) use super::Value;
-pub(crate) use path_iter::{PathComponent, PathIter};
 
 pub use all_fields::all_fields;
 pub use contains::contains;
@@ -17,6 +16,7 @@ pub use get::get_value;
 pub use get_mut::get_mut;
 pub use insert::{insert, insert_path};
 pub use keys::keys;
+pub use path_iter::{PathComponent, PathIter};
 pub use remove::remove;
 
 #[cfg(test)]

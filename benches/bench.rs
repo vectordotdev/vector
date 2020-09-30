@@ -728,11 +728,11 @@ fn benchmark_remap(c: &mut Criterion) {
 
     c.bench_function("remap: add fields with add_fields", |b| {
         let mut fields = IndexMap::new();
-        fields.insert("foo".into(), "bar".into());
-        fields.insert("bar".into(), "baz".into());
-        fields.insert("copy".into(), "{{ copy_from }}".into());
+        fields.insert("foo".into(), String::from("bar").into());
+        fields.insert("bar".into(), String::from("baz").into());
+        fields.insert("copy".into(), String::from("{{ copy_from }}").into());
 
-        let tform = AddFields::new(fields, true);
+        let tform = AddFields::new(fields, true).unwrap();
 
         b.iter(add_fields_runner(Box::new(tform)))
     });

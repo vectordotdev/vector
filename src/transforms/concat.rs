@@ -1,7 +1,7 @@
 use super::{BuildError, Transform};
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::Event,
+    event::{Event, Value},
     internal_events::{ConcatEventProcessed, ConcatSubstringError, ConcatSubstringSourceMissing},
 };
 use regex::bytes::Regex;
@@ -185,7 +185,10 @@ impl Transform for Concat {
         }
 
         let content = content_vec.join(self.joiner.as_bytes());
-        event.as_mut_log().insert(self.target.clone(), content);
+        event.as_mut_log().insert(
+            self.target.clone(),
+            Value::from(String::from_utf8_lossy(&content).to_string()),
+        );
 
         Some(event)
     }
