@@ -39,15 +39,6 @@ use std::path::Path;
 use std::time::Duration;
 use tokio::{select, time};
 
-macro_rules! btreemap {
-    ( $( $key:expr => $value:expr ),* ) => {{
-        #[allow(unused_mut)]
-        let mut result = std::collections::BTreeMap::default();
-        $( result.insert($key, $value); )*
-            result
-    }}
-}
-
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 enum Collector {
@@ -537,9 +528,9 @@ impl HostMetricsConfig {
                 .map(|(partition, usage)| {
                     let timestamp = Utc::now();
                     let fs = partition.file_system();
-                    let mut tags = btreemap![
-                        "filesystem".to_string() => fs.as_str().to_string(),
-                        "mountpoint".into() => partition.mount_point().to_string_lossy().into()
+                    let mut tags = tags![
+                        "filesystem" => fs.as_str(),
+                        "mountpoint" => partition.mount_point().to_string_lossy()
                     ];
                     if let Some(device) = partition.device() {
                         tags.insert("device".into(), device.to_string_lossy().into());
@@ -593,8 +584,8 @@ impl HostMetricsConfig {
                     .filter_map(|counter| async { counter })
                     .map(|counter| {
                         let timestamp = Utc::now();
-                        let tags = btreemap![
-                            "device".into() => counter.device_name().to_string_lossy().to_string()
+                        let tags = tags![
+                            "device" => counter.device_name().to_string_lossy()
                         ];
                         stream::iter(
                             vec![
