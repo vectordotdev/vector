@@ -526,7 +526,7 @@ inventory::submit! {
 
 impl GenerateConfig for CheckFieldsConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -583,6 +583,11 @@ impl Condition for CheckFields {
 mod test {
     use super::*;
     use crate::Event;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<CheckFieldsConfig>();
+    }
 
     #[test]
     fn check_predicate_errors() {

@@ -17,7 +17,7 @@ inventory::submit! {
 
 impl GenerateConfig for IsLogConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -58,6 +58,11 @@ mod test {
         event::metric::{Metric, MetricKind, MetricValue},
         Event,
     };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<IsLogConfig>();
+    }
 
     #[test]
     fn is_log_basic() {
