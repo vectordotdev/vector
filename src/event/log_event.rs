@@ -94,6 +94,12 @@ impl LogEvent {
                     Value::Map(map) => map.entry(field),
                     _ => return Err("Looking up field on a non-map value.".into())
                 },
+                (Segment::Field(field), Entry::Vacant(entry)) => match entry.insert(
+                    Value::from(BTreeMap::new())
+                ) {
+                    Value::Map(ref mut map) => map.entry(field),
+                    _ => return Err("Looking up field on a non-map value.".into())
+                },
                 _ => return Err("The entry API cannot yet descend into array indices.".into())
             };
         };
@@ -255,7 +261,7 @@ mod test {
         let entry = event.entry(lookup).unwrap();
         trace!(?entry);
         let fallback = json!(
-            "If you don't see this, the `LogEvent::entry` API is not working on non-existing keys."
+            "If you don't see this, the `LogEvent::entry` API is not working on non-existing lookups."
         );
         entry.or_insert(fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
@@ -266,7 +272,7 @@ mod test {
         let entry = event.entry(lookup).unwrap();
         trace!(?entry);
         let fallback = json!(
-            "If you see this, the `LogEvent::entry` API is not working on existing, single segment keys."
+            "If you see this, the `LogEvent::entry` API is not working on existing, single segment lookups."
         );
         entry.or_insert(fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
@@ -276,7 +282,7 @@ mod test {
         let entry = event.entry(lookup).unwrap();
         trace!(?entry);
         let fallback = json!(
-            "If you see this, the `LogEvent::entry` API is not working on existing, double segment keys."
+            "If you see this, the `LogEvent::entry` API is not working on existing, double segment lookups."
         );
         entry.or_insert(fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
@@ -286,7 +292,7 @@ mod test {
         let entry = event.entry(lookup).unwrap();
         trace!(?entry);
         let fallback = json!(
-            "If you see this, the `LogEvent::entry` API is not working on existing, multi-segment keys."
+            "If you see this, the `LogEvent::entry` API is not working on existing, multi-segment lookups."
         );
         entry.or_insert(fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
@@ -296,10 +302,20 @@ mod test {
         let entry = event.entry(lookup).unwrap();
         trace!(?entry);
         let fallback = json!(
-            "If you don't see this, the `LogEvent::entry` API is not working on non-existing multi-segment keys."
+            "If you don't see this, the `LogEvent::entry` API is not working on non-existing multi-segment lookups."
         );
         entry.or_insert(fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
         assert_eq!(json.pointer("/map/map/non-existing"), Some(&fallback));
+
+        let lookup = Lookup::from_str("map.non-existing.map").unwrap();
+        let entry = event.entry(lookup).unwrap();
+        trace!(?entry);
+        let fallback = json!(
+            "If you don't see this, the `LogEvent::entry` API is not working on a non-existing middle field in multi-segment lookups."
+        );
+        entry.or_insert(fallback.clone().into());
+        let json: serde_json::Value = event.clone().try_into().unwrap();
+        assert_eq!(json.pointer("/map/non-existing/map"), Some(&fallback));
     }
 }
