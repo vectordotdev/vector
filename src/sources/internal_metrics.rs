@@ -16,7 +16,7 @@ use std::time::Duration;
 use tokio::{select, time::interval};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
-pub struct InternalMetricsConfig;
+pub struct InternalMetricsConfig {}
 
 inventory::submit! {
     SourceDescription::new::<InternalMetricsConfig>("internal_metrics")

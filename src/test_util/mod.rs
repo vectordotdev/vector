@@ -55,7 +55,7 @@ where
     for<'de> T: GenerateConfig + serde::Deserialize<'de>,
 {
     let cfg = T::generate_config().to_string();
-    assert!(toml::from_str::<T>(&cfg).is_ok())
+    toml::from_str::<T>(&cfg).expect("Invalid config generated");
 }
 
 pub fn next_addr() -> SocketAddr {
