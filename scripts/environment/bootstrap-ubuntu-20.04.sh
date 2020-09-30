@@ -40,7 +40,8 @@ apt install --yes \
     libsasl2-dev \
     gnupg2 \
     wget \
-    gawk
+    gawk \
+    yarn
 
 # Grease
 # Grease is used for the `make release-github` task.
@@ -60,16 +61,17 @@ dpkg-reconfigure locales
 # Rust
 curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
 
-# Docker
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-add-apt-repository \
-   "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
-   xenial \
-   stable"
-
-# Install those new things
-apt update --yes
-apt install --yes yarn docker-ce docker-ce-cli containerd.io
+if ! [ -x "$(command -v docker)" ]; then
+    # Docker
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+    add-apt-repository \
+        "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+        xenial \
+        stable"
+    # Install those new things
+    apt update --yes
+    apt install --yes docker-ce docker-ce-cli containerd.io
+fi
 
 # Apt cleanup
 apt clean
