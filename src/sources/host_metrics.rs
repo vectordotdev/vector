@@ -834,7 +834,7 @@ mod tests {
     #[tokio::test]
     async fn generates_cpu_metrics() {
         let metrics = HostMetricsConfig::default().cpu_metrics().await;
-        assert!(metrics.len() > 0);
+        assert!(!metrics.is_empty());
         assert!(all_counters(&metrics));
 
         // They should all be named cpu_seconds_total
@@ -850,7 +850,7 @@ mod tests {
     #[tokio::test]
     async fn generates_disk_metrics() {
         let metrics = HostMetricsConfig::default().disk_metrics().await;
-        assert!(metrics.len() > 0);
+        assert!(!metrics.is_empty());
         assert!(metrics.len() % 4 == 0);
         assert!(all_counters(&metrics));
 
@@ -889,7 +889,7 @@ mod tests {
     #[tokio::test]
     async fn generates_filesystem_metrics() {
         let metrics = HostMetricsConfig::default().filesystem_metrics().await;
-        assert!(metrics.len() > 0);
+        assert!(!metrics.is_empty());
         assert!(metrics.len() % 3 == 0);
         assert!(all_gauges(&metrics));
 
@@ -963,7 +963,7 @@ mod tests {
     #[tokio::test]
     async fn generates_network_metrics() {
         let metrics = HostMetricsConfig::default().network_metrics().await;
-        assert!(metrics.len() > 0);
+        assert!(!metrics.is_empty());
         assert!(all_counters(&metrics));
 
         // All metrics are named network_*
