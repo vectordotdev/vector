@@ -64,7 +64,7 @@ inventory::submit! {
 
 impl GenerateConfig for InfluxDBConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -385,6 +385,11 @@ mod tests {
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use crate::sinks::influxdb::test_util::{assert_fields, split_line_protocol, tags, ts};
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<InfluxDBConfig>();
+    }
 
     #[test]
     fn test_encode_counter() {

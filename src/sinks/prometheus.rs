@@ -69,7 +69,13 @@ inventory::submit! {
 
 impl GenerateConfig for PrometheusSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self {
+            namespace: None,
+            address: default_address(),
+            buckets: default_histogram_buckets(),
+            flush_period_secs: default_flush_period_secs(),
+        })
+        .unwrap()
     }
 }
 
@@ -426,6 +432,11 @@ mod tests {
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<PrometheusSinkConfig>();
+    }
 
     fn tags() -> BTreeMap<String, String> {
         vec![("code".to_owned(), "200".to_owned())]

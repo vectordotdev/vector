@@ -85,7 +85,7 @@ inventory::submit! {
 
 impl GenerateConfig for HecSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -281,6 +281,11 @@ mod tests {
     use chrono::Utc;
     use serde::Deserialize;
     use std::collections::BTreeMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<HecSinkConfig>();
+    }
 
     #[derive(Deserialize, Debug)]
     struct HecEventJson {

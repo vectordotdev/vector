@@ -65,7 +65,12 @@ inventory::submit! {
 
 impl GenerateConfig for StatsdSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
+        toml::Value::try_from(&Self {
+            namespace: None,
+            address: default_address(),
+            batch: Default::default(),
+        })
+        .unwrap()
     }
 }
 
@@ -237,6 +242,11 @@ mod test {
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
     #[cfg(feature = "sources-statsd")]
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<StatsdSinkConfig>();
+    }
 
     fn tags() -> BTreeMap<String, String> {
         vec![
