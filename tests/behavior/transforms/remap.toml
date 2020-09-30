@@ -597,7 +597,7 @@
   type = "remap"
   mapping = """
     .a = parse_duration(.a, "ms")
-    .b = parse_duration("100ms", format = .b)
+    .b = parse_duration("100ms", output = .b)
   """
 [[tests]]
   name = "remap_function_parse_duration"

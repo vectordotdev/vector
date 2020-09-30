@@ -6,10 +6,18 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 lazy_static! {
-    static ref RE: Regex =
-        Regex::new(r"(?i)\A(?P<value>[0-9]*\.?[0-9]+)\s?(?P<unit>[a-z]{1,2})\z").unwrap();
+    static ref RE: Regex = Regex::new(
+        r"(?ix)                        # i: case-insensitive, x: ignore whitespace + comments
+            \A
+            (?P<value>[0-9]*\.?[0-9]+) # value: integer or float
+            \s?                        # optional space between value and unit
+            (?P<unit>[a-z]{1,2})       # unit: one or two letters
+            \z"
+    )
+    .unwrap();
     static ref UNITS: HashMap<String, Decimal> = vec![
         ("ns", Decimal::new(1, 9)),
+        ("us", Decimal::new(1, 6)),
         ("µs", Decimal::new(1, 6)),
         ("ms", Decimal::new(1, 3)),
         ("cs", Decimal::new(1, 2)),
@@ -27,15 +35,15 @@ lazy_static! {
 #[derive(Debug)]
 pub(in crate::mapping) struct ParseDurationFn {
     query: Box<dyn Function>,
-    format: Box<dyn Function>,
+    output: Box<dyn Function>,
 }
 
 impl ParseDurationFn {
     #[cfg(test)]
-    pub(in crate::mapping) fn new(query: Box<dyn Function>, format: &str) -> Self {
-        let format = Box::new(Literal::from(Value::from(format)));
+    pub(in crate::mapping) fn new(query: Box<dyn Function>, output: &str) -> Self {
+        let output = Box::new(Literal::from(Value::from(output)));
 
-        Self { query, format }
+        Self { query, output }
     }
 }
 
@@ -46,25 +54,27 @@ impl Function for ParseDurationFn {
             String::from_utf8_lossy(&bytes).into_owned()
         };
 
-        let fmt_decimal = {
-            let bytes = required!(ctx, self.format, Value::Bytes(v) => v);
-            let format = String::from_utf8_lossy(&bytes).into_owned();
+        let conversion_factor = {
+            let bytes = required!(ctx, self.output, Value::Bytes(v) => v);
+            let output = String::from_utf8_lossy(&bytes).into_owned();
 
             UNITS
-                .get(&format)
-                .ok_or(format!("unknown format unit: '{}'", format))?
+                .get(&output)
+                .ok_or(format!("unknown output format: '{}'", output))?
         };
 
         let captures = RE
             .captures(&value)
             .ok_or(format!("unable to parse duration: '{}'", value))?;
 
-        let value = Decimal::from_str(&captures["value"]).map_err(|e| e.to_string())?;
-        let decimal = UNITS
+        let value = Decimal::from_str(&captures["value"])
+            .map_err(|e| format!("unable to parse number: {}", e))?;
+
+        let unit = UNITS
             .get(&captures["unit"])
             .ok_or(format!("unknown duration unit: '{}'", &captures["unit"]))?;
 
-        let number = value * decimal / fmt_decimal;
+        let number = value * unit / conversion_factor;
         let number = number
             .to_f64()
             .ok_or(format!("unable to format duration: '{}'", number))?;
@@ -80,7 +90,7 @@ impl Function for ParseDurationFn {
                 required: true,
             },
             Parameter {
-                keyword: "format",
+                keyword: "output",
                 accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
@@ -93,9 +103,9 @@ impl TryFrom<ArgumentList> for ParseDurationFn {
 
     fn try_from(mut arguments: ArgumentList) -> Result<Self> {
         let query = arguments.required("value")?;
-        let format = arguments.required("format")?;
+        let output = arguments.required("output")?;
 
-        Ok(Self { query, format })
+        Ok(Self { query, output })
     }
 }
 
@@ -164,7 +174,7 @@ mod tests {
             ),
             (
                 Event::from(""),
-                Err("unknown format unit: 'w'".to_owned()),
+                Err("unknown output format: 'w'".to_owned()),
                 ParseDurationFn::new(Box::new(Literal::from("1s")), "w"),
             ),
         ];

@@ -1211,7 +1211,7 @@ mod tests {
                 ))]),
             ),
             (
-                r#".foo = parse_duration(.foo, format = "s")"#,
+                r#".foo = parse_duration(.foo, output = "s")"#,
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ParseDurationFn::new(Box::new(QueryPath::from("foo")), "s")),
