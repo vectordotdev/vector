@@ -20,6 +20,7 @@ mod test {
     use self::file_watcher::FileWatcher;
     use super::*;
     use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
+    use rand::{distributions::Alphanumeric, Rng};
     use std::fs;
     use std::io::Write;
     #[cfg(unix)]
@@ -174,7 +175,7 @@ mod test {
                 // These weights are more or less arbitrary. 'Pause' maybe
                 // doesn't have a use but we keep it in place to allow for
                 // variations in file-system flushes.
-                0..=50 => FWAction::WriteLine(g.gen_ascii_chars().take(ln_sz).collect()),
+                0..=50 => FWAction::WriteLine(g.sample_iter(&Alphanumeric).take(ln_sz).collect()),
                 51..=69 => FWAction::Read,
                 70..=75 => FWAction::Pause(pause),
                 76..=85 => FWAction::RotateFile,
