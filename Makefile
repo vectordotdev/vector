@@ -985,10 +985,6 @@ ifeq (${CI}, true)
 ci-sweep: ## Sweep up the CI to try to get more disk space.
 	@echo "Preparing the CI for build by sweeping up disk space a bit..."
 	df -h
-	sudo apt-get install -y aptitude ubuntu-minimal
-	sudo aptitude markauto -y '~i!~M!~prequired!~pimportant!~R~prequired!~R~R~prequired!~R~pimportant!~R~R~pimportant!busybox!grub!initramfs-tools'
-	sudo aptitude hold -y moby-engine moby-cli
-	sudo aptitude purge -y '~c'
 	sudo apt-get --purge autoremove
 	sudo apt-get clean
 	sudo rm -rf "/opt/*" "/usr/local/*"
