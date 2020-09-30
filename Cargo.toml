@@ -18,12 +18,6 @@ required-features = ["api"]
 [profile.bench]
 debug = true
 
-[profile.release]
-opt-level = 3
-debug = false
-lto = "fat"
-codegen-units = 1
-
 [package.metadata.deb]
 maintainer-scripts = "distribution/debian/scripts/"
 conf-files = ["/etc/vector/vector.toml"]

@@ -9,6 +9,7 @@ on:
 env:
   VERBOSE: true
   ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+  CI: true
 
 jobs:
   publish-new-environment:
@@ -18,13 +19,7 @@ jobs:
     steps:
       - run: docker login https://docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/checkout@v2
-      - name: free disk space
-        run: |
-          sudo swapoff -a
-          sudo rm -f /swapfile
-          sudo apt clean
-          docker rmi $(docker image ls -aq)
-          df -h
+      - run: make ci-sweep
       - name: prepare environment
         run: make environment-prepare
       - name: push image
