@@ -42,6 +42,7 @@ use tower::{
     timeout::Timeout,
     Service, ServiceBuilder, ServiceExt,
 };
+use string_cache::DefaultAtom as Atom;
 
 // Estimated maximum size of InputLogEvent with an empty message
 const EVENT_SIZE_OVERHEAD: usize = 50;
@@ -411,7 +412,7 @@ fn encode_log(
     mut log: LogEvent,
     encoding: &EncodingConfig<Encoding>,
 ) -> Result<InputLogEvent, CloudwatchLogsError> {
-    let timestamp = match log.remove(&log_schema().timestamp_key()) {
+    let timestamp = match log.remove(&Atom::from(log_schema().timestamp_key())) {
         Some(Value::Timestamp(ts)) => ts.timestamp_millis(),
         _ => Utc::now().timestamp_millis(),
     };
@@ -419,7 +420,7 @@ fn encode_log(
     let message = match encoding.codec() {
         Encoding::Json => serde_json::to_string(&log).unwrap(),
         Encoding::Text => log
-            .get(&log_schema().message_key())
+            .get(&Atom::from(log_schema().message_key()))
             .map(|v| v.to_string_lossy())
             .unwrap_or_else(|| "".into()),
     };

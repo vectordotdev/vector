@@ -15,6 +15,7 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::io::{self, AsyncWriteExt};
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
@@ -85,7 +86,7 @@ fn encode_event(
             Encoding::Json => serde_json::to_string(&log),
             Encoding::Text => {
                 let s = log
-                    .get(&crate::config::log_schema().message_key())
+                    .get(&Atom::from(crate::config::log_schema().message_key()))
                     .map(|v| v.to_string_lossy())
                     .unwrap_or_else(|| "".into());
                 Ok(s)

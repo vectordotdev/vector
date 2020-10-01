@@ -53,7 +53,7 @@ pub struct Sampler {
 
 impl Sampler {
     pub fn new(rate: u64, key_field: Option<Atom>, pass_list: RegexSet) -> Self {
-        let key_field = key_field.unwrap_or_else(|| log_schema().message_key().clone());
+        let key_field = key_field.unwrap_or_else(|| Atom::from(log_schema().message_key()));
         Self {
             rate,
             key_field,

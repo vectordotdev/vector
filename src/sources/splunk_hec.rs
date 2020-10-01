@@ -350,7 +350,7 @@ impl<R: Read> EventStream<R> {
             channel: channel.map(Value::from),
             time: Time::Now(Utc::now()),
             extractors: [
-                DefaultExtractor::new_with("host", &log_schema().host_key(), host.map(Value::from)),
+                DefaultExtractor::new_with("host", log_schema().host_key(), host.map(Value::from)),
                 DefaultExtractor::new("index", &INDEX),
                 DefaultExtractor::new("source", &SOURCE),
                 DefaultExtractor::new("sourcetype", &SOURCETYPE),
@@ -531,12 +531,12 @@ fn parse_timestamp(t: i64) -> Option<DateTime<Utc>> {
 /// Maintains last known extracted value of field and uses it in the absence of field.
 struct DefaultExtractor {
     field: &'static str,
-    to_field: &'static Atom,
+    to_field: &'static str,
     value: Option<Value>,
 }
 
 impl DefaultExtractor {
-    fn new(field: &'static str, to_field: &'static Atom) -> Self {
+    fn new(field: &'static str, to_field: &'static str) -> Self {
         DefaultExtractor {
             field,
             to_field,
@@ -546,7 +546,7 @@ impl DefaultExtractor {
 
     fn new_with(
         field: &'static str,
-        to_field: &'static Atom,
+        to_field: &'static str,
         value: impl Into<Option<Value>>,
     ) -> Self {
         DefaultExtractor {
@@ -621,7 +621,7 @@ fn raw_event(
     // Add source type
     event
         .as_mut_log()
-        .try_insert(log_schema().source_type_key(), Bytes::from("splunk_hec"));
+        .try_insert(&Atom::from(log_schema().source_type_key()), Bytes::from("splunk_hec"));
 
     emit!(SplunkHECEventReceived);
 

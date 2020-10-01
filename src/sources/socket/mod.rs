@@ -12,6 +12,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 // TODO: add back when https://github.com/serde-rs/serde/issues/1358 is addressed
@@ -92,7 +93,7 @@ impl SourceConfig for SocketConfig {
                 let host_key = config
                     .host_key
                     .clone()
-                    .unwrap_or_else(|| log_schema().host_key().clone());
+                    .unwrap_or_else(|| Atom::from(log_schema().host_key().clone()));
                 Ok(udp::udp(
                     config.address,
                     config.max_length,

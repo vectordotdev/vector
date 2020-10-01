@@ -29,6 +29,7 @@ use std::{
 };
 use tower::Service;
 use tracing_futures::Instrument;
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Clone)]
 pub struct KinesisFirehoseService {
@@ -234,7 +235,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
         Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
 
         Encoding::Text => log
-            .get(&crate::config::log_schema().message_key())
+            .get(&Atom::from(crate::config::log_schema().message_key()))
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };

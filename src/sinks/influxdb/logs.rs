@@ -19,6 +19,7 @@ use http::{Request, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -147,7 +148,7 @@ impl HttpSink for InfluxDBLogsSink {
         let measurement = encode_namespace(Some(&self.namespace), '.', "vector");
 
         // Timestamp
-        let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
+        let timestamp = encode_timestamp(match event.remove(&Atom::from(log_schema().timestamp_key())) {
             Some(Value::Timestamp(ts)) => Some(ts),
             _ => None,
         });

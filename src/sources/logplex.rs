@@ -17,6 +17,7 @@ use std::{
     str::FromStr,
 };
 use warp::http::{HeaderMap, StatusCode};
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LogplexConfig {
@@ -168,7 +169,7 @@ fn line_to_event(line: String) -> Event {
     // Add source type
     event
         .as_mut_log()
-        .try_insert(log_schema().source_type_key(), Bytes::from("logplex"));
+        .try_insert(&Atom::from(log_schema().source_type_key()), Bytes::from("logplex"));
 
     event
 }

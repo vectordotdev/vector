@@ -869,7 +869,9 @@ impl ContainerLogInfo {
                 // current message being the initial one.
                 if let Some(partial_event_merge_state) = partial_event_merge_state {
                     partial_event_merge_state
-                        .merge_in_next_event(log_event, &[log_schema().message_key().clone()]);
+                        .merge_in_next_event(log_event, &[
+                            Atom::from(log_schema().message_key())
+                        ]);
                 } else {
                     *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
                 };
@@ -882,7 +884,7 @@ impl ContainerLogInfo {
             // Otherwise it's just a regular event that we return as-is.
             match partial_event_merge_state.take() {
                 Some(partial_event_merge_state) => partial_event_merge_state
-                    .merge_in_final_event(log_event, &[log_schema().message_key().clone()]),
+                    .merge_in_final_event(log_event, &[Atom::from(log_schema().message_key())]),
                 None => log_event,
             }
         } else {
@@ -972,7 +974,7 @@ fn line_agg_adapter(
         let mut log_event = event.into_log();
 
         let message_value = log_event
-            .remove(log_schema().message_key())
+            .remove(&Atom::from(log_schema().message_key()))
             .expect("message must exist in the event");
         let stream_value = log_event
             .get(&STREAM)

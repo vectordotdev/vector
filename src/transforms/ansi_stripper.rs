@@ -26,8 +26,8 @@ impl TransformConfig for AnsiStripperConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
-            .as_ref()
-            .unwrap_or(&crate::config::log_schema().message_key());
+            .clone()
+            .unwrap_or(Atom::from(crate::config::log_schema().message_key()));
 
         Ok(Box::new(AnsiStripper {
             field: field.clone(),

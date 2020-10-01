@@ -161,7 +161,7 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<Atom>> {
 fn render_timestamp(src: &str, event: &Event) -> String {
     let timestamp = match event {
         Event::Log(log) => log
-            .get(&log_schema().timestamp_key())
+            .get(&Atom::from(log_schema().timestamp_key()))
             .and_then(Value::as_timestamp),
         _ => None,
     };

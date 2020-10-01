@@ -39,7 +39,7 @@ inventory::submit! {
 #[typetag::serde(name = "grok_parser")]
 impl TransformConfig for GrokParserConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        let field = self.field.as_ref().unwrap_or(&log_schema().message_key());
+        let field = self.field.clone().unwrap_or(Atom::from(log_schema().message_key()));
 
         let mut grok = grok::Grok::with_patterns();
 

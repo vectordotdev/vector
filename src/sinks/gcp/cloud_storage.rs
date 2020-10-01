@@ -34,6 +34,7 @@ use std::task::Poll;
 use tower::{Service, ServiceBuilder};
 use tracing::field;
 use uuid::Uuid;
+use string_cache::DefaultAtom as Atom;
 
 const NAME: &str = "gcp_cloud_storage";
 const BASE_URL: &str = "https://storage.googleapis.com/";
@@ -423,7 +424,7 @@ fn encode_event(
             .expect("Failed to encode event as json, this is a bug!"),
         Encoding::Text => {
             let mut bytes = log
-                .get(&crate::config::log_schema().message_key())
+                .get(&Atom::from(crate::config::log_schema().message_key()))
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             bytes.push(b'\n');

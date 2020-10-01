@@ -76,7 +76,7 @@ pub enum Encoding {
 }
 
 fn default_host_key() -> Atom {
-    crate::config::LogSchema::default().host_key().clone()
+    Atom::from(crate::config::LogSchema::default().host_key())
 }
 
 inventory::submit! {
@@ -151,7 +151,7 @@ impl HttpSink for HecSinkConfig {
 
         let host = event.get(&self.host_key).cloned();
 
-        let timestamp = match event.remove(&log_schema().timestamp_key()) {
+        let timestamp = match event.remove(&Atom::from(log_schema().timestamp_key())) {
             Some(Value::Timestamp(ts)) => ts,
             _ => chrono::Utc::now(),
         };
@@ -170,7 +170,7 @@ impl HttpSink for HecSinkConfig {
         let event = match self.encoding.codec() {
             Encoding::Json => json!(event),
             Encoding::Text => json!(event
-                .get(&log_schema().message_key())
+                .get(&Atom::from(log_schema().message_key()))
                 .map(|v| v.to_string_lossy())
                 .unwrap_or_else(|| "".into())),
         };

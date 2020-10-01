@@ -15,6 +15,7 @@ use serde_json::Value as JsonValue;
 use std::net::SocketAddr;
 use tokio_util::codec::Decoder;
 use warp::http::{HeaderMap, HeaderValue, StatusCode};
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct SimpleHttpConfig {
@@ -54,7 +55,7 @@ impl HttpSource for SimpleHttpSource {
                 // Add source type
                 let key = log_schema().source_type_key();
                 for event in events.iter_mut() {
-                    event.as_mut_log().try_insert(key, Bytes::from("http"));
+                    event.as_mut_log().try_insert(&Atom::from(key), Bytes::from("http"));
                 }
                 events
             })

@@ -23,7 +23,7 @@ use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
 };
-
+use string_cache::DefaultAtom as Atom;
 mod bytes_path;
 use bytes_path::BytesPath;
 
@@ -297,7 +297,7 @@ pub fn encode_event(encoding: &EncodingConfigWithDefault<Encoding>, mut event: E
     match encoding.codec() {
         Encoding::Ndjson => serde_json::to_vec(&log).expect("Unable to encode event as JSON."),
         Encoding::Text => log
-            .get(&log_schema().message_key())
+            .get(&Atom::from(log_schema().message_key()))
             .map(|v| v.to_string_lossy().into_bytes())
             .unwrap_or_default(),
     }
