@@ -412,9 +412,8 @@ impl PrometheusSink {
 #[async_trait]
 impl StreamSink for PrometheusSink {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        self.start_server_if_needed();
         while let Some(event) = input.next().await {
-            self.start_server_if_needed();
-
             let item = event.into_metric();
             let mut metrics = self.metrics.write().unwrap();
 
