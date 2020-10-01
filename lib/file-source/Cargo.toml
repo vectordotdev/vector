@@ -19,5 +19,6 @@ libc =  "0.2"
 tokio = { version = "0.2.13", features = ["time"] }
 
 [dev-dependencies]
-quickcheck = "0.6"
+quickcheck = "0.9"
+rand = "0.7"
 tempfile = "3.1.0"
