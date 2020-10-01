@@ -339,16 +339,45 @@ impl HttpSink for DatadogLogsTextService {
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
-        let uri = self.config.get_endpoint();
         let body: Vec<u8> = events.iter().flat_map(|b| b.into_iter()).cloned().collect();
 
-        let request = Request::post(uri)
-            .header("Content-Type", "text/plain")
-            .header("Content-Length", body.len())
-            .header("DD-API-KEY", self.config.api_key.clone());
-
-        request.body(body).map_err(Into::into)
+        build_request(&self.config, body)
     }
+}
+
+/// Build the request, GZipping the contents if the config specifies.
+fn build_request(
+    config: &DatadogLogsConfig,
+    body: Vec<u8>,
+) -> crate::Result<http::Request<Vec<u8>>> {
+    let uri = config.get_endpoint();
+    let request = Request::post(uri)
+        .header("Content-Type", "text/plain")
+        .header("DD-API-KEY", config.api_key.clone());
+
+    let (request, body) = match config.compression {
+        Compression::None => (request, body),
+        Compression::Gzip => {
+            let mut encoder = GzEncoder::new(
+                Vec::new(),
+                match config.compression_level {
+                    Some(level) if level <= 9 => flate2::Compression::new(level),
+                    _ => flate2::Compression::fast(),
+                },
+            );
+
+            encoder.write_all(&body)?;
+            (
+                request.header("Content-Encoding", "gzip"),
+                encoder.finish()?,
+            )
+        }
+    };
+
+    request
+        .header("Content-Length", body.len())
+        .body(body)
+        .map_err(Into::into)
 }
 
 /// The healthcheck is performed by sending an empty request to Datadog and checking
@@ -426,6 +455,7 @@ mod tests {
             r#"
             api_key = "atoken"
             encoding = "text"
+            compression = "none"
             batch.max_events = 1
             "#,
         )
@@ -461,6 +491,7 @@ mod tests {
             r#"
             api_key = "atoken"
             encoding = "json"
+            compression = "none"
             batch.max_events = 1
             "#,
         )
