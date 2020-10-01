@@ -8,6 +8,7 @@ use crate::{
         },
         util::{
             http::{HttpBatchService, HttpClient, HttpRetryLogic},
+            statistic::DistributionStatistic,
             BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -18,7 +19,6 @@ use futures::future::{ready, BoxFuture};
 use futures01::Sink;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::task::Poll;
 use tower::Service;
@@ -300,67 +300,23 @@ fn encode_distribution(
     counts: &[u32],
     quantiles: &[f64],
 ) -> Option<HashMap<String, Field>> {
-    if values.len() != counts.len() {
-        return None;
-    }
-
-    let mut samples = Vec::new();
-    for (v, c) in values.iter().zip(counts.iter()) {
-        for _ in 0..*c {
-            samples.push(*v);
-        }
-    }
-
-    if samples.is_empty() {
-        return None;
-    }
-
-    if samples.len() == 1 {
-        let val = samples[0];
-        return Some(
-            vec![
-                ("min".to_owned(), Field::Float(val)),
-                ("max".to_owned(), Field::Float(val)),
-                ("median".to_owned(), Field::Float(val)),
-                ("avg".to_owned(), Field::Float(val)),
-                ("sum".to_owned(), Field::Float(val)),
-                ("count".to_owned(), Field::Float(1.0)),
-            ]
-            .into_iter()
-            .chain(
-                quantiles
-                    .iter()
-                    .map(|p| (format!("quantile_{:.2}", p), Field::Float(val))),
-            )
-            .collect(),
-        );
-    }
-
-    samples.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
-
-    let length = samples.len() as f64;
-    let min = samples.first().unwrap();
-    let max = samples.last().unwrap();
-
-    let median = samples[(0.50 * length - 1.0).round() as usize];
-    let quantiles = quantiles.iter().map(|p| {
-        let sample = samples[(p * length - 1.0).round() as usize];
-        (format!("quantile_{:.2}", p), Field::Float(sample))
-    });
-
-    let sum = samples.iter().sum();
-    let avg = sum / length;
+    let statistic = DistributionStatistic::new(values, counts, quantiles)?;
 
     let fields: HashMap<String, Field> = vec![
-        ("min".to_owned(), Field::Float(*min)),
-        ("max".to_owned(), Field::Float(*max)),
-        ("median".to_owned(), Field::Float(median)),
-        ("avg".to_owned(), Field::Float(avg)),
-        ("sum".to_owned(), Field::Float(sum)),
-        ("count".to_owned(), Field::Float(length)),
+        ("min".to_owned(), Field::Float(statistic.min)),
+        ("max".to_owned(), Field::Float(statistic.max)),
+        ("median".to_owned(), Field::Float(statistic.median)),
+        ("avg".to_owned(), Field::Float(statistic.avg)),
+        ("sum".to_owned(), Field::Float(statistic.sum)),
+        ("count".to_owned(), Field::Float(statistic.count as f64)),
     ]
     .into_iter()
-    .chain(quantiles)
+    .chain(
+        statistic
+            .quantiles
+            .iter()
+            .map(|&(p, val)| (format!("quantile_{:.2}", p), Field::Float(val))),
+    )
     .collect();
 
     Some(fields)

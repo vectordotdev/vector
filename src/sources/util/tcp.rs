@@ -19,7 +19,6 @@ use tokio::{
     time::delay_for,
 };
 use tokio_util::codec::{Decoder, FramedRead};
-use tracing::field;
 use tracing_futures::Instrument;
 
 async fn make_listener(
@@ -85,12 +84,10 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
 
             info!(
                 message = "Listening.",
-                addr = field::display(
-                    listener
-                        .local_addr()
-                        .map(SocketListenAddr::SocketAddr)
-                        .unwrap_or(addr)
-                )
+                addr = %listener
+                    .local_addr()
+                    .map(SocketListenAddr::SocketAddr)
+                    .unwrap_or(addr)
             );
 
             let tripwire = shutdown.clone().compat();
