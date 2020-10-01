@@ -82,7 +82,7 @@ impl LogEvent {
     }
 
     #[instrument(skip(self, lookup), fields(lookup = %lookup), err)]
-    fn entry<'a>(&'a mut self, lookup: Lookup) -> crate::Result<Entry<'a, String, Value>> {
+    fn entry(&mut self, lookup: Lookup) -> crate::Result<Entry<String, Value>> {
         trace!("Seeking to entry.");
         let mut walker = lookup.into_iter().enumerate();
 
@@ -102,8 +102,13 @@ impl LogEvent {
                 },
                 (Segment::Field(field), Entry::Vacant(entry)) => {
                     trace!(segment = %field, index, "Met vacant entry.");
-                    return Err(format!("Tried to step into `{}` of `{}`, but it did not exist.", field, entry.key()).into())
-                },
+                    return Err(format!(
+                        "Tried to step into `{}` of `{}`, but it did not exist.",
+                        field,
+                        entry.key()
+                    )
+                    .into());
+                }
                 _ => return Err("The entry API cannot yet descend into array indices.".into()),
             };
         }
