@@ -273,7 +273,7 @@ mod test {
         let fallback = json!(
             "If you don't see this, the `LogEvent::entry` API is not working on non-existing lookups."
         );
-        entry.or_insert(fallback.clone().into());
+        entry.or_insert_with(|| fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
         trace!(?json);
         assert_eq!(json.pointer("/non-existing"), Some(&fallback));
@@ -283,7 +283,7 @@ mod test {
         let fallback = json!(
             "If you see this, the `LogEvent::entry` API is not working on existing, single segment lookups."
         );
-        entry.or_insert(fallback.clone().into());
+        entry.or_insert_with(|| fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
         assert_eq!(json.pointer("/nulled"), Some(&serde_json::Value::Null));
 
@@ -292,7 +292,7 @@ mod test {
         let fallback = json!(
             "If you see this, the `LogEvent::entry` API is not working on existing, double segment lookups."
         );
-        entry.or_insert(fallback.clone().into());
+        entry.or_insert_with(|| fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
         assert_eq!(
             json.pointer("/map/basic"),
@@ -304,7 +304,7 @@ mod test {
         let fallback = json!(
             "If you see this, the `LogEvent::entry` API is not working on existing, multi-segment lookups."
         );
-        entry.or_insert(fallback.clone().into());
+        entry.or_insert_with(|| fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
         assert_eq!(
             json.pointer("/map/map/buddy"),
@@ -316,7 +316,7 @@ mod test {
         let fallback = json!(
             "If you don't see this, the `LogEvent::entry` API is not working on non-existing multi-segment lookups."
         );
-        entry.or_insert(fallback.clone().into());
+        entry.or_insert_with(|| fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
         assert_eq!(json.pointer("/map/map/non-existing"), Some(&fallback));
     }
