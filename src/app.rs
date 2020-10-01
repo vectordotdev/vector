@@ -183,24 +183,27 @@ impl Application {
 
         let mut config_paths = self.config.config_paths;
 
-        #[cfg(feature = "api")]
-        // assigned to prevent the API terminating when falling out of scope
-        let _api = if self.config.api.enabled {
-            emit!(ApiStarted {
-                addr: self.config.api.bind.unwrap(),
-                playground: self.config.api.playground
-            });
-
-            Some(api::Server::start(self.config.api))
-        } else {
-            None
-        };
-
         let opts = self.opts;
+
+        #[cfg(feature = "api")]
+        let api_config = self.config.api;
 
         rt.block_on(async move {
             emit!(VectorStarted);
             tokio::spawn(heartbeat::heartbeat());
+
+            #[cfg(feature = "api")]
+            // assigned to prevent the API terminating when falling out of scope
+            let _api = if api_config.enabled {
+                emit!(ApiStarted {
+                    addr: api_config.bind.unwrap(),
+                    playground: api_config.playground
+                });
+
+                Some(api::Server::start(api_config))
+            } else {
+                None
+            };
 
             let signals = signal::signals();
             tokio::pin!(signals);
