@@ -5,7 +5,7 @@ use crate::{
         Event,
     },
     shutdown::ShutdownSignal,
-    Pipeline,
+    BoolAndSome, Pipeline,
 };
 use chrono::{DateTime, Utc};
 use futures::{
@@ -438,7 +438,7 @@ impl HostMetricsConfig {
                         self.network
                             .devices
                             .contains_str(counter.interface())
-                            .map(|()| counter)
+                            .and_some(counter)
                     })
                     .filter_map(|counter| async { counter })
                     .map(|counter| {
@@ -511,24 +511,25 @@ impl HostMetricsConfig {
                 .filter_map(|result| filter_result(result, "Failed to load/parse partition data"))
                 // Filter on configured mountpoints
                 .map(|partition| {
-                    self.filesystem.mountpoints.contains_path(partition.mount_point()).map(|()| partition)
+                    self.filesystem.mountpoints.contains_path(partition.mount_point()).and_some(partition)
                 })
                 .filter_map(|partition| async { partition })
                 // Filter on configured devices
                 .map(|partition| {
-                    if self.filesystem.devices.is_empty() {
-                        Some(())
-                    } else {
-                        partition
+                    (
+                        self.filesystem.devices.is_empty()
+                            && partition
                             .device()
-                            .and_then(|device| self.filesystem.devices.contains_path(device.as_ref()))
-                    }.map(|()| partition)
+                            .map(|device| self.filesystem.devices.contains_path(device.as_ref()))
+                            .unwrap_or(false)
+                    )
+                    .and_some(partition)
                 })
                 .filter_map(|partition| async { partition })
                 // Filter on configured filesystems
                 .map(|partition| {
                     self.filesystem.filesystems.contains_str(partition.file_system().as_str())
-                        .map(|()| partition)
+                        .and_some(partition)
                 })
                 .filter_map(|partition| async { partition })
                 // Load usage from the partition mount point
@@ -597,7 +598,7 @@ impl HostMetricsConfig {
                         self.disk
                             .devices
                             .contains_path(counter.device_name().as_ref())
-                            .map(|()| counter)
+                            .and_some(counter)
                     })
                     .filter_map(|counter| async { counter })
                     .map(|counter| {
@@ -697,52 +698,38 @@ impl FilterList {
         self.includes.is_none() && self.excludes.is_none()
     }
 
-    fn contains_str(&self, value: &str) -> Option<()> {
-        let result = match &self.includes {
+    fn contains_str(&self, value: &str) -> bool {
+        (match &self.includes {
             // No includes list includes everything
             None => true,
             // Otherwise find the given value
             Some(includes) => includes.iter().any(|pattern| pattern.matches_str(value)),
-        } && match &self.excludes {
+        }) && match &self.excludes {
             // No excludes, list excludes nothing
             None => true,
             // Otherwise find the given value
             Some(excludes) => !excludes.iter().any(|pattern| pattern.matches_str(value)),
-        };
-        if result {
-            Some(())
-        } else {
-            None
         }
     }
 
-    fn contains_path(&self, value: &Path) -> Option<()> {
-        let result = match &self.includes {
+    fn contains_path(&self, value: &Path) -> bool {
+        (match &self.includes {
             // No includes list includes everything
             None => true,
             // Otherwise find the given value
             Some(includes) => includes.iter().any(|pattern| pattern.matches_path(value)),
-        } && match &self.excludes {
+        }) && match &self.excludes {
             // No excludes, list excludes nothing
             None => true,
             // Otherwise find the given value
             Some(excludes) => !excludes.iter().any(|pattern| pattern.matches_path(value)),
-        };
-        if result {
-            Some(())
-        } else {
-            None
         }
     }
 
     #[cfg(test)]
     fn contains_test(&self, value: &str) -> bool {
-        let result = self.contains_str(value).is_some();
-        assert_eq!(
-            result,
-            self.contains_path(&std::path::PathBuf::from(value))
-                .is_some()
-        );
+        let result = self.contains_str(value);
+        assert_eq!(result, self.contains_path(&std::path::PathBuf::from(value)));
         result
     }
 }
