@@ -11,7 +11,7 @@ mod tests {
     use futures::StreamExt;
     use graphql_client::*;
     use std::{
-        sync::{Arc, Once},
+        sync::Once,
         time::{Duration, Instant},
     };
     use tokio::{select, sync::oneshot};
@@ -98,8 +98,7 @@ mod tests {
     // Starts and returns the server
     fn start_server() -> Server {
         let config = api_enabled_config();
-
-        api::Server::start(Arc::new(config))
+        api::Server::start(&config)
     }
 
     // Returns the result of a URL test against the API. Wraps the test in retry_until
@@ -108,7 +107,7 @@ mod tests {
         let addr = config.api.bind.unwrap();
         let url = format!("http://{}:{}/{}", addr.ip(), addr.port(), url);
 
-        let _server = api::Server::start(Arc::new(config));
+        let _server = api::Server::start(&config);
 
         // Build the request
         let client = reqwest::Client::new();
@@ -128,7 +127,7 @@ mod tests {
         let addr = config.api.bind.unwrap();
         let url = format!("http://{}:{}/graphql", addr.ip(), addr.port());
 
-        let _server = api::Server::start(Arc::new(config));
+        let _server = api::Server::start(&config);
         let client = reqwest::Client::new();
 
         retry_until(

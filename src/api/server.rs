@@ -42,6 +42,13 @@ impl Server {
     pub fn addr(&self) -> SocketAddr {
         self.addr
     }
+
+    /// Update the configuration of a running server. While this instance method doesn't
+    /// directly involve `self`, it provides a neater API to expose an internal implementation
+    /// detail than exposing the function of the sub-mod directly
+    pub fn update_config(&self, config: &config::Config) {
+        schema::topology::update_config(config)
+    }
 }
 
 fn make_routes(playground: bool) -> BoxedFilter<(impl Reply,)> {

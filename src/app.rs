@@ -223,8 +223,8 @@ impl Application {
                             {
                                 Ok(true) => {
                                     #[cfg(feature="api")]
-                                    if api.is_some() {
-                                        api::update_config(topology.config());
+                                    if let Some(ref api_server) = api {
+                                        api_server.update_config(topology.config())
                                     }
 
                                     emit!(VectorReloaded { config_paths: &config_paths })
