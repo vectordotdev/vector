@@ -192,7 +192,7 @@ impl Application {
 
             #[cfg(feature = "api")]
             // assigned to prevent the API terminating when falling out of scope
-            let _api = if api_config.enabled {
+            let api_server = if api_config.enabled {
                 emit!(ApiStarted {
                     addr: api_config.bind.unwrap(),
                     playground: api_config.playground
@@ -224,8 +224,8 @@ impl Application {
                             {
                                 Ok(true) => {
                                     #[cfg(feature="api")]
-                                    if let Some(ref api_server) = api {
-                                        api_server.update_config(topology.config())
+                                    if let Some(ref api) = api_server {
+                                        api.update_config(topology.config())
                                     }
 
                                     emit!(VectorReloaded { config_paths: &config_paths })
