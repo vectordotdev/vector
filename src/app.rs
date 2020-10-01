@@ -181,7 +181,7 @@ impl Application {
         let graceful_crash = self.config.graceful_crash;
         let mut topology = self.config.topology;
 
-        let config_paths = self.config.config_paths;
+        let mut config_paths = self.config.config_paths;
 
         #[cfg(feature = "api")]
         // assigned to prevent the API terminating when falling out of scope
@@ -211,6 +211,8 @@ impl Application {
                 tokio::select! {
                 Some(signal) = signals.next() => {
                     if signal == SignalTo::Reload {
+                        // Reload paths
+                        config_paths = config::process_paths(&opts.config_paths).unwrap_or(config_paths);
                         // Reload config
                         let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
 
