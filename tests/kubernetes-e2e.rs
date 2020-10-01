@@ -93,7 +93,7 @@ async fn smoke_check_first_line(log_reader: &mut Reader) {
         .read_line()
         .await
         .expect("unable to read first line");
-    let expected_pat = "INFO vector: Log level \"info\" is enabled.\n";
+    let expected_pat = "INFO vector::app: Log level \"info\" is enabled.\n";
     assert!(
         first_line.ends_with(expected_pat),
         "Expected a line ending with {:?} but got {:?}; vector might be malfunctioning",
