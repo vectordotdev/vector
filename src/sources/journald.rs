@@ -19,8 +19,7 @@ use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
 use std::{
     collections::{HashMap, HashSet},
-    fs::{File, OpenOptions},
-    io::{Read, Seek, SeekFrom, Write},
+    io::SeekFrom,
     iter::FromIterator,
     path::PathBuf,
     pin::Pin,
@@ -30,7 +29,8 @@ use std::{
 };
 use string_cache::DefaultAtom as Atom;
 use tokio::{
-    io::{self, AsyncBufReadExt, BufReader},
+    fs::{File, OpenOptions},
+    io::{self, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     process::Command,
 };
 use tracing::field;
@@ -83,9 +83,20 @@ inventory::submit! {
 
 type Record = HashMap<Atom, String>;
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "journald")]
 impl SourceConfig for JournaldConfig {
     fn build(
+        &self,
+        _name: &str,
+        _globals: &GlobalOptions,
+        _shutdown: ShutdownSignal,
+        _out: Pipeline,
+    ) -> crate::Result<super::Source> {
+        unimplemented!()
+    }
+
+    async fn build_async(
         &self,
         name: &str,
         globals: &GlobalOptions,
@@ -117,9 +128,11 @@ impl SourceConfig for JournaldConfig {
 
         let mut checkpoint = data_dir;
         checkpoint.push(CHECKPOINT_FILENAME);
-        let checkpointer = Checkpointer::new(checkpoint.clone()).map_err(|error| {
-            format!("Unable to open checkpoint file {:?}: {}", checkpoint, error)
-        })?;
+        let checkpointer = Checkpointer::new(checkpoint.clone())
+            .await
+            .map_err(|error| {
+                format!("Unable to open checkpoint file {:?}: {}", checkpoint, error)
+            })?;
 
         self.source::<Journalctl>(
             out,
@@ -130,6 +143,7 @@ impl SourceConfig for JournaldConfig {
             batch_size,
             self.remap_priority,
         )
+        .await
     }
 
     fn output_type(&self) -> DataType {
@@ -142,7 +156,7 @@ impl SourceConfig for JournaldConfig {
 }
 
 impl JournaldConfig {
-    fn source<J>(
+    async fn source<J>(
         &self,
         out: Pipeline,
         shutdown: ShutdownSignal,
@@ -160,7 +174,7 @@ impl JournaldConfig {
             .with(|record: Record| future::ok(create_event(record)));
 
         // Retrieve the saved checkpoint, and use it to seek forward in the journald log
-        let cursor = match checkpointer.get() {
+        let cursor = match checkpointer.get().await {
             Ok(cursor) => cursor,
             Err(err) => {
                 error!(
@@ -386,7 +400,7 @@ where
 
             if saw_record {
                 if let Some(cursor) = cursor {
-                    if let Err(err) = self.checkpointer.set(&cursor) {
+                    if let Err(err) = self.checkpointer.set(&cursor).await {
                         error!(
                             message = "Could not set journald checkpoint.",
                             error = field::display(&err),
@@ -469,25 +483,28 @@ struct Checkpointer {
 }
 
 impl Checkpointer {
-    fn new(filename: PathBuf) -> Result<Self, io::Error> {
+    async fn new(filename: PathBuf) -> Result<Self, io::Error> {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
-            .open(&filename)?;
+            .open(&filename)
+            .await?;
         Ok(Checkpointer { file, filename })
     }
 
-    fn set(&mut self, token: &str) -> Result<(), io::Error> {
-        self.file.seek(SeekFrom::Start(0))?;
-        self.file.write_all(format!("{}\n", token).as_bytes())?;
+    async fn set(&mut self, token: &str) -> Result<(), io::Error> {
+        self.file.seek(SeekFrom::Start(0)).await?;
+        self.file
+            .write_all(format!("{}\n", token).as_bytes())
+            .await?;
         Ok(())
     }
 
-    fn get(&mut self) -> Result<Option<String>, io::Error> {
+    async fn get(&mut self) -> Result<Option<String>, io::Error> {
         let mut buf = Vec::<u8>::new();
-        self.file.seek(SeekFrom::Start(0))?;
-        self.file.read_to_end(&mut buf)?;
+        self.file.seek(SeekFrom::Start(0)).await?;
+        self.file.read_to_end(&mut buf).await?;
         match buf.len() {
             0 => Ok(None),
             _ => {
@@ -504,43 +521,39 @@ impl Checkpointer {
 #[cfg(test)]
 mod checkpointer_tests {
     use super::*;
-    use core::fmt::Debug;
-    use std::fs::File;
-    use std::io::Read;
-    use std::path::Path;
     use tempfile::tempdir;
+    use tokio::fs::read_to_string;
 
-    fn open_read_close<F: AsRef<Path> + Debug>(path: F) -> Vec<u8> {
-        let mut file = File::open(&path).unwrap_or_else(|_| panic!("Could not open {:?}", path));
-        let mut buf = Vec::<u8>::new();
-        file.read_to_end(&mut buf)
-            .unwrap_or_else(|_| panic!("Could not read {:?}", path));
-        buf
-    }
-
-    #[test]
-    fn journald_checkpointer_works() {
+    #[tokio::test]
+    async fn journald_checkpointer_works() {
         let tempdir = tempdir().unwrap();
         let mut filename = tempdir.path().to_path_buf();
         filename.push(CHECKPOINT_FILENAME);
-        let mut checkpointer =
-            Checkpointer::new(filename.clone()).expect("Creating checkpointer failed!");
+        let mut checkpointer = Checkpointer::new(filename.clone())
+            .await
+            .expect("Creating checkpointer failed!");
 
-        assert!(checkpointer.get().unwrap().is_none());
+        assert!(checkpointer.get().await.unwrap().is_none());
 
         checkpointer
             .set("first test")
+            .await
             .expect("Setting checkpoint failed");
-        assert_eq!(checkpointer.get().unwrap().unwrap(), "first test");
-        let contents = open_read_close(&filename);
-        assert!(String::from_utf8_lossy(&contents).starts_with("first test\n"));
+        assert_eq!(checkpointer.get().await.unwrap().unwrap(), "first test");
+        let contents = read_to_string(filename.clone())
+            .await
+            .unwrap_or_else(|_| panic!("Failed to read: {:?}", filename));
+        assert!(contents.starts_with("first test\n"));
 
         checkpointer
             .set("second")
+            .await
             .expect("Setting checkpoint failed");
-        assert_eq!(checkpointer.get().unwrap().unwrap(), "second");
-        let contents = open_read_close(&filename);
-        assert!(String::from_utf8_lossy(&contents).starts_with("second\n"));
+        assert_eq!(checkpointer.get().await.unwrap().unwrap(), "second");
+        let contents = read_to_string(filename.clone())
+            .await
+            .unwrap_or_else(|_| panic!("Failed to read: {:?}", filename));
+        assert!(contents.starts_with("second\n"));
     }
 }
 
@@ -619,12 +632,17 @@ mod tests {
         let tempdir = tempdir().unwrap();
         let mut filename = tempdir.path().to_path_buf();
         filename.push(CHECKPOINT_FILENAME);
-        let mut checkpointer = Checkpointer::new(filename).expect("Creating checkpointer failed!");
+        let mut checkpointer = Checkpointer::new(filename)
+            .await
+            .expect("Creating checkpointer failed!");
         let include_units = HashSet::<String>::from_iter(iunits.iter().map(|&s| s.into()));
         let exclude_units = HashSet::<String>::from_iter(xunits.iter().map(|&s| s.into()));
 
         if let Some(cursor) = cursor {
-            checkpointer.set(cursor).expect("Could not set checkpoint");
+            checkpointer
+                .set(cursor)
+                .await
+                .expect("Could not set checkpoint");
         }
 
         let config = JournaldConfig::default();
@@ -638,6 +656,7 @@ mod tests {
                 DEFAULT_BATCH_SIZE,
                 true,
             )
+            .await
             .expect("Creating journald source failed");
         tokio::spawn(source.compat());
 
