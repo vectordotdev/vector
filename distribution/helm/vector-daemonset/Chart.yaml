@@ -1,5 +1,5 @@
 apiVersion: v2
-name: vector
+name: vector-daemonset
 type: application
 icon: https://vector.dev/press/vector-icon.svg
 description: A Helm chart to collect Kubernetes logs with Vector
