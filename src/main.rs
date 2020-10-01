@@ -120,8 +120,18 @@ fn main() {
                 std::process::exit(exitcode::CONFIG);
             });
 
-        #[cfg(feature="api")]
-        let api_enabled = config.api.enabled;
+        #[cfg(feature = "api")]
+        // assigned to prevent the API terminating when falling out of scope
+        let api = if config.api.enabled {
+            emit!(ApiStarted{
+                addr: config.api.bind.unwrap(),
+                playground: config.api.playground
+            });
+
+            Some(api::Server::start(&config))
+        } else {
+            None
+        };
 
         crate::config::LOG_SCHEMA
             .set(config.global.log_schema.clone())
@@ -138,20 +148,7 @@ fn main() {
             std::process::exit(exitcode::CONFIG);
         });
 
-        #[cfg(feature = "api")]
-        // assigned to prevent the API terminating when falling out of scope
-        let _api = if api_enabled {
-            let config = topology.clone_config();
 
-            emit!(ApiStarted{
-                addr: config.api.bind.unwrap(),
-                playground: config.api.playground
-            });
-
-            Some(api::Server::start(config))
-        } else {
-            None
-        };
 
         emit!(VectorStarted);
         tokio::spawn(heartbeat::heartbeat());
@@ -178,8 +175,8 @@ fn main() {
                             {
                                 Ok(true) => {
                                     #[cfg(feature="api")]
-                                    if api_enabled {
-                                        api::update_config(topology.clone_config());
+                                    if api.is_some() {
+                                        api::update_config(topology.config());
                                     }
 
                                     emit!(VectorReloaded { config_paths: &config_paths })

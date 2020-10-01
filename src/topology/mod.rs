@@ -21,7 +21,6 @@ use futures01::{sync::mpsc, Future};
 use std::{
     collections::{HashMap, HashSet},
     panic::AssertUnwindSafe,
-    sync::Arc,
 };
 use tokio::time::{delay_until, interval, Duration, Instant};
 use tracing_futures::Instrument;
@@ -36,7 +35,7 @@ pub struct RunningTopology {
     source_tasks: HashMap<String, TaskHandle>,
     tasks: HashMap<String, TaskHandle>,
     shutdown_coordinator: SourceShutdownCoordinator,
-    config: Arc<Config>,
+    config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
 }
 
@@ -51,7 +50,7 @@ pub async fn start_validated(
     let mut running_topology = RunningTopology {
         inputs: HashMap::new(),
         outputs: HashMap::new(),
-        config: Arc::new(config),
+        config,
         shutdown_coordinator: SourceShutdownCoordinator::default(),
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
@@ -236,7 +235,7 @@ impl RunningTopology {
             {
                 self.connect_diff(&diff, &mut new_pieces);
                 self.spawn_diff(&diff, new_pieces);
-                self.config = Arc::new(new_config);
+                self.config = new_config;
                 // We have successfully changed to new config.
                 return Ok(true);
             }
@@ -596,9 +595,9 @@ impl RunningTopology {
         self.inputs.insert(name.to_string(), tx);
     }
 
-    /// Returns an Arc-wrapped clone of the current Config
-    pub fn clone_config(&self) -> Arc<Config> {
-        Arc::clone(&self.config)
+    /// Borrows the Config
+    pub fn config(&self) -> &Config {
+        &self.config
     }
 }
 

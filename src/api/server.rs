@@ -5,7 +5,7 @@ use async_graphql::{
     QueryBuilder,
 };
 use async_graphql_warp::{graphql_subscription, GQLResponse};
-use std::{convert::Infallible, net::SocketAddr, sync::Arc};
+use std::{convert::Infallible, net::SocketAddr};
 use tokio::sync::oneshot;
 use warp::filters::BoxedFilter;
 use warp::{http::Response, Filter, Reply};
@@ -18,7 +18,7 @@ pub struct Server {
 impl Server {
     /// Start the API server. This creates the routes and spawns a Warp server. The server is
     /// gracefully shut down when Self falls out of scope by way of the oneshot sender closing
-    pub fn start(config: Arc<config::Config>) -> Self {
+    pub fn start(config: &config::Config) -> Self {
         let routes = make_routes(config.api.playground);
 
         let (_shutdown, rx) = oneshot::channel();
