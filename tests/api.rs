@@ -198,7 +198,7 @@ mod tests {
                 .utc
                 - now;
 
-            assert!(diff.num_milliseconds() > mul as i64 * interval);
+            assert!(diff.num_milliseconds() >= mul as i64 * interval);
         }
 
         // Stream should have stopped after `num_results`
