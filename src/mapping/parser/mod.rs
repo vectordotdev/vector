@@ -506,10 +506,10 @@ pub fn parse(input: &str) -> Result<Mapping> {
 mod tests {
     use super::*;
     use crate::mapping::query::function::{
-        ContainsFn, DowncaseFn, FormatTimestampFn, Md5Fn, NowFn, ParseJsonFn, ParseTimestampFn,
-        Sha1Fn, Sha2Fn, Sha3Fn, SliceFn, StripAnsiEscapeCodesFn, StripWhitespaceFn, ToBooleanFn,
-        ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn, TokenizeFn, TruncateFn, UpcaseFn,
-        UuidV4Fn,
+        ContainsFn, DowncaseFn, FormatTimestampFn, Md5Fn, NowFn, ParseDurationFn, ParseJsonFn,
+        ParseTimestampFn, Sha1Fn, Sha2Fn, Sha3Fn, SliceFn, StripAnsiEscapeCodesFn,
+        StripWhitespaceFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn,
+        TokenizeFn, TruncateFn, UpcaseFn, UuidV4Fn,
     };
 
     #[test]
@@ -1208,6 +1208,13 @@ mod tests {
                     Box::new(StripAnsiEscapeCodesFn::new(Box::new(QueryPath::from(
                         "foo",
                     )))),
+                ))]),
+            ),
+            (
+                r#".foo = parse_duration(.foo, output = "s")"#,
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ParseDurationFn::new(Box::new(QueryPath::from("foo")), "s")),
                 ))]),
             ),
         ];

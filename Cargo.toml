@@ -172,6 +172,7 @@ sha3 = "0.9"
 md-5 = "0.9"
 hex = "0.4.2"
 chrono-tz = "0.5.3"
+rust_decimal = "1.8.1"
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
