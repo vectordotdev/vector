@@ -81,6 +81,16 @@ which is a smaller, more compact variant of the [`debian` image][urls.docker_deb
 docker run timberio/vector:0.10.0-debian
 ```
 
+#### distroless-*
+
+[Distroless][urls.distroless] is a base docker image based on either stripping down an OS, or building
+the key parts from scratch. It contains only the barest of essentials for running
+a static or dynamically linked binary.
+
+distroless-static uses the statically linked musl x86 build
+distroless-libc uses a dynamically linked build which leverages
+libc provided by distroless/base/cc
+
 ### Architectures
 
 Vector's images are multi-arch and support the
@@ -125,3 +135,4 @@ Vector's Docker source files are located
 [urls.vector_docker_source_files]: https://github.com/timberio/vector/tree/master/distribution/docker
 [urls.vector_releases]: https://vector.dev/releases/latest/
 [urls.vector_repo]: https://github.com/timberio/vector
+[urls.distroless]: https://github.com/GoogleContainerTools/distroless
