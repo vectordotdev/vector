@@ -51,20 +51,31 @@ enum Collector {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
+struct FilterList {
+    includes: Option<Vec<PatternWrapper>>,
+    excludes: Option<Vec<PatternWrapper>>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct DiskConfig {
-    devices: Option<Vec<PatternWrapper>>,
+    #[serde(default)]
+    devices: FilterList,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct FilesystemConfig {
-    devices: Option<Vec<PatternWrapper>>,
-    filesystems: Option<Vec<PatternWrapper>>,
-    mountpoints: Option<Vec<PatternWrapper>>,
+    #[serde(default)]
+    devices: FilterList,
+    #[serde(default)]
+    filesystems: FilterList,
+    #[serde(default)]
+    mountpoints: FilterList,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct NetworkConfig {
-    devices: Option<Vec<PatternWrapper>>,
+    #[serde(default)]
+    devices: FilterList,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -424,7 +435,9 @@ impl HostMetricsConfig {
                     // .filter_map, but it results in a strange "one type is
                     // more general than the other" error.
                     .map(|counter| {
-                        vec_contains_str(&self.network.devices, counter.interface())
+                        self.network
+                            .devices
+                            .contains_str(counter.interface())
                             .map(|()| counter)
                     })
                     .filter_map(|counter| async { counter })
@@ -498,20 +511,23 @@ impl HostMetricsConfig {
                 .filter_map(|result| filter_result(result, "Failed to load/parse partition data"))
                 // Filter on configured mountpoints
                 .map(|partition| {
-                    vec_contains_path(&self.filesystem.mountpoints, partition.mount_point()).map(|()| partition)
+                    self.filesystem.mountpoints.contains_path(partition.mount_point()).map(|()| partition)
                 })
                 .filter_map(|partition| async { partition })
                 // Filter on configured devices
-                .map(|partition| match &self.filesystem.devices {
-                    Some(_) => partition
-                        .device()
-                        .and_then(|device| vec_contains_path(&self.filesystem.devices, device.as_ref())),
-                    None => Some(())
-                }.map(|()| partition))
+                .map(|partition| {
+                    if self.filesystem.devices.is_empty() {
+                        Some(())
+                    } else {
+                        partition
+                            .device()
+                            .and_then(|device| self.filesystem.devices.contains_path(device.as_ref()))
+                    }.map(|()| partition)
+                })
                 .filter_map(|partition| async { partition })
                 // Filter on configured filesystems
                 .map(|partition| {
-                    vec_contains_str(&self.filesystem.filesystems, partition.file_system().as_str())
+                    self.filesystem.filesystems.contains_str(partition.file_system().as_str())
                         .map(|()| partition)
                 })
                 .filter_map(|partition| async { partition })
@@ -578,7 +594,9 @@ impl HostMetricsConfig {
                         filter_result(result, "Failed to load/parse disk I/O data")
                     })
                     .map(|counter| {
-                        vec_contains_path(&self.disk.devices, counter.device_name().as_ref())
+                        self.disk
+                            .devices
+                            .contains_path(counter.device_name().as_ref())
                             .map(|()| counter)
                     })
                     .filter_map(|counter| async { counter })
@@ -667,30 +685,6 @@ async fn filter_result<T>(result: Result<T, Error>, message: &'static str) -> Op
         .ok()
 }
 
-fn vec_contains_path(vec: &Option<Vec<PatternWrapper>>, value: &Path) -> Option<()> {
-    match vec {
-        // No patterns list matches everything
-        None => Some(()),
-        // Otherwise find the given value
-        Some(vec) => vec
-            .iter()
-            .find(|&pattern| pattern.matches_path(value))
-            .map(|_| ()),
-    }
-}
-
-fn vec_contains_str(vec: &Option<Vec<PatternWrapper>>, value: &str) -> Option<()> {
-    match vec {
-        // No patterns list matches everything
-        None => Some(()),
-        // Otherwise find the given value
-        Some(vec) => vec
-            .iter()
-            .find(|&pattern| pattern.matches(value))
-            .map(|_| ()),
-    }
-}
-
 fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
     for metric in &mut metrics {
         (metric.tags.as_mut().unwrap()).insert("collector".into(), collector.into());
@@ -698,29 +692,77 @@ fn add_collector(collector: &str, mut metrics: Vec<Metric>) -> Vec<Metric> {
     metrics
 }
 
-// Pattern doesn't implement Deserialize or Serialize, and we can't
-// implement them ourselves due the orphan rules, so make a wrapper.
-// This also adds support for negative patterns.
-#[derive(Clone, Debug)]
-struct PatternWrapper {
-    negate: bool,
-    pattern: Pattern,
-}
-
-impl PatternWrapper {
-    fn new(s: &str) -> Result<PatternWrapper, PatternError> {
-        let negate = s.starts_with('!');
-        let s = s.trim_start_matches('!');
-        let pattern = Pattern::new(s)?;
-        Ok(PatternWrapper { negate, pattern })
+impl FilterList {
+    fn is_empty(&self) -> bool {
+        self.includes.is_none() && self.excludes.is_none()
     }
 
-    fn matches(&self, s: &str) -> bool {
-        self.pattern.matches(s) ^ self.negate
+    fn contains_str(&self, value: &str) -> Option<()> {
+        let result = match &self.includes {
+            // No includes list includes everything
+            None => true,
+            // Otherwise find the given value
+            Some(includes) => includes.iter().any(|pattern| pattern.matches_str(value)),
+        } && match &self.excludes {
+            // No excludes, list excludes nothing
+            None => true,
+            // Otherwise find the given value
+            Some(excludes) => !excludes.iter().any(|pattern| pattern.matches_str(value)),
+        };
+        if result {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    fn contains_path(&self, value: &Path) -> Option<()> {
+        let result = match &self.includes {
+            // No includes list includes everything
+            None => true,
+            // Otherwise find the given value
+            Some(includes) => includes.iter().any(|pattern| pattern.matches_path(value)),
+        } && match &self.excludes {
+            // No excludes, list excludes nothing
+            None => true,
+            // Otherwise find the given value
+            Some(excludes) => !excludes.iter().any(|pattern| pattern.matches_path(value)),
+        };
+        if result {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    #[cfg(test)]
+    fn contains_test(&self, value: &str) -> bool {
+        let result = self.contains_str(value).is_some();
+        assert_eq!(
+            result,
+            self.contains_path(&std::path::PathBuf::from(value))
+                .is_some()
+        );
+        result
+    }
+}
+
+// Pattern doesn't implement Deserialize or Serialize, and we can't
+// implement them ourselves due the orphan rules, so make a wrapper.
+#[derive(Clone, Debug)]
+struct PatternWrapper(Pattern);
+
+impl PatternWrapper {
+    fn new(pattern: impl AsRef<str>) -> Result<PatternWrapper, PatternError> {
+        Ok(PatternWrapper(Pattern::new(pattern.as_ref())?))
+    }
+
+    fn matches_str(&self, s: &str) -> bool {
+        self.0.matches(s)
     }
 
     fn matches_path(&self, p: &Path) -> bool {
-        self.pattern.matches_path(p) ^ self.negate
+        self.0.matches_path(p)
     }
 }
 
@@ -746,11 +788,7 @@ impl<'de> Visitor<'de> for PatternVisitor {
 
 impl Serialize for PatternWrapper {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        if self.negate {
-            serializer.serialize_str(&format!("!{}", self.pattern.as_str()))
-        } else {
-            serializer.serialize_str(self.pattern.as_str())
-        }
+        serializer.serialize_str(self.0.as_str())
     }
 }
 
@@ -759,6 +797,67 @@ mod tests {
     use super::*;
     use std::collections::HashSet;
     use std::future::Future;
+
+    #[test]
+    fn filterlist_default_includes_everything() {
+        let filters = FilterList::default();
+        assert!(filters.is_empty());
+        assert!(filters.contains_test("anything"));
+        assert!(filters.contains_test("should"));
+        assert!(filters.contains_test("work"));
+    }
+
+    #[test]
+    fn filterlist_includes_works() {
+        let filters = FilterList {
+            includes: Some(vec![
+                PatternWrapper::new("sda").unwrap(),
+                PatternWrapper::new("dm-*").unwrap(),
+            ]),
+            excludes: None,
+        };
+        assert!(!filters.contains_test("sd"));
+        assert!(filters.contains_test("sda"));
+        assert!(!filters.contains_test("sda1"));
+        assert!(filters.contains_test("dm-"));
+        assert!(filters.contains_test("dm-5"));
+        assert!(!filters.contains_test("xda"));
+    }
+
+    #[test]
+    fn filterlist_excludes_works() {
+        let filters = FilterList {
+            includes: None,
+            excludes: Some(vec![
+                PatternWrapper::new("sda").unwrap(),
+                PatternWrapper::new("dm-*").unwrap(),
+            ]),
+        };
+        assert!(filters.contains_test("sd"));
+        assert!(!filters.contains_test("sda"));
+        assert!(filters.contains_test("sda1"));
+        assert!(!filters.contains_test("dm-"));
+        assert!(!filters.contains_test("dm-5"));
+        assert!(filters.contains_test("xda"));
+    }
+
+    #[test]
+    fn filterlist_includes_and_excludes_works() {
+        let filters = FilterList {
+            includes: Some(vec![
+                PatternWrapper::new("sda").unwrap(),
+                PatternWrapper::new("dm-*").unwrap(),
+            ]),
+            excludes: Some(vec![PatternWrapper::new("dm-5").unwrap()]),
+        };
+        assert!(!filters.contains_test("sd"));
+        assert!(filters.contains_test("sda"));
+        assert!(!filters.contains_test("sda1"));
+        assert!(filters.contains_test("dm-"));
+        assert!(filters.contains_test("dm-1"));
+        assert!(!filters.contains_test("dm-5"));
+        assert!(!filters.contains_test("xda"));
+    }
 
     #[tokio::test]
     async fn filters_on_collectors() {
@@ -1042,45 +1141,52 @@ mod tests {
     // Run a series of tests using filters to ensure they are obeyed
     async fn assert_filtered_metrics<'a, Get, Fut>(tag: &str, get_metrics: Get)
     where
-        Get: Fn(Option<Vec<PatternWrapper>>) -> Fut,
+        Get: Fn(FilterList) -> Fut,
         Fut: Future<Output = Vec<Metric>>,
     {
-        let all_metrics = get_metrics(None).await;
+        let all_metrics = get_metrics(FilterList::default()).await;
         let keys = collect_tag_values(&all_metrics, tag);
         // Pick an arbitrary key value
         let key = keys.into_iter().next().unwrap();
         let key_prefix = &key[..key.len() - 1];
 
-        let filtered_metrics_with =
-            get_metrics(Some(vec![PatternWrapper::new(&key).unwrap()])).await;
+        let filtered_metrics_with = get_metrics(FilterList {
+            includes: Some(vec![PatternWrapper::new(&key).unwrap()]),
+            excludes: None,
+        })
+        .await;
 
         assert!(filtered_metrics_with.len() < all_metrics.len());
         assert!(all_tags_match(&filtered_metrics_with, tag, |s| s == key));
 
-        let filtered_metrics_with_match =
-            get_metrics(Some(vec![
+        let filtered_metrics_with_match = get_metrics(FilterList {
+            includes: Some(vec![
                 PatternWrapper::new(&format!("{}*", key_prefix)).unwrap()
-            ]))
-            .await;
+            ]),
+            excludes: None,
+        })
+        .await;
 
         assert!(filtered_metrics_with_match.len() >= filtered_metrics_with.len());
         assert!(all_tags_match(&filtered_metrics_with_match, tag, |s| {
             s.starts_with(key_prefix)
         }));
 
-        let filtered_metrics_without =
-            get_metrics(Some(vec![
-                PatternWrapper::new(&format!("!{}", key)).unwrap()
-            ]))
-            .await;
+        let filtered_metrics_without = get_metrics(FilterList {
+            includes: None,
+            excludes: Some(vec![PatternWrapper::new(&key).unwrap()]),
+        })
+        .await;
 
         assert!(filtered_metrics_without.len() < all_metrics.len());
         assert!(all_tags_match(&filtered_metrics_without, tag, |s| s != key));
 
-        let filtered_metrics_without_match = get_metrics(Some(vec![PatternWrapper::new(
-            &format!("!{}*", key_prefix),
-        )
-        .unwrap()]))
+        let filtered_metrics_without_match = get_metrics(FilterList {
+            includes: None,
+            excludes: Some(vec![
+                PatternWrapper::new(&format!("{}*", key_prefix)).unwrap()
+            ]),
+        })
         .await;
 
         assert!(filtered_metrics_without_match.len() <= filtered_metrics_without.len());

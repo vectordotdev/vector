@@ -1,0 +1,22 @@
+[<%= namespace %>]
+type = "table"
+category = "Filesystem"
+description = "Lists of <%= term %> patterns to include or exclude."
+
+[<%= namespace %>.options.includes]
+type = "[string]"
+required = false
+examples = <%= examples.to_toml %>
+description = """\
+The list of <%= term %> patterns for which to gather <%= metrics %> metrics. \
+Defaults to including all <%= term %>s.\
+"""
+
+[<%= namespace %>.options.excludes]
+type = "[string]"
+required = false
+examples = <%= examples.to_toml %>
+description = """\
+The list of <%= term %> patterns for which to skip gathering <%= metrics %> metrics. \
+Defaults to excluding no <%= term %>s.\
+"""

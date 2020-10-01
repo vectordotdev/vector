@@ -48,57 +48,47 @@ type = "table"
 category = "Filesystem"
 description = "Options for the \"disk\" metrics collector."
 
-[sources.host_metrics.options.disk.options.devices]
-type = "[string]"
-required = false
-examples = [["sda"], ["sd*"], ["!dm-*"]
-description = """\
-The list of devices for which to gather I/O metrics. \
-Defaults to all devices.\
-"""
+<%= render("_partials/fields/_includes_excludes.toml",
+  namespace: "sources.host_metrics.options.disk.options.devices",
+  term: "device name",
+  metrics: "I/O",
+  examples: [["sda"], ["dm-*"]]
+) %>
 
 [sources.host_metrics.options.filesystem]
 type = "table"
 category = "Filesystem"
 description = "Options for the \"filesystem\" metrics collector."
 
-[sources.host_metrics.options.filesystem.options.devices]
-type = "[string]"
-required = false
-examples = [["sda"], ["sd*"], ["!dm-*"]]
-description = """\
-The list of filesystem devices for which to gather metrics. \
-Defaults to all devices.\
-"""
+<%= render("_partials/fields/_includes_excludes.toml",
+  namespace: "sources.host_metrics.options.filesystem.options.devices",
+  term: "device name",
+  metrics: "usage",
+  examples: [["sda"], ["dm-*"]]
+) %>
 
-[sources.host_metrics.options.filesystem.options.filesystems]
-type = "[string]"
-required = false
-examples = [["ntfs"], ["ext*"], ["!nfs*"]]
-description = """\
-The list of filesystem type names for which to gather metrics. \
-Defaults to all types.\
-"""
+<%= render("_partials/fields/_includes_excludes.toml",
+  namespace: "sources.host_metrics.options.filesystem.options.filesystems",
+  term: "filesystem name",
+  metrics: "usage",
+  examples: [["ntfs"], ["ext*"]]
+) %>
 
-[sources.host_metrics.options.filesystem.options.mountpoints]
-type = "[string]"
-required = false
-examples = [["/"], ["/home*"], ["!/usr*"]]
-description = """\
-The list of filesystem mount points for which to gather metrics. \
-Defaults to all mount points.\
-"""
+<%= render("_partials/fields/_includes_excludes.toml",
+  namespace: "sources.host_metrics.options.filesystem.options.mountpoints",
+  term: "mountpoint path",
+  metrics: "usage",
+  examples: [["/home"], ["/raid*"]]
+) %>
 
 [sources.host_metrics.options.network]
 type = "table"
 category = "Network"
 description = "Options for the \"network\" metrics collector."
 
-[sources.host_metrics.options.network.options.devices]
-type = "[string]"
-required = false
-examples = [["eth0"], ["en*"], ["!docker*"]]
-description = """\
-The list of network devices for which to gather metrics. \
-Defaults to all local network devices.\
-"""
+<%= render("_partials/fields/_includes_excludes.toml",
+  namespace: "sources.host_metrics.options.network.options.devices",
+  term: "mountpoint path",
+  metrics: "utilization",
+  examples: [["eth0"], ["enp?s*"]]
+) %>
