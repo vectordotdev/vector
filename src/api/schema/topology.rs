@@ -1,14 +1,14 @@
-use crate::config::{Config, DataType, SourceConfig};
-use async_graphql::Object;
+use crate::config::{Config, DataType};
+use async_graphql::{Enum, Object};
 use lazy_static::lazy_static;
 use std::sync::{Arc, RwLock};
 
-// #[EnumType]
-// pub enum SourceOutputType {
-//     Any,
-//     Log,
-//     Metric,
-// }
+#[Enum]
+pub enum SourceOutputType {
+    Any,
+    Log,
+    Metric,
+}
 
 #[derive(Clone)]
 pub struct SourceData {
@@ -30,14 +30,14 @@ impl Source {
         self.0.name.clone()
     }
 
-    // /// The output type given by the source
-    // async fn output_type(&self) -> SourceOutputType {
-    //     match self.0.output_type {
-    //         DataType::Metric => SourceOutputType::Metric,
-    //         DataType::Log => SourceOutputType::Log,
-    //         DataType::Any => SourceOutputType::Any,
-    //     }
-    // }
+    /// The output type given by the source
+    async fn output_type(&self) -> SourceOutputType {
+        match self.0.output_type {
+            DataType::Metric => SourceOutputType::Metric,
+            DataType::Log => SourceOutputType::Log,
+            DataType::Any => SourceOutputType::Any,
+        }
+    }
 }
 
 #[derive(Default)]
