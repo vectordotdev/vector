@@ -46,7 +46,7 @@ pub struct TopologyQuery;
 #[Object]
 impl TopologyQuery {
     async fn sources(&self) -> Vec<Source> {
-        SOURCES.read().unwrap().iter().map(|s| s.clone()).collect()
+        SOURCES.read().unwrap().iter().cloned().collect()
     }
 }
 
