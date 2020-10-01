@@ -184,6 +184,8 @@ impl Application {
         let mut config_paths = self.config.config_paths;
 
         let opts = self.opts;
+
+        #[cfg(feature = "api")]
         let api_config = self.config.api;
 
         rt.block_on(async move {
