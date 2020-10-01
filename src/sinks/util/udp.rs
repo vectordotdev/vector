@@ -19,7 +19,7 @@ use tracing::field;
 
 #[derive(Debug, Snafu)]
 pub enum UdpError {
-    #[snafu(display("failed to create UDP listener socket, error = {:?}", source))]
+    #[snafu(display("Failed to create UDP listener socket, error = {:?}.", source))]
     BindError {
         source: std::io::Error,
     },
