@@ -90,3 +90,7 @@ pub fn get_version() -> String {
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
+
+pub fn get_hostname() -> std::io::Result<String> {
+    Ok(hostname::get()?.to_string_lossy().into())
+}

@@ -1,5 +1,6 @@
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    metrics::Controller,
     metrics::{capture_metrics, get_controller},
     shutdown::ShutdownSignal,
     Pipeline,
@@ -10,7 +11,6 @@ use futures::{
     stream::StreamExt,
 };
 use futures01::Sink;
-use metrics_runtime::Controller;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::{select, time::interval};
@@ -45,7 +45,7 @@ impl SourceConfig for InternalMetricsConfig {
 }
 
 async fn run(
-    controller: Controller,
+    controller: &Controller,
     mut out: Pipeline,
     shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
@@ -60,7 +60,7 @@ async fn run(
             else => false,
         };
 
-        let metrics = capture_metrics(&controller);
+        let metrics = capture_metrics(controller);
 
         let (sink, _) = out
             .send_all(futures01::stream::iter_ok(metrics))
@@ -77,7 +77,7 @@ async fn run(
 mod tests {
     use crate::event::metric::{Metric, MetricValue, StatisticKind};
     use crate::metrics::{capture_metrics, get_controller};
-    use metrics::{counter, gauge, timing, value};
+    use metrics::{counter, gauge, histogram};
     use std::collections::BTreeMap;
 
     #[test]
@@ -87,14 +87,14 @@ mod tests {
         // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
         std::thread::sleep(std::time::Duration::from_millis(300));
 
-        gauge!("foo", 1);
-        gauge!("foo", 2);
+        gauge!("foo", 1.0);
+        gauge!("foo", 2.0);
         counter!("bar", 3);
         counter!("bar", 4);
-        timing!("baz", 5);
-        timing!("baz", 6);
-        value!("quux", 7, "host" => "foo");
-        value!("quux", 8, "host" => "foo");
+        histogram!("baz", 5);
+        histogram!("baz", 6);
+        histogram!("quux", 7, "host" => "foo");
+        histogram!("quux", 8, "host" => "foo");
 
         let controller = get_controller().expect("no controller");
 

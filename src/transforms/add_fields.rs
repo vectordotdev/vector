@@ -2,18 +2,17 @@ use super::Transform;
 use crate::serde::Fields;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::Lookup,
     event::{Event, Value},
     internal_events::{
         AddFieldsEventProcessed, AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten,
-        AddFieldsTemplateInvalid, AddFieldsTemplateRenderingError,
+        AddFieldsTemplateRenderingError,
     },
     template::Template,
 };
-use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
-use string_cache::DefaultAtom as Atom;
+use std::{convert::TryFrom, str::FromStr};
 use toml::value::Value as TomlValue;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -42,8 +41,9 @@ impl From<Value> for TemplateOrValue {
     }
 }
 
+#[derive(Clone)]
 pub struct AddFields {
-    fields: IndexMap<Atom, TemplateOrValue>,
+    fields: IndexMap<Lookup, TemplateOrValue>,
     overwrite: bool,
 }
 
@@ -54,10 +54,12 @@ inventory::submit! {
 #[typetag::serde(name = "add_fields")]
 impl TransformConfig for AddFieldsConfig {
     fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(AddFields::new(
-            self.fields.clone().all_fields().collect(),
-            self.overwrite,
-        )))
+        let all_fields = self.fields.clone().all_fields().collect::<IndexMap<_, _>>();
+        let mut fields = IndexMap::with_capacity(all_fields.len());
+        for (key, value) in all_fields {
+            fields.insert(Lookup::from_str(&key)?, Value::try_from(value)?);
+        }
+        Ok(Box::new(AddFields::new(fields, self.overwrite)?))
     }
 
     fn input_type(&self) -> DataType {
@@ -74,17 +76,23 @@ impl TransformConfig for AddFieldsConfig {
 }
 
 impl AddFields {
-    pub fn new(fields: IndexMap<Atom, TomlValue>, overwrite: bool) -> Self {
-        let mut new_fields = IndexMap::new();
-
-        for (k, v) in fields {
-            flatten_field(k, v, &mut new_fields);
+    pub fn new(mut fields: IndexMap<Lookup, Value>, overwrite: bool) -> crate::Result<Self> {
+        let mut with_templates = IndexMap::with_capacity(fields.len());
+        for (k, v) in fields.drain(..) {
+            let maybe_template = match v {
+                Value::Bytes(s) => match Template::try_from(String::from_utf8(s.to_vec())?) {
+                    Ok(t) => TemplateOrValue::from(t),
+                    Err(_) => TemplateOrValue::from(Value::Bytes(s)),
+                },
+                v => TemplateOrValue::from(v),
+            };
+            with_templates.insert(k, maybe_template);
         }
 
-        AddFields {
-            fields: new_fields,
+        Ok(AddFields {
+            fields: with_templates,
             overwrite,
-        }
+        })
     }
 }
 
@@ -93,12 +101,13 @@ impl Transform for AddFields {
         emit!(AddFieldsEventProcessed);
 
         for (key, value_or_template) in self.fields.clone() {
+            let key_string = key.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
             let value = match value_or_template {
                 TemplateOrValue::Template(v) => match v.render_string(&event) {
                     Ok(v) => v,
                     Err(_) => {
                         emit!(AddFieldsTemplateRenderingError {
-                            field: key.as_ref()
+                            field: &format!("{}", &key),
                         });
                         continue;
                     }
@@ -107,17 +116,17 @@ impl Transform for AddFields {
                 TemplateOrValue::Value(v) => v,
             };
             if self.overwrite {
-                if event.as_mut_log().insert(&key, value).is_some() {
+                if event.as_mut_log().insert(&key_string, value).is_some() {
                     emit!(AddFieldsFieldOverwritten {
-                        field: key.as_ref()
+                        field: &format!("{}", &key),
                     });
                 }
-            } else if event.as_mut_log().contains(&key) {
+            } else if event.as_mut_log().contains(&key_string) {
                 emit!(AddFieldsFieldNotOverwritten {
-                    field: key.as_ref()
+                    field: &format!("{}", &key),
                 });
             } else {
-                event.as_mut_log().insert(key, value);
+                event.as_mut_log().insert(&key_string, value);
             }
         }
 
@@ -125,78 +134,22 @@ impl Transform for AddFields {
     }
 }
 
-fn flatten_field(key: Atom, value: TomlValue, new_fields: &mut IndexMap<Atom, TemplateOrValue>) {
-    match value {
-        TomlValue::String(s) => match Template::try_from(s.as_str()) {
-            Ok(t) => new_fields.insert(key, t.into()),
-            Err(error) => {
-                emit!(AddFieldsTemplateInvalid {
-                    field: key.as_ref(),
-                    error
-                });
-                new_fields.insert(key, Value::from(s).into())
-            }
-        },
-        TomlValue::Integer(i) => {
-            let i = Value::from(i);
-            new_fields.insert(key, i.into())
-        }
-        TomlValue::Float(f) => {
-            let f = Value::from(f);
-            new_fields.insert(key, f.into())
-        }
-        TomlValue::Boolean(b) => {
-            let b = Value::from(b);
-            new_fields.insert(key, b.into())
-        }
-        TomlValue::Datetime(dt) => {
-            let dt = dt.to_string();
-            if let Ok(ts) = dt.parse::<DateTime<Utc>>() {
-                let ts = Value::from(ts);
-                new_fields.insert(key, ts.into())
-            } else {
-                let dt = Value::from(dt);
-                new_fields.insert(key, dt.into())
-            }
-        }
-        TomlValue::Array(vals) => {
-            for (i, val) in vals.into_iter().enumerate() {
-                let key = format!("{}[{}]", key, i);
-                flatten_field(key.into(), val, new_fields);
-            }
-
-            None
-        }
-        TomlValue::Table(map) => {
-            for (table_key, value) in map {
-                let key = format!("{}.{}", key, table_key);
-                flatten_field(key.into(), value, new_fields);
-            }
-
-            None
-        }
-    };
-}
-
 #[cfg(test)]
 mod tests {
-    use super::AddFields;
-    use crate::{event::Event, transforms::Transform};
-    use indexmap::IndexMap;
-    use std::collections::HashMap;
-    use string_cache::DefaultAtom as Atom;
+    use super::*;
+    use std::{iter::FromIterator, string::ToString};
 
     #[test]
     fn add_fields_event() {
         let event = Event::from("augment me");
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "some_val".into());
-        let mut augment = AddFields::new(fields, true);
+        let mut augment = AddFields::new(fields, true).unwrap();
 
         let new_event = augment.transform(event).unwrap();
 
-        let key = Atom::from("some_key".to_string());
-        let kv = new_event.as_log().get(&key);
+        let key = Lookup::from_str("some_key").unwrap().to_string();
+        let kv = new_event.as_log().get_flat(&key);
 
         let val = "some_val".to_string();
         assert_eq!(kv, Some(&val.into()));
@@ -207,12 +160,12 @@ mod tests {
         let event = Event::from("augment me");
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "{{message}} {{message}}".into());
-        let mut augment = AddFields::new(fields, true);
+        let mut augment = AddFields::new(fields, true).unwrap();
 
         let new_event = augment.transform(event).unwrap();
 
-        let key = Atom::from("some_key".to_string());
-        let kv = new_event.as_log().get(&key);
+        let key = Lookup::from_str("some_key").unwrap().to_string();
+        let kv = new_event.as_log().get_flat(&key);
 
         let val = "augment me augment me".to_string();
         assert_eq!(kv, Some(&val.into()));
@@ -226,7 +179,7 @@ mod tests {
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "some_overwritten_message".into());
 
-        let mut augment = AddFields::new(fields, false);
+        let mut augment = AddFields::new(fields, false).unwrap();
 
         let new_event = augment.transform(event.clone()).unwrap();
 
@@ -235,24 +188,32 @@ mod tests {
 
     #[test]
     fn add_fields_preserves_types() {
+        crate::test_util::trace_init();
         let event = Event::from("hello world");
 
         let mut fields = IndexMap::new();
-        fields.insert("float".into(), 4.5.into());
-        fields.insert("int".into(), 4.into());
-        fields.insert("string".into(), "thisisastring".into());
-        fields.insert("bool".into(), true.into());
-        fields.insert("array".into(), vec![1, 2, 3].into());
+        fields.insert(Lookup::from_str("float").unwrap(), Value::from(4.5));
+        fields.insert(Lookup::from_str("int").unwrap(), Value::from(4));
+        fields.insert(
+            Lookup::from_str("string").unwrap(),
+            Value::from("thisisastring"),
+        );
+        fields.insert(Lookup::from_str("bool").unwrap(), Value::from(true));
+        fields.insert(
+            Lookup::from_str("array").unwrap(),
+            Value::from(vec![1_isize, 2, 3]),
+        );
 
-        let mut map = HashMap::new();
-        map.insert("key", "value");
+        let mut map = IndexMap::new();
+        map.insert(String::from("key"), Value::from("value"));
 
-        fields.insert("table".into(), map.into());
+        fields.insert(Lookup::from_str("table").unwrap(), Value::from_iter(map));
 
-        let mut transform = AddFields::new(fields, false);
+        let mut transform = AddFields::new(fields, false).unwrap();
 
         let event = transform.transform(event).unwrap().into_log();
 
+        tracing::error!(?event);
         assert_eq!(event[&"float".into()], 4.5.into());
         assert_eq!(event[&"int".into()], 4.into());
         assert_eq!(event[&"string".into()], "thisisastring".into());

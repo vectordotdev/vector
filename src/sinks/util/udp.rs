@@ -2,6 +2,7 @@ use super::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, St
 use crate::{
     config::SinkContext,
     dns::Resolver,
+    internal_events::UdpSendIncomplete,
     sinks::{Healthcheck, VectorSink},
 };
 use bytes::Bytes;
@@ -250,7 +251,15 @@ impl Sink for UdpSink {
                         error!(message = "send failed", %error);
                         Ok(AsyncSink::NotReady(line))
                     }
-                    Ok(_) => Ok(AsyncSink::Ready),
+                    Ok(sent) => {
+                        if sent != line.len() {
+                            emit!(UdpSendIncomplete {
+                                data_size: line.len(),
+                                sent: sent,
+                            });
+                        }
+                        Ok(AsyncSink::Ready)
+                    }
                 }
             }
             Ok(Async::NotReady) => Ok(AsyncSink::NotReady(line)),
