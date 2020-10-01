@@ -148,10 +148,12 @@ impl HttpSink for InfluxDBLogsSink {
         let measurement = encode_namespace(Some(&self.namespace), '.', "vector");
 
         // Timestamp
-        let timestamp = encode_timestamp(match event.remove(&Atom::from(log_schema().timestamp_key())) {
-            Some(Value::Timestamp(ts)) => Some(ts),
-            _ => None,
-        });
+        let timestamp = encode_timestamp(
+            match event.remove(&Atom::from(log_schema().timestamp_key())) {
+                Some(Value::Timestamp(ts)) => Some(ts),
+                _ => None,
+            },
+        );
 
         // Tags + Fields
         let mut tags: BTreeMap<String, String> = BTreeMap::new();

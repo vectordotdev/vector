@@ -11,8 +11,8 @@ use crate::{
 use bytes::Bytes;
 use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
-use syslog::{Facility, Formatter3164, LogFormat, Severity};
 use string_cache::DefaultAtom as Atom;
+use syslog::{Facility, Formatter3164, LogFormat, Severity};
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -70,7 +70,10 @@ impl SinkConfig for PapertrailConfig {
 }
 
 fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {
-    let host = if let Some(host) = event.as_mut_log().remove(&Atom::from(log_schema().host_key())) {
+    let host = if let Some(host) = event
+        .as_mut_log()
+        .remove(&Atom::from(log_schema().host_key()))
+    {
         Some(host.to_string_lossy())
     } else {
         None

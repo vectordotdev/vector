@@ -619,9 +619,10 @@ fn raw_event(
     log.insert(log_schema().timestamp_key().clone(), Utc::now());
 
     // Add source type
-    event
-        .as_mut_log()
-        .try_insert(&Atom::from(log_schema().source_type_key()), Bytes::from("splunk_hec"));
+    event.as_mut_log().try_insert(
+        &Atom::from(log_schema().source_type_key()),
+        Bytes::from("splunk_hec"),
+    );
 
     emit!(SplunkHECEventReceived);
 

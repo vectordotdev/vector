@@ -34,6 +34,7 @@ use std::{
     fmt,
     task::{Context, Poll},
 };
+use string_cache::DefaultAtom as Atom;
 use tokio::sync::oneshot;
 use tower::{
     buffer::Buffer,
@@ -42,7 +43,6 @@ use tower::{
     timeout::Timeout,
     Service, ServiceBuilder, ServiceExt,
 };
-use string_cache::DefaultAtom as Atom;
 
 // Estimated maximum size of InputLogEvent with an empty message
 const EVENT_SIZE_OVERHEAD: usize = 50;

@@ -31,10 +31,10 @@ use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::task::Poll;
+use string_cache::DefaultAtom as Atom;
 use tower::{Service, ServiceBuilder};
 use tracing::field;
 use uuid::Uuid;
-use string_cache::DefaultAtom as Atom;
 
 const NAME: &str = "gcp_cloud_storage";
 const BASE_URL: &str = "https://storage.googleapis.com/";

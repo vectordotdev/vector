@@ -27,9 +27,9 @@ use std::{
     fmt,
     task::{Context, Poll},
 };
+use string_cache::DefaultAtom as Atom;
 use tower::Service;
 use tracing_futures::Instrument;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Clone)]
 pub struct KinesisFirehoseService {

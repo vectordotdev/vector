@@ -19,11 +19,11 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
+use string_cache::DefaultAtom as Atom;
 use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
 };
-use string_cache::DefaultAtom as Atom;
 mod bytes_path;
 use bytes_path::BytesPath;
 

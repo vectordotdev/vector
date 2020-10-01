@@ -30,11 +30,11 @@ use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::task::Context;
 use std::task::Poll;
+use string_cache::DefaultAtom as Atom;
 use tower::{Service, ServiceBuilder};
 use tracing::field;
 use tracing_futures::Instrument;
 use uuid::Uuid;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Clone)]
 pub struct S3Sink {

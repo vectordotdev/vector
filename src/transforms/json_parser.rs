@@ -54,7 +54,9 @@ pub struct JsonParser {
 
 impl From<JsonParserConfig> for JsonParser {
     fn from(config: JsonParserConfig) -> JsonParser {
-        let field = config.field.unwrap_or(Atom::from(log_schema().message_key()));
+        let field = config
+            .field
+            .unwrap_or(Atom::from(log_schema().message_key()));
 
         JsonParser {
             field,

@@ -869,9 +869,7 @@ impl ContainerLogInfo {
                 // current message being the initial one.
                 if let Some(partial_event_merge_state) = partial_event_merge_state {
                     partial_event_merge_state
-                        .merge_in_next_event(log_event, &[
-                            Atom::from(log_schema().message_key())
-                        ]);
+                        .merge_in_next_event(log_event, &[Atom::from(log_schema().message_key())]);
                 } else {
                     *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
                 };

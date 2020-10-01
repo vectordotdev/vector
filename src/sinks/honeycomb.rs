@@ -82,7 +82,8 @@ impl HttpSink for HoneycombConfig {
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let mut log = event.into_log();
 
-        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(&Atom::from(log_schema().timestamp_key()))
+        let timestamp = if let Some(Value::Timestamp(ts)) =
+            log.remove(&Atom::from(log_schema().timestamp_key()))
         {
             ts
         } else {

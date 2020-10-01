@@ -14,8 +14,8 @@ use futures::{
     FutureExt,
 };
 use serde::{Deserialize, Serialize};
-use tokio::io::{self, AsyncWriteExt};
 use string_cache::DefaultAtom as Atom;
+use tokio::io::{self, AsyncWriteExt};
 
 #[derive(Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
