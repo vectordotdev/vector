@@ -31,7 +31,6 @@ use std::convert::{TryFrom, TryInto};
 use std::task::Context;
 use std::task::Poll;
 use tower::{Service, ServiceBuilder};
-use tracing::field;
 use tracing_futures::Instrument;
 use uuid::Uuid;
 
@@ -327,9 +326,9 @@ fn build_request(
 
     debug!(
         message = "sending events.",
-        bytes = &field::debug(inner.len()),
-        bucket = &field::debug(&bucket),
-        key = &field::debug(&key)
+        bytes = ?inner.len(),
+        bucket = ?bucket,
+        key = ?key
     );
 
     Request {
