@@ -304,8 +304,8 @@ impl JournalSource for Journalctl {
                 let mut line = Vec::new();
                 yield match stdout.read_until(b'\n', &mut line).await {
                     Ok(0) => break,
-                    Ok(_) => Ok::<String, io::Error>(String::from_utf8_lossy(&line).into()),
-                    Err(err) => Err::<String, io::Error>(err),
+                    Ok(_) => Ok(String::from_utf8_lossy(&line).into()),
+                    Err(err) => Err(err),
                 };
             }
         });
