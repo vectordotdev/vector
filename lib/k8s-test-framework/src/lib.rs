@@ -17,12 +17,14 @@
 
 mod exec_tail;
 pub mod framework;
+mod helm_values_file;
 pub mod interface;
 mod lock;
 mod log_lookup;
 pub mod namespace;
 mod reader;
 mod resource_file;
+mod temp_file;
 pub mod test_pod;
 mod up_down;
 mod util;
