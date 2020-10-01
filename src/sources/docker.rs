@@ -346,11 +346,7 @@ impl DockerSource {
                 let names = container.names.unwrap();
                 let image = container.image.unwrap();
 
-                trace!(
-                    message = "found already running container.",
-                    id = %id,
-                    names = ?names
-                );
+                trace!(message = "found already running container.", %id, ?names);
 
                 if !self.exclude_vector(id.as_str(), image.as_str()) {
                     return;
@@ -368,7 +364,7 @@ impl DockerSource {
                         }
                     }),
                 ) {
-                    trace!(message = "container excluded.", id = %id);
+                    trace!(message = "container excluded.", %id);
                     return;
                 }
 

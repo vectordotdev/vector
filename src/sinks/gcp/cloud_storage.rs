@@ -315,11 +315,7 @@ impl RequestWrapper {
             settings.extension
         );
 
-        debug!(
-            message = "sending events.",
-            bytes = ?body.len(),
-            key = ?key
-        );
+        debug!(message = "sending events.", bytes = ?body.len(), ?key);
 
         Self {
             body,
