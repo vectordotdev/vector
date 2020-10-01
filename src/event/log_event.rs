@@ -101,13 +101,8 @@ impl LogEvent {
                     v => return Err(format!("Looking up field on a non-map value: {:?}", v).into()),
                 },
                 (Segment::Field(field), Entry::Vacant(entry)) => {
-                    trace!(segment = %field, index, "Injecting empty map.");
-                    let value = entry.insert(Value::from(BTreeMap::new()));
-                    match value
-                    {
-                        Value::Map(ref mut map) => map.entry(field),
-                        v => return Err(format!("Looking up field on a non-map value: {:?}", v).into()),
-                    }
+                    trace!(segment = %field, index, "Met vacant entry.");
+                    return Err(format!("Tried to step into `{}` of `{}`, but it did not exist.", field, entry.key()).into())
                 },
                 _ => return Err("The entry API cannot yet descend into array indices.".into()),
             };
@@ -319,29 +314,5 @@ mod test {
         entry.or_insert(fallback.clone().into());
         let json: serde_json::Value = event.clone().try_into().unwrap();
         assert_eq!(json.pointer("/map/map/non-existing"), Some(&fallback));
-
-        let lookup = Lookup::from_str("map.non-existing.non-existing").unwrap();
-        let entry = event.entry(lookup).unwrap();
-        let fallback = json!(
-            "If you don't see this, the `LogEvent::entry` API is not working on a non-existing middle field in multi-segment lookups."
-        );
-        entry.or_insert(fallback.clone().into());
-        let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(
-            json.pointer("/map/non-existing/non-existing"),
-            Some(&fallback)
-        );
-
-        let lookup = Lookup::from_str("map-non-existing.non-existing.non-existing").unwrap();
-        let entry = event.entry(lookup).unwrap();
-        let fallback = json!(
-            "If you don't see this, the `LogEvent::entry` API is not working on a non-existing first (and rest) field in multi-segment lookups."
-        );
-        entry.or_insert(fallback.clone().into());
-        let json: serde_json::Value = event.clone().try_into().unwrap();
-        assert_eq!(
-            json.pointer("/map-non-existing/non-existing/non-existing"),
-            Some(&fallback)
-        );
     }
 }
