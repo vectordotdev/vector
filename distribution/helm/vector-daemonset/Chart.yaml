@@ -11,3 +11,7 @@ sources:
 maintainers:
   - name: Vector Contributors
     email: vector@timber.io
+dependencies:
+  - name: vector-shared
+    version: "*"
+    repository: file://../vector-shared

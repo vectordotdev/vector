@@ -1,13 +1,13 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: {{ include "vector.fullname" . }}
+  name: {{ include "libvector.fullname" . }}
   labels:
-    {{- include "vector.labels" . | nindent 4 }}
+    {{- include "libvector.labels" . | nindent 4 }}
 spec:
   selector:
     matchLabels:
-      {{- include "vector.selectorLabels" . | nindent 6 }}
+      {{- include "libvector.selectorLabels" . | nindent 6 }}
   minReadySeconds: 1
   updateStrategy:
     type: {{ .Values.updateStrategy }}
@@ -21,21 +21,21 @@ spec:
         {{- with .Values.podLabels }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
-        {{- include "vector.selectorLabels" . | nindent 8 }}
+        {{- include "libvector.selectorLabels" . | nindent 8 }}
         vector.dev/exclude: "true"
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "vector.serviceAccountName" . }}
+      serviceAccountName: {{ include "libvector.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: vector
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ include "vector.imageTag" . }}"
+          image: "{{ .Values.image.repository }}:{{ include "libvector.imageTag" . }}"
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
           args:
             - --config
@@ -110,7 +110,7 @@ spec:
             sources:
               # Managed `ConfigMap`.
               - configMap:
-                  name: {{ include "vector.configMapName" . }}
+                  name: {{ include "libvector.configMapName" . }}
                   optional: true
               # Custom `ConfigMap`.
               - configMap:
