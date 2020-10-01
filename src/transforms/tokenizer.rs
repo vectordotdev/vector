@@ -2,7 +2,7 @@ use super::util::tokenize::parse;
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, PathComponent, PathIter},
+    event::{Event, PathComponent, PathIter, Value},
     internal_events::{TokenizerConvertFailed, TokenizerEventProcessed, TokenizerFieldMissing},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -96,7 +96,7 @@ impl Transform for Tokenizer {
             for ((name, path, conversion), value) in
                 self.field_names.iter().zip(parse(value).into_iter())
             {
-                match conversion.convert(value.as_bytes().to_vec().into()) {
+                match conversion.convert(Value::from(value.to_owned())) {
                     Ok(value) => {
                         event.as_mut_log().insert_path(path.clone(), value);
                     }
