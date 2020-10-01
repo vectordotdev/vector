@@ -4,6 +4,7 @@ statement = _{ assignment | function | if_statement }
 
 assignment = { target_path ~ "=" ~ query_arithmetic }
 
+
 if_statement = {
     "if" ~ query_arithmetic ~ "{" ~ NEWLINE* ~
         statement ~
@@ -12,10 +13,15 @@ if_statement = {
     NEWLINE* ~ "}" )?
 }
 
+// Used by `src/event/lookup.rs`
+lookup = { (path_segment | quoted_path_segment) ~ ("." ~ (path_segment | quoted_path_segment))* }
+
 // Paths
-path_index = ${ "[" ~ ('0'..'9')+ ~ "]" }
-path_segment = ${ (ASCII_ALPHA | "_" | "-" )+ ~ path_index? }
-quoted_path_segment = ${ "\"" ~ inner_quoted_string ~ "\"" ~ path_index? }
+path_index =$ { "[" ~ inner_path_index ~ "]" }
+inner_path_index = { '0'..'9'+ }
+path_segment = ${ path_field_name ~ path_index* }
+path_field_name = { (ASCII_ALPHA | "_" | "-" )+ }
+quoted_path_segment = ${ "\"" ~ inner_quoted_string ~ "\"" ~ path_index* }
 
 target_path = @{ ("." ~ (path_segment | quoted_path_segment))+ }
 

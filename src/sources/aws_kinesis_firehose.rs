@@ -39,12 +39,12 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         let svc = filters::firehose(self.access_key.clone(), out);
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
-        let mut listener = tls.bind(&self.address).await?;
+        let listener = tls.bind(&self.address).await?;
 
         let fut = async move {
             let _ = warp::serve(svc)
                 .serve_incoming_with_graceful_shutdown(
-                    listener.incoming(),
+                    listener.accept_stream(),
                     shutdown.clone().compat().map(|_| ()),
                 )
                 .await;
@@ -236,6 +236,7 @@ mod handlers {
     use super::errors::{ParseRecords, RequestError};
     use super::models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse};
     use crate::{config::log_schema, event::Event, Pipeline};
+    use bytes::Bytes;
     use chrono::Utc;
     use flate2::read::GzDecoder;
     use futures::{compat::Future01CompatExt, TryFutureExt};
@@ -312,7 +313,7 @@ mod handlers {
     }
 
     /// Decodes a Firehose record from its base64 gzip format
-    fn decode_record(record: &EncodedFirehoseRecord) -> std::io::Result<Vec<u8>> {
+    fn decode_record(record: &EncodedFirehoseRecord) -> std::io::Result<Bytes> {
         let mut cursor = std::io::Cursor::new(record.data.as_bytes());
         let base64decoder = base64::read::DecoderReader::new(&mut cursor, base64::STANDARD);
 
@@ -320,7 +321,7 @@ mod handlers {
         let mut buffer = Vec::new();
         gz.read_to_end(&mut buffer)?;
 
-        Ok(buffer)
+        Ok(Bytes::from(buffer))
     }
 }
 
