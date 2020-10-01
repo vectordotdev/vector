@@ -7,11 +7,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::TimeZone;
-use futures::{
-    compat::Future01CompatExt,
-    executor::block_on,
-    future::{select, Either, FutureExt, TryFutureExt},
-};
+use futures::{compat::Future01CompatExt, FutureExt, Stream, StreamExt, TryFutureExt};
 use futures01::{future, Future, Sink};
 use lazy_static::lazy_static;
 use nix::{
@@ -21,19 +17,24 @@ use nix::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
-use std::collections::{HashMap, HashSet};
-use std::fs::{File, OpenOptions};
-use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
-use std::iter::FromIterator;
-use std::path::PathBuf;
-use std::process::{Child, ChildStdout, Command, Stdio};
-use std::str::FromStr;
+use std::{
+    collections::{HashMap, HashSet},
+    fs::{File, OpenOptions},
+    io::{Read, Seek, SeekFrom, Write},
+    iter::FromIterator,
+    path::PathBuf,
+    pin::Pin,
+    process::Stdio,
+    str::FromStr,
+    task::{Context, Poll},
+};
 use string_cache::DefaultAtom as Atom;
 use tokio::{
-    task::spawn_blocking,
-    time::{delay_for, Duration},
+    io::{self, AsyncBufReadExt, BufReader},
+    process::Command,
 };
-use tracing::{dispatcher, field};
+use tracing::field;
+use tracing_futures::Instrument;
 
 const DEFAULT_BATCH_SIZE: usize = 16;
 
@@ -171,32 +172,30 @@ impl JournaldConfig {
         };
 
         let (journal, close) = J::new(self, cursor)?;
+        let journald_server = JournaldServer {
+            journal: Box::pin(journal),
+            include_units,
+            exclude_units,
+            channel: out,
+            shutdown: shutdown.clone(),
+            checkpointer,
+            batch_size,
+            remap_priority,
+        };
 
-        Ok(Box::new(future::lazy(move || {
-            info!(message = "Starting journald server.",);
-
-            let journald_server = JournaldServer {
-                journal,
-                include_units,
-                exclude_units,
-                channel: out,
-                shutdown: shutdown.clone(),
-                checkpointer,
-                batch_size,
-                remap_priority,
-            };
-            let span = info_span!("journald-server");
-            let dispatcher = dispatcher::get_default(|d| d.clone());
-            spawn_blocking(move || {
-                dispatcher::with_default(&dispatcher, || span.in_scope(|| journald_server.run()))
-            })
+        Ok(Box::new(
+            async move {
+                info!(message = "Starting journald server.",);
+                journald_server.run().await;
+                Ok(())
+            }
+            .instrument(info_span!("journald-server"))
             .boxed()
             .compat()
-            .map_err(|error| error!(message = "Journald server unexpectedly stopped.", %error))
             .select(shutdown.map(move |_| close()))
             .map(|_| ())
-            .map_err(|_| ())
-        })))
+            .map_err(|_| ()),
+        ))
     }
 }
 
@@ -243,11 +242,11 @@ fn fixup_unit(unit: &str) -> String {
     }
 }
 
-/// A `JournalSource` is a data source that works as an `Iterator`
+/// A `JournalSource` is a data source that works as a `Stream`
 /// producing lines that resemble journald JSON format records. These
-/// trait functions is an addition to the standard iteration methods for
+/// trait functions is an addition to the standard stream methods for
 /// initializing the source.
-trait JournalSource: Iterator<Item = Result<String, io::Error>> + Sized {
+trait JournalSource: Stream<Item = io::Result<String>> + Sized {
     /// (source, close_underlying_stream)
     fn new(
         config: &JournaldConfig,
@@ -256,9 +255,7 @@ trait JournalSource: Iterator<Item = Result<String, io::Error>> + Sized {
 }
 
 struct Journalctl {
-    #[allow(dead_code)]
-    child: Child,
-    stdout: BufReader<ChildStdout>,
+    inner: futures::stream::BoxStream<'static, io::Result<String>>,
 }
 
 impl JournalSource for Journalctl {
@@ -287,12 +284,21 @@ impl JournalSource for Journalctl {
         }
 
         let mut child = command.spawn().context(JournalctlSpawn)?;
-        let stdout = child.stdout.take().unwrap();
-        let stdout = BufReader::new(stdout);
+        let mut stdout = BufReader::new(child.stdout.take().unwrap());
+        let jstream = Box::pin(async_stream::stream! {
+            loop {
+                let mut line = Vec::new();
+                yield match stdout.read_until(b'\n', &mut line).await {
+                    Ok(0) => break,
+                    Ok(_) => Ok::<String, io::Error>(String::from_utf8_lossy(&line).into()),
+                    Err(err) => Err::<String, io::Error>(err),
+                };
+            }
+        });
 
         let pid = Pid::from_raw(child.id() as i32);
         Ok((
-            Journalctl { child, stdout },
+            Journalctl { inner: jstream },
             Box::new(move || {
                 // Signal the child process to terminate so that the
                 // blocking future can be unblocked sooner rather
@@ -303,20 +309,16 @@ impl JournalSource for Journalctl {
     }
 }
 
-impl Iterator for Journalctl {
-    type Item = Result<String, io::Error>;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut line = Vec::<u8>::new();
-        match self.stdout.read_until(b'\n', &mut line) {
-            Ok(0) => None,
-            Ok(_) => Some(Ok(String::from_utf8_lossy(&line).into())),
-            Err(err) => Some(Err(err)),
-        }
+impl Stream for Journalctl {
+    type Item = io::Result<String>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
+        self.get_mut().inner.as_mut().poll_next(cx)
     }
 }
 
 struct JournaldServer<J, T> {
-    journal: J,
+    journal: Pin<Box<J>>,
     include_units: HashSet<String>,
     exclude_units: HashSet<String>,
     channel: T,
@@ -331,21 +333,18 @@ where
     J: JournalSource,
     T: Sink<SinkItem = Record, SinkError = ()>,
 {
-    pub fn run(mut self) {
-        let timeout = Duration::from_millis(500); // arbitrary timeout
+    pub async fn run(mut self) {
         let channel = &mut self.channel;
-        let mut shutdown = self.shutdown.compat();
 
         loop {
             let mut saw_record = false;
-            let mut at_end = false;
             let mut cursor: Option<String> = None;
 
             for _ in 0..self.batch_size {
-                let text = match self.journal.next() {
+                let text = match self.journal.next().await {
                     None => {
-                        at_end = true;
-                        break;
+                        let _ = self.shutdown.compat().await;
+                        return;
                     }
                     Some(Ok(text)) => text,
                     Some(Err(err)) => {
@@ -379,7 +378,7 @@ where
                     byte_size: text.len()
                 });
 
-                match channel.send(record).wait() {
+                match channel.send(record).compat().await {
                     Ok(_) => {}
                     Err(()) => error!(message = "Could not send journald log"),
                 }
@@ -394,18 +393,6 @@ where
                             filename = ?self.checkpointer.filename,
                         );
                     }
-                }
-            }
-
-            if at_end {
-                // This works only if run inside tokio context since we are using
-                // tokio's Timer. Outside of such context, this will panic on the first
-                // call. Also since we are using block_on here and wait in the above code,
-                // this should be run in it's own thread. `spawn_blocking` fulfills
-                // all of these requirements.
-                match block_on(select(shutdown, delay_for(timeout))) {
-                    Either::Left((_, _)) => return,
-                    Either::Right((_, future)) => shutdown = future,
                 }
             }
         }
@@ -561,13 +548,16 @@ mod checkpointer_tests {
 mod tests {
     use super::*;
     use crate::Pipeline;
-    use futures01::stream::Stream;
+    use futures01::stream::Stream as _;
     use std::{
-        io::{self, BufReader, Cursor},
+        io::{BufRead, BufReader, Cursor},
         iter::FromIterator,
     };
     use tempfile::tempdir;
-    use tokio::time::timeout;
+    use tokio::{
+        io,
+        time::{delay_for, timeout, Duration},
+    };
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}
@@ -580,9 +570,8 @@ mod tests {
         reader: BufReader<Cursor<&'static str>>,
     }
 
-    impl Iterator for FakeJournal {
-        type Item = Result<String, io::Error>;
-        fn next(&mut self) -> Option<Self::Item> {
+    impl FakeJournal {
+        fn next(&mut self) -> Option<io::Result<String>> {
             let mut line = String::new();
             match self.reader.read_line(&mut line) {
                 Ok(0) => None,
@@ -592,6 +581,14 @@ mod tests {
                 }
                 Err(err) => Some(Err(err)),
             }
+        }
+    }
+
+    impl Stream for FakeJournal {
+        type Item = io::Result<String>;
+
+        fn poll_next(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Option<Self::Item>> {
+            Poll::Ready(Pin::into_inner(self).next())
         }
     }
 
