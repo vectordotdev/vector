@@ -188,6 +188,7 @@ mod test {
     // If this test hangs that means somewhere we are not collecting the correct
     // events.
     #[cfg(all(feature = "sources-tls", feature = "listenfd"))]
+    #[cfg(not(macos))] // Issue https://github.com/timberio/vector/issues/2978
     #[tokio::test]
     async fn tcp_stream_detects_disconnect() {
         use crate::tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
