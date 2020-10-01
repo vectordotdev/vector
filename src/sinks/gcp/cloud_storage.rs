@@ -32,7 +32,6 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::task::Poll;
 use tower::{Service, ServiceBuilder};
-use tracing::field;
 use uuid::Uuid;
 
 const NAME: &str = "gcp_cloud_storage";
@@ -318,8 +317,8 @@ impl RequestWrapper {
 
         debug!(
             message = "sending events.",
-            bytes = &field::debug(body.len()),
-            key = &field::debug(&key)
+            bytes = ?body.len(),
+            key = ?key
         );
 
         Self {
