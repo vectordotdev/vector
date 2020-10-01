@@ -33,6 +33,15 @@ impl From<Value> for Literal {
     }
 }
 
+#[cfg(test)]
+impl From<&str> for Literal {
+    fn from(value: &str) -> Self {
+        Self {
+            value: Value::from(value),
+        }
+    }
+}
+
 impl Function for Literal {
     fn execute(&self, _: &Event) -> Result<Value> {
         Ok(self.value.clone())
