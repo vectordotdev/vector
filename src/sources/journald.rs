@@ -7,7 +7,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::TimeZone;
-use futures::{compat::Future01CompatExt, FutureExt, Stream, StreamExt, TryFutureExt};
+use futures::{compat::Future01CompatExt, ready, FutureExt, Stream, StreamExt, TryFutureExt};
 use futures01::{future, Future, Sink};
 use lazy_static::lazy_static;
 use nix::{
@@ -31,7 +31,7 @@ use string_cache::DefaultAtom as Atom;
 use tokio::{
     fs::{File, OpenOptions},
     io::{self, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
-    process::Command,
+    process::{ChildStdout, Command},
 };
 use tracing::field;
 use tracing_futures::Instrument;
@@ -268,8 +268,10 @@ trait JournalSource: Stream<Item = io::Result<String>> + Sized {
     ) -> crate::Result<(Self, Box<dyn FnOnce() + Send>)>;
 }
 
+#[pin_project::pin_project]
 struct Journalctl {
-    inner: futures::stream::BoxStream<'static, io::Result<String>>,
+    #[pin]
+    inner: io::Split<BufReader<ChildStdout>>,
 }
 
 impl JournalSource for Journalctl {
@@ -298,21 +300,13 @@ impl JournalSource for Journalctl {
         }
 
         let mut child = command.spawn().context(JournalctlSpawn)?;
-        let mut stdout = BufReader::new(child.stdout.take().unwrap());
-        let jstream = Box::pin(async_stream::stream! {
-            loop {
-                let mut line = Vec::new();
-                yield match stdout.read_until(b'\n', &mut line).await {
-                    Ok(0) => break,
-                    Ok(_) => Ok(String::from_utf8_lossy(&line).into()),
-                    Err(err) => Err(err),
-                };
-            }
-        });
+        let stdout = BufReader::new(child.stdout.take().unwrap());
 
         let pid = Pid::from_raw(child.id() as i32);
         Ok((
-            Journalctl { inner: jstream },
+            Journalctl {
+                inner: stdout.split(b'\n'),
+            },
             Box::new(move || {
                 // Signal the child process to terminate so that the
                 // blocking future can be unblocked sooner rather
@@ -327,7 +321,11 @@ impl Stream for Journalctl {
     type Item = io::Result<String>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        self.get_mut().inner.as_mut().poll_next(cx)
+        Poll::Ready(match ready!(self.project().inner.poll_next(cx)) {
+            Some(Ok(segment)) => Some(Ok(String::from_utf8_lossy(&segment).into())),
+            Some(Err(err)) => Some(Err(err)),
+            None => None,
+        })
     }
 }
 

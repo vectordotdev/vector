@@ -110,7 +110,6 @@ futures-util = {version = "0.3.5", optional = true }
 weak-table = { version = "0.3.0", optional = true }
 
 # External libs
-async-stream = "0.2.1"
 derivative = "1.0"
 chrono = { version = "0.4.6", features = ["serde"] }
 rand = "0.5.5"
@@ -186,6 +185,7 @@ lucetc = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863da
 lucet-runtime = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
 lucet-wasi = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
 anyhow = { version = "1.0.28", optional = true }
+async-stream = "0.2.1"
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1"
