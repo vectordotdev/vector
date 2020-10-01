@@ -4156,6 +4156,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rust_decimal"
+version = "1.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9e81662973c7a8d9663e64a0de4cd642b89a21d64966e3d99606efdc5fb0cc6"
+dependencies = [
+ "num-traits",
+ "serde",
+]
+
+[[package]]
 name = "rustc-demangle"
 version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5750,6 +5760,7 @@ dependencies = [
  "rusoto_s3",
  "rusoto_signature",
  "rusoto_sts",
+ "rust_decimal",
  "schannel",
  "seahash",
  "security-framework 0.4.4",

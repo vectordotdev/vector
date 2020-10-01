@@ -123,6 +123,7 @@ build_signatures! {
     slice => SliceFn,
     tokenize => TokenizeFn,
     strip_ansi_escape_codes => StripAnsiEscapeCodesFn,
+    parse_duration => ParseDurationFn,
 }
 
 /// A parameter definition accepted by a function.
