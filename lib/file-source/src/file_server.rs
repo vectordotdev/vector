@@ -13,7 +13,6 @@ use std::io::{self, Read, Seek, Write};
 use std::path::{Path, PathBuf};
 use std::time::{self, Duration};
 use tokio::time::delay_for;
-use tracing::field;
 
 use crate::metadata_ext::PortableFileExt;
 use crate::paths_provider::PathsProvider;
@@ -153,22 +152,22 @@ where
                             if watcher.path == path {
                                 trace!(
                                     message = "Continue watching file.",
-                                    path = field::debug(&path),
+                                    path = ?path,
                                 );
                             } else {
                                 // matches a file with a different path
                                 if !was_found_this_cycle {
                                     info!(
                                         message = "Watched file has been renamed.",
-                                        path = field::debug(&path),
-                                        old_path = field::debug(&watcher.path)
+                                        path = ?path,
+                                        old_path = ?watcher.path
                                     );
                                     watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
                                 } else {
                                     info!(
                                         message = "More than one file has the same fingerprint.",
-                                        path = field::debug(&path),
-                                        old_path = field::debug(&watcher.path)
+                                        path = ?path,
+                                        old_path = ?watcher.path
                                     );
                                     let (old_path, new_path) = (&watcher.path, &path);
                                     if let (Ok(old_modified_time), Ok(new_modified_time)) = (
@@ -178,8 +177,8 @@ where
                                         if old_modified_time < new_modified_time {
                                             info!(
                                                 message = "switching to watch most recently modified file.",
-                                                new_modified_time = field::debug(&new_modified_time),
-                                                old_modified_time = field::debug(&old_modified_time),
+                                                new_modified_time = ?new_modified_time,
+                                                old_modified_time = ?old_modified_time,
                                             );
                                             watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
                                         }
@@ -211,8 +210,8 @@ where
                     let sz = line.len();
                     trace!(
                         message = "read bytes.",
-                        path = field::debug(&watcher.path),
-                        bytes = field::debug(sz)
+                        path = ?watcher.path,
+                        bytes = ?sz
                     );
 
                     bytes_read += sz;

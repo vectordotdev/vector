@@ -28,7 +28,6 @@ use tokio_util::{
     codec::{BytesCodec, Decoder, LinesCodec, LinesCodecError},
     udp::UdpFramed,
 };
-use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug)]
 // TODO: add back when serde-rs/serde#1358 is addressed
@@ -259,7 +258,7 @@ pub fn udp(
                 .expect("Failed to bind to UDP listener socket");
             info!(
                 message = "Listening.",
-                addr = &field::display(addr),
+                addr = %addr,
                 r#type = "udp"
             );
 
@@ -351,7 +350,7 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
 
     trace!(
         message = "processing one event.",
-        event = &field::debug(&event)
+        event = ?event
     );
 
     Some(event)

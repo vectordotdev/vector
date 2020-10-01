@@ -62,7 +62,7 @@ impl InternalEvent for WasmHostcallProgress {
                 state = self.state.as_const_str(),
                 call = self.call,
                 role = self.role.as_const_str(),
-                error = tracing::field::display(self.error.as_ref().unwrap_or(&String::from(""))),
+                error = %self.error.as_ref().unwrap_or(&String::from("")),
                 elapsed_micros = self.elapsed.as_micros() as u64,
                 rate_limit_secs = 30,
                 "Hostcall errored.",

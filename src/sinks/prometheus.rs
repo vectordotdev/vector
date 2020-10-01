@@ -25,7 +25,6 @@ use std::{
     sync::{Arc, RwLock},
 };
 use stream_cancel::{Trigger, Tripwire};
-use tracing::field;
 
 const MIN_FLUSH_PERIOD_SECS: u64 = 1;
 
@@ -343,7 +342,7 @@ fn handle(
 
     info!(
         message = "Request complete",
-        response_code = field::debug(response.status())
+        response_code = ?response.status()
     );
 
     response
@@ -387,8 +386,8 @@ impl PrometheusSink {
 
                     let response = info_span!(
                         "prometheus_server",
-                        method = field::debug(req.method()),
-                        path = field::debug(req.uri().path()),
+                        method = ?req.method(),
+                        path = ?req.uri().path(),
                     )
                     .in_scope(|| handle(req, namespace.as_deref(), &buckets, expired, &metrics));
 
