@@ -182,6 +182,7 @@ fn encode_event(event: Event, namespace: Option<&str>) -> Option<Vec<u8>> {
                 "invalid metric sent to statsd sink ({:?}) ({:?})",
                 metric.kind, metric.value
             );
+            return None;
         }
     };
 
