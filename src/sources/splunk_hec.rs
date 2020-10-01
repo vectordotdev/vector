@@ -124,12 +124,12 @@ impl SourceConfig for SplunkConfig {
             .or_else(finish_err);
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
-        let mut listener = tls.bind(&self.address).await?;
+        let listener = tls.bind(&self.address).await?;
 
         let fut = async move {
             let _ = warp::serve(services)
                 .serve_incoming_with_graceful_shutdown(
-                    listener.incoming(),
+                    listener.accept_stream(),
                     shutdown.clone().compat().map(|_| ()),
                 )
                 .await;
@@ -347,14 +347,10 @@ impl<R: Read> EventStream<R> {
         EventStream {
             data,
             events: 0,
-            channel: channel.map(|value| value.into_bytes().into()),
+            channel: channel.map(Value::from),
             time: Time::Now(Utc::now()),
             extractors: [
-                DefaultExtractor::new_with(
-                    "host",
-                    &log_schema().host_key(),
-                    host.map(|value| value.into_bytes().into()),
-                ),
+                DefaultExtractor::new_with("host", &log_schema().host_key(), host.map(Value::from)),
                 DefaultExtractor::new("index", &INDEX),
                 DefaultExtractor::new("source", &SOURCE),
                 DefaultExtractor::new("sourcetype", &SOURCETYPE),
@@ -594,7 +590,7 @@ fn raw_event(
         let mut data = Vec::new();
         match GzDecoder::new(bytes.reader()).read_to_end(&mut data) {
             Ok(0) => return Err(ApiError::NoData.into()),
-            Ok(_) => data.into(),
+            Ok(_) => Value::from(Bytes::from(data)),
             Err(error) => {
                 emit!(SplunkHECRequestBodyInvalid { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
@@ -612,11 +608,11 @@ fn raw_event(
     log.insert(log_schema().message_key().clone(), message);
 
     // Add channel
-    log.insert(CHANNEL.clone(), channel.into_bytes());
+    log.insert(CHANNEL.clone(), channel);
 
     // Add host
     if let Some(host) = host {
-        log.insert(log_schema().host_key().clone(), host.into_bytes());
+        log.insert(log_schema().host_key().clone(), host);
     }
 
     // Add timestamp

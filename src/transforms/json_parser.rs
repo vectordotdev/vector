@@ -73,16 +73,18 @@ impl From<JsonParserConfig> for JsonParser {
 impl Transform for JsonParser {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
-        let to_parse = log.get(&self.field).map(|s| s.as_bytes());
+        let value = log.get(&self.field);
 
         emit!(JsonParserEventProcessed);
 
-        let parsed = to_parse
-            .and_then(|to_parse| {
+        let parsed = value
+            .and_then(|value| {
+                let to_parse = value.as_bytes();
                 serde_json::from_slice::<Value>(to_parse.as_ref())
                     .map_err(|error| {
                         emit!(JsonParserFailedParse {
                             field: &self.field,
+                            value: value.to_string_lossy().as_str(),
                             error
                         })
                     })
