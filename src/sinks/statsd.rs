@@ -1,38 +1,23 @@
 #[cfg(unix)]
-use crate::sinks::util::unix::{UnixService, UnixSinkConfig, UnixSocketError};
+use crate::sinks::util::unix::{UnixService, UnixSinkConfig};
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::Event,
     sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
     sinks::util::{
-        tcp::{TcpError, TcpService, TcpSinkConfig},
-        udp::{UdpError, UdpService, UdpSinkConfig},
+        tcp::{TcpService, TcpSinkConfig},
+        udp::{UdpService, UdpSinkConfig},
     },
 };
-use futures::{future, FutureExt};
+use futures::{future, FutureExt, TryFutureExt};
 use futures01::{stream, Sink};
 use serde::{Deserialize, Serialize};
-use snafu::{futures::TryFutureExt, Snafu};
+
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::task::{Context, Poll};
 use tower::{Service, ServiceBuilder};
-
-#[derive(Debug, Snafu)]
-pub enum StatsdError {
-    Udp {
-        #[snafu(source)]
-        source: UdpError,
-    },
-    Tcp {
-        source: TcpError,
-    },
-    #[cfg(unix)]
-    Unix {
-        source: UnixSocketError,
-    },
-}
 
 pub struct StatsdSvc {
     client: Client,
@@ -210,21 +195,15 @@ fn encode_event(event: Event, namespace: Option<&str>) -> Option<Vec<u8>> {
 
 impl Service<Vec<u8>> for StatsdSvc {
     type Response = ();
-    type Error = StatsdError;
+    type Error = crate::Error;
     type Future = future::BoxFuture<'static, Result<(), Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         match &mut self.client {
-            Client::Tcp(service) => service
-                .poll_ready(cx)
-                .map_err(|source| StatsdError::Tcp { source }),
-            Client::Udp(service) => service
-                .poll_ready(cx)
-                .map_err(|source| StatsdError::Udp { source }),
+            Client::Tcp(service) => service.poll_ready(cx).map_err(Into::into),
+            Client::Udp(service) => service.poll_ready(cx).map_err(Into::into),
             #[cfg(unix)]
-            Client::Unix(service) => service
-                .poll_ready(cx)
-                .map_err(|source| StatsdError::Unix { source }),
+            Client::Unix(service) => service.poll_ready(cx).map_err(Into::into),
         }
     }
 
@@ -233,10 +212,10 @@ impl Service<Vec<u8>> for StatsdSvc {
             frame.pop();
         }
         match &mut self.client {
-            Client::Tcp(service) => service.call(frame.into()).context(Tcp).boxed(),
-            Client::Udp(service) => service.call(frame.into()).context(Udp).boxed(),
+            Client::Tcp(service) => service.call(frame.into()).err_into().boxed(),
+            Client::Udp(service) => service.call(frame.into()).err_into().boxed(),
             #[cfg(unix)]
-            Client::Unix(service) => service.call(frame.into()).context(Unix).boxed(),
+            Client::Unix(service) => service.call(frame.into()).err_into().boxed(),
         }
     }
 }
