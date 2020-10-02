@@ -87,16 +87,6 @@ type Record = HashMap<Atom, String>;
 impl SourceConfig for JournaldConfig {
     async fn build(
         &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
-        _out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        unimplemented!()
-    }
-
-    async fn build_async(
-        &self,
         name: &str,
         globals: &GlobalOptions,
         shutdown: ShutdownSignal,
