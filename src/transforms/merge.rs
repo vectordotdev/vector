@@ -22,7 +22,9 @@ pub struct MergeConfig {
     /// merges in the fields from each successive partial event, until a
     /// non-partial event arrives. Finally, the non-partial event fields are
     /// merged in, producing the resulting merged event.
-    pub merge_fields: Vec<Atom>,
+    // Deprecated name is merge_fields
+    #[serde(alias = "merge_fields")]
+    pub fields: Vec<Atom>,
     /// An ordered list of fields to distinguish streams by. Each stream has a
     /// separate partial event merging state. Should be used to prevent events
     /// from unrelated sources from mixing together, as this affects partial
@@ -38,7 +40,7 @@ impl Default for MergeConfig {
     fn default() -> Self {
         Self {
             partial_event_marker_field: event::PARTIAL.clone(),
-            merge_fields: vec![crate::config::log_schema().message_key().clone()],
+            fields: vec![crate::config::log_schema().message_key().clone()],
             stream_discriminant_fields: vec![],
         }
     }
@@ -67,7 +69,7 @@ impl TransformConfig for MergeConfig {
 #[derive(Debug)]
 pub struct Merge {
     partial_event_marker_field: Atom,
-    merge_fields: Vec<Atom>,
+    fields: Vec<Atom>,
     stream_discriminant_fields: Vec<Atom>,
     log_event_merge_states: HashMap<Discriminant, LogEventMergeState>,
 }
@@ -76,7 +78,7 @@ impl From<MergeConfig> for Merge {
     fn from(config: MergeConfig) -> Self {
         Self {
             partial_event_marker_field: config.partial_event_marker_field,
-            merge_fields: config.merge_fields,
+            fields: config.fields,
             stream_discriminant_fields: config.stream_discriminant_fields,
             log_event_merge_states: HashMap::new(),
         }
@@ -109,9 +111,7 @@ impl Transform for Merge {
                     entry.insert(LogEventMergeState::new(event));
                 }
                 hash_map::Entry::Occupied(mut entry) => {
-                    entry
-                        .get_mut()
-                        .merge_in_next_event(event, &self.merge_fields);
+                    entry.get_mut().merge_in_next_event(event, &self.fields);
                 }
             }
 
@@ -131,7 +131,7 @@ impl Transform for Merge {
 
         // Merge in the final non-partial event and consume the merge state in
         // exchange for the merged event.
-        let merged_event = log_event_merge_state.merge_in_final_event(event, &self.merge_fields);
+        let merged_event = log_event_merge_state.merge_in_final_event(event, &self.fields);
 
         // Return the merged event.
         Some(Event::Log(merged_event))
