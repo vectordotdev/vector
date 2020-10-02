@@ -16,7 +16,7 @@ jobs:
   build-x86_64-unknown-linux-musl-packages:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v1
       - run: make ci-sweep
       - env:
           PASS_FEATURES: "default-cmake"
@@ -29,7 +29,7 @@ jobs:
   build-x86_64-unknown-linux-gnu-packages:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v1
       - run: make ci-sweep
       - env:
           PASS_FEATURES: "default"
@@ -50,7 +50,7 @@ jobs:
   build-aarch64-unknown-linux-musl-packages:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v1
       - run: make ci-sweep
       - env:
           DOCKER_PRIVILEGED: "true"
@@ -72,7 +72,7 @@ jobs:
   build-x86_64-apple-darwin-packages:
     runs-on: macos-10.15
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v1
       - name: "Upgrade bash"
         run: brew install bash
       - name: "Install realpath dependency"
@@ -92,7 +92,7 @@ jobs:
   build-x86_64-pc-windows-msvc-packages:
     runs-on: windows-2019
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v1
       - name: "Build archive"
         shell: bash
         run: |
@@ -124,7 +124,7 @@ jobs:
       - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v1
       - uses: actions/download-artifact@v1
         with:
           name: vector-x86_64-unknown-linux-musl.tar.gz
@@ -159,7 +159,7 @@ jobs:
       - build-x86_64-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v1
       - uses: actions/download-artifact@v1
         with:
           name: vector-x86_64-unknown-linux-gnu.tar.gz
@@ -214,7 +214,7 @@ jobs:
       - build-x86_64-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v1
       - uses: actions/download-artifact@v1
         with:
           name: vector-x86_64-unknown-linux-gnu.tar.gz
@@ -272,7 +272,7 @@ jobs:
       - build-x86_64-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v1
       - uses: actions/download-artifact@v1
         with:
           name: vector-x86_64-unknown-linux-gnu.tar.gz
@@ -326,7 +326,7 @@ jobs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-aarch64-unknown-linux-musl-packages
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v1
       - uses: actions/download-artifact@v1
         with:
           name: vector-amd64.deb
@@ -403,7 +403,7 @@ jobs:
       # appear before the image it refers to.
       - release-docker
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v1
       - name: Install Helm
         run: scripts/ci-setup-helm.sh
       - name: Release Helm Chart
