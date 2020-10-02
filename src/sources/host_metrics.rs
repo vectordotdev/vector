@@ -123,9 +123,10 @@ inventory::submit! {
     SourceDescription::new::<HostMetricsConfig>("host_metrics")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "host_metrics")]
 impl SourceConfig for HostMetricsConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,

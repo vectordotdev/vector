@@ -25,9 +25,13 @@ inventory::submit! {
     SinkDescription::new_without_default::<PapertrailConfig>("papertrail")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "papertrail")]
 impl SinkConfig for PapertrailConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let host = self
             .endpoint
             .host()

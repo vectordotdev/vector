@@ -64,8 +64,10 @@ mod socket;
 mod split;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 mod splunk_hec;
+#[cfg(feature = "sinks-statsd")]
+mod statsd_sink;
 #[cfg(feature = "sources-statsd")]
-mod statsd;
+mod statsd_source;
 mod stdin;
 #[cfg(feature = "transforms-swimlanes")]
 mod swimlanes;
@@ -144,8 +146,10 @@ pub(crate) use self::socket::*;
 pub use self::split::*;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 pub(crate) use self::splunk_hec::*;
+#[cfg(feature = "sinks-statsd")]
+pub use self::statsd_sink::*;
 #[cfg(feature = "sources-statsd")]
-pub use self::statsd::*;
+pub use self::statsd_source::*;
 pub use self::stdin::*;
 #[cfg(feature = "transforms-swimlanes")]
 pub use self::swimlanes::*;
@@ -160,6 +164,8 @@ pub use self::unix::*;
 pub use self::vector::*;
 #[cfg(feature = "wasm")]
 pub use self::wasm::*;
+#[cfg(windows)]
+pub use self::windows::*;
 
 pub trait InternalEvent {
     fn emit_logs(&self) {}
@@ -180,6 +186,7 @@ macro_rules! emit {
 
 // Modules that require emit! macro so they need to be defined after the macro.
 mod file;
+mod windows;
 
 const ELLIPSIS: &str = "[...]";
 

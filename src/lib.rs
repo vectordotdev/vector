@@ -22,6 +22,7 @@ extern crate pest_derive;
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 pub mod buffers;
+pub mod cli;
 pub mod conditions;
 pub mod config;
 pub mod dns;
@@ -34,6 +35,7 @@ pub mod wasm;
 pub mod internal_events;
 #[cfg(feature = "api")]
 pub mod api;
+pub mod app;
 pub mod async_read;
 pub mod heartbeat;
 #[cfg(feature = "rdkafka")]
@@ -46,6 +48,7 @@ pub mod metrics;
 pub(crate) mod pipeline;
 pub mod region;
 pub mod serde;
+pub mod service;
 pub mod shutdown;
 pub mod signal;
 pub mod sinks;
@@ -60,6 +63,8 @@ pub mod transforms;
 pub mod types;
 pub mod unit_test;
 pub mod validate;
+#[cfg(windows)]
+pub mod vector_windows;
 
 pub use event::Event;
 pub use pipeline::Pipeline;

@@ -31,7 +31,6 @@ use std::convert::{TryFrom, TryInto};
 use std::task::Context;
 use std::task::Poll;
 use tower::{Service, ServiceBuilder};
-use tracing::field;
 use tracing_futures::Instrument;
 use uuid::Uuid;
 
@@ -139,9 +138,13 @@ inventory::submit! {
     SinkDescription::new::<S3SinkConfig>("aws_s3")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(cx.resolver())?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = self.new(client, cx)?;
@@ -327,9 +330,9 @@ fn build_request(
 
     debug!(
         message = "sending events.",
-        bytes = &field::debug(inner.len()),
-        bucket = &field::debug(&bucket),
-        key = &field::debug(&key)
+        bytes = ?inner.len(),
+        bucket = ?bucket,
+        key = ?key
     );
 
     Request {
