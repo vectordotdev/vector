@@ -1,4 +1,4 @@
-name: Test Suite
+name: Bors Test Suite
 
 on:
   push:
