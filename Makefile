@@ -56,6 +56,9 @@ export WASM_MODULE_OUTPUTS = $(patsubst %,/target/wasm32-wasi/%,$(WASM_MODULES))
 export AWS_ACCESS_KEY_ID ?= "dummy"
 export AWS_SECRET_ACCESS_KEY ?= "dummy"
 
+# Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
+export CI ?= false
+
 FORMATTING_BEGIN_YELLOW = \033[0;33m
 FORMATTING_BEGIN_BLUE = \033[36m
 FORMATTING_END = \033[0m
@@ -489,15 +492,15 @@ start-integration-influxdb:
 ifeq ($(CONTAINER_TOOL),podman)
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-influxdb -p 8086:8086 -p 9999:9999
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb --name vector_influxdb_v1 \
-	 -e INFLUXDB_REPORTING_DISABLED=true influxdb:1.7
+	 -e INFLUXDB_REPORTING_DISABLED=true influxdb:1.8
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb --name vector_influxdb_v2 \
-	 -e INFLUXDB_REPORTING_DISABLED=true  quay.io/influxdb/influxdb:2.0.0-beta influxd --reporting-disabled
+	 -e INFLUXDB_REPORTING_DISABLED=true  quay.io/influxdb/influxdb:2.0.0-rc influxd --reporting-disabled --http-bind-address=:9999
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-influxdb
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb -p 8086:8086 --name vector_influxdb_v1 \
-	 -e INFLUXDB_REPORTING_DISABLED=true influxdb:1.7
+	 -e INFLUXDB_REPORTING_DISABLED=true influxdb:1.8
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb -p 9999:9999 --name vector_influxdb_v2 \
-	 -e INFLUXDB_REPORTING_DISABLED=true  quay.io/influxdb/influxdb:2.0.0-beta influxd --reporting-disabled
+	 -e INFLUXDB_REPORTING_DISABLED=true  quay.io/influxdb/influxdb:2.0.0-rc influxd --reporting-disabled --http-bind-address=:9999
 endif
 
 .PHONY: stop-integration-influxdb
@@ -976,6 +979,19 @@ signoff: ## Signsoff all previous commits since branch creation
 .PHONY: slim-builds
 slim-builds: ## Updates the Cargo config to product disk optimized builds (for CI, not for users)
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/slim-builds.sh
+
+ifeq (${CI}, true)
+.PHONY: ci-sweep
+ci-sweep: ## Sweep up the CI to try to get more disk space.
+	@echo "Preparing the CI for build by sweeping up disk space a bit..."
+	df -h
+	sudo apt-get --purge autoremove
+	sudo apt-get clean
+	sudo rm -rf "/opt/*" "/usr/local/*"
+	sudo rm -rf "/usr/local/share/boost" && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
+	docker system prune --force
+	df -h
+endif
 
 .PHONY: target-graph
 target-graph: ## Display dependencies between targets in this Makefile

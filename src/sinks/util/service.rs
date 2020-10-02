@@ -129,6 +129,7 @@ impl<'de> Deserialize<'de> for InFlightLimit {
 
 pub trait InFlightLimitOption {
     fn parse_in_flight_limit(&self, default: &Self) -> Option<usize>;
+    fn is_none(&self) -> bool;
 }
 
 impl InFlightLimitOption for Option<usize> {
@@ -138,6 +139,10 @@ impl InFlightLimitOption for Option<usize> {
             Some(x) => Some(*x),
         };
         limit.or(Some(5))
+    }
+
+    fn is_none(&self) -> bool {
+        matches!(self, None)
     }
 }
 
@@ -149,12 +154,17 @@ impl InFlightLimitOption for InFlightLimit {
             InFlightLimit::Fixed(limit) => Some(limit),
         }
     }
+
+    fn is_none(&self) -> bool {
+        matches!(self, InFlightLimit::None)
+    }
 }
 
 /// Tower Request based configuration
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-pub struct TowerRequestConfig<T = InFlightLimit> {
+pub struct TowerRequestConfig<T: InFlightLimitOption = InFlightLimit> {
     #[serde(default)]
+    #[serde(skip_serializing_if = "InFlightLimitOption::is_none")]
     pub in_flight_limit: T, // 5
     pub timeout_secs: Option<u64>,             // 60
     pub rate_limit_duration_secs: Option<u64>, // 1
@@ -369,6 +379,10 @@ mod tests {
     #[test]
     fn in_flight_limit_works() {
         type TowerRequestConfigTest = TowerRequestConfig<InFlightLimit>;
+
+        let cfg = TowerRequestConfigTest::default();
+        let toml = toml::to_string(&cfg).unwrap();
+        toml::from_str::<TowerRequestConfigTest>(&toml).expect("Default config failed");
 
         let cfg = toml::from_str::<TowerRequestConfigTest>("").expect("Empty config failed");
         assert_eq!(cfg.in_flight_limit, InFlightLimit::None);

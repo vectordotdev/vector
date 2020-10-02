@@ -31,7 +31,6 @@ use std::convert::{TryFrom, TryInto};
 use std::task::Context;
 use std::task::Poll;
 use tower::{Service, ServiceBuilder};
-use tracing::field;
 use tracing_futures::Instrument;
 use uuid::Uuid;
 
@@ -331,9 +330,9 @@ fn build_request(
 
     debug!(
         message = "sending events.",
-        bytes = &field::debug(inner.len()),
-        bucket = &field::debug(&bucket),
-        key = &field::debug(&key)
+        bytes = ?inner.len(),
+        bucket = ?bucket,
+        key = ?key
     );
 
     Request {
@@ -621,7 +620,7 @@ mod integration_tests {
 
         let config = S3SinkConfig {
             compression: Compression::Gzip,
-            filename_time_format: Some("%S%f".into()),
+            filename_time_format: Some("%s%f".into()),
             ..config(10000).await
         };
 

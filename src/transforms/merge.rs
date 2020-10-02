@@ -187,7 +187,7 @@ mod test {
         );
 
         // Merged event shouldn't contain partial event marker.
-        assert!(!merged_event.as_log().contains(&event::PARTIAL));
+        assert!(!merged_event.as_log().contains(&*event::PARTIAL));
     }
 
     #[test]
@@ -244,7 +244,7 @@ mod test {
         );
 
         // Merged events shouldn't contain partial event marker.
-        assert!(!s1_merged_event.as_log().contains(&event::PARTIAL));
-        assert!(!s2_merged_event.as_log().contains(&event::PARTIAL));
+        assert!(!s1_merged_event.as_log().contains(&*event::PARTIAL));
+        assert!(!s2_merged_event.as_log().contains(&*event::PARTIAL));
     }
 }

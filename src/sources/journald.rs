@@ -33,7 +33,7 @@ use tokio::{
     task::spawn_blocking,
     time::{delay_for, Duration},
 };
-use tracing::{dispatcher, field};
+use tracing::dispatcher;
 
 const DEFAULT_BATCH_SIZE: usize = 16;
 
@@ -165,7 +165,7 @@ impl JournaldConfig {
             Err(err) => {
                 error!(
                     message = "Could not retrieve saved journald checkpoint",
-                    error = field::display(&err)
+                    error = %err
                 );
                 None
             }
@@ -352,7 +352,7 @@ where
                     Some(Err(err)) => {
                         error!(
                             message = "Could not read from journald source",
-                            error = field::display(&err),
+                            error = %err,
                         );
                         break;
                     }
@@ -391,7 +391,7 @@ where
                     if let Err(err) = self.checkpointer.set(&cursor) {
                         error!(
                             message = "Could not set journald checkpoint.",
-                            error = field::display(&err),
+                            error = %err,
                             filename = ?self.checkpointer.filename,
                         );
                     }

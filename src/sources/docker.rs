@@ -35,7 +35,6 @@ use std::time::Duration;
 use std::{collections::HashMap, convert::TryFrom, env};
 use string_cache::DefaultAtom as Atom;
 use tokio::sync::mpsc;
-use tracing::field;
 
 /// The beginning of image names of vector docker images packaged by vector.
 const VECTOR_IMAGE_NAME: &str = "timberio/vector";
@@ -348,11 +347,7 @@ impl DockerSource {
                 let names = container.names.unwrap();
                 let image = container.image.unwrap();
 
-                trace!(
-                    message = "found already running container.",
-                    id = field::display(&id),
-                    names = field::debug(&names)
-                );
+                trace!(message = "found already running container.", %id, ?names);
 
                 if !self.exclude_vector(id.as_str(), image.as_str()) {
                     return;
@@ -370,7 +365,7 @@ impl DockerSource {
                         }
                     }),
                 ) {
-                    trace!(message = "container excluded.", id = field::display(&id));
+                    trace!(message = "container excluded.", %id);
                     return;
                 }
 
@@ -936,7 +931,7 @@ impl ContainerMetadata {
                     .map(|(key, value)| {
                         (
                             ("label.".to_owned() + key).into(),
-                            value.as_bytes().to_owned().into(),
+                            Value::from(value.to_owned()),
                         )
                     })
                     .collect()

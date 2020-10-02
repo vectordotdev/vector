@@ -113,6 +113,8 @@ build_signatures! {
     uuid_v4 => UuidV4Fn,
     md5 => Md5Fn,
     sha1 => Sha1Fn,
+    sha2 => Sha2Fn,
+    sha3 => Sha3Fn,
     now => NowFn,
     truncate => TruncateFn,
     parse_json => ParseJsonFn,
@@ -121,6 +123,7 @@ build_signatures! {
     slice => SliceFn,
     tokenize => TokenizeFn,
     strip_ansi_escape_codes => StripAnsiEscapeCodesFn,
+    parse_duration => ParseDurationFn,
 }
 
 /// A parameter definition accepted by a function.
