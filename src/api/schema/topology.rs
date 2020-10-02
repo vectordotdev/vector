@@ -10,6 +10,16 @@ pub enum SourceOutputType {
     Metric,
 }
 
+impl From<DataType> for SourceOutputType {
+    fn from(data_type: DataType) -> Self {
+        match data_type {
+            DataType::Metric => SourceOutputType::Metric,
+            DataType::Log => SourceOutputType::Log,
+            DataType::Any => SourceOutputType::Any,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct SourceData {
     name: String,
@@ -32,11 +42,7 @@ impl Source {
 
     /// The output type given by the source
     async fn output_type(&self) -> SourceOutputType {
-        match self.0.output_type {
-            DataType::Metric => SourceOutputType::Metric,
-            DataType::Log => SourceOutputType::Log,
-            DataType::Any => SourceOutputType::Any,
-        }
+        self.0.output_type.into()
     }
 }
 
