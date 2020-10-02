@@ -1,14 +1,19 @@
-use crate::{shutdown::ShutdownSignal, stream::StreamExt, topology::config::GlobalOptions, Event};
-use futures01::{future, sync::mpsc, Future, Sink, Stream};
+use crate::{
+    config::{self, GlobalOptions, SourceConfig, SourceDescription},
+    internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
+    shutdown::ShutdownSignal,
+    Event, Pipeline,
+};
+use futures::{
+    compat::{Future01CompatExt, Sink01CompatExt},
+    stream, FutureExt, StreamExt, TryFutureExt,
+};
+use futures01::Sink;
 use parser::parse;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use tokio01::{
-    self,
-    codec::BytesCodec,
-    net::{UdpFramed, UdpSocket},
-};
-use tracing::field;
+use tokio::net::UdpSocket;
+use tokio_util::{codec::BytesCodec, udp::UdpFramed};
 
 pub mod parser;
 
@@ -17,20 +22,25 @@ struct StatsdConfig {
     address: SocketAddr,
 }
 
+inventory::submit! {
+    SourceDescription::new_without_default::<StatsdConfig>("statsd")
+}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "statsd")]
-impl crate::topology::config::SourceConfig for StatsdConfig {
-    fn build(
+impl SourceConfig for StatsdConfig {
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         Ok(statsd(self.address, shutdown, out))
     }
 
-    fn output_type(&self) -> crate::topology::config::DataType {
-        crate::topology::config::DataType::Metric
+    fn output_type(&self) -> crate::config::DataType {
+        config::DataType::Metric
     }
 
     fn source_type(&self) -> &'static str {
@@ -38,39 +48,59 @@ impl crate::topology::config::SourceConfig for StatsdConfig {
     }
 }
 
-fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: mpsc::Sender<Event>) -> super::Source {
-    let out = out.sink_map_err(|e| error!("error sending metric: {:?}", e));
+fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> super::Source {
+    let out = out.sink_map_err(|e| error!("Error sending metric: {:?}", e));
 
     Box::new(
-        future::lazy(move || {
-            let socket = UdpSocket::bind(&addr).expect("failed to bind to udp listener socket");
+        async move {
+            let socket = UdpSocket::bind(&addr)
+                .map_err(|error| emit!(StatsdSocketError::bind(error)))
+                .await?;
 
             info!(
-                message = "listening.",
-                addr = &field::display(addr),
+                message = "Listening.",
+                addr = %addr,
                 r#type = "udp"
             );
 
-            future::ok(socket)
-        })
-        .and_then(move |socket| {
-            let metrics_in = UdpFramed::new(socket, BytesCodec::new())
-                .take_until(shutdown)
-                .map(|(bytes, _sock)| {
-                    let packet = String::from_utf8_lossy(bytes.as_ref());
-                    let metrics = packet
-                        .lines()
-                        .map(parse)
-                        .filter_map(|res| res.map_err(|e| error!("{}", e)).ok())
-                        .map(Event::Metric)
-                        .collect::<Vec<_>>();
-                    futures01::stream::iter_ok::<_, std::io::Error>(metrics)
+            let _ = UdpFramed::new(socket, BytesCodec::new())
+                .take_until(shutdown.compat())
+                .filter_map(|frame| async move {
+                    match frame {
+                        Ok((bytes, _sock)) => {
+                            let packet = String::from_utf8_lossy(bytes.as_ref());
+                            let metrics = packet
+                                .lines()
+                                .filter_map(|line| match parse(line) {
+                                    Ok(metric) => {
+                                        emit!(StatsdEventReceived {
+                                            byte_size: line.len()
+                                        });
+                                        Some(Ok(Event::Metric(metric)))
+                                    }
+                                    Err(error) => {
+                                        emit!(StatsdInvalidRecord { error, text: line });
+                                        None
+                                    }
+                                })
+                                .collect::<Vec<_>>();
+                            Some(stream::iter(metrics))
+                        }
+                        Err(error) => {
+                            emit!(StatsdSocketError::read(error));
+                            None
+                        }
+                    }
                 })
                 .flatten()
-                .map_err(|e| error!("error reading datagram: {:?}", e));
+                .forward(out.sink_compat())
+                .await;
 
-            metrics_in.forward(out).map(|_| info!("finished sending"))
-        }),
+            info!("Finished sending");
+            Ok(())
+        }
+        .boxed()
+        .compat(),
     )
 }
 
@@ -79,13 +109,13 @@ fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: mpsc::Sender<Event>) 
 mod test {
     use super::StatsdConfig;
     use crate::{
+        config,
         sinks::prometheus::PrometheusSinkConfig,
-        test_util::{block_on, next_addr, runtime, shutdown_on_idle},
-        topology::{self, config},
+        test_util::{next_addr, start_topology},
     };
-    use futures::{TryFutureExt, TryStreamExt};
+    use futures::{compat::Future01CompatExt, TryStreamExt};
     use futures01::Stream;
-    use std::{thread, time::Duration};
+    use tokio::time::{delay_for, Duration};
 
     fn parse_count(lines: &[&str], prefix: &str) -> usize {
         lines
@@ -97,27 +127,25 @@ mod test {
             .unwrap()
     }
 
-    #[test]
-    fn test_statsd() {
+    #[tokio::test]
+    async fn test_statsd() {
         let in_addr = next_addr();
         let out_addr = next_addr();
 
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source("in", StatsdConfig { address: in_addr });
         config.add_sink(
             "out",
             &["in"],
             PrometheusSinkConfig {
                 address: out_addr,
-                namespace: "vector".into(),
+                namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
                 flush_period_secs: 1,
             },
         );
 
-        let mut rt = runtime();
-
-        let (topology, _crash) = rt.block_on_std(topology::start(config, false)).unwrap();
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
         let bind_addr = next_addr();
         let socket = std::net::UdpSocket::bind(&bind_addr).unwrap();
@@ -130,29 +158,27 @@ mod test {
                 )
                 .unwrap();
             // Space things out slightly to try to avoid dropped packets
-            thread::sleep(Duration::from_millis(10));
+            delay_for(Duration::from_millis(10)).await;
         }
 
         // Give packets some time to flow through
-        thread::sleep(Duration::from_millis(100));
+        delay_for(Duration::from_millis(100)).await;
 
         let client = hyper::Client::new();
-        let response = block_on(
-            client
-                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
-                .compat(),
-        )
-        .unwrap();
+        let response = client
+            .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+            .await
+            .unwrap();
         assert!(response.status().is_success());
 
-        let body = block_on(
-            response
-                .into_body()
-                .compat()
-                .map(|bytes| bytes.to_vec())
-                .concat2(),
-        )
-        .unwrap();
+        let body = response
+            .into_body()
+            .compat()
+            .map(|bytes| bytes.to_vec())
+            .concat2()
+            .compat()
+            .await
+            .unwrap();
         let lines = std::str::from_utf8(&body)
             .unwrap()
             .lines()
@@ -185,30 +211,28 @@ mod test {
         assert_eq!(milliglork_count * 3, milliglork_sum);
 
         // Set test
-        // Flush could have occured
+        // Flush could have occurred
         assert!(parse_count(&lines, "vector_set") <= 2);
 
         // Flush test
         {
             // Wait for flush to happen
-            thread::sleep(Duration::from_millis(2000));
+            delay_for(Duration::from_millis(2000)).await;
 
-            let response = block_on(
-                client
-                    .get(format!("http://{}/metrics", out_addr).parse().unwrap())
-                    .compat(),
-            )
-            .unwrap();
+            let response = client
+                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+                .await
+                .unwrap();
             assert!(response.status().is_success());
 
-            let body = block_on(
-                response
-                    .into_body()
-                    .compat()
-                    .map(|bytes| bytes.to_vec())
-                    .concat2(),
-            )
-            .unwrap();
+            let body = response
+                .into_body()
+                .compat()
+                .map(|bytes| bytes.to_vec())
+                .concat2()
+                .compat()
+                .await
+                .unwrap();
             let lines = std::str::from_utf8(&body)
                 .unwrap()
                 .lines()
@@ -217,30 +241,28 @@ mod test {
             // Check rested
             assert_eq!(parse_count(&lines, "vector_set"), 0);
 
-            // Recheck that set is also reseted------------
+            // Re-check that set is also reset------------
 
             socket.send_to(b"set:0|s\nset:1|s\n", &in_addr).unwrap();
             // Space things out slightly to try to avoid dropped packets
-            thread::sleep(Duration::from_millis(10));
+            delay_for(Duration::from_millis(10)).await;
             // Give packets some time to flow through
-            thread::sleep(Duration::from_millis(100));
+            delay_for(Duration::from_millis(100)).await;
 
-            let response = block_on(
-                client
-                    .get(format!("http://{}/metrics", out_addr).parse().unwrap())
-                    .compat(),
-            )
-            .unwrap();
+            let response = client
+                .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+                .await
+                .unwrap();
             assert!(response.status().is_success());
 
-            let body = block_on(
-                response
-                    .into_body()
-                    .compat()
-                    .map(|bytes| bytes.to_vec())
-                    .concat2(),
-            )
-            .unwrap();
+            let body = response
+                .into_body()
+                .compat()
+                .map(|bytes| bytes.to_vec())
+                .concat2()
+                .compat()
+                .await
+                .unwrap();
             let lines = std::str::from_utf8(&body)
                 .unwrap()
                 .lines()
@@ -251,7 +273,6 @@ mod test {
         }
 
         // Shut down server
-        block_on(topology.stop()).unwrap();
-        shutdown_on_idle(rt);
+        topology.stop().compat().await.unwrap();
     }
 }

@@ -1,24 +1,24 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpClient, HttpSink},
-            service2::TowerRequestConfig,
-            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer,
+            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
-        Healthcheck, RouterSink,
+        Healthcheck, VectorSink,
     },
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::Sink;
 use http::{Request, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, map};
 use snafu::Snafu;
 use std::collections::HashMap;
 use string_cache::DefaultAtom as Atom;
@@ -107,18 +107,19 @@ lazy_static! {
         .unwrap();
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let creds = self.auth.make_credentials(Scope::LoggingWrite)?;
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let creds = self.auth.make_credentials(Scope::LoggingWrite).await?;
 
-        let batch = self.batch.use_size_as_bytes()?.get_settings_or_default(
-            BatchSettings::default()
-                .bytes(bytesize::kib(5000u64))
-                .timeout(1),
-        );
+        let batch = BatchSettings::default()
+            .bytes(bytesize::kib(5000u64))
+            .timeout(1)
+            .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(cx.resolver(), tls_settings)?;
 
         let sink = StackdriverSink {
             config: self.clone(),
@@ -129,25 +130,19 @@ impl SinkConfig for StackdriverConfig {
                 .map(|key| Atom::from(key.as_str())),
         };
 
-        let healthcheck = healthcheck(
-            cx.clone(),
-            sink.clone(),
-            TlsSettings::from_options(&self.tls)?,
-        )
-        .boxed()
-        .compat();
+        let healthcheck = healthcheck(client.clone(), sink.clone()).boxed();
 
         let sink = BatchedHttpSink::new(
             sink,
             JsonArrayBuffer::new(batch.size),
             request,
             batch.timeout,
-            tls_settings,
-            &cx,
+            client,
+            cx.acker(),
         )
         .sink_map_err(|e| error!("Fatal stackdriver sink error: {}", e));
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -164,8 +159,7 @@ impl HttpSink for StackdriverSink {
     type Input = serde_json::Value;
     type Output = Vec<BoxedRawValue>;
 
-    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-        self.config.encoding.apply_rules(&mut event);
+    fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let mut log = event.into_log();
         let severity = self
             .severity_key
@@ -174,12 +168,21 @@ impl HttpSink for StackdriverSink {
             .map(remap_severity)
             .unwrap_or_else(|| 0.into());
 
-        let entry = serde_json::json!({
-            "jsonPayload": log,
-            "severity": severity,
-        });
+        let mut event = Event::Log(log);
+        self.config.encoding.apply_rules(&mut event);
 
-        Some(entry)
+        let log = event.into_log();
+
+        let mut entry = map::Map::with_capacity(3);
+        entry.insert("jsonPayload".into(), json!(log));
+        entry.insert("severity".into(), json!(severity));
+
+        // If the event contains a timestamp, send it in the main message so gcp can pick it up.
+        if let Some(timestamp) = log.get(&log_schema().timestamp_key()) {
+            entry.insert("timestamp".into(), json!(timestamp));
+        }
+
+        Some(json!(entry))
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<Request<Vec<u8>>> {
@@ -247,14 +250,9 @@ fn remap_severity(severity: Value) -> Value {
     Value::Integer(n)
 }
 
-async fn healthcheck(
-    cx: SinkContext,
-    sink: StackdriverSink,
-    tls: TlsSettings,
-) -> crate::Result<()> {
+async fn healthcheck(mut client: HttpClient, sink: StackdriverSink) -> crate::Result<()> {
     let request = sink.build_request(vec![]).await?.map(Body::from);
 
-    let mut client = HttpClient::new(cx.resolver(), tls)?;
     let response = client.send(request).await?;
     healthcheck_response(sink.creds.clone(), HealthcheckError::NotFound.into())(response)
 }
@@ -274,10 +272,8 @@ impl StackdriverConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        event::{LogEvent, Value},
-        test_util::runtime,
-    };
+    use crate::event::{LogEvent, Value};
+    use chrono::{TimeZone, Utc};
     use serde_json::value::RawValue;
     use std::iter::FromIterator;
 
@@ -289,6 +285,7 @@ mod tests {
            log_id = "testlogs"
            resource.type = "generic_node"
            resource.namespace = "office"
+           encoding.except_fields = ["anumber"]
         "#,
         )
         .unwrap();
@@ -309,6 +306,40 @@ mod tests {
         assert_eq!(
             body,
             "{\"jsonPayload\":{\"message\":\"hello world\"},\"severity\":100}"
+        );
+    }
+
+    #[test]
+    fn encode_inserts_timestamp() {
+        let config: StackdriverConfig = toml::from_str(
+            r#"
+           project_id = "project"
+           log_id = "testlogs"
+           resource.type = "generic_node"
+           resource.namespace = "office"
+        "#,
+        )
+        .unwrap();
+
+        let sink = StackdriverSink {
+            config,
+            creds: None,
+            severity_key: Some("anumber".into()),
+        };
+
+        let mut log = LogEvent::default();
+        log.insert("message", Value::Bytes("hello world".into()));
+        log.insert("anumber", Value::Bytes("100".into()));
+        log.insert(
+            "timestamp",
+            Value::Timestamp(Utc.ymd(2020, 1, 1).and_hms(12, 30, 0)),
+        );
+
+        let json = sink.encode_event(Event::from(log)).unwrap();
+        let body = serde_json::to_string(&json).unwrap();
+        assert_eq!(
+            body,
+            "{\"jsonPayload\":{\"message\":\"hello world\",\"timestamp\":\"2020-01-01T12:30:00Z\"},\"severity\":100,\"timestamp\":\"2020-01-01T12:30:00Z\"}"
         );
     }
 
@@ -340,8 +371,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn correct_request() {
+    #[tokio::test]
+    async fn correct_request() {
         let config: StackdriverConfig = toml::from_str(
             r#"
            project_id = "project"
@@ -370,10 +401,7 @@ mod tests {
 
         let events = vec![raw1, raw2];
 
-        let mut rt = runtime();
-        let request = rt
-            .block_on_std(async move { sink.build_request(events).await })
-            .unwrap();
+        let request = sink.build_request(events).await.unwrap();
 
         let (parts, body) = request.into_parts();
 
@@ -411,8 +439,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn fails_missing_creds() {
+    #[tokio::test]
+    async fn fails_missing_creds() {
         let config: StackdriverConfig = toml::from_str(
             r#"
            project_id = "project"
@@ -422,7 +450,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config.build(SinkContext::new_test()).is_ok() {
+        if config.build(SinkContext::new_test()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }

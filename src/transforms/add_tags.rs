@@ -1,11 +1,12 @@
 use super::Transform;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    internal_events::{AddTagsEventProcessed, AddTagsTagNotOverwritten, AddTagsTagOverwritten},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{btree_map::Entry, BTreeMap};
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -25,9 +26,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<AddTagsConfig>("add_tags")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "add_tags")]
 impl TransformConfig for AddTagsConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(AddTags::new(self.tags.clone(), self.overwrite)))
     }
 
@@ -52,6 +54,8 @@ impl AddTags {
 
 impl Transform for AddTags {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
+        emit!(AddTagsEventProcessed);
+
         if !self.tags.is_empty() {
             let tags = &mut event.as_mut_metric().tags;
 
@@ -61,11 +65,19 @@ impl Transform for AddTags {
 
             for (name, value) in &self.tags {
                 let map = tags.as_mut().unwrap(); // initialized earlier
-                if self.overwrite {
-                    map.insert(name.to_string(), value.to_string());
-                } else {
-                    map.entry(name.to_string())
-                        .or_insert_with(|| value.to_string());
+
+                let entry = map.entry(name.to_string());
+                match (entry, self.overwrite) {
+                    (Entry::Vacant(entry), _) => {
+                        entry.insert(value.clone());
+                    }
+                    (Entry::Occupied(mut entry), true) => {
+                        emit!(AddTagsTagOverwritten { tag: name.as_ref() });
+                        entry.insert(value.clone());
+                    }
+                    (Entry::Occupied(_entry), false) => {
+                        emit!(AddTagsTagNotOverwritten { tag: name.as_ref() })
+                    }
                 }
             }
         }

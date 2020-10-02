@@ -1,8 +1,9 @@
 use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    internal_events::{SwimlanesEventDiscarded, SwimlanesEventProcessed},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -16,9 +17,10 @@ pub struct SwimlaneConfig {
     condition: AnyCondition,
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "swimlane")]
 impl TransformConfig for SwimlaneConfig {
-    fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Swimlane::new(self.condition.build()?)))
     }
 
@@ -48,8 +50,10 @@ impl Swimlane {
 impl Transform for Swimlane {
     fn transform(&mut self, event: Event) -> Option<Event> {
         if self.condition.check(&event) {
+            emit!(SwimlanesEventProcessed);
             Some(event)
         } else {
+            emit!(SwimlanesEventDiscarded);
             None
         }
     }
@@ -67,9 +71,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<SwimlanesConfig>("swimlanes")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "swimlanes")]
 impl TransformConfig for SwimlanesConfig {
-    fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Err("this transform must be expanded".into())
     }
 

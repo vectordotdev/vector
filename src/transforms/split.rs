@@ -1,7 +1,8 @@
 use super::Transform;
 use crate::{
-    event::{self, Event},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::{Event, Value},
+    internal_events::{SplitConvertFailed, SplitEventProcessed, SplitFieldMissing},
     types::{parse_check_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -23,13 +24,14 @@ inventory::submit! {
     TransformDescription::new::<SplitConfig>("split")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "split")]
 impl TransformConfig for SplitConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
             .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+            .unwrap_or(&crate::config::log_schema().message_key());
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)
             .map_err(|err| format!("{}", err))?;
@@ -101,16 +103,12 @@ impl Transform for Split {
                 .iter()
                 .zip(split(value, self.separator.clone()).into_iter())
             {
-                match conversion.convert(value.as_bytes().into()) {
+                match conversion.convert(Value::from(value.to_owned())) {
                     Ok(value) => {
                         event.as_mut_log().insert(name.clone(), value);
                     }
                     Err(error) => {
-                        debug!(
-                            message = "Could not convert types.",
-                            name = &name[..],
-                            %error
-                        );
+                        emit!(SplitConvertFailed { field: name, error });
                     }
                 }
             }
@@ -118,11 +116,10 @@ impl Transform for Split {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            debug!(
-                message = "Field does not exist.",
-                field = self.field.as_ref(),
-            );
+            emit!(SplitFieldMissing { field: &self.field });
         };
+
+        emit!(SplitEventProcessed);
 
         Some(event)
     }
@@ -143,7 +140,7 @@ mod tests {
     use super::SplitConfig;
     use crate::event::{LogEvent, Value};
     use crate::{
-        topology::config::{TransformConfig, TransformContext},
+        config::{TransformConfig, TransformContext},
         Event,
     };
     use string_cache::DefaultAtom as Atom;
@@ -169,7 +166,7 @@ mod tests {
         );
     }
 
-    fn parse_log(
+    async fn parse_log(
         text: &str,
         fields: &str,
         separator: Option<String>,
@@ -188,31 +185,32 @@ mod tests {
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
         .build(TransformContext::new_test())
+        .await
         .unwrap();
 
         parser.transform(event).unwrap().into_log()
     }
 
-    #[test]
-    fn split_adds_parsed_field_to_event() {
-        let log = parse_log("1234 5678", "status time", None, None, false, &[]);
+    #[tokio::test]
+    async fn split_adds_parsed_field_to_event() {
+        let log = parse_log("1234 5678", "status time", None, None, false, &[]).await;
 
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"time".into()], "5678".into());
         assert!(log.get(&"message".into()).is_some());
     }
 
-    #[test]
-    fn split_does_drop_parsed_field() {
-        let log = parse_log("1234 5678", "status time", None, Some("message"), true, &[]);
+    #[tokio::test]
+    async fn split_does_drop_parsed_field() {
+        let log = parse_log("1234 5678", "status time", None, Some("message"), true, &[]).await;
 
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"time".into()], "5678".into());
         assert!(log.get(&"message".into()).is_none());
     }
 
-    #[test]
-    fn split_does_not_drop_same_name_parsed_field() {
+    #[tokio::test]
+    async fn split_does_not_drop_same_name_parsed_field() {
         let log = parse_log(
             "1234 yes",
             "status message",
@@ -220,14 +218,15 @@ mod tests {
             Some("message"),
             true,
             &[],
-        );
+        )
+        .await;
 
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"message".into()], "yes".into());
     }
 
-    #[test]
-    fn split_coerces_fields_to_types() {
+    #[tokio::test]
+    async fn split_coerces_fields_to_types() {
         let log = parse_log(
             "1234 yes 42.3 word",
             "code flag number rest",
@@ -235,7 +234,8 @@ mod tests {
             None,
             false,
             &[("flag", "bool"), ("code", "integer"), ("number", "float")],
-        );
+        )
+        .await;
 
         assert_eq!(log[&"number".into()], Value::Float(42.3));
         assert_eq!(log[&"flag".into()], Value::Boolean(true));
@@ -243,8 +243,8 @@ mod tests {
         assert_eq!(log[&"rest".into()], Value::Bytes("word".into()));
     }
 
-    #[test]
-    fn split_works_with_different_separator() {
+    #[tokio::test]
+    async fn split_works_with_different_separator() {
         let log = parse_log(
             "1234,foo,bar",
             "code who why",
@@ -252,7 +252,9 @@ mod tests {
             None,
             false,
             &[("code", "integer"), ("who", "string"), ("why", "string")],
-        );
+        )
+        .await;
+
         assert_eq!(log[&"code".into()], Value::Integer(1234));
         assert_eq!(log[&"who".into()], Value::Bytes("foo".into()));
         assert_eq!(log[&"why".into()], Value::Bytes("bar".into()));

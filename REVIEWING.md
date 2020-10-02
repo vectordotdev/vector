@@ -15,6 +15,10 @@ should be used for all pull requests:
 - [ ] Is there a risk of performance regressions? If so, have run the [Vector test harness](https://github.com/timberio/vector-test-harness)? (see [Performance Testing](#performance-testing))
 - [ ] Should documentation be adjusted to reflect any of these changes? (see [Documentation](#documentation))
 
+## Expectations
+
+We endeavour to review all PRs within 2 working days (Monday to Friday - broadly Eastern Time) of submission.
+
 ## Backward Compatibility
 
 All changes should strive to retain backward compatibility. If a change breaks
@@ -30,7 +34,7 @@ to ensure reviews are welcoming, open, and respectful.
 ## Code Owners
 
 Code owners should be involved in reviews that touch their code. This is
-defined in the [`.github/CODEOWNERS`](.github/CODE_OWNERS) file. Involving code
+defined in the [`.github/CODEOWNERS`](.github/CODEOWNERS) file. Involving code
 owners ensures all context is applied to reviews since they have intimate
 knowledge of the code.
 

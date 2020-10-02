@@ -1,21 +1,23 @@
 use crate::{
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::Event,
+    internal_events::GeneratorEventProcessed,
     shutdown::ShutdownSignal,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    Pipeline,
 };
 use futures::{
     compat::Future01CompatExt,
     future::{FutureExt, TryFutureExt},
     stream::StreamExt,
 };
-use futures01::{future::Future, stream::iter_ok, sync::mpsc, Sink};
+use futures01::{future::Future, stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::time::interval;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct GeneratorConfig {
+pub struct GeneratorConfig {
     #[serde(default)]
     sequence: bool,
     lines: Vec<String>,
@@ -27,11 +29,11 @@ pub(crate) struct GeneratorConfig {
 
 impl GeneratorConfig {
     #[allow(dead_code)] // to make check-component-features pass
-    #[cfg(test)]
-    pub fn repeat(lines: Vec<String>, count: usize) -> Self {
+    pub fn repeat(lines: Vec<String>, count: usize, batch_interval: Option<f64>) -> Self {
         Self {
             lines,
             count,
+            batch_interval,
             ..Self::default()
         }
     }
@@ -41,14 +43,15 @@ inventory::submit! {
     SourceDescription::new::<GeneratorConfig>("generator")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "generator")]
 impl SourceConfig for GeneratorConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         Ok(self.clone().generator(shutdown, out))
     }
@@ -63,19 +66,11 @@ impl SourceConfig for GeneratorConfig {
 }
 
 impl GeneratorConfig {
-    pub(self) fn generator(
-        self,
-        shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
-    ) -> super::Source {
+    pub(self) fn generator(self, shutdown: ShutdownSignal, out: Pipeline) -> super::Source {
         Box::new(self.inner(shutdown, out).boxed().compat())
     }
 
-    async fn inner(
-        self,
-        mut shutdown: ShutdownSignal,
-        mut out: mpsc::Sender<Event>,
-    ) -> Result<(), ()> {
+    async fn inner(self, mut shutdown: ShutdownSignal, mut out: Pipeline) -> Result<(), ()> {
         let mut batch_interval = self
             .batch_interval
             .map(|i| interval(Duration::from_secs_f64(i)));
@@ -94,6 +89,8 @@ impl GeneratorConfig {
                 .lines
                 .iter()
                 .map(|line| {
+                    emit!(GeneratorEventProcessed);
+
                     if self.sequence {
                         number += 1;
                         Event::from(&format!("{} {}", number, line)[..])
@@ -116,26 +113,30 @@ impl GeneratorConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event, shutdown::ShutdownSignal, test_util::runtime};
+    use crate::{config::log_schema, shutdown::ShutdownSignal, Pipeline};
+    use futures::compat::Future01CompatExt;
     use futures01::{stream::Stream, sync::mpsc, Async::*};
     use std::time::{Duration, Instant};
 
-    fn runit(config: &str) -> mpsc::Receiver<Event> {
-        let (tx, rx) = mpsc::channel(10);
-        let mut rt = runtime();
+    async fn runit(config: &str) -> mpsc::Receiver<Event> {
+        let (tx, rx) = Pipeline::new_test();
         let config: GeneratorConfig = toml::from_str(config).unwrap();
-        let source = config.generator(ShutdownSignal::noop(), tx);
-        rt.block_on(source).unwrap();
+        config
+            .generator(ShutdownSignal::noop(), tx)
+            .compat()
+            .await
+            .unwrap();
         rx
     }
 
-    #[test]
-    fn copies_lines() {
-        let message_key = event::log_schema().message_key();
+    #[tokio::test]
+    async fn copies_lines() {
+        let message_key = log_schema().message_key();
         let mut rx = runit(
             r#"lines = ["one", "two"]
                count = 1"#,
-        );
+        )
+        .await;
 
         for line in &["one", "two"] {
             let event = rx.poll().unwrap();
@@ -145,20 +146,21 @@ mod tests {
                     let message = log[&message_key].to_string_lossy();
                     assert_eq!(message, *line);
                 }
-                Ready(None) => panic!("premature end of input"),
-                NotReady => panic!("generator was not ready"),
+                Ready(None) => panic!("Premature end of input"),
+                NotReady => panic!("Generator was not ready"),
             }
         }
 
         assert_eq!(rx.poll().unwrap(), Ready(None));
     }
 
-    #[test]
-    fn limits_count() {
+    #[tokio::test]
+    async fn limits_count() {
         let mut rx = runit(
             r#"lines = ["one", "two"]
                count = 5"#,
-        );
+        )
+        .await;
 
         for _ in 0..10 {
             assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
@@ -166,14 +168,15 @@ mod tests {
         assert_eq!(rx.poll().unwrap(), Ready(None));
     }
 
-    #[test]
-    fn adds_sequence() {
-        let message_key = event::log_schema().message_key();
+    #[tokio::test]
+    async fn adds_sequence() {
+        let message_key = log_schema().message_key();
         let mut rx = runit(
             r#"lines = ["one", "two"]
                count = 2
                sequence = true"#,
-        );
+        )
+        .await;
 
         for line in &["1 one", "2 two", "3 one", "4 two"] {
             let event = rx.poll().unwrap();
@@ -183,22 +186,23 @@ mod tests {
                     let message = log[&message_key].to_string_lossy();
                     assert_eq!(message, *line);
                 }
-                Ready(None) => panic!("premature end of input"),
-                NotReady => panic!("generator was not ready"),
+                Ready(None) => panic!("Premature end of input"),
+                NotReady => panic!("Generator was not ready"),
             }
         }
 
         assert_eq!(rx.poll().unwrap(), Ready(None));
     }
 
-    #[test]
-    fn obeys_batch_interval() {
+    #[tokio::test]
+    async fn obeys_batch_interval() {
         let start = Instant::now();
         let mut rx = runit(
             r#"lines = ["one", "two"]
                count = 3
                batch_interval = 1.0"#,
-        );
+        )
+        .await;
 
         for _ in 0..6 {
             assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));

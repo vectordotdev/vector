@@ -1,15 +1,14 @@
 use super::{
-    retries2::{RetryAction, RetryLogic},
-    service2::{TowerBatchedSink, TowerRequestSettings},
-    sink, Batch,
+    retries::{RetryAction, RetryLogic},
+    sink, Batch, TowerBatchedSink, TowerRequestSettings,
 };
 use crate::{
+    buffers::Acker,
     dns::Resolver,
     event::Event,
     tls::{tls_connector_builder, MaybeTlsSettings},
-    topology::config::SinkContext,
 };
-use bytes05::{Buf, Bytes};
+use bytes::{Buf, Bytes};
 use futures::future::BoxFuture;
 use futures01::{Async, AsyncSink, Poll as Poll01, Sink, StartSend};
 use http::header::HeaderValue;
@@ -26,7 +25,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tower03::Service;
+use tower::Service;
 use tracing::Span;
 use tracing_futures::Instrument;
 
@@ -84,8 +83,8 @@ where
         batch: B,
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
-        tls_settings: impl Into<MaybeTlsSettings>,
-        cx: &SinkContext,
+        client: HttpClient,
+        acker: Acker,
     ) -> Self {
         Self::with_retry_logic(
             sink,
@@ -93,8 +92,8 @@ where
             HttpRetryLogic,
             request_settings,
             batch_timeout,
-            tls_settings,
-            cx,
+            client,
+            acker,
         )
     }
 }
@@ -112,8 +111,8 @@ where
         logic: L,
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
-        tls_settings: impl Into<MaybeTlsSettings>,
-        cx: &SinkContext,
+        client: HttpClient,
+        acker: Acker,
     ) -> Self {
         let sink = Arc::new(sink);
 
@@ -124,8 +123,8 @@ where
                 Box::pin(async move { sink.build_request(b).await })
             };
 
-        let svc = HttpBatchService::new(cx.resolver(), tls_settings, request_builder);
-        let inner = request_settings.batch_sink(logic, svc, batch, batch_timeout, cx.acker());
+        let svc = HttpBatchService::new(client, request_builder);
+        let inner = request_settings.batch_sink(logic, svc, batch, batch_timeout, acker);
 
         Self {
             sink,
@@ -246,14 +245,14 @@ where
                 .insert("User-Agent", self.user_agent.clone());
         }
 
-        debug!(message = "sending request.", uri = %request.uri(), method = %request.method());
+        debug!(message = "Sending request.", uri = %request.uri(), method = %request.method());
 
         let response = self.client.request(request);
 
         let fut = async move {
             let res = response.await?;
             debug!(
-                    message = "response.",
+                    message = "Response.",
                     status = ?res.status(),
                     version = ?res.version(),
             );
@@ -291,13 +290,9 @@ pub struct HttpBatchService<F, B = Vec<u8>> {
 
 impl<F, B> HttpBatchService<F, B> {
     pub fn new(
-        resolver: Resolver,
-        tls_settings: impl Into<MaybeTlsSettings>,
+        inner: HttpClient,
         request_builder: impl Fn(B) -> F + Send + Sync + 'static,
     ) -> Self {
-        let inner =
-            HttpClient::new(resolver, tls_settings).expect("Unable to initialize http client");
-
         HttpBatchService {
             inner,
             request_builder: Arc::new(Box::new(request_builder)),
@@ -336,7 +331,7 @@ impl<F, B> Clone for HttpBatchService<F, B> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
-            request_builder: self.request_builder.clone(),
+            request_builder: Arc::clone(&self.request_builder),
         }
     }
 }
@@ -362,7 +357,7 @@ impl RetryLogic for HttpRetryLogic {
         let status = response.status();
 
         match status {
-            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("Too many requests".into()),
+            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
@@ -404,13 +399,14 @@ impl Auth {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_util::runtime;
-    use bytes05::Buf;
-    use futures::future::ready;
-    use futures01::{Future, Stream};
-    use hyper::service::{make_service_fn, service_fn};
-    use hyper::{Body, Response, Server, Uri};
-    use tower03::Service;
+    use crate::test_util::next_addr;
+    use futures::{compat::Future01CompatExt, future::ready};
+    use futures01::Stream;
+    use hyper::{
+        service::{make_service_fn, service_fn},
+        {Body, Response, Server, Uri},
+    };
+    use tower::Service;
 
     #[test]
     fn util_http_retry_logic() {
@@ -431,9 +427,9 @@ mod test {
             .is_not_retryable());
     }
 
-    #[test]
-    fn util_http_it_makes_http_requests() {
-        let addr = crate::test_util::next_addr();
+    #[tokio::test]
+    async fn util_http_it_makes_http_requests() {
+        let addr = next_addr();
         let resolver = Resolver;
 
         let uri = format!("http://{}:{}/", addr.ip(), addr.port())
@@ -441,7 +437,8 @@ mod test {
             .unwrap();
 
         let request = b"hello".to_vec();
-        let mut service = HttpBatchService::new(resolver, None, move |body: Vec<u8>| {
+        let client = HttpClient::new(resolver, None).unwrap();
+        let mut service = HttpBatchService::new(client, move |body: Vec<u8>| {
             Box::pin(ready(Request::post(&uri).body(body).map_err(Into::into)))
         });
 
@@ -468,23 +465,16 @@ mod test {
             async move { Ok::<_, std::convert::Infallible>(svc) }
         });
 
-        let mut rt = runtime();
-
-        rt.spawn_std(async move {
+        tokio::spawn(async move {
             if let Err(e) = Server::bind(&addr).serve(new_service).await {
                 eprintln!("server error: {}", e);
             }
         });
 
-        rt.block_on_std(async move {
-            tokio::time::delay_for(std::time::Duration::from_millis(50)).await;
-            service.call(request).await
-        })
-        .unwrap();
+        tokio::time::delay_for(std::time::Duration::from_millis(50)).await;
+        service.call(request).await.unwrap();
 
-        let _ = rt.shutdown_now();
-
-        let (body, _rest) = rx.into_future().wait().unwrap();
+        let (body, _rest) = rx.into_future().compat().await.unwrap();
         assert_eq!(body.unwrap(), "hello");
     }
 }

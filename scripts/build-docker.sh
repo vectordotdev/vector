@@ -10,7 +10,7 @@ set -euo pipefail
 
 set -x
 
-CHANNEL="${CHANNEL:-"$(scripts/util/release-channel.sh)"}"
+CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
 VERSION="${VERSION:-"$(scripts/version.sh)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
 PUSH="${PUSH:-}"
@@ -68,12 +68,15 @@ if [[ "$CHANNEL" == "latest" ]]; then
   for VERSION_TAG in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X" latest; do
     build alpine "$VERSION_TAG"
     build debian "$VERSION_TAG"
+    build distroless-static "$VERSION_TAG"
+    build distroless-libc "$VERSION_TAG"
   done
 elif [[ "$CHANNEL" == "nightly" ]]; then
-  for VERSION_TAG in "nightly-$DATE" nightly; do
-    build alpine "$VERSION_TAG"
-    build debian "$VERSION_TAG"
-  done
+    build alpine nightly
+    build distroless-static nightly
+    build distroless-libc nightly
 elif [[ "$CHANNEL" == "test" ]]; then
   build "${BASE:-"alpine"}" "${TAG:-"test"}"
+  build "${BASE:-"distroless-libc"}" "${TAG:-"test"}"
+  build "${BASE:-"distroless-static"}" "${TAG:-"test"}"
 fi

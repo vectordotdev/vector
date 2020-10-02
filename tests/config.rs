@@ -1,9 +1,23 @@
-use vector::topology::{self, Config, ConfigDiff};
+use vector::{
+    config::{self, ConfigDiff},
+    topology,
+};
 
-fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
-    Config::load(config.as_bytes())
-        .and_then(|c| topology::builder::check_build(&c, &ConfigDiff::initial(&c)))
-        .map(|(_topology, warnings)| warnings)
+async fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
+    match config::load_from_str(config) {
+        Ok(c) => {
+            let diff = ConfigDiff::initial(&c);
+            match (
+                config::warnings(&c),
+                topology::builder::build_pieces(&c, &diff).await,
+            ) {
+                (Some(warnings), Ok(_pieces)) => Ok(warnings),
+                (None, Ok(_pieces)) => Ok(vec![]),
+                (_, Err(errors)) => Err(errors),
+            }
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[cfg(all(
@@ -11,8 +25,8 @@ fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
     feature = "transforms-sampler",
     feature = "sinks-socket"
 ))]
-#[test]
-fn happy_path() {
+#[tokio::test]
+async fn happy_path() {
     load(
         r#"
         [sources.in]
@@ -34,6 +48,7 @@ fn happy_path() {
         address = "127.0.0.1:9999"
       "#,
     )
+    .await
     .unwrap();
 
     load(
@@ -48,19 +63,20 @@ fn happy_path() {
         out = {type = "socket", mode = "tcp", inputs = ["sampler"], encoding = "text", address = "127.0.0.1:9999"}
       "#,
     )
+    .await
     .unwrap();
 }
 
-#[test]
-fn early_eof() {
-    let err = load("[sinks]\n[sin").unwrap_err();
+#[tokio::test]
+async fn early_eof() {
+    let err = load("[sinks]\n[sin").await.unwrap_err();
 
     assert_eq!(err, vec!["expected a right bracket, found eof at line 2"]);
 }
 
-#[test]
-fn bad_syntax() {
-    let err = load(r#"{{{"#).unwrap_err();
+#[tokio::test]
+async fn bad_syntax() {
+    let err = load(r#"{{{"#).await.unwrap_err();
 
     assert_eq!(
         err,
@@ -69,8 +85,8 @@ fn bad_syntax() {
 }
 
 #[cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
-#[test]
-fn missing_key() {
+#[tokio::test]
+async fn missing_key() {
     let err = load(
         r#"
         [sources.in]
@@ -83,14 +99,15 @@ fn missing_key() {
         address = "127.0.0.1:9999"
       "#,
     )
+    .await
     .unwrap_err();
 
     assert_eq!(err, vec!["missing field `mode` for key `sources.in`"]);
 }
 
 #[cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
-#[test]
-fn missing_key2() {
+#[tokio::test]
+async fn missing_key2() {
     let err = load(
         r#"
         [sources.in]
@@ -104,14 +121,15 @@ fn missing_key2() {
         address = "127.0.0.1:9999"
       "#,
     )
+    .await
     .unwrap_err();
 
     assert_eq!(err, vec!["missing field `address` for key `sources.in`"]);
 }
 
 #[cfg(feature = "sources-socket")]
-#[test]
-fn bad_type() {
+#[tokio::test]
+async fn bad_type() {
     let err = load(
         r#"
         [sources.in]
@@ -125,6 +143,7 @@ fn bad_type() {
         address = "127.0.0.1:9999"
       "#,
     )
+    .await
     .unwrap_err();
 
     assert_eq!(err.len(), 1);
@@ -140,8 +159,8 @@ fn bad_type() {
     feature = "transforms-sampler",
     feature = "sinks-socket"
 ))]
-#[test]
-fn nonexistant_input() {
+#[tokio::test]
+async fn nonexistant_input() {
     let err = load(
         r#"
         [sources.in]
@@ -163,6 +182,7 @@ fn nonexistant_input() {
         address = "127.0.0.1:9999"
       "#,
     )
+    .await
     .unwrap_err();
 
     assert_eq!(
@@ -179,8 +199,8 @@ fn nonexistant_input() {
     feature = "transforms-sampler",
     feature = "sinks-socket"
 ))]
-#[test]
-fn bad_regex() {
+#[tokio::test]
+async fn bad_regex() {
     let err = load(
         r#"
         [sources.in]
@@ -202,6 +222,7 @@ fn bad_regex() {
         address = "127.0.0.1:9999"
       "#,
     )
+    .await
     .unwrap_err();
 
     assert_eq!(err.len(), 1);
@@ -227,6 +248,7 @@ fn bad_regex() {
         address = "127.0.0.1:9999"
       "#,
     )
+    .await
     .unwrap_err();
 
     assert_eq!(err.len(), 1);
@@ -238,8 +260,8 @@ fn bad_regex() {
     feature = "transforms-regex_parser",
     feature = "sinks-socket"
 ))]
-#[test]
-fn good_regex_parser() {
+#[tokio::test]
+async fn good_regex_parser() {
     let result = load(
         r#"
         [sources.in]
@@ -262,7 +284,8 @@ fn good_regex_parser() {
         encoding = "text"
         address = "127.0.0.1:9999"
       "#,
-    );
+    )
+    .await;
 
     assert!(result.is_ok());
 }
@@ -272,8 +295,8 @@ fn good_regex_parser() {
     feature = "transforms-tokenizer",
     feature = "sinks-socket"
 ))]
-#[test]
-fn good_tokenizer() {
+#[tokio::test]
+async fn good_tokenizer() {
     let result = load(
         r#"
         [sources.in]
@@ -297,13 +320,14 @@ fn good_tokenizer() {
         encoding = "text"
         address = "127.0.0.1:9999"
       "#,
-    );
+    )
+    .await;
 
     assert!(result.is_ok());
 }
 #[cfg(all(feature = "sources-socket", feature = "sinks-aws_s3"))]
-#[test]
-fn bad_s3_region() {
+#[tokio::test]
+async fn bad_s3_region() {
     let err = load(
         r#"
         [sources.in]
@@ -351,6 +375,7 @@ fn bad_s3_region() {
         max_size = 100000
       "#,
     )
+    .await
     .unwrap_err();
 
     assert_eq!(
@@ -369,8 +394,8 @@ fn bad_s3_region() {
     feature = "transforms-sampler",
     feature = "sinks-socket"
 ))]
-#[test]
-fn warnings() {
+#[tokio::test]
+async fn warnings() {
     let warnings = load(
         r#"
         [sources.in1]
@@ -403,6 +428,7 @@ fn warnings() {
         address = "127.0.0.1:9999"
       "#,
     )
+    .await
     .unwrap();
 
     assert_eq!(
@@ -419,8 +445,8 @@ fn warnings() {
     feature = "transforms-sampler",
     feature = "sinks-socket"
 ))]
-#[test]
-fn cycle() {
+#[tokio::test]
+async fn cycle() {
     let errors = load(
         r#"
         [sources.in]
@@ -460,6 +486,7 @@ fn cycle() {
         address = "127.0.0.1:9999"
       "#,
     )
+    .await
     .unwrap_err();
 
     assert_eq!(
@@ -469,8 +496,8 @@ fn cycle() {
 }
 
 #[cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
-#[test]
-fn disabled_healthcheck() {
+#[tokio::test]
+async fn disabled_healthcheck() {
     load(
         r#"
       [sources.in]
@@ -487,12 +514,13 @@ fn disabled_healthcheck() {
       healthcheck = false
       "#,
     )
+    .await
     .unwrap();
 }
 
 #[cfg(all(feature = "sources-stdin", feature = "sinks-http"))]
-#[test]
-fn parses_sink_no_request() {
+#[tokio::test]
+async fn parses_sink_no_request() {
     load(
         r#"
         [sources.in]
@@ -505,12 +533,13 @@ fn parses_sink_no_request() {
         encoding = "json"
         "#,
     )
+    .await
     .unwrap();
 }
 
 #[cfg(all(feature = "sources-stdin", feature = "sinks-http"))]
-#[test]
-fn parses_sink_partial_request() {
+#[tokio::test]
+async fn parses_sink_partial_request() {
     load(
         r#"
         [sources.in]
@@ -526,12 +555,13 @@ fn parses_sink_partial_request() {
         in_flight_limit = 42
         "#,
     )
+    .await
     .unwrap();
 }
 
 #[cfg(all(feature = "sources-stdin", feature = "sinks-http"))]
-#[test]
-fn parses_sink_full_request() {
+#[tokio::test]
+async fn parses_sink_full_request() {
     load(
         r#"
         [sources.in]
@@ -553,12 +583,13 @@ fn parses_sink_full_request() {
         retry_initial_backoff_secs = 6
         "#,
     )
+    .await
     .unwrap();
 }
 
 #[cfg(all(feature = "sources-stdin", feature = "sinks-http"))]
-#[test]
-fn parses_sink_full_batch_bytes() {
+#[tokio::test]
+async fn parses_sink_full_batch_bytes() {
     load(
         r#"
         [sources.in]
@@ -575,12 +606,13 @@ fn parses_sink_full_batch_bytes() {
         timeout_secs = 10
         "#,
     )
+    .await
     .unwrap();
 }
 
 #[cfg(all(feature = "sources-stdin", feature = "sinks-aws_cloudwatch_logs"))]
-#[test]
-fn parses_sink_full_batch_event() {
+#[tokio::test]
+async fn parses_sink_full_batch_event() {
     load(
         r#"
         [sources.in]
@@ -599,12 +631,13 @@ fn parses_sink_full_batch_event() {
         timeout_secs = 10
         "#,
     )
+    .await
     .unwrap();
 }
 
 #[cfg(all(feature = "sources-stdin", feature = "sinks-http"))]
-#[test]
-fn parses_sink_full_auth() {
+#[tokio::test]
+async fn parses_sink_full_auth() {
     load(
         r#"
         [sources.in]
@@ -622,12 +655,13 @@ fn parses_sink_full_auth() {
         password = "password"
         "#,
     )
+    .await
     .unwrap();
 }
 
 #[cfg(all(feature = "sources-stdin", feature = "sinks-elasticsearch"))]
-#[test]
-fn parses_sink_full_es_basic_auth() {
+#[tokio::test]
+async fn parses_sink_full_es_basic_auth() {
     load(
         r#"
         [sources.in]
@@ -644,6 +678,7 @@ fn parses_sink_full_es_basic_auth() {
         password = "password"
         "#,
     )
+    .await
     .unwrap();
 }
 
@@ -652,8 +687,8 @@ fn parses_sink_full_es_basic_auth() {
     feature = "sources-stdin",
     feature = "sinks-elasticsearch"
 ))]
-#[test]
-fn parses_sink_full_es_aws() {
+#[tokio::test]
+async fn parses_sink_full_es_aws() {
     load(
         r#"
         [sources.in]
@@ -668,5 +703,46 @@ fn parses_sink_full_es_aws() {
         strategy = "aws"
         "#,
     )
+    .await
     .unwrap();
+}
+
+#[cfg(all(
+    feature = "sources-socket",
+    feature = "transforms-swimlanes",
+    feature = "sinks-socket"
+))]
+#[tokio::test]
+async fn swimlanes() {
+    let warnings = load(
+        r#"
+        [sources.in]
+        type = "socket"
+        mode = "tcp"
+        address = "127.0.0.1:1235"
+
+        [transforms.splitting_gerrys]
+        type = "swimlanes"
+        inputs = ["in"]
+
+        [transforms.splitting_gerrys.lanes.only_gerrys]
+        type = "check_fields"
+        "host.eq" = "gerry"
+
+        [transforms.splitting_gerrys.lanes.no_gerrys]
+        type = "check_fields"
+        "host.neq" = "gerry"
+
+        [sinks.out]
+        type = "socket"
+        mode = "tcp"
+        inputs = ["splitting_gerrys.only_gerrys", "splitting_gerrys.no_gerrys"]
+        encoding = "text"
+        address = "127.0.0.1:9999"
+      "#,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(0, warnings.len());
 }

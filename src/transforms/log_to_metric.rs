@@ -1,9 +1,13 @@
 use super::Transform;
 use crate::{
-    event::metric::{Metric, MetricKind, MetricValue},
-    event::{self, Value},
+    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
+    event::Value,
+    internal_events::{
+        LogToMetricEventProcessed, LogToMetricFieldNotFound, LogToMetricParseError,
+        LogToMetricRenderError, LogToMetricTemplateError,
+    },
     template::{Template, TemplateError},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
     Event,
 };
 use indexmap::IndexMap;
@@ -54,11 +58,20 @@ pub struct HistogramConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
+pub struct SummaryConfig {
+    field: Atom,
+    name: Option<Atom>,
+    tags: Option<IndexMap<Atom, String>>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum MetricConfig {
     Counter(CounterConfig),
     Histogram(HistogramConfig),
     Gauge(GaugeConfig),
     Set(SetConfig),
+    Summary(SummaryConfig),
 }
 
 fn default_increment_by_value() -> bool {
@@ -73,9 +86,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<LogToMetricConfig>("log_to_metric")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(LogToMetric::new(self.clone())))
     }
 
@@ -109,7 +123,7 @@ fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
     let template = Template::try_from(s).map_err(TransformError::TemplateError)?;
     let name = template.render(&event).map_err(|e| {
         TransformError::RenderError(format!(
-            "Keys ({:?}) do not exist on the event. Dropping event.",
+            "Keys ({:?}) do not exist on the event; dropping event.",
             e
         ))
     })?;
@@ -142,7 +156,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
     let log = event.as_log();
 
     let timestamp = log
-        .get(&event::log_schema().timestamp_key())
+        .get(&log_schema().timestamp_key())
         .and_then(Value::as_timestamp)
         .cloned();
 
@@ -193,6 +207,33 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 value: MetricValue::Distribution {
                     values: vec![value],
                     sample_rates: vec![1],
+                    statistic: StatisticKind::Histogram,
+                },
+            })
+        }
+        MetricConfig::Summary(summary) => {
+            let value = log
+                .get(&summary.field)
+                .ok_or(TransformError::FieldNotFound)?;
+            let value = value
+                .to_string_lossy()
+                .parse()
+                .map_err(|_| TransformError::ParseError("summary value"))?;
+
+            let name = summary.name.as_ref().unwrap_or(&summary.field);
+            let name = render_template(&name, &event)?;
+
+            let tags = render_tags(&summary.tags, &event);
+
+            Ok(Metric {
+                name,
+                timestamp,
+                tags,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![value],
+                    sample_rates: vec![1],
+                    statistic: StatisticKind::Summary,
                 },
             })
         }
@@ -241,6 +282,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 impl Transform for LogToMetric {
     // Only used in tests
     fn transform(&mut self, event: Event) -> Option<Event> {
+        emit!(LogToMetricEventProcessed);
         let mut output = Vec::new();
         self.transform_into(&mut output, event);
         output.pop()
@@ -252,15 +294,11 @@ impl Transform for LogToMetric {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }
-                Err(TransformError::FieldNotFound) => {}
-                Err(TransformError::ParseError(error)) => {
-                    debug!(message = "failed to parse.", %error, rate_limit_secs = 30);
-                }
-                Err(TransformError::RenderError(error)) => {
-                    debug!(message = "Unable to render.", %error, rate_limit_secs = 30);
-                }
+                Err(TransformError::FieldNotFound) => emit!(LogToMetricFieldNotFound),
+                Err(TransformError::ParseError(error)) => emit!(LogToMetricParseError { error }),
+                Err(TransformError::RenderError(error)) => emit!(LogToMetricRenderError { error }),
                 Err(TransformError::TemplateError(error)) => {
-                    debug!(message = "failed to parse.", %error, rate_limit_secs = 30);
+                    emit!(LogToMetricTemplateError { error })
                 }
             }
         }
@@ -271,8 +309,9 @@ impl Transform for LogToMetric {
 mod tests {
     use super::{LogToMetric, LogToMetricConfig};
     use crate::{
-        event::metric::{Metric, MetricKind, MetricValue},
-        event::{self, Event},
+        config::log_schema,
+        event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
+        event::Event,
         transforms::Transform,
     };
     use chrono::{offset::TimeZone, DateTime, Utc};
@@ -289,7 +328,7 @@ mod tests {
         let mut log = Event::from("i am a log");
         log.as_mut_log().insert(key, value);
         log.as_mut_log()
-            .insert(event::log_schema().timestamp_key().clone(), ts());
+            .insert(log_schema().timestamp_key().clone(), ts());
         log
     }
 
@@ -511,7 +550,7 @@ mod tests {
         let mut event = Event::from("i am a log");
         event
             .as_mut_log()
-            .insert(event::log_schema().timestamp_key().clone(), ts());
+            .insert(log_schema().timestamp_key().clone(), ts());
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
 
@@ -561,7 +600,7 @@ mod tests {
         let mut event = Event::from("i am a log");
         event
             .as_mut_log()
-            .insert(event::log_schema().timestamp_key().clone(), ts());
+            .insert(log_schema().timestamp_key().clone(), ts());
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
         event.as_mut_log().insert("host", "local");
@@ -650,6 +689,37 @@ mod tests {
                 value: MetricValue::Distribution {
                     values: vec![2.5],
                     sample_rates: vec![1],
+                    statistic: StatisticKind::Histogram
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn response_time_summary() {
+        let config = parse_config(
+            r#"
+            [[metrics]]
+            type = "summary"
+            field = "response_time"
+            "#,
+        );
+
+        let event = create_event("response_time", "2.5");
+        let mut transform = LogToMetric::new(config);
+        let metric = transform.transform(event).unwrap();
+
+        assert_eq!(
+            metric.into_metric(),
+            Metric {
+                name: "response_time".into(),
+                timestamp: Some(ts()),
+                tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![2.5],
+                    sample_rates: vec![1],
+                    statistic: StatisticKind::Summary
                 },
             }
         );

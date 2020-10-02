@@ -1,7 +1,8 @@
 use super::{BuildError, Transform};
 use crate::{
-    event::Event,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::{Event, Value},
+    internal_events::{ConcatEventProcessed, ConcatSubstringError, ConcatSubstringSourceMissing},
 };
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
@@ -21,9 +22,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<ConcatConfig>("concat")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "concat")]
 impl TransformConfig for ConcatConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let joiner: String = match self.joiner.clone() {
             None => " ".into(),
             Some(var) => var,
@@ -118,7 +120,10 @@ impl Concat {
 
 impl Transform for Concat {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
+        emit!(ConcatEventProcessed);
+
         let mut content_vec: Vec<bytes::Bytes> = Vec::new();
+
         for substring in self.items.iter() {
             if let Some(value) = event.as_log().get(&substring.source) {
                 let b = value.as_bytes();
@@ -143,36 +148,48 @@ impl Transform for Concat {
                     }
                 };
                 if start >= end {
-                    error!(
-                        "substring error on {}: start {} > end {}",
-                        substring.source, start, end
-                    );
+                    emit!(ConcatSubstringError {
+                        condition: "start >= end",
+                        source: substring.source.as_ref(),
+                        start,
+                        end,
+                        length: b.len()
+                    });
                     return None;
                 }
                 if start > b.len() {
-                    error!(
-                        "substring error on {}: start {} > len {}",
-                        substring.source,
+                    emit!(ConcatSubstringError {
+                        condition: "start > len",
+                        source: substring.source.as_ref(),
                         start,
-                        b.len()
-                    );
+                        end,
+                        length: b.len()
+                    });
                     return None;
                 }
                 if end > b.len() {
-                    error!(
-                        "substring error on {}: end {} > len {}",
-                        substring.source,
+                    emit!(ConcatSubstringError {
+                        condition: "end > len",
+                        source: substring.source.as_ref(),
+                        start,
                         end,
-                        b.len()
-                    );
+                        length: b.len()
+                    });
                     return None;
                 }
-                content_vec.push(b.slice(start, end));
+                content_vec.push(b.slice(start..end));
+            } else {
+                emit!(ConcatSubstringSourceMissing {
+                    source: substring.source.as_ref()
+                });
             }
         }
 
         let content = content_vec.join(self.joiner.as_bytes());
-        event.as_mut_log().insert(self.target.clone(), content);
+        event.as_mut_log().insert(
+            self.target.clone(),
+            Value::from(String::from_utf8_lossy(&content).to_string()),
+        );
 
         Some(event)
     }

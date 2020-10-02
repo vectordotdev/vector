@@ -1,19 +1,18 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpClient, HttpSink},
-            service2::TowerRequestConfig,
-            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer,
+            BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
-        Healthcheck, RouterSink, UriParseError,
+        Healthcheck, UriParseError, VectorSink,
     },
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::Sink;
 use http::{Request, Uri};
 use hyper::Body;
@@ -61,39 +60,40 @@ inventory::submit! {
     SinkDescription::new::<PubsubConfig>("gcp_pubsub")
 }
 
+lazy_static::lazy_static! {
+    static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
+        rate_limit_num: Some(100),
+        ..Default::default()
+    };
+}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let sink = PubsubSink::from_config(self)?;
-        let batch_settings = self.batch.use_size_as_bytes()?.get_settings_or_default(
-            BatchSettings::default()
-                .bytes(bytesize::mib(10u64))
-                .events(1000)
-                .timeout(1),
-        );
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let sink = PubsubSink::from_config(self).await?;
+        let batch_settings = BatchSettings::default()
+            .bytes(bytesize::mib(10u64))
+            .events(1000)
+            .timeout(1)
+            .parse_config(self.batch)?;
         let request_settings = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(cx.resolver(), tls_settings)?;
 
-        let healthcheck = healthcheck(
-            cx.clone(),
-            sink.uri("")?,
-            tls_settings.clone(),
-            sink.creds.clone(),
-        )
-        .boxed()
-        .compat();
+        let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.creds.clone()).boxed();
 
         let sink = BatchedHttpSink::new(
             sink,
             JsonArrayBuffer::new(batch_settings.size),
             request_settings,
             batch_settings.timeout,
-            Some(tls_settings),
-            &cx,
+            client,
+            cx.acker(),
         )
         .sink_map_err(|e| error!("Fatal gcp pubsub sink error: {}", e));
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -113,10 +113,10 @@ struct PubsubSink {
 }
 
 impl PubsubSink {
-    fn from_config(config: &PubsubConfig) -> crate::Result<Self> {
-        // We only need to load the credentials if we are not targetting an emulator.
+    async fn from_config(config: &PubsubConfig) -> crate::Result<Self> {
+        // We only need to load the credentials if we are not targeting an emulator.
         let creds = match config.emulator_host {
-            None => config.auth.make_credentials(Scope::PubSub)?,
+            None => config.auth.make_credentials(Scope::PubSub).await?,
             Some(_) => None,
         };
 
@@ -178,9 +178,8 @@ impl HttpSink for PubsubSink {
 }
 
 async fn healthcheck(
-    cx: SinkContext,
+    mut client: HttpClient,
     uri: Uri,
-    tls: TlsSettings,
     creds: Option<GcpCredentials>,
 ) -> crate::Result<()> {
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
@@ -188,7 +187,6 @@ async fn healthcheck(
         creds.apply(&mut request);
     }
 
-    let mut client = HttpClient::new(cx.resolver(), tls.clone())?;
     let response = client.send(request).await?;
     healthcheck_response(creds, HealthcheckError::TopicNotFound.into())(response)
 }
@@ -197,8 +195,8 @@ async fn healthcheck(
 mod tests {
     use super::*;
 
-    #[test]
-    fn fails_missing_creds() {
+    #[tokio::test]
+    async fn fails_missing_creds() {
         let config: PubsubConfig = toml::from_str(
             r#"
            project = "project"
@@ -206,7 +204,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config.build(SinkContext::new_test()).is_ok() {
+        if config.build(SinkContext::new_test()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }
@@ -216,9 +214,7 @@ mod tests {
 #[cfg(feature = "gcp-pubsub-integration-tests")]
 mod integration_tests {
     use super::*;
-    use crate::test_util::{random_events_with_stream, random_string, runtime, trace_init};
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
+    use crate::test_util::{random_events_with_stream, random_string, trace_init};
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
 
@@ -234,58 +230,45 @@ mod integration_tests {
         }
     }
 
-    fn config_build(topic: &str) -> (crate::sinks::RouterSink, crate::sinks::Healthcheck) {
+    async fn config_build(topic: &str) -> (VectorSink, crate::sinks::Healthcheck) {
         let cx = SinkContext::new_test();
-        config(topic).build(cx).expect("Building sink failed")
+        config(topic).build(cx).await.expect("Building sink failed")
     }
 
-    #[test]
-    fn publish_events() {
+    #[tokio::test]
+    async fn publish_events() {
         trace_init();
 
-        let mut rt = runtime();
-        rt.block_on_std(async {
-            let (topic, subscription) = create_topic_subscription().await;
-            let (sink, healthcheck) = config_build(&topic);
+        let (topic, subscription) = create_topic_subscription().await;
+        let (sink, healthcheck) = config_build(&topic).await;
 
-            healthcheck.compat().await.expect("Health check failed");
+        healthcheck.await.expect("Health check failed");
 
-            let (input, events) = random_events_with_stream(100, 100);
-            let _ = sink
-                .send_all(events)
-                .compat()
-                .await
-                .expect("Sending events failed");
+        let (input, events) = random_events_with_stream(100, 100);
+        sink.run(events).await.expect("Sending events failed");
 
-            let response = pull_messages(&subscription, 1000).await;
-            let messages = response
-                .receivedMessages
-                .as_ref()
-                .expect("Response is missing messages");
-            assert_eq!(input.len(), messages.len());
-            for i in 0..input.len() {
-                let data = messages[i].message.decode_data();
-                let data = serde_json::to_value(data).unwrap();
-                let expected = serde_json::to_value(input[i].as_log().all_fields()).unwrap();
-                assert_eq!(data, expected);
-            }
-        });
+        let response = pull_messages(&subscription, 1000).await;
+        let messages = response
+            .receivedMessages
+            .as_ref()
+            .expect("Response is missing messages");
+        assert_eq!(input.len(), messages.len());
+        for i in 0..input.len() {
+            let data = messages[i].message.decode_data();
+            let data = serde_json::to_value(data).unwrap();
+            let expected = serde_json::to_value(input[i].as_log().all_fields()).unwrap();
+            assert_eq!(data, expected);
+        }
     }
 
-    #[test]
-    fn checks_for_valid_topic() {
+    #[tokio::test]
+    async fn checks_for_valid_topic() {
         trace_init();
 
-        let mut rt = runtime();
-        rt.block_on_std(async {
-            let (topic, _subscription) = create_topic_subscription().await;
-            let topic = format!("BAD{}", topic);
-            let (_sink, healthcheck) = config_build(&topic);
-            healthcheck
-                .compat()
-                .await
-                .expect_err("Health check did not fail");
-        });
+        let (topic, _subscription) = create_topic_subscription().await;
+        let topic = format!("BAD{}", topic);
+        let (_sink, healthcheck) = config_build(&topic).await;
+        healthcheck.await.expect_err("Health check did not fail");
     }
 
     async fn create_topic_subscription() -> (String, String) {
@@ -315,7 +298,7 @@ mod integration_tests {
             .json(&json)
             .send()
             .await
-            .expect(&format!("Sending {} request to {} failed", method, url))
+            .unwrap_or_else(|_| panic!("Sending {} request to {} failed", method, url))
     }
 
     async fn pull_messages(subscription: &str, count: usize) -> PullResponse {

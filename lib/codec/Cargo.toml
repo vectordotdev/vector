@@ -5,8 +5,8 @@ authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 
 [dependencies]
-bytes = { version = "0.4.10", features = ["serde"] }
-tokio-codec = "0.1"
+bytes = "0.5"
+tokio-util = { version = "0.3.1", features = ["codec"] }
 tracing = "0.1.15"
 
 [dev-dependencies]

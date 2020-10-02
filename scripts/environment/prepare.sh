@@ -1,6 +1,7 @@
 #! /usr/bin/env bash
 set -e -o verbose
 
+rustup toolchain install "$(cat rust-toolchain)"
 rustup default "$(cat rust-toolchain)"
 rustup component add rustfmt
 rustup component add clippy
@@ -11,6 +12,9 @@ bundle update --bundler
 bundle install
 cd ..
 
-cd website
-yarn install
+cd scripts
+npm install markdownlint-cli
 cd ..
+
+pip3 install jsonschema==3.2.0
+pip3 install remarshal==0.11.2

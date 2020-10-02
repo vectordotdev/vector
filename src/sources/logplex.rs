@@ -1,16 +1,17 @@
 use crate::{
-    event::{self, Event},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    event::Event,
+    internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     shutdown::ShutdownSignal,
     sources::util::{ErrorMessage, HttpSource},
     tls::TlsConfig,
-    topology::config::{DataType, GlobalOptions, SourceConfig},
+    Pipeline,
 };
-use bytes05::Bytes;
+use bytes::{buf::BufExt, Bytes};
 use chrono::{DateTime, Utc};
-use futures01::sync::mpsc;
 use serde::{Deserialize, Serialize};
 use std::{
-    io::{BufRead, BufReader, Cursor},
+    io::{BufRead, BufReader},
     net::SocketAddr,
     str::FromStr,
 };
@@ -22,6 +23,10 @@ pub struct LogplexConfig {
     tls: Option<TlsConfig>,
 }
 
+inventory::submit! {
+    SourceDescription::new_without_default::<LogplexConfig>("logplex")
+}
+
 #[derive(Clone, Default)]
 struct LogplexSource {}
 
@@ -31,14 +36,15 @@ impl HttpSource for LogplexSource {
     }
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "logplex")]
 impl SourceConfig for LogplexConfig {
-    fn build(
+    async fn build(
         &self,
         _: &str,
         _: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let source = LogplexSource::default();
         source.run(self.address, "events", &self.tls, out, shutdown)
@@ -61,7 +67,12 @@ fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, Erro
     };
     let frame_id = get_header(&header_map, "Logplex-Frame-Id")?;
     let drain_token = get_header(&header_map, "Logplex-Drain-Token")?;
-    info!(message = "Handling logplex request", %msg_count, %frame_id, %drain_token);
+
+    emit!(HerokuLogplexRequestReceived {
+        msg_count,
+        frame_id,
+        drain_token
+    });
 
     // Deal with body
     let events = body_to_events(body);
@@ -75,8 +86,6 @@ fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, Erro
 
         if cfg!(test) {
             panic!(error_msg);
-        } else {
-            error!(message = error_msg.as_str());
         }
         return Err(header_error_message("Logplex-Msg-Count", &error_msg));
     }
@@ -102,10 +111,10 @@ fn header_error_message(name: &str, msg: &str) -> ErrorMessage {
 }
 
 fn body_to_events(body: Bytes) -> Vec<Event> {
-    let rdr = BufReader::new(Cursor::new(body));
+    let rdr = BufReader::new(body.reader());
     rdr.lines()
         .filter_map(|res| {
-            res.map_err(|error| error!(message = "Error reading request body", ?error))
+            res.map_err(|error| emit!(HerokuLogplexRequestReadError { error }))
                 .ok()
         })
         .filter(|s| !s.is_empty())
@@ -127,19 +136,20 @@ fn line_to_event(line: String) -> Event {
         let log = event.as_mut_log();
 
         if let Ok(ts) = timestamp.parse::<DateTime<Utc>>() {
-            log.insert(event::log_schema().timestamp_key().clone(), ts);
+            log.insert(log_schema().timestamp_key().clone(), ts);
         }
 
-        log.insert(event::log_schema().host_key().clone(), hostname);
+        log.insert(log_schema().host_key().clone(), hostname.to_owned());
 
-        log.insert("app_name", app_name);
-        log.insert("proc_id", proc_id);
+        log.insert("app_name", app_name.to_owned());
+        log.insert("proc_id", proc_id.to_owned());
 
         event
     } else {
         warn!(
-            message = "Line didn't match expected logplex format. Forwarding raw message.",
-            fields = parts.len()
+            message = "Line didn't match expected logplex format, so raw message is forwarded.",
+            fields = parts.len(),
+            rate_limit_secs = 10
         );
         Event::from(line)
     };
@@ -147,7 +157,7 @@ fn line_to_event(line: String) -> Event {
     // Add source type
     event
         .as_mut_log()
-        .try_insert(event::log_schema().source_type_key(), "logplex");
+        .try_insert(log_schema().source_type_key(), Bytes::from("logplex"));
 
     event
 }
@@ -157,10 +167,10 @@ mod tests {
     use super::LogplexConfig;
     use crate::shutdown::ShutdownSignal;
     use crate::{
-        event::{self, Event},
-        runtime::Runtime,
-        test_util::{self, collect_n, runtime},
-        topology::config::{GlobalOptions, SourceConfig},
+        config::{log_schema, GlobalOptions, SourceConfig},
+        event::Event,
+        test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
+        Pipeline,
     };
     use chrono::{DateTime, Utc};
     use futures::compat::Future01CompatExt;
@@ -168,11 +178,10 @@ mod tests {
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
 
-    fn source(rt: &mut Runtime) -> (mpsc::Receiver<Event>, SocketAddr) {
-        test_util::trace_init();
-        let (sender, recv) = mpsc::channel(100);
-        let address = test_util::next_addr();
-        rt.spawn(
+    async fn source() -> (mpsc::Receiver<Event>, SocketAddr) {
+        let (sender, recv) = Pipeline::new_test();
+        let address = next_addr();
+        tokio::spawn(async move {
             LogplexConfig { address, tls: None }
                 .build(
                     "default",
@@ -180,8 +189,13 @@ mod tests {
                     ShutdownSignal::noop(),
                     sender,
                 )
-                .unwrap(),
-        );
+                .await
+                .unwrap()
+                .compat()
+                .await
+                .unwrap()
+        });
+        wait_for_tcp(address).await;
         (recv, address)
     }
 
@@ -200,34 +214,33 @@ mod tests {
             .as_u16()
     }
 
-    #[test]
-    fn logplex_handles_router_log() {
+    #[tokio::test]
+    async fn logplex_handles_router_log() {
+        trace_init();
+
         let body = r#"267 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#;
 
-        let mut rt = runtime();
-        let (rx, addr) = source(&mut rt);
+        let (rx, addr) = source().await;
 
-        rt.block_on_std(async move {
-            assert_eq!(200, send(addr, body).await);
+        assert_eq!(200, send(addr, body).await);
 
-            let mut events = collect_n(rx, body.lines().count()).compat().await.unwrap();
-            let event = events.remove(0);
-            let log = event.as_log();
+        let mut events = collect_n(rx, body.lines().count()).await.unwrap();
+        let event = events.remove(0);
+        let log = event.as_log();
 
-            assert_eq!(
-                log[&event::log_schema().message_key()],
-                r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
-            );
-            assert_eq!(
-                log[&event::log_schema().timestamp_key()],
-                "2020-01-08T22:33:57.353034+00:00"
-                    .parse::<DateTime<Utc>>()
-                    .unwrap()
-                    .into()
-            );
-            assert_eq!(log[&event::log_schema().host_key()], "host".into());
-            assert_eq!(log[event::log_schema().source_type_key()], "logplex".into());
-        });
+        assert_eq!(
+            log[&log_schema().message_key()],
+            r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
+        );
+        assert_eq!(
+            log[&log_schema().timestamp_key()],
+            "2020-01-08T22:33:57.353034+00:00"
+                .parse::<DateTime<Utc>>()
+                .unwrap()
+                .into()
+        );
+        assert_eq!(log[&log_schema().host_key()], "host".into());
+        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
     }
 
     #[test]
@@ -236,19 +249,16 @@ mod tests {
         let event = super::line_to_event(body.into());
         let log = event.as_log();
 
+        assert_eq!(log[&log_schema().message_key()], "foo bar baz".into());
         assert_eq!(
-            log[&event::log_schema().message_key()],
-            "foo bar baz".into()
-        );
-        assert_eq!(
-            log[&event::log_schema().timestamp_key()],
+            log[&log_schema().timestamp_key()],
             "2020-01-08T22:33:57.353034+00:00"
                 .parse::<DateTime<Utc>>()
                 .unwrap()
                 .into()
         );
-        assert_eq!(log[&event::log_schema().host_key()], "host".into());
-        assert_eq!(log[event::log_schema().source_type_key()], "logplex".into());
+        assert_eq!(log[&log_schema().host_key()], "host".into());
+        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
     }
 
     #[test]
@@ -258,11 +268,11 @@ mod tests {
         let log = event.as_log();
 
         assert_eq!(
-            log[&event::log_schema().message_key()],
+            log[&log_schema().message_key()],
             "what am i doing here".into()
         );
-        assert!(log.get(&event::log_schema().timestamp_key()).is_some());
-        assert_eq!(log[event::log_schema().source_type_key()], "logplex".into());
+        assert!(log.get(&log_schema().timestamp_key()).is_some());
+        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
     }
 
     #[test]
@@ -271,18 +281,15 @@ mod tests {
         let event = super::line_to_event(body.into());
         let log = event.as_log();
 
+        assert_eq!(log[&log_schema().message_key()], "i'm not that long".into());
         assert_eq!(
-            log[&event::log_schema().message_key()],
-            "i'm not that long".into()
-        );
-        assert_eq!(
-            log[&event::log_schema().timestamp_key()],
+            log[&log_schema().timestamp_key()],
             "2020-01-08T22:33:57.353034+00:00"
                 .parse::<DateTime<Utc>>()
                 .unwrap()
                 .into()
         );
-        assert_eq!(log[&event::log_schema().host_key()], "host".into());
-        assert_eq!(log[event::log_schema().source_type_key()], "logplex".into());
+        assert_eq!(log[&log_schema().host_key()], "host".into());
+        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
     }
 }

@@ -1,0 +1,14 @@
+# This is a part of our skaffold setup for development.
+# Do not use in production.
+
+namespace: vector
+
+bases:
+  - distribution/kubernetes
+
+resources:
+  - skaffold/manifests/namespace.yaml
+  - skaffold/manifests/config.yaml
+
+patchesStrategicMerge:
+  - skaffold/manifests/patches/env.yaml

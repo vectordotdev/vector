@@ -1,17 +1,16 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::proto,
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    Event,
+    Event, Pipeline,
 };
 use bytes::{Bytes, BytesMut};
-use futures01::sync::mpsc;
 use prost::Message;
 use serde::{Deserialize, Serialize};
-use tokio01::codec::LengthDelimitedCodec;
+use tokio_util::codec::LengthDelimitedCodec;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -41,14 +40,15 @@ inventory::submit! {
     SourceDescription::new_without_default::<VectorConfig>("vector")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "vector")]
 impl SourceConfig for VectorConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
         let vector = VectorSource;
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
@@ -68,6 +68,7 @@ impl SourceConfig for VectorConfig {
 struct VectorSource;
 
 impl TcpSource for VectorSource {
+    type Error = std::io::Error;
     type Decoder = LengthDelimitedCodec;
 
     fn decoder(&self) -> Self::Decoder {
@@ -75,8 +76,6 @@ impl TcpSource for VectorSource {
     }
 
     fn build_event(&self, frame: BytesMut, _host: Bytes) -> Option<Event> {
-        let frame = bytes05::Bytes::copy_from_slice(&frame);
-
         let byte_size = frame.len();
         match proto::EventWrapper::decode(frame).map(Event::from) {
             Ok(event) => {
@@ -97,21 +96,22 @@ mod test {
     use super::VectorConfig;
     use crate::shutdown::ShutdownSignal;
     use crate::{
+        config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
         event::{
             metric::{MetricKind, MetricValue},
             Metric,
         },
         sinks::vector::VectorSinkConfig,
-        test_util::{next_addr, runtime, wait_for_tcp, CollectCurrent},
+        test_util::{collect_ready, next_addr, wait_for_tcp},
         tls::{TlsConfig, TlsOptions},
-        topology::config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
-        Event,
+        Event, Pipeline,
     };
-    use futures01::{stream, sync::mpsc, Future, Sink};
+    use futures::{compat::Future01CompatExt, stream};
     use std::net::SocketAddr;
+    use tokio::time::{delay_for, Duration};
 
-    fn stream_test(addr: SocketAddr, source: VectorConfig, sink: VectorSinkConfig) {
-        let (tx, rx) = mpsc::channel(100);
+    async fn stream_test(addr: SocketAddr, source: VectorConfig, sink: VectorSinkConfig) {
+        let (tx, rx) = Pipeline::new_test();
 
         let server = source
             .build(
@@ -120,13 +120,14 @@ mod test {
                 ShutdownSignal::noop(),
                 tx,
             )
-            .unwrap();
-        let mut rt = runtime();
-        rt.spawn(server);
-        wait_for_tcp(addr);
+            .await
+            .unwrap()
+            .compat();
+        tokio::spawn(server);
+        wait_for_tcp(addr).await;
 
         let cx = SinkContext::new_test();
-        let (sink, _) = sink.build(cx).unwrap();
+        let (sink, _) = sink.build(cx).await.unwrap();
 
         let events = vec![
             Event::from("test"),
@@ -146,18 +147,16 @@ mod test {
             }),
         ];
 
-        let _ = rt
-            .block_on(sink.send_all(stream::iter_ok(events.clone().into_iter())))
-            .unwrap();
+        sink.run(stream::iter(events.clone())).await.unwrap();
 
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        delay_for(Duration::from_millis(50)).await;
 
-        let (_, output) = CollectCurrent::new(rx).wait().unwrap();
+        let output = collect_ready(rx).await.unwrap();
         assert_eq!(events, output);
     }
 
-    #[test]
-    fn it_works_with_vector_sink() {
+    #[tokio::test]
+    async fn it_works_with_vector_sink() {
         let addr = next_addr();
         stream_test(
             addr,
@@ -166,11 +165,12 @@ mod test {
                 address: format!("localhost:{}", addr.port()),
                 tls: None,
             },
-        );
+        )
+        .await;
     }
 
-    #[test]
-    fn it_works_with_vector_sink_tls() {
+    #[tokio::test]
+    async fn it_works_with_vector_sink_tls() {
         let addr = next_addr();
         stream_test(
             addr,
@@ -195,6 +195,7 @@ mod test {
                     },
                 }),
             },
-        );
+        )
+        .await;
     }
 }

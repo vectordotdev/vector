@@ -41,7 +41,6 @@ write_to_description = "[Clickhouse][urls.clickhouse] via the [`HTTP` Interface]
   "_partials/fields/_request_options.toml",
   namespace: "sinks.clickhouse.options",
   common: false,
-  in_flight_limit: 5,
   rate_limit_duration_secs: 1,
   rate_limit_num: 5,
   retry_initial_backoff_secs: 1,
@@ -93,12 +92,12 @@ description = "The token to use for bearer authentication"
   }
 ) %>
 
-[sinks.clickhouse.options.host]
+[sinks.clickhouse.options.endpoint]
 type = "string"
 common = true
 examples = ["http://localhost:8123"]
 required = true
-description = "The host url of the [Clickhouse][urls.clickhouse] server."
+description = "The endpoint of the [Clickhouse][urls.clickhouse] server."
 
 [sinks.clickhouse.options.table]
 type = "string"

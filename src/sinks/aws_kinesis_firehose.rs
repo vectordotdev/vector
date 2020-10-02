@@ -1,19 +1,18 @@
 use crate::{
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
-    event::{self, Event},
+    event::Event,
     region::RegionOrEndpoint,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        retries2::RetryLogic,
+        retries::RetryLogic,
         rusoto,
-        service2::TowerRequestConfig,
         sink::Response,
-        BatchConfig, BatchSettings, Compression, VecBuffer,
+        BatchConfig, BatchSettings, Compression, EncodedLength, TowerRequestConfig, VecBuffer,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
-use bytes05::Bytes;
-use futures::{future::BoxFuture, FutureExt, TryFutureExt};
+use bytes::Bytes;
+use futures::{future::BoxFuture, FutureExt};
 use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::RusotoError;
@@ -28,7 +27,7 @@ use std::{
     fmt,
     task::{Context, Poll},
 };
-use tower03::Service;
+use tower::Service;
 use tracing_futures::Instrument;
 
 #[derive(Clone)]
@@ -71,12 +70,20 @@ inventory::submit! {
     SinkDescription::new_without_default::<KinesisFirehoseSinkConfig>("aws_kinesis_firehose")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let healthcheck = self.clone().healthcheck(cx.resolver()).boxed().compat();
-        let sink = KinesisFirehoseService::new(self.clone(), cx)?;
-        Ok((Box::new(sink), Box::new(healthcheck)))
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let client = self.create_client(cx.resolver())?;
+        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
+        let sink = KinesisFirehoseService::new(self.clone(), client, cx)?;
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -89,8 +96,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
 }
 
 impl KinesisFirehoseSinkConfig {
-    async fn healthcheck(self, resolver: Resolver) -> crate::Result<()> {
-        let client = self.create_client(resolver)?;
+    async fn healthcheck(self, client: KinesisFirehoseClient) -> crate::Result<()> {
         let stream_name = self.stream_name;
 
         let req = client.describe_delivery_stream(DescribeDeliveryStreamInput {
@@ -126,15 +132,14 @@ impl KinesisFirehoseSinkConfig {
 impl KinesisFirehoseService {
     pub fn new(
         config: KinesisFirehoseSinkConfig,
+        client: KinesisFirehoseClient,
         cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
-        let client = config.create_client(cx.resolver())?;
-
-        let batch = config
-            .batch
-            .disallow_max_bytes()?
-            .use_size_as_events()?
-            .get_settings_or_default(BatchSettings::default().events(500).timeout(1));
+        let batch = BatchSettings::default()
+            .bytes(4_000_000)
+            .events(500)
+            .timeout(1)
+            .parse_config(config.batch)?;
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
@@ -182,6 +187,13 @@ impl Service<Vec<Record>> for KinesisFirehoseService {
     }
 }
 
+impl EncodedLength for Record {
+    fn encoded_length(&self) -> usize {
+        // data is simply base64 encoded, quoted, and comma separated
+        (self.data.len() + 2) / 3 * 4 + 3
+    }
+}
+
 impl fmt::Debug for KinesisFirehoseService {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("KinesisFirehoseService")
@@ -226,7 +238,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
         Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
 
         Encoding::Text => log
-            .get(&event::log_schema().message_key())
+            .get(&crate::config::log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };
@@ -239,7 +251,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{self, Event};
+    use crate::event::Event;
     use std::collections::BTreeMap;
 
     #[test]
@@ -259,7 +271,10 @@ mod tests {
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
-        assert_eq!(map[&event::log_schema().message_key().to_string()], message);
+        assert_eq!(
+            map[&crate::config::log_schema().message_key().to_string()],
+            message
+        );
         assert_eq!(map["key"], "value".to_string());
     }
 }
@@ -269,26 +284,25 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        config::SinkContext,
         region::RegionOrEndpoint,
         sinks::{
             elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
             util::BatchConfig,
         },
-        test_util::{random_events_with_stream, random_string, runtime},
-        topology::config::SinkContext,
+        test_util::{random_events_with_stream, random_string},
     };
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
+    use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
     use rusoto_core::Region;
     use rusoto_firehose::{
         CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration, KinesisFirehose,
         KinesisFirehoseClient,
     };
     use serde_json::{json, Value};
-    use std::{thread, time::Duration};
+    use tokio::time::{delay_for, Duration};
 
-    #[test]
-    fn firehose_put_records() {
+    #[tokio::test]
+    async fn firehose_put_records() {
         let stream = gen_stream();
 
         let region = Region::Custom {
@@ -296,8 +310,7 @@ mod integration_tests {
             endpoint: "http://localhost:4573".into(),
         };
 
-        let mut rt = runtime();
-        rt.block_on_std(ensure_stream(region, stream.clone()));
+        ensure_stream(region, stream.clone()).await;
 
         let config = KinesisFirehoseSinkConfig {
             stream_name: stream.clone(),
@@ -318,49 +331,49 @@ mod integration_tests {
 
         let cx = SinkContext::new_test();
 
-        let sink = KinesisFirehoseService::new(config, cx).unwrap();
+        let client = config.create_client(cx.resolver()).unwrap();
+        let sink = KinesisFirehoseService::new(config, client, cx).unwrap();
 
         let (input, events) = random_events_with_stream(100, 100);
+        let mut events = events.map(Ok);
 
-        rt.block_on_std(async move {
-            let _ = sink.send_all(events).compat().await.unwrap();
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 
-            thread::sleep(Duration::from_secs(1));
+        delay_for(Duration::from_secs(1)).await;
 
-            let config = ElasticSearchConfig {
-                auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
-                host: "http://localhost:4571".into(),
-                index: Some(stream.clone()),
-                ..Default::default()
-            };
-            let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
+        let config = ElasticSearchConfig {
+            auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
+            endpoint: "http://localhost:4571".into(),
+            index: Some(stream.clone()),
+            ..Default::default()
+        };
+        let common = ElasticSearchCommon::parse_config(&config).expect("Config error");
 
-            let client = reqwest::Client::builder()
-                .build()
-                .expect("Could not build HTTP client");
+        let client = reqwest::Client::builder()
+            .build()
+            .expect("Could not build HTTP client");
 
-            let response = client
-                .get(&format!("{}/{}/_search", common.base_url, stream))
-                .json(&json!({
-                    "query": { "query_string": { "query": "*" } }
-                }))
-                .send()
-                .await
-                .unwrap()
-                .json::<elastic_responses::search::SearchResponse<Value>>()
-                .await
-                .unwrap();
+        let response = client
+            .get(&format!("{}/{}/_search", common.base_url, stream))
+            .json(&json!({
+                "query": { "query_string": { "query": "*" } }
+            }))
+            .send()
+            .await
+            .unwrap()
+            .json::<elastic_responses::search::SearchResponse<Value>>()
+            .await
+            .unwrap();
 
-            assert_eq!(input.len() as u64, response.total());
-            let input = input
-                .into_iter()
-                .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
-                .collect::<Vec<_>>();
-            for hit in response.into_hits() {
-                let event = hit.into_document().unwrap();
-                assert!(input.contains(&event));
-            }
-        });
+        assert_eq!(input.len() as u64, response.total());
+        let input = input
+            .into_iter()
+            .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
+            .collect::<Vec<_>>();
+        for hit in response.into_hits() {
+            let event = hit.into_document().unwrap();
+            assert!(input.contains(&event));
+        }
     }
 
     async fn ensure_stream(region: Region, delivery_stream_name: String) {

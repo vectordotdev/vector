@@ -1,31 +1,28 @@
 use crate::{
-    event::{self, Event},
+    buffers::Acker,
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
     },
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use async_trait::async_trait;
-use futures::pin_mut;
-use futures::stream::{Stream, StreamExt};
-use futures01::future;
+use futures::{
+    future,
+    stream::{BoxStream, StreamExt},
+    FutureExt,
+};
 use serde::{Deserialize, Serialize};
 use tokio::io::{self, AsyncWriteExt};
 
-use super::streaming_sink::{self, StreamingSink};
-
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Target {
+    #[derivative(Default)]
     Stdout,
     Stderr,
-}
-
-impl Default for Target {
-    fn default() -> Self {
-        Target::Stdout
-    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -47,9 +44,13 @@ inventory::submit! {
     SinkDescription::new_without_default::<ConsoleSinkConfig>("console")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let encoding = self.encoding.clone();
 
         let output: Box<dyn io::AsyncWrite + Send + Sync + Unpin> = match self.target {
@@ -57,11 +58,16 @@ impl SinkConfig for ConsoleSinkConfig {
             Target::Stderr => Box::new(io::stderr()),
         };
 
-        let sink = WriterSink { output, encoding };
-        let sink = streaming_sink::compat::adapt_to_topology(sink);
-        let sink = StreamSink::new(sink, cx.acker());
+        let sink = WriterSink {
+            acker: cx.acker(),
+            output,
+            encoding,
+        };
 
-        Ok((Box::new(sink), Box::new(future::ok(()))))
+        Ok((
+            super::VectorSink::Stream(Box::new(sink)),
+            future::ok(()).boxed(),
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -83,13 +89,16 @@ fn encode_event(
             Encoding::Json => serde_json::to_string(&log),
             Encoding::Text => {
                 let s = log
-                    .get(&event::log_schema().message_key())
+                    .get(&crate::config::log_schema().message_key())
                     .map(|v| v.to_string_lossy())
                     .unwrap_or_else(|| "".into());
                 Ok(s)
             }
         },
-        Event::Metric(metric) => serde_json::to_string(&metric),
+        Event::Metric(metric) => match encoding.codec() {
+            Encoding::Json => serde_json::to_string(&metric),
+            Encoding::Text => Ok(format!("{}", metric)),
+        },
     }
 }
 
@@ -106,21 +115,19 @@ async fn write_event_to_output(
 }
 
 struct WriterSink {
+    acker: Acker,
     output: Box<dyn io::AsyncWrite + Send + Sync + Unpin>,
     encoding: EncodingConfig<Encoding>,
 }
 
 #[async_trait]
-impl StreamingSink for WriterSink {
-    async fn run(
-        &mut self,
-        input: impl Stream<Item = Event> + Send + Sync + 'static,
-    ) -> crate::Result<()> {
-        let output = &mut self.output;
-        pin_mut!(output);
-        pin_mut!(input);
+impl StreamSink for WriterSink {
+    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
-            write_event_to_output(&mut output, event, &self.encoding).await?
+            write_event_to_output(&mut self.output, event, &self.encoding)
+                .await
+                .expect("console sink error");
+            self.acker.ack(1);
         }
         Ok(())
     }
@@ -129,7 +136,7 @@ impl StreamingSink for WriterSink {
 #[cfg(test)]
 mod test {
     use super::{encode_event, Encoding, EncodingConfig};
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use crate::event::{Event, Value};
     use chrono::{offset::TimeZone, Utc};
 
@@ -174,7 +181,7 @@ mod test {
         });
         assert_eq!(
             r#"{"name":"foos","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"Key3":"Value3","key1":"value1","key2":"value2"},"kind":"incremental","counter":{"value":100.0}}"#,
-            encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
+            encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
         );
     }
 
@@ -191,7 +198,7 @@ mod test {
         });
         assert_eq!(
             r#"{"name":"users","timestamp":null,"tags":null,"kind":"incremental","set":{"values":["bob"]}}"#,
-            encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
+            encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
         );
     }
 
@@ -205,10 +212,28 @@ mod test {
             value: MetricValue::Distribution {
                 values: vec![10.0],
                 sample_rates: vec![1],
+                statistic: StatisticKind::Histogram,
             },
         });
         assert_eq!(
-            r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","distribution":{"values":[10.0],"sample_rates":[1]}}"#,
+            r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","distribution":{"values":[10.0],"sample_rates":[1],"statistic":"histogram"}}"#,
+            encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
+        );
+    }
+
+    #[test]
+    fn encodes_metric_text() {
+        let event = Event::Metric(Metric {
+            name: "users".into(),
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Incremental,
+            value: MetricValue::Set {
+                values: vec!["bob".into()].into_iter().collect(),
+            },
+        });
+        assert_eq!(
+            "users{} + bob",
             encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
         );
     }

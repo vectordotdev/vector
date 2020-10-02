@@ -1,6 +1,7 @@
 use derivative::Derivative;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
+use std::marker::PhantomData;
 use std::time::Duration;
 
 #[derive(Debug, Snafu)]
@@ -24,6 +25,7 @@ pub struct BatchConfig {
 }
 
 impl BatchConfig {
+    // This is used internally by new_relic_logs sink, else it could be pub(super) too
     pub fn use_size_as_bytes(&self) -> Result<Self, BatchError> {
         let max_bytes = match (self.max_bytes, self.max_size) {
             (Some(_), Some(_)) => return Err(BatchError::BytesAndSize),
@@ -38,7 +40,7 @@ impl BatchConfig {
         })
     }
 
-    pub fn disallow_max_bytes(&self) -> Result<Self, BatchError> {
+    pub(super) fn disallow_max_bytes(&self) -> Result<Self, BatchError> {
         // Sinks that used `max_size` for an event count cannot count
         // bytes, so err if `max_bytes` is set.
         match self.max_bytes {
@@ -47,7 +49,7 @@ impl BatchConfig {
         }
     }
 
-    pub fn use_size_as_events(&self) -> Result<Self, BatchError> {
+    pub(super) fn use_size_as_events(&self) -> Result<Self, BatchError> {
         let max_events = match (self.max_events, self.max_size) {
             (Some(_), Some(_)) => return Err(BatchError::EventsAndSize),
             (Some(events), None) => Some(events),
@@ -61,11 +63,15 @@ impl BatchConfig {
         })
     }
 
-    pub fn get_settings_or_default(&self, defaults: BatchSettings) -> BatchSettings {
+    pub(super) fn get_settings_or_default<T>(
+        &self,
+        defaults: BatchSettings<T>,
+    ) -> BatchSettings<T> {
         BatchSettings {
             size: BatchSize {
                 bytes: self.max_bytes.unwrap_or(defaults.size.bytes),
                 events: self.max_events.unwrap_or(defaults.size.events),
+                ..Default::default()
             },
             timeout: self
                 .timeout_secs
@@ -75,22 +81,37 @@ impl BatchConfig {
     }
 }
 
-#[derive(Clone, Copy, Debug, Derivative)]
-#[derivative(Default)]
-pub struct BatchSize {
+#[derive(Debug, Derivative)]
+#[derivative(Clone(bound = ""))]
+#[derivative(Copy(bound = ""))]
+#[derivative(Default(bound = ""))]
+pub struct BatchSize<B> {
     #[derivative(Default(value = "usize::max_value()"))]
     pub bytes: usize,
     #[derivative(Default(value = "usize::max_value()"))]
     pub events: usize,
+    // This type marker is used to drive type inference, which allows us
+    // to call the right Batch::get_settings_defaults without explicitly
+    // naming the type in BatchSettings::parse_config.
+    _type_marker: PhantomData<B>,
 }
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct BatchSettings {
-    pub size: BatchSize,
+#[derive(Debug, Derivative)]
+#[derivative(Clone(bound = ""))]
+#[derivative(Copy(bound = ""))]
+#[derivative(Default(bound = ""))]
+pub struct BatchSettings<B> {
+    pub size: BatchSize<B>,
     pub timeout: Duration,
 }
 
-impl BatchSettings {
+impl<B: Batch> BatchSettings<B> {
+    pub fn parse_config(self, config: BatchConfig) -> Result<Self, BatchError> {
+        B::get_settings_defaults(config, self)
+    }
+}
+
+impl<B> BatchSettings<B> {
     // Fake the builder pattern
     pub const fn bytes(self, bytes: u64) -> Self {
         Self {
@@ -116,6 +137,19 @@ impl BatchSettings {
             ..self
         }
     }
+
+    // Would like to use `trait From` here, but that results in
+    // "conflicting implementations of trait"
+    pub const fn into<B2>(self) -> BatchSettings<B2> {
+        BatchSettings {
+            size: BatchSize {
+                bytes: self.size.bytes,
+                events: self.size.events,
+                _type_marker: PhantomData,
+            },
+            timeout: self.timeout,
+        }
+    }
 }
 
 pub(super) fn err_event_too_large<T>(length: usize) -> PushResult<T> {
@@ -136,9 +170,18 @@ pub enum PushResult<T> {
     Overflow(T),
 }
 
-pub trait Batch {
+pub trait Batch: Sized {
     type Input;
     type Output;
+
+    /// Turn the batch configuration into an actualized set of settings,
+    /// and deal with the proper behavior of `max_size` and if
+    /// `max_bytes` may be set. This is in the trait to ensure all batch
+    /// buffers implement it.
+    fn get_settings_defaults(
+        _config: BatchConfig,
+        _defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError>;
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input>;
     fn is_empty(&self) -> bool;
@@ -187,6 +230,13 @@ where
 {
     type Input = B::Input;
     type Output = B::Output;
+
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
+        Ok(B::get_settings_defaults(config, defaults.into())?.into())
+    }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         if self.was_full {

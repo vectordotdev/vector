@@ -29,13 +29,13 @@ pub struct VectorEventReceived {
 
 impl InternalEvent for VectorEventReceived {
     fn emit_logs(&self) {
-        trace!(message = "received one event.",);
+        trace!(message = "Received one event.",);
     }
 
     fn emit_metrics(&self) {
         counter!(
             "events_processed", 1,
-            "component_kind" => "sink",
+            "component_kind" => "source",
             "component_type" => "vector",
         );
         counter!(
@@ -53,7 +53,7 @@ pub struct VectorProtoDecodeError {
 
 impl InternalEvent for VectorProtoDecodeError {
     fn emit_logs(&self) {
-        error!(message = "failed to decode protobuf message", error = %self.error);
+        error!(message = "Failed to decode protobuf message.", error = %self.error, rate_limit_secs = 10);
     }
 
     fn emit_metrics(&self) {

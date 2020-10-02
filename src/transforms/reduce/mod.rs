@@ -1,15 +1,15 @@
 use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::discriminant::Discriminant,
     event::{Event, LogEvent},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    internal_events::{ReduceEventProcessed, ReduceStaleEventFlushed},
 };
 use async_stream::stream;
 use futures::{
     compat::{Compat, Compat01As03},
-    stream,
-    stream::StreamExt,
+    stream, StreamExt,
 };
 use futures01::Stream as Stream01;
 use indexmap::IndexMap;
@@ -48,9 +48,10 @@ inventory::submit! {
     TransformDescription::new::<ReduceConfig>("reduce")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let t = Reduce::new(self)?;
         Ok(Box::new(t))
     }
@@ -78,12 +79,11 @@ impl ReduceState {
     fn new(e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) -> Self {
         Self {
             stale_since: Instant::now(),
-            // TODO: all_fields alternative that consumes
             fields: e
-                .all_fields()
+                .into_iter()
                 .filter_map(|(k, v)| {
                     if let Some(strat) = strategies.get(&k) {
-                        match get_value_merger(v.clone(), strat) {
+                        match get_value_merger(v, strat) {
                             Ok(m) => Some((k, m)),
                             Err(err) => {
                                 warn!("failed to create merger for field '{}': {}", k, err);
@@ -91,7 +91,7 @@ impl ReduceState {
                             }
                         }
                     } else {
-                        Some((k, v.clone().into()))
+                        Some((k, v.into()))
                     }
                 })
                 .collect(),
@@ -99,12 +99,12 @@ impl ReduceState {
     }
 
     fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) {
-        for (k, v) in e.all_fields() {
+        for (k, v) in e.into_iter() {
             let strategy = strategies.get(&k);
             match self.fields.entry(k) {
                 hash_map::Entry::Vacant(entry) => {
                     if let Some(strat) = strategy {
-                        match get_value_merger(v.clone(), strat) {
+                        match get_value_merger(v, strat) {
                             Ok(m) => {
                                 entry.insert(m);
                             }
@@ -182,6 +182,7 @@ impl Reduce {
         }
         for k in &flush_discriminants {
             if let Some(t) = self.reduce_merge_states.remove(k) {
+                emit!(ReduceStaleEventFlushed);
                 output.push(Event::from(t.flush()));
             }
         }
@@ -232,6 +233,8 @@ impl Transform for Reduce {
             }
         }
 
+        emit!(ReduceEventProcessed);
+
         self.flush_into(output);
     }
 
@@ -267,7 +270,7 @@ impl Transform for Reduce {
                       me.transform_into(&mut output, event);
                       false
                     }
-                    Some(Err(())) => panic!("unexpected error reading channel"),
+                    Some(Err(())) => panic!("Unexpected error reading channel"),
                   }
                 }
             };
@@ -288,13 +291,14 @@ impl Transform for Reduce {
 mod test {
     use super::ReduceConfig;
     use crate::{
+        config::{TransformConfig, TransformContext},
         event::Value,
-        topology::config::{TransformConfig, TransformContext},
         Event,
     };
+    use serde_json::json;
 
-    #[test]
-    fn reduce_from_condition() {
+    #[tokio::test]
+    async fn reduce_from_condition() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
 identifier_fields = [ "request_id" ]
@@ -305,6 +309,7 @@ identifier_fields = [ "request_id" ]
         )
         .unwrap()
         .build(TransformContext::new_test())
+        .await
         .unwrap();
 
         let mut outputs = Vec::new();
@@ -364,8 +369,8 @@ identifier_fields = [ "request_id" ]
         );
     }
 
-    #[test]
-    fn reduce_merge_strategies() {
+    #[tokio::test]
+    async fn reduce_merge_strategies() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
 identifier_fields = [ "request_id" ]
@@ -380,6 +385,7 @@ merge_strategies.baz = "max"
         )
         .unwrap()
         .build(TransformContext::new_test())
+        .await
         .unwrap();
 
         let mut outputs = Vec::new();
@@ -425,8 +431,8 @@ merge_strategies.baz = "max"
         assert_eq!(outputs.first().unwrap().as_log()[&"baz".into()], 3.into(),);
     }
 
-    #[test]
-    fn missing_identifier() {
+    #[tokio::test]
+    async fn missing_identifier() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
 identifier_fields = [ "request_id" ]
@@ -437,6 +443,7 @@ identifier_fields = [ "request_id" ]
         )
         .unwrap()
         .build(TransformContext::new_test())
+        .await
         .unwrap();
 
         let mut outputs = Vec::new();
@@ -492,6 +499,89 @@ identifier_fields = [ "request_id" ]
         assert_eq!(
             outputs.first().unwrap().as_log()[&"counter".into()],
             Value::from(7)
+        );
+    }
+
+    #[tokio::test]
+    async fn arrays() {
+        let mut reduce = toml::from_str::<ReduceConfig>(
+            r#"
+identifier_fields = [ "request_id" ]
+
+merge_strategies.foo = "array"
+merge_strategies.bar = "concat"
+
+[ends_when]
+  "test_end.exists" = true
+"#,
+        )
+        .unwrap()
+        .build(TransformContext::new_test())
+        .await
+        .unwrap();
+
+        let mut outputs = Vec::new();
+
+        let mut e = Event::from("test message 1");
+        e.as_mut_log().insert("foo", json!([1, 3]));
+        e.as_mut_log().insert("bar", json!([1, 3]));
+        e.as_mut_log().insert("request_id", "1");
+        reduce.transform_into(&mut outputs, e);
+
+        let mut e = Event::from("test message 2");
+        e.as_mut_log().insert("foo", json!([2, 4]));
+        e.as_mut_log().insert("bar", json!([2, 4]));
+        e.as_mut_log().insert("request_id", "2");
+        reduce.transform_into(&mut outputs, e);
+
+        let mut e = Event::from("test message 3");
+        e.as_mut_log().insert("foo", json!([5, 7]));
+        e.as_mut_log().insert("bar", json!([5, 7]));
+        e.as_mut_log().insert("request_id", "1");
+        reduce.transform_into(&mut outputs, e);
+
+        let mut e = Event::from("test message 4");
+        e.as_mut_log().insert("foo", json!("done"));
+        e.as_mut_log().insert("bar", json!("done"));
+        e.as_mut_log().insert("request_id", "1");
+        e.as_mut_log().insert("test_end", "yep");
+        reduce.transform_into(&mut outputs, e);
+
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"foo".into()],
+            json!([[1, 3], [5, 7], "done"]).into()
+        );
+
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"bar".into()],
+            json!([1, 3, 5, 7, "done"]).into()
+        );
+
+        outputs.clear();
+
+        let mut e = Event::from("test message 5");
+        e.as_mut_log().insert("foo", json!([6, 8]));
+        e.as_mut_log().insert("bar", json!([6, 8]));
+        e.as_mut_log().insert("request_id", "2");
+        reduce.transform_into(&mut outputs, e);
+
+        let mut e = Event::from("test message 6");
+        e.as_mut_log().insert("foo", json!("done"));
+        e.as_mut_log().insert("bar", json!("done"));
+        e.as_mut_log().insert("request_id", "2");
+        e.as_mut_log().insert("test_end", "yep");
+        reduce.transform_into(&mut outputs, e);
+
+        assert_eq!(outputs.len(), 1);
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"foo".into()],
+            json!([[2, 4], [6, 8], "done"]).into()
+        );
+        assert_eq!(
+            outputs.first().unwrap().as_log()[&"bar".into()],
+            json!([2, 4, 6, 8, "done"]).into()
         );
     }
 }

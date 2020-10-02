@@ -1,25 +1,26 @@
 use crate::{
-    event::{self, Event},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    event::{Event, Value},
+    internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::KafkaAuthConfig,
     shutdown::ShutdownSignal,
-    stream::StreamExt,
-    topology::config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    Pipeline,
 };
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::compat::Compat;
-use futures01::{future, sync::mpsc, Future, Poll, Sink, Stream};
-use owning_ref::OwningHandle;
+use futures::{
+    compat::{Compat, Future01CompatExt},
+    FutureExt, StreamExt,
+};
+use futures01::Sink;
 use rdkafka::{
     config::ClientConfig,
-    consumer::{Consumer, DefaultConsumerContext, MessageStream, StreamConsumer},
-    error::KafkaError,
-    message::{BorrowedMessage, Message},
+    consumer::{Consumer, StreamConsumer},
+    message::Message,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{collections::HashMap, sync::Arc};
-use tokio::task::block_in_place;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -75,16 +76,17 @@ inventory::submit! {
     SourceDescription::new_without_default::<KafkaSourceConfig>("kafka")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "kafka")]
 impl SourceConfig for KafkaSourceConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
-        out: mpsc::Sender<Event>,
+        out: Pipeline,
     ) -> crate::Result<super::Source> {
-        kafka_source(self.clone(), shutdown, out)
+        kafka_source(self, shutdown, out)
     }
 
     fn output_type(&self) -> DataType {
@@ -97,78 +99,100 @@ impl SourceConfig for KafkaSourceConfig {
 }
 
 fn kafka_source(
-    config: KafkaSourceConfig,
+    config: &KafkaSourceConfig,
     shutdown: ShutdownSignal,
-    out: mpsc::Sender<Event>,
+    out: Pipeline,
 ) -> crate::Result<super::Source> {
-    let consumer = Arc::new(create_consumer(config.clone())?);
-    let source = future::lazy(move || {
-        let consumer_ref = Arc::clone(&consumer);
+    let key_field = config.key_field.clone();
+    let consumer = Arc::new(create_consumer(config)?);
 
-        // See https://github.com/fede1024/rust-rdkafka/issues/85#issuecomment-439141656
-        let stream = OwnedConsumerStream {
-            upstream: OwningHandle::new_with_fn(consumer.clone(), |c| {
-                let cf = unsafe { &*c };
-                Box::new(Compat::new(cf.start()))
-            }),
-        };
-
-        stream
-            .take_until(shutdown.map(move |_| block_in_place(|| consumer.stop())))
+    let fut = async move {
+        Arc::clone(&consumer)
+            .start()
+            .take_until(shutdown.clone().compat())
             .then(move |message| {
-                match message {
-                    Err(e) => Err(error!(message = "Error reading message from Kafka", error = ?e)),
-                    Ok(msg) => {
-                        let payload = match msg.payload_view::<[u8]>() {
-                            None => return Err(()), // skip messages with empty payload
-                            Some(Err(e)) => {
-                                return Err(error!(message = "Cannot extract payload", error = ?e))
-                            }
-                            Some(Ok(payload)) => Bytes::from(payload),
-                        };
-                        let mut event = Event::new_empty_log();
-                        let log = event.as_mut_log();
+                let key_field = key_field.clone();
+                let consumer = Arc::clone(&consumer);
 
-                        log.insert(event::log_schema().message_key().clone(), payload);
-
-                        // Extract timestamp from kafka message
-                        let timestamp = msg
-                            .timestamp()
-                            .to_millis()
-                            .and_then(|millis| Utc.timestamp_millis_opt(millis).latest())
-                            .unwrap_or_else(Utc::now);
-                        log.insert(event::log_schema().timestamp_key().clone(), timestamp);
-
-                        // Add source type
-                        log.insert(event::log_schema().source_type_key(), "kafka");
-
-                        if let Some(key_field) = &config.key_field {
-                            match msg.key_view::<[u8]>() {
-                                None => (),
-                                Some(Err(e)) => {
-                                    return Err(error!(message = "Cannot extract key", error = ?e))
-                                }
-                                Some(Ok(key)) => {
-                                    log.insert(key_field.clone(), key);
-                                }
-                            }
+                async move {
+                    match message {
+                        Err(error) => {
+                            emit!(KafkaEventFailed { error });
+                            Err(())
                         }
+                        Ok(msg) => {
+                            emit!(KafkaEventReceived {
+                                byte_size: msg.payload_len()
+                            });
 
-                        consumer_ref.store_offset(&msg).map_err(
-                            |e| error!(message = "Cannot store offset for the message", error = ?e),
-                        )?;
-                        Ok(event)
+                            let payload = match msg.payload() {
+                                None => return Err(()), // skip messages with empty payload
+                                Some(payload) => payload,
+                            };
+                            let mut event = Event::new_empty_log();
+                            let log = event.as_mut_log();
+
+                            log.insert(
+                                log_schema().message_key().clone(),
+                                Value::from(Bytes::from(payload.to_owned())),
+                            );
+
+                            // Extract timestamp from kafka message
+                            let timestamp = msg
+                                .timestamp()
+                                .to_millis()
+                                .and_then(|millis| Utc.timestamp_millis_opt(millis).latest())
+                                .unwrap_or_else(Utc::now);
+                            log.insert(log_schema().timestamp_key().clone(), timestamp);
+
+                            // Add source type
+                            log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
+
+                            if let Some(key_field) = &key_field {
+                                match msg.key() {
+                                    None => (),
+                                    Some(key) => {
+                                        log.insert(
+                                            key_field.clone(),
+                                            Value::from(String::from_utf8_lossy(key).to_string()),
+                                        );
+                                    }
+                                }
+                            }
+
+                            consumer.store_offset(&msg).map_err(|error| {
+                                emit!(KafkaOffsetUpdateFailed { error });
+                            })?;
+
+                            Ok(event)
+                        }
                     }
                 }
             })
-            .forward(out.sink_map_err(|e| error!(message = "Error sending to sink", error = ?e)))
-            .map(|_| ())
-    });
+            // Try `forward` after removing old futures.
+            // Error: implementation of `futures_core::stream::Stream` is not general enough
+            // .forward(
+            //     out.sink_compat()
+            //         .sink_map_err(|e| error!(message = "Error sending to sink", error = ?e)),
+            // )
+            .for_each(|item| {
+                let out = out.clone();
+                async move {
+                    if let Ok(item) = item {
+                        if let Err(e) = out.send(item).compat().await {
+                            error!(message = "Error sending to sink", error = ?e);
+                        }
+                    }
+                }
+            })
+            .await;
+        Ok(())
+    };
 
-    Ok(Box::new(source))
+    Ok(Box::new(Compat::new(fut.boxed())))
 }
 
-fn create_consumer(config: KafkaSourceConfig) -> crate::Result<StreamConsumer> {
+fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer> {
     let mut client_config = ClientConfig::new();
     client_config
         .set("group.id", &config.group_id)
@@ -188,8 +212,8 @@ fn create_consumer(config: KafkaSourceConfig) -> crate::Result<StreamConsumer> {
 
     config.auth.apply(&mut client_config)?;
 
-    if let Some(librdkafka_options) = config.librdkafka_options {
-        for (key, value) in librdkafka_options.into_iter() {
+    if let Some(librdkafka_options) = &config.librdkafka_options {
+        for (key, value) in librdkafka_options {
             client_config.set(key.as_str(), value.as_str());
         }
     }
@@ -201,27 +225,10 @@ fn create_consumer(config: KafkaSourceConfig) -> crate::Result<StreamConsumer> {
     Ok(consumer)
 }
 
-struct OwnedConsumerStream {
-    upstream: OwningHandle<
-        Arc<StreamConsumer>,
-        Box<Compat<MessageStream<'static, DefaultConsumerContext>>>,
-    >,
-}
-
-impl Stream for OwnedConsumerStream {
-    type Item = BorrowedMessage<'static>;
-    type Error = KafkaError;
-
-    fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
-        self.upstream.poll()
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::{kafka_source, KafkaSourceConfig};
-    use crate::shutdown::ShutdownSignal;
-    use futures01::sync::mpsc;
+    use crate::{shutdown::ShutdownSignal, Pipeline};
 
     fn make_config() -> KafkaSourceConfig {
         KafkaSourceConfig {
@@ -241,7 +248,7 @@ mod test {
     #[test]
     fn kafka_source_create_ok() {
         let config = make_config();
-        assert!(kafka_source(config, ShutdownSignal::noop(), mpsc::channel(1).0).is_ok());
+        assert!(kafka_source(&config, ShutdownSignal::noop(), Pipeline::new_test().0).is_ok());
     }
 
     #[test]
@@ -250,36 +257,31 @@ mod test {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
             ..make_config()
         };
-        assert!(kafka_source(config, ShutdownSignal::noop(), mpsc::channel(1).0).is_err());
+        assert!(kafka_source(&config, ShutdownSignal::noop(), Pipeline::new_test().0).is_err());
     }
 }
 
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use super::{kafka_source, KafkaSourceConfig};
+    use super::*;
     use crate::{
-        event,
         shutdown::ShutdownSignal,
-        test_util::{collect_n, random_string, runtime},
+        test_util::{collect_n, random_string},
+        Pipeline,
     };
-    use chrono::{TimeZone, Utc};
-    use futures::compat::Compat;
-    use futures01::{sync::mpsc, Future};
+    use chrono::Utc;
+    use futures::compat::Future01CompatExt;
     use rdkafka::{
         config::ClientConfig,
         producer::{FutureProducer, FutureRecord},
+        util::Timeout,
     };
     use string_cache::DefaultAtom as Atom;
 
     const BOOTSTRAP_SERVER: &str = "localhost:9092";
 
-    fn send_event(
-        topic: &str,
-        key: &str,
-        text: &str,
-        timestamp: i64,
-    ) -> impl Future<Item = (), Error = ()> {
+    async fn send_event(topic: String, key: &str, text: &str, timestamp: i64) {
         let producer: FutureProducer = ClientConfig::new()
             .set("bootstrap.servers", BOOTSTRAP_SERVER)
             .set("produce.offset.report", "true")
@@ -287,19 +289,19 @@ mod integration_test {
             .create()
             .expect("Producer creation error");
 
-        let record = FutureRecord::to(topic)
+        let record = FutureRecord::to(&topic)
             .payload(text)
             .key(key)
             .timestamp(timestamp);
 
-        Compat::new(producer.send(record, 0))
-            .map(|_| ())
-            .map_err(|e| panic!("Cannot send event to Kafka: {:?}", e))
+        if let Err(err) = producer.send(record, Timeout::Never).await {
+            panic!("Cannot send event to Kafka: {:?}", err);
+        }
     }
 
-    #[test]
     #[ignore]
-    fn kafka_source_consume_event() {
+    #[tokio::test]
+    async fn kafka_source_consume_event() {
         let topic = format!("test-topic-{}", random_string(10));
         println!("Test topic name: {}", topic);
         let group_id = format!("test-group-{}", random_string(10));
@@ -318,21 +320,26 @@ mod integration_test {
             ..Default::default()
         };
 
-        let mut rt = runtime();
         println!("Sending event...");
-        rt.block_on(send_event(
-            &topic,
+        send_event(
+            topic.clone(),
             "my key",
             "my message",
             now.timestamp_millis(),
-        ))
-        .unwrap();
+        )
+        .await;
+
         println!("Receiving event...");
-        let (tx, rx) = mpsc::channel(1);
-        rt.spawn(kafka_source(config, ShutdownSignal::noop(), tx).unwrap());
-        let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
+        let (tx, rx) = Pipeline::new_test();
+        tokio::spawn(
+            kafka_source(&config, ShutdownSignal::noop(), tx)
+                .unwrap()
+                .compat(),
+        );
+        let events = collect_n(rx, 1).await.unwrap();
+
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[&log_schema().message_key()],
             "my message".into()
         );
         assert_eq!(
@@ -340,12 +347,9 @@ mod integration_test {
             "my key".into()
         );
         assert_eq!(
-            events[0].as_log()[event::log_schema().source_type_key()],
+            events[0].as_log()[log_schema().source_type_key()],
             "kafka".into()
         );
-        assert_eq!(
-            events[0].as_log()[event::log_schema().timestamp_key()],
-            now.into()
-        );
+        assert_eq!(events[0].as_log()[log_schema().timestamp_key()], now.into());
     }
 }

@@ -1,9 +1,9 @@
+use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::{future, Async, Future};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Instant;
 use stream_cancel::{Trigger, Tripwire};
-use tokio01::timer;
+use tokio::time::{timeout_at, Instant};
 
 /// When this struct goes out of scope and its internal refcount goes to 0 it is a signal that its
 /// corresponding Source has completed executing and may be cleaned up.  It is the responsibility
@@ -281,42 +281,35 @@ impl SourceShutdownCoordinator {
         name: String,
         deadline: Instant,
     ) -> impl Future<Item = bool, Error = ()> {
-        let success = shutdown_complete_tripwire.map(move |_| true);
-
-        let timeout = timer::Delay::new(deadline)
-            .map(move |_| {
+        async move {
+            let fut = shutdown_complete_tripwire.compat();
+            if timeout_at(deadline, fut).await.is_ok() {
+                shutdown_force_trigger.disable();
+                true
+            } else {
                 error!(
                     "Source '{}' failed to shutdown before deadline. Forcing shutdown.",
                     name,
                 );
+                shutdown_force_trigger.cancel();
                 false
-            })
-            .map_err(|err| panic!("Timer error: {:?}", err));
-
-        let union = success.select(timeout);
-        union
-            .map(|(success, _)| {
-                if success {
-                    shutdown_force_trigger.disable();
-                } else {
-                    shutdown_force_trigger.cancel();
-                }
-                success
-            })
-            .map_err(|_| ())
+            }
+        }
+        .map(Ok)
+        .boxed()
+        .compat()
     }
 }
 
 #[cfg(test)]
 mod test {
     use crate::shutdown::SourceShutdownCoordinator;
-    use crate::test_util::runtime;
+    use futures::compat::Future01CompatExt;
     use futures01::future::Future;
-    use std::time::{Duration, Instant};
+    use tokio::time::{Duration, Instant};
 
-    #[test]
-    fn shutdown_coordinator_shutdown_source_clean() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn shutdown_coordinator_shutdown_source_clean() {
         let mut shutdown = SourceShutdownCoordinator::default();
         let name = "test";
 
@@ -327,13 +320,12 @@ mod test {
 
         drop(shutdown_signal);
 
-        let success = rt.block_on(shutdown_complete).unwrap();
+        let success = shutdown_complete.compat().await.unwrap();
         assert_eq!(true, success);
     }
 
-    #[test]
-    fn shutdown_coordinator_shutdown_source_force() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn shutdown_coordinator_shutdown_source_force() {
         let mut shutdown = SourceShutdownCoordinator::default();
         let name = "test";
 
@@ -344,7 +336,7 @@ mod test {
 
         // Since we never drop the ShutdownSignal the ShutdownCoordinator assumes the Source is
         // still running and must force shutdown.
-        let success = rt.block_on(shutdown_complete).unwrap();
+        let success = shutdown_complete.compat().await.unwrap();
         assert_eq!(false, success);
         assert!(force_shutdown_tripwire.wait().is_ok());
     }

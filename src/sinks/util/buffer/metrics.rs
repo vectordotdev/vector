@@ -1,6 +1,8 @@
 use crate::event::metric::{Metric, MetricKind, MetricValue};
 use crate::event::Event;
-use crate::sinks::util::{Batch, BatchSize, PushResult};
+use crate::sinks::util::batch::{
+    Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
+};
 use std::cmp::Ordering;
 use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::{Hash, Hasher};
@@ -64,7 +66,7 @@ pub struct MetricBuffer {
 
 impl MetricBuffer {
     // Metric buffer is a data structure for creating normalised
-    // batched metrics data from the flow of datapoints.
+    // batched metrics data from the flow of data points.
     //
     // Batching mostly means that we will aggregate away timestamp information, and
     // apply metric-specific compression to improve the performance of the pipeline.
@@ -76,9 +78,9 @@ impl MetricBuffer {
     // produce absolute values gauges that are well supported by Datadog.
     //
     // Another example of normalisation is disaggregation of counters. Most sinks would expect we send
-    // them delta counters (e.g. how many events occured during the flush period). And most sources are
-    // producting exactly this kind of counters, with Prometheus being a notable exception. If the counter
-    // comes allready aggregated inside the source, the buffer will compare it's values with the previous
+    // them delta counters (e.g. how many events occurred during the flush period). And most sources are
+    // producing exactly these kind of counters, with Prometheus being a notable exception. If the counter
+    // comes already aggregated inside the source, the buffer will compare it's values with the previous
     // known and calculate the delta.
     //
     // This table will summarise how metrics are transforming inside the buffer:
@@ -97,7 +99,7 @@ impl MetricBuffer {
     //   Absolute AggregatedHistogram => Absolute AggregatedHistogram
     //   Absolute AggregatedSummary   => Absolute AggregatedSummary
     //
-    pub fn new(settings: BatchSize) -> Self {
+    pub fn new(settings: BatchSize<Self>) -> Self {
         Self::new_with_state(settings.events, HashSet::new())
     }
 
@@ -114,6 +116,16 @@ impl Batch for MetricBuffer {
     type Input = Event;
     type Output = Vec<Metric>;
 
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
+        Ok(config
+            .disallow_max_bytes()?
+            .use_size_as_events()?
+            .get_settings_or_default(defaults))
+    }
+
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         if self.num_items() >= self.max_events {
             PushResult::Overflow(item)
@@ -128,7 +140,7 @@ impl Batch for MetricBuffer {
                         ..
                     })) = self.state.get(&new)
                     {
-                        // Counters are disaggregated. We take the previoud value from the state
+                        // Counters are disaggregated. We take the previous value from the state
                         // and emit the difference between previous and current as a Counter
                         let delta = MetricEntry(Metric {
                             name: item.name.to_string(),
@@ -153,7 +165,7 @@ impl Batch for MetricBuffer {
                     }
                 }
                 MetricValue::Gauge { .. } if item.kind.is_incremental() => {
-                    let new = MetricEntry(item.clone().to_absolute());
+                    let new = MetricEntry(item.to_absolute());
                     if let Some(MetricEntry(mut existing)) = self.metrics.take(&new) {
                         existing.add(&item);
                         self.metrics.insert(MetricEntry(existing));
@@ -220,12 +232,14 @@ impl Batch for MetricBuffer {
                 if let MetricValue::Distribution {
                     values,
                     sample_rates,
+                    statistic,
                 } = metric.value
                 {
                     let compressed = compress_distribution(values, sample_rates);
                     metric.value = MetricValue::Distribution {
                         values: compressed.0,
                         sample_rates: compressed.1,
+                        statistic,
                     };
                 };
                 metric
@@ -270,20 +284,20 @@ fn compress_distribution(values: Vec<f64>, sample_rates: Vec<u32>) -> (Vec<f64>,
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::sinks::util::{BatchSink, BatchSize};
+    use crate::sinks::util::BatchSink;
     use crate::{
         buffers::Acker,
-        event::metric::{Metric, MetricValue},
-        runtime::Runtime,
-        test_util::runtime,
+        event::metric::{Metric, MetricValue, StatisticKind},
         Event,
     };
-    use futures01::{future, Future, Sink};
+    use futures::{compat::Future01CompatExt, future};
+    use futures01::Sink;
     use pretty_assertions::assert_eq;
-    use std::collections::BTreeMap;
-    use std::sync::{Arc, Mutex};
-    use std::time::Duration;
-    use tokio01_test::clock::MockClock;
+    use std::{
+        collections::BTreeMap,
+        sync::{Arc, Mutex},
+    };
+    use tokio::time::Duration;
 
     fn tag(name: &str) -> BTreeMap<String, String> {
         vec![(name.to_owned(), "true".to_owned())]
@@ -299,42 +313,31 @@ mod test {
 
     fn sink() -> (
         impl Sink<SinkItem = Event, SinkError = crate::Error>,
-        Runtime,
-        MockClock,
         Arc<Mutex<Vec<Vec<Metric>>>>,
     ) {
-        let rt = runtime();
-        let clock = MockClock::new();
-
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
-        let sent_requests1 = sent_requests.clone();
+        let sent_requests1 = Arc::clone(&sent_requests);
 
         let svc = tower::service_fn(move |req| {
-            let sent_requests = sent_requests1.clone();
-
+            let sent_requests = Arc::clone(&sent_requests1);
             sent_requests.lock().unwrap().push(req);
-
             future::ok::<_, std::io::Error>(())
         });
-        let batch_size = BatchSize {
-            bytes: 9999,
-            events: 6,
-        };
-        let buffered = BatchSink::with_executor(
+        let batch_size = BatchSettings::default().bytes(9999).events(6).size;
+        let buffered = BatchSink::new(
             svc,
             MetricBuffer::new(batch_size),
             Duration::from_secs(0),
             acker,
-            rt.executor(),
         );
 
-        (buffered, rt, clock, sent_requests)
+        (buffered, sent_requests)
     }
 
-    #[test]
-    fn metric_buffer_counters() {
-        let (sink, _rt, mut clock, sent_batches) = sink();
+    #[tokio::test]
+    async fn metric_buffer_counters() {
+        let (sink, sent_batches) = sink();
 
         let mut events = Vec::new();
         for i in 0..4 {
@@ -370,13 +373,12 @@ mod test {
             events.push(event);
         }
 
-        let (sink, _) = clock.enter(|_| {
-            sink.sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(events.into_iter()))
-                .wait()
-                .unwrap()
-        });
-        drop(sink);
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(events.into_iter()))
+            .compat()
+            .await
+            .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 
@@ -453,9 +455,9 @@ mod test {
         );
     }
 
-    #[test]
-    fn metric_buffer_aggregated_counters() {
-        let (sink, _rt, mut clock, sent_batches) = sink();
+    #[tokio::test]
+    async fn metric_buffer_aggregated_counters() {
+        let (sink, sent_batches) = sink();
 
         let mut events = Vec::new();
         for i in 0..4 {
@@ -482,13 +484,12 @@ mod test {
             events.push(event);
         }
 
-        let (sink, _) = clock.enter(|_| {
-            sink.sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(events.into_iter()))
-                .wait()
-                .unwrap()
-        });
-        drop(sink);
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(events.into_iter()))
+            .compat()
+            .await
+            .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 
@@ -530,9 +531,9 @@ mod test {
         );
     }
 
-    #[test]
-    fn metric_buffer_gauges() {
-        let (sink, _rt, mut clock, sent_batches) = sink();
+    #[tokio::test]
+    async fn metric_buffer_gauges() {
+        let (sink, sent_batches) = sink();
 
         let mut events = Vec::new();
         for i in 1..5 {
@@ -557,13 +558,12 @@ mod test {
             events.push(event);
         }
 
-        let (sink, _) = clock.enter(|_| {
-            sink.sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(events.into_iter()))
-                .wait()
-                .unwrap()
-        });
-        drop(sink);
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(events.into_iter()))
+            .compat()
+            .await
+            .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 
@@ -605,9 +605,9 @@ mod test {
         );
     }
 
-    #[test]
-    fn metric_buffer_aggregated_gauges() {
-        let (sink, _rt, mut clock, sent_batches) = sink();
+    #[tokio::test]
+    async fn metric_buffer_aggregated_gauges() {
+        let (sink, sent_batches) = sink();
 
         let mut events = Vec::new();
         for i in 3..6 {
@@ -647,13 +647,12 @@ mod test {
             events.push(event);
         }
 
-        let (sink, _) = clock.enter(|_| {
-            sink.sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(events.into_iter()))
-                .wait()
-                .unwrap()
-        });
-        drop(sink);
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(events.into_iter()))
+            .compat()
+            .await
+            .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 
@@ -702,9 +701,9 @@ mod test {
         );
     }
 
-    #[test]
-    fn metric_buffer_sets() {
-        let (sink, _rt, mut clock, sent_batches) = sink();
+    #[tokio::test]
+    async fn metric_buffer_sets() {
+        let (sink, sent_batches) = sink();
 
         let mut events = Vec::new();
         for i in 0..4 {
@@ -733,13 +732,12 @@ mod test {
             events.push(event);
         }
 
-        let (sink, _) = clock.enter(|_| {
-            sink.sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(events.into_iter()))
-                .wait()
-                .unwrap()
-        });
-        drop(sink);
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(events.into_iter()))
+            .compat()
+            .await
+            .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 
@@ -761,9 +759,9 @@ mod test {
         );
     }
 
-    #[test]
-    fn metric_buffer_distributions() {
-        let (sink, _rt, mut clock, sent_batches) = sink();
+    #[tokio::test]
+    async fn metric_buffer_distributions() {
+        let (sink, sent_batches) = sink();
 
         let mut events = Vec::new();
         for _ in 2..6 {
@@ -775,6 +773,7 @@ mod test {
                 value: MetricValue::Distribution {
                     values: vec![2.0],
                     sample_rates: vec![10],
+                    statistic: StatisticKind::Histogram,
                 },
             });
             events.push(event);
@@ -789,18 +788,18 @@ mod test {
                 value: MetricValue::Distribution {
                     values: vec![i as f64],
                     sample_rates: vec![10],
+                    statistic: StatisticKind::Histogram,
                 },
             });
             events.push(event);
         }
 
-        let (sink, _) = clock.enter(|_| {
-            sink.sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(events.into_iter()))
-                .wait()
-                .unwrap()
-        });
-        drop(sink);
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(events.into_iter()))
+            .compat()
+            .await
+            .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 
@@ -817,6 +816,7 @@ mod test {
                     value: MetricValue::Distribution {
                         values: vec![2.0],
                         sample_rates: vec![50],
+                        statistic: StatisticKind::Histogram
                     },
                 },
                 Metric {
@@ -827,6 +827,7 @@ mod test {
                     value: MetricValue::Distribution {
                         values: vec![3.0],
                         sample_rates: vec![10],
+                        statistic: StatisticKind::Histogram
                     },
                 },
                 Metric {
@@ -837,6 +838,7 @@ mod test {
                     value: MetricValue::Distribution {
                         values: vec![4.0],
                         sample_rates: vec![10],
+                        statistic: StatisticKind::Histogram
                     },
                 },
                 Metric {
@@ -847,6 +849,7 @@ mod test {
                     value: MetricValue::Distribution {
                         values: vec![5.0],
                         sample_rates: vec![10],
+                        statistic: StatisticKind::Histogram
                     }
                 },
             ]
@@ -864,9 +867,9 @@ mod test {
         );
     }
 
-    #[test]
-    fn metric_buffer_aggregated_histograms_absolute() {
-        let (sink, _rt, mut clock, sent_batches) = sink();
+    #[tokio::test]
+    async fn metric_buffer_aggregated_histograms_absolute() {
+        let (sink, sent_batches) = sink();
 
         let mut events = Vec::new();
         for _ in 2..5 {
@@ -901,13 +904,12 @@ mod test {
             events.push(event);
         }
 
-        let (sink, _) = clock.enter(|_| {
-            sink.sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(events.into_iter()))
-                .wait()
-                .unwrap()
-        });
-        drop(sink);
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(events.into_iter()))
+            .compat()
+            .await
+            .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 
@@ -956,9 +958,9 @@ mod test {
         );
     }
 
-    #[test]
-    fn metric_buffer_aggregated_histograms_incremental() {
-        let (sink, _rt, mut clock, sent_batches) = sink();
+    #[tokio::test]
+    async fn metric_buffer_aggregated_histograms_incremental() {
+        let (sink, sent_batches) = sink();
 
         let mut events = Vec::new();
         for _ in 0..3 {
@@ -993,13 +995,12 @@ mod test {
             events.push(event);
         }
 
-        let (sink, _) = clock.enter(|_| {
-            sink.sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(events.into_iter()))
-                .wait()
-                .unwrap()
-        });
-        drop(sink);
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(events.into_iter()))
+            .compat()
+            .await
+            .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 
@@ -1036,9 +1037,9 @@ mod test {
         );
     }
 
-    #[test]
-    fn metric_buffer_aggregated_summaries() {
-        let (sink, _rt, mut clock, sent_batches) = sink();
+    #[tokio::test]
+    async fn metric_buffer_aggregated_summaries() {
+        let (sink, sent_batches) = sink();
 
         let mut events = Vec::new();
         for _ in 0..10 {
@@ -1059,13 +1060,12 @@ mod test {
             }
         }
 
-        let (sink, _) = clock.enter(|_| {
-            sink.sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(events.into_iter()))
-                .wait()
-                .unwrap()
-        });
-        drop(sink);
+        let _ = sink
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(events.into_iter()))
+            .compat()
+            .await
+            .unwrap();
 
         let buffer = Arc::try_unwrap(sent_batches).unwrap().into_inner().unwrap();
 

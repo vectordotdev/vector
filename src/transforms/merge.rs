@@ -1,9 +1,9 @@
 use super::Transform;
 use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::discriminant::Discriminant,
     event::merge_state::LogEventMergeState,
     event::{self, Event},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
@@ -38,15 +38,16 @@ impl Default for MergeConfig {
     fn default() -> Self {
         Self {
             partial_event_marker_field: event::PARTIAL.clone(),
-            merge_fields: vec![event::log_schema().message_key().clone()],
+            merge_fields: vec![crate::config::log_schema().message_key().clone()],
             stream_discriminant_fields: vec![],
         }
     }
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "merge")]
 impl TransformConfig for MergeConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Merge::from(self.clone())))
     }
 
@@ -100,7 +101,7 @@ impl Transform for Merge {
         // If current event has the partial marker, consider it partial.
         // Remove the partial marker from the event and stash it.
         if event.remove(&self.partial_event_marker_field).is_some() {
-            // We got a perial event. Initialize a partial event merging state
+            // We got a partial event. Initialize a partial event merging state
             // if there's none available yet, or extend the existing one by
             // merging the incoming partial event in.
             match self.log_event_merge_states.entry(discriminant) {
@@ -119,8 +120,8 @@ impl Transform for Merge {
         }
 
         // We got non-partial event. Attempt to get a partial event merge
-        // state. If it's empty then we don't have a backlog of partail events
-        // so we just return the event as is. Otherwise we proceed to merge in
+        // state. If it's empty then we don't have a backlog of partial events
+        // so we just return the event as-is. Otherwise we proceed to merge in
         // the final non-partial event to the partial event merge state - and
         // then return the merged event.
         let log_event_merge_state = match self.log_event_merge_states.remove(&discriminant) {
@@ -150,7 +151,7 @@ mod test {
     }
 
     #[test]
-    fn merge_passthorughs_non_partial_events() {
+    fn merge_passthroughs_non_partial_events() {
         let mut merge = Merge::from(MergeConfig::default());
 
         // A non-partial event.
@@ -186,7 +187,7 @@ mod test {
         );
 
         // Merged event shouldn't contain partial event marker.
-        assert!(!merged_event.as_log().contains(&event::PARTIAL));
+        assert!(!merged_event.as_log().contains(&*event::PARTIAL));
     }
 
     #[test]
@@ -243,7 +244,7 @@ mod test {
         );
 
         // Merged events shouldn't contain partial event marker.
-        assert!(!s1_merged_event.as_log().contains(&event::PARTIAL));
-        assert!(!s2_merged_event.as_log().contains(&event::PARTIAL));
+        assert!(!s1_merged_event.as_log().contains(&*event::PARTIAL));
+        assert!(!s2_merged_event.as_log().contains(&*event::PARTIAL));
     }
 }

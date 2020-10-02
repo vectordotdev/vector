@@ -1,4 +1,5 @@
 use crate::event::{LogEvent, Value};
+use bytes::BytesMut;
 use string_cache::DefaultAtom as Atom;
 
 /// Merges all fields specified at `merge_fields` from `incoming` to `current`.
@@ -22,7 +23,12 @@ pub fn merge_log_event(current: &mut LogEvent, mut incoming: LogEvent, merge_fie
 /// Will concatenate `Bytes` and overwrite the rest value kinds.
 pub fn merge_value(current: &mut Value, incoming: Value) {
     match (current, incoming) {
-        (Value::Bytes(current), Value::Bytes(ref incoming)) => current.extend_from_slice(incoming),
+        (Value::Bytes(current_bytes), Value::Bytes(ref incoming)) => {
+            let mut bytes = BytesMut::with_capacity(current_bytes.len() + incoming.len());
+            bytes.extend_from_slice(&current_bytes[..]);
+            bytes.extend_from_slice(&incoming[..]);
+            *current_bytes = bytes.freeze();
+        }
         (current, incoming) => *current = incoming,
     }
 }
@@ -93,8 +99,8 @@ mod test {
             log.insert("merge_b", 456); // will be merged in as `456`.
             log.insert("merge_c", false); // will be merged in as `false`.
 
-            // `a` will remain as is, since it's not marked for merge and
-            // niether it is specified in the `incoming` event.
+            // `a` will remain as-is, since it's not marked for merge and
+            // neither is it specified in the `incoming` event.
             log.insert("b", 456); // `b` not marked for merge, will not change.
             log.insert("c", true); // `c` not marked for merge, will be ignored.
 

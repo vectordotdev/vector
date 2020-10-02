@@ -1,6 +1,7 @@
 use super::Transform;
 use crate::{
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    internal_events::RemoveTagsEventProcessed,
     Event,
 };
 use serde::{Deserialize, Serialize};
@@ -20,9 +21,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<RemoveTagsConfig>("remove_tags")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "remove_tags")]
 impl TransformConfig for RemoveTagsConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(RemoveTags::new(self.tags.clone())))
     }
 
@@ -47,6 +49,8 @@ impl RemoveTags {
 
 impl Transform for RemoveTags {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
+        emit!(RemoveTagsEventProcessed);
+
         let tags = &mut event.as_mut_metric().tags;
 
         if let Some(map) = tags {

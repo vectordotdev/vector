@@ -1,16 +1,10 @@
+use super::util::tokenize::parse;
 use super::Transform;
 use crate::{
-    event::{self, Event, PathComponent, PathIter},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::{Event, PathComponent, PathIter, Value},
+    internal_events::{TokenizerConvertFailed, TokenizerEventProcessed, TokenizerFieldMissing},
     types::{parse_check_conversion_map, Conversion},
-};
-use nom::{
-    branch::alt,
-    bytes::complete::{escaped, is_not, tag},
-    character::complete::{one_of, space0},
-    combinator::{all_consuming, map, opt, rest, verify},
-    multi::many0,
-    sequence::{delimited, terminated},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -30,13 +24,14 @@ inventory::submit! {
     TransformDescription::new::<TokenizerConfig>("tokenizer")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "tokenizer")]
 impl TransformConfig for TokenizerConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
             .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+            .unwrap_or(&crate::config::log_schema().message_key());
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)?;
 
@@ -65,7 +60,7 @@ impl TransformConfig for TokenizerConfig {
 }
 
 pub struct Tokenizer {
-    field_names: Vec<(String, Vec<PathComponent>, Conversion)>,
+    field_names: Vec<(Atom, Vec<PathComponent>, Conversion)>,
     field: Atom,
     drop_field: bool,
 }
@@ -82,7 +77,7 @@ impl Tokenizer {
             .map(|name| {
                 let conversion = types.get(&name).unwrap_or(&Conversion::Bytes).clone();
                 let path: Vec<PathComponent> = PathIter::new(&name).collect();
-                (name.to_string(), path, conversion)
+                (name, path, conversion)
             })
             .collect();
 
@@ -102,17 +97,12 @@ impl Transform for Tokenizer {
             for ((name, path, conversion), value) in
                 self.field_names.iter().zip(parse(value).into_iter())
             {
-                match conversion.convert(value.as_bytes().into()) {
+                match conversion.convert(Value::from(value.to_owned())) {
                     Ok(value) => {
                         event.as_mut_log().insert_path(path.clone(), value);
                     }
                     Err(error) => {
-                        debug!(
-                            message = "Could not convert types.",
-                            path = &name[..],
-                            %error,
-                            rate_limit_secs = 30
-                        );
+                        emit!(TokenizerConvertFailed { field: name, error });
                     }
                 }
             }
@@ -120,145 +110,26 @@ impl Transform for Tokenizer {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            debug!(
-                message = "Field does not exist.",
-                field = self.field.as_ref(),
-            );
+            emit!(TokenizerFieldMissing { field: &self.field });
         };
+
+        emit!(TokenizerEventProcessed);
 
         Some(event)
     }
 }
 
-pub fn parse(input: &str) -> Vec<&str> {
-    let simple = is_not::<_, _, (&str, nom::error::ErrorKind)>(" \t[\"");
-    let string = delimited(
-        tag("\""),
-        map(opt(escaped(is_not("\"\\"), '\\', one_of("\"\\"))), |o| {
-            o.unwrap_or("")
-        }),
-        tag("\""),
-    );
-    let bracket = delimited(
-        tag("["),
-        map(opt(escaped(is_not("]\\"), '\\', one_of("]\\"))), |o| {
-            o.unwrap_or("")
-        }),
-        tag("]"),
-    );
-
-    // fall back to returning the rest of the input, if any
-    let remainder = verify(rest, |s: &str| !s.is_empty());
-    let field = alt((bracket, string, simple, remainder));
-
-    all_consuming(many0(terminated(field, space0)))(input)
-        .expect("parser should always succeed")
-        .1
-}
-
 #[cfg(test)]
 mod tests {
-    use super::parse;
     use super::TokenizerConfig;
     use crate::event::{LogEvent, Value};
     use crate::{
-        topology::config::{TransformConfig, TransformContext},
+        config::{TransformConfig, TransformContext},
         Event,
     };
     use string_cache::DefaultAtom as Atom;
 
-    #[test]
-    fn basic() {
-        assert_eq!(parse("foo"), &["foo"]);
-    }
-
-    #[test]
-    fn multiple() {
-        assert_eq!(parse("foo bar"), &["foo", "bar"]);
-    }
-
-    #[test]
-    fn more_space() {
-        assert_eq!(parse("foo\t bar"), &["foo", "bar"]);
-    }
-
-    #[test]
-    fn so_much_space() {
-        assert_eq!(parse("foo  \t bar     baz"), &["foo", "bar", "baz"]);
-    }
-
-    #[test]
-    fn quotes() {
-        assert_eq!(parse(r#"foo "bar baz""#), &["foo", r#"bar baz"#]);
-    }
-
-    #[test]
-    fn empty_quotes() {
-        assert_eq!(parse(r#"foo """#), &["foo", ""]);
-    }
-
-    #[test]
-    fn escaped_quotes() {
-        assert_eq!(
-            parse(r#"foo "bar \" \" baz""#),
-            &["foo", r#"bar \" \" baz"#],
-        );
-    }
-
-    #[test]
-    fn unclosed_quotes() {
-        assert_eq!(parse(r#"foo "bar"#), &["foo", "\"bar"],);
-    }
-
-    #[test]
-    fn brackets() {
-        assert_eq!(parse("[foo.bar = baz] quux"), &["foo.bar = baz", "quux"],);
-    }
-
-    #[test]
-    fn empty_brackets() {
-        assert_eq!(parse("[] quux"), &["", "quux"],);
-    }
-
-    #[test]
-    fn escaped_brackets() {
-        assert_eq!(
-            parse(r#"[foo " [[ \] "" bar] baz"#),
-            &[r#"foo " [[ \] "" bar"#, "baz"],
-        );
-    }
-
-    #[test]
-    fn unclosed_brackets() {
-        assert_eq!(parse("foo [bar"), &["foo", "[bar"],);
-    }
-
-    #[test]
-    fn truncated_field() {
-        assert_eq!(
-            parse("foo bar[baz]: quux"),
-            &["foo", "bar", "baz", ":", "quux"]
-        );
-        assert_eq!(parse("foo bar[baz quux"), &["foo", "bar", "[baz quux"]);
-    }
-
-    #[test]
-    fn dash_field() {
-        assert_eq!(parse("foo - bar"), &["foo", "-", "bar"]);
-    }
-
-    #[test]
-    fn from_fuzzing() {
-        assert_eq!(parse("").len(), 0);
-        assert_eq!(parse("f] bar"), &["f]", "bar"]);
-        assert_eq!(parse("f\" bar"), &["f", "\" bar"]);
-        assert_eq!(parse("f[f bar"), &["f", "[f bar"]);
-        assert_eq!(parse("f\"f bar"), &["f", "\"f bar"]);
-        assert_eq!(parse("[][x"), &["", "[x"]);
-        assert_eq!(parse("x[][x"), &["x", "", "[x"]);
-    }
-
-    fn parse_log(
+    async fn parse_log(
         text: &str,
         fields: &str,
         field: Option<&str>,
@@ -275,46 +146,48 @@ mod tests {
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
         .build(TransformContext::new_test())
+        .await
         .unwrap();
 
         parser.transform(event).unwrap().into_log()
     }
 
-    #[test]
-    fn tokenizer_adds_parsed_field_to_event() {
-        let log = parse_log("1234 5678", "status time", None, false, &[]);
+    #[tokio::test]
+    async fn tokenizer_adds_parsed_field_to_event() {
+        let log = parse_log("1234 5678", "status time", None, false, &[]).await;
 
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"time".into()], "5678".into());
         assert!(log.get(&"message".into()).is_some());
     }
 
-    #[test]
-    fn tokenizer_does_drop_parsed_field() {
-        let log = parse_log("1234 5678", "status time", Some("message"), true, &[]);
+    #[tokio::test]
+    async fn tokenizer_does_drop_parsed_field() {
+        let log = parse_log("1234 5678", "status time", Some("message"), true, &[]).await;
 
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"time".into()], "5678".into());
         assert!(log.get(&"message".into()).is_none());
     }
 
-    #[test]
-    fn tokenizer_does_not_drop_same_name_parsed_field() {
-        let log = parse_log("1234 yes", "status message", Some("message"), true, &[]);
+    #[tokio::test]
+    async fn tokenizer_does_not_drop_same_name_parsed_field() {
+        let log = parse_log("1234 yes", "status message", Some("message"), true, &[]).await;
 
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"message".into()], "yes".into());
     }
 
-    #[test]
-    fn tokenizer_coerces_fields_to_types() {
+    #[tokio::test]
+    async fn tokenizer_coerces_fields_to_types() {
         let log = parse_log(
             "1234 yes 42.3 word",
             "code flag number rest",
             None,
             false,
             &[("flag", "bool"), ("code", "integer"), ("number", "float")],
-        );
+        )
+        .await;
 
         assert_eq!(log[&"number".into()], Value::Float(42.3));
         assert_eq!(log[&"flag".into()], Value::Boolean(true));
@@ -322,15 +195,16 @@ mod tests {
         assert_eq!(log[&"rest".into()], Value::Bytes("word".into()));
     }
 
-    #[test]
-    fn tokenizer_keeps_dash_as_dash() {
+    #[tokio::test]
+    async fn tokenizer_keeps_dash_as_dash() {
         let log = parse_log(
             "1234 - foo",
             "code who why",
             None,
             false,
             &[("code", "integer"), ("who", "string"), ("why", "string")],
-        );
+        )
+        .await;
         assert_eq!(log[&"code".into()], Value::Integer(1234));
         assert_eq!(log[&"who".into()], Value::Bytes("-".into()));
         assert_eq!(log[&"why".into()], Value::Bytes("foo".into()));
