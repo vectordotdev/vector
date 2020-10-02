@@ -72,9 +72,12 @@ if [[ "$CHANNEL" == "latest" ]]; then
     build distroless-libc "$VERSION_TAG"
   done
 elif [[ "$CHANNEL" == "nightly" ]]; then
-    build alpine nightly
-    build distroless-static nightly
-    build distroless-libc nightly
+  for VERSION_TAG in "nightly-$DATE" nightly; do
+    build alpine "$VERSION_TAG"
+    build debian "$VERSION_TAG"
+    build distroless-static "$VERSION_TAG"
+    build distroless-libc "$VERSION_TAG"
+  done
 elif [[ "$CHANNEL" == "test" ]]; then
   build "${BASE:-"alpine"}" "${TAG:-"test"}"
   build "${BASE:-"distroless-libc"}" "${TAG:-"test"}"
