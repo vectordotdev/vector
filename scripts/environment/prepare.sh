@@ -12,13 +12,9 @@ bundle update --bundler
 bundle install
 cd ..
 
-
-if ! [ -x "$(command -v sudo)" ]; then
-  npm -g install markdownlint-cli
-else
-  sudo npm -g install markdownlint-cli
-fi
-
+cd scripts
+npm install markdownlint-cli
+cd ..
 
 pip3 install jsonschema==3.2.0
 pip3 install remarshal==0.11.2

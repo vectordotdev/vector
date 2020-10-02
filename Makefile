@@ -59,8 +59,6 @@ export AWS_SECRET_ACCESS_KEY ?= "dummy"
 # Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
 export CI ?= false
 
-export SUDO := $(shell command -v sudo 2> /dev/null)
-
 FORMATTING_BEGIN_YELLOW = \033[0;33m
 FORMATTING_BEGIN_BLUE = \033[36m
 FORMATTING_END = \033[0m
@@ -986,10 +984,10 @@ ifeq (${CI}, true)
 ci-sweep: ## Sweep up the CI to try to get more disk space.
 	@echo "Preparing the CI for build by sweeping up disk space a bit..."
 	df -h
-	${SUDO} apt-get --purge autoremove
-	${SUDO} apt-get clean
-	${SUDO} rm -rf "/opt/*" "/usr/local/*"
-	${SUDO} rm -rf "/usr/local/share/boost" && ${SUDO} rm -rf "${AGENT_TOOLSDIRECTORY}"
+	sudo apt-get --purge autoremove
+	sudo apt-get clean
+	sudo rm -rf "/opt/*" "/usr/local/*"
+	sudo rm -rf "/usr/local/share/boost" && sudo rm -rf "${AGENT_TOOLSDIRECTORY}"
 	docker system prune --force
 	df -h
 endif

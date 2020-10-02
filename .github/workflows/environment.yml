@@ -17,16 +17,11 @@ jobs:
     env:
       ENVIRONMENT_AUTOBUILD: true
     steps:
-      - run: |
-          docker login https://docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
-          docker login -u "${{ secrets.CI_DOCKER_USERNAME }}" -p "${{ secrets.CI_DOCKER_PASSWORD }}"
+      - run: docker login https://docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/checkout@v2
       - run: make ci-sweep
       - name: prepare environment
         run: make environment-prepare
       - name: push image
         if: github.event_name != 'workflow_dispatch'
-        run: |
-          docker push $ENVIRONMENT_UPSTREAM
-          docker tag $ENVIRONMENT_UPSTREAM timberio/ci_image
-          docker push timberio/ci_image
+        run: docker push docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
