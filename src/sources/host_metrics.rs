@@ -225,7 +225,8 @@ impl HostMetricsConfig {
             Ok(times) => {
                 times
                     .filter_map(|result| filter_result(result, "Failed to load/parse CPU time"))
-                    .map(|times| {
+                    .enumerate()
+                    .map(|(index, times)| {
                         let timestamp = Utc::now();
                         let name = "cpu_seconds_total";
                         stream::iter(
@@ -234,26 +235,26 @@ impl HostMetricsConfig {
                                     name,
                                     timestamp,
                                     times.idle().get::<second>(),
-                                    tags!["mode" => "idle"],
+                                    tags!["mode" => "idle", "cpu" => index.to_string()],
                                 ),
                                 #[cfg(target_os = "linux")]
                                 self.counter(
                                     name,
                                     timestamp,
                                     times.nice().get::<second>(),
-                                    tags!["mode" => "nice"],
+                                    tags!["mode" => "nice", "cpu" => index.to_string()],
                                 ),
                                 self.counter(
                                     name,
                                     timestamp,
                                     times.system().get::<second>(),
-                                    tags!["mode" => "system"],
+                                    tags!["mode" => "system", "cpu" => index.to_string()],
                                 ),
                                 self.counter(
                                     name,
                                     timestamp,
                                     times.user().get::<second>(),
-                                    tags!["mode" => "user"],
+                                    tags!["mode" => "user", "cpu" => index.to_string()],
                                 ),
                             ]
                             .into_iter(),
