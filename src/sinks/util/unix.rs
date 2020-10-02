@@ -4,12 +4,12 @@ use crate::{
         UnixSocketConnectionEstablished, UnixSocketConnectionFailure, UnixSocketError,
         UnixSocketEventSent,
     },
-    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, StreamSink},
-    sinks::{Healthcheck, RouterSink},
+    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, StreamSinkOld},
+    sinks::{Healthcheck, VectorSink},
 };
 use bytes::Bytes;
 use futures::{compat::CompatSink, FutureExt, TryFutureExt};
-use futures01::{stream::iter_ok, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
+use futures01::{stream, try_ready, Async, AsyncSink, Future, Poll, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{path::PathBuf, time::Duration};
@@ -19,7 +19,6 @@ use tokio::{
 };
 use tokio_retry::strategy::ExponentialBackoff;
 use tokio_util::codec::{BytesCodec, FramedWrite};
-use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -33,16 +32,17 @@ impl UnixSinkConfig {
         Self { path, encoding }
     }
 
-    pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    pub fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let encoding = self.encoding.clone();
         let unix = UnixSink::new(self.path.clone());
-        let sink = StreamSink::new(unix, cx.acker());
+        let sink = StreamSinkOld::new(unix, cx.acker());
 
-        let sink =
-            Box::new(sink.with_flat_map(move |event| iter_ok(encode_event(event, &encoding))));
-        let healthcheck = healthcheck(self.path.clone()).boxed().compat();
+        let sink = Box::new(
+            sink.with_flat_map(move |event| stream::iter_ok(encode_event(event, &encoding))),
+        );
+        let healthcheck = healthcheck(self.path.clone()).boxed();
 
-        Ok((sink, Box::new(healthcheck)))
+        Ok((VectorSink::Futures01Sink(sink), healthcheck))
     }
 }
 
@@ -131,7 +131,7 @@ impl UnixSink {
                 UnixSinkState::Disconnected => {
                     debug!(
                         message = "Connecting",
-                        path = &field::display(self.path.to_str().unwrap())
+                        path = %self.path.to_str().unwrap()
                     );
                     let connect_future = UnixStream::connect(self.path.clone()).boxed().compat();
                     UnixSinkState::Creating(Box::new(connect_future))
@@ -196,8 +196,6 @@ impl Sink for UnixSink {
 mod tests {
     use super::*;
     use crate::test_util::{random_lines_with_stream, CountReceiver};
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
     use tokio::net::UnixListener;
 
     fn temp_uds_path(name: &str) -> PathBuf {
@@ -229,12 +227,12 @@ mod tests {
 
         // Send the test data
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
-        let _ = sink.send_all(events).compat().await.unwrap();
+        sink.run(events).await.unwrap();
 
         // Wait for output to connect
         receiver.connected().await;
 
         // Receive the data sent by the Sink to the receiver
-        assert_eq!(input_lines, receiver.wait().await);
+        assert_eq!(input_lines, receiver.await);
     }
 }

@@ -8,7 +8,7 @@ set -euo pipefail
 #   Starts a Docker Distribution instance in docker and prints it's IP address
 #   to the stdout.
 #
-#   Useful for conducting tests involing Vector docker images.
+#   Useful for conducting tests involving Vector docker images.
 #
 
 CONTAINER_NAME="${1:-"vector-docker-registry"}"

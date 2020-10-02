@@ -78,11 +78,11 @@ to use to ingest the data.
 If unset, Humio will default it to none.
 """
 
-[sinks.humio_logs.options.host]
+[sinks.humio_logs.options.endpoint]
 type = "string"
 default = "https://cloud.humio.com"
 examples = ["http://myhumiohost.com"]
-description = "The optional host to send Humio logs to."
+description = "The optional endpoint to send Humio logs to."
 
 <%= render("_partials/fields/_compression_options.toml",
   namespace: "sinks.humio_logs.options",
@@ -95,4 +95,14 @@ description = "The optional host to send Humio logs to."
   namespace: "sinks.humio_logs.options",
   encodings: ["json", "text"],
   default: "json"
-) %>
+          ) %>
+
+[sinks.humio_logs.options.host_key]
+type = "string"
+common = true
+examples = ["hostname"]
+required = false
+description = """\
+The name of the log field to be used as the hostname sent to Humio. This \
+overrides the [global `host_key` option][docs.reference.global-options#host_key].\
+"""

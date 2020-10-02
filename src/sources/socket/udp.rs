@@ -1,11 +1,11 @@
 use crate::{
-    event::{self, Event},
-    internal_events::{UdpEventReceived, UdpSocketError},
+    event::Event,
+    internal_events::{SocketEventReceived, SocketMode, SocketReceiveError},
     shutdown::ShutdownSignal,
     sources::Source,
     Pipeline,
 };
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::Sink;
@@ -62,7 +62,10 @@ pub fn udp(
                 tokio::select! {
                     recv = socket.recv_from(&mut buf) => {
                         let (byte_size, address) = recv.map_err(|error| {
-                            emit!(UdpSocketError { error });
+                            emit!(SocketReceiveError {
+                                error,
+                                mode: SocketMode::Udp
+                            });
                         })?;
 
                         let mut payload = buf.split_to(byte_size);
@@ -75,12 +78,12 @@ pub fn udp(
 
                             event
                                 .as_mut_log()
-                                .insert(event::log_schema().source_type_key(), "socket");
+                                .insert(crate::config::log_schema().source_type_key(), Bytes::from("socket"));
                             event
                                 .as_mut_log()
                                 .insert(host_key.clone(), address.to_string());
 
-                            emit!(UdpEventReceived { byte_size });
+                            emit!(SocketEventReceived { byte_size,mode:SocketMode::Udp });
 
                             tokio::select!{
                                 result = out.send(event).compat() => {

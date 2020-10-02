@@ -88,7 +88,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             out.send_all(futures01::stream::iter_ok(events))
                                 .compat()
                                 .map_err(move |e: futures01::sync::mpsc::SendError<Event>| {
-                                    // can only fail if receiving end disconnected, so we are shuting down,
+                                    // can only fail if receiving end disconnected, so we are shutting down,
                                     // probably not gracefully.
                                     error!("Failed to forward events, downstream is closed");
                                     error!("Tried to send the following event: {:?}", e);
@@ -126,10 +126,10 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let fut = async move {
-            let mut listener = tls.bind(&address).await.unwrap();
+            let listener = tls.bind(&address).await.unwrap();
             let _ = warp::serve(routes)
                 .serve_incoming_with_graceful_shutdown(
-                    listener.incoming(),
+                    listener.accept_stream(),
                     shutdown.clone().compat().map(|_| ()),
                 )
                 .await;

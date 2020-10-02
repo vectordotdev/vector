@@ -9,6 +9,7 @@ apt upgrade --yes
 # Deps
 apt install --yes \
     build-essential \
+    cmake \
     pkg-config \
     libssl-dev \
     python3-pip \
@@ -25,7 +26,9 @@ apt install --yes \
     ruby-bundler \
     libsasl2-dev \
     gnupg2 \
-    wget
+    wget \
+    gawk \
+    yarn
 
 # Grease
 # Grease is used for the `make release-github` task.
@@ -45,13 +48,17 @@ dpkg-reconfigure locales
 # Rust
 curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
 
-# Docker
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-add-apt-repository \
-   "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
-   xenial \
-   stable"
+if ! [ -x "$(command -v docker)" ]; then
+    # Docker
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+    add-apt-repository \
+        "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+        xenial \
+        stable"
+    # Install those new things
+    apt update --yes
+    apt install --yes docker-ce docker-ce-cli containerd.io
+fi
 
-# Install those new things
-apt update --yes
-apt install --yes yarn docker-ce docker-ce-cli containerd.io
+# Apt cleanup
+apt clean

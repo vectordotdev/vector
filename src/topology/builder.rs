@@ -11,7 +11,10 @@ use crate::{
     shutdown::SourceShutdownCoordinator,
     Pipeline,
 };
-use futures::{compat::Future01CompatExt, FutureExt};
+use futures::{
+    compat::{Future01CompatExt, Stream01CompatExt},
+    future, FutureExt, StreamExt,
+};
 use futures01::{sync::mpsc, Future, Stream};
 use std::collections::HashMap;
 use tokio::time::{timeout, Duration};
@@ -56,7 +59,7 @@ pub async fn build_pieces(
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
 
         let server = match source
-            .build_async(&name, &config.global, shutdown_signal, pipeline)
+            .build(&name, &config.global, shutdown_signal, pipeline)
             .await
         {
             Err(error) => {
@@ -100,7 +103,7 @@ pub async fn build_pieces(
         let cx = TransformContext { resolver };
 
         let input_type = transform.inner.input_type();
-        let transform = match transform.inner.build_async(cx).await {
+        let transform = match transform.inner.build(cx).await {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
                 continue;
@@ -148,7 +151,7 @@ pub async fn build_pieces(
 
         let cx = SinkContext { resolver, acker };
 
-        let (sink, healthcheck) = match sink.inner.build_async(cx).await {
+        let (sink, healthcheck) = match sink.inner.build(cx).await {
             Err(error) => {
                 errors.push(format!("Sink \"{}\": {}", name, error));
                 continue;
@@ -156,16 +159,20 @@ pub async fn build_pieces(
             Ok((sink, healthcheck)) => (sink, healthcheck),
         };
 
-        let sink = filter_event_type(rx, input_type)
-            .forward(sink)
-            .map(|_| debug!("Finished"))
-            .compat();
+        let sink = sink
+            .run(
+                filter_event_type(rx, input_type)
+                    .compat()
+                    .take_while(|e| future::ready(e.is_ok()))
+                    .map(|x| x.unwrap()),
+            )
+            .inspect(|_| debug!("Finished"));
         let task = Task::new(name, typetag, sink);
 
         let healthcheck_task = async move {
             if enable_healthcheck {
                 let duration = Duration::from_secs(10);
-                timeout(duration, healthcheck.compat())
+                timeout(duration, healthcheck)
                     .map(|result| match result {
                         Ok(Ok(_)) => {
                             info!("Healthcheck: Passed.");

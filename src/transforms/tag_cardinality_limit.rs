@@ -1,6 +1,10 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    internal_events::{
+        TagCardinalityLimitEventProcessed, TagCardinalityLimitRejectingEvent,
+        TagCardinalityLimitRejectingTag, TagCardinalityValueLimitReached,
+    },
     Event,
 };
 use bloom::{BloomFilter, ASMS};
@@ -65,9 +69,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<TagCardinalityLimitConfig>("tag_cardinality_limit")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(TagCardinalityLimit::new(self.clone())))
     }
 
@@ -174,10 +179,7 @@ impl TagCardinalityLimit {
             tag_value_set.insert(value);
 
             if tag_value_set.len() == self.config.value_limit as usize {
-                warn!(
-                    "value_limit reached for key {}. New values for this key will be rejected",
-                    key
-                );
+                emit!(TagCardinalityValueLimitReached { key });
             }
 
             true
@@ -190,18 +192,17 @@ impl TagCardinalityLimit {
 
 impl Transform for TagCardinalityLimit {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
+        emit!(TagCardinalityLimitEventProcessed);
         match event.as_mut_metric().tags {
             Some(ref mut tags_map) => {
                 match self.config.limit_exceeded_action {
                     LimitExceededAction::DropEvent => {
                         for (key, value) in tags_map {
                             if !self.try_accept_tag(key, Cow::Borrowed(value)) {
-                                info!(
-                                    message = "Rejecting Metric Event containing tag with new value after hitting configured 'value_limit'",
-                                    tag_key = key.as_str(),
-                                    tag_value = &value.as_str(),
-                                    rate_limit_secs = 10,
-                                );
+                                emit!(TagCardinalityLimitRejectingEvent {
+                                    tag_key: &key,
+                                    tag_value: &value,
+                                });
                                 return None;
                             }
                         }
@@ -210,13 +211,10 @@ impl Transform for TagCardinalityLimit {
                         let mut to_delete = Vec::new();
                         for (key, value) in tags_map.iter() {
                             if !self.try_accept_tag(key, Cow::Borrowed(value)) {
-                                info!(
-                                    message =
-                                        "Rejecting tag after hitting configured 'value_limit'",
-                                    tag_key = key.as_str(),
-                                    tag_value = value.as_str(),
-                                    rate_limit_secs = 10,
-                                );
+                                emit!(TagCardinalityLimitRejectingTag {
+                                    tag_key: &key,
+                                    tag_value: &value,
+                                });
                                 to_delete.push(key.clone());
                             }
                         }

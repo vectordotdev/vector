@@ -7,13 +7,16 @@ use crate::{
     template::Template,
 };
 use serde::{Deserialize, Serialize};
+use string_cache::DefaultAtom as Atom;
 
 const HOST: &str = "https://cloud.humio.com";
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct HumioLogsConfig {
     token: String,
-    host: Option<String>,
+    // Deprecated name
+    #[serde(alias = "host")]
+    endpoint: Option<String>,
     source: Option<Template>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
@@ -23,6 +26,9 @@ pub struct HumioLogsConfig {
 
     event_type: Option<Template>,
 
+    #[serde(default = "default_host_key")]
+    pub host_key: Atom,
+
     #[serde(default)]
     pub compression: Compression,
 
@@ -31,6 +37,10 @@ pub struct HumioLogsConfig {
 
     #[serde(default)]
     batch: BatchConfig,
+}
+
+fn default_host_key() -> Atom {
+    crate::config::LogSchema::default().host_key().clone()
 }
 
 inventory::submit! {
@@ -55,10 +65,14 @@ impl From<Encoding> for splunk_hec::Encoding {
     }
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        self.build_hec_config().build(cx)
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        self.build_hec_config().build(cx).await
     }
 
     fn input_type(&self) -> DataType {
@@ -72,17 +86,18 @@ impl SinkConfig for HumioLogsConfig {
 
 impl HumioLogsConfig {
     fn build_hec_config(&self) -> HecSinkConfig {
-        let host = self.host.clone().unwrap_or_else(|| HOST.to_string());
+        let endpoint = self.endpoint.clone().unwrap_or_else(|| HOST.to_string());
 
         HecSinkConfig {
             token: self.token.clone(),
-            host,
+            endpoint,
             source: self.source.clone(),
             sourcetype: self.event_type.clone(),
             encoding: self.encoding.clone().transmute(),
             compression: self.compression,
             batch: self.batch,
             request: self.request,
+            host_key: self.host_key.clone(),
             ..Default::default()
         }
     }
@@ -131,142 +146,139 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::{SinkConfig, SinkContext},
+        config::{log_schema, SinkConfig, SinkContext},
         sinks::util::Compression,
-        test_util::{random_string, runtime},
+        test_util::random_string,
         Event,
     };
     use chrono::Utc;
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
-    use serde_json::json;
-    use serde_json::Value as JsonValue;
-    use std::collections::HashMap;
-    use std::convert::TryFrom;
+    use futures::{future, stream};
+    use serde_json::{json, Value as JsonValue};
+    use std::{collections::HashMap, convert::TryFrom};
 
     // matches humio container address
     const HOST: &str = "http://localhost:8080";
 
-    #[test]
-    fn humio_insert_message() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn humio_insert_message() {
         let cx = SinkContext::new_test();
 
-        rt.block_on_std(async move {
-            let repo = create_repository().await;
+        let repo = create_repository().await;
 
+        let config = config(&repo.default_ingest_token);
+
+        let (sink, _) = config.build(cx).await.unwrap();
+
+        let message = random_string(100);
+        let host = "192.168.1.1".to_string();
+        let mut event = Event::from(message.clone());
+        let log = event.as_mut_log();
+        log.insert(log_schema().host_key(), host.clone());
+
+        sink.run(stream::once(future::ready(event))).await.unwrap();
+
+        let entry = find_entry(repo.name.as_str(), message.as_str()).await;
+
+        assert_eq!(
+            message,
+            entry
+                .fields
+                .get("message")
+                .expect("no message key")
+                .as_str()
+                .unwrap()
+        );
+        assert!(
+            entry.error.is_none(),
+            "Humio encountered an error parsing this message: {}",
+            entry
+                .error_msg
+                .unwrap_or_else(|| "no error message".to_string())
+        );
+        assert_eq!(Some(host), entry.host);
+    }
+
+    #[tokio::test]
+    async fn humio_insert_source() {
+        let cx = SinkContext::new_test();
+
+        let repo = create_repository().await;
+
+        let mut config = config(&repo.default_ingest_token);
+        config.source = Template::try_from("/var/log/syslog".to_string()).ok();
+
+        let (sink, _) = config.build(cx).await.unwrap();
+
+        let message = random_string(100);
+        let event = Event::from(message.clone());
+        sink.run(stream::once(future::ready(event))).await.unwrap();
+
+        let entry = find_entry(repo.name.as_str(), message.as_str()).await;
+
+        assert_eq!(entry.source, Some("/var/log/syslog".to_owned()));
+        assert!(
+            entry.error.is_none(),
+            "Humio encountered an error parsing this message: {}",
+            entry
+                .error_msg
+                .unwrap_or_else(|| "no error message".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn humio_type() {
+        let repo = create_repository().await;
+
+        // sets type
+        {
+            let mut config = config(&repo.default_ingest_token);
+            config.event_type = Template::try_from("json".to_string()).ok();
+
+            let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+
+            let message = random_string(100);
+            let mut event = Event::from(message.clone());
+            // Humio expects to find an @timestamp field for JSON lines
+            // https://docs.humio.com/ingesting-data/parsers/built-in-parsers/#json
+            event
+                .as_mut_log()
+                .insert("@timestamp", Utc::now().to_rfc3339());
+
+            sink.run(stream::once(future::ready(event))).await.unwrap();
+
+            let entry = find_entry(repo.name.as_str(), message.as_str()).await;
+
+            assert_eq!(entry.humio_type, "json");
+            assert!(
+                entry.error.is_none(),
+                "Humio encountered an error parsing this message: {}",
+                entry
+                    .error_msg
+                    .unwrap_or_else(|| "no error message".to_string())
+            );
+        }
+
+        // defaults to none
+        {
             let config = config(&repo.default_ingest_token);
 
-            let (sink, _) = config.build(cx).unwrap();
+            let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
             let message = random_string(100);
             let event = Event::from(message.clone());
 
-            sink.send(event).compat().await.unwrap();
+            sink.run(stream::once(future::ready(event))).await.unwrap();
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
-            assert_eq!(
-                message,
-                entry
-                    .fields
-                    .get("message")
-                    .expect("no message key")
-                    .as_str()
-                    .unwrap()
-            );
-            assert!(
-                entry.error.is_none(),
-                "Humio encountered an error parsing this message: {}",
-                entry.error_msg.unwrap_or("no error message".to_string())
-            );
-        });
-    }
-
-    #[test]
-    fn humio_insert_source() {
-        let mut rt = runtime();
-        let cx = SinkContext::new_test();
-
-        rt.block_on_std(async move {
-            let repo = create_repository().await;
-
-            let mut config = config(&repo.default_ingest_token);
-            config.source = Template::try_from("/var/log/syslog".to_string()).ok();
-
-            let (sink, _) = config.build(cx).unwrap();
-
-            let message = random_string(100);
-            let event = Event::from(message.clone());
-            sink.send(event).compat().await.unwrap();
-
-            let entry = find_entry(repo.name.as_str(), message.as_str()).await;
-
-            assert_eq!(entry.source, Some("/var/log/syslog".to_owned()));
-            assert!(
-                entry.error.is_none(),
-                "Humio encountered an error parsing this message: {}",
-                entry.error_msg.unwrap_or("no error message".to_string())
-            );
-        });
-    }
-
-    #[test]
-    fn humio_type() {
-        let mut rt = runtime();
-
-        rt.block_on_std(async move {
-            let repo = create_repository().await;
-
-            // sets type
-            {
-                let mut config = config(&repo.default_ingest_token);
-                config.event_type = Template::try_from("json".to_string()).ok();
-
-                let (sink, _) = config.build(SinkContext::new_test()).unwrap();
-
-                let message = random_string(100);
-                let mut event = Event::from(message.clone());
-                // Humio expects to find an @timestamp field for JSON lines
-                // https://docs.humio.com/ingesting-data/parsers/built-in-parsers/#json
-                event
-                    .as_mut_log()
-                    .insert("@timestamp", Utc::now().to_rfc3339());
-
-                sink.send(event).compat().await.unwrap();
-
-                let entry = find_entry(repo.name.as_str(), message.as_str()).await;
-
-                assert_eq!(entry.humio_type, "json");
-                assert!(
-                    entry.error.is_none(),
-                    "Humio encountered an error parsing this message: {}",
-                    entry.error_msg.unwrap_or("no error message".to_string())
-                );
-            }
-
-            // defaults to none
-            {
-                let config = config(&repo.default_ingest_token);
-
-                let (sink, _) = config.build(SinkContext::new_test()).unwrap();
-
-                let message = random_string(100);
-                let event = Event::from(message.clone());
-
-                sink.send(event).compat().await.unwrap();
-
-                let entry = find_entry(repo.name.as_str(), message.as_str()).await;
-
-                assert_eq!(entry.humio_type, "none");
-            }
-        });
+            assert_eq!(entry.humio_type, "none");
+        }
     }
 
     /// create a new test config with the given ingest token
     fn config(token: &str) -> super::HumioLogsConfig {
         super::HumioLogsConfig {
-            host: Some(HOST.to_string()),
+            endpoint: Some(HOST.to_string()),
             token: token.to_string(),
             compression: Compression::None,
             encoding: Encoding::Json.into(),
@@ -274,6 +286,7 @@ mod integration_tests {
                 max_events: Some(1),
                 ..Default::default()
             },
+            host_key: log_schema().host_key().clone(),
             ..Default::default()
         }
     }
@@ -395,6 +408,9 @@ mutation {{
 
         #[serde(rename = "@source")]
         source: Option<String>,
+
+        #[serde(rename = "@host")]
+        host: Option<String>,
 
         // fields parsed from ingested log
         #[serde(flatten)]

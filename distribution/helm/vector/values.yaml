@@ -35,6 +35,9 @@ serviceAccount:
 # Annotations to add to the `Pod`s managed by `DaemonSet`.
 podAnnotations: {}
 
+# Labels to add to the `Pod`s managed by `DaemonSet`.
+podLabels: {}
+
 # PodSecurityContext to set at the `Pod`s managed by `DaemonSet`.
 podSecurityContext: {}
   # fsGroup: 2000
@@ -52,16 +55,22 @@ securityContext: {}
 # Extra env vars to pass to the `vector` container.
 env: []
 
+# Tolerations to set for the `Pod`s managed by `DaemonSet`.
+tolerations:
+  # This toleration is to have the `DaemonSet` runnable on master nodes.
+  # Remove it if your masters can't run pods.
+  - key: node-role.kubernetes.io/master
+    effect: NoSchedule
+
 # Various tweakables for the `Pod`s managed by `DaemonSet`.
 resources: {}
 nodeSelector: {}
-tolerations: []
 affinity: {}
 
-# Additional volmes to pass to the `Pod`s managed by `DaemonSet`.
+# Additional volumes to pass to the `Pod`s managed by `DaemonSet`.
 extraVolumes: []
 
-# Additional volme mounts to pass to the `vector` container of the `Pod`s
+# Additional volume mounts to pass to the `vector` container of the `Pod`s
 # managed by `DaemonSet`.
 extraVolumeMounts: []
 

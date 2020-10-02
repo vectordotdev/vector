@@ -1,8 +1,8 @@
-use crate::sinks::RouterSink;
 use crate::Event;
 use futures::compat::Future01CompatExt;
-use futures01::sync::mpsc;
-use futures01::{future, Async, AsyncSink, Poll, Sink, StartSend, Stream};
+use futures01::{future, sync::mpsc, Async, AsyncSink, Poll, Sink, StartSend, Stream};
+
+type RouterSink = Box<dyn Sink<SinkItem = Event, SinkError = ()> + 'static + Send>;
 
 pub struct Fanout {
     sinks: Vec<(String, RouterSink)>,
@@ -144,13 +144,13 @@ impl Sink for Fanout {
 #[cfg(test)]
 mod tests {
     use super::{ControlMessage, Fanout};
-    use crate::test_util::{self, runtime, CollectCurrent};
-    use crate::Event;
-    use futures01::sync::mpsc;
-    use futures01::{stream, Future, Sink, Stream};
+    use crate::{test_util::collect_ready, Event};
+    use futures::compat::Future01CompatExt;
+    use futures01::{stream, sync::mpsc, Future, Sink, Stream};
+    use tokio::time::{delay_for, Duration};
 
-    #[test]
-    fn fanout_writes_to_all() {
+    #[tokio::test]
+    async fn fanout_writes_to_all() {
         let (tx_a, rx_a) = mpsc::unbounded();
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::unbounded();
@@ -164,21 +164,18 @@ mod tests {
         let rec1 = Event::from("line 1".to_string());
         let rec2 = Event::from("line 2".to_string());
 
-        let fanout = fanout.send(rec1.clone()).wait().unwrap();
-        let _fanout = fanout.send(rec2.clone()).wait().unwrap();
+        let fanout = fanout.send(rec1.clone()).compat().await.unwrap();
+        let _fanout = fanout.send(rec2.clone()).compat().await.unwrap();
 
         assert_eq!(
-            CollectCurrent::new(rx_a).wait().unwrap().1,
+            collect_ready(rx_a).await.unwrap(),
             vec![rec1.clone(), rec2.clone()]
         );
-        assert_eq!(
-            CollectCurrent::new(rx_b).wait().unwrap().1,
-            vec![rec1, rec2]
-        );
+        assert_eq!(collect_ready(rx_b).await.unwrap(), vec![rec1, rec2]);
     }
 
-    #[test]
-    fn fanout_notready() {
+    #[tokio::test]
+    async fn fanout_notready() {
         let (tx_a, rx_a) = mpsc::channel(1);
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::channel(0);
@@ -196,26 +193,24 @@ mod tests {
         let rec2 = Event::from("line 2".to_string());
         let rec3 = Event::from("line 3".to_string());
 
-        let mut rt = runtime();
-
         let recs = vec![rec1, rec2, rec3];
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
-        rt.spawn(send.map(|_| ()));
+        tokio::spawn(send.map(|_| ()).compat());
 
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        delay_for(Duration::from_millis(50)).await;
         // The send_all task will be blocked on sending rec2 to b right now.
 
-        let collect_a = futures01::sync::oneshot::spawn(rx_a.collect(), &rt.executor());
-        let collect_b = futures01::sync::oneshot::spawn(rx_b.collect(), &rt.executor());
-        let collect_c = futures01::sync::oneshot::spawn(rx_c.collect(), &rt.executor());
+        let collect_a = tokio::spawn(rx_a.collect().compat());
+        let collect_b = tokio::spawn(rx_b.collect().compat());
+        let collect_c = tokio::spawn(rx_c.collect().compat());
 
-        assert_eq!(collect_a.wait().unwrap(), recs);
-        assert_eq!(collect_b.wait().unwrap(), recs);
-        assert_eq!(collect_c.wait().unwrap(), recs);
+        assert_eq!(collect_a.await.unwrap().unwrap(), recs);
+        assert_eq!(collect_b.await.unwrap().unwrap(), recs);
+        assert_eq!(collect_c.await.unwrap().unwrap(), recs);
     }
 
-    #[test]
-    fn fanout_grow() {
+    #[tokio::test]
+    async fn fanout_grow() {
         let (tx_a, rx_a) = mpsc::unbounded();
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::unbounded();
@@ -229,29 +224,29 @@ mod tests {
         let rec1 = Event::from("line 1".to_string());
         let rec2 = Event::from("line 2".to_string());
 
-        let fanout = fanout.send(rec1.clone()).wait().unwrap();
-        let mut fanout = fanout.send(rec2.clone()).wait().unwrap();
+        let fanout = fanout.send(rec1.clone()).compat().await.unwrap();
+        let mut fanout = fanout.send(rec2.clone()).compat().await.unwrap();
 
         let (tx_c, rx_c) = mpsc::unbounded();
         let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
         fanout.add("c".to_string(), tx_c);
 
         let rec3 = Event::from("line 3".to_string());
-        let _fanout = fanout.send(rec3.clone()).wait().unwrap();
+        let _fanout = fanout.send(rec3.clone()).compat().await.unwrap();
 
         assert_eq!(
-            CollectCurrent::new(rx_a).wait().unwrap().1,
+            collect_ready(rx_a).await.unwrap(),
             vec![rec1.clone(), rec2.clone(), rec3.clone()]
         );
         assert_eq!(
-            CollectCurrent::new(rx_b).wait().unwrap().1,
+            collect_ready(rx_b).await.unwrap(),
             vec![rec1, rec2, rec3.clone()]
         );
-        assert_eq!(CollectCurrent::new(rx_c).wait().unwrap().1, vec![rec3]);
+        assert_eq!(collect_ready(rx_c).await.unwrap(), vec![rec3]);
     }
 
-    #[test]
-    fn fanout_shrink() {
+    #[tokio::test]
+    async fn fanout_shrink() {
         let (tx_a, rx_a) = mpsc::unbounded();
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::unbounded();
@@ -265,28 +260,26 @@ mod tests {
         let rec1 = Event::from("line 1".to_string());
         let rec2 = Event::from("line 2".to_string());
 
-        let fanout = fanout.send(rec1.clone()).wait().unwrap();
-        let fanout = fanout.send(rec2.clone()).wait().unwrap();
+        let fanout = fanout.send(rec1.clone()).compat().await.unwrap();
+        let fanout = fanout.send(rec2.clone()).compat().await.unwrap();
 
         fanout_control
             .unbounded_send(ControlMessage::Remove("b".to_string()))
             .unwrap();
 
         let rec3 = Event::from("line 3".to_string());
-        let _fanout = test_util::block_on(fanout.send(rec3.clone())).unwrap();
+        use futures::compat::Future01CompatExt;
+        let _fanout = fanout.send(rec3.clone()).compat().await.unwrap();
 
         assert_eq!(
-            CollectCurrent::new(rx_a).wait().unwrap().1,
+            collect_ready(rx_a).await.unwrap(),
             vec![rec1.clone(), rec2.clone(), rec3]
         );
-        assert_eq!(
-            CollectCurrent::new(rx_b).wait().unwrap().1,
-            vec![rec1, rec2]
-        );
+        assert_eq!(collect_ready(rx_b).await.unwrap(), vec![rec1, rec2]);
     }
 
-    #[test]
-    fn fanout_shrink_after_notready() {
+    #[tokio::test]
+    async fn fanout_shrink_after_notready() {
         let (tx_a, rx_a) = mpsc::channel(1);
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::channel(0);
@@ -304,29 +297,27 @@ mod tests {
         let rec2 = Event::from("line 2".to_string());
         let rec3 = Event::from("line 3".to_string());
 
-        let mut rt = runtime();
-
         let recs = vec![rec1.clone(), rec2, rec3];
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
-        rt.spawn(send.map(|_| ()));
+        tokio::spawn(send.map(|_| ()).compat());
 
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        delay_for(Duration::from_millis(50)).await;
         // The send_all task will be blocked on sending rec2 to b right now.
         fanout_control
             .unbounded_send(ControlMessage::Remove("c".to_string()))
             .unwrap();
 
-        let collect_a = futures01::sync::oneshot::spawn(rx_a.collect(), &rt.executor());
-        let collect_b = futures01::sync::oneshot::spawn(rx_b.collect(), &rt.executor());
-        let collect_c = futures01::sync::oneshot::spawn(rx_c.collect(), &rt.executor());
+        let collect_a = tokio::spawn(rx_a.collect().compat());
+        let collect_b = tokio::spawn(rx_b.collect().compat());
+        let collect_c = tokio::spawn(rx_c.collect().compat());
 
-        assert_eq!(collect_b.wait().unwrap(), recs);
-        assert_eq!(collect_a.wait().unwrap(), recs);
-        assert_eq!(collect_c.wait().unwrap(), vec![rec1]);
+        assert_eq!(collect_b.await.unwrap().unwrap(), recs);
+        assert_eq!(collect_a.await.unwrap().unwrap(), recs);
+        assert_eq!(collect_c.await.unwrap().unwrap(), vec![rec1]);
     }
 
-    #[test]
-    fn fanout_shrink_at_notready() {
+    #[tokio::test]
+    async fn fanout_shrink_at_notready() {
         let (tx_a, rx_a) = mpsc::channel(1);
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::channel(0);
@@ -344,29 +335,27 @@ mod tests {
         let rec2 = Event::from("line 2".to_string());
         let rec3 = Event::from("line 3".to_string());
 
-        let mut rt = runtime();
-
         let recs = vec![rec1.clone(), rec2, rec3];
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
-        rt.spawn(send.map(|_| ()));
+        tokio::spawn(send.map(|_| ()).compat());
 
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        delay_for(Duration::from_millis(50)).await;
         // The send_all task will be blocked on sending rec2 to b right now.
         fanout_control
             .unbounded_send(ControlMessage::Remove("b".to_string()))
             .unwrap();
 
-        let collect_a = futures01::sync::oneshot::spawn(rx_a.collect(), &rt.executor());
-        let collect_b = futures01::sync::oneshot::spawn(rx_b.collect(), &rt.executor());
-        let collect_c = futures01::sync::oneshot::spawn(rx_c.collect(), &rt.executor());
+        let collect_a = tokio::spawn(rx_a.collect().compat());
+        let collect_b = tokio::spawn(rx_b.collect().compat());
+        let collect_c = tokio::spawn(rx_c.collect().compat());
 
-        assert_eq!(collect_a.wait().unwrap(), recs);
-        assert_eq!(collect_b.wait().unwrap(), vec![rec1]);
-        assert_eq!(collect_c.wait().unwrap(), recs);
+        assert_eq!(collect_a.await.unwrap().unwrap(), recs);
+        assert_eq!(collect_b.await.unwrap().unwrap(), vec![rec1]);
+        assert_eq!(collect_c.await.unwrap().unwrap(), recs);
     }
 
-    #[test]
-    fn fanout_shrink_before_notready() {
+    #[tokio::test]
+    async fn fanout_shrink_before_notready() {
         let (tx_a, rx_a) = mpsc::channel(1);
         let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::channel(0);
@@ -384,41 +373,39 @@ mod tests {
         let rec2 = Event::from("line 2".to_string());
         let rec3 = Event::from("line 3".to_string());
 
-        let mut rt = runtime();
-
         let recs = vec![rec1.clone(), rec2.clone(), rec3];
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
-        rt.spawn(send.map(|_| ()));
+        tokio::spawn(send.map(|_| ()).compat());
 
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        delay_for(Duration::from_millis(50)).await;
         // The send_all task will be blocked on sending rec2 to b right now.
 
         fanout_control
             .unbounded_send(ControlMessage::Remove("a".to_string()))
             .unwrap();
 
-        let collect_a = futures01::sync::oneshot::spawn(rx_a.collect(), &rt.executor());
-        let collect_b = futures01::sync::oneshot::spawn(rx_b.collect(), &rt.executor());
-        let collect_c = futures01::sync::oneshot::spawn(rx_c.collect(), &rt.executor());
+        let collect_a = tokio::spawn(rx_a.collect().compat());
+        let collect_b = tokio::spawn(rx_b.collect().compat());
+        let collect_c = tokio::spawn(rx_c.collect().compat());
 
-        assert_eq!(collect_a.wait().unwrap(), [rec1, rec2]);
-        assert_eq!(collect_b.wait().unwrap(), recs);
-        assert_eq!(collect_c.wait().unwrap(), recs);
+        assert_eq!(collect_a.await.unwrap().unwrap(), [rec1, rec2]);
+        assert_eq!(collect_b.await.unwrap().unwrap(), recs);
+        assert_eq!(collect_c.await.unwrap().unwrap(), recs);
     }
 
-    #[test]
-    fn fanout_no_sinks() {
+    #[tokio::test]
+    async fn fanout_no_sinks() {
         let fanout = Fanout::new().0;
 
         let rec1 = Event::from("line 1".to_string());
         let rec2 = Event::from("line 2".to_string());
 
-        let fanout = fanout.send(rec1).wait().unwrap();
-        let _fanout = fanout.send(rec2).wait().unwrap();
+        let fanout = fanout.send(rec1).compat().await.unwrap();
+        let _fanout = fanout.send(rec2).compat().await.unwrap();
     }
 
-    #[test]
-    fn fanout_replace() {
+    #[tokio::test]
+    async fn fanout_replace() {
         let (tx_a1, rx_a1) = mpsc::unbounded();
         let tx_a1 = Box::new(tx_a1.sink_map_err(|_| unreachable!()));
         let (tx_b, rx_b) = mpsc::unbounded();
@@ -432,24 +419,24 @@ mod tests {
         let rec1 = Event::from("line 1".to_string());
         let rec2 = Event::from("line 2".to_string());
 
-        let fanout = fanout.send(rec1.clone()).wait().unwrap();
-        let mut fanout = fanout.send(rec2.clone()).wait().unwrap();
+        let fanout = fanout.send(rec1.clone()).compat().await.unwrap();
+        let mut fanout = fanout.send(rec2.clone()).compat().await.unwrap();
 
         let (tx_a2, rx_a2) = mpsc::unbounded();
         let tx_a2 = Box::new(tx_a2.sink_map_err(|_| unreachable!()));
         fanout.replace("a".to_string(), tx_a2);
 
         let rec3 = Event::from("line 3".to_string());
-        let _fanout = fanout.send(rec3.clone()).wait().unwrap();
+        let _fanout = fanout.send(rec3.clone()).compat().await.unwrap();
 
         assert_eq!(
-            CollectCurrent::new(rx_a1).wait().unwrap().1,
+            collect_ready(rx_a1).await.unwrap(),
             vec![rec1.clone(), rec2.clone()]
         );
         assert_eq!(
-            CollectCurrent::new(rx_b).wait().unwrap().1,
+            collect_ready(rx_b).await.unwrap(),
             vec![rec1, rec2, rec3.clone()]
         );
-        assert_eq!(CollectCurrent::new(rx_a2).wait().unwrap().1, vec![rec3]);
+        assert_eq!(collect_ready(rx_a2).await.unwrap(), vec![rec3]);
     }
 }

@@ -1,7 +1,10 @@
 use super::Transform;
-use crate::config::{DataType, TransformConfig, TransformContext, TransformDescription};
-use crate::event::Event;
-use crate::types::{parse_conversion_map, Conversion};
+use crate::{
+    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    event::Event,
+    internal_events::{CoercerConversionFailed, CoercerEventProcessed},
+    types::{parse_conversion_map, Conversion},
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
@@ -19,9 +22,10 @@ inventory::submit! {
     TransformDescription::new::<CoercerConfig>("coercer")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let types = parse_conversion_map(&self.types)?;
         Ok(Box::new(Coercer {
             types,
@@ -50,6 +54,7 @@ pub struct Coercer {
 impl Transform for Coercer {
     fn transform(&mut self, event: Event) -> Option<Event> {
         let mut log = event.into_log();
+        emit!(CoercerEventProcessed);
         if self.drop_unspecified {
             // This uses a different algorithm from the default path
             // below, as it will be fewer steps to fully recreate the
@@ -63,14 +68,7 @@ impl Transform for Coercer {
                         Ok(converted) => {
                             new_log.insert(field, converted);
                         }
-                        Err(error) => {
-                            warn!(
-                                message = "Could not convert types.",
-                                field = &field[..],
-                                %error,
-                                rate_limit_secs = 10,
-                            );
-                        }
+                        Err(error) => emit!(CoercerConversionFailed { field, error }),
                     }
                 }
             }
@@ -82,14 +80,7 @@ impl Transform for Coercer {
                         Ok(converted) => {
                             log.insert(field, converted);
                         }
-                        Err(error) => {
-                            warn!(
-                                message = "Could not convert types.",
-                                field = &field[..],
-                                %error,
-                                rate_limit_secs = 10,
-                            );
-                        }
+                        Err(error) => emit!(CoercerConversionFailed { field, error }),
                     }
                 }
             }
@@ -108,7 +99,7 @@ mod tests {
     };
     use pretty_assertions::assert_eq;
 
-    fn parse_it(extra: &str) -> LogEvent {
+    async fn parse_it(extra: &str) -> LogEvent {
         let mut event = Event::from("dummy message");
         for &(key, value) in &[
             ("number", "1234"),
@@ -130,32 +121,33 @@ mod tests {
         ))
         .unwrap()
         .build(TransformContext::new_test())
+        .await
         .unwrap();
         coercer.transform(event).unwrap().into_log()
     }
 
-    #[test]
-    fn converts_valid_fields() {
-        let log = parse_it("");
+    #[tokio::test]
+    async fn converts_valid_fields() {
+        let log = parse_it("").await;
         assert_eq!(log[&"number".into()], Value::Integer(1234));
         assert_eq!(log[&"bool".into()], Value::Boolean(true));
     }
 
-    #[test]
-    fn leaves_unnamed_fields_as_is() {
-        let log = parse_it("");
+    #[tokio::test]
+    async fn leaves_unnamed_fields_as_is() {
+        let log = parse_it("").await;
         assert_eq!(log[&"other".into()], Value::Bytes("no".into()));
     }
 
-    #[test]
-    fn drops_nonconvertible_fields() {
-        let log = parse_it("");
+    #[tokio::test]
+    async fn drops_nonconvertible_fields() {
+        let log = parse_it("").await;
         assert!(log.get(&"float".into()).is_none());
     }
 
-    #[test]
-    fn drops_unspecified_fields() {
-        let log = parse_it("drop_unspecified = true");
+    #[tokio::test]
+    async fn drops_unspecified_fields() {
+        let log = parse_it("drop_unspecified = true").await;
 
         let mut expected = Event::new_empty_log();
         expected.as_mut_log().insert("bool", true);

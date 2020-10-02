@@ -2,12 +2,11 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::proto,
     internal_events::VectorEventSent,
-    sinks::util::{tcp::TcpSink, StreamSink},
+    sinks::util::{tcp::TcpSink, StreamSinkOld},
     tls::{MaybeTlsSettings, TlsConfig},
     Event,
 };
 use bytes::{BufMut, Bytes, BytesMut};
-use futures::TryFutureExt;
 use futures01::{stream::iter_ok, Sink};
 use prost::Message;
 use serde::{Deserialize, Serialize};
@@ -38,9 +37,13 @@ inventory::submit! {
     SinkDescription::new_without_default::<VectorSinkConfig>("vector")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "vector")]
 impl SinkConfig for VectorSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(BuildError::MissingHost)?.to_string();
@@ -50,10 +53,13 @@ impl SinkConfig for VectorSinkConfig {
 
         let sink = TcpSink::new(host, port, cx.resolver(), tls);
         let healthcheck = sink.healthcheck();
-        let sink = StreamSink::new(sink, cx.acker())
+        let sink = StreamSinkOld::new(sink, cx.acker())
             .with_flat_map(move |event| iter_ok(encode_event(event)));
 
-        Ok((Box::new(sink), Box::new(healthcheck.compat())))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {

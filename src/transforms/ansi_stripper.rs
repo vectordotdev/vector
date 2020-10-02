@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{self, Value},
+    event::Value,
     internal_events::{
         ANSIStripperEventProcessed, ANSIStripperFailed, ANSIStripperFieldInvalid,
         ANSIStripperFieldMissing,
@@ -21,13 +21,14 @@ inventory::submit! {
     TransformDescription::new_without_default::<AnsiStripperConfig>("ansi_stripper")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "ansi_stripper")]
 impl TransformConfig for AnsiStripperConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
             .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+            .unwrap_or(&crate::config::log_schema().message_key());
 
         Ok(Box::new(AnsiStripper {
             field: field.clone(),
@@ -79,7 +80,7 @@ impl Transform for AnsiStripper {
 mod tests {
     use super::AnsiStripper;
     use crate::{
-        event::{self, Event, Value},
+        event::{Event, Value},
         transforms::Transform,
     };
 
@@ -94,7 +95,7 @@ mod tests {
                 let event = transform.transform(event).unwrap();
 
                 assert_eq!(
-                    event.into_log().remove(&event::log_schema().message_key()).unwrap(),
+                    event.into_log().remove(&crate::config::log_schema().message_key()).unwrap(),
                     Value::from("foo bar")
                 );
             )+

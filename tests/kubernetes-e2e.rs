@@ -12,7 +12,17 @@ use k8s_test_framework::{
 };
 use std::collections::HashSet;
 
-const VECTOR_CONFIG: &str = r#"
+const HELM_VALUES_STDOUT_SINK: &str = r#"
+sinks:
+  stdout:
+    type: "console"
+    inputs: ["kubernetes_logs"]
+    rawConfig: |
+      target = "stdout"
+      encoding = "json"
+"#;
+
+const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = r#"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -93,7 +103,7 @@ async fn smoke_check_first_line(log_reader: &mut Reader) {
         .read_line()
         .await
         .expect("unable to read first line");
-    let expected_pat = "INFO vector: Log level \"info\" is enabled.\n";
+    let expected_pat = "INFO vector::app: Log level \"info\" is enabled.\n";
     assert!(
         first_line.ends_with(expected_pat),
         "Expected a line ending with {:?} but got {:?}; vector might be malfunctioning",
@@ -160,7 +170,9 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    let vector = framework
+        .vector("test-vector", HELM_VALUES_STDOUT_SINK, "")
+        .await?;
     framework
         .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
         .await?;
@@ -228,7 +240,9 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    let vector = framework
+        .vector("test-vector", HELM_VALUES_STDOUT_SINK, "")
+        .await?;
     framework
         .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
         .await?;
@@ -319,7 +333,9 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     // Wait for some extra time to ensure pod completes.
     tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    let vector = framework
+        .vector("test-vector", HELM_VALUES_STDOUT_SINK, "")
+        .await?;
     framework
         .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
         .await?;
@@ -368,7 +384,9 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    let vector = framework
+        .vector("test-vector", HELM_VALUES_STDOUT_SINK, "")
+        .await?;
     framework
         .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
         .await?;
@@ -408,7 +426,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
         // Take the next marker.
         let current_marker = test_messages_iter
             .next()
-            .expect("expected no more lines since the test messages iter is exausted");
+            .expect("expected no more lines since the test messages iter is exhausted");
 
         // Ensure we got the marker.
         assert_eq!(val["message"], current_marker);
@@ -438,7 +456,9 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    let vector = framework
+        .vector("test-vector", HELM_VALUES_STDOUT_SINK, "")
+        .await?;
     framework
         .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
         .await?;
@@ -493,6 +513,14 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(val["kubernetes"]["pod_uid"].as_str().unwrap().len(), 36); // 36 is a standard UUID string length
         assert_eq!(val["kubernetes"]["pod_labels"]["label1"], "hello");
         assert_eq!(val["kubernetes"]["pod_labels"]["label2"], "world");
+        // We don't have the node name to compare this to, so just assert it's
+        // a non-empty string.
+        assert!(!val["kubernetes"]["pod_node_name"]
+            .as_str()
+            .unwrap()
+            .is_empty());
+        assert_eq!(val["kubernetes"]["container_name"], "test-pod");
+        assert_eq!(val["kubernetes"]["container_image"], BUSYBOX_IMAGE);
 
         // Request to stop the flow.
         FlowControlCommand::Terminate
@@ -514,7 +542,9 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    let vector = framework
+        .vector("test-vector", HELM_VALUES_STDOUT_SINK, "")
+        .await?;
     framework
         .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
         .await?;
@@ -558,9 +588,9 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
     smoke_check_first_line(&mut log_reader).await;
 
-    // Read the log lines until the reasoable amount of time passes for us
-    // to be confident that vector shoud've picked up the excluded message
-    // if it wasn't fitlering it.
+    // Read the log lines until the reasonable amount of time passes for us
+    // to be confident that vector should've picked up the excluded message
+    // if it wasn't filtering it.
     let mut got_control_marker = false;
     let mut lines_till_we_give_up: usize = 10000;
     let (stop_tx, mut stop_rx) = futures::channel::mpsc::channel(0);
@@ -654,7 +684,9 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
     let framework = make_framework();
 
-    let vector = framework.vector("test-vector", VECTOR_CONFIG).await?;
+    let vector = framework
+        .vector("test-vector", HELM_VALUES_STDOUT_SINK, "")
+        .await?;
     framework
         .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
         .await?;
@@ -727,6 +759,77 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
 
     drop(test_pods);
     drop(test_namespaces);
+    drop(vector);
+    Ok(())
+}
+
+/// This test validates that vector helm chart properly allows configuration via
+/// an additional config file, i.e. it can combine the managed and custom config
+/// files.
+#[tokio::test]
+async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = lock();
+    let framework = make_framework();
+
+    let vector = framework
+        .vector("test-vector", "", CUSTOM_RESOURCE_VECTOR_CONFIG)
+        .await?;
+    framework
+        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
+        .await?;
+
+    let test_namespace = framework.namespace("test-vector-test-pod").await?;
+
+    let test_pod = framework
+        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+            "test-vector-test-pod",
+            "test-pod",
+            "echo MARKER",
+            vec![],
+        ))?)
+        .await?;
+    framework
+        .wait(
+            "test-vector-test-pod",
+            vec!["pods/test-pod"],
+            WaitFor::Condition("initialized"),
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
+    smoke_check_first_line(&mut log_reader).await;
+
+    // Read the rest of the log lines.
+    let mut got_marker = false;
+    look_for_log_line(&mut log_reader, |val| {
+        if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
+            // A log from something other than our test pod, pretend we don't
+            // see it.
+            return FlowControlCommand::GoOn;
+        }
+
+        // Ensure we got the marker.
+        assert_eq!(val["message"], "MARKER");
+
+        if got_marker {
+            // We've already seen one marker! This is not good, we only emitted
+            // one.
+            panic!("Marker seen more than once");
+        }
+
+        // If we did, remember it.
+        got_marker = true;
+
+        // Request to stop the flow.
+        FlowControlCommand::Terminate
+    })
+    .await?;
+
+    assert!(got_marker);
+
+    drop(test_pod);
+    drop(test_namespace);
     drop(vector);
     Ok(())
 }

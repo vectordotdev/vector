@@ -39,6 +39,8 @@ pub mod merge;
 pub mod reduce;
 #[cfg(feature = "transforms-regex_parser")]
 pub mod regex_parser;
+#[cfg(feature = "transforms-remap")]
+pub mod remap;
 #[cfg(feature = "transforms-remove_fields")]
 pub mod remove_fields;
 #[cfg(feature = "transforms-remove_tags")]

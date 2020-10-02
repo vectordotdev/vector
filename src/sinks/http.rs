@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{self, Event},
+    event::Event,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
@@ -9,8 +9,8 @@ use crate::{
     },
     tls::{TlsOptions, TlsSettings},
 };
-use futures::{FutureExt, TryFutureExt};
-use futures01::{future, Sink};
+use futures::{future, FutureExt};
+use futures01::Sink;
 use http::{
     header::{self, HeaderName, HeaderValue},
     Method, Request, StatusCode, Uri,
@@ -73,7 +73,7 @@ lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
         in_flight_limit: InFlightLimit::Fixed(10),
         timeout_secs: Some(30),
-        rate_limit_num: Some(10),
+        rate_limit_num: Some(u64::max_value()),
         ..Default::default()
     };
 }
@@ -99,9 +99,13 @@ inventory::submit! {
     SinkDescription::new_without_default::<HttpSinkConfig>("http")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         validate_headers(&self.headers, &self.auth)?;
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(cx.resolver(), tls)?;
@@ -126,16 +130,14 @@ impl SinkConfig for HttpSinkConfig {
         )
         .sink_map_err(|e| error!("Fatal HTTP sink error: {}", e));
 
-        let sink = Box::new(sink);
+        let sink = super::VectorSink::Futures01Sink(Box::new(sink));
 
         match self.healthcheck_uri.clone() {
             Some(healthcheck_uri) => {
-                let healthcheck = healthcheck(healthcheck_uri, self.auth.clone(), client)
-                    .boxed()
-                    .compat();
-                Ok((sink, Box::new(healthcheck)))
+                let healthcheck = healthcheck(healthcheck_uri, self.auth.clone(), client).boxed();
+                Ok((sink, healthcheck))
             }
-            None => Ok((sink, Box::new(future::ok(())))),
+            None => Ok((sink, future::ok(()).boxed())),
         }
     }
 
@@ -159,7 +161,7 @@ impl HttpSink for HttpSinkConfig {
 
         let body = match &self.encoding.codec() {
             Encoding::Text => {
-                if let Some(v) = event.get(&event::log_schema().message_key()) {
+                if let Some(v) = event.get(&crate::config::log_schema().message_key()) {
                     let mut b = v.to_string_lossy().into_bytes();
                     b.push(b'\n');
                     b
@@ -291,14 +293,15 @@ mod tests {
     use crate::{
         assert_downcast_matches,
         config::SinkContext,
-        sinks::http::HttpSinkConfig,
-        sinks::util::http::HttpSink,
-        sinks::util::test::build_test_server,
+        sinks::{
+            http::HttpSinkConfig,
+            util::{http::HttpSink, test::build_test_server},
+        },
         test_util::{next_addr, random_lines_with_stream},
     };
     use bytes::buf::BufExt;
-    use futures::compat::Future01CompatExt;
-    use futures01::{Sink, Stream};
+    use flate2::read::GzDecoder;
+    use futures::{stream, StreamExt};
     use headers::{Authorization, HeaderMapExt};
     use hyper::Method;
     use serde::Deserialize;
@@ -368,9 +371,11 @@ mod tests {
         );
     }
 
-    #[test]
+    // TODO: Fix failure on GH Actions using macos-latest image.
+    #[cfg(not(target_os = "macos"))]
+    #[tokio::test]
     #[should_panic(expected = "Authorization header can not be used with defined auth options")]
-    fn http_headers_auth_conflict() {
+    async fn http_headers_auth_conflict() {
         let config = r#"
         uri = "http://$IN_ADDR/"
         encoding = "text"
@@ -385,10 +390,10 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
-        let _ = config.build(cx).unwrap();
+        let _ = config.build(cx).await.unwrap();
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test]
     async fn http_happy_path_post() {
         let num_lines = 1000;
 
@@ -409,44 +414,40 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
-        let pump = sink.send_all(events);
+        let pump = sink.run(events);
 
         tokio::spawn(server);
 
-        let _ = pump.compat().await.unwrap();
+        pump.await.unwrap();
         drop(trigger);
 
         let output_lines = rx
-            .wait()
-            .map(Result::unwrap)
-            .map(|(parts, body)| {
+            .flat_map(|(parts, body)| {
                 assert_eq!(Method::POST, parts.method);
                 assert_eq!("/frames", parts.uri.path());
                 assert_eq!(
                     Some(Authorization::basic("waldo", "hunter2")),
                     parts.headers.typed_get()
                 );
-                body.reader()
+                stream::iter(BufReader::new(GzDecoder::new(body.reader())).lines())
             })
-            .map(flate2::read::GzDecoder::new)
-            .map(BufReader::new)
-            .flat_map(BufRead::lines)
             .map(Result::unwrap)
-            .map(|s| {
-                let val: serde_json::Value = serde_json::from_str(&s).unwrap();
+            .map(|line| {
+                let val: serde_json::Value = serde_json::from_str(&line).unwrap();
                 val.get("message").unwrap().as_str().unwrap().to_owned()
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+            .await;
 
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test]
     async fn http_happy_path_put() {
         let num_lines = 1000;
 
@@ -468,44 +469,40 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
-        let pump = sink.send_all(events);
+        let pump = sink.run(events);
 
         tokio::spawn(server);
 
-        let _ = pump.compat().await.unwrap();
+        pump.await.unwrap();
         drop(trigger);
 
         let output_lines = rx
-            .wait()
-            .map(Result::unwrap)
-            .map(|(parts, body)| {
+            .flat_map(|(parts, body)| {
                 assert_eq!(Method::PUT, parts.method);
                 assert_eq!("/frames", parts.uri.path());
                 assert_eq!(
                     Some(Authorization::basic("waldo", "hunter2")),
                     parts.headers.typed_get()
                 );
-                body.reader()
+                stream::iter(BufReader::new(GzDecoder::new(body.reader())).lines())
             })
-            .map(flate2::read::GzDecoder::new)
-            .map(BufReader::new)
-            .flat_map(BufRead::lines)
             .map(Result::unwrap)
-            .map(|s| {
-                let val: serde_json::Value = serde_json::from_str(&s).unwrap();
+            .map(|line| {
+                let val: serde_json::Value = serde_json::from_str(&line).unwrap();
                 val.get("message").unwrap().as_str().unwrap().to_owned()
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+            .await;
 
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);
     }
 
-    #[tokio::test(core_threads = 2)]
+    #[tokio::test]
     async fn http_passes_custom_headers() {
         let num_lines = 1000;
 
@@ -524,21 +521,19 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
-        let pump = sink.send_all(events);
+        let pump = sink.run(events);
 
         tokio::spawn(server);
 
-        let _ = pump.compat().await.unwrap();
+        pump.await.unwrap();
         drop(trigger);
 
         let output_lines = rx
-            .wait()
-            .map(Result::unwrap)
-            .map(|(parts, body)| {
+            .flat_map(|(parts, body)| {
                 assert_eq!(Method::POST, parts.method);
                 assert_eq!("/frames", parts.uri.path());
                 assert_eq!(
@@ -549,17 +544,15 @@ mod tests {
                     Some("quux"),
                     parts.headers.get("baz").map(|v| v.to_str().unwrap())
                 );
-                body.reader()
+                stream::iter(BufReader::new(GzDecoder::new(body.reader())).lines())
             })
-            .map(flate2::read::GzDecoder::new)
-            .map(BufReader::new)
-            .flat_map(BufRead::lines)
             .map(Result::unwrap)
-            .map(|s| {
-                let val: serde_json::Value = serde_json::from_str(&s).unwrap();
+            .map(|line| {
+                let val: serde_json::Value = serde_json::from_str(&line).unwrap();
                 val.get("message").unwrap().as_str().unwrap().to_owned()
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+            .await;
 
         assert_eq!(num_lines, output_lines.len());
         assert_eq!(input_lines, output_lines);

@@ -3,7 +3,7 @@
 use crate::{dns::Resolver, sinks::util, tls::MaybeTlsSettings};
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::{Stream, StreamExt};
+use futures::StreamExt;
 use http::{
     header::{HeaderMap, HeaderName, HeaderValue},
     Method, Request, Response, StatusCode,
@@ -20,7 +20,7 @@ use rusoto_credential::{
     StaticProvider,
 };
 use rusoto_signature::{SignedRequest, SignedRequestPayload};
-use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
+use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient, WebIdentityProvider};
 use snafu::{ResultExt, Snafu};
 use std::{
     fmt, io,
@@ -44,9 +44,50 @@ enum RusotoError {
     InvalidAWSCredentials { source: CredentialsError },
 }
 
+// A custom chain provider incorporating web identity support
+// See - https://github.com/rusoto/rusoto/issues/1781
+pub struct CustomChainProvider {
+    chain_provider: ChainProvider,
+    web_provider: WebIdentityProvider,
+}
+
+impl CustomChainProvider {
+    pub fn new() -> CustomChainProvider {
+        CustomChainProvider {
+            chain_provider: ChainProvider::new(),
+            web_provider: WebIdentityProvider::from_k8s_env(),
+        }
+    }
+
+    pub fn set_timeout(&mut self, duration: Duration) {
+        self.chain_provider.set_timeout(duration);
+    }
+}
+
+impl Default for CustomChainProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[async_trait]
+impl ProvideAwsCredentials for CustomChainProvider {
+    async fn credentials(&self) -> Result<AwsCredentials, CredentialsError> {
+        if let Ok(creds) = self.web_provider.credentials().await {
+            return Ok(creds);
+        }
+        if let Ok(creds) = self.chain_provider.credentials().await {
+            return Ok(creds);
+        }
+        Err(CredentialsError::new(
+            "Couldn't find AWS credentials in environment, credentials file, or IAM role.",
+        ))
+    }
+}
+
 // A place-holder for the types of AWS credentials we support
 pub enum AwsCredentialsProvider {
-    Default(AutoRefreshingProvider<ChainProvider>),
+    Default(AutoRefreshingProvider<CustomChainProvider>),
     Role(AutoRefreshingProvider<StsAssumeRoleSessionCredentialsProvider>),
     Static(StaticProvider),
 }
@@ -85,7 +126,7 @@ impl AwsCredentialsProvider {
             Ok(Self::Role(creds))
         } else {
             debug!("using default credentials provider for AWS.");
-            let mut chain = ChainProvider::new();
+            let mut chain = CustomChainProvider::new();
             // 8 seconds because our default healthcheck timeout
             // is 10 seconds.
             chain.set_timeout(Duration::from_secs(8));
@@ -260,17 +301,14 @@ impl HttpBody for RusotoBody {
                     Poll::Ready(None)
                 }
             }
-            Some(SignedRequestPayload::Stream(stream)) => {
-                let stream = Pin::new(stream);
-                match stream.poll_next(cx) {
-                    Poll::Ready(Some(result)) => match result {
-                        Ok(buf) => Poll::Ready(Some(Ok(buf))),
-                        Err(error) => Poll::Ready(Some(Err(error))),
-                    },
-                    Poll::Ready(None) => Poll::Ready(None),
-                    Poll::Pending => Poll::Pending,
-                }
-            }
+            Some(SignedRequestPayload::Stream(stream)) => match stream.poll_next_unpin(cx) {
+                Poll::Ready(Some(result)) => match result {
+                    Ok(buf) => Poll::Ready(Some(Ok(buf))),
+                    Err(error) => Poll::Ready(Some(Err(error))),
+                },
+                Poll::Ready(None) => Poll::Ready(None),
+                Poll::Pending => Poll::Pending,
+            },
             None => Poll::Ready(None),
         }
     }

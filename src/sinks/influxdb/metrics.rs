@@ -1,13 +1,17 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::metric::{Metric, MetricValue},
-    sinks::influxdb::{
-        encode_namespace, encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings,
-        Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
-    },
-    sinks::util::{
-        http::{HttpBatchService, HttpClient, HttpRetryLogic},
-        BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
+    event::metric::{Metric, MetricValue, StatisticKind},
+    sinks::{
+        influxdb::{
+            encode_namespace, encode_timestamp, healthcheck, influx_line_protocol,
+            influxdb_settings, Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
+        },
+        util::{
+            http::{HttpBatchService, HttpClient, HttpRetryLogic},
+            statistic::DistributionStatistic,
+            BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
+        },
+        Healthcheck, VectorSink,
     },
 };
 use bytes::Bytes;
@@ -15,7 +19,6 @@ use futures::future::{ready, BoxFuture};
 use futures01::Sink;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::task::Poll;
 use tower::Service;
@@ -30,7 +33,7 @@ struct InfluxDBSvc {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDBConfig {
-    pub namespace: String,
+    pub namespace: Option<String>,
     pub endpoint: String,
     #[serde(flatten)]
     pub influxdb1_settings: Option<InfluxDB1Settings>,
@@ -59,9 +62,10 @@ inventory::submit! {
     SinkDescription::new::<InfluxDBConfig>("influxdb_metrics")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDBConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = HttpClient::new(cx.resolver(), None)?;
         let healthcheck = healthcheck(
             self.clone().endpoint,
@@ -87,7 +91,7 @@ impl InfluxDBSvc {
         config: InfluxDBConfig,
         cx: SinkContext,
         client: HttpClient,
-    ) -> crate::Result<super::RouterSink> {
+    ) -> crate::Result<VectorSink> {
         let settings = influxdb_settings(
             config.influxdb1_settings.clone(),
             config.influxdb2_settings.clone(),
@@ -123,7 +127,7 @@ impl InfluxDBSvc {
             )
             .sink_map_err(|e| error!("Fatal influxdb sink error: {}", e));
 
-        Ok(Box::new(sink))
+        Ok(VectorSink::Futures01Sink(Box::new(sink)))
     }
 }
 
@@ -137,7 +141,11 @@ impl Service<Vec<Metric>> for InfluxDBSvc {
     }
 
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
-        let input = encode_events(self.protocol_version, items, &self.config.namespace);
+        let input = encode_events(
+            self.protocol_version,
+            items,
+            self.config.namespace.as_deref(),
+        );
         let body: Vec<u8> = input.into_bytes();
 
         self.inner.call(body)
@@ -164,11 +172,11 @@ fn create_build_request(
 fn encode_events(
     protocol_version: ProtocolVersion,
     events: Vec<Metric>,
-    namespace: &str,
+    namespace: Option<&str>,
 ) -> String {
     let mut output = String::new();
     for event in events.into_iter() {
-        let fullname = encode_namespace(namespace, &event.name);
+        let fullname = encode_namespace(namespace, '.', &event.name);
         let ts = encode_timestamp(event.timestamp);
         let tags = event.tags.clone();
         match event.value {
@@ -262,9 +270,13 @@ fn encode_events(
             MetricValue::Distribution {
                 values,
                 sample_rates,
-                statistic: _,
+                statistic,
             } => {
-                let fields = encode_distribution(&values, &sample_rates);
+                let quantiles = match statistic {
+                    StatisticKind::Histogram => &[0.95] as &[_],
+                    StatisticKind::Summary => &[0.5, 0.75, 0.9, 0.95, 0.99] as &[_],
+                };
+                let fields = encode_distribution(&values, &sample_rates, quantiles);
 
                 influx_line_protocol(
                     protocol_version,
@@ -284,61 +296,28 @@ fn encode_events(
     output
 }
 
-fn encode_distribution(values: &[f64], counts: &[u32]) -> Option<HashMap<String, Field>> {
-    if values.len() != counts.len() {
-        return None;
-    }
-
-    let mut samples = Vec::new();
-    for (v, c) in values.iter().zip(counts.iter()) {
-        for _ in 0..*c {
-            samples.push(*v);
-        }
-    }
-
-    if samples.is_empty() {
-        return None;
-    }
-
-    if samples.len() == 1 {
-        let val = samples[0];
-        return Some(
-            vec![
-                ("min".to_owned(), Field::Float(val)),
-                ("max".to_owned(), Field::Float(val)),
-                ("median".to_owned(), Field::Float(val)),
-                ("avg".to_owned(), Field::Float(val)),
-                ("sum".to_owned(), Field::Float(val)),
-                ("count".to_owned(), Field::Float(1.0)),
-                ("quantile_0.95".to_owned(), Field::Float(val)),
-            ]
-            .into_iter()
-            .collect(),
-        );
-    }
-
-    samples.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
-
-    let length = samples.len() as f64;
-    let min = samples.first().unwrap();
-    let max = samples.last().unwrap();
-
-    let p50 = samples[(0.50 * length - 1.0).round() as usize];
-    let p95 = samples[(0.95 * length - 1.0).round() as usize];
-
-    let sum = samples.iter().sum();
-    let avg = sum / length;
+fn encode_distribution(
+    values: &[f64],
+    counts: &[u32],
+    quantiles: &[f64],
+) -> Option<HashMap<String, Field>> {
+    let statistic = DistributionStatistic::new(values, counts, quantiles)?;
 
     let fields: HashMap<String, Field> = vec![
-        ("min".to_owned(), Field::Float(*min)),
-        ("max".to_owned(), Field::Float(*max)),
-        ("median".to_owned(), Field::Float(p50)),
-        ("avg".to_owned(), Field::Float(avg)),
-        ("sum".to_owned(), Field::Float(sum)),
-        ("count".to_owned(), Field::Float(length)),
-        ("quantile_0.95".to_owned(), Field::Float(p95)),
+        ("min".to_owned(), Field::Float(statistic.min)),
+        ("max".to_owned(), Field::Float(statistic.max)),
+        ("median".to_owned(), Field::Float(statistic.median)),
+        ("avg".to_owned(), Field::Float(statistic.avg)),
+        ("sum".to_owned(), Field::Float(statistic.sum)),
+        ("count".to_owned(), Field::Float(statistic.count as f64)),
     ]
     .into_iter()
+    .chain(
+        statistic
+            .quantiles
+            .iter()
+            .map(|&(p, val)| (format!("quantile_{:.2}", p), Field::Float(val))),
+    )
     .collect();
 
     Some(fields)
@@ -377,7 +356,7 @@ mod tests {
             },
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
         assert_eq!(
             line_protocols,
             "ns.total,metric_type=counter value=1.5 1542182950000000011\n\
@@ -395,7 +374,7 @@ mod tests {
             value: MetricValue::Gauge { value: -1.5 },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
         assert_eq!(
             line_protocols,
             "ns.meter,metric_type=gauge,normal_tag=value,true_tag=true value=-1.5 1542182950000000011"
@@ -414,7 +393,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
         assert_eq!(
             line_protocols,
             "ns.users,metric_type=set,normal_tag=value,true_tag=true value=2 1542182950000000011"
@@ -436,7 +415,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V1, events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V1, events, Some("ns"));
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -475,7 +454,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -514,7 +493,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V1, events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V1, events, Some("ns"));
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -553,7 +532,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -615,7 +594,7 @@ mod tests {
             },
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 3);
 
@@ -691,7 +670,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
         assert_eq!(line_protocols.len(), 0);
     }
 
@@ -709,7 +688,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
         assert_eq!(line_protocols.len(), 0);
     }
 
@@ -727,8 +706,52 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, "ns");
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
         assert_eq!(line_protocols.len(), 0);
+    }
+
+    #[test]
+    fn test_encode_distribution_summary() {
+        let events = vec![Metric {
+            name: "requests".into(),
+            timestamp: Some(ts()),
+            tags: Some(tags()),
+            kind: MetricKind::Incremental,
+            value: MetricValue::Distribution {
+                values: vec![1.0, 2.0, 3.0],
+                sample_rates: vec![3, 3, 2],
+                statistic: StatisticKind::Summary,
+            },
+        }];
+
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
+        let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
+        assert_eq!(line_protocols.len(), 1);
+
+        let line_protocol = split_line_protocol(line_protocols[0]);
+        assert_eq!("ns.requests", line_protocol.0);
+        assert_eq!(
+            "metric_type=distribution,normal_tag=value,true_tag=true",
+            line_protocol.1
+        );
+        assert_fields(
+            line_protocol.2.to_string(),
+            [
+                "avg=1.875",
+                "count=8",
+                "max=3",
+                "median=2",
+                "min=1",
+                "sum=15",
+                "quantile_0.50=2",
+                "quantile_0.75=2",
+                "quantile_0.90=3",
+                "quantile_0.95=3",
+                "quantile_0.99=3",
+            ]
+            .to_vec(),
+        );
+        assert_eq!("1542182950000000011", line_protocol.3);
     }
 }
 
@@ -746,12 +769,10 @@ mod integration_tests {
             },
             util::http::HttpClient,
         },
-        test_util::runtime,
         Event,
     };
     use chrono::Utc;
-    use futures::compat::Future01CompatExt;
-    use futures01::{stream as stream01, Sink};
+    use futures::stream;
 
     //    fn onboarding_v1() {
     //        let client = reqwest::Client::builder()
@@ -773,15 +794,14 @@ mod integration_tests {
     //        );
     //    }
 
-    #[test]
-    fn influxdb2_metrics_put_data() {
-        let mut rt = runtime();
-        onboarding_v2();
+    #[tokio::test]
+    async fn influxdb2_metrics_put_data() {
+        onboarding_v2().await;
 
         let cx = SinkContext::new_test();
 
         let config = InfluxDBConfig {
-            namespace: "ns".to_string(),
+            namespace: Some("ns".to_string()),
             endpoint: "http://localhost:9999".to_string(),
             influxdb1_settings: None,
             influxdb2_settings: Some(InfluxDB2Settings {
@@ -815,71 +835,66 @@ mod integration_tests {
 
         let client = HttpClient::new(cx.resolver(), None).unwrap();
         let sink = InfluxDBSvc::new(config, cx, client).unwrap();
+        sink.run(stream::iter(events)).await.unwrap();
 
-        let stream = stream01::iter_ok(events.clone().into_iter());
+        let mut body = std::collections::HashMap::new();
+        body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));
+        body.insert("type", "flux".to_owned());
 
-        rt.block_on_std(async move {
-            let _ = sink.send_all(stream).compat().await.unwrap();
+        let client = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()
+            .unwrap();
 
-            let mut body = std::collections::HashMap::new();
-            body.insert("query", format!("from(bucket:\"my-bucket\") |> range(start: 0) |> filter(fn: (r) => r._measurement == \"ns.{}\")", metric));
-            body.insert("type", "flux".to_owned());
+        let res = client
+            .post("http://localhost:9999/api/v2/query?org=my-org")
+            .json(&body)
+            .header("accept", "application/json")
+            .header("Authorization", "Token my-token")
+            .send()
+            .await
+            .unwrap();
+        let string = res.text().await.unwrap();
 
-            let client = reqwest::Client::builder()
-                .danger_accept_invalid_certs(true)
-                .build()
-                .unwrap();
+        let lines = string.split('\n').collect::<Vec<&str>>();
+        let header = lines[0].split(',').collect::<Vec<&str>>();
+        let record = lines[1].split(',').collect::<Vec<&str>>();
 
-            let res = client
-                .post("http://localhost:9999/api/v2/query?org=my-org")
-                .json(&body)
-                .header("accept", "application/json")
-                .header("Authorization", "Token my-token")
-                .send()
-                .await
-                .unwrap();
-            let string = res.text().await.unwrap();
-
-            let lines = string.split("\n").collect::<Vec<&str>>();
-            let header = lines[0].split(",").collect::<Vec<&str>>();
-            let record = lines[1].split(",").collect::<Vec<&str>>();
-
-            assert_eq!(
-                record[header
-                    .iter()
-                    .position(|&r| r.trim() == "metric_type")
-                    .unwrap()]
-                .trim(),
-                "counter"
-            );
-            assert_eq!(
-                record[header
-                    .iter()
-                    .position(|&r| r.trim() == "production")
-                    .unwrap()]
-                .trim(),
-                "true"
-            );
-            assert_eq!(
-                record[header.iter().position(|&r| r.trim() == "region").unwrap()].trim(),
-                "us-west-1"
-            );
-            assert_eq!(
-                record[header
-                    .iter()
-                    .position(|&r| r.trim() == "_measurement")
-                    .unwrap()]
-                .trim(),
-                format!("ns.{}", metric)
-            );
-            assert_eq!(
-                record[header.iter().position(|&r| r.trim() == "_field").unwrap()].trim(),
-                "value"
-            );
-            assert_eq!(
-                record[header.iter().position(|&r| r.trim() == "_value").unwrap()].trim(),
-                "45"
-            );
-        });
+        assert_eq!(
+            record[header
+                .iter()
+                .position(|&r| r.trim() == "metric_type")
+                .unwrap()]
+            .trim(),
+            "counter"
+        );
+        assert_eq!(
+            record[header
+                .iter()
+                .position(|&r| r.trim() == "production")
+                .unwrap()]
+            .trim(),
+            "true"
+        );
+        assert_eq!(
+            record[header.iter().position(|&r| r.trim() == "region").unwrap()].trim(),
+            "us-west-1"
+        );
+        assert_eq!(
+            record[header
+                .iter()
+                .position(|&r| r.trim() == "_measurement")
+                .unwrap()]
+            .trim(),
+            format!("ns.{}", metric)
+        );
+        assert_eq!(
+            record[header.iter().position(|&r| r.trim() == "_field").unwrap()].trim(),
+            "value"
+        );
+        assert_eq!(
+            record[header.iter().position(|&r| r.trim() == "_value").unwrap()].trim(),
+            "45"
+        );
     }
 }

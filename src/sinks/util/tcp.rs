@@ -6,14 +6,14 @@ use crate::{
         TcpConnectionDisconnected, TcpConnectionEstablished, TcpConnectionFailed,
         TcpConnectionShutdown, TcpEventSent, TcpFlushError,
     },
-    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSink},
-    sinks::{Healthcheck, RouterSink},
+    sinks::util::{
+        encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSinkOld,
+    },
+    sinks::{Healthcheck, VectorSink},
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
 };
 use bytes::Bytes;
-use futures::{
-    compat::CompatSink, future::BoxFuture, task::noop_waker_ref, FutureExt, TryFutureExt,
-};
+use futures::{compat::CompatSink, task::noop_waker_ref, FutureExt, TryFutureExt};
 use futures01::{
     stream::iter_ok, try_ready, Async, AsyncSink, Future, Poll as Poll01, Sink, StartSend,
 };
@@ -50,7 +50,7 @@ impl TcpSinkConfig {
         }
     }
 
-    pub fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    pub fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -63,11 +63,11 @@ impl TcpSinkConfig {
 
         let encoding = self.encoding.clone();
         let sink = Box::new(
-            StreamSink::new(tcp, cx.acker())
+            StreamSinkOld::new(tcp, cx.acker())
                 .with_flat_map(move |event| iter_ok(encode_event(event, &encoding))),
         );
 
-        Ok((sink, Box::new(healthcheck.compat())))
+        Ok((VectorSink::Futures01Sink(sink), healthcheck))
     }
 }
 
@@ -105,7 +105,7 @@ impl TcpSink {
         }
     }
 
-    pub fn healthcheck(&self) -> BoxFuture<'static, crate::Result<()>> {
+    pub fn healthcheck(&self) -> Healthcheck {
         tcp_healthcheck(
             self.host.clone(),
             self.port,
@@ -199,59 +199,60 @@ impl Sink for TcpSink {
         let span = self.span.clone();
         let _enter = span.enter();
 
-        match self.poll_connection() {
-            Ok(Async::Ready(connection)) => {
-                // Test if the remote has issued a disconnect by calling read(2)
-                // with a 1 sized buffer.
-                //
-                // This can return a proper disconnect error or `Ok(0)`
-                // which means the pipe is broken and we should try to reconnect.
-                //
-                // If this returns `Poll::Pending` we know the connection is still
-                // valid and the write will most likely succeed.
+        loop {
+            match self.poll_connection() {
+                Ok(Async::Ready(connection)) => {
+                    // Test if the remote has issued a disconnect by calling read(2)
+                    // with a 1 sized buffer.
+                    //
+                    // This can return a proper disconnect error or `Ok(0)`
+                    // which means the pipe is broken and we should try to reconnect.
+                    //
+                    // If this returns `Poll::Pending` we know the connection is still
+                    // valid and the write will most likely succeed.
 
-                let stream: &mut MaybeTlsStream<TcpStream> = connection.get_mut().get_mut();
-                let mut cx = Context::from_waker(noop_waker_ref());
-                match Pin::new(stream).poll_read(&mut cx, &mut [0u8; 1]) {
-                    Poll::Ready(Err(error)) => {
-                        emit!(TcpConnectionDisconnected { error });
-                        self.state = TcpSinkState::Disconnected;
-                        Ok(AsyncSink::NotReady(line))
-                    }
-                    Poll::Ready(Ok(0)) => {
-                        // Maybe this is only a sign to close the channel,
-                        // in which case we should try to flush our buffers
-                        // before disconnecting.
-                        match connection.poll_complete() {
-                            // Flush done so we can safely disconnect, or
-                            // error in which case we have really been
-                            // disconnected.
-                            Ok(Async::Ready(())) | Err(_) => {
-                                emit!(TcpConnectionShutdown {});
-                                self.state = TcpSinkState::Disconnected;
-                            }
-                            Ok(Async::NotReady) => (),
+                    let stream: &mut MaybeTlsStream<TcpStream> = connection.get_mut().get_mut();
+                    let mut cx = Context::from_waker(noop_waker_ref());
+                    match Pin::new(stream).poll_read(&mut cx, &mut [0u8; 1]) {
+                        Poll::Ready(Err(error)) => {
+                            emit!(TcpConnectionDisconnected { error });
+                            self.state = TcpSinkState::Disconnected;
                         }
-
-                        Ok(AsyncSink::NotReady(line))
-                    }
-                    _ => {
-                        emit!(TcpEventSent {
-                            byte_size: line.len()
-                        });
-                        match connection.start_send(line) {
-                            Err(error) => {
-                                error!(message = "connection disconnected.", %error);
-                                self.state = TcpSinkState::Disconnected;
-                                Ok(AsyncSink::Ready)
+                        Poll::Ready(Ok(0)) => {
+                            // Maybe this is only a sign to close the channel,
+                            // in which case we should try to flush our buffers
+                            // before disconnecting.
+                            match connection.poll_complete() {
+                                // Flush done so we can safely disconnect, or
+                                // error in which case we have really been
+                                // disconnected.
+                                Ok(Async::Ready(())) | Err(_) => {
+                                    emit!(TcpConnectionShutdown {});
+                                    self.state = TcpSinkState::Disconnected;
+                                }
+                                Ok(Async::NotReady) => return Ok(AsyncSink::NotReady(line)),
                             }
-                            Ok(res) => Ok(res),
+                        }
+                        _ => {
+                            let byte_size = line.len();
+                            return match connection.start_send(line) {
+                                Ok(AsyncSink::NotReady(line)) => Ok(AsyncSink::NotReady(line)),
+                                Err(error) => {
+                                    error!(message = "connection disconnected.", %error);
+                                    self.state = TcpSinkState::Disconnected;
+                                    return Ok(AsyncSink::Ready);
+                                }
+                                Ok(AsyncSink::Ready) => {
+                                    emit!(TcpEventSent { byte_size });
+                                    Ok(AsyncSink::Ready)
+                                }
+                            };
                         }
                     }
                 }
+                Ok(Async::NotReady) => return Ok(AsyncSink::NotReady(line)),
+                Err(_) => unreachable!(),
             }
-            Ok(Async::NotReady) => Ok(AsyncSink::NotReady(line)),
-            Err(_) => unreachable!(),
         }
     }
 

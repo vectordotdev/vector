@@ -196,14 +196,14 @@ impl<S: Sink> Sink for DropWhenFull<S> {
 #[cfg(test)]
 mod test {
     use super::{Acker, BufferConfig, DropWhenFull, WhenFull};
-    use crate::test_util::block_on;
+    use futures::compat::Future01CompatExt;
     use futures01::{future, sync::mpsc, task::AtomicTask, Async, AsyncSink, Sink, Stream};
     use std::sync::{atomic::AtomicUsize, Arc};
     use tokio01_test::task::MockTask;
 
-    #[test]
-    fn drop_when_full() {
-        block_on::<_, _, ()>(future::lazy(|| {
+    #[tokio::test]
+    async fn drop_when_full() {
+        future::lazy(|| {
             let (tx, mut rx) = mpsc::channel(2);
 
             let mut tx = DropWhenFull { inner: tx };
@@ -218,8 +218,10 @@ mod test {
             assert_eq!(rx.poll(), Ok(Async::Ready(Some(3))));
             assert_eq!(rx.poll(), Ok(Async::NotReady));
 
-            future::ok(())
-        }))
+            future::ok::<(), ()>(())
+        })
+        .compat()
+        .await
         .unwrap();
     }
 

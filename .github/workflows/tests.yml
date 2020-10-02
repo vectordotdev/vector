@@ -36,16 +36,19 @@ on:
 
 env:
   VERBOSE: true
+  AUTOINSTALL: true
   RUST_TEST_THREADS: 1
   TEST_LOG: vector=debug
   RUST_BACKTRACE: full
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
+  CONTAINER_TOOL: "docker"
+  CI: true
 
 jobs:
   cancel-previous:
     name: Cancel redundant jobs
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
@@ -54,10 +57,13 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
   test-linux:
-    name: Unit - Linux
+    name: Unit - x86_64-unknown-linux-gnu
     runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -66,8 +72,53 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test
+
+  # TODO: Upgrade to test once the tz issues are solved.
+  # https://github.com/timberio/vector/issues/3771
+  build-x86_64-unknown-linux-gnu:
+    name: Unit - x86_64-unknown-linux-gnu
+    runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
+    steps:
+      - uses: actions/checkout@v2
+      - run: make ci-sweep
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: make build-x86_64-unknown-linux-gnu
+
+  # TODO: Upgrade to test once the tz issues are solved.
+  # https://github.com/timberio/vector/issues/3771
+  build-aarch64-unknown-linux-gnu:
+    name: Unit - aarch64-unknown-linux-gnu
+    runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
+    steps:
+      - uses: actions/checkout@v2
+      - run: make ci-sweep
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: make build-aarch64-unknown-linux-gnu
 
   test-mac:
     name: Unit - Mac
@@ -75,6 +126,8 @@ jobs:
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
     runs-on: macos-latest
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -85,6 +138,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: bash scripts/environment/bootstrap-macos-10.sh
       - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test
 
@@ -94,18 +148,22 @@ jobs:
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
     runs-on: windows-latest
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v1
       - env:
-          USE_CONTAINER: none
           RUSTFLAGS: "-D warnings"
-        run: cargo test --no-default-features --features default-msvc
+        run: cargo test --no-fail-fast --no-default-features --features default-msvc
 
   test-misc:
     name: Shutdown - Linux
     runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -114,6 +172,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test-shutdown
       - run: make test-cli
@@ -122,8 +181,11 @@ jobs:
   test-integration-aws:
     name: Integration - Linux, AWS
     runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -132,14 +194,18 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test-integration-aws
 
   test-integration-clickhouse:
     name: Integration - Linux, Clickhouse
     runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -154,8 +220,11 @@ jobs:
   test-integration-docker:
     name: Integration - Linux, Docker
     runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -164,14 +233,18 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test-integration-docker
 
   test-integration-elasticsearch:
     name: Integration - Linux, ES
     runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -180,14 +253,18 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test-integration-elasticsearch
 
   test-integration-gcp:
     name: Integration - Linux, GCP
     runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -196,14 +273,38 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test-integration-gcp
+
+  test-integration-humio:
+    name: Integration - Linux, Humio
+    runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
+    steps:
+      - uses: actions/checkout@v2
+      - run: make ci-sweep
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: make test-integration-humio
 
   test-integration-influxdb:
     name: Integration - Linux, Influx
     runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -212,14 +313,18 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test-integration-influxdb
 
   test-integration-kafka:
     name: Integration - Linux, Kafka
     runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -228,14 +333,18 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test-integration-kafka
 
   test-integration-loki:
     name: Integration - Linux, Loki
     runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -244,14 +353,18 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test-integration-loki
 
   test-integration-pulsar:
     name: Integration - Linux, Pulsar
     runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -260,14 +373,18 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test-integration-pulsar
 
   test-integration-splunk:
     name: Integration - Linux, Splunk
     runs-on: ubuntu-20.04
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
+      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
@@ -276,5 +393,6 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test-integration-splunk

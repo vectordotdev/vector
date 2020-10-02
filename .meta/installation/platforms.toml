@@ -18,6 +18,3 @@ strategies = [
 ]
 
 <%= render("_partials/descriptions/_docker.toml") %>
-
-#[installation.platforms.kubernetes]
-#min_version = "1.14

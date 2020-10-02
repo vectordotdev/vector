@@ -14,12 +14,15 @@
 extern crate tracing;
 #[macro_use]
 extern crate derivative;
+#[macro_use]
+extern crate pest_derive;
 
 #[cfg(feature = "jemallocator")]
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 pub mod buffers;
+pub mod cli;
 pub mod conditions;
 pub mod config;
 pub mod dns;
@@ -30,6 +33,9 @@ pub mod generate;
 pub mod wasm;
 #[macro_use]
 pub mod internal_events;
+#[cfg(feature = "api")]
+pub mod api;
+pub mod app;
 pub mod async_read;
 pub mod heartbeat;
 #[cfg(feature = "rdkafka")]
@@ -37,11 +43,12 @@ pub mod kafka;
 pub mod kubernetes;
 pub mod line_agg;
 pub mod list;
+pub mod mapping;
 pub mod metrics;
 pub(crate) mod pipeline;
 pub mod region;
-pub mod runtime;
 pub mod serde;
+pub mod service;
 pub mod shutdown;
 pub mod signal;
 pub mod sinks;
@@ -56,6 +63,8 @@ pub mod transforms;
 pub mod types;
 pub mod unit_test;
 pub mod validate;
+#[cfg(windows)]
+pub mod vector_windows;
 
 pub use event::Event;
 pub use pipeline::Pipeline;
@@ -85,4 +94,8 @@ pub fn get_version() -> String {
 #[allow(unused)]
 mod built_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
+}
+
+pub fn get_hostname() -> std::io::Result<String> {
+    Ok(hostname::get()?.to_string_lossy().into())
 }

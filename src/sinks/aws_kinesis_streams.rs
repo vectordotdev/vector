@@ -1,7 +1,7 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
-    event::{self, Event},
+    event::Event,
     internal_events::AwsKinesisStreamsEventSent,
     region::RegionOrEndpoint,
     sinks::util::{
@@ -13,7 +13,7 @@ use crate::{
     },
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, FutureExt, TryFutureExt};
+use futures::{future::BoxFuture, FutureExt};
 use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
 use rand::random;
@@ -75,13 +75,20 @@ inventory::submit! {
     SinkDescription::new_without_default::<KinesisSinkConfig>("aws_kinesis_streams")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(cx.resolver())?;
-        let healthcheck = self.clone().healthcheck(client.clone()).boxed().compat();
+        let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = KinesisService::new(self.clone(), client, cx)?;
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -247,7 +254,6 @@ fn encode_event(
     partition_key_field: &Option<Atom>,
     encoding: &EncodingConfig<Encoding>,
 ) -> Option<PutRecordsRequestEntry> {
-    encoding.apply_rules(&mut event);
     let partition_key = if let Some(partition_key_field) = partition_key_field {
         if let Some(v) = event.as_log().get(&partition_key_field) {
             v.to_string_lossy()
@@ -269,11 +275,13 @@ fn encode_event(
         partition_key
     };
 
+    encoding.apply_rules(&mut event);
+
     let log = event.into_log();
     let data = match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
         Encoding::Text => log
-            .get(&event::log_schema().message_key())
+            .get(&log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };
@@ -302,10 +310,7 @@ fn gen_partition_key() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        event::{self, Event},
-        test_util::random_string,
-    };
+    use crate::{event::Event, test_util::random_string};
     use std::collections::BTreeMap;
 
     #[test]
@@ -325,7 +330,7 @@ mod tests {
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
 
-        assert_eq!(map[&event::log_schema().message_key().to_string()], message);
+        assert_eq!(map[&log_schema().message_key().to_string()], message);
         assert_eq!(map["key"], "value".to_string());
     }
 
@@ -348,6 +353,21 @@ mod tests {
         assert_eq!(&event.data[..], b"hello world");
         assert_eq!(event.partition_key.len(), 256);
     }
+
+    #[test]
+    fn kinesis_encode_event_apply_rules() {
+        let mut event = Event::from("hello world");
+        event.as_mut_log().insert("key", "some_key");
+
+        let mut encoding: EncodingConfig<_> = Encoding::Json.into();
+        encoding.except_fields = Some(vec![Atom::from("key")]);
+
+        let event = encode_event(event, &Some("key".into()), &encoding).unwrap();
+        let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();
+
+        assert_eq!(&event.partition_key, &"some_key".to_string());
+        assert!(!map.contains_key("key"));
+    }
 }
 
 #[cfg(feature = "aws-kinesis-streams-integration-tests")]
@@ -357,15 +377,16 @@ mod integration_tests {
     use crate::{
         config::SinkContext,
         region::RegionOrEndpoint,
-        test_util::{random_lines_with_stream, random_string, runtime},
+        test_util::{random_lines_with_stream, random_string},
     };
-    use futures01::Sink;
+    use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
     use rusoto_core::Region;
     use rusoto_kinesis::{Kinesis, KinesisClient};
     use std::sync::Arc;
+    use tokio::time::{delay_for, Duration};
 
-    #[test]
-    fn kinesis_put_records() {
+    #[tokio::test]
+    async fn kinesis_put_records() {
         let stream = gen_stream();
 
         let region = Region::Custom {
@@ -373,8 +394,7 @@ mod integration_tests {
             endpoint: "http://localhost:4568".into(),
         };
 
-        let mut rt = runtime();
-        rt.block_on_std(ensure_stream(region.clone(), stream.clone()));
+        ensure_stream(region.clone(), stream.clone()).await;
 
         let config = KinesisSinkConfig {
             stream_name: stream.clone(),
@@ -398,16 +418,14 @@ mod integration_tests {
         let timestamp = chrono::Utc::now().timestamp_millis();
 
         let (mut input_lines, events) = random_lines_with_stream(100, 11);
+        let mut events = events.map(Ok);
 
-        let pump = sink.send_all(events);
-        let _ = rt.block_on(pump).unwrap();
+        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
 
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        delay_for(Duration::from_secs(1)).await;
 
         let timestamp = timestamp as f64 / 1000.0;
-        let records = rt
-            .block_on_std(fetch_records(stream, timestamp, region))
-            .unwrap();
+        let records = fetch_records(stream, timestamp, region).await.unwrap();
 
         let mut output_lines = records
             .into_iter()

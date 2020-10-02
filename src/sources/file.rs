@@ -1,6 +1,7 @@
+use super::util::MultilineConfig;
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::{self, Event},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    event::Event,
     internal_events::{FileEventReceived, FileSourceInternalEventsEmitter},
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -21,7 +22,7 @@ use futures01::{future, Future, Sink, Stream};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 use tokio::task::spawn_blocking;
@@ -53,24 +54,6 @@ enum BuildError {
         indicator: String,
         source: regex::Error,
     },
-    #[snafu(display(
-        "unable to parse multiline start pattern from {:?}: {}",
-        start_pattern,
-        source
-    ))]
-    InvalidMultilineStartPattern {
-        start_pattern: String,
-        source: regex::Error,
-    },
-    #[snafu(display(
-        "unable to parse multiline condition pattern from {:?}: {}",
-        condition_pattern,
-        source
-    ))]
-    InvalidMultilineConditionPattern {
-        condition_pattern: String,
-        source: regex::Error,
-    },
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
@@ -93,42 +76,6 @@ pub struct FileConfig {
     pub max_read_bytes: usize,
     pub oldest_first: bool,
     pub remove_after: Option<u64>,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct MultilineConfig {
-    pub start_pattern: String,
-    pub condition_pattern: String,
-    pub mode: line_agg::Mode,
-    pub timeout_ms: u64,
-}
-
-impl TryFrom<&MultilineConfig> for line_agg::Config {
-    type Error = crate::Error;
-
-    fn try_from(config: &MultilineConfig) -> crate::Result<Self> {
-        let MultilineConfig {
-            start_pattern,
-            condition_pattern,
-            mode,
-            timeout_ms,
-        } = config;
-
-        let start_pattern = Regex::new(start_pattern)
-            .with_context(|| InvalidMultilineStartPattern { start_pattern })?;
-        let condition_pattern = Regex::new(condition_pattern)
-            .with_context(|| InvalidMultilineConditionPattern { condition_pattern })?;
-        let mode = mode.clone();
-        let timeout = Duration::from_millis(*timeout_ms);
-
-        Ok(Self {
-            start_pattern,
-            condition_pattern,
-            mode,
-            timeout,
-        })
-    }
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -191,9 +138,10 @@ inventory::submit! {
     SourceDescription::new::<FileConfig>("file")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "file")]
 impl SourceConfig for FileConfig {
-    fn build(
+    async fn build(
         &self,
         name: &str,
         globals: &GlobalOptions,
@@ -206,12 +154,17 @@ impl SourceConfig for FileConfig {
         // other
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
 
-        if let Some(ref config) = self.multiline {
-            let _: line_agg::Config = config.try_into()?;
-        }
+        // Clippy rule, because async_trait?
+        #[allow(clippy::suspicious_else_formatting)]
+        {
+            if let Some(ref config) = self.multiline {
+                let _: line_agg::Config = config.try_into()?;
+            }
 
-        if let Some(ref indicator) = self.message_start_indicator {
-            Regex::new(indicator).with_context(|| InvalidMessageStartIndicator { indicator })?;
+            if let Some(ref indicator) = self.message_start_indicator {
+                Regex::new(indicator)
+                    .with_context(|| InvalidMessageStartIndicator { indicator })?;
+            }
         }
 
         Ok(file_source(self, data_dir, shutdown, out))
@@ -258,8 +211,8 @@ pub fn file_source(
     let host_key = config
         .host_key
         .clone()
-        .unwrap_or_else(|| event::log_schema().host_key().to_string());
-    let hostname = hostname::get_hostname();
+        .unwrap_or_else(|| log_schema().host_key().to_string());
+    let hostname = crate::get_hostname().ok();
 
     let include = config.include.clone();
     let exclude = config.exclude.clone();
@@ -278,7 +231,11 @@ pub fn file_source(
                 futures::future::ready(val.ok())
             });
             let logic = line_agg::Logic::new(config);
-            Box::new(Compat::new(LineAgg::new(rx, logic).map(Ok)))
+            Box::new(Compat::new(
+                LineAgg::new(rx.map(|(line, src)| (src, line, ())), logic)
+                    .map(|(src, line, _context)| (line, src))
+                    .map(Ok),
+            ))
         };
         let messages: Box<dyn Stream<Item = (Bytes, String), Error = ()> + Send> =
             if let Some(ref multiline_config) = multiline_config {
@@ -346,7 +303,7 @@ fn create_event(
     // Add source type
     event
         .as_mut_log()
-        .insert(event::log_schema().source_type_key(), "file");
+        .insert(log_schema().source_type_key(), Bytes::from("file"));
 
     if let Some(file_key) = &file_key {
         event.as_mut_log().insert(file_key.clone(), file);
@@ -362,9 +319,7 @@ fn create_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        config::Config, event, shutdown::ShutdownSignal, sources::file, test_util::trace_init,
-    };
+    use crate::{config::Config, shutdown::ShutdownSignal, sources::file};
     use futures01::Stream;
     use pretty_assertions::assert_eq;
     use std::{
@@ -454,7 +409,7 @@ mod tests {
         let global_dir = tempdir().unwrap();
         let local_dir = tempdir().unwrap();
 
-        let mut config = Config::empty();
+        let mut config = Config::default();
         config.global.data_dir = global_dir.into_path().into();
 
         // local path given -- local should win
@@ -482,11 +437,8 @@ mod tests {
 
         assert_eq!(log[&"file".into()], "some_file.rs".into());
         assert_eq!(log[&"host".into()], "Some.Machine".into());
-        assert_eq!(
-            log[&event::log_schema().message_key()],
-            "hello world".into()
-        );
-        assert_eq!(log[event::log_schema().source_type_key()], "file".into());
+        assert_eq!(log[&log_schema().message_key()], "hello world".into());
+        assert_eq!(log[log_schema().source_type_key()], "file".into());
     }
 
     #[tokio::test]
@@ -526,7 +478,7 @@ mod tests {
         let mut goodbye_i = 0;
 
         for event in received {
-            let line = event.as_log()[&event::log_schema().message_key()].to_string_lossy();
+            let line = event.as_log()[&log_schema().message_key()].to_string_lossy();
             if line.starts_with("hello") {
                 assert_eq!(line, format!("hello {}", hello_i));
                 assert_eq!(
@@ -596,7 +548,7 @@ mod tests {
                 path.to_str().unwrap()
             );
 
-            let line = event.as_log()[&event::log_schema().message_key()].to_string_lossy();
+            let line = event.as_log()[&log_schema().message_key()].to_string_lossy();
 
             if pre_trunc {
                 assert_eq!(line, format!("pretrunc {}", i));
@@ -662,7 +614,7 @@ mod tests {
                 path.to_str().unwrap()
             );
 
-            let line = event.as_log()[&event::log_schema().message_key()].to_string_lossy();
+            let line = event.as_log()[&log_schema().message_key()].to_string_lossy();
 
             if pre_rot {
                 assert_eq!(line, format!("prerot {}", i));
@@ -721,7 +673,7 @@ mod tests {
         let mut is = [0; 3];
 
         for event in received {
-            let line = event.as_log()[&event::log_schema().message_key()].to_string_lossy();
+            let line = event.as_log()[&log_schema().message_key()].to_string_lossy();
             let mut split = line.split(' ');
             let file = split.next().unwrap().parse::<usize>().unwrap();
             assert_ne!(file, 4);
@@ -843,10 +795,10 @@ mod tests {
             assert_eq!(
                 received.as_log().keys().collect::<HashSet<_>>(),
                 vec![
-                    event::log_schema().host_key().to_string(),
-                    event::log_schema().message_key().to_string(),
-                    event::log_schema().timestamp_key().to_string(),
-                    event::log_schema().source_type_key().to_string()
+                    log_schema().host_key().to_string(),
+                    log_schema().message_key().to_string(),
+                    log_schema().timestamp_key().to_string(),
+                    log_schema().source_type_key().to_string()
                 ]
                 .into_iter()
                 .collect::<HashSet<_>>()
@@ -884,7 +836,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
+                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["zeroth line", "first line"]);
         }
@@ -905,7 +857,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
+                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["second line"]);
         }
@@ -931,7 +883,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
+                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(
                 lines,
@@ -968,7 +920,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
+                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["first line"]);
         }
@@ -993,7 +945,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
+                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["second line"]);
         }
@@ -1071,7 +1023,7 @@ mod tests {
                     .to_string_lossy()
                     .ends_with("before")
             })
-            .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
+            .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
             .collect::<Vec<_>>();
         let after_lines = received
             .iter()
@@ -1080,7 +1032,7 @@ mod tests {
                     .to_string_lossy()
                     .ends_with("after")
             })
-            .map(|event| event.as_log()[&event::log_schema().message_key()].to_string_lossy())
+            .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(before_lines, vec!["second line"]);
         assert_eq!(after_lines, vec!["_first line", "_second line"]);
@@ -1129,7 +1081,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&event::log_schema().message_key())
+                    .get(&log_schema().message_key())
                     .unwrap()
                     .clone()
             })
@@ -1191,7 +1143,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&event::log_schema().message_key())
+                    .get(&log_schema().message_key())
                     .unwrap()
                     .clone()
             })
@@ -1266,7 +1218,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&event::log_schema().message_key())
+                    .get(&log_schema().message_key())
                     .unwrap()
                     .clone()
             })
@@ -1333,7 +1285,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&event::log_schema().message_key())
+                    .get(&log_schema().message_key())
                     .unwrap()
                     .clone()
             })
@@ -1398,7 +1350,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&event::log_schema().message_key())
+                    .get(&log_schema().message_key())
                     .unwrap()
                     .clone()
             })
@@ -1416,6 +1368,64 @@ mod tests {
                 "i'm new".into(),
                 "hopefully you read all the old stuff first".into(),
                 "because otherwise i'm not going to make sense".into(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_split_reads() {
+        let (tx, rx) = Pipeline::new_test();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            start_at_beginning: true,
+            max_read_bytes: 1,
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        writeln!(&mut file, "hello i am a normal line").unwrap();
+
+        sleep_500_millis().await;
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        tokio::spawn(source.compat());
+
+        sleep_500_millis().await;
+
+        write!(&mut file, "i am not a full line").unwrap();
+
+        // Longer than the EOF timeout
+        sleep_500_millis().await;
+
+        writeln!(&mut file, " until now").unwrap();
+
+        sleep_500_millis().await;
+
+        drop(trigger_shutdown);
+
+        let received = wait_with_timeout(
+            rx.map(|event| {
+                event
+                    .as_log()
+                    .get(&log_schema().message_key())
+                    .unwrap()
+                    .clone()
+            })
+            .collect()
+            .compat(),
+        )
+        .await;
+
+        assert_eq!(
+            received,
+            vec![
+                "hello i am a normal line".into(),
+                "i am not a full line until now".into(),
             ]
         );
     }
@@ -1442,7 +1452,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&event::log_schema().message_key())
+                    .get(&log_schema().message_key())
                     .unwrap()
                     .clone()
             })
@@ -1461,49 +1471,5 @@ mod tests {
                 "hooray".into(),
             ]
         );
-    }
-
-    #[tokio::test]
-    async fn remove_file() {
-        trace_init();
-
-        let n = 5;
-        let remove_after = 2;
-
-        let (tx, rx) = Pipeline::new_test();
-        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
-
-        let dir = tempdir().unwrap();
-        let config = file::FileConfig {
-            include: vec![dir.path().join("*")],
-            remove_after: Some(remove_after),
-            ..test_default_file_config(&dir)
-        };
-
-        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
-        tokio::spawn(source.compat());
-
-        let path = dir.path().join("file");
-        let mut file = File::create(&path).unwrap();
-
-        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
-
-        for i in 0..n {
-            writeln!(&mut file, "{}", i).unwrap();
-        }
-        std::mem::drop(file);
-
-        // Wait for remove grace period to end.
-        delay_for(Duration::from_secs(remove_after + 1)).await;
-
-        drop(trigger_shutdown);
-
-        let received = wait_with_timeout(rx.collect().compat()).await;
-        assert_eq!(received.len(), n);
-
-        match File::open(&path) {
-            Ok(_) => panic!("File wasn't removed"),
-            Err(error) => assert_eq!(error.kind(), std::io::ErrorKind::NotFound),
-        }
     }
 }

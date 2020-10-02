@@ -9,7 +9,7 @@ publish = false
 bytes = "0.5"
 crc = "1.8.1"
 futures = { version = "0.3", default-features = false, features = ["executor"] }
-glob = "0.2.11"
+glob = "0.3.0"
 scan_fmt = "0.2.5"
 tracing = "0.1.15"
 indexmap = {version = "1.5.1", features = ["serde-1"]}
@@ -19,5 +19,6 @@ libc =  "0.2"
 tokio = { version = "0.2.13", features = ["time"] }
 
 [dev-dependencies]
-quickcheck = "0.6"
+quickcheck = "0.9"
+rand = "0.7"
 tempfile = "3.1.0"

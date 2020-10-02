@@ -44,6 +44,8 @@ pub enum TlsError {
     DerExportError { source: ErrorStack },
     #[snafu(display("Identity certificate is missing a key"))]
     MissingKey,
+    #[snafu(display("Certificate file contains no certificates"))]
+    MissingCertificate,
     #[snafu(display("Could not parse certificate in {:?}: {}", filename, source))]
     CertificateParseError {
         filename: PathBuf,
@@ -84,7 +86,7 @@ pub enum TlsError {
     AddExtraChainCert { source: ErrorStack },
     #[snafu(display("Error creating a certificate store: {}", source))]
     NewStoreBuilder { source: ErrorStack },
-    #[snafu(display("Error adding a certifcate to a store: {}", source))]
+    #[snafu(display("Error adding a certificate to a store: {}", source))]
     AddCertToStore { source: ErrorStack },
     #[snafu(display("Error setting up the verification certificate: {}", source))]
     SetVerifyCert { source: ErrorStack },
@@ -107,6 +109,10 @@ pub enum TlsError {
     #[cfg(any(windows, target_os = "macos"))]
     #[snafu(display("Unable to parse X509 from system cert: {}", source))]
     X509SystemParseError { source: ErrorStack },
+    #[snafu(display("Creating an empty CA stack failed"))]
+    NewCaStack { source: ErrorStack },
+    #[snafu(display("Could not push intermediate certificate onto stack"))]
+    CaStackPush { source: ErrorStack },
 }
 
 impl MaybeTlsStream<TcpStream> {

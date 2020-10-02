@@ -51,7 +51,7 @@ pub struct KafkaEventFailed {
 
 impl InternalEvent for KafkaEventFailed {
     fn emit_logs(&self) {
-        error!(message = "failed to read message.", error = %self.error);
+        error!(message = "Failed to read message.", error = %self.error);
     }
 
     fn emit_metrics(&self) {
@@ -70,6 +70,6 @@ pub struct KafkaKeyExtractionFailed<'a> {
 
 impl InternalEvent for KafkaKeyExtractionFailed<'_> {
     fn emit_logs(&self) {
-        error!(message = "failed to extract key.", key_field = %self.key_field);
+        error!(message = "Failed to extract key.", key_field = %self.key_field);
     }
 }

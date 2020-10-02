@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - master
+  workflow_dispatch:
 
 env:
   VERBOSE: true
   ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+  CI: true
 
 jobs:
   publish-new-environment:
@@ -17,5 +19,9 @@ jobs:
     steps:
       - run: docker login https://docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/checkout@v2
-      - run: make environment-prepare
-      - run: docker push docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+      - run: make ci-sweep
+      - name: prepare environment
+        run: make environment-prepare
+      - name: push image
+        if: github.event_name != 'workflow_dispatch'
+        run: docker push docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
