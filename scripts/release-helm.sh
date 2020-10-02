@@ -14,9 +14,8 @@ CHANNEL="${CHANNEL:-"$(scripts/util/release-channel.sh)"}"
 VERSION="${VERSION:-"$(scripts/version.sh)"}"
 
 if [[ "$CHANNEL" == "nightly" ]]; then
-  DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
-  APP_VERSION="nightly-$DATE" # matches the version part of the image tag
-  CHART_VERSION="$VERSION-$DATE"
+  APP_VERSION="nightly-alpine" # matches the version part of the image tag
+  CHART_VERSION="$VERSION"
 else
   APP_VERSION="$VERSION" # matches the version part of the image tag
   CHART_VERSION="$VERSION"
