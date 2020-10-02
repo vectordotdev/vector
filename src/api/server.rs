@@ -1,34 +1,53 @@
 use super::{handler, schema};
-use crate::config::api::Options;
+use crate::config;
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig},
     QueryBuilder,
 };
 use async_graphql_warp::{graphql_subscription, GQLResponse};
-use std::convert::Infallible;
+use std::{convert::Infallible, net::SocketAddr};
 use tokio::sync::oneshot;
 use warp::filters::BoxedFilter;
 use warp::{http::Response, Filter, Reply};
 
 pub struct Server {
     _shutdown: oneshot::Sender<()>,
+    addr: SocketAddr,
 }
 
 impl Server {
     /// Start the API server. This creates the routes and spawns a Warp server. The server is
     /// gracefully shut down when Self falls out of scope by way of the oneshot sender closing
-    pub fn start(config: Options) -> Self {
-        let bind = config.bind.expect("Invalid socket address");
-        let routes = make_routes(config.playground);
+    pub fn start(config: &config::Config) -> Self {
+        let routes = make_routes(config.api.playground);
 
         let (_shutdown, rx) = oneshot::channel();
-        let (_, server) = warp::serve(routes).bind_with_graceful_shutdown(bind, async {
-            rx.await.ok();
-        });
+        let (addr, server) = warp::serve(routes).bind_with_graceful_shutdown(
+            config.api.bind.expect("Invalid socket address"),
+            async {
+                rx.await.ok();
+            },
+        );
 
+        // Update topology schema with the config before starting the server
+        schema::topology::update_config(config);
+
+        // Spawn the server in the background
         tokio::spawn(server);
 
-        Self { _shutdown }
+        Self { addr, _shutdown }
+    }
+
+    /// Returns a copy of the SocketAddr that the server was started on
+    pub fn addr(&self) -> SocketAddr {
+        self.addr
+    }
+
+    /// Update the configuration of a running server. While this instance method doesn't
+    /// directly involve `self`, it provides a neater API to expose an internal implementation
+    /// detail than exposing the function of the sub-mod directly
+    pub fn update_config(&self, config: &config::Config) {
+        schema::topology::update_config(config)
     }
 }
 

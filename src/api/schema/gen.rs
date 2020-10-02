@@ -1,5 +1,5 @@
 use std::fs;
-use vector::api::schema::build_schema;
+use vector::api::build_schema;
 
 static INTROSPECTION_QUERY: &str = r#"
 query IntrospectionQuery {
