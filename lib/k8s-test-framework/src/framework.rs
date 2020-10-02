@@ -22,11 +22,13 @@ impl Framework {
     pub async fn vector(
         &self,
         namespace: &str,
+        helm_chart: &str,
         config: vector::Config<'_>,
     ) -> Result<up_down::Manager<vector::CommandBuilder>> {
         let mut manager = vector::manager(
             self.interface.deploy_vector_command.as_str(),
             namespace,
+            helm_chart,
             config,
         )?;
         manager.up().await?;

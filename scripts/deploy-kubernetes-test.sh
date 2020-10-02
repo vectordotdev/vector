@@ -15,11 +15,11 @@ set -euo pipefail
 #
 #   Deploy:
 #
-#   $ CONTAINER_IMAGE=timberio/vector:alpine-latest scripts/deploy-kubernetes-test.sh up vector-test-qwerty
+#   $ CONTAINER_IMAGE=timberio/vector:alpine-latest scripts/deploy-kubernetes-test.sh up vector-test-qwerty vector
 #
 #   Teardown:
 #
-#   $ scripts/deploy-kubernetes-test.sh down vector-test-qwerty
+#   $ scripts/deploy-kubernetes-test.sh down vector-test-qwerty vector
 #
 
 # Command to perform.
@@ -28,14 +28,16 @@ COMMAND="${1:?"Specify the command (up/down) as the first argument"}"
 # A Kubernetes namespace to deploy to.
 NAMESPACE="${2:?"Specify the namespace as the second argument"}"
 
+if [[ "$COMMAND" == "up" ]]; then
+  # The helm chart to deploy.
+  HELM_CHART="${3:?"Specify the helm chart name as the third argument"}"
+fi
+
 # Allow overriding kubectl with something like `minikube kubectl --`.
 VECTOR_TEST_KUBECTL="${VECTOR_TEST_KUBECTL:-"kubectl"}"
 
 # Allow overriding helm with a custom command.
 VECTOR_TEST_HELM="${VECTOR_TEST_HELM:-"helm"}"
-
-# Allow overriding the chart to deploy.
-HELM_CHART="${HELM_CHART:-"vector"}"
 
 # Allow optionally installing custom resource configs.
 CUSTOM_RESOURCE_CONFIGS_FILE="${CUSTOM_RESOURCE_CONFIGS_FILE:-""}"
