@@ -29,7 +29,7 @@ fn bench(c: &mut Criterion) {
                             foo = "foo",
                             bar = "bar",
                             baz = 3,
-                            quuux = field::debug(0.99),
+                            quuux = ?0.99,
                         )
                     }
                 })
@@ -51,7 +51,7 @@ fn bench(c: &mut Criterion) {
                             foo = "foo",
                             bar = "bar",
                             baz = 3,
-                            quuux = field::debug(0.99),
+                            quuux = ?0.99,
                             rate_limit_secs = 5
                         )
                     }

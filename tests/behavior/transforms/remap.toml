@@ -591,3 +591,24 @@
     [[tests.outputs.conditions]]
       "a.equals" = "4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7"
       "b.equals" = "dbae094156f1bf73d9f442f75eb01e52398eb667cd12ba1dcb95748fc0151880ea260310c1451570d60b37bef8655d01f62280e5e24e70cffe3a55c23c2d7351"
+
+[transforms.remap_function_parse_duration]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = parse_duration(.a, "ms")
+    .b = parse_duration("100ms", output = .b)
+  """
+[[tests]]
+  name = "remap_function_parse_duration"
+  [tests.input]
+    insert_at = "remap_function_parse_duration"
+    type = "log"
+    [tests.input.log_fields]
+      a = "2s"
+      b = "s"
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_duration"
+    [[tests.outputs.conditions]]
+      "a.equals" = 2000
+      "b.equals" = 0.1

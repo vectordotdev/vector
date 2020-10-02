@@ -13,7 +13,6 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::Duration;
 use tokio::time::{delay_for, Delay};
 use tokio_retry::strategy::ExponentialBackoff;
-use tracing::field;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -164,7 +163,7 @@ impl Sink for UdpSink {
             Ok(Async::Ready(socket)) => {
                 debug!(
                     message = "sending event.",
-                    bytes = &field::display(line.len())
+                    bytes = %line.len()
                 );
                 match socket.send(&line) {
                     Err(error) => {
