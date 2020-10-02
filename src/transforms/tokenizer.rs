@@ -24,9 +24,10 @@ inventory::submit! {
     TransformDescription::new::<TokenizerConfig>("tokenizer")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "tokenizer")]
 impl TransformConfig for TokenizerConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
             .as_ref()
@@ -128,7 +129,7 @@ mod tests {
     };
     use string_cache::DefaultAtom as Atom;
 
-    fn parse_log(
+    async fn parse_log(
         text: &str,
         fields: &str,
         field: Option<&str>,
@@ -145,46 +146,48 @@ mod tests {
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
         .build(TransformContext::new_test())
+        .await
         .unwrap();
 
         parser.transform(event).unwrap().into_log()
     }
 
-    #[test]
-    fn tokenizer_adds_parsed_field_to_event() {
-        let log = parse_log("1234 5678", "status time", None, false, &[]);
+    #[tokio::test]
+    async fn tokenizer_adds_parsed_field_to_event() {
+        let log = parse_log("1234 5678", "status time", None, false, &[]).await;
 
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"time".into()], "5678".into());
         assert!(log.get(&"message".into()).is_some());
     }
 
-    #[test]
-    fn tokenizer_does_drop_parsed_field() {
-        let log = parse_log("1234 5678", "status time", Some("message"), true, &[]);
+    #[tokio::test]
+    async fn tokenizer_does_drop_parsed_field() {
+        let log = parse_log("1234 5678", "status time", Some("message"), true, &[]).await;
 
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"time".into()], "5678".into());
         assert!(log.get(&"message".into()).is_none());
     }
 
-    #[test]
-    fn tokenizer_does_not_drop_same_name_parsed_field() {
-        let log = parse_log("1234 yes", "status message", Some("message"), true, &[]);
+    #[tokio::test]
+    async fn tokenizer_does_not_drop_same_name_parsed_field() {
+        let log = parse_log("1234 yes", "status message", Some("message"), true, &[]).await;
 
         assert_eq!(log[&"status".into()], "1234".into());
         assert_eq!(log[&"message".into()], "yes".into());
     }
 
-    #[test]
-    fn tokenizer_coerces_fields_to_types() {
+    #[tokio::test]
+    async fn tokenizer_coerces_fields_to_types() {
         let log = parse_log(
             "1234 yes 42.3 word",
             "code flag number rest",
             None,
             false,
             &[("flag", "bool"), ("code", "integer"), ("number", "float")],
-        );
+        )
+        .await;
 
         assert_eq!(log[&"number".into()], Value::Float(42.3));
         assert_eq!(log[&"flag".into()], Value::Boolean(true));
@@ -192,15 +195,16 @@ mod tests {
         assert_eq!(log[&"rest".into()], Value::Bytes("word".into()));
     }
 
-    #[test]
-    fn tokenizer_keeps_dash_as_dash() {
+    #[tokio::test]
+    async fn tokenizer_keeps_dash_as_dash() {
         let log = parse_log(
             "1234 - foo",
             "code who why",
             None,
             false,
             &[("code", "integer"), ("who", "string"), ("why", "string")],
-        );
+        )
+        .await;
         assert_eq!(log[&"code".into()], Value::Integer(1234));
         assert_eq!(log[&"who".into()], Value::Bytes("-".into()));
         assert_eq!(log[&"why".into()], Value::Bytes("foo".into()));

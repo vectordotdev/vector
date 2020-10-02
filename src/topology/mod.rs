@@ -837,9 +837,10 @@ mod transient_state_tests {
         }
     }
 
+    #[async_trait::async_trait]
     #[typetag::serde(name = "mock")]
     impl SourceConfig for MockSourceConfig {
-        fn build(
+        async fn build(
             &self,
             _name: &str,
             _globals: &GlobalOptions,

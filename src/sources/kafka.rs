@@ -76,9 +76,10 @@ inventory::submit! {
     SourceDescription::new_without_default::<KafkaSourceConfig>("kafka")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "kafka")]
 impl SourceConfig for KafkaSourceConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,

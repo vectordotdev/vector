@@ -40,9 +40,10 @@ inventory::submit! {
     SourceDescription::new::<StdinConfig>("stdin")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,

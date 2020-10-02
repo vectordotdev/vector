@@ -24,9 +24,10 @@ inventory::submit! {
     SinkDescription::new_without_default::<DatadogLogsConfig>("datadog_logs")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let (host, port) = if let Some(uri) = &self.endpoint {
             let host = uri
                 .host()

@@ -57,10 +57,14 @@ impl From<Encoding> for splunk_hec::Encoding {
     }
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        self.build_hec_config().build(cx)
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        self.build_hec_config().build(cx).await
     }
 
     fn input_type(&self) -> DataType {
@@ -154,7 +158,7 @@ mod integration_tests {
 
         let config = config(&repo.default_ingest_token);
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let event = Event::from(message.clone());
@@ -190,7 +194,7 @@ mod integration_tests {
         let mut config = config(&repo.default_ingest_token);
         config.source = Template::try_from("/var/log/syslog".to_string()).ok();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let event = Event::from(message.clone());
@@ -217,7 +221,7 @@ mod integration_tests {
             let mut config = config(&repo.default_ingest_token);
             config.event_type = Template::try_from("json".to_string()).ok();
 
-            let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+            let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
             let message = random_string(100);
             let mut event = Event::from(message.clone());
@@ -245,7 +249,7 @@ mod integration_tests {
         {
             let config = config(&repo.default_ingest_token);
 
-            let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+            let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
             let message = random_string(100);
             let event = Event::from(message.clone());

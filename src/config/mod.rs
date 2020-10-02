@@ -2,6 +2,7 @@ use crate::{
     buffers::Acker, conditions, dns::Resolver, event::Metric, shutdown::ShutdownSignal, sinks,
     sources, transforms, Pipeline,
 };
+use async_trait::async_trait;
 use component::ComponentDescription;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
@@ -129,26 +130,16 @@ pub enum DataType {
     Metric,
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {
-    fn build(
+    async fn build(
         &self,
         name: &str,
         globals: &GlobalOptions,
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<sources::Source>;
-
-    async fn build_async(
-        &self,
-        name: &str,
-        globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<sources::Source> {
-        self.build(name, globals, shutdown, out)
-    }
 
     fn output_type(&self) -> DataType;
 
@@ -170,17 +161,13 @@ pub struct SinkOuter {
     pub inner: Box<dyn SinkConfig>,
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait SinkConfig: core::fmt::Debug + Send + Sync {
-    fn build(&self, cx: SinkContext) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)>;
-
-    async fn build_async(
+    async fn build(
         &self,
         cx: SinkContext,
-    ) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)> {
-        self.build(cx)
-    }
+    ) -> crate::Result<(sinks::VectorSink, sinks::Healthcheck)>;
 
     fn input_type(&self) -> DataType;
 
@@ -222,17 +209,10 @@ pub struct TransformOuter {
     pub inner: Box<dyn TransformConfig>,
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug + Send + Sync {
-    fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn transforms::Transform>>;
-
-    async fn build_async(
-        &self,
-        cx: TransformContext,
-    ) -> crate::Result<Box<dyn transforms::Transform>> {
-        self.build(cx)
-    }
+    async fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn transforms::Transform>>;
 
     fn input_type(&self) -> DataType;
 

@@ -74,11 +74,15 @@ pub(crate) fn skip_serializing_if_default(e: &EncodingConfigWithDefault<Encoding
     e.codec() == &Encoding::default()
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "new_relic_logs")]
 impl SinkConfig for NewRelicLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let http_conf = self.create_config()?;
-        http_conf.build(cx)
+        http_conf.build(cx).await
     }
 
     fn input_type(&self) -> DataType {
@@ -283,7 +287,7 @@ mod tests {
             .unwrap()
             .into();
 
-        let (sink, _healthcheck) = http_config.build(SinkContext::new_test()).unwrap();
+        let (sink, _healthcheck) = http_config.build(SinkContext::new_test()).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let input_lines = (0..100).map(|i| format!("msg {}", i)).collect::<Vec<_>>();

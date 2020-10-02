@@ -85,7 +85,7 @@ type Record = HashMap<Atom, String>;
 #[async_trait::async_trait]
 #[typetag::serde(name = "journald")]
 impl SourceConfig for JournaldConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,

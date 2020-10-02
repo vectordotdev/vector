@@ -166,9 +166,13 @@ impl CloudwatchLogsSinkConfig {
     }
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let batch = BatchSettings::default()
             .bytes(1_048_576)
             .events(10_000)
@@ -877,7 +881,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -921,7 +925,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
         let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
 
@@ -984,7 +988,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
         let now = chrono::Utc::now();
 
@@ -1053,7 +1057,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -1102,7 +1106,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -1152,7 +1156,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
         let timestamp = chrono::Utc::now();
 

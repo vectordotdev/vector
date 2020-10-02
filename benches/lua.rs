@@ -6,6 +6,7 @@ use transforms::lua::v2::LuaConfig;
 use vector::{
     config::{TransformConfig, TransformContext},
     event::Lookup,
+    test_util::runtime,
     transforms::{self, Transform},
     Event,
 };
@@ -91,14 +92,18 @@ fn field_filter(c: &mut Criterion) {
     c.bench(
         "lua_field_filter",
         Benchmark::new("native", move |b| {
+            let mut rt = runtime();
             b.iter_with_setup(
                 || {
-                    transforms::field_filter::FieldFilterConfig {
-                        field: "the_field".to_string(),
-                        value: "0".to_string(),
-                    }
-                    .build(TransformContext::new_test())
-                    .unwrap()
+                    rt.block_on(async move {
+                        transforms::field_filter::FieldFilterConfig {
+                            field: "the_field".to_string(),
+                            value: "0".to_string(),
+                        }
+                        .build(TransformContext::new_test())
+                        .await
+                        .unwrap()
+                    })
                 },
                 |mut transform| {
                     let num = (0..num_events)

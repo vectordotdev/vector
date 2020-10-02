@@ -94,9 +94,10 @@ struct TestConfig {
     controller_stats: Arc<Mutex<Arc<Mutex<ControllerStatistics>>>>,
 }
 
+#[async_trait::async_trait]
 #[typetag::serialize(name = "test")]
 impl SinkConfig for TestConfig {
-    fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
+    async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), crate::Error> {
         let batch = BatchSettings::default().events(1).bytes(9999).timeout(9999);
         let request = self.request.unwrap_with(&TowerRequestConfig::default());
         let sink = request

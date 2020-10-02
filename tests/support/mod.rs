@@ -1,8 +1,10 @@
 // Using a shared mod like this is probably not the best idea, since we have to
 // disable the `dead_code` lint, as we don't need all of the helpers from here
 // all over the place.
+#![allow(clippy::type_complexity)]
 #![allow(dead_code)]
 
+use async_trait::async_trait;
 use futures::{future, FutureExt};
 use futures01::{sink::Sink, stream, sync::mpsc::Receiver, Async, Future, Stream};
 use serde::{Deserialize, Serialize};
@@ -93,9 +95,10 @@ impl MockSourceConfig {
     }
 }
 
+#[async_trait]
 #[typetag::serde(name = "mock")]
 impl SourceConfig for MockSourceConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -217,9 +220,10 @@ impl MockTransformConfig {
     }
 }
 
+#[async_trait]
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    fn build(&self, _cx: TransformContext) -> Result<Box<dyn Transform>, vector::Error> {
+    async fn build(&self, _cx: TransformContext) -> Result<Box<dyn Transform>, vector::Error> {
         Ok(Box::new(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,
@@ -270,13 +274,14 @@ enum HealthcheckError {
     Unhealthy,
 }
 
+#[async_trait]
 #[typetag::serialize(name = "mock")]
 impl<T> SinkConfig for MockSinkConfig<T>
 where
     T: Sink<SinkItem = Event> + std::fmt::Debug + Clone + Send + Sync + 'static,
     <T as Sink>::SinkError: std::fmt::Debug,
 {
-    fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
+    async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         let sink = self.sink.clone().unwrap();
         let sink = sink.sink_map_err(|error| {
             error!(message = "Ingesting an event failed at mock sink", ?error)

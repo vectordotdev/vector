@@ -22,9 +22,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<SamplerConfig>("sampler")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "sampler")]
 impl TransformConfig for SamplerConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(RegexSet::new(&self.pass_list)
             .map::<Box<dyn Transform>, _>(|regex_set| {
                 Box::new(Sampler::new(self.rate, self.key_field.clone(), regex_set))

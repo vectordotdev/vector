@@ -69,11 +69,7 @@ inventory::submit! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "pulsar")]
 impl SinkConfig for PulsarSinkConfig {
-    fn build(&self, _cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        unimplemented!()
-    }
-
-    async fn build_async(
+    async fn build(
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {

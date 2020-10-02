@@ -43,9 +43,10 @@ inventory::submit! {
     SourceDescription::new::<GeneratorConfig>("generator")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "generator")]
 impl SourceConfig for GeneratorConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,

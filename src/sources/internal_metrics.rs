@@ -22,9 +22,10 @@ inventory::submit! {
     SourceDescription::new::<InternalMetricsConfig>("internal_metrics")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "internal_metrics")]
 impl SourceConfig for InternalMetricsConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,

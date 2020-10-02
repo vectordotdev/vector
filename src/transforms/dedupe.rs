@@ -74,9 +74,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<DedupeConfig>("dedupe")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Dedupe::new(self.fill_default())))
     }
 

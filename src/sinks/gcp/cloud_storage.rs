@@ -150,11 +150,7 @@ inventory::submit! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
-    fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        unimplemented!()
-    }
-
-    async fn build_async(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = GcsSink::new(self, &cx).await?;
         let healthcheck = sink.clone().healthcheck().boxed();
         let service = sink.service(self, &cx)?;

@@ -59,7 +59,7 @@ pub async fn build_pieces(
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
 
         let server = match source
-            .build_async(&name, &config.global, shutdown_signal, pipeline)
+            .build(&name, &config.global, shutdown_signal, pipeline)
             .await
         {
             Err(error) => {
@@ -103,7 +103,7 @@ pub async fn build_pieces(
         let cx = TransformContext { resolver };
 
         let input_type = transform.inner.input_type();
-        let transform = match transform.inner.build_async(cx).await {
+        let transform = match transform.inner.build(cx).await {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
                 continue;
@@ -151,7 +151,7 @@ pub async fn build_pieces(
 
         let cx = SinkContext { resolver, acker };
 
-        let (sink, healthcheck) = match sink.inner.build_async(cx).await {
+        let (sink, healthcheck) = match sink.inner.build(cx).await {
             Err(error) => {
                 errors.push(format!("Sink \"{}\": {}", name, error));
                 continue;

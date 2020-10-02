@@ -44,9 +44,10 @@ impl Default for MergeConfig {
     }
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "merge")]
 impl TransformConfig for MergeConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Merge::from(self.clone())))
     }
 

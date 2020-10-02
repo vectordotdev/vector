@@ -69,9 +69,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<TagCardinalityLimitConfig>("tag_cardinality_limit")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(TagCardinalityLimit::new(self.clone())))
     }
 

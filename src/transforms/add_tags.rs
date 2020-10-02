@@ -26,9 +26,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<AddTagsConfig>("add_tags")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "add_tags")]
 impl TransformConfig for AddTagsConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(AddTags::new(self.tags.clone(), self.overwrite)))
     }
 

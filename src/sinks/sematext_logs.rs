@@ -41,9 +41,13 @@ pub enum Region {
     Eu,
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "sematext")]
 impl SinkConfig for SematextLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let endpoint = match (&self.endpoint, &self.region) {
             (Some(host), None) => host.clone(),
             (None, Some(Region::Na)) => "https://logsene-receiver.sematext.com".to_owned(),
@@ -66,7 +70,8 @@ impl SinkConfig for SematextLogsConfig {
             encoding: self.encoding.clone(),
             ..Default::default()
         }
-        .build(cx)?;
+        .build(cx)
+        .await?;
 
         let sink = Box::new(sink.into_futures01sink().with(map_timestamp));
 
@@ -118,7 +123,7 @@ mod tests {
         .unwrap();
 
         // Make sure we can build the config
-        let _ = config.build(cx.clone()).unwrap();
+        let _ = config.build(cx.clone()).await.unwrap();
 
         let addr = next_addr();
         // Swap out the host so we can force send it
@@ -126,7 +131,7 @@ mod tests {
         config.endpoint = Some(format!("http://{}", addr));
         config.region = None;
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
