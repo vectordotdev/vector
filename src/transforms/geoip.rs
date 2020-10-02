@@ -30,9 +30,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<GeoipConfig>("geoip")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "geoip")]
 impl TransformConfig for GeoipConfig {
-    fn build(&self, _cx: TransformContext) -> Result<Box<dyn Transform>, crate::Error> {
+    async fn build(&self, _cx: TransformContext) -> Result<Box<dyn Transform>, crate::Error> {
         let reader = maxminddb::Reader::open_readfile(self.database.clone())?;
         Ok(Box::new(Geoip::new(
             reader,
