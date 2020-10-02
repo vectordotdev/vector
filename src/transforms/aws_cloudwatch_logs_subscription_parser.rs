@@ -53,13 +53,11 @@ impl From<AwsCloudwatchLogsSubscriptionParserConfig> for AwsCloudwatchLogsSubscr
     fn from(
         config: AwsCloudwatchLogsSubscriptionParserConfig,
     ) -> AwsCloudwatchLogsSubscriptionParser {
-        let field = if let Some(field) = &config.field {
-            field
-        } else {
-            &log_schema().message_key()
-        };
         AwsCloudwatchLogsSubscriptionParser {
-            field: field.clone(),
+            field: config
+                .field
+                .unwrap_or_else(|| log_schema().message_key())
+                .clone(),
         }
     }
 }

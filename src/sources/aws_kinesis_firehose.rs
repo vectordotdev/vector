@@ -127,7 +127,7 @@ mod filters {
             .and_then(
                 |encoding: Option<String>, request_id: String, body: Bytes| async move {
                     match encoding {
-                        Some(s) if s.as_bytes() == b"gzip" => {
+                        Some(s) if s == "gzip" => {
                             Ok(Box::new(GzDecoder::new(body.reader())) as Box<dyn io::Read>)
                         }
                         Some(s) => Err(warp::reject::Rejection::from(
