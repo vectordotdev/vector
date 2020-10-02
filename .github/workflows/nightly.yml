@@ -329,24 +329,24 @@ jobs:
           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
         run: make release-helm
 
-        nightly-failure:
-          name: nightly-failure
-          if: failure()
-          needs:
-            - build-x86_64-unknown-linux-gnu-packages
-            - build-x86_64-unknown-linux-musl-packages
-            - build-aarch64-unknown-linux-musl-packages
-            - build-x86_64-apple-darwin-packages
-            - build-x86_64-pc-windows-msvc-packages
-            - release-docker
-            - release-s3
-            - release-cloudsmith
-            - release-helm
-          runs-on: ubuntu-latest
-          steps:
-          - name: Discord notification
-            env:
-              DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-            uses: Ilshidur/action-discord@0.3.0
-            with:
-              args: "Nightly failed: https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}"
+  nightly-failure:
+    name: nightly-failure
+    if: failure()
+    needs:
+      - build-x86_64-unknown-linux-gnu-packages
+      - build-x86_64-unknown-linux-musl-packages
+      - build-aarch64-unknown-linux-musl-packages
+      - build-x86_64-apple-darwin-packages
+      - build-x86_64-pc-windows-msvc-packages
+      - release-docker
+      - release-s3
+      - release-cloudsmith
+      - release-helm
+    runs-on: ubuntu-latest
+    steps:
+    - name: Discord notification
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      uses: Ilshidur/action-discord@0.3.0
+      with:
+        args: "Nightly failed: https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}"
