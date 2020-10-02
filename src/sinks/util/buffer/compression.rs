@@ -10,7 +10,7 @@ pub enum Compression {
 }
 
 impl Compression {
-    pub fn default_gzip() -> Compression {
+    pub const fn default_gzip() -> Compression {
         Compression::Gzip(6)
     }
 
