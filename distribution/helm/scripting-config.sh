@@ -8,7 +8,7 @@ DEPENDENCY_UPDATE_ORDER=(
   vector-shared
 
   # Intermediate level.
-  vector-daemonset
+  vector-agent
 
   # Highest level.
   vector
@@ -18,6 +18,6 @@ DEPENDENCY_UPDATE_ORDER=(
 # We only need to release the application charts, library charts don't need to
 # be released.
 CHARTS_TO_PUBLISH=(
-  vector-daemonset
+  vector-agent
   vector
 )

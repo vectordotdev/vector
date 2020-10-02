@@ -13,7 +13,7 @@ use k8s_test_framework::{
 };
 use std::collections::HashSet;
 
-const HELM_CHART_VECTOR_DAEMONSET: &str = "vector-daemonset";
+const HELM_CHART_VECTOR_AGENT: &str = "vector-agent";
 
 const HELM_VALUES_STDOUT_SINK: &str = r#"
 sinks:
@@ -176,7 +176,7 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
     let vector = framework
         .vector(
             "test-vector",
-            HELM_CHART_VECTOR_DAEMONSET,
+            HELM_CHART_VECTOR_AGENT,
             VectorConfig {
                 custom_helm_values: HELM_VALUES_STDOUT_SINK,
                 ..Default::default()
@@ -186,7 +186,7 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             "test-vector",
-            "daemonset/vector-daemonset",
+            "daemonset/vector-agent",
             vec!["--timeout=60s"],
         )
         .await?;
@@ -210,7 +210,7 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs("test-vector", "daemonset/vector-daemonset")?;
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-agent")?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -257,7 +257,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     let vector = framework
         .vector(
             "test-vector",
-            HELM_CHART_VECTOR_DAEMONSET,
+            HELM_CHART_VECTOR_AGENT,
             VectorConfig {
                 custom_helm_values: HELM_VALUES_STDOUT_SINK,
                 ..Default::default()
@@ -267,7 +267,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             "test-vector",
-            "daemonset/vector-daemonset",
+            "daemonset/vector-agent",
             vec!["--timeout=60s"],
         )
         .await?;
@@ -292,7 +292,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs("test-vector", "daemonset/vector-daemonset")?;
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-agent")?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -361,7 +361,7 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     let vector = framework
         .vector(
             "test-vector",
-            HELM_CHART_VECTOR_DAEMONSET,
+            HELM_CHART_VECTOR_AGENT,
             VectorConfig {
                 custom_helm_values: HELM_VALUES_STDOUT_SINK,
                 ..Default::default()
@@ -371,12 +371,12 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             "test-vector",
-            "daemonset/vector-daemonset",
+            "daemonset/vector-agent",
             vec!["--timeout=60s"],
         )
         .await?;
 
-    let mut log_reader = framework.logs("test-vector", "daemonset/vector-daemonset")?;
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-agent")?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -423,7 +423,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     let vector = framework
         .vector(
             "test-vector",
-            HELM_CHART_VECTOR_DAEMONSET,
+            HELM_CHART_VECTOR_AGENT,
             VectorConfig {
                 custom_helm_values: HELM_VALUES_STDOUT_SINK,
                 ..Default::default()
@@ -433,7 +433,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             "test-vector",
-            "daemonset/vector-daemonset",
+            "daemonset/vector-agent",
             vec!["--timeout=60s"],
         )
         .await?;
@@ -458,7 +458,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs("test-vector", "daemonset/vector-daemonset")?;
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-agent")?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -506,7 +506,7 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     let vector = framework
         .vector(
             "test-vector",
-            HELM_CHART_VECTOR_DAEMONSET,
+            HELM_CHART_VECTOR_AGENT,
             VectorConfig {
                 custom_helm_values: HELM_VALUES_STDOUT_SINK,
                 ..Default::default()
@@ -516,7 +516,7 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             "test-vector",
-            "daemonset/vector-daemonset",
+            "daemonset/vector-agent",
             vec!["--timeout=60s"],
         )
         .await?;
@@ -540,7 +540,7 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs("test-vector", "daemonset/vector-daemonset")?;
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-agent")?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -603,7 +603,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     let vector = framework
         .vector(
             "test-vector",
-            HELM_CHART_VECTOR_DAEMONSET,
+            HELM_CHART_VECTOR_AGENT,
             VectorConfig {
                 custom_helm_values: HELM_VALUES_STDOUT_SINK,
                 ..Default::default()
@@ -613,7 +613,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             "test-vector",
-            "daemonset/vector-daemonset",
+            "daemonset/vector-agent",
             vec!["--timeout=60s"],
         )
         .await?;
@@ -654,7 +654,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs("test-vector", "daemonset/vector-daemonset")?;
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-agent")?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the log lines until the reasonable amount of time passes for us
@@ -756,7 +756,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     let vector = framework
         .vector(
             "test-vector",
-            HELM_CHART_VECTOR_DAEMONSET,
+            HELM_CHART_VECTOR_AGENT,
             VectorConfig {
                 custom_helm_values: HELM_VALUES_STDOUT_SINK,
                 ..Default::default()
@@ -766,7 +766,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             "test-vector",
-            "daemonset/vector-daemonset",
+            "daemonset/vector-agent",
             vec!["--timeout=60s"],
         )
         .await?;
@@ -802,7 +802,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
         test_pods.push(test_pod);
     }
 
-    let mut log_reader = framework.logs("test-vector", "daemonset/vector-daemonset")?;
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-agent")?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -854,7 +854,7 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
     let vector = framework
         .vector(
             "test-vector",
-            HELM_CHART_VECTOR_DAEMONSET,
+            HELM_CHART_VECTOR_AGENT,
             VectorConfig {
                 custom_resource: CUSTOM_RESOURCE_VECTOR_CONFIG,
                 ..Default::default()
@@ -864,7 +864,7 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
     framework
         .wait_for_rollout(
             "test-vector",
-            "daemonset/vector-daemonset",
+            "daemonset/vector-agent",
             vec!["--timeout=60s"],
         )
         .await?;
@@ -888,7 +888,7 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs("test-vector", "daemonset/vector-daemonset")?;
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-agent")?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.

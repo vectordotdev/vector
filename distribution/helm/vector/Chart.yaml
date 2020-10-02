@@ -12,6 +12,6 @@ maintainers:
   - name: Vector Contributors
     email: vector@timber.io
 dependencies:
-  - name: vector-daemonset
+  - name: vector-agent
     version: "*"
-    repository: file://../vector-daemonset
+    repository: file://../vector-agent

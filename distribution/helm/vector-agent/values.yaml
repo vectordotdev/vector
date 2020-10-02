@@ -1,4 +1,4 @@
-# Default values for vector-daemonset.
+# Default values for vector-agent.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
