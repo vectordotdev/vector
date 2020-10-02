@@ -79,7 +79,7 @@
 /src/sinks/util/auto_concurrency @bruceg
 
 /src/sources/apache_metrics/ @jszwedko
-/src/sources/aws_kinesis_firehose.rs @jszwedko
+/src/sources/aws_kinesis_firehose/ @jszwedko
 /src/sources/docker.rs @fanatid
 /src/sources/generator.rs @bruceg
 /src/sources/journald.rs @bruceg
