@@ -503,7 +503,7 @@ mod tests {
             "date".into(),
             None,
             false,
-            Compression::Gzip(6),
+            Compression::default_gzip(),
             "bucket".into(),
             S3Options::default(),
         );
@@ -514,7 +514,7 @@ mod tests {
             "date".into(),
             None,
             true,
-            Compression::Gzip(6),
+            Compression::default_gzip(),
             "bucket".into(),
             S3Options::default(),
         );
@@ -619,7 +619,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let config = S3SinkConfig {
-            compression: Compression::Gzip(6),
+            compression: Compression::default_gzip(),
             filename_time_format: Some("%s%f".into()),
             ..config(10000).await
         };

@@ -61,7 +61,7 @@ impl<'de> de::Deserialize<'de> for Compression {
             {
                 match s {
                     "none" => Ok(Compression::None),
-                    "gzip" => Ok(Compression::Gzip(6)),
+                    "gzip" => Ok(Compression::default_gzip()),
                     _ => Err(de::Error::invalid_value(de::Unexpected::Str(s), &self)),
                 }
             }
