@@ -184,7 +184,11 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
     framework
-        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            "test-vector",
+            "daemonset/vector-daemonset",
+            vec!["--timeout=60s"],
+        )
         .await?;
 
     let test_namespace = framework.namespace("test-vector-test-pod").await?;
@@ -206,7 +210,7 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-daemonset")?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -261,7 +265,11 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
     framework
-        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            "test-vector",
+            "daemonset/vector-daemonset",
+            vec!["--timeout=60s"],
+        )
         .await?;
 
     let test_namespace = framework.namespace("test-vector-test-pod").await?;
@@ -284,7 +292,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-daemonset")?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -361,10 +369,14 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
     framework
-        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            "test-vector",
+            "daemonset/vector-daemonset",
+            vec!["--timeout=60s"],
+        )
         .await?;
 
-    let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-daemonset")?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -419,7 +431,11 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
     framework
-        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            "test-vector",
+            "daemonset/vector-daemonset",
+            vec!["--timeout=60s"],
+        )
         .await?;
 
     let test_namespace = framework.namespace("test-vector-test-pod").await?;
@@ -442,7 +458,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-daemonset")?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -498,7 +514,11 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
     framework
-        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            "test-vector",
+            "daemonset/vector-daemonset",
+            vec!["--timeout=60s"],
+        )
         .await?;
 
     let test_namespace = framework.namespace("test-vector-test-pod").await?;
@@ -520,7 +540,7 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-daemonset")?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -591,7 +611,11 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
     framework
-        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            "test-vector",
+            "daemonset/vector-daemonset",
+            vec!["--timeout=60s"],
+        )
         .await?;
 
     let test_namespace = framework.namespace("test-vector-test-pod").await?;
@@ -630,7 +654,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-daemonset")?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the log lines until the reasonable amount of time passes for us
@@ -740,7 +764,11 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
     framework
-        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            "test-vector",
+            "daemonset/vector-daemonset",
+            vec!["--timeout=60s"],
+        )
         .await?;
 
     const NS_PREFIX: &str = "test-vector-test-pod";
@@ -774,7 +802,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
         test_pods.push(test_pod);
     }
 
-    let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-daemonset")?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
@@ -834,7 +862,11 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
     framework
-        .wait_for_rollout("test-vector", "daemonset/vector", vec!["--timeout=60s"])
+        .wait_for_rollout(
+            "test-vector",
+            "daemonset/vector-daemonset",
+            vec!["--timeout=60s"],
+        )
         .await?;
 
     let test_namespace = framework.namespace("test-vector-test-pod").await?;
@@ -856,7 +888,7 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let mut log_reader = framework.logs("test-vector", "daemonset/vector")?;
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-daemonset")?;
     smoke_check_first_line(&mut log_reader).await;
 
     // Read the rest of the log lines.
