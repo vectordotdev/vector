@@ -521,7 +521,7 @@ impl HostMetricsConfig {
                             && partition
                             .device()
                             .map(|device| self.filesystem.devices.contains_path(device.as_ref()))
-                            .unwrap_or(false)
+                            .unwrap_or(true)
                     )
                     .and_some(partition)
                 })
