@@ -4,6 +4,7 @@ use crate::{
         metric::{Metric, MetricKind, MetricValue},
         Event,
     },
+    internal_events::HostMetricsEventReceived,
     shutdown::ShutdownSignal,
     BoolAndSome, Pipeline,
 };
@@ -212,6 +213,9 @@ impl HostMetricsConfig {
                 (metric.tags.as_mut().unwrap()).insert("host".into(), hostname.into());
             }
         }
+        emit!(HostMetricsEventReceived {
+            count: metrics.len()
+        });
         metrics.into_iter().map(Into::into)
     }
 
