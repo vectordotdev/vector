@@ -87,7 +87,7 @@ fn default_config(e: Encoding) -> GcsSinkConfig {
         filename_append_uuid: Default::default(),
         filename_extension: Default::default(),
         encoding: e.into(),
-        compression: Compression::Gzip(0),
+        compression: Compression::Gzip(6),
         batch: Default::default(),
         request: Default::default(),
         auth: Default::default(),
@@ -543,11 +543,11 @@ mod tests {
 
         let req = RequestWrapper::new(
             buf.clone(),
-            request_settings(None, false, Compression::Gzip(0)),
+            request_settings(None, false, Compression::Gzip(6)),
         );
         assert_eq!(req.key, "key/date.log.gz".to_string());
 
-        let req = RequestWrapper::new(buf, request_settings(None, true, Compression::Gzip(0)));
+        let req = RequestWrapper::new(buf, request_settings(None, true, Compression::Gzip(6)));
         assert_ne!(req.key, "key/date.log.gz".to_string());
     }
 }

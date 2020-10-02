@@ -160,7 +160,7 @@ mod test {
 
         let buffered = BatchSink::new(
             svc,
-            Buffer::new(batch_size, Compression::Gzip(0)),
+            Buffer::new(batch_size, Compression::Gzip(6)),
             timeout,
             acker,
         );
