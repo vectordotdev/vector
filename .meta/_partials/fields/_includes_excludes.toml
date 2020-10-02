@@ -9,7 +9,8 @@ required = false
 examples = <%= examples.to_toml %>
 description = """\
 The list of <%= term %> patterns for which to gather <%= metrics %> metrics. \
-Defaults to including all <%= term %>s.\
+Defaults to including all <%= term %>s. \
+The patterns are matched using [globbing](#globbing).\
 """
 
 [<%= namespace %>.options.excludes]
@@ -18,5 +19,6 @@ required = false
 examples = <%= examples.to_toml %>
 description = """\
 The list of <%= term %> patterns for which to skip gathering <%= metrics %> metrics. \
-Defaults to excluding no <%= term %>s.\
+Defaults to excluding no <%= term %>s. \
+The patterns are matched using [globbing](#globbing).\
 """
