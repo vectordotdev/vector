@@ -294,7 +294,7 @@ impl HostMetricsConfig {
                         memory.available().get::<byte>() as f64,
                         tags![],
                     ),
-                    #[cfg(target_os = "linux")]
+                    #[cfg(any(target_os = "linux", target_os = "macos"))]
                     self.gauge(
                         "memory_active_bytes",
                         timestamp,
@@ -327,13 +327,6 @@ impl HostMetricsConfig {
                         "memory_used_bytes",
                         timestamp,
                         memory.used().get::<byte>() as f64,
-                        tags![],
-                    ),
-                    #[cfg(target_os = "macos")]
-                    self.gauge(
-                        "memory_active_bytes",
-                        timestamp,
-                        memory.active().get::<byte>() as f64,
                         tags![],
                     ),
                     #[cfg(target_os = "macos")]
