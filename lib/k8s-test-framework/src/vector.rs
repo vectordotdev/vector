@@ -9,6 +9,7 @@ use std::process::{Command, Stdio};
 pub struct CommandBuilder {
     interface_command: String,
     namespace: String,
+    custom_helm_chart: Option<String>,
     custom_helm_values_file: Option<HelmValuesFile>,
     custom_resource_file: Option<ResourceFile>,
 }
@@ -23,6 +24,10 @@ impl up_down::CommandBuilder for CommandBuilder {
             })
             .arg(&self.namespace)
             .stdin(Stdio::null());
+
+        if let Some(ref custom_helm_chart) = self.custom_helm_chart {
+            command.env("HELM_CHART", custom_helm_chart);
+        }
 
         if let Some(ref custom_helm_values_file) = self.custom_helm_values_file {
             command.env("CUSTOM_HELM_VALUES_FILE", custom_helm_values_file.path());
@@ -39,6 +44,10 @@ impl up_down::CommandBuilder for CommandBuilder {
 /// Vector configuration to deploy.
 #[derive(Debug, Default)]
 pub struct Config<'a> {
+    /// Custom Helm chart name to deploy.
+    /// Set to empty to use the default chart name.
+    pub custom_helm_chart: &'a str,
+
     /// Custom Helm values to set, in the YAML format.
     /// Set to empty to opt-out of passing any custom values.
     pub custom_helm_values: &'a str,
@@ -57,9 +66,15 @@ pub fn manager(
     config: Config<'_>,
 ) -> Result<up_down::Manager<CommandBuilder>> {
     let Config {
+        custom_helm_chart,
         custom_helm_values,
         custom_resource,
     } = config;
+    let custom_helm_chart = if custom_helm_chart.is_empty() {
+        None
+    } else {
+        Some(custom_helm_chart.to_owned())
+    };
     let custom_helm_values_file = if custom_helm_values.is_empty() {
         None
     } else {
@@ -73,6 +88,7 @@ pub fn manager(
     Ok(up_down::Manager::new(CommandBuilder {
         interface_command: interface_command.to_owned(),
         namespace: namespace.to_owned(),
+        custom_helm_chart,
         custom_helm_values_file,
         custom_resource_file,
     }))

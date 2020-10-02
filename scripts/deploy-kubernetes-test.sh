@@ -34,6 +34,9 @@ VECTOR_TEST_KUBECTL="${VECTOR_TEST_KUBECTL:-"kubectl"}"
 # Allow overriding helm with a custom command.
 VECTOR_TEST_HELM="${VECTOR_TEST_HELM:-"helm"}"
 
+# Allow overriding the chart to deploy.
+HELM_CHART="${HELM_CHART:-"vector"}"
+
 # Allow optionally installing custom resource configs.
 CUSTOM_RESOURCE_CONFIGS_FILE="${CUSTOM_RESOURCE_CONFIGS_FILE:-""}"
 
@@ -82,7 +85,7 @@ up() {
     --namespace "$NAMESPACE" \
     "${HELM_VALUES[@]}" \
     "vector" \
-    "./distribution/helm/vector"
+    "./distribution/helm/$HELM_CHART"
   { set +x; } &>/dev/null
 }
 
