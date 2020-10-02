@@ -32,8 +32,6 @@ jobs:
   test-linux:
     name: Unit - x86_64-unknown-linux-gnu
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -55,8 +53,6 @@ jobs:
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
     runs-on: macos-latest
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -77,8 +73,6 @@ jobs:
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
     runs-on: windows-latest
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - env:
@@ -88,8 +82,6 @@ jobs:
   test-misc:
     name: Shutdown - Linux
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -110,8 +102,6 @@ jobs:
   test-integration-aws:
     name: Integration - Linux, AWS
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -130,8 +120,6 @@ jobs:
   test-integration-clickhouse:
     name: Integration - Linux, Clickhouse
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -149,8 +137,6 @@ jobs:
   test-integration-docker:
     name: Integration - Linux, Docker
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -169,8 +155,6 @@ jobs:
   test-integration-elasticsearch:
     name: Integration - Linux, ES
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -189,8 +173,6 @@ jobs:
   test-integration-gcp:
     name: Integration - Linux, GCP
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -209,8 +191,6 @@ jobs:
   test-integration-humio:
     name: Integration - Linux, Humio
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -229,8 +209,6 @@ jobs:
   test-integration-influxdb:
     name: Integration - Linux, Influx
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -249,8 +227,6 @@ jobs:
   test-integration-kafka:
     name: Integration - Linux, Kafka
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -269,8 +245,6 @@ jobs:
   test-integration-loki:
     name: Integration - Linux, Loki
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -289,8 +263,6 @@ jobs:
   test-integration-pulsar:
     name: Integration - Linux, Pulsar
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -309,8 +281,6 @@ jobs:
   test-integration-splunk:
     name: Integration - Linux, Splunk
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -331,8 +301,6 @@ jobs:
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -357,8 +325,6 @@ jobs:
   build-aarch64-unknown-linux-gnu:
     name: Build - aarch64-unknown-linux-gnu
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -383,8 +349,6 @@ jobs:
   compute-k8s-test-plan:
     name: Compute K8s test plan
     runs-on: ubuntu-latest
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -436,8 +400,6 @@ jobs:
   test-e2e-kubernetes:
     name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime }} (${{ matrix.kubernetes_version.role }})
     runs-on: ubuntu-latest
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     needs:
       - build-deb-package
       - compute-k8s-test-plan
@@ -466,8 +428,6 @@ jobs:
   check-component-features:
     name: Component Features - Linux
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
