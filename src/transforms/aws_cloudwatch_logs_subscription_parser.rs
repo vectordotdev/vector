@@ -56,6 +56,7 @@ impl From<AwsCloudwatchLogsSubscriptionParserConfig> for AwsCloudwatchLogsSubscr
         AwsCloudwatchLogsSubscriptionParser {
             field: config
                 .field
+                .as_ref()
                 .unwrap_or_else(|| log_schema().message_key())
                 .clone(),
         }
