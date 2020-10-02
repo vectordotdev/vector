@@ -136,6 +136,7 @@ mod tests {
         tokio::time::timeout(timeout, signal.recv()).await.is_ok()
     }
 
+    #[cfg(not(macos))] // Issue https://github.com/timberio/vector/issues/2978
     #[tokio::test]
     async fn file_update() {
         trace_init();
