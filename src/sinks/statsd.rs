@@ -32,9 +32,11 @@ enum Client {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
+// TODO: add back when serde-rs/serde#1358 is addressed
+// #[serde(deny_unknown_fields)]
 pub struct StatsdSinkConfig {
     pub namespace: Option<String>,
+    #[serde(flatten)]
     pub mode: Mode,
     #[serde(default)]
     pub batch: BatchConfig,
