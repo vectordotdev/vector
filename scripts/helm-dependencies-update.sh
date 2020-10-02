@@ -11,17 +11,9 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 set -x
 
-ORDER=(
-  # Lowest level.
-  vector-shared
+# Read the shared scripting config.
+source "distribution/helm/scripting-config.sh"
 
-  # Intermediate level.
-  vector-daemonset
-
-  # Highest level.
-  vector
-)
-
-for CHART in "${ORDER[@]}"; do
+for CHART in "${DEPENDENCY_UPDATE_ORDER[@]}"; do
   helm dependency update "distribution/helm/$CHART" --skip-refresh "$@"
 done

@@ -43,12 +43,20 @@ capture_stderr() {
 rm -rf "$REPO_DIR"
 mkdir -p "$REPO_DIR"
 
-# Package our chart.
-helm package \
-  distribution/helm/vector \
-  --version "$CHART_VERSION" \
-  --app-version "$APP_VERSION" \
-  --destination "$REPO_DIR"
+# Ensure chart dependencies are up to date.
+scripts/helm-dependencies-update.sh
+
+# Read the shared scripting config.
+source "distribution/helm/scripting-config.sh"
+
+# Package our charts.
+for CHART in "${CHARTS_TO_PUBLISH[@]}"; do
+  helm package \
+    "distribution/helm/$CHART" \
+    --version "$CHART_VERSION" \
+    --app-version "$APP_VERSION" \
+    --destination "$REPO_DIR"
+done
 
 # Download previous manifest.
 # If it doesn't exist - ignore the error and continue.
