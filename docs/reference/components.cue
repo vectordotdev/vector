@@ -1,5 +1,7 @@
 package metadata
 
+#Field: [Name=string]: #Field | _
+
 components: close({
   #LogEvents: [Name=string]: {
     description: string
