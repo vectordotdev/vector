@@ -346,7 +346,11 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
-      - run: make build-x86_64-unknown-linux-gnu
+      - run: make package-deb-x86_64
+      - uses: actions/upload-artifact@v2
+        with:
+          name: e2e-test-deb-package
+          path: target/artifacts/*
 
   # TODO: Upgrade to test once the tz issues are solved.
   # https://github.com/timberio/vector/issues/3771
@@ -369,20 +373,6 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make build-aarch64-unknown-linux-gnu
-
-  build-deb-package:
-    name: Build .deb package
-    runs-on: ubuntu-latest
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
-    steps:
-      - uses: actions/checkout@v2
-      - run: make ci-sweep
-      - run: make package-deb-x86_64
-      - uses: actions/upload-artifact@v2
-        with:
-          name: e2e-test-deb-package
-          path: target/artifacts/*
 
   # Github Actions don't support `matrix` at the job-level `if:` condition.
   # We apply this workaround - compute `matrix` in a preceding job, and assign
