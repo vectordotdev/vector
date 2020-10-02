@@ -4,6 +4,7 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::Event,
+    internal_events::StatsdInvalidMetricReceived,
     sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
     sinks::util::{
         tcp::{TcpService, TcpSinkConfig},
@@ -178,10 +179,11 @@ fn encode_event(event: Event, namespace: Option<&str>) -> Option<Vec<u8>> {
             }
         }
         _ => {
-            warn!(
-                "invalid metric sent to statsd sink ({:?}) ({:?})",
-                metric.kind, metric.value
-            );
+            emit!(StatsdInvalidMetricReceived {
+                value: &metric.value,
+                kind: &metric.kind,
+            });
+
             return None;
         }
     };

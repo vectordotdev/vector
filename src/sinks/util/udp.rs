@@ -15,7 +15,6 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 use tokio::time::{delay_for, Delay};
 use tokio_retry::strategy::ExponentialBackoff;
-use tracing::field;
 
 #[derive(Debug, Snafu)]
 pub enum UdpError {
@@ -243,7 +242,7 @@ impl Sink for UdpSink {
             Ok(Async::Ready(socket)) => {
                 debug!(
                     message = "sending event.",
-                    bytes = &field::display(line.len())
+                    bytes = %line.len()
                 );
                 match socket.send(&line) {
                     Err(error) => {

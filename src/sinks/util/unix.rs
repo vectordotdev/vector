@@ -20,7 +20,6 @@ use tokio::{
 };
 use tokio_retry::strategy::ExponentialBackoff;
 use tokio_util::codec::{BytesCodec, FramedWrite};
-use tracing::field;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -181,7 +180,7 @@ impl UnixSink {
                 UnixSinkState::Disconnected => {
                     debug!(
                         message = "Connecting",
-                        path = &field::display(self.connector.path.to_str().unwrap())
+                        path = %self.connector.path.to_str().unwrap()
                     );
                     let fut = self.connector.connect();
                     UnixSinkState::Creating(Box::new(fut.compat()))
