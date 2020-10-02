@@ -47,7 +47,7 @@ Has higher memory requirements than `probabilistic`, but never falsely outputs \
 metrics with new tags after the limit has been hit.\
 """
 probabilistic = """\
-Has lower memory requirements than `exact`, but may occassionally allow \
+Has lower memory requirements than `exact`, but may occasionally allow \
 metric events to pass through the transform even when they contain new tags \
 that exceed the configured limit.  The rate at which this happens can be \
 controlled by changing the value of `cache_size_per_tag`.\
@@ -82,7 +82,7 @@ For example, given this configuration:
 ```
 
 Vector will drop metric tags that exceed a cardinality of 1. Note, this limit is
-unrealistically low and used only for demontration purposes.
+unrealistically low and used only for demonstration purposes.
 
 If we were to receive the first metric event:
 
@@ -102,7 +102,7 @@ If we were to receive the first metric event:
 ```
 
 It would pass through like normal; no tags would be removed. But if we were to
-recieve a second metric event:
+receive a second metric event:
 
 ```js
 {

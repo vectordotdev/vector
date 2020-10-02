@@ -258,7 +258,7 @@ data_dir = "/home/user/vector/"
   # Fingerprinting
   #
 
-  [sources.file.fingerprinting]
+  [sources.file.fingerprint]
     # The number of bytes read off the head of the file to generate a unique
     # fingerprint.
     #
@@ -267,7 +267,7 @@ data_dir = "/home/user/vector/"
     # * type: uint
     # * unit: bytes
     # * relevant when strategy = "checksum"
-    fingerprint_bytes = 256
+    bytes = 256
 
     # The number of bytes to skip ahead (or ignore) when generating a unique
     # fingerprint. This is helpful if all files share a common header.
@@ -2246,8 +2246,8 @@ require('custom_module')
   # * optional
   # * default: ["message"]
   # * type: [string]
-  merge_fields = ["message"]
-  merge_fields = ["message", "parent.child"]
+  fields = ["message"]
+  fields = ["message", "parent.child"]
 
   # The field that indicates that the event is partial. A consequent stream of
   # partial events along with the first non-partial event will be merged together.

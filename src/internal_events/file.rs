@@ -43,7 +43,7 @@ pub struct FileChecksumFailed<'a> {
 impl<'a> InternalEvent for FileChecksumFailed<'a> {
     fn emit_logs(&self) {
         warn!(
-            message = "Currently ignoring file too small for fingerprinting.",
+            message = "Currently ignoring file too small to fingerprint.",
             path = ?self.path,
         );
     }

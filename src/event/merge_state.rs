@@ -22,14 +22,14 @@ impl LogEventMergeState {
     }
 
     /// Merge the incoming (partial) event in.
-    pub fn merge_in_next_event(&mut self, incoming: LogEvent, merge_fields: &[Atom]) {
-        merge_log_event(&mut self.intermediate_merged_event, incoming, merge_fields);
+    pub fn merge_in_next_event(&mut self, incoming: LogEvent, fields: &[Atom]) {
+        merge_log_event(&mut self.intermediate_merged_event, incoming, fields);
     }
 
     /// Merge the final (non-partial) event in and return the resulting (merged)
     /// event.
-    pub fn merge_in_final_event(mut self, incoming: LogEvent, merge_fields: &[Atom]) -> LogEvent {
-        self.merge_in_next_event(incoming, merge_fields);
+    pub fn merge_in_final_event(mut self, incoming: LogEvent, fields: &[Atom]) -> LogEvent {
+        self.merge_in_next_event(incoming, fields);
         self.intermediate_merged_event
     }
 }
@@ -46,12 +46,11 @@ mod test {
 
     #[test]
     fn log_event_merge_state_example() {
-        let merge_fields = &[Atom::from("message")];
+        let fields = &[Atom::from("message")];
 
         let mut state = LogEventMergeState::new(log_event_with_message("hel"));
-        state.merge_in_next_event(log_event_with_message("lo "), merge_fields);
-        let merged_event =
-            state.merge_in_final_event(log_event_with_message("world"), merge_fields);
+        state.merge_in_next_event(log_event_with_message("lo "), fields);
+        let merged_event = state.merge_in_final_event(log_event_with_message("world"), fields);
 
         assert_eq!(
             merged_event
