@@ -64,6 +64,8 @@
 
 /src/kubernetes/ @MOZGIII @JeanMertz
 
+/src/mapping/ @JeanMertz @FungusHumungus
+
 /src/sinks/*_metrics.rs @lukesteensen
 /src/sinks/aws_kinesis_streams.rs @jszwedko
 /src/sinks/aws_s3.rs @jszwedko
@@ -105,6 +107,7 @@
 /src/transforms/log_to_metric.rs @lukesteensen
 /src/transforms/merge.rs @MOZGIII
 /src/transforms/regex_parser.rs @lukesteensen
+/src/transforms/remap.rs @JeanMertz @FungusHumungus
 /src/transforms/remove_tags.rs @lukesteensen
 /src/transforms/sampler.rs @lukesteensen
 /src/transforms/split.rs @lukesteensen
