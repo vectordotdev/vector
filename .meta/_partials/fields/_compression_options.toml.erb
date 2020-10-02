@@ -19,16 +19,16 @@ description = """\
 Configures the compression specific sink behavior.\
 """
 
-[<%= namespace %>.compression.children.codec]
+[<%= namespace %>.compression.children.algorithm]
 <%= options.to_toml %>
 
-[<%= namespace %>.compression.children.codec.enum]
+[<%= namespace %>.compression.children.algorithm.enum]
 <%= enum.to_toml %>
 
 [<%= namespace %>.compression.children.level]
-type = "uint"
-default = 6
-examples = [0, 1, 6, 9]
+type = "string"
+default = "default"
+examples = ["fast", "default", "best"]
 description = """\
-Compression level. Can be described by string: `none`, `fast`, `default`, `best`.\
+Compression level. Can be described by string, like: `none`, `fast`, `default`, `best`. Or by number, like: `0`, `1`, `6`, `9`.\
 """

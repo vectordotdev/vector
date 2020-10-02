@@ -70,52 +70,56 @@ impl<'de> de::Deserialize<'de> for Compression {
             where
                 A: de::MapAccess<'de>,
             {
-                let mut codec = None;
+                let mut algorithm = None;
                 let mut level = None;
 
                 while let Some(key) = map.next_key()? {
                     match key {
-                        "codec" => {
-                            if codec.is_some() {
-                                return Err(de::Error::duplicate_field("codec"));
+                        "algorithm" => {
+                            if algorithm.is_some() {
+                                return Err(de::Error::duplicate_field("algorithm"));
                             }
-                            codec = Some(map.next_value()?);
+                            algorithm = Some(map.next_value::<&str>()?);
                         }
                         "level" => {
                             if level.is_some() {
                                 return Err(de::Error::duplicate_field("level"));
                             }
-                            let value = map.next_value::<&str>()?;
-                            level = Some(match value.to_lowercase().as_str() {
-                                "none" => 0,
-                                "fast" => 1,
-                                "default" => 6,
-                                "best" => 9,
-                                level => match level.parse() {
-                                    Ok(level) if level <= 9 => level,
-                                    Ok(level) => {
-                                        return Err(de::Error::invalid_value(
-                                            de::Unexpected::Unsigned(level as u64),
-                                            &self,
-                                        ))
-                                    }
-                                    Err(_) => {
-                                        return Err(de::Error::invalid_value(
-                                            de::Unexpected::Str(value),
-                                            &self,
-                                        ))
-                                    }
-                                },
+                            level = Some(match map.next_value::<usize>() {
+                                Ok(value) => value.to_string(),
+                                Err(_) => map.next_value::<&str>()?.to_string(),
                             });
                         }
-                        _ => return Err(de::Error::unknown_field(key, &["codec", "level"])),
+                        _ => return Err(de::Error::unknown_field(key, &["algorithm", "level"])),
                     };
                 }
 
-                match codec.ok_or_else(|| de::Error::missing_field("codec"))? {
+                match algorithm.ok_or_else(|| de::Error::missing_field("algorithm"))? {
                     "none" => Ok(Compression::None),
-                    "gzip" => Ok(Compression::Gzip(level.unwrap_or(6))),
-                    codec => Err(de::Error::unknown_variant(codec, &["none", "gzip"])),
+                    "gzip" => Ok(Compression::Gzip(
+                        match level.unwrap_or_else(|| "default".to_owned()).as_str() {
+                            "none" => 0,
+                            "fast" => 1,
+                            "default" => 6,
+                            "best" => 9,
+                            value => match value.parse::<usize>() {
+                                Ok(level) if level <= 9 => level,
+                                Ok(level) => {
+                                    return Err(de::Error::invalid_value(
+                                        de::Unexpected::Unsigned(level as u64),
+                                        &self,
+                                    ))
+                                }
+                                Err(_) => {
+                                    return Err(de::Error::invalid_value(
+                                        de::Unexpected::Str(value),
+                                        &self,
+                                    ))
+                                }
+                            },
+                        },
+                    )),
+                    algorithm => Err(de::Error::unknown_variant(algorithm, &["none", "gzip"])),
                 }
             }
         }
@@ -133,10 +137,16 @@ impl ser::Serialize for Compression {
 
         let mut map = serializer.serialize_map(None)?;
         match self {
-            Compression::None => map.serialize_entry("codec", "none")?,
+            Compression::None => map.serialize_entry("algorithm", "none")?,
             Compression::Gzip(level) => {
-                map.serialize_entry("codec", "gzip")?;
-                map.serialize_entry("level", level)?;
+                map.serialize_entry("algorithm", "gzip")?;
+                match level {
+                    0 => map.serialize_entry("level", "none")?,
+                    1 => map.serialize_entry("level", "fast")?,
+                    6 => map.serialize_entry("level", "default")?,
+                    9 => map.serialize_entry("level", "fast")?,
+                    level => map.serialize_entry("level", level)?,
+                };
             }
         };
         map.end()
