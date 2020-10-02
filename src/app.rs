@@ -194,13 +194,13 @@ impl Application {
 
             #[cfg(feature = "api")]
             // assigned to prevent the API terminating when falling out of scope
-            let _api = if api_config.enabled {
+            let api_server = if api_config.enabled {
                 emit!(ApiStarted {
                     addr: api_config.bind.unwrap(),
                     playground: api_config.playground
                 });
 
-                Some(api::Server::start(api_config))
+                Some(api::Server::start(topology.config()))
             } else {
                 None
             };
@@ -224,7 +224,14 @@ impl Application {
                                 .reload_config_and_respawn(new_config, opts.require_healthy)
                                 .await
                             {
-                                Ok(true) =>  emit!(VectorReloaded { config_paths: &config_paths }),
+                                Ok(true) => {
+                                    #[cfg(feature="api")]
+                                    if let Some(ref api_server) = api_server {
+                                        api_server.update_config(topology.config())
+                                    }
+
+                                    emit!(VectorReloaded { config_paths: &config_paths })
+                                },
                                 Ok(false) => emit!(VectorReloadFailed),
                                 // Trigger graceful shutdown for what remains of the topology
                                 Err(()) => {
