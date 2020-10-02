@@ -69,7 +69,9 @@ pub struct FileConfig {
     pub host_key: Option<String>,
     pub data_dir: Option<PathBuf>,
     pub glob_minimum_cooldown: u64, // millis
-    pub fingerprinting: FingerprintingConfig,
+    // Deprecated name
+    #[serde(alias = "fingerprinting")]
+    pub fingerprint: FingerprintConfig,
     pub message_start_indicator: Option<String>,
     pub multi_line_timeout: u64, // millis
     pub multiline: Option<MultilineConfig>,
@@ -80,26 +82,26 @@ pub struct FileConfig {
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 #[serde(tag = "strategy", rename_all = "snake_case")]
-pub enum FingerprintingConfig {
+pub enum FingerprintConfig {
     Checksum {
-        fingerprint_bytes: usize,
+        bytes: usize,
         ignored_header_bytes: usize,
     },
     #[serde(rename = "device_and_inode")]
     DevInode,
 }
 
-impl From<FingerprintingConfig> for Fingerprinter {
-    fn from(config: FingerprintingConfig) -> Fingerprinter {
+impl From<FingerprintConfig> for Fingerprinter {
+    fn from(config: FingerprintConfig) -> Fingerprinter {
         match config {
-            FingerprintingConfig::Checksum {
-                fingerprint_bytes,
+            FingerprintConfig::Checksum {
+                bytes,
                 ignored_header_bytes,
             } => Fingerprinter::Checksum {
-                fingerprint_bytes,
+                bytes,
                 ignored_header_bytes,
             },
-            FingerprintingConfig::DevInode => Fingerprinter::DevInode,
+            FingerprintConfig::DevInode => Fingerprinter::DevInode,
         }
     }
 }
@@ -117,8 +119,8 @@ impl Default for FileConfig {
             start_at_beginning: false,
             ignore_older: None,
             max_line_bytes: default_max_line_bytes(),
-            fingerprinting: FingerprintingConfig::Checksum {
-                fingerprint_bytes: 256,
+            fingerprint: FingerprintConfig::Checksum {
+                bytes: 256,
                 ignored_header_bytes: 0,
             },
             host_key: None,
@@ -201,7 +203,7 @@ pub fn file_source(
         max_line_bytes: config.max_line_bytes,
         data_dir,
         glob_minimum_cooldown,
-        fingerprinter: config.fingerprinting.clone().into(),
+        fingerprinter: config.fingerprint.clone().into(),
         oldest_first: config.oldest_first,
         remove_after: config.remove_after.map(Duration::from_secs),
         emitter: FileSourceInternalEventsEmitter,
@@ -333,8 +335,8 @@ mod tests {
 
     fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {
-            fingerprinting: FingerprintingConfig::Checksum {
-                fingerprint_bytes: 8,
+            fingerprint: FingerprintConfig::Checksum {
+                bytes: 8,
                 ignored_header_bytes: 0,
             },
             data_dir: Some(dir.path().to_path_buf()),
@@ -370,35 +372,35 @@ mod tests {
         .unwrap();
         assert_eq!(config, FileConfig::default());
         assert_eq!(
-            config.fingerprinting,
-            FingerprintingConfig::Checksum {
-                fingerprint_bytes: 256,
+            config.fingerprint,
+            FingerprintConfig::Checksum {
+                bytes: 256,
                 ignored_header_bytes: 0,
             }
         );
 
         let config: FileConfig = toml::from_str(
             r#"
-        [fingerprinting]
+        [fingerprint]
         strategy = "device_and_inode"
         "#,
         )
         .unwrap();
-        assert_eq!(config.fingerprinting, FingerprintingConfig::DevInode);
+        assert_eq!(config.fingerprint, FingerprintConfig::DevInode);
 
         let config: FileConfig = toml::from_str(
             r#"
-        [fingerprinting]
+        [fingerprint]
         strategy = "checksum"
-        fingerprint_bytes = 128
+        bytes = 128
         ignored_header_bytes = 512
         "#,
         )
         .unwrap();
         assert_eq!(
-            config.fingerprinting,
-            FingerprintingConfig::Checksum {
-                fingerprint_bytes: 128,
+            config.fingerprint,
+            FingerprintConfig::Checksum {
+                bytes: 128,
                 ignored_header_bytes: 512,
             }
         );
