@@ -64,9 +64,13 @@ inventory::submit! {
     SinkDescription::new_without_default::<StatsdSinkConfig>("statsd")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "statsd")]
 impl SinkConfig for StatsdSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = StatsdSvc::new(self.clone(), cx.acker())?;
         Ok((sink, future::ok(()).boxed()))
     }

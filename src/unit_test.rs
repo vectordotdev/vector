@@ -11,7 +11,7 @@ pub struct Opts {
     paths: Vec<PathBuf>,
 }
 
-pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
+pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let mut failed_files: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
     let mut inspected_files: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
 
@@ -25,7 +25,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
             println!();
         }
         println!("Running {} tests", path_str);
-        match config::build_unit_tests(path.clone()) {
+        match config::build_unit_tests(path.clone()).await {
             Ok(mut tests) => {
                 let mut aggregated_test_errors = Vec::new();
                 let mut aggregated_test_inspections = Vec::new();
