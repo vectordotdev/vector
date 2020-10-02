@@ -1,14 +1,11 @@
 use super::Transform;
-
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
 };
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
-
 use std::str::FromStr;
-use tracing::field;
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -157,7 +154,7 @@ impl Transform for Geoip {
             } else {
                 debug!(
                     message = "IP Address not parsed correctly.",
-                    ipaddr = &field::display(&ipaddress),
+                    ipaddr = %ipaddress,
                 );
             }
         } else {

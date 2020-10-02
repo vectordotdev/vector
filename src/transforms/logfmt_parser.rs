@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::Event,
+    event::{Event, Value},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -73,7 +73,7 @@ impl Transform for Logfmt {
                 }
 
                 if let Some(conv) = self.conversions.get(&key) {
-                    match conv.convert(val.into_bytes().into()) {
+                    match conv.convert(Value::from(val)) {
                         Ok(value) => {
                             event.as_mut_log().insert(key, value);
                         }

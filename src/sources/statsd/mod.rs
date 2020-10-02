@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tokio::net::UdpSocket;
 use tokio_util::{codec::BytesCodec, udp::UdpFramed};
-use tracing::field;
 
 pub mod parser;
 
@@ -59,7 +58,7 @@ fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> super::S
 
             info!(
                 message = "Listening.",
-                addr = &field::display(addr),
+                addr = %addr,
                 r#type = "udp"
             );
 

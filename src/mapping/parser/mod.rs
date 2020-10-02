@@ -40,7 +40,7 @@ static TOKEN_ERR: &str = "unexpected token sequence";
 
 #[derive(Parser)]
 #[grammar = "./mapping/parser/grammar.pest"]
-struct MappingParser;
+pub(crate) struct MappingParser;
 
 fn target_path_from_pair(pair: Pair<Rule>) -> Result<String> {
     let mut segments = Vec::new();
@@ -506,10 +506,10 @@ pub fn parse(input: &str) -> Result<Mapping> {
 mod tests {
     use super::*;
     use crate::mapping::query::function::{
-        ContainsFn, DowncaseFn, FormatTimestampFn, Md5Fn, NowFn, ParseJsonFn, ParseTimestampFn,
-        Sha1Fn, Sha2Fn, Sha3Fn, SliceFn, StripAnsiEscapeCodesFn, StripWhitespaceFn, ToBooleanFn,
-        ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn, TokenizeFn, TruncateFn, UpcaseFn,
-        UuidV4Fn,
+        ContainsFn, DowncaseFn, FormatTimestampFn, Md5Fn, NowFn, ParseDurationFn, ParseJsonFn,
+        ParseTimestampFn, Sha1Fn, Sha2Fn, Sha3Fn, SliceFn, StripAnsiEscapeCodesFn,
+        StripWhitespaceFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn,
+        TokenizeFn, TruncateFn, UpcaseFn, UuidV4Fn,
     };
 
     #[test]
@@ -518,7 +518,7 @@ mod tests {
             (".foo = {\"bar\"}", vec![" 1:8\n", "= expected query"]),
             (
                 ". = \"bar\"",
-                vec![" 1:2\n", "= expected path_segment or quoted_path_segment"],
+                vec![" 1:2\n", "= expected path_field_name or quoted_path_segment"],
             ),
             (
                 ".foo = !",
@@ -542,7 +542,7 @@ mod tests {
             (".foo.bar = \"baz\" +", vec![" 1:19", "= expected query"]),
             (
                 ".foo.bar = .foo.(bar |)",
-                vec![" 1:23\n", "= expected path_segment"],
+                vec![" 1:23\n", "= expected path_field_name or quoted_path_segment"],
             ),
             (
                 "if .foo > 0 { .foo = \"bar\" } else",
@@ -589,7 +589,7 @@ mod tests {
             (
                 // Same here as above.
                 r#".foo."invalid \k escape".sequence = "foo""#,
-                vec![" 1:6\n", "= expected path_segment or quoted_path_segment"],
+                vec![" 1:6\n", "= expected path_field_name or quoted_path_segment"],
             ),
         ];
 
@@ -1208,6 +1208,13 @@ mod tests {
                     Box::new(StripAnsiEscapeCodesFn::new(Box::new(QueryPath::from(
                         "foo",
                     )))),
+                ))]),
+            ),
+            (
+                r#".foo = parse_duration(.foo, output = "s")"#,
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(ParseDurationFn::new(Box::new(QueryPath::from("foo")), "s")),
                 ))]),
             ),
         ];
