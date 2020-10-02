@@ -12,9 +12,9 @@
 /kustomization.yaml @MOZGIII
 
 /distribution/ @hoverbear @jamtur01
-/distribution/kubernetes/ @MOZGIII
-/distribution/helm/ @MOZGIII
 /distribution/docker/ @MOZGIII
+/distribution/helm/ @MOZGIII
+/distribution/kubernetes/ @MOZGIII
 
 /lib/file-source/src/paths_provider/mod.rs @MOZGIII
 /lib/file-source/src/paths_provider/glob.rs @MOZGIII
