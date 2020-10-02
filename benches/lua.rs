@@ -92,9 +92,9 @@ fn field_filter(c: &mut Criterion) {
     c.bench(
         "lua_field_filter",
         Benchmark::new("native", move |b| {
+            let mut rt = runtime();
             b.iter_with_setup(
                 || {
-                    let mut rt = runtime();
                     rt.block_on(async move {
                         transforms::field_filter::FieldFilterConfig {
                             field: "the_field".to_string(),
