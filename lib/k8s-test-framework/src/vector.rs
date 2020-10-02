@@ -36,15 +36,30 @@ impl up_down::CommandBuilder for CommandBuilder {
     }
 }
 
+/// Vector configuration to deploy.
+#[derive(Debug, Default)]
+pub struct Config<'a> {
+    /// Custom Helm values to set, in the YAML format.
+    /// Set to empty to opt-out of passing any custom values.
+    pub custom_helm_values: &'a str,
+
+    /// Custom Kubernestes resource(s) to deploy together with Vector.
+    /// Set to empty to opt-out of deploying custom resources.
+    pub custom_resource: &'a str,
+}
+
 /// Takes care of deploying Vector into the Kubernetes cluster.
 ///
 /// Manages the config file secret accordingly.
 pub fn manager(
     interface_command: &str,
     namespace: &str,
-    custom_helm_values: &str,
-    custom_resource: &str,
+    config: Config<'_>,
 ) -> Result<up_down::Manager<CommandBuilder>> {
+    let Config {
+        custom_helm_values,
+        custom_resource,
+    } = config;
     let custom_helm_values_file = if custom_helm_values.is_empty() {
         None
     } else {
