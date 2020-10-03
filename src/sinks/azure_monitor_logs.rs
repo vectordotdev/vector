@@ -1,18 +1,18 @@
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{self, Event, Value},
+    event::{Event, Value},
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpClient, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
-        Healthcheck, RouterSink,
+        Healthcheck, VectorSink,
     },
     tls::{TlsOptions, TlsSettings},
 };
 use bytesize::ByteSize;
-use futures::TryFutureExt;
+use futures::FutureExt;
 use futures01::Sink;
 use http::{
     header, header::HeaderMap, header::HeaderName, header::HeaderValue, Request, StatusCode, Uri,
@@ -81,9 +81,10 @@ const SHARED_KEY: &str = "SharedKey";
 /// API version
 const API_VERSION: &str = "2016-04-01";
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "azure_monitor_logs")]
 impl SinkConfig for AzureMonitorLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let batch_settings = BatchSettings::default()
             .bytes(bytesize::kib(5000u64))
             .timeout(1)
@@ -106,7 +107,7 @@ impl SinkConfig for AzureMonitorLogsConfig {
         let sink = AzureMonitorLogsSink::new(self)?;
         let request_settings = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        let healthcheck = Box::new(Box::pin(healthcheck(sink.clone(), client.clone())).compat());
+        let healthcheck = healthcheck(sink.clone(), client.clone()).boxed();
 
         let sink = BatchedHttpSink::new(
             sink,
@@ -118,7 +119,7 @@ impl SinkConfig for AzureMonitorLogsConfig {
         )
         .sink_map_err(|e| error!("Fatal azure_monitor_logs sink error: {}", e));
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -417,8 +418,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn fails_missing_creds() {
+    #[tokio::test]
+    async fn fails_missing_creds() {
         let config: AzureMonitorLogsConfig = toml::from_str(
             r#"
             customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
@@ -428,13 +429,13 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config.build(SinkContext::new_test()).is_ok() {
+        if config.build(SinkContext::new_test()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }
 
-    #[test]
-    fn fails_invalid_base64() {
+    #[tokio::test]
+    async fn fails_invalid_base64() {
         let config: AzureMonitorLogsConfig = toml::from_str(
             r#"
             customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
@@ -444,7 +445,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config.build(SinkContext::new_test()).is_ok() {
+        if config.build(SinkContext::new_test()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }
