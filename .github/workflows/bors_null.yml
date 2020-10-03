@@ -9,6 +9,7 @@ on:
       - trying
     paths-ignore:
       - ".github/workflows/bors.yml"
+      - "benches/**"
       - "lib/**"
       - "proto/**"
       - "scripts/**"

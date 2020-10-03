@@ -7,6 +7,7 @@ on:
       - trying
     paths:
       - ".github/workflows/bors.yml"
+      - "benches/**"
       - "lib/**"
       - "proto/**"
       - "scripts/**"
