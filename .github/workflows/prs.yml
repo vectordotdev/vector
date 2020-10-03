@@ -1,9 +1,6 @@
 name: PR Checks
 
 on:
-  push:
-    branches:
-      - master
   pull_request: {}
 
 env:
