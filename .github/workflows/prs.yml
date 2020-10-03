@@ -1,9 +1,6 @@
 name: PR Checks
 
 on:
-  push:
-    branches:
-      - master
   pull_request: {}
 
 env:
@@ -26,11 +23,37 @@ jobs:
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
+  changes:
+      runs-on: ubuntu-latest
+      # Set job outputs to values from filter step
+      outputs:
+        source: ${{ steps.filter.outputs.source }}
+      steps:
+      # For pull requests it's not necessary to checkout the code
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            source:
+              - "benches/**"
+              - "lib/**"
+              - "proto/**"
+              - "scripts/**"
+              - "skaffold/**"
+              - "src/**"
+              - "tests/**"
+              - "build.rs"
+              - "Cargo.lock"
+              - "Cargo.toml"
+              - "docker-compose.yml"
+              - "Makefile"
+              - "rust-toolchain"
+
   test-linux:
     name: Unit - x86_64-unknown-linux-gnu
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -49,34 +72,68 @@ jobs:
   checks:
     name: Checks
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            docs:
+              - 'docs/**'
+            markdown:
+              - '**/**.md'
+            clippy:
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            internal_events:
+              - 'src/internal_events/**'
+            helm:
+              - 'distribution/helm/vector'
       - uses: actions/checkout@v2
         with:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
-      - run: make ci-sweep
+      - name: Clean up CI disk space
+        run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: scripts/ci-setup-helm.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make check-markdown
-      - run: make check-docs
-      - run: make check-fmt
-      - run: make check-clippy
-      - run: make check-version
-      - run: make check-scripts
-      - run: make check-helm
-      - run: make check-kubernetes-yaml
-      - run: make check-internal-events
+      - name: Bootstrap
+        run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - name: Prepare environment
+        run: bash scripts/environment/prepare.sh
+      - name: Setup Help
+        run: scripts/ci-setup-helm.sh
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
+      - name: Make slim-builds
+        run: make slim-builds
+      - name: Check markdown
+        if: steps.changes.outputs.markdown == 'true'
+        run: make check-markdown
+      - name: Check Cue docs
+        if: steps.changes.outputs.docs == 'true'
+        run: make check-docs
+      - name: Check code format
+        run: make check-fmt
+      - name: Check clippy
+        if: steps.changes.outputs.clippy == 'true'
+        run: make check-clippy
+      - name: Check version
+        run: make check-version
+      - name: Check scripts
+        run: make check-scripts
+      - name: Check helm
+        if: steps.changes.outputs.helm == 'true'
+        run: make check-helm
+      - name: Check k8s YAML
+        run: make check-kubernetes-yaml
+      - name: Check internal events
+        if: steps.changes.outputs.internal_events == 'true'
+        run: make check-internal-events
       - uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check advisories
+
