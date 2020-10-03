@@ -53,11 +53,7 @@ inventory::submit! {
     SourceDescription::new::<SplunkConfig>("splunk_hec")
 }
 
-impl GenerateConfig for SplunkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(SplunkConfig);
 
 impl SplunkConfig {
     #[cfg(test)]

@@ -21,11 +21,7 @@ inventory::submit! {
     TransformDescription::new::<LogfmtConfig>("logfmt_parser")
 }
 
-impl GenerateConfig for LogfmtConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(LogfmtConfig);
 
 #[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {

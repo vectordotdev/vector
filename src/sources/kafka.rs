@@ -78,11 +78,7 @@ inventory::submit! {
     SourceDescription::new::<KafkaSourceConfig>("kafka")
 }
 
-impl GenerateConfig for KafkaSourceConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(KafkaSourceConfig);
 
 #[typetag::serde(name = "kafka")]
 impl SourceConfig for KafkaSourceConfig {

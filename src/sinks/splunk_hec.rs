@@ -83,11 +83,7 @@ inventory::submit! {
     SinkDescription::new::<HecSinkConfig>("splunk_hec")
 }
 
-impl GenerateConfig for HecSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(HecSinkConfig);
 
 #[typetag::serde(name = "splunk_hec")]
 impl SinkConfig for HecSinkConfig {

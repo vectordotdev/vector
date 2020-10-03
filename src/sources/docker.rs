@@ -114,11 +114,7 @@ inventory::submit! {
     SourceDescription::new::<DockerConfig>("docker")
 }
 
-impl GenerateConfig for DockerConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(DockerConfig);
 
 #[typetag::serde(name = "docker")]
 impl SourceConfig for DockerConfig {

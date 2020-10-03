@@ -22,11 +22,7 @@ inventory::submit! {
     SourceDescription::new::<InternalMetricsConfig>("internal_metrics")
 }
 
-impl GenerateConfig for InternalMetricsConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(InternalMetricsConfig);
 
 #[typetag::serde(name = "internal_metrics")]
 impl SourceConfig for InternalMetricsConfig {

@@ -34,11 +34,7 @@ inventory::submit! {
     TransformDescription::new::<MergeConfig>("merge")
 }
 
-impl GenerateConfig for MergeConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(MergeConfig);
 
 impl Default for MergeConfig {
     fn default() -> Self {

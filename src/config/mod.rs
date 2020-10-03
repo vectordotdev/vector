@@ -135,6 +135,17 @@ pub trait GenerateConfig {
     }
 }
 
+#[macro_export]
+macro_rules! impl_generate_config_from_default {
+    ($type:ty) => {
+        impl $crate::config::GenerateConfig for $type {
+            fn generate_config() -> toml::Value {
+                toml::Value::try_from(&Self::default()).unwrap()
+            }
+        }
+    };
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(tag = "type")]
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {

@@ -60,11 +60,7 @@ inventory::submit! {
     SinkDescription::new::<PubsubConfig>("gcp_pubsub")
 }
 
-impl GenerateConfig for PubsubConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(PubsubConfig);
 
 lazy_static::lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {

@@ -39,11 +39,7 @@ inventory::submit! {
     SinkDescription::new::<HumioLogsConfig>("humio_logs")
 }
 
-impl GenerateConfig for HumioLogsConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(HumioLogsConfig);
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]

@@ -51,11 +51,7 @@ inventory::submit! {
     SinkDescription::new::<ClickhouseConfig>("clickhouse")
 }
 
-impl GenerateConfig for ClickhouseConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(ClickhouseConfig);
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]

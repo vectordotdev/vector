@@ -145,11 +145,7 @@ inventory::submit! {
     SinkDescription::new::<DatadogConfig>("datadog_metrics")
 }
 
-impl GenerateConfig for DatadogConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(DatadogConfig);
 
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogConfig {

@@ -39,11 +39,7 @@ inventory::submit! {
     TransformDescription::new::<GrokParserConfig>("grok_parser")
 }
 
-impl GenerateConfig for GrokParserConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(GrokParserConfig);
 
 #[typetag::serde(name = "grok_parser")]
 impl TransformConfig for GrokParserConfig {

@@ -62,11 +62,7 @@ inventory::submit! {
     SinkDescription::new::<InfluxDBConfig>("influxdb_metrics")
 }
 
-impl GenerateConfig for InfluxDBConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(InfluxDBConfig);
 
 #[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDBConfig {

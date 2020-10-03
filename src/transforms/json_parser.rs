@@ -27,11 +27,7 @@ inventory::submit! {
     TransformDescription::new::<JsonParserConfig>("json_parser")
 }
 
-impl GenerateConfig for JsonParserConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(JsonParserConfig);
 
 #[typetag::serde(name = "json_parser")]
 impl TransformConfig for JsonParserConfig {

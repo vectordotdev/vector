@@ -98,11 +98,7 @@ inventory::submit! {
     SinkDescription::new::<ElasticSearchConfig>("elasticsearch")
 }
 
-impl GenerateConfig for ElasticSearchConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(ElasticSearchConfig);
 
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {

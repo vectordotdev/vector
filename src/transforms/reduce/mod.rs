@@ -48,11 +48,7 @@ inventory::submit! {
     TransformDescription::new::<ReduceConfig>("reduce")
 }
 
-impl GenerateConfig for ReduceConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(ReduceConfig);
 
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {

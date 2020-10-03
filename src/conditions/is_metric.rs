@@ -15,11 +15,7 @@ inventory::submit! {
     ConditionDescription::new::<IsMetricConfig>("is_metric")
 }
 
-impl GenerateConfig for IsMetricConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(IsMetricConfig);
 
 #[typetag::serde(name = "is_metric")]
 impl ConditionConfig for IsMetricConfig {

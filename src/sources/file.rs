@@ -140,11 +140,7 @@ inventory::submit! {
     SourceDescription::new::<FileConfig>("file")
 }
 
-impl GenerateConfig for FileConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(FileConfig);
 
 #[typetag::serde(name = "file")]
 impl SourceConfig for FileConfig {

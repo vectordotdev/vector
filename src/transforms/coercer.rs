@@ -22,11 +22,7 @@ inventory::submit! {
     TransformDescription::new::<CoercerConfig>("coercer")
 }
 
-impl GenerateConfig for CoercerConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(CoercerConfig);
 
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {

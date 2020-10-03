@@ -524,11 +524,7 @@ inventory::submit! {
     ConditionDescription::new::<CheckFieldsConfig>("check_fields")
 }
 
-impl GenerateConfig for CheckFieldsConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(CheckFieldsConfig);
 
 #[typetag::serde(name = "check_fields")]
 impl ConditionConfig for CheckFieldsConfig {

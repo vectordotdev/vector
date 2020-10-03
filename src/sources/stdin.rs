@@ -42,11 +42,7 @@ inventory::submit! {
     SourceDescription::new::<StdinConfig>("stdin")
 }
 
-impl GenerateConfig for StdinConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(StdinConfig);
 
 #[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {

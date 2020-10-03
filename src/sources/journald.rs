@@ -82,11 +82,7 @@ inventory::submit! {
     SourceDescription::new::<JournaldConfig>("journald")
 }
 
-impl GenerateConfig for JournaldConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(JournaldConfig);
 
 type Record = HashMap<Atom, String>;
 

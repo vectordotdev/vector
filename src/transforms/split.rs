@@ -24,11 +24,7 @@ inventory::submit! {
     TransformDescription::new::<SplitConfig>("split")
 }
 
-impl GenerateConfig for SplitConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(SplitConfig);
 
 #[typetag::serde(name = "split")]
 impl TransformConfig for SplitConfig {

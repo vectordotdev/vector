@@ -15,11 +15,7 @@ inventory::submit! {
     ConditionDescription::new::<IsLogConfig>("is_log")
 }
 
-impl GenerateConfig for IsLogConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(IsLogConfig);
 
 #[typetag::serde(name = "is_log")]
 impl ConditionConfig for IsLogConfig {

@@ -24,11 +24,7 @@ inventory::submit! {
     TransformDescription::new::<TokenizerConfig>("tokenizer")
 }
 
-impl GenerateConfig for TokenizerConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(TokenizerConfig);
 
 #[typetag::serde(name = "tokenizer")]
 impl TransformConfig for TokenizerConfig {

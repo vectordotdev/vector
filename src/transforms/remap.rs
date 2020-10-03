@@ -19,11 +19,7 @@ inventory::submit! {
     TransformDescription::new::<RemapConfig>("remap")
 }
 
-impl GenerateConfig for RemapConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(RemapConfig);
 
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {

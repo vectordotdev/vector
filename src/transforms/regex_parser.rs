@@ -39,11 +39,7 @@ inventory::submit! {
     TransformDescription::new::<RegexParserConfig>("regex_parser")
 }
 
-impl GenerateConfig for RegexParserConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(RegexParserConfig);
 
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {

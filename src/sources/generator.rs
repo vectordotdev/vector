@@ -43,11 +43,7 @@ inventory::submit! {
     SourceDescription::new::<GeneratorConfig>("generator")
 }
 
-impl GenerateConfig for GeneratorConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(GeneratorConfig);
 
 #[typetag::serde(name = "generator")]
 impl SourceConfig for GeneratorConfig {
