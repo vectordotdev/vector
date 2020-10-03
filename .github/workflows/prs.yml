@@ -63,20 +63,54 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: scripts/ci-setup-helm.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make check-markdown
-      - run: make check-meta
-      - run: make check-fmt
-      - run: make check-clippy
-      - run: make check-version
-      - run: make check-scripts
-      - run: make check-helm
-      - run: make check-kubernetes-yaml
-      - run: make check-internal-events
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            metadata:
+              - '.meta/**'
+            markdown:
+              - '**/**.md'
+            clippy:
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+            internal_events:
+              - 'src/internal_events/**'
+            helm:
+              - 'distribution/helm/vector'            
+      - name: Bootstrap
+        run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - name: Prepare environment
+        run: bash scripts/environment/prepare.sh
+      - name: Setup Help
+        run: scripts/ci-setup-helm.sh
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
+      - name: Make slim-builds
+        run: make slim-builds
+      - name: Check markdown
+        if: steps.changes.outputs.markdown == 'true'
+        run: make check-markdown
+      - name: Check metadata
+        if: steps.changes.outputs.metadata == 'true'
+        run: make check-meta
+      - name: Check code format
+        run: make check-fmt
+      - name: Check clippy
+        if: steps.changes.outputs.clippy == 'true'
+        run: make check-clippy
+      - name: Check version
+        run: make check-version
+      - name: Check scripts
+        run: make check-scripts
+      - name: Check helm
+        if: steps.changes.outputs.helm == 'true'
+        run: make check-helm
+      - name: Check k8s YAML
+        run: make check-kubernetes-yaml
+      - name: Check internal events
+        if: steps.changes.outputs.internal_events == 'true'
+        run: make check-internal-events
       - uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check advisories
