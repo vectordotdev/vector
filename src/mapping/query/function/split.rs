@@ -38,11 +38,11 @@ lazy_static! {
 fn regex_from_map(mut map: BTreeMap<String, Value>) -> Result<(regex::Regex, bool)> {
     let pattern = map
         .remove("pattern")
-        .ok_or("Field is not a regular expression".to_string())?;
+        .ok_or_else(|| "Field is not a regular expression".to_string())?;
 
     let flags = match map.remove("flags") {
         None => Value::from(Vec::<Value>::new()),
-        Some(flags) => flags
+        Some(flags) => flags,
     };
 
     match (flags, pattern) {
@@ -86,31 +86,27 @@ impl Function for SplitFn {
             })
             .transpose()?;
 
+        let to_value = |iter: Box<dyn Iterator<Item = &str>>| {
+            Value::Array(
+                iter.map(|sub| Value::Bytes(sub.to_string().into()))
+                    .collect(),
+            )
+        };
+
         match self.pattern.execute(ctx)? {
             Value::Bytes(path) => {
                 let pattern = String::from_utf8_lossy(&path).into_owned();
-
-                let iter: Box<dyn Iterator<Item = _>> = match limit {
-                    Some(limit) => Box::new(string.splitn(limit, &pattern)),
-                    None => Box::new(string.split(&pattern)),
-                };
-
-                Ok(Value::Array(
-                    iter.map(|sub| Value::Bytes(sub.to_string().into()))
-                        .collect(),
-                ))
+                Ok(match limit {
+                    Some(limit) => to_value(Box::new(string.splitn(limit, &pattern))),
+                    None => to_value(Box::new(string.split(&pattern))),
+                })
             }
             Value::Map(pattern) => {
                 let (regex, _global) = regex_from_map(pattern)?;
-                let iter: Box<dyn Iterator<Item = _>> = match &limit {
-                    Some(ref limit) => Box::new(regex.splitn(&string, *limit)),
-                    None => Box::new(regex.split(&string)),
-                };
-
-                Ok(Value::Array(
-                    iter.map(|sub| Value::Bytes(sub.to_string().into()))
-                        .collect(),
-                ))
+                Ok(match &limit {
+                    Some(ref limit) => to_value(Box::new(regex.splitn(&string, *limit))),
+                    None => to_value(Box::new(regex.split(&string))),
+                })
             }
             _ => Err("invalid pattern".to_string()),
         }
