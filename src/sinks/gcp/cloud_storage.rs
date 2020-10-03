@@ -32,7 +32,6 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::task::Poll;
 use tower::{Service, ServiceBuilder};
-use tracing::field;
 use uuid::Uuid;
 
 const NAME: &str = "gcp_cloud_storage";
@@ -151,11 +150,7 @@ inventory::submit! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
-    fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        unimplemented!()
-    }
-
-    async fn build_async(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = GcsSink::new(self, &cx).await?;
         let healthcheck = sink.clone().healthcheck().boxed();
         let service = sink.service(self, &cx)?;
@@ -316,11 +311,7 @@ impl RequestWrapper {
             settings.extension
         );
 
-        debug!(
-            message = "sending events.",
-            bytes = &field::debug(body.len()),
-            key = &field::debug(&key)
-        );
+        debug!(message = "sending events.", bytes = ?body.len(), ?key);
 
         Self {
             body,

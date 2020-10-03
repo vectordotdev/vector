@@ -147,9 +147,10 @@ impl rlua::UserData for LuaEvent {
             |_ctx, this, (key, value): (String, Option<rlua::Value<'lua>>)| {
                 match value {
                     Some(rlua::Value::String(string)) => {
-                        this.inner
-                            .as_mut_log()
-                            .insert(key, string.as_bytes().to_vec());
+                        this.inner.as_mut_log().insert(
+                            key,
+                            Value::from(string.to_str().expect("Expected UTF-8.").to_owned()),
+                        );
                     }
                     Some(rlua::Value::Integer(integer)) => {
                         this.inner.as_mut_log().insert(key, Value::Integer(integer));

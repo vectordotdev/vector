@@ -4,19 +4,6 @@ set -e -o verbose
 export DEBIAN_FRONTEND=noninteractive
 
 apt update --yes
-
-# This is a workaround for GH https://github.com/actions/virtual-environments/issues/1605
-# This fix will be removed when GH addresses the issue.
-# What's happening here? Well we use this script inside CI and Docker containers.
-# It'll run fine in CI because update-grub can find a root parition.
-# Inside a container it'll fail. Either way we don't care about the outcome of the command
-# so we ignore its exit.
-
-set +e
-apt-get install --yes grub-efi
-update-grub
-set -e
-
 apt upgrade --yes
 
 # Deps
@@ -40,7 +27,18 @@ apt install --yes \
     libsasl2-dev \
     gnupg2 \
     wget \
-    gawk
+    gawk \
+    yarn
+
+# Cue
+TEMP=$(mktemp -d)
+curl \
+    -L https://github.com/cuelang/cue/releases/download/v0.3.0-alpha3/cue_0.3.0-alpha3_Linux_x86_64.tar.gz \
+    -o "${TEMP}/cue_0.3.0-alpha3_Linux_x86_64.tar.gz"
+tar \
+    -xvf "${TEMP}/cue_0.3.0-alpha3_Linux_x86_64.tar.gz" \
+    -C "${TEMP}"
+cp "${TEMP}/cue" /usr/bin/cue
 
 # Grease
 # Grease is used for the `make release-github` task.
@@ -60,16 +58,17 @@ dpkg-reconfigure locales
 # Rust
 curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
 
-# Docker
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-add-apt-repository \
-   "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
-   xenial \
-   stable"
-
-# Install those new things
-apt update --yes
-apt install --yes yarn docker-ce docker-ce-cli containerd.io
+if ! [ -x "$(command -v docker)" ]; then
+    # Docker
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+    add-apt-repository \
+        "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+        xenial \
+        stable"
+    # Install those new things
+    apt update --yes
+    apt install --yes docker-ce docker-ce-cli containerd.io
+fi
 
 # Apt cleanup
 apt clean

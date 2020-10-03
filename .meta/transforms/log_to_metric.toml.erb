@@ -28,8 +28,9 @@ description = "The metric type."
 [transforms.log_to_metric.options.metrics.children.type.enum]
 counter = "A [counter metric type][docs.data-model.metric#counter]."
 gauge = "A [gauge metric type][docs.data-model.metric#gauge]."
-histogram = "A [distribution metric type][docs.data-model.metric#distribution]."
+histogram = "A [distribution metric type with histogram statistic][docs.data-model.metric#distribution]."
 set = "A [set metric type][docs.data-model.metric#set]."
+summary = "A [distribution metric type with summary statistic][docs.data-model.metric#distribution]."
 
 [transforms.log_to_metric.options.metrics.children.field]
 type = "string"
@@ -119,6 +120,7 @@ structure:
   "distribution": {
     "values": [54.2],
     "sample_rates": [1.0]
+    "statistic": "histogram"
   }
 }
 ```

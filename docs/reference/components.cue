@@ -1,7 +1,5 @@
 package metadata
 
-#Field: [Name=string]: #Field | _
-
 components: close({
   #LogEvents: [Name=string]: {
     description: string
@@ -76,17 +74,21 @@ components: close({
           default: uint | null
         }
         examples?: [...uint],
-        unit: "bytes" | "milliseconds" | "seconds"
+        unit: "bytes" | "logs" | "milliseconds" | "seconds"
       }
     }
   }
 
   #Components: [Type=string]: {
-    // A short description of the component.
+    // A long description of the component, full of relevant keywords for SEO
+    // purposes.
     description: string
 
     // The component kind. This is set automatically.
     kind: "sink" | "source" | "transform"
+
+    // A short, one sentence description.
+    short_description: string
 
     // The component title, used in text. For example, the `http` source has
     // a title of "HTTP".
@@ -120,10 +122,12 @@ components: close({
 
     // The various statuses of this component.
     statuses: {
-      // The delivery status. At least once means we guarantee that events
-      // will be delivered at least once. Best effort means there is potential
-      // for data loss.
-      delivery: "at_least_once" | "best_effort"
+      if kind == "source" || kind == "sink" {
+        // The delivery status. At least once means we guarantee that events
+        // will be delivered at least once. Best effort means there is potential
+        // for data loss.
+        delivery: "at_least_once" | "best_effort"
+      }
 
       // The developmnet status of this component. Beta means the component is
       // new and has not proven to be stable. Prod ready means that component
@@ -138,6 +142,7 @@ components: close({
       platforms: {
         "aarch64-unknown-linux-gnu": bool
         "aarch64-unknown-linux-musl": bool
+        "x86_64-apple-darwin": bool
         "x86_64-pc-windows-msv": bool
         "x86_64-unknown-linux-gnu": bool
         "x86_64-unknown-linux-musl": bool
@@ -179,8 +184,8 @@ components: close({
               "\( k )"?: _ | *null
             }
           }
-          input: string
-          "output": #Field
+          input: #Fields | string
+          "output": #Fields
         }
       ]
     }

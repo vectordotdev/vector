@@ -69,7 +69,9 @@ pub struct FileConfig {
     pub host_key: Option<String>,
     pub data_dir: Option<PathBuf>,
     pub glob_minimum_cooldown: u64, // millis
-    pub fingerprinting: FingerprintingConfig,
+    // Deprecated name
+    #[serde(alias = "fingerprinting")]
+    pub fingerprint: FingerprintConfig,
     pub message_start_indicator: Option<String>,
     pub multi_line_timeout: u64, // millis
     pub multiline: Option<MultilineConfig>,
@@ -80,26 +82,26 @@ pub struct FileConfig {
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 #[serde(tag = "strategy", rename_all = "snake_case")]
-pub enum FingerprintingConfig {
+pub enum FingerprintConfig {
     Checksum {
-        fingerprint_bytes: usize,
+        bytes: usize,
         ignored_header_bytes: usize,
     },
     #[serde(rename = "device_and_inode")]
     DevInode,
 }
 
-impl From<FingerprintingConfig> for Fingerprinter {
-    fn from(config: FingerprintingConfig) -> Fingerprinter {
+impl From<FingerprintConfig> for Fingerprinter {
+    fn from(config: FingerprintConfig) -> Fingerprinter {
         match config {
-            FingerprintingConfig::Checksum {
-                fingerprint_bytes,
+            FingerprintConfig::Checksum {
+                bytes,
                 ignored_header_bytes,
             } => Fingerprinter::Checksum {
-                fingerprint_bytes,
+                bytes,
                 ignored_header_bytes,
             },
-            FingerprintingConfig::DevInode => Fingerprinter::DevInode,
+            FingerprintConfig::DevInode => Fingerprinter::DevInode,
         }
     }
 }
@@ -117,8 +119,8 @@ impl Default for FileConfig {
             start_at_beginning: false,
             ignore_older: None,
             max_line_bytes: default_max_line_bytes(),
-            fingerprinting: FingerprintingConfig::Checksum {
-                fingerprint_bytes: 256,
+            fingerprint: FingerprintConfig::Checksum {
+                bytes: 256,
                 ignored_header_bytes: 0,
             },
             host_key: None,
@@ -138,9 +140,10 @@ inventory::submit! {
     SourceDescription::new::<FileConfig>("file")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "file")]
 impl SourceConfig for FileConfig {
-    fn build(
+    async fn build(
         &self,
         name: &str,
         globals: &GlobalOptions,
@@ -153,12 +156,17 @@ impl SourceConfig for FileConfig {
         // other
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
 
-        if let Some(ref config) = self.multiline {
-            let _: line_agg::Config = config.try_into()?;
-        }
+        // Clippy rule, because async_trait?
+        #[allow(clippy::suspicious_else_formatting)]
+        {
+            if let Some(ref config) = self.multiline {
+                let _: line_agg::Config = config.try_into()?;
+            }
 
-        if let Some(ref indicator) = self.message_start_indicator {
-            Regex::new(indicator).with_context(|| InvalidMessageStartIndicator { indicator })?;
+            if let Some(ref indicator) = self.message_start_indicator {
+                Regex::new(indicator)
+                    .with_context(|| InvalidMessageStartIndicator { indicator })?;
+            }
         }
 
         Ok(file_source(self, data_dir, shutdown, out))
@@ -195,7 +203,7 @@ pub fn file_source(
         max_line_bytes: config.max_line_bytes,
         data_dir,
         glob_minimum_cooldown,
-        fingerprinter: config.fingerprinting.clone().into(),
+        fingerprinter: config.fingerprint.clone().into(),
         oldest_first: config.oldest_first,
         remove_after: config.remove_after.map(Duration::from_secs),
         emitter: FileSourceInternalEventsEmitter,
@@ -327,8 +335,8 @@ mod tests {
 
     fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {
-            fingerprinting: FingerprintingConfig::Checksum {
-                fingerprint_bytes: 8,
+            fingerprint: FingerprintConfig::Checksum {
+                bytes: 8,
                 ignored_header_bytes: 0,
             },
             data_dir: Some(dir.path().to_path_buf()),
@@ -364,35 +372,35 @@ mod tests {
         .unwrap();
         assert_eq!(config, FileConfig::default());
         assert_eq!(
-            config.fingerprinting,
-            FingerprintingConfig::Checksum {
-                fingerprint_bytes: 256,
+            config.fingerprint,
+            FingerprintConfig::Checksum {
+                bytes: 256,
                 ignored_header_bytes: 0,
             }
         );
 
         let config: FileConfig = toml::from_str(
             r#"
-        [fingerprinting]
+        [fingerprint]
         strategy = "device_and_inode"
         "#,
         )
         .unwrap();
-        assert_eq!(config.fingerprinting, FingerprintingConfig::DevInode);
+        assert_eq!(config.fingerprint, FingerprintConfig::DevInode);
 
         let config: FileConfig = toml::from_str(
             r#"
-        [fingerprinting]
+        [fingerprint]
         strategy = "checksum"
-        fingerprint_bytes = 128
+        bytes = 128
         ignored_header_bytes = 512
         "#,
         )
         .unwrap();
         assert_eq!(
-            config.fingerprinting,
-            FingerprintingConfig::Checksum {
-                fingerprint_bytes: 128,
+            config.fingerprint,
+            FingerprintConfig::Checksum {
+                bytes: 128,
                 ignored_header_bytes: 512,
             }
         );
@@ -1362,6 +1370,64 @@ mod tests {
                 "i'm new".into(),
                 "hopefully you read all the old stuff first".into(),
                 "because otherwise i'm not going to make sense".into(),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_split_reads() {
+        let (tx, rx) = Pipeline::new_test();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            start_at_beginning: true,
+            max_read_bytes: 1,
+            ..test_default_file_config(&dir)
+        };
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        writeln!(&mut file, "hello i am a normal line").unwrap();
+
+        sleep_500_millis().await;
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        tokio::spawn(source.compat());
+
+        sleep_500_millis().await;
+
+        write!(&mut file, "i am not a full line").unwrap();
+
+        // Longer than the EOF timeout
+        sleep_500_millis().await;
+
+        writeln!(&mut file, " until now").unwrap();
+
+        sleep_500_millis().await;
+
+        drop(trigger_shutdown);
+
+        let received = wait_with_timeout(
+            rx.map(|event| {
+                event
+                    .as_log()
+                    .get(&log_schema().message_key())
+                    .unwrap()
+                    .clone()
+            })
+            .collect()
+            .compat(),
+        )
+        .await;
+
+        assert_eq!(
+            received,
+            vec![
+                "hello i am a normal line".into(),
+                "i am not a full line until now".into(),
             ]
         );
     }

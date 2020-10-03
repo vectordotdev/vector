@@ -7,6 +7,7 @@ use crate::{
     template::Template,
 };
 use serde::{Deserialize, Serialize};
+use string_cache::DefaultAtom as Atom;
 
 const HOST: &str = "https://cloud.humio.com";
 
@@ -25,6 +26,9 @@ pub struct HumioLogsConfig {
 
     event_type: Option<Template>,
 
+    #[serde(default = "default_host_key")]
+    pub host_key: Atom,
+
     #[serde(default)]
     pub compression: Compression,
 
@@ -33,6 +37,10 @@ pub struct HumioLogsConfig {
 
     #[serde(default)]
     batch: BatchConfig,
+}
+
+fn default_host_key() -> Atom {
+    crate::config::LogSchema::default().host_key().clone()
 }
 
 inventory::submit! {
@@ -57,10 +65,14 @@ impl From<Encoding> for splunk_hec::Encoding {
     }
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        self.build_hec_config().build(cx)
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        self.build_hec_config().build(cx).await
     }
 
     fn input_type(&self) -> DataType {
@@ -85,6 +97,7 @@ impl HumioLogsConfig {
             compression: self.compression,
             batch: self.batch,
             request: self.request,
+            host_key: self.host_key.clone(),
             ..Default::default()
         }
     }
@@ -133,7 +146,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::{SinkConfig, SinkContext},
+        config::{log_schema, SinkConfig, SinkContext},
         sinks::util::Compression,
         test_util::random_string,
         Event,
@@ -154,10 +167,13 @@ mod integration_tests {
 
         let config = config(&repo.default_ingest_token);
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
-        let event = Event::from(message.clone());
+        let host = "192.168.1.1".to_string();
+        let mut event = Event::from(message.clone());
+        let log = event.as_mut_log();
+        log.insert(log_schema().host_key(), host.clone());
 
         sink.run(stream::once(future::ready(event))).await.unwrap();
 
@@ -175,8 +191,11 @@ mod integration_tests {
         assert!(
             entry.error.is_none(),
             "Humio encountered an error parsing this message: {}",
-            entry.error_msg.unwrap_or("no error message".to_string())
+            entry
+                .error_msg
+                .unwrap_or_else(|| "no error message".to_string())
         );
+        assert_eq!(Some(host), entry.host);
     }
 
     #[tokio::test]
@@ -188,7 +207,7 @@ mod integration_tests {
         let mut config = config(&repo.default_ingest_token);
         config.source = Template::try_from("/var/log/syslog".to_string()).ok();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let event = Event::from(message.clone());
@@ -200,7 +219,9 @@ mod integration_tests {
         assert!(
             entry.error.is_none(),
             "Humio encountered an error parsing this message: {}",
-            entry.error_msg.unwrap_or("no error message".to_string())
+            entry
+                .error_msg
+                .unwrap_or_else(|| "no error message".to_string())
         );
     }
 
@@ -213,7 +234,7 @@ mod integration_tests {
             let mut config = config(&repo.default_ingest_token);
             config.event_type = Template::try_from("json".to_string()).ok();
 
-            let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+            let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
             let message = random_string(100);
             let mut event = Event::from(message.clone());
@@ -231,7 +252,9 @@ mod integration_tests {
             assert!(
                 entry.error.is_none(),
                 "Humio encountered an error parsing this message: {}",
-                entry.error_msg.unwrap_or("no error message".to_string())
+                entry
+                    .error_msg
+                    .unwrap_or_else(|| "no error message".to_string())
             );
         }
 
@@ -239,7 +262,7 @@ mod integration_tests {
         {
             let config = config(&repo.default_ingest_token);
 
-            let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+            let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
             let message = random_string(100);
             let event = Event::from(message.clone());
@@ -263,6 +286,7 @@ mod integration_tests {
                 max_events: Some(1),
                 ..Default::default()
             },
+            host_key: log_schema().host_key().clone(),
             ..Default::default()
         }
     }
@@ -384,6 +408,9 @@ mutation {{
 
         #[serde(rename = "@source")]
         source: Option<String>,
+
+        #[serde(rename = "@host")]
+        host: Option<String>,
 
         // fields parsed from ingested log
         #[serde(flatten)]

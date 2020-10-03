@@ -1,12 +1,11 @@
 use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::Event,
+    event::{Event, Value},
     shutdown::ShutdownSignal,
     sources::util::{ErrorMessage, HttpSource},
     tls::TlsConfig,
     Pipeline,
 };
-use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use codec::BytesDelimitedCodec;
@@ -61,20 +60,10 @@ impl HttpSource for SimpleHttpSource {
     }
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "http")]
-#[async_trait]
 impl SourceConfig for SimpleHttpConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
-        _out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        unimplemented!()
-    }
-
-    async fn build_async(
+    async fn build(
         &self,
         _: &str,
         _: &GlobalOptions,
@@ -108,9 +97,10 @@ fn add_headers(
             .map(HeaderValue::as_bytes)
             .unwrap_or_default();
         for event in events.iter_mut() {
-            event
-                .as_mut_log()
-                .insert(header_name as &str, value.to_vec());
+            event.as_mut_log().insert(
+                header_name as &str,
+                Value::from(Bytes::from(value.to_owned())),
+            );
         }
     }
 
@@ -240,7 +230,7 @@ mod tests {
                 headers,
                 tls: None,
             }
-            .build_async(
+            .build(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),

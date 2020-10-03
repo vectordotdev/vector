@@ -35,7 +35,6 @@ use std::time::Duration;
 use std::{collections::HashMap, convert::TryFrom, env};
 use string_cache::DefaultAtom as Atom;
 use tokio::sync::mpsc;
-use tracing::field;
 
 /// The beginning of image names of vector docker images packaged by vector.
 const VECTOR_IMAGE_NAME: &str = "timberio/vector";
@@ -113,9 +112,10 @@ inventory::submit! {
     SourceDescription::new::<DockerConfig>("docker")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "docker")]
 impl SourceConfig for DockerConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -347,11 +347,7 @@ impl DockerSource {
                 let names = container.names.unwrap();
                 let image = container.image.unwrap();
 
-                trace!(
-                    message = "found already running container.",
-                    id = field::display(&id),
-                    names = field::debug(&names)
-                );
+                trace!(message = "found already running container.", %id, ?names);
 
                 if !self.exclude_vector(id.as_str(), image.as_str()) {
                     return;
@@ -369,7 +365,7 @@ impl DockerSource {
                         }
                     }),
                 ) {
-                    trace!(message = "container excluded.", id = field::display(&id));
+                    trace!(message = "container excluded.", %id);
                     return;
                 }
 
@@ -935,7 +931,7 @@ impl ContainerMetadata {
                     .map(|(key, value)| {
                         (
                             ("label.".to_owned() + key).into(),
-                            value.as_bytes().to_owned().into(),
+                            Value::from(value.to_owned()),
                         )
                     })
                     .collect()
@@ -1030,6 +1026,7 @@ mod tests {
                     ShutdownSignal::noop(),
                     sender,
                 )
+                .await
                 .unwrap()
                 .compat()
                 .await
