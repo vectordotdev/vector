@@ -5,6 +5,20 @@ on:
     branches:
       - staging
       - trying
+    paths:
+      - ".github/workflows/bors.yml"
+      - "lib/**"
+      - "proto/**"
+      - "scripts/**"
+      - "skaffold/**"
+      - "src/**"
+      - "tests/**"
+      - "build.rs"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "docker-compose.yml"
+      - "Makefile"
+      - "rust-toolchain"
 
 env:
   AUTOINSTALL: true
