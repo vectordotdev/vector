@@ -451,7 +451,6 @@ jobs:
       - test-linux
       - build-x86_64-unknown-linux-gnu
       - build-aarch64-unknown-linux-gnu
-      - test-mac
       - test-windows
       - test-misc
       - test-integration-aws
@@ -480,7 +479,6 @@ jobs:
       - test-linux
       - build-x86_64-unknown-linux-gnu
       - build-aarch64-unknown-linux-gnu
-      - test-mac
       - test-windows
       - test-misc
       - test-integration-aws
