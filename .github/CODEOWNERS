@@ -26,7 +26,7 @@
 
 /scripts/build-* @hoverbear
 /scripts/ci-docker-images/ @hoverbear @jamtur01
-/scripts/check-meta.sh @binarylogic @jamtur01
+/scripts/check-docs.sh @binarylogic @jamtur01
 /scripts/check-* @jamtur01
 /scripts/docker-* @jamtur01
 /scripts/environment/* @hoverbear @jamtur01
