@@ -72,17 +72,6 @@ jobs:
     name: Checks
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
-        with:
-          # check-version needs tags
-          fetch-depth: 0 # fetch everything
-      - run: make ci-sweep
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - uses: dorny/paths-filter@v2
         id: changes
         with:
@@ -98,6 +87,18 @@ jobs:
               - 'src/internal_events/**'
             helm:
               - 'distribution/helm/vector'
+      - uses: actions/checkout@v2
+        with:
+          # check-version needs tags
+          fetch-depth: 0 # fetch everything
+      - name: Clean up CI disk space
+        run: make ci-sweep
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Bootstrap
         run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - name: Prepare environment
