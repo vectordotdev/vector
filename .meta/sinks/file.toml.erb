@@ -35,8 +35,8 @@ write_to_description = "a file"
 type = "string"
 common = true
 examples = [
-  "vector-%Y-%m-%d.log",
-  "application-{{ application_id }}-%Y-%m-%d.log"
+  "/tmp/vector-%Y-%m-%d.log",
+  "/tmp/application-{{ application_id }}-%Y-%m-%d.log"
 ]
 required = true
 templateable = true
