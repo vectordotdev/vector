@@ -171,6 +171,15 @@ components: sources: [Name=string]: {
     }
   }
 
+  // Example uses for the component.
+  examples: {
+    log: [
+      ...{
+        input: string
+      }
+    ]
+  }
+
   how_it_works: {
     if _features.checkpoint.enabled {
       checkpointing: {

@@ -1,7 +1,5 @@
 package metadata
 
-#Field: [Name=string]: #Field | _
-
 components: close({
   #LogEvents: [Name=string]: {
     description: string
@@ -120,10 +118,12 @@ components: close({
 
     // The various statuses of this component.
     statuses: {
-      // The delivery status. At least once means we guarantee that events
-      // will be delivered at least once. Best effort means there is potential
-      // for data loss.
-      delivery: "at_least_once" | "best_effort"
+      if kind == "source" || kind == "sink" {
+        // The delivery status. At least once means we guarantee that events
+        // will be delivered at least once. Best effort means there is potential
+        // for data loss.
+        delivery: "at_least_once" | "best_effort"
+      }
 
       // The developmnet status of this component. Beta means the component is
       // new and has not proven to be stable. Prod ready means that component
@@ -179,8 +179,8 @@ components: close({
               "\( k )"?: _ | *null
             }
           }
-          input: string
-          "output": #Field
+          input: #Fields | string
+          "output": #Fields
         }
       ]
     }
