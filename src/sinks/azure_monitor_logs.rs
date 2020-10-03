@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
     sinks::{
         util::{
@@ -150,7 +150,7 @@ impl HttpSink for AzureMonitorLogsSink {
         // it seems like Azure Monitor doesn't support full 9-digit nanosecond precision
         // adjust the timestamp format accordingly, keeping only milliseconds
         let mut log = event.into_log();
-        let timestamp_key = event::log_schema().timestamp_key();
+        let timestamp_key = log_schema().timestamp_key();
 
         let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(timestamp_key) {
             ts
@@ -199,7 +199,7 @@ impl AzureMonitorLogsSink {
         let log_type = HeaderValue::from_str(&config.log_type)?;
         default_headers.insert(LOG_TYPE_HEADER.clone(), log_type);
 
-        let timestamp_key = event::log_schema().timestamp_key();
+        let timestamp_key = log_schema().timestamp_key();
         default_headers.insert(
             TIME_GENERATED_FIELD_HEADER.clone(),
             HeaderValue::from_str(timestamp_key)?,
@@ -304,7 +304,7 @@ mod tests {
     fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
         let now = chrono::Utc::now();
 
-        let timestamp_key = event::log_schema().timestamp_key().to_string();
+        let timestamp_key = log_schema().timestamp_key().to_string();
         let timestamp_value = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
         log.insert(&timestamp_key, now);
 
@@ -399,7 +399,7 @@ mod tests {
         assert_eq!(log_type.to_str().unwrap(), "Vector");
 
         let time_generated_field = headers.get("time-generated-field").unwrap();
-        let timestamp_key = event::log_schema().timestamp_key();
+        let timestamp_key = log_schema().timestamp_key();
         assert_eq!(
             time_generated_field.to_str().unwrap(),
             timestamp_key.as_ref()
