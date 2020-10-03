@@ -77,8 +77,8 @@ jobs:
         id: changes
         with:
           filters: |
-            metadata:
-              - '.meta/**'
+            docs:
+              - 'docs/**'
             markdown:
               - '**/**.md'
             clippy:
@@ -113,9 +113,9 @@ jobs:
       - name: Check markdown
         if: steps.changes.outputs.markdown == 'true'
         run: make check-markdown
-      - name: Check metadata
-        if: steps.changes.outputs.metadata == 'true'
-        run: make check-meta
+      - name: Check Cue docs
+        if: steps.changes.outputs.docs == 'true'
+        run: make check-docs
       - name: Check code format
         run: make check-fmt
       - name: Check clippy
