@@ -38,8 +38,6 @@ curl \
 tar \
     -xvf "${TEMP}/cue_0.3.0-alpha3_Linux_x86_64.tar.gz" \
     -C "${TEMP}"
-ls "${TEMP}"
-ls "${TEMP}/cue"
 cp "${TEMP}/cue" /usr/bin/cue
 
 # Grease
