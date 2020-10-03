@@ -6,7 +6,7 @@ on:
       - staging
       - trying
     paths:
-      - ".github/workflows/tests.yml"
+      - ".github/workflows/bors.yml"
       - "lib/**"
       - "proto/**"
       - "scripts/**"
