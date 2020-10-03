@@ -18,6 +18,7 @@ expanding into more specifics.
    1. [Github Pull Requests](#github-pull-requests)
       1. [Title](#title)
       1. [Reviews & Approvals](#reviews--approvals)
+      1. [Bors review process](#bors-review-process)
       1. [Merge Style](#merge-style)
    1. [CI](#ci)
       1. [Releasing](#releasing)
@@ -39,6 +40,7 @@ expanding into more specifics.
    1. [Guidelines](#guidelines)
       1. [Sink Healthchecks](#sink-healthchecks)
       1. [Metric naming convention](#metric-naming-convention)
+      1. [Option naming](#option-naming)
    1. [Testing](#testing-1)
       1. [Unit Tests](#unit-tests)
       1. [Integration Tests](#integration-tests)
@@ -107,7 +109,7 @@ To merge a new source, sink, or transform, you need to:
 
 - [ ] Add tests, especially integration tests if your contribution connects to an external service.
 - [ ] Add instrumentation so folks using your integration can get insight into how it's working and performing. You can see some [example of instrumentation in existing integrations](https://github.com/timberio/vector/tree/master/src/internal_events).
-- [ ] Add internal documentation of options and fields. You can see [examples in the `.meta` directory](https://github.com/timberio/vector/blob/master/.meta/sources/kafka.toml.erb).
+- [ ] Add documentation. You can see [examples in the `docs` directory](https://github.com/timberio/vector/blob/master/docs).
 - [ ] Update [`.github/CODEOWNERS`](https://github.com/timberio/vector/blob/master/.github/CODEOWNERS) or talk to us about identifying someone on the team to help look after the new integration.
 
 ## Change Control
@@ -892,17 +894,9 @@ your feature.
 
 ### Documentation
 
-Documentation is very important to the Vector project! In order to keep things
-simple for contributors, all reference documentation is derived from metadata
-in the [`/.meta` directory](/.meta). If you add a component, change options,
-or otherwise change anything user facing, you should update the relevant files
-in the `/.meta` directory.
-
-To ensure your change is valid, you can run `make check-meta`, which validates
-your changes against the local `/.meta/.schema.json` file.
-
-The actual website and documentation are generated on the
-[`vector-website`](https://github.com/timberio/vector-website) repo.
+Documentation is very important to the Vector project! All documentation is
+located in the `/docs` folder. To ensure your change is valid, you can run
+`make check-docs`, which validates your changes to the `/docs` directory.
 
 ### Changelog
 

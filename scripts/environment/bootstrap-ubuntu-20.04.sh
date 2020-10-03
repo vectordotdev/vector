@@ -30,6 +30,16 @@ apt install --yes \
     gawk \
     yarn
 
+# Cue
+TEMP=$(mktemp -d)
+curl \
+    -L https://github.com/cuelang/cue/releases/download/v0.3.0-alpha3/cue_0.3.0-alpha3_Linux_x86_64.tar.gz \
+    -o "${TEMP}/cue_0.3.0-alpha3_Linux_x86_64.tar.gz"
+tar \
+    -xvf "${TEMP}/cue_0.3.0-alpha3_Linux_x86_64.tar.gz" \
+    -C "${TEMP}"
+cp "${TEMP}/cue" /usr/bin/cue
+
 # Grease
 # Grease is used for the `make release-github` task.
 TEMP=$(mktemp -d)
