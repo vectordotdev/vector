@@ -401,7 +401,7 @@ jobs:
     name: K8s ${{ matrix.kubernetes_version.version }} / ${{ matrix.container_runtime }} (${{ matrix.kubernetes_version.role }})
     runs-on: ubuntu-latest
     needs:
-      - build-deb-package
+      - build-x86_64-unknown-linux-gnu
       - compute-k8s-test-plan
     strategy:
       matrix: ${{ fromJson(needs.compute-k8s-test-plan.outputs.matrix) }}
@@ -465,7 +465,6 @@ jobs:
       - test-integration-loki
       - test-integration-pulsar
       - test-integration-splunk
-      - build-deb-package
       - compute-k8s-test-plan
       - test-e2e-kubernetes
       - check-component-features
@@ -495,7 +494,6 @@ jobs:
       - test-integration-loki
       - test-integration-pulsar
       - test-integration-splunk
-      - build-deb-package
       - compute-k8s-test-plan
       - test-e2e-kubernetes
       - check-component-features
