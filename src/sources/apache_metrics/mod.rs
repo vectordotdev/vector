@@ -46,11 +46,7 @@ inventory::submit! {
     SourceDescription::new::<ApacheMetricsConfig>("apache_metrics")
 }
 
-impl GenerateConfig for ApacheMetricsConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for ApacheMetricsConfig {}
 
 #[typetag::serde(name = "apache_metrics")]
 impl crate::config::SourceConfig for ApacheMetricsConfig {

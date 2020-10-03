@@ -24,11 +24,7 @@ inventory::submit! {
     SinkDescription::new::<DatadogLogsConfig>("datadog_logs")
 }
 
-impl GenerateConfig for DatadogLogsConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for DatadogLogsConfig {}
 
 #[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {

@@ -26,11 +26,7 @@ inventory::submit! {
     TransformDescription::new::<AddTagsConfig>("add_tags")
 }
 
-impl GenerateConfig for AddTagsConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for AddTagsConfig {}
 
 #[typetag::serde(name = "add_tags")]
 impl TransformConfig for AddTagsConfig {

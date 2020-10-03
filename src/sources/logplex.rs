@@ -30,11 +30,7 @@ inventory::submit! {
     SourceDescription::new::<LogplexConfig>("logplex")
 }
 
-impl GenerateConfig for LogplexConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for LogplexConfig {}
 
 #[derive(Clone, Default)]
 struct LogplexSource {}

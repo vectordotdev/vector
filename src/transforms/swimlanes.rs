@@ -70,11 +70,7 @@ inventory::submit! {
     TransformDescription::new::<SwimlanesConfig>("swimlanes")
 }
 
-impl GenerateConfig for SwimlanesConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for SwimlanesConfig {}
 
 #[typetag::serde(name = "swimlanes")]
 impl TransformConfig for SwimlanesConfig {

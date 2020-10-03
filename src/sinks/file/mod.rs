@@ -48,11 +48,7 @@ inventory::submit! {
     SinkDescription::new::<FileSinkConfig>("file")
 }
 
-impl GenerateConfig for FileSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for FileSinkConfig {}
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(rename_all = "snake_case")]

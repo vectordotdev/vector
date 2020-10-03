@@ -51,11 +51,7 @@ inventory::submit! {
     SinkDescription::new::<LogdnaConfig>("logdna")
 }
 
-impl GenerateConfig for LogdnaConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for LogdnaConfig {}
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]

@@ -89,11 +89,7 @@ inventory::submit! {
     TransformDescription::new::<LogToMetricConfig>("log_to_metric")
 }
 
-impl GenerateConfig for LogToMetricConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for LogToMetricConfig {}
 
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {

@@ -147,11 +147,7 @@ inventory::submit! {
     SinkDescription::new::<GcsSinkConfig>(NAME)
 }
 
-impl GenerateConfig for GcsSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for GcsSinkConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]

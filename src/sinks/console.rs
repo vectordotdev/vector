@@ -44,11 +44,7 @@ inventory::submit! {
     SinkDescription::new::<ConsoleSinkConfig>("console")
 }
 
-impl GenerateConfig for ConsoleSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for ConsoleSinkConfig {}
 
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {

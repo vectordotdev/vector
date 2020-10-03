@@ -21,11 +21,7 @@ inventory::submit! {
     TransformDescription::new::<AnsiStripperConfig>("ansi_stripper")
 }
 
-impl GenerateConfig for AnsiStripperConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for AnsiStripperConfig {}
 
 #[typetag::serde(name = "ansi_stripper")]
 impl TransformConfig for AnsiStripperConfig {

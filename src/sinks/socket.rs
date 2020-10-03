@@ -28,11 +28,7 @@ inventory::submit! {
     SinkDescription::new::<SocketSinkConfig>("socket")
 }
 
-impl GenerateConfig for SocketSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for SocketSinkConfig {}
 
 impl SocketSinkConfig {
     pub fn make_tcp_config(

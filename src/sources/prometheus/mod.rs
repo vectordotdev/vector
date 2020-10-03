@@ -37,11 +37,7 @@ inventory::submit! {
     SourceDescription::new::<PrometheusConfig>("prometheus")
 }
 
-impl GenerateConfig for PrometheusConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for PrometheusConfig {}
 
 #[typetag::serde(name = "prometheus")]
 impl SourceConfig for PrometheusConfig {

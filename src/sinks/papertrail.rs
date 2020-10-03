@@ -25,11 +25,7 @@ inventory::submit! {
     SinkDescription::new::<PapertrailConfig>("papertrail")
 }
 
-impl GenerateConfig for PapertrailConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for PapertrailConfig {}
 
 #[typetag::serde(name = "papertrail")]
 impl SinkConfig for PapertrailConfig {

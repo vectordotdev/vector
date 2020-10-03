@@ -25,11 +25,7 @@ inventory::submit! {
     TransformDescription::new::<SamplerConfig>("sampler")
 }
 
-impl GenerateConfig for SamplerConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for SamplerConfig {}
 
 #[typetag::serde(name = "sampler")]
 impl TransformConfig for SamplerConfig {

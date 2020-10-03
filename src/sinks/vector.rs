@@ -37,11 +37,7 @@ inventory::submit! {
     SinkDescription::new::<VectorSinkConfig>("vector")
 }
 
-impl GenerateConfig for VectorSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for VectorSinkConfig {}
 
 #[typetag::serde(name = "vector")]
 impl SinkConfig for VectorSinkConfig {

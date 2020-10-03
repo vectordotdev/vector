@@ -75,11 +75,7 @@ inventory::submit! {
     SinkDescription::new::<KinesisSinkConfig>("aws_kinesis_streams")
 }
 
-impl GenerateConfig for KinesisSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for KinesisSinkConfig {}
 
 #[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {

@@ -34,11 +34,7 @@ inventory::submit! {
     SinkDescription::new::<SematextLogsConfig>("sematext")
 }
 
-impl GenerateConfig for SematextLogsConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for SematextLogsConfig {}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

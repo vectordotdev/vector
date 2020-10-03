@@ -66,11 +66,7 @@ inventory::submit! {
     SinkDescription::new::<PulsarSinkConfig>("pulsar")
 }
 
-impl GenerateConfig for PulsarSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for PulsarSinkConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "pulsar")]

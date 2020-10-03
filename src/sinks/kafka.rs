@@ -84,11 +84,7 @@ inventory::submit! {
     SinkDescription::new::<KafkaSinkConfig>("kafka")
 }
 
-impl GenerateConfig for KafkaSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for KafkaSinkConfig {}
 
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {

@@ -85,11 +85,7 @@ inventory::submit! {
     SinkDescription::new::<CloudwatchLogsSinkConfig>("aws_cloudwatch_logs")
 }
 
-impl GenerateConfig for CloudwatchLogsSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for CloudwatchLogsSinkConfig {}
 
 #[cfg(test)]
 fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {

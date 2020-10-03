@@ -130,7 +130,9 @@ pub enum DataType {
 }
 
 pub trait GenerateConfig {
-    fn generate_config() -> toml::Value;
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
 }
 
 #[async_trait::async_trait]

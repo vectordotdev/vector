@@ -26,11 +26,7 @@ inventory::submit! {
     SourceDescription::new::<StatsdConfig>("statsd")
 }
 
-impl GenerateConfig for StatsdConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for StatsdConfig {}
 
 #[typetag::serde(name = "statsd")]
 impl SourceConfig for StatsdConfig {

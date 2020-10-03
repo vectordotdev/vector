@@ -22,11 +22,7 @@ inventory::submit! {
     TransformDescription::new::<ConcatConfig>("concat")
 }
 
-impl GenerateConfig for ConcatConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for ConcatConfig {}
 
 #[typetag::serde(name = "concat")]
 impl TransformConfig for ConcatConfig {

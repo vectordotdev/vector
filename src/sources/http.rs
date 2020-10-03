@@ -32,11 +32,7 @@ inventory::submit! {
     SourceDescription::new::<SimpleHttpConfig>("http")
 }
 
-impl GenerateConfig for SimpleHttpConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for SimpleHttpConfig {}
 
 #[derive(Clone)]
 struct SimpleHttpSource {

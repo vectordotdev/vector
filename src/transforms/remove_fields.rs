@@ -25,11 +25,7 @@ inventory::submit! {
     TransformDescription::new::<RemoveFieldsConfig>("remove_fields")
 }
 
-impl GenerateConfig for RemoveFieldsConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for RemoveFieldsConfig {}
 
 #[typetag::serde(name = "remove_fields")]
 impl TransformConfig for RemoveFieldsConfig {

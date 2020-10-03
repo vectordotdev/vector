@@ -16,11 +16,7 @@ inventory::submit! {
     TransformDescription::new::<FilterConfig>("filter")
 }
 
-impl GenerateConfig for FilterConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for FilterConfig {}
 
 #[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {

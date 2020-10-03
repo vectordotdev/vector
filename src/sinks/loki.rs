@@ -69,11 +69,7 @@ inventory::submit! {
     SinkDescription::new::<LokiConfig>("loki")
 }
 
-impl GenerateConfig for LokiConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for LokiConfig {}
 
 #[typetag::serde(name = "loki")]
 impl SinkConfig for LokiConfig {

@@ -35,11 +35,7 @@ inventory::submit! {
     SinkDescription::new::<HoneycombConfig>("honeycomb")
 }
 
-impl GenerateConfig for HoneycombConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for HoneycombConfig {}
 
 #[typetag::serde(name = "honeycomb")]
 impl SinkConfig for HoneycombConfig {

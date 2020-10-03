@@ -77,11 +77,7 @@ inventory::submit! {
     SourceDescription::new::<SyslogConfig>("syslog")
 }
 
-impl GenerateConfig for SyslogConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for SyslogConfig {}
 
 #[typetag::serde(name = "syslog")]
 impl SourceConfig for SyslogConfig {

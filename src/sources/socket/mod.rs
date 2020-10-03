@@ -67,11 +67,7 @@ inventory::submit! {
     SourceDescription::new::<SocketConfig>("socket")
 }
 
-impl GenerateConfig for SocketConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for SocketConfig {}
 
 #[typetag::serde(name = "socket")]
 impl SourceConfig for SocketConfig {

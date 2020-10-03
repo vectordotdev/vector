@@ -46,11 +46,7 @@ inventory::submit! {
     TransformDescription::new::<LuaConfig>("lua")
 }
 
-impl GenerateConfig for LuaConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for LuaConfig {}
 
 #[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {

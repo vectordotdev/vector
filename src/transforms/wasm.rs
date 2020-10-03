@@ -49,11 +49,7 @@ inventory::submit! {
     TransformDescription::new::<WasmConfig>("wasm")
 }
 
-impl GenerateConfig for WasmConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for WasmConfig {}
 
 #[typetag::serde(name = "wasm")]
 impl TransformConfig for WasmConfig {

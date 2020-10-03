@@ -99,11 +99,7 @@ inventory::submit! {
     SinkDescription::new::<HttpSinkConfig>("http")
 }
 
-impl GenerateConfig for HttpSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for HttpSinkConfig {}
 
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {

@@ -77,11 +77,7 @@ inventory::submit! {
     TransformDescription::new::<DedupeConfig>("dedupe")
 }
 
-impl GenerateConfig for DedupeConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for DedupeConfig {}
 
 #[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {

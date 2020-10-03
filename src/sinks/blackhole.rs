@@ -26,11 +26,7 @@ inventory::submit! {
     SinkDescription::new::<BlackholeConfig>("blackhole")
 }
 
-impl GenerateConfig for BlackholeConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for BlackholeConfig {}
 
 #[typetag::serde(name = "blackhole")]
 impl SinkConfig for BlackholeConfig {

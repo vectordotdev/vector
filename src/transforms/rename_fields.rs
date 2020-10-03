@@ -27,11 +27,7 @@ inventory::submit! {
     TransformDescription::new::<RenameFieldsConfig>("rename_fields")
 }
 
-impl GenerateConfig for RenameFieldsConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for RenameFieldsConfig {}
 
 #[typetag::serde(name = "rename_fields")]
 impl TransformConfig for RenameFieldsConfig {

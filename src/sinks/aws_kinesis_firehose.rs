@@ -70,11 +70,7 @@ inventory::submit! {
     SinkDescription::new::<KinesisFirehoseSinkConfig>("aws_kinesis_firehose")
 }
 
-impl GenerateConfig for KinesisFirehoseSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for KinesisFirehoseSinkConfig {}
 
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {

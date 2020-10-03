@@ -69,11 +69,7 @@ inventory::submit! {
     TransformDescription::new::<TagCardinalityLimitConfig>("tag_cardinality_limit")
 }
 
-impl GenerateConfig for TagCardinalityLimitConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for TagCardinalityLimitConfig {}
 
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {

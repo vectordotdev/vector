@@ -40,11 +40,7 @@ inventory::submit! {
     SourceDescription::new::<VectorConfig>("vector")
 }
 
-impl GenerateConfig for VectorConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for VectorConfig {}
 
 #[typetag::serde(name = "vector")]
 impl SourceConfig for VectorConfig {

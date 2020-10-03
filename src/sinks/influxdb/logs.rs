@@ -71,11 +71,7 @@ inventory::submit! {
     SinkDescription::new::<InfluxDBLogsConfig>("influxdb_logs")
 }
 
-impl GenerateConfig for InfluxDBLogsConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for InfluxDBLogsConfig {}
 
 #[typetag::serde(name = "influxdb_logs")]
 impl SinkConfig for InfluxDBLogsConfig {

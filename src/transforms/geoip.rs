@@ -30,11 +30,7 @@ inventory::submit! {
     TransformDescription::new::<GeoipConfig>("geoip")
 }
 
-impl GenerateConfig for GeoipConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
-}
+impl GenerateConfig for GeoipConfig {}
 
 #[typetag::serde(name = "geoip")]
 impl TransformConfig for GeoipConfig {
