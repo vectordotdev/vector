@@ -22,12 +22,14 @@ use heim::memory::os::macos::MemoryExt;
 use heim::memory::os::SwapExt;
 #[cfg(target_os = "windows")]
 use heim::net::os::windows::IoCountersExt;
+#[cfg(not(target_os = "windows"))]
+use heim::units::ratio::ratio;
 #[cfg(target_os = "linux")]
 use heim::{
     cpu::os::linux::CpuTimeExt, memory::os::linux::MemoryExt, net::os::linux::IoCountersExt,
 };
 use heim::{
-    units::{information::byte, ratio::ratio, time::second},
+    units::{information::byte, time::second},
     Error,
 };
 use serde::{
@@ -458,12 +460,6 @@ impl HostMetricsConfig {
                                     tags!["device" => interface],
                                 ),
                                 self.counter(
-                                    "network_receive_packets_drop_total",
-                                    timestamp,
-                                    counter.drop_sent() as f64,
-                                    tags!["device" => interface],
-                                ),
-                                self.counter(
                                     "network_receive_packets_total",
                                     timestamp,
                                     counter.drop_recv() as f64,
@@ -481,7 +477,14 @@ impl HostMetricsConfig {
                                     counter.errors_sent() as f64,
                                     tags!["device" => interface],
                                 ),
-                                #[cfg(any(target_os = "windows", target_os = "linux"))]
+                                #[cfg(any(target_os = "linux", target_os = "windows"))]
+                                self.counter(
+                                    "network_transmit_packets_drop_total",
+                                    timestamp,
+                                    counter.drop_sent() as f64,
+                                    tags!["device" => interface],
+                                ),
+                                #[cfg(any(target_os = "linux", target_os = "windows"))]
                                 self.counter(
                                     "network_transmit_packets_total",
                                     timestamp,

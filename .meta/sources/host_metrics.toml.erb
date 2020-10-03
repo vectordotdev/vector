@@ -124,7 +124,6 @@ The host metrics source generates the following metrics on all operating systems
 2020-10-02T23:15:13.463746084Z host_memory_swap_used_bytes{collector="memory",host="myhost"} = 0
 2020-10-02T23:15:13.464392430Z host_network_receive_bytes_total{collector="network",device="enp5s0",host="myhost"} = 3420962102
 2020-10-02T23:15:13.464392430Z host_network_receive_errs_total{collector="network",device="enp5s0",host="myhost"} = 0
-2020-10-02T23:15:13.464392430Z host_network_receive_packets_drop_total{collector="network",device="enp5s0",host="myhost"} = 0
 2020-10-02T23:15:13.464392430Z host_network_receive_packets_total{collector="network",device="enp5s0",host="myhost"} = 0
 2020-10-02T23:15:13.464392430Z host_network_transmit_bytes_total{collector="network",device="enp5s0",host="myhost"} = 990111734
 2020-10-02T23:15:13.464392430Z host_network_transmit_errs_total{collector="network",device="enp5s0",host="myhost"} = 0
@@ -149,6 +148,7 @@ On Linux-based hosts, the host metrics source generates the following additional
 2020-10-02T23:15:13.463284771Z host_memory_used_bytes{collector="memory",host="myhost"} = 9467140000
 2020-10-02T23:15:13.463746084Z host_memory_swapped_in_bytes_total{collector="memory",host="myhost"} = 0
 2020-10-02T23:15:13.463746084Z host_memory_swapped_out_bytes_total{collector="memory",host="myhost"} = 0
+2020-10-02T23:15:13.464392430Z host_network_transmit_packets_drop_total{collector="network",device="enp5s0",host="myhost"} = 0
 2020-10-02T23:15:13.464392430Z host_network_transmit_packets_total{collector="network",device="enp5s0",host="myhost"} = 2347835
 ```\
 """
@@ -159,6 +159,7 @@ body = """\
 On Windows-based hosts, the host metrics source generates the following additional metrics:
 
 ```text title="Example metrics"
+2020-10-02T23:15:13.464392430Z host_network_transmit_packets_drop_total{collector="network",device="enp5s0",host="myhost"} = 0
 2020-10-02T23:15:13.464392430Z host_network_transmit_packets_total{collector="network",device="enp5s0",host="myhost"} = 2347835
 ```\
 """
