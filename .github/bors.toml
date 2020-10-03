@@ -4,4 +4,3 @@ status = [
 delete_merged_branches = true
 use_squash_merge = true
 cut_body_after = "---"
-use_codeowners = true
