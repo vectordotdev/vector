@@ -77,7 +77,7 @@ jobs:
             internal_events:
               - 'src/internal_events/**'
             helm:
-              - 'distribution/helm/vector'            
+              - 'distribution/helm/vector'
       - name: Bootstrap
         run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - name: Prepare environment
