@@ -138,11 +138,7 @@ inventory::submit! {
     SinkDescription::new::<S3SinkConfig>("aws_s3")
 }
 
-impl GenerateConfig for S3SinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(S3SinkConfig);
 
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {

@@ -111,11 +111,7 @@ inventory::submit! {
     TransformDescription::new::<Ec2Metadata>("aws_ec2_metadata")
 }
 
-impl GenerateConfig for Ec2Metadata {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self::default()).unwrap()
-    }
-}
+impl_generate_config_from_default!(Ec2Metadata);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_ec2_metadata")]
