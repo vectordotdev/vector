@@ -37,7 +37,7 @@ default = "host"
 description = "The namespace prefix that will be added to all metric names."
 
 [sources.host_metrics.options.scrape_interval_secs]
-type = "integer"
+type = "int"
 common = false
 required = false
 default = 15
@@ -49,7 +49,7 @@ category = "Filesystem"
 description = "Options for the \"disk\" metrics collector."
 
 <%= render("_partials/fields/_includes_excludes.toml",
-  namespace: "sources.host_metrics.options.disk.options.devices",
+  namespace: "sources.host_metrics.options.disk.children.devices",
   term: "device name",
   metrics: "I/O",
   examples: [["sda"], ["dm-*"]]
@@ -61,21 +61,21 @@ category = "Filesystem"
 description = "Options for the \"filesystem\" metrics collector."
 
 <%= render("_partials/fields/_includes_excludes.toml",
-  namespace: "sources.host_metrics.options.filesystem.options.devices",
+  namespace: "sources.host_metrics.options.filesystem.children.devices",
   term: "device name",
   metrics: "usage",
   examples: [["sda"], ["dm-*"]]
 ) %>
 
 <%= render("_partials/fields/_includes_excludes.toml",
-  namespace: "sources.host_metrics.options.filesystem.options.filesystems",
+  namespace: "sources.host_metrics.options.filesystem.children.filesystems",
   term: "filesystem name",
   metrics: "usage",
   examples: [["ntfs"], ["ext*"]]
 ) %>
 
 <%= render("_partials/fields/_includes_excludes.toml",
-  namespace: "sources.host_metrics.options.filesystem.options.mountpoints",
+  namespace: "sources.host_metrics.options.filesystem.children.mountpoints",
   term: "mountpoint path",
   metrics: "usage",
   examples: [["/home"], ["/raid*"]]
@@ -87,7 +87,7 @@ category = "Network"
 description = "Options for the \"network\" metrics collector."
 
 <%= render("_partials/fields/_includes_excludes.toml",
-  namespace: "sources.host_metrics.options.network.options.devices",
+  namespace: "sources.host_metrics.options.network.children.devices",
   term: "mountpoint path",
   metrics: "utilization",
   examples: [["eth0"], ["enp?s*"]]
