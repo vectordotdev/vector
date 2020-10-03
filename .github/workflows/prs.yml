@@ -6,6 +6,21 @@ on:
       - master
   pull_request: {}
 
+
+  - ".github/workflows/bors.yml"
+  - "lib/**"
+  - "proto/**"
+  - "scripts/**"
+  - "skaffold/**"
+  - "src/**"
+  - "tests/**"
+  - "build.rs"
+  - "Cargo.lock"
+  - "Cargo.toml"
+  - "docker-compose.yml"
+  - "Makefile"
+  - "rust-toolchain"
+
 env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
@@ -26,13 +41,43 @@ jobs:
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
+  changes:
+      runs-on: ubuntu-latest
+      # Set job outputs to values from filter step
+      outputs:
+        source: ${{ steps.filter.outputs.source }}
+        frontend: ${{ steps.filter.outputs.frontend }}
+      steps:
+      # For pull requests it's not necessary to checkout the code
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            source:
+              - "lib/**"
+              - "proto/**"
+              - "scripts/**"
+              - "skaffold/**"
+              - "src/**"
+              - "tests/**"
+              - "build.rs"
+              - "Cargo.lock"
+              - "Cargo.toml"
+              - "docker-compose.yml"
+              - "Makefile"
+              - "rust-toolchain"
+
   test-linux:
     name: Unit - x86_64-unknown-linux-gnu
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
+      - uses: dorny/paths-filter@v2
+      id: changes
+      with:
+
       - run: make ci-sweep
       - uses: actions/cache@v2
         with:
@@ -49,8 +94,6 @@ jobs:
   checks:
     name: Checks
     runs-on: ubuntu-20.04
-    if: |
-      !contains(github.event.pull_request.labels.*.name, 'ci-condition: skip')
     steps:
       - uses: actions/checkout@v2
         with:
