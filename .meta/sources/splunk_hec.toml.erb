@@ -12,7 +12,7 @@ features = [
 ]
 function_category = "receive"
 output_types = ["log"]
-requirements.network_port = "80"
+requirements.network_port = "8088"
 service_providers = ["Splunk"]
 strategies = ["service"]
 through_description = "the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol]"
@@ -22,7 +22,7 @@ through_description = "the [Splunk HTTP Event Collector protocol][urls.splunk_he
 [sources.splunk_hec.options.address]
 type = "string"
 common = true
-default = "0.0.0.0:80"
+default = "0.0.0.0:8088"
 description = """\
 The address to accept connections on.\
 """
