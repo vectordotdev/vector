@@ -6,21 +6,6 @@ on:
       - master
   pull_request: {}
 
-
-  - ".github/workflows/bors.yml"
-  - "lib/**"
-  - "proto/**"
-  - "scripts/**"
-  - "skaffold/**"
-  - "src/**"
-  - "tests/**"
-  - "build.rs"
-  - "Cargo.lock"
-  - "Cargo.toml"
-  - "docker-compose.yml"
-  - "Makefile"
-  - "rust-toolchain"
-
 env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
