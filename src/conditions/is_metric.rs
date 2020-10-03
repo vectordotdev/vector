@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
-    config::GenerateConfig,
     Event,
 };
 

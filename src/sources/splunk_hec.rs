@@ -1,6 +1,6 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+        log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription,
     },
     event::{Event, LogEvent, Value},
     internal_events::{

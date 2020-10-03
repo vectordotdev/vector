@@ -1,6 +1,5 @@
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
-    config::GenerateConfig,
     event::Value,
     Event,
 };
