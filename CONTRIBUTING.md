@@ -191,6 +191,8 @@ their review.
 
 #### Bors review process
 
+[![Bors enabled](https://bors.tech/images/badge_small.svg)](https://app.bors.tech/repositories/28346)
+
 Once you’ve reviewed the PR, instead of clicking the green “Merge Button”, leave a comment like this on the pull request:
 
 ```text
