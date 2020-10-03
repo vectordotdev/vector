@@ -123,20 +123,16 @@ struct WriterSink {
 impl StreamSink for WriterSink {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
-            let buf = match encode_event(event, &self.encoding) {
-                Some(mut buf) => {
-                    buf.push('\n');
-                    buf
-                }
-                None => continue,
-            };
-            self.output
-                .write_all(buf.as_bytes())
-                .await
-                .map_err(|error| {
-                    error!("Error writing to output: {}.", error);
-                })?;
             self.acker.ack(1);
+            if let Some(mut buf) = encode_event(event, &self.encoding) {
+                buf.push('\n');
+                if let Err(error) = self.output.write_all(buf.as_bytes()).await {
+                    // Error when writing to stdout/stderr is likely irrecoverable,
+                    // so stop the sink.
+                    error!("Error writing to output: {}. Stopping sink.", error);
+                    return Err(());
+                }
+            }
         }
         Ok(())
     }
