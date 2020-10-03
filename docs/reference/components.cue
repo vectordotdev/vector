@@ -74,17 +74,21 @@ components: close({
           default: uint | null
         }
         examples?: [...uint],
-        unit: "bytes" | "milliseconds" | "seconds"
+        unit: "bytes" | "logs" | "milliseconds" | "seconds"
       }
     }
   }
 
   #Components: [Type=string]: {
-    // A short description of the component.
+    // A long description of the component, full of relevant keywords for SEO
+    // purposes.
     description: string
 
     // The component kind. This is set automatically.
     kind: "sink" | "source" | "transform"
+
+    // A short, one sentence description.
+    short_description: string
 
     // The component title, used in text. For example, the `http` source has
     // a title of "HTTP".
@@ -138,6 +142,7 @@ components: close({
       platforms: {
         "aarch64-unknown-linux-gnu": bool
         "aarch64-unknown-linux-musl": bool
+        "x86_64-apple-darwin": bool
         "x86_64-pc-windows-msv": bool
         "x86_64-unknown-linux-gnu": bool
         "x86_64-unknown-linux-musl": bool
