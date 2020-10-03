@@ -59,6 +59,7 @@ components: close({
         }
       }
       "object"?: {
+        examples?: [...{[Name=string]: _}]
         options: #ConfigurationOptions | {}
       }
       "string"?: {
