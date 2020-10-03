@@ -13,7 +13,7 @@ set -euo pipefail
 
 DOCS_PATH="docs"
 
-echo "Validating ${DOCS_PATH}/**/*.cue..."
+echo "Validating ${DOCS_PATH}/**/*.c..."
 
 if ! [ -x "$(command -v cue)" ]; then
   echo 'Error: cue is not installed.' >&2
@@ -23,7 +23,7 @@ fi
 errors=$(cue vet ${DOCS_PATH}/*.cue ${DOCS_PATH}/**/*.cue)
 
 if [ -n "$errors" ]; then
-  echo "Failed!\n\n${errors}"
+  printf "Failed!\n\n%s\n" "${errors}"
   exit 1
 else
   echo "Success! The contents of the ${DOCS_PATH} directory are valid."
