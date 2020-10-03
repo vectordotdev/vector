@@ -201,7 +201,7 @@ built = { version = "0.4", features = ["git2", "chrono"] }
 approx = "0.3.0"
 criterion = "0.3"
 tempfile = "3.0.6"
-libc = "0.2.43"
+libc = "0.2.78"
 libz-sys = "1.1.2"
 walkdir = "2.2.7"
 elastic_responses = "0.21.0-pre.4"
