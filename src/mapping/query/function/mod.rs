@@ -134,6 +134,7 @@ build_signatures! {
     floor => FloorFn,
     ceil => CeilFn,
     parse_syslog => ParseSyslogFn,
+    split => SplitFn,
 }
 
 /// A parameter definition accepted by a function.
