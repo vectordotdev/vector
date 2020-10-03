@@ -69,7 +69,7 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make check-markdown
-      - run: make check-meta
+      - run: make check-docs
       - run: make check-fmt
       - run: make check-clippy
       - run: make check-version
