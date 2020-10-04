@@ -68,40 +68,24 @@ components: sinks: aws_kinesis_streams: {
   }
 
   configuration: {
-    compression: {
-      common: true
-      description: "The compression strategy used to compress the encoded event data before transmission."
-      groups: []
-      required: false
-      warnings: []
-        type: string: {
-          default: "none"
-          enum: {
-            none: "No compression."
-            gzip: "[Gzip][urls.gzip] standard DEFLATE compression."
-          }
-        }
-    }
     partition_key_field: {
       common: true
       description: "The log field used as the Kinesis record's partition key value."
-      groups: []
       required: false
       warnings: []
-        type: string: {
-          default: null
-          examples: ["user_id"]
-        }
+      type: string: {
+        default: null
+        examples: ["user_id"]
+      }
     }
     stream_name: {
       common: true
       description: "The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target Kinesis Logs stream."
-      groups: []
       required: true
       warnings: []
-        type: string: {
-          examples: ["my-stream"]
-        }
+      type: string: {
+        examples: ["my-stream"]
+      }
     }
   }
 }
