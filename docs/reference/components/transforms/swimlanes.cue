@@ -14,7 +14,6 @@ components: transforms: swimlanes: {
   classes: {
     commonly_used: false
     function: "route"
-    service_providers: []
   }
 
   statuses: {
