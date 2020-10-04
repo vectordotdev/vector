@@ -80,3 +80,4 @@ components: sinks: aws_kinesis_firehose: {
     }
   }
 }
+
