@@ -78,81 +78,71 @@ components: sinks: http: {
     auth: {
       common: false
       description: "Options for the authentication strategy."
-      groups: []
       required: false
       warnings: []
-        type: object: {
-          default: null
-          examples: []
-          options: {
+      type: object: {
+        examples: []
+        options: {
+          password: {
+            common: true
+            description: "The basic authentication password."
+            required: true
+            warnings: []
             type: string: {
               examples: ["${HTTP_PASSWORD}","password"]
             }
+          }
+          strategy: {
+            common: true
+            description: "The authentication strategy to use."
+            required: true
+            warnings: []
             type: string: {
               enum: {
                 basic: "The [basic authentication strategy][urls.basic_auth]."
                 bearer: "The bearer token authentication strategy."
               }
             }
+          }
+          token: {
+            common: true
+            description: "The token to use for bearer authentication"
+            required: true
+            warnings: []
             type: string: {
               examples: ["${API_TOKEN}","xyz123"]
             }
+          }
+          user: {
+            common: true
+            description: "The basic authentication user name."
+            required: true
+            warnings: []
             type: string: {
               examples: ["${HTTP_USERNAME}","username"]
             }
           }
         }
-    }
-    compression: {
-      common: true
-      description: "The compression strategy used to compress the encoded event data before transmission."
-      groups: []
-      required: false
-      warnings: []
-        type: string: {
-          default: "none"
-          enum: {
-            none: "No compression."
-            gzip: "[Gzip][urls.gzip] standard DEFLATE compression."
-          }
-        }
+      }
     }
     headers: {
       common: false
       description: "Options for custom headers."
-      groups: []
       required: false
       warnings: []
-        type: object: {
-          default: null
-          examples: []
-          options: {
-            type: string: {
-              examples: [{"Authorization":"${HTTP_TOKEN}"},{"X-Powered-By":"Vector"}]
-            }
-          }
-        }
-    }
-    healthcheck_uri: {
-      common: false
-      description: "A URI that Vector can request in order to determine the service health."
-      groups: []
-      required: false
-      warnings: []
-        type: string: {
-          default: null
-          examples: ["https://10.22.212.22:9000/_health"]
-        }
+      type: object: {
+        examples: [{"Authorization":"${HTTP_TOKEN}"},{"X-Powered-By":"Vector"}]
+        options: {}
+      }
     }
     uri: {
       common: true
       description: "The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI."
-      groups: []
       required: true
       warnings: []
-        type: string: {
-          examples: ["https://10.22.212.22:9000/endpoint"]
-        }
+      type: string: {
+        examples: ["https://10.22.212.22:9000/endpoint"]
+      }
     }
   }
 }
