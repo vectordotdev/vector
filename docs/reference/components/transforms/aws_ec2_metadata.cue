@@ -14,7 +14,6 @@ components: transforms: aws_ec2_metadata: {
   classes: {
     commonly_used: false
     function: "enrich"
-    service_providers: []
   }
 
   statuses: {
