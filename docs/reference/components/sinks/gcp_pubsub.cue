@@ -74,44 +74,40 @@ components: sinks: gcp_pubsub: {
     api_key: {
       common: false
       description: "A [Google Cloud API key][urls.gcp_authentication_api_key] used to authenticate access the pubsub project and topic. Either this or `credentials_path` must be set."
-      groups: []
       required: false
       warnings: []
-        type: string: {
-          default: null
-          examples: ["${GCP_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]
-        }
+      type: string: {
+        default: null
+        examples: ["${GCP_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]
+      }
     }
     credentials_path: {
       common: true
       description: "The filename for a Google Cloud service account credentials JSON file used to authenticate access to the pubsub project and topic. If this is unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.\n\nIf no filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is running on. If Vector is not running on a GCE instance, you must define a credentials file as above."
-      groups: []
       required: false
       warnings: []
-        type: string: {
-          default: null
-          examples: ["/path/to/credentials.json"]
-        }
+      type: string: {
+        default: null
+        examples: ["/path/to/credentials.json"]
+      }
     }
     project: {
       common: false
       description: "The project name to which to publish logs."
-      groups: []
       required: true
       warnings: []
-        type: string: {
-          examples: ["vector-123456"]
-        }
+      type: string: {
+        examples: ["vector-123456"]
+      }
     }
     topic: {
       common: false
       description: "The topic within the project to which to publish logs."
-      groups: []
       required: true
       warnings: []
-        type: string: {
-          examples: ["this-is-a-topic"]
-        }
+      type: string: {
+        examples: ["this-is-a-topic"]
+      }
     }
   }
 }
