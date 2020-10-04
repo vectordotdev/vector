@@ -3,7 +3,7 @@ package metadata
 components: transforms: log_to_metric: {
   title: "#{component.title}"
   short_description: "Accepts log events and allows you to convert logs into one or more metrics."
-  description: "Accepts log events and allows you to convert logs into one or more metrics."
+  long_description: "Accepts log events and allows you to convert logs into one or more metrics."
 
   _features: {
     checkpoint: enabled: false
@@ -14,6 +14,7 @@ components: transforms: log_to_metric: {
   classes: {
     commonly_used: true
     function: "convert"
+    service_providers: []
   }
 
   statuses: {
@@ -21,6 +22,8 @@ components: transforms: log_to_metric: {
   }
 
   support: {
+      input_types: ["log"]
+
     platforms: {
       "aarch64-unknown-linux-gnu": true
       "aarch64-unknown-linux-musl": true
@@ -39,7 +42,7 @@ components: transforms: log_to_metric: {
       common: true
       description: "A table of key/value pairs representing the keys to be added to the event."
       required: true
-
+      warnings: []
     }
   }
 }
