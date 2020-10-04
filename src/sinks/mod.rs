@@ -15,6 +15,8 @@ pub mod aws_kinesis_firehose;
 pub mod aws_kinesis_streams;
 #[cfg(feature = "sinks-aws_s3")]
 pub mod aws_s3;
+#[cfg(feature = "sinks-azure_monitor_logs")]
+pub mod azure_monitor_logs;
 #[cfg(feature = "sinks-blackhole")]
 pub mod blackhole;
 #[cfg(feature = "sinks-clickhouse")]
