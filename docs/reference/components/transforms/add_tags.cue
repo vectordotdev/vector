@@ -14,7 +14,6 @@ components: transforms: add_tags: {
   classes: {
     commonly_used: false
     function: "schema"
-    service_providers: []
   }
 
   statuses: {
