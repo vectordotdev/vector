@@ -14,7 +14,6 @@ components: transforms: filter: {
   classes: {
     commonly_used: true
     function: "filter"
-    service_providers: []
   }
 
   statuses: {
