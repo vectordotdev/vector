@@ -14,7 +14,6 @@ components: transforms: grok_parser: {
   classes: {
     commonly_used: false
     function: "parse"
-    service_providers: []
   }
 
   statuses: {
