@@ -14,7 +14,6 @@ components: transforms: lua: {
   classes: {
     commonly_used: true
     function: "program"
-    service_providers: []
   }
 
   statuses: {
