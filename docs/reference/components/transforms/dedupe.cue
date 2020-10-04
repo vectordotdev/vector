@@ -14,7 +14,6 @@ components: transforms: dedupe: {
   classes: {
     commonly_used: false
     function: "filter"
-    service_providers: []
   }
 
   statuses: {
