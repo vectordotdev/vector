@@ -3,7 +3,7 @@ package metadata
 components: transforms: remove_fields: {
   title: "#{component.title}"
   short_description: "Accepts log events and allows you to remove one or more log fields."
-  description: "Accepts log events and allows you to remove one or more log fields."
+  long_description: "Accepts log events and allows you to remove one or more log fields."
 
   _features: {
     checkpoint: enabled: false
@@ -14,6 +14,7 @@ components: transforms: remove_fields: {
   classes: {
     commonly_used: false
     function: "schema"
+    service_providers: []
   }
 
   statuses: {
@@ -21,6 +22,8 @@ components: transforms: remove_fields: {
   }
 
   support: {
+      input_types: ["log"]
+
     platforms: {
       "aarch64-unknown-linux-gnu": true
       "aarch64-unknown-linux-musl": true
@@ -39,15 +42,17 @@ components: transforms: remove_fields: {
       common: false
       description: "If set to `true`, after removing fields, remove any parent objects that are now empty."
       required: false
-        type: bool: default: false
+      warnings: []
+      type: bool: default: false
     }
     fields: {
       common: true
       description: "The log field names to drop."
       required: true
-        type: "[string]": {
-          examples: [["field1","field2","parent.child"]]
-        }
+      warnings: []
+      type: "[string]": {
+        examples: [["field1","field2","parent.child"]]
+      }
     }
   }
 }
