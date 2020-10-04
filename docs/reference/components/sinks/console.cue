@@ -64,3 +64,4 @@ components: sinks: console: {
     }
   }
 }
+
