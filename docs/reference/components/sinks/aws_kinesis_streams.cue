@@ -89,3 +89,4 @@ components: sinks: aws_kinesis_streams: {
     }
   }
 }
+
