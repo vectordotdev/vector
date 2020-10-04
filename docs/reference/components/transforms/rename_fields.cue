@@ -3,7 +3,7 @@ package metadata
 components: transforms: rename_fields: {
   title: "#{component.title}"
   short_description: "Accepts log events and allows you to rename one or more log fields."
-  description: "Accepts log events and allows you to rename one or more log fields."
+  long_description: "Accepts log events and allows you to rename one or more log fields."
 
   _features: {
     checkpoint: enabled: false
@@ -14,6 +14,7 @@ components: transforms: rename_fields: {
   classes: {
     commonly_used: false
     function: "schema"
+    service_providers: []
   }
 
   statuses: {
@@ -21,6 +22,8 @@ components: transforms: rename_fields: {
   }
 
   support: {
+      input_types: ["log"]
+
     platforms: {
       "aarch64-unknown-linux-gnu": true
       "aarch64-unknown-linux-musl": true
@@ -39,17 +42,18 @@ components: transforms: rename_fields: {
       common: false
       description: "If set to `true`, after renaming fields, remove any parent objects of the old field that are now empty."
       required: false
-        type: bool: default: false
+      warnings: []
+      type: bool: default: false
     }
     fields: {
       common: true
       description: "A table of old-key/new-key pairs representing the keys to be moved in the event."
       required: true
-        type: object: {
-          examples: [{"old_field_name":"new_field_name"},{"parent":{"old_child_name":"parent.new_child_name"}}]
-          options: {
-          }
-        }
+      warnings: []
+      type: object: {
+        examples: [{"old_field_name":"new_field_name"},{"parent":{"old_child_name":"parent.new_child_name"}}]
+        options: {}
+      }
     }
   }
 }
