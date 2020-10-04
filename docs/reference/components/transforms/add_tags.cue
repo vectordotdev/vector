@@ -3,7 +3,7 @@ package metadata
 components: transforms: add_tags: {
   title: "#{component.title}"
   short_description: "Accepts metric events and allows you to add one or more metric tags."
-  description: "Accepts metric events and allows you to add one or more metric tags."
+  long_description: "Accepts metric events and allows you to add one or more metric tags."
 
   _features: {
     checkpoint: enabled: false
@@ -14,6 +14,7 @@ components: transforms: add_tags: {
   classes: {
     commonly_used: false
     function: "schema"
+    service_providers: []
   }
 
   statuses: {
@@ -21,6 +22,8 @@ components: transforms: add_tags: {
   }
 
   support: {
+      input_types: ["metric"]
+
     platforms: {
       "aarch64-unknown-linux-gnu": true
       "aarch64-unknown-linux-musl": true
@@ -39,21 +42,18 @@ components: transforms: add_tags: {
       common: true
       description: "By default, fields will be overridden. Set this to `false` to avoid overwriting values.\n"
       required: false
-        type: bool: default: true
+      warnings: []
+      type: bool: default: true
     }
     tags: {
       common: true
       description: "A table of key/value pairs representing the tags to be added to the metric."
       required: false
-        type: object: {
-          default: null
-          examples: []
-          options: {
-            type: string: {
-              examples: [{"static_tag":"my value"},{"env_tag":"${ENV_VAR}"}]
-            }
-          }
-        }
+      warnings: []
+      type: object: {
+        examples: [{"static_tag":"my value"},{"env_tag":"${ENV_VAR}"}]
+        options: {}
+      }
     }
   }
 }
