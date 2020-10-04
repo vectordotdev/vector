@@ -14,7 +14,6 @@ components: transforms: merge: {
   classes: {
     commonly_used: false
     function: "aggregate"
-    service_providers: []
   }
 
   statuses: {
