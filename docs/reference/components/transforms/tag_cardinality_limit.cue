@@ -14,7 +14,6 @@ components: transforms: tag_cardinality_limit: {
   classes: {
     commonly_used: true
     function: "filter"
-    service_providers: []
   }
 
   statuses: {
