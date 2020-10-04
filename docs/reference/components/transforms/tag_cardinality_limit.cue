@@ -3,7 +3,7 @@ package metadata
 components: transforms: tag_cardinality_limit: {
   title: "#{component.title}"
   short_description: "Accepts metric events and allows you to limit the cardinality of metric tags to prevent downstream disruption of metrics services."
-  description: "Accepts metric events and allows you to limit the cardinality of metric tags to prevent downstream disruption of metrics services."
+  long_description: "Accepts metric events and allows you to limit the cardinality of metric tags to prevent downstream disruption of metrics services."
 
   _features: {
     checkpoint: enabled: false
@@ -14,6 +14,7 @@ components: transforms: tag_cardinality_limit: {
   classes: {
     commonly_used: true
     function: "filter"
+    service_providers: []
   }
 
   statuses: {
@@ -21,6 +22,8 @@ components: transforms: tag_cardinality_limit: {
   }
 
   support: {
+      input_types: ["metric"]
+
     platforms: {
       "aarch64-unknown-linux-gnu": true
       "aarch64-unknown-linux-musl": true
@@ -39,41 +42,45 @@ components: transforms: tag_cardinality_limit: {
       common: false
       description: "The size of the cache in bytes to use to detect duplicate tags. The bigger the cache the less likely it is to have a 'false positive' or a case where we allow a new value for tag even after we have reached the configured limits."
       required: false
-        type: uint: {
-          default: 5120000
-          unit: "bytes"
-        }
+      warnings: []
+      type: uint: {
+        default: 5120000
+        unit: "bytes"
+      }
     }
     limit_exceeded_action: {
       common: true
       description: "Controls what should happen when a metric comes in with a tag that would exceed the configured limit on cardinality."
       required: false
-        type: string: {
-          default: "drop_tag"
-          enum: {
-            drop_tag: "Remove tags that would exceed the configured limit from the incoming metric"
-            drop_event: "Drop any metric events that contain tags that would exceed the configured limit"
-          }
+      warnings: []
+      type: string: {
+        default: "drop_tag"
+        enum: {
+          drop_tag: "Remove tags that would exceed the configured limit from the incoming metric"
+          drop_event: "Drop any metric events that contain tags that would exceed the configured limit"
         }
+      }
     }
     mode: {
       common: true
       description: "Controls what approach is used internally to keep track of previously seen tags and deterime when a tag on an incoming metric exceeds the limit."
       required: true
-        type: string: {
-          enum: {
-            exact: "Has higher memory requirements than `probabilistic`, but never falsely outputs metrics with new tags after the limit has been hit."
-            probabilistic: "Has lower memory requirements than `exact`, but may occasionally allow metric events to pass through the transform even when they contain new tags that exceed the configured limit.  The rate at which this happens can be controlled by changing the value of `cache_size_per_tag`."
-          }
+      warnings: []
+      type: string: {
+        enum: {
+          exact: "Has higher memory requirements than `probabilistic`, but never falsely outputs metrics with new tags after the limit has been hit."
+          probabilistic: "Has lower memory requirements than `exact`, but may occasionally allow metric events to pass through the transform even when they contain new tags that exceed the configured limit.  The rate at which this happens can be controlled by changing the value of `cache_size_per_tag`."
         }
+      }
     }
     value_limit: {
       common: true
       description: "How many distinct values to accept for any given key."
       required: false
-        type: uint: {
-          default: 500
-        }
+      warnings: []
+      type: uint: {
+        default: 500
+      }
     }
   }
 }
