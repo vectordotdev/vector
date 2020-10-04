@@ -80,3 +80,4 @@ components: sinks: honeycomb: {
     }
   }
 }
+
