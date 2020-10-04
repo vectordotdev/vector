@@ -106,9 +106,9 @@ jobs:
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: test
-        run: ls -la
+        run: ls -la scripts
       - name: Setup Helm
-        run: ./scripts/ci-setup-helm.sh
+        run: "$PWD/scripts/ci-setup-helm.sh"
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
       - name: Make slim-builds
