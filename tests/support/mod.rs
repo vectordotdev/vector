@@ -4,8 +4,8 @@
 #![allow(clippy::type_complexity)]
 #![allow(dead_code)]
 
-use async_trait::async_trait;
 use assert_cmd::prelude::*;
+use async_trait::async_trait;
 use futures::{future, FutureExt};
 use futures01::{sink::Sink, stream, sync::mpsc::Receiver, Async, Future, Stream};
 use serde::{Deserialize, Serialize};
