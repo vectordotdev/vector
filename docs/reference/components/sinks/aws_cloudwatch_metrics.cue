@@ -65,3 +65,4 @@ components: sinks: aws_cloudwatch_metrics: {
     }
   }
 }
+
