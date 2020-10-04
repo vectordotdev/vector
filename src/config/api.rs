@@ -28,6 +28,27 @@ fn default_playground() -> bool {
 }
 
 /// Updates the configuration to take into account API changes
-pub fn update_config(old_config: &mut ConfigBuilder, new_config: &ConfigBuilder) {
-    old_config.api = new_config.api; // copy
+pub fn update_config(
+    old_config: &mut ConfigBuilder,
+    new_config: &ConfigBuilder,
+) -> Result<(), String> {
+    // Merge options
+
+    // Try to merge bind
+    let bind = match (old_config.api.bind, new_config.api.bind) {
+        (None, b) => b,
+        (Some(a), None) => Some(a),
+        (Some(a), Some(b)) if a == b => Some(a),
+        (Some(a), Some(b)) => return Err(format!("Conflicting `api` bindings: {}, {} .", a, b)),
+    };
+
+    let options = Options {
+        bind,
+        enabled: old_config.api.enabled | new_config.api.enabled,
+        playground: old_config.api.playground | new_config.api.playground,
+    };
+
+    old_config.api = options;
+
+    Ok(())
 }
