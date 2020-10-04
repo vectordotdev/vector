@@ -25,7 +25,7 @@ env:
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"
-  ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+  ENVIRONMENT_UPSTREAM: timberio/ci_image:${{ github.sha }}
   RUST_BACKTRACE: full
   RUST_TEST_THREADS: 1
   TEST_LOG: vector=debug
