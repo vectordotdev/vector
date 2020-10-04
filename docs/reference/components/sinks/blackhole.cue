@@ -47,12 +47,11 @@ components: sinks: blackhole: {
     print_amount: {
       common: true
       description: "The number of events that must be received in order to print a summary of activity."
-      groups: []
       required: true
       warnings: []
-        type: uint: {
-          examples: [1000]
-        }
+      type: uint: {
+        examples: [1000]
+      }
     }
   }
 }
