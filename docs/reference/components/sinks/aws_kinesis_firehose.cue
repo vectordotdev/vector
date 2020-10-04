@@ -69,29 +69,14 @@ components: sinks: aws_kinesis_firehose: {
   }
 
   configuration: {
-    compression: {
-      common: true
-      description: "The compression strategy used to compress the encoded event data before transmission."
-      groups: []
-      required: false
-      warnings: []
-        type: string: {
-          default: "none"
-          enum: {
-            none: "No compression."
-            gzip: "[Gzip][urls.gzip] standard DEFLATE compression."
-          }
-        }
-    }
     stream_name: {
       common: true
       description: "The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target Kinesis Firehose delivery stream."
-      groups: []
       required: true
       warnings: []
-        type: string: {
-          examples: ["my-stream"]
-        }
+      type: string: {
+        examples: ["my-stream"]
+      }
     }
   }
 }
