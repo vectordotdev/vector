@@ -67,3 +67,4 @@ components: sinks: datadog_logs: {
     }
   }
 }
+
