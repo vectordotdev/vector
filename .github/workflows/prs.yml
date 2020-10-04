@@ -108,7 +108,7 @@ jobs:
       - name: test
         run: ls -la
       - name: Setup Helm
-        run: scripts/ci-setup-helm.sh
+        run: ./scripts/ci-setup-helm.sh
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
       - name: Make slim-builds
