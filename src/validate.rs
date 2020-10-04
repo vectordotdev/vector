@@ -4,7 +4,7 @@ use crate::{
 };
 use colored::*;
 use exitcode::ExitCode;
-use std::{fmt, path::PathBuf};
+use std::{fmt, fs::remove_dir_all, path::PathBuf};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -29,13 +29,18 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
 
     let mut validated = true;
 
-    let config = match validate_config(opts, &mut fmt) {
+    let mut config = match validate_config(opts, &mut fmt) {
         Some(config) => config,
         None => return exitcode::CONFIG,
     };
 
     if !opts.no_environment {
-        validated &= validate_environment(&config, &mut fmt).await;
+        if let Some(tmp_directory) = create_tmp_directory(&mut config, &mut fmt) {
+            validated &= validate_environment(&config, &mut fmt).await;
+            remove_tmp_directory(tmp_directory);
+        } else {
+            validated = false;
+        }
     }
 
     if validated {
@@ -143,6 +148,31 @@ async fn validate_healthchecks(
     }
 
     validated
+}
+
+/// For data directory that we write to:
+/// 1. Create a tmp directory in it.
+/// 2. Change config to point to that tmp directory.
+fn create_tmp_directory(config: &mut Config, fmt: &mut Formatter) -> Option<PathBuf> {
+    match config
+        .global
+        .resolve_and_make_data_subdir(None, "validate_tmp")
+    {
+        Ok(path) => {
+            config.global.data_dir = Some(path.clone());
+            Some(path)
+        }
+        Err(error) => {
+            fmt.error(format!("{}", error));
+            None
+        }
+    }
+}
+
+fn remove_tmp_directory(path: PathBuf) {
+    if let Err(error) = remove_dir_all(&path) {
+        error!(message = "Failed to remove temporary directory.", path = ?path, error = %error);
+    }
 }
 
 struct Formatter {
