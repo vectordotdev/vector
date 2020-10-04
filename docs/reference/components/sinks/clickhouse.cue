@@ -82,65 +82,71 @@ components: sinks: clickhouse: {
     auth: {
       common: false
       description: "Options for the authentication strategy."
-      groups: []
       required: false
       warnings: []
-        type: object: {
-          default: null
-          examples: []
-          options: {
+      type: object: {
+        examples: []
+        options: {
+          password: {
+            common: true
+            description: "The basic authentication password."
+            required: true
+            warnings: []
             type: string: {
               examples: ["${CLICKHOUSE_PASSWORD}","password"]
             }
+          }
+          strategy: {
+            common: true
+            description: "The authentication strategy to use."
+            required: true
+            warnings: []
             type: string: {
               enum: {
                 basic: "The [basic authentication strategy][urls.basic_auth]."
                 bearer: "The bearer token authentication strategy."
               }
             }
+          }
+          token: {
+            common: true
+            description: "The token to use for bearer authentication"
+            required: true
+            warnings: []
             type: string: {
               examples: ["${API_TOKEN}","xyz123"]
             }
+          }
+          user: {
+            common: true
+            description: "The basic authentication user name."
+            required: true
+            warnings: []
             type: string: {
               examples: ["${CLICKHOUSE_USERNAME}","username"]
             }
           }
         }
-    }
-    compression: {
-      common: true
-      description: "The compression strategy used to compress the encoded event data before transmission."
-      groups: []
-      required: false
-      warnings: []
-        type: string: {
-          default: "gzip"
-          enum: {
-            none: "No compression."
-            gzip: "[Gzip][urls.gzip] standard DEFLATE compression."
-          }
-        }
+      }
     }
     database: {
       common: true
       description: "The database that contains the stable that data will be inserted into."
-      groups: []
       required: false
       warnings: []
-        type: string: {
-          default: null
-          examples: ["mydatabase"]
-        }
+      type: string: {
+        default: null
+        examples: ["mydatabase"]
+      }
     }
     table: {
       common: true
       description: "The table that data will be inserted into."
-      groups: []
       required: true
       warnings: []
-        type: string: {
-          examples: ["mytable"]
-        }
+      type: string: {
+        examples: ["mytable"]
+      }
     }
   }
 }
