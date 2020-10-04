@@ -14,7 +14,6 @@ components: transforms: concat: {
   classes: {
     commonly_used: false
     function: "schema"
-    service_providers: []
   }
 
   statuses: {
