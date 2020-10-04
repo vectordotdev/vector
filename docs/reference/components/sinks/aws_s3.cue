@@ -242,3 +242,4 @@ components: sinks: aws_s3: {
     }
   }
 }
+
