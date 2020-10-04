@@ -54,29 +54,14 @@ components: sinks: aws_cloudwatch_metrics: {
   }
 
   configuration: {
-    compression: {
-      common: true
-      description: "The compression strategy used to compress the encoded event data before transmission."
-      groups: []
-      required: false
-      warnings: []
-        type: string: {
-          default: "none"
-          enum: {
-            none: "No compression."
-            gzip: "[Gzip][urls.gzip] standard DEFLATE compression."
-          }
-        }
-    }
     namespace: {
       common: true
       description: "A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other."
-      groups: []
       required: true
       warnings: []
-        type: string: {
-          examples: ["service"]
-        }
+      type: string: {
+        examples: ["service"]
+      }
     }
   }
 }
