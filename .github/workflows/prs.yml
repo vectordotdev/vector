@@ -52,11 +52,7 @@ jobs:
   test-linux:
     name: Unit - x86_64-unknown-linux-gnu
     runs-on: ubuntu-20.04
-    container:
-      image: docker.pkg.github.com/timberio/vector/environment
-      credentials:
-         username: ${{ github.actor }}
-         password: ${{ secrets.GITHUB_TOKEN }}
+    container: timberio/ci_image
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
@@ -74,11 +70,7 @@ jobs:
   checks:
     name: Checks
     runs-on: ubuntu-20.04
-    container:
-      image: docker.pkg.github.com/timberio/vector/environment
-      credentials:
-         username: ${{ github.actor }}
-         password: ${{ secrets.GITHUB_TOKEN }}
+    container: timberio/ci_image
     steps:
       - uses: dorny/paths-filter@v2
         id: changes
