@@ -7,6 +7,8 @@ use exitcode::ExitCode;
 use std::{fmt, fs::remove_dir_all, path::PathBuf};
 use structopt::StructOpt;
 
+const TEMPORARY_DIRECTORY: &'static str = "validate_tmp";
+
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Opts {
@@ -156,7 +158,7 @@ async fn validate_healthchecks(
 fn create_tmp_directory(config: &mut Config, fmt: &mut Formatter) -> Option<PathBuf> {
     match config
         .global
-        .resolve_and_make_data_subdir(None, "validate_tmp")
+        .resolve_and_make_data_subdir(None, TEMPORARY_DIRECTORY)
     {
         Ok(path) => {
             config.global.data_dir = Some(path.clone());
