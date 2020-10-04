@@ -52,19 +52,21 @@ jobs:
   test-linux:
     name: Unit - x86_64-unknown-linux-gnu
     runs-on: ubuntu-20.04
+    container:
+      image: docker.pkg.github.com/timberio/vector/environment
+      credentials:
+         username: ${{ github.actor }}
+         password: ${{ secrets.GITHUB_TOKEN }}
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
-      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test
@@ -104,7 +106,7 @@ jobs:
         run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - name: Prepare environment
         run: bash scripts/environment/prepare.sh
-      - name: Setup Help
+      - name: Setup Helm
         run: scripts/ci-setup-helm.sh
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
@@ -136,4 +138,3 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check advisories
-
