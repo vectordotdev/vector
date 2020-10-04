@@ -106,7 +106,7 @@ jobs:
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: test
-        run: pwd
+        run: ls -la
       - name: Setup Helm
         run: scripts/ci-setup-helm.sh
       - name: Enable Rust matcher

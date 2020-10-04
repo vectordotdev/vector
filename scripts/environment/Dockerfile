@@ -10,7 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN echo $TZ > /etc/timezone
 
 # Setup the env
-RUN mkdir -p /git/timberio/vector/{scripts,scripts/environment}
+RUN mkdir -p /git/timberio/vector/scripts/environment
 ADD scripts/environment/bootstrap-ubuntu-20.04.sh /git/timberio/vector/scripts/environment/
 RUN ./git/timberio/vector/scripts/environment/bootstrap-ubuntu-20.04.sh
 
