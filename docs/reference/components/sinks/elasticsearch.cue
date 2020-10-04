@@ -78,137 +78,133 @@ components: sinks: elasticsearch: {
     auth: {
       common: false
       description: "Options for the authentication strategy."
-      groups: []
       required: false
       warnings: []
-        type: object: {
-          default: null
-          examples: []
-          options: {
+      type: object: {
+        examples: []
+        options: {
+          assume_role: {
+            common: false
+            description: "The ARN of an [IAM role][urls.aws_iam_role] to assume at startup."
+            required: false
+            warnings: []
             type: string: {
               default: null
               examples: ["arn:aws:iam::123456789098:role/my_role"]
             }
+          }
+          password: {
+            common: true
+            description: "The basic authentication password."
+            required: true
+            warnings: []
             type: string: {
               examples: ["${ELASTICSEARCH_PASSWORD}","password"]
             }
+          }
+          strategy: {
+            common: true
+            description: "The authentication strategy to use."
+            required: true
+            warnings: []
             type: string: {
               enum: {
                 aws: "Authentication strategy used for [AWS' hosted Elasticsearch service][urls.aws_elasticsearch]."
                 basic: "The [basic authentication strategy][urls.basic_auth]."
               }
             }
+          }
+          user: {
+            common: true
+            description: "The basic authentication user name."
+            required: true
+            warnings: []
             type: string: {
               examples: ["${ELASTICSEARCH_USERNAME}","username"]
             }
           }
         }
+      }
     }
     aws: {
       common: false
       description: "Options for the AWS connections."
-      groups: []
       required: false
       warnings: []
-        type: object: {
-          default: null
-          examples: []
-          options: {
+      type: object: {
+        examples: []
+        options: {
+          region: {
+            common: true
+            description: "The [AWS region][urls.aws_regions] of the target service. This defaults to the region named in the endpoint parameter, or the value of the `$AWS_REGION` or `$AWS_DEFAULT_REGION` environment variables if that cannot be determined, or \"us-east-1\"."
+            required: false
+            warnings: []
             type: string: {
               default: null
               examples: ["us-east-1"]
             }
           }
         }
-    }
-    compression: {
-      common: true
-      description: "The compression strategy used to compress the encoded event data before transmission."
-      groups: []
-      required: false
-      warnings: [{"visibility_level":"component","text":"AWS hosted Elasticsearch is unable to use compression","option_name":"compression"}]
-        type: string: {
-          default: "none"
-          enum: {
-            none: "No compression."
-            gzip: "[Gzip][urls.gzip] standard DEFLATE compression."
-          }
-        }
+      }
     }
     doc_type: {
       common: false
       description: "The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it."
-      groups: []
       required: false
       warnings: []
-        type: string: {
-          default: "_doc"
-        }
+      type: string: {
+        default: "_doc"
+      }
     }
     headers: {
       common: false
       description: "Options for custom headers."
-      groups: []
       required: false
       warnings: []
-        type: object: {
-          default: null
-          examples: []
-          options: {
-            type: string: {
-              examples: [{"Authorization":"${ELASTICSEARCH_TOKEN}"},{"X-Powered-By":"Vector"}]
-            }
-          }
-        }
+      type: object: {
+        examples: [{"Authorization":"${ELASTICSEARCH_TOKEN}"},{"X-Powered-By":"Vector"}]
+        options: {}
+      }
     }
     id_key: {
       common: false
       description: "The name of the event key that should map to Elasticsearch's [`_id` field][urls.elasticsearch_id_field]. By default, Vector does not set the `_id` field, which allows Elasticsearch to set this automatically. You should think carefully about setting your own Elasticsearch IDs, since this can [hinder perofrmance][urls.elasticsearch_id_performance]."
-      groups: []
       required: false
       warnings: []
-        type: string: {
-          default: null
-          examples: ["id","_id"]
-        }
+      type: string: {
+        default: null
+        examples: ["id","_id"]
+      }
     }
     index: {
       common: true
       description: "Index name to write events to."
-      groups: []
       required: false
       warnings: []
-        type: string: {
-          default: "vector-%F"
-          examples: ["application-{{ application_id }}-%Y-%m-%d","vector-%Y-%m-%d"]
-        }
+      type: string: {
+        default: "vector-%F"
+        examples: ["application-{{ application_id }}-%Y-%m-%d","vector-%Y-%m-%d"]
+      }
     }
     pipeline: {
       common: true
       description: "Name of the pipeline to apply."
-      groups: []
       required: false
       warnings: []
-        type: string: {
-          default: null
-          examples: ["pipeline-name"]
-        }
+      type: string: {
+        default: null
+        examples: ["pipeline-name"]
+      }
     }
     query: {
       common: false
       description: "Custom parameters to Elasticsearch query string."
-      groups: []
       required: false
       warnings: []
-        type: object: {
-          default: null
-          examples: []
-          options: {
-            type: string: {
-              examples: [{"X-Powered-By":"Vector"}]
-            }
-          }
-        }
+      type: object: {
+        examples: [{"X-Powered-By":"Vector"}]
+        options: {}
+      }
     }
   }
 }
