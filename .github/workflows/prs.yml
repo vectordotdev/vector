@@ -81,13 +81,15 @@ jobs:
               - 'docs/**'
             markdown:
               - '**/**.md'
-            clippy:
+            cargo:
               - 'Cargo.toml'
               - 'Cargo.lock'
             internal_events:
               - 'src/internal_events/**'
             helm:
               - 'distribution/helm/vector'
+            k8syaml:
+              - 'distribution/kubernetes/vector.yaml'
       - uses: actions/checkout@v2
         with:
           # check-version needs tags
@@ -119,7 +121,7 @@ jobs:
       - name: Check code format
         run: make check-fmt
       - name: Check clippy
-        if: steps.changes.outputs.clippy == 'true'
+        if: steps.changes.outputs.cargo == 'true'
         run: make check-clippy
       - name: Check version
         run: make check-version
@@ -129,11 +131,13 @@ jobs:
         if: steps.changes.outputs.helm == 'true'
         run: make check-helm
       - name: Check k8s YAML
+        if: steps.changes.outputs.k8syaml == 'true'
         run: make check-kubernetes-yaml
       - name: Check internal events
         if: steps.changes.outputs.internal_events == 'true'
         run: make check-internal-events
-      - uses: EmbarkStudios/cargo-deny-action@v1
+      - name: Check cargo deny
+        if: steps.changes.outputs.cargo == 'true'
+        uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check advisories
-
