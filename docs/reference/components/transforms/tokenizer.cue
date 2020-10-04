@@ -14,7 +14,6 @@ components: transforms: tokenizer: {
   classes: {
     commonly_used: true
     function: "parse"
-    service_providers: []
   }
 
   statuses: {
