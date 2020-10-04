@@ -69,62 +69,45 @@ components: sinks: humio_logs: {
   }
 
   configuration: {
-    compression: {
-      common: true
-      description: "The compression strategy used to compress the encoded event data before transmission."
-      groups: []
-      required: false
-      warnings: []
-        type: string: {
-          default: "none"
-          enum: {
-            none: "No compression."
-            gzip: "[Gzip][urls.gzip] standard DEFLATE compression."
-          }
-        }
-    }
     event_type: {
       common: false
       description: "The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.\n\nIf unset, Humio will default it to none.\n"
-      groups: []
       required: false
       warnings: []
-        type: string: {
-          default: null
-          examples: ["json","none"]
-        }
+      type: string: {
+        default: null
+        examples: ["json","none"]
+      }
     }
     host_key: {
       common: true
       description: "The name of the log field to be used as the hostname sent to Humio. This overrides the [global `host_key` option][docs.reference.global-options#host_key]."
-      groups: []
       required: false
       warnings: []
-        type: string: {
-          default: null
-          examples: ["hostname"]
-        }
+      type: string: {
+        default: null
+        examples: ["hostname"]
+      }
     }
     source: {
       common: false
       description: "The source of events sent to this sink. Typically the filename the logs originated from. Maps to @source in Humio.\n"
-      groups: []
       required: false
       warnings: []
-        type: string: {
-          default: null
-          examples: ["{{file}}","/var/log/syslog","UDP:514"]
-        }
+      type: string: {
+        default: null
+        examples: ["{{file}}","/var/log/syslog","UDP:514"]
+      }
     }
     token: {
       common: true
       description: "Your Humio ingestion token."
-      groups: []
       required: true
       warnings: []
-        type: string: {
-          examples: ["${HUMIO_TOKEN}","A94A8FE5CCB19BA61C4C08"]
-        }
+      type: string: {
+        examples: ["${HUMIO_TOKEN}","A94A8FE5CCB19BA61C4C08"]
+      }
     }
   }
 }
+
