@@ -111,3 +111,4 @@ components: sinks: gcp_pubsub: {
     }
   }
 }
+
