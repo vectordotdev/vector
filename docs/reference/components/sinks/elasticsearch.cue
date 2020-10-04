@@ -208,3 +208,4 @@ components: sinks: elasticsearch: {
     }
   }
 }
+
