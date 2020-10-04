@@ -171,3 +171,4 @@ components: sinks: gcp_stackdriver_logs: {
     }
   }
 }
+
