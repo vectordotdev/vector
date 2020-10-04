@@ -131,7 +131,7 @@ jobs:
         if: steps.changes.outputs.helm == 'true'
         run: make check-helm
       - name: Check k8s YAML
-      if: steps.changes.outputs.k8syaml == 'true'
+        if: steps.changes.outputs.k8syaml == 'true'
         run: make check-kubernetes-yaml
       - name: Check internal events
         if: steps.changes.outputs.internal_events == 'true'
