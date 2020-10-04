@@ -14,7 +14,6 @@ components: transforms: ansi_stripper: {
   classes: {
     commonly_used: false
     function: "sanitize"
-    service_providers: []
   }
 
   statuses: {
