@@ -173,3 +173,4 @@ components: sinks: gcp_cloud_storage: {
     }
   }
 }
+
