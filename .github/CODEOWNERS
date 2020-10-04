@@ -11,6 +11,48 @@
 /skaffold.yaml @MOZGIII
 /kustomization.yaml @MOZGIII
 
+/docs/reference/components/sinks/*_metrics.cue @lukesteensen
+/docs/reference/components/sinks/aws_kinesis_streams.cue @jszwedko
+/docs/reference/components/sinks/aws_s3.cue @jszwedko
+/docs/reference/components/sinks/console.cue @lukesteensen
+/docs/reference/components/sinks/gcp @bruceg
+/docs/reference/components/sinks/http.cue @jszwedko
+/docs/reference/components/sinks/humio_logs.cue @jszwedko
+/docs/reference/components/sinks/splunk_hec.cue @ktff
+/docs/reference/components/sinks/kafka.cue @lukesteensen
+/docs/reference/components/sinks/prometheus.cue @lukesteensen
+/docs/reference/components/sinks/splunk_hec.cue @lukesteensen
+/docs/reference/components/sinks/statsd.cue @lukesteensen
+/docs/reference/components/sinks/tcp.cue @bruceg @lukesteensen
+
+/docs/reference/components/sources/apache_metrics/ @jszwedko
+/docs/reference/components/sources/docker.cue @fanatid
+/docs/reference/components/sources/generator.cue @bruceg
+/docs/reference/components/sources/journald.cue @bruceg
+/docs/reference/components/sources/stdin.cue @bruceg
+/docs/reference/components/sources/syslog.cue @lukesteensen
+/docs/reference/components/sources/tcp.cue @bruceg
+/docs/reference/components/sources/udp.cue @bruceg
+/docs/reference/components/sources/vector.cue @lukesteensen
+/docs/reference/components/sources/kubernetes_* @MOZGIII @JeanMertz
+/docs/reference/components/sources/splunk_hec.cue @ktff
+
+/docs/reference/components/transforms/add_tags.cue @lukesteensen
+/docs/reference/components/transforms/ansi_stripper.cue @JeanMertz
+/docs/reference/components/transforms/coercer.cue @bruceg
+/docs/reference/components/transforms/filter.cue @bruceg
+/docs/reference/components/transforms/field_filter.cue @lukesteensen
+/docs/reference/components/transforms/geoip.cue @lukesteensen
+/docs/reference/components/transforms/grok_parser.cue @lukesteensen
+/docs/reference/components/transforms/log_to_metric.cue @lukesteensen
+/docs/reference/components/transforms/merge.cue @MOZGIII
+/docs/reference/components/transforms/regex_parser.cue @lukesteensen
+/docs/reference/components/transforms/remap.cue @JeanMertz @FungusHumungus
+/docs/reference/components/transforms/remove_tags.cue @lukesteensen
+/docs/reference/components/transforms/sampler.cue @lukesteensen
+/docs/reference/components/transforms/split.cue @lukesteensen
+/docs/reference/components/transforms/tokenzier.cue @lukesteensen
+
 /distribution/ @hoverbear @jamtur01
 /distribution/docker/ @MOZGIII
 /distribution/helm/ @MOZGIII
@@ -73,7 +115,7 @@
 /src/sinks/gcp @bruceg
 /src/sinks/http.rs @jszwedko
 /src/sinks/humio_logs.rs @jszwedko
-/src/sinks/splunk_hec.rs @jszwedko
+/src/sinks/splunk_hec.rs @ktff
 /src/sinks/kafka.rs @lukesteensen
 /src/sinks/prometheus.rs @lukesteensen
 /src/sinks/splunk_hec.rs @lukesteensen
