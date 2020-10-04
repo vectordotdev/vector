@@ -59,12 +59,11 @@ components: sinks: datadog_logs: {
     api_key: {
       common: true
       description: "Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)"
-      groups: []
       required: true
       warnings: []
-        type: string: {
-          examples: ["${DATADOG_API_KEY_ENV_VAR}","ef8d5de700e7989468166c40fc8a0ccd"]
-        }
+      type: string: {
+        examples: ["${DATADOG_API_KEY_ENV_VAR}","ef8d5de700e7989468166c40fc8a0ccd"]
+      }
     }
   }
 }
