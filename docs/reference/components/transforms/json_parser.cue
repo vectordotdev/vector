@@ -14,7 +14,6 @@ components: transforms: json_parser: {
   classes: {
     commonly_used: true
     function: "parse"
-    service_providers: []
   }
 
   statuses: {
