@@ -3,7 +3,7 @@ package metadata
 components: transforms: ansi_stripper: {
   title: "#{component.title}"
   short_description: "Accepts log events and allows you to strips ANSI escape sequences from the specified field."
-  description: "Accepts log events and allows you to strips ANSI escape sequences from the specified field."
+  long_description: "Accepts log events and allows you to strips ANSI escape sequences from the specified field."
 
   _features: {
     checkpoint: enabled: false
@@ -14,6 +14,7 @@ components: transforms: ansi_stripper: {
   classes: {
     commonly_used: false
     function: "sanitize"
+    service_providers: []
   }
 
   statuses: {
@@ -21,6 +22,8 @@ components: transforms: ansi_stripper: {
   }
 
   support: {
+      input_types: ["log"]
+
     platforms: {
       "aarch64-unknown-linux-gnu": true
       "aarch64-unknown-linux-musl": true
@@ -39,10 +42,11 @@ components: transforms: ansi_stripper: {
       common: true
       description: "The target field to strip ANSI escape sequences from."
       required: false
-        type: string: {
-          default: "message"
-          examples: ["message","parent.child","array[0]"]
-        }
+      warnings: []
+      type: string: {
+        default: "message"
+        examples: ["message","parent.child","array[0]"]
+      }
     }
   }
 }
