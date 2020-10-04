@@ -14,7 +14,6 @@ components: transforms: log_to_metric: {
   classes: {
     commonly_used: true
     function: "convert"
-    service_providers: []
   }
 
   statuses: {
