@@ -3,7 +3,7 @@ package metadata
 components: transforms: remove_tags: {
   title: "#{component.title}"
   short_description: "Accepts metric events and allows you to remove one or more metric tags."
-  description: "Accepts metric events and allows you to remove one or more metric tags."
+  long_description: "Accepts metric events and allows you to remove one or more metric tags."
 
   _features: {
     checkpoint: enabled: false
@@ -14,6 +14,7 @@ components: transforms: remove_tags: {
   classes: {
     commonly_used: false
     function: "schema"
+    service_providers: []
   }
 
   statuses: {
@@ -21,6 +22,8 @@ components: transforms: remove_tags: {
   }
 
   support: {
+      input_types: ["metric"]
+
     platforms: {
       "aarch64-unknown-linux-gnu": true
       "aarch64-unknown-linux-musl": true
@@ -39,9 +42,10 @@ components: transforms: remove_tags: {
       common: true
       description: "The tag names to drop."
       required: true
-        type: "[string]": {
-          examples: [["tag1","tag2"]]
-        }
+      warnings: []
+      type: "[string]": {
+        examples: [["tag1","tag2"]]
+      }
     }
   }
 }
