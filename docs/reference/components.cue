@@ -36,9 +36,14 @@ components: close({
   #ConfigurationOptions: [Name=string]: {
     common: bool
     description: string
+    groups: [...string]
     name: Name
     relevant_when?: string
     required: bool
+    warnings: [...{
+      visibility_level: "component" | "option"
+      text: string
+    }]
 
     if required {
       common: true
@@ -81,12 +86,12 @@ components: close({
   }
 
   #Components: [Type=string]: {
-    // A long description of the component, full of relevant keywords for SEO
-    // purposes.
-    description: string
-
     // The component kind. This is set automatically.
     kind: "sink" | "source" | "transform"
+
+    // A long description of the component, full of relevant keywords for SEO
+    // purposes.
+    long_description: string
 
     // A short, one sentence description.
     short_description: string
@@ -138,6 +143,10 @@ components: close({
 
     // Various support details for the component.
     support: {
+      if kind == "transform" || kind == "sink" {
+        input_types: ["log" | "metric", ...]
+      }
+
       // The platforms that this component is available in. It is possible for
       // Vector to disable some components on a per-platform basis.
       platforms: {
