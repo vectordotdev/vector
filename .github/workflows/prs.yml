@@ -74,6 +74,11 @@ jobs:
   checks:
     name: Checks
     runs-on: ubuntu-20.04
+    container:
+      image: docker.pkg.github.com/timberio/vector/environment
+      credentials:
+         username: ${{ github.actor }}
+         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: dorny/paths-filter@v2
         id: changes
@@ -94,18 +99,12 @@ jobs:
         with:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
-      - name: Clean up CI disk space
-        run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Bootstrap
-        run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - name: Prepare environment
-        run: bash scripts/environment/prepare.sh
       - name: Setup Helm
         run: scripts/ci-setup-helm.sh
       - name: Enable Rust matcher
