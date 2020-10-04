@@ -45,7 +45,7 @@ pub fn update_config(
     let options = Options {
         bind,
         enabled: old_config.api.enabled | new_config.api.enabled,
-        playground: old_config.api.playground | new_config.api.playground,
+        playground: old_config.api.playground & new_config.api.playground,
     };
 
     old_config.api = options;
