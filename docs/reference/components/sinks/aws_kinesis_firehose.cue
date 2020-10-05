@@ -70,7 +70,6 @@ components: sinks: aws_kinesis_firehose: {
 
   configuration: {
     stream_name: {
-      common: true
       description: "The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target Kinesis Firehose delivery stream."
       required: true
       warnings: []
