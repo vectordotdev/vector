@@ -1,7 +1,7 @@
 package metadata
 
 components: transforms: add_tags: {
-  title: "#{component.title}"
+  title: "Add Tags"
   short_description: "Accepts metric events and allows you to add one or more metric tags."
   long_description: "Accepts metric events and allows you to add one or more metric tags."
 
