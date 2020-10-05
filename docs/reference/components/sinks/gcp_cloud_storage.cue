@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: gcp_cloud_storage: {
-  title: "#{component.title}"
+  title: "GCP Cloud Storage (GCS)"
   short_description: "Batches log events to [Google Cloud Platform's Cloud Storage service](https://cloud.google.com/storage) via the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview)."
   long_description: "[Google Cloud Storage][urls.gcp_cloud_storage] is a RESTful online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities. This makes it a prime candidate for log data."
 
@@ -23,6 +23,7 @@ components: sinks: gcp_cloud_storage: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
