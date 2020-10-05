@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: kafka: {
-  title: "#{component.title}"
+  title: "Kafka"
   short_description: "Streams log events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol]."
   long_description: "[Apache Kafka][urls.kafka] is an open-source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. These features make it an excellent candidate for durably storing logs and metrics data."
 
@@ -17,6 +17,7 @@ components: sinks: kafka: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
