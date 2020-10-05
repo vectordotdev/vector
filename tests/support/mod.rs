@@ -164,10 +164,7 @@ impl Transform for MockTransform {
                     .unwrap()
                     .to_string_lossy();
                 v.push_str(&self.suffix);
-                log.insert(
-                    vector::config::log_schema().message_key(),
-                    Value::from(v),
-                );
+                log.insert(vector::config::log_schema().message_key(), Value::from(v));
             }
             Event::Metric(metric) => match metric.value {
                 MetricValue::Counter { ref mut value } => {
