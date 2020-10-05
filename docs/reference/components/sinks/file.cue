@@ -61,6 +61,7 @@ components: sinks: file: {
       warnings: []
       type: uint: {
         default: "30"
+        unit: null
       }
     }
     path: {
