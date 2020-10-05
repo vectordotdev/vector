@@ -1,0 +1,126 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "libvector.fullname" . }}
+  labels:
+    {{- include "libvector.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "libvector.selectorLabels" . | nindent 6 }}
+  minReadySeconds: 1
+  updateStrategy:
+    type: {{ .Values.updateStrategy }}
+  template:
+    metadata:
+    {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- with .Values.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- include "libvector.selectorLabels" . | nindent 8 }}
+        vector.dev/exclude: "true"
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "libvector.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: vector
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ include "libvector.imageTag" . }}"
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          args:
+            - --config
+            - /etc/vector/*.toml
+          env:
+            - name: VECTOR_SELF_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: VECTOR_SELF_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: VECTOR_SELF_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            # Host log directory mount.
+            - name: var-log
+              mountPath: /var/log/
+              readOnly: true
+            # Host mount for docker and containerd log file symlinks.
+            - name: var-lib
+              mountPath: /var/lib
+              readOnly: true
+            # Vector data dir mount.
+            - name: data-dir
+              mountPath: "{{ .Values.globalOptions.dataDir }}"
+            # Vector config dir mount.
+            - name: config-dir
+              mountPath: /etc/vector
+              readOnly: true
+            {{- with .Values.extraVolumeMounts }}
+            # Extra volumes.
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      terminationGracePeriodSeconds: 60
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        # Log directory.
+        - name: var-log
+          hostPath:
+            path: /var/log/
+        # Docker and containerd log files in Kubernetes are symlinks to this folder.
+        - name: var-lib
+          hostPath:
+            path: /var/lib/
+        # Vector will store it's data here.
+        - name: data-dir
+          hostPath:
+            path: /var/lib/vector/
+        # Vector config dir with a managed config map.
+        - name: config-dir
+          projected:
+            sources:
+              # Managed `ConfigMap`.
+              - configMap:
+                  name: {{ include "libvector.configMapName" . }}
+                  optional: true
+              # Custom `ConfigMap`.
+              - configMap:
+                  name: vector-config
+                  optional: true
+              # Custom `Secret`.
+              - secret:
+                  name: vector-config
+                  optional: true
+        {{- with .Values.extraVolumes }}
+        # Extra volumes.
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
