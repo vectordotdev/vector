@@ -1,7 +1,7 @@
 package metadata
 
 components: transforms: remove_tags: {
-  title: "#{component.title}"
+  title: "Remove Tags"
   short_description: "Accepts metric events and allows you to remove one or more metric tags."
   long_description: "Accepts metric events and allows you to remove one or more metric tags."
 
