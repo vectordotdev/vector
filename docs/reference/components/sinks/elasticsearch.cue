@@ -94,7 +94,6 @@ components: sinks: elasticsearch: {
             }
           }
           password: {
-            common: true
             description: "The basic authentication password."
             required: true
             warnings: []
@@ -103,7 +102,6 @@ components: sinks: elasticsearch: {
             }
           }
           strategy: {
-            common: true
             description: "The authentication strategy to use."
             required: true
             warnings: []
@@ -115,7 +113,6 @@ components: sinks: elasticsearch: {
             }
           }
           user: {
-            common: true
             description: "The basic authentication user name."
             required: true
             warnings: []
