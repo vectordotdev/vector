@@ -1,9 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{
-        log_schema, DataType, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{JsonParserEventProcessed, JsonParserFailedParse, JsonParserTargetExists},
 };

@@ -1,8 +1,6 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{
-        log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription,
-    },
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
     internal_events::{
