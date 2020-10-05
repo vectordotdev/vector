@@ -80,7 +80,7 @@ components: close({
           default: uint | null
         }
         examples?: [...uint],
-        unit: "bytes" | "logs" | "milliseconds" | "seconds"
+        unit: "bytes" | "logs" | "milliseconds" | "seconds" | null
       }
     }
   }
