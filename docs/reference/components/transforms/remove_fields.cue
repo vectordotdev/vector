@@ -45,7 +45,6 @@ components: transforms: remove_fields: {
       type: bool: default: false
     }
     fields: {
-      common: true
       description: "The log field names to drop."
       required: true
       warnings: []
