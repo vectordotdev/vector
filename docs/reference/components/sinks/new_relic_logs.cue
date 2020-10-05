@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: new_relic_logs: {
-  title: "#{component.title}"
+  title: "New Relic Logs"
   short_description: "Batches log events to [New Relic's log service][urls.new_relic] via their [log API][urls.new_relic_log_api]."
   long_description: "[New Relic][urls.new_relic] is a San Francisco, California-based technology company which develops cloud-based software to help website and application owners track the performances of their services."
 
@@ -23,6 +23,7 @@ components: sinks: new_relic_logs: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
