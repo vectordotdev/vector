@@ -122,7 +122,7 @@ jobs:
       - name: Check code format
         run: make check-fmt
       - name: Check clippy
-        if: ${{ needs.changes.outputs.source == 'true' }}
+        if: needs.changes.outputs.source == 'true'
         run: make check-clippy
       - name: Check version
         run: make check-version
