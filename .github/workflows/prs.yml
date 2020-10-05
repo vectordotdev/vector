@@ -28,11 +28,11 @@ jobs:
       # Set job outputs to values from filter step
       outputs:
         source: ${{ steps.filter.outputs.source }}
-        source: ${{ steps.filter.outputs.docs }}
-        source: ${{ steps.filter.outputs.markdown }}
-        source: ${{ steps.filter.outputs.cargo }}
-        source: ${{ steps.filter.outputs.internal_events }}
-        source: ${{ steps.filter.outputs.helm }}
+        docs: ${{ steps.filter.outputs.docs }}
+        markdown: ${{ steps.filter.outputs.markdown }}
+        cargo: ${{ steps.filter.outputs.cargo }}
+        internal_events: ${{ steps.filter.outputs.internal_events }}
+        helm: ${{ steps.filter.outputs.helm }}
       steps:
       # For pull requests it's not necessary to checkout the code
       - uses: dorny/paths-filter@v2
