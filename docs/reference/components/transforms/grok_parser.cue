@@ -55,7 +55,6 @@ components: transforms: grok_parser: {
       }
     }
     pattern: {
-      common: true
       description: "The [Grok pattern][urls.grok_patterns]"
       required: true
       warnings: []
