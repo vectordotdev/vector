@@ -79,6 +79,7 @@ metrics-tracing-context = { version = "0.1.0-alpha"  }
 rusoto_core = { version = "0.45.0", features = ["encoding"], optional = true }
 rusoto_es = { version = "0.45.0", optional = true }
 rusoto_s3 = { version = "0.45.0", optional = true }
+rusoto_sqs = { version = "0.45.0", optional = true }
 rusoto_logs = { version = "0.45.0", optional = true }
 rusoto_cloudwatch = { version = "0.45.0", optional = true }
 rusoto_kinesis = { version = "0.45.0", optional = true }
@@ -288,6 +289,7 @@ api-client = [
 sources = [
   "sources-apache_metrics",
   "sources-aws_kinesis_firehose",
+  "sources-aws_s3",
   "sources-docker",
   "sources-file",
   "sources-generator",
@@ -309,6 +311,7 @@ sources = [
 ]
 sources-apache_metrics = []
 sources-aws_kinesis_firehose = ["base64", "tls", "warp"]
+sources-aws_s3 = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_s3", "rusoto_sqs"]
 sources-docker = ["bollard"]
 sources-file = ["bytesize", "file-source"]
 sources-generator = []
