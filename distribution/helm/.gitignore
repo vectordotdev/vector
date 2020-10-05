@@ -1,5 +1,0 @@
-# Chart dependencies
-*/charts/*.tgz
-
-# Chart dependency lockfiles - since we're only using local chart dependencies
-*/Chart.lock
