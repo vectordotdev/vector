@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: vector: {
-  title: "#{component.title}"
+  title: "Vector"
   short_description: "Streams log and metric events to another downstream [`vector` source][docs.sources.vector]."
   long_description: "Streams log and metric events to another downstream [`vector` source][docs.sources.vector]."
 
