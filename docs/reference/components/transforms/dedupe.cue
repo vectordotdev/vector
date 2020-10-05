@@ -52,6 +52,7 @@ components: transforms: dedupe: {
             warnings: []
             type: uint: {
               default: 5000
+              unit: null
             }
           }
         }
