@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: humio_logs: {
-  title: "#{component.title}"
+  title: "Humio Logs"
   short_description: "Batches log events to [Humio][urls.humio] via the [HEC API][urls.humio_hec]."
   long_description: "[Humio][urls.humio] is a time-series logging and aggregation platform for unrestricted, comprehensive event analysis, On-Premises or in the Cloud. With 1TB/day of raw log ingest/node, in-memory stream processing, and live, shareable dashboards and alerts, you can instantly and in real-time explore, monitor, and visualize any system’s data."
 
@@ -23,6 +23,7 @@ components: sinks: humio_logs: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
