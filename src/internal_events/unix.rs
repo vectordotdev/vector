@@ -72,7 +72,7 @@ pub struct UnixSocketFlushFailed<'a, E> {
 impl<E: std::error::Error> InternalEvent for UnixSocketFlushFailed<'_, E> {
     fn emit_logs(&self) {
         error!(
-            message = "flush failed.",
+            message = "Flush failed.",
             error = %self.error,
             path = ?self.path,
         );
@@ -115,7 +115,7 @@ pub struct UnixSocketReceiveFailed<'a, E> {
 impl<E: std::error::Error> InternalEvent for UnixSocketReceiveFailed<'_, E> {
     fn emit_logs(&self) {
         error!(
-            message = "error receiving data.",
+            message = "Error receiving data.",
             error = %self.error,
             path = ?self.path,
         );
@@ -140,7 +140,7 @@ impl<E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display> InternalEven
 {
     fn emit_logs(&self) {
         debug!(
-            message = "unix socket error.",
+            message = "Unix socket error.",
             error = %self.error,
             path = ?self.path,
         );
