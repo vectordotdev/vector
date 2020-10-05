@@ -1,12 +1,9 @@
 package metadata
 
-import (
-  "strings"
-)
-
 components: sources: file: {
   title: "File"
-  description: strings.ToTitle(classes.function) + " logs by tailing one more files."
+  long_description: ""
+  short_description: "Collect logs by tailing one more files."
 
   _features: {
     checkpoint: enabled: true
@@ -29,6 +26,7 @@ components: sources: file: {
     platforms: {
       "aarch64-unknown-linux-gnu": true
       "aarch64-unknown-linux-musl": true
+      "x86_64-apple-darwin": true
       "x86_64-pc-windows-msv": true
       "x86_64-unknown-linux-gnu": true
       "x86_64-unknown-linux-musl": true

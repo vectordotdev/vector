@@ -1,12 +1,9 @@
 package metadata
 
-import (
-  "strings"
-)
-
 components: sources: apache_metrics: {
   title: "Apache HTTPD Metrics"
-  description: strings.ToTitle(classes.function) + " metrics from an Apache HTTPD server."
+  long_description: "fill me in"
+  short_description: "Collect metrics from an Apache HTTPD server."
 
   _features: {
     checkpoint: enabled: false
@@ -29,6 +26,7 @@ components: sources: apache_metrics: {
     platforms: {
       "aarch64-unknown-linux-gnu": true
       "aarch64-unknown-linux-musl": true
+      "x86_64-apple-darwin": true
       "x86_64-pc-windows-msv": true
       "x86_64-unknown-linux-gnu": true
       "x86_64-unknown-linux-musl": true
