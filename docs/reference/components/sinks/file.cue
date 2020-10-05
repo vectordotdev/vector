@@ -60,7 +60,8 @@ components: sinks: file: {
       required: false
       warnings: []
       type: uint: {
-        default: "30"
+        default: 30
+        unit: "seconds"
       }
     }
     path: {
