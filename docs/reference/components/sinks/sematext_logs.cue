@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: sematext_logs: {
-  title: "#{component.title}"
+  title: "Sematext Logs"
   short_description: "Batches log events to [Sematext][urls.sematext] via the [Elasticsearch API][urls.sematext_es]."
   long_description: "[Sematext][urls.sematext] is a hosted monitoring platform based on Elasticsearch. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time."
 
@@ -19,6 +19,7 @@ components: sinks: sematext_logs: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
