@@ -1028,8 +1028,8 @@ version: ## Get the current Vector version
 git-hooks: ## Add Vector-local git hooks for commit sign-off
 	@scripts/install-git-hooks.sh
 
-.PHONY: helm-dependencies-update
-helm-dependencies-update: ## Recursively update the dependencies of the Helm charts in the proper order
+.PHONY: update-helm-dependencies
+update-helm-dependencies: ## Recursively update the dependencies of the Helm charts in the proper order
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-dependencies.sh update
 
 .PHONY: update-kubernetes-yaml
