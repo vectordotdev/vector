@@ -70,6 +70,7 @@ components: transforms: aws_ec2_metadata: {
       warnings: []
       type: uint: {
         default: 10
+        unit: null
       }
     }
   }
