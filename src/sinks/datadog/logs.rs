@@ -12,6 +12,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
+    tls::{MaybeTlsSettings, TlsConfig},
 };
 use bytes::Bytes;
 use flate2::write::GzEncoder;
@@ -29,6 +30,7 @@ pub struct DatadogLogsConfig {
     endpoint: Option<String>,
     api_key: String,
     encoding: EncodingConfig<Encoding>,
+    tls: Option<TlsConfig>,
 
     #[serde(default)]
     compression: Option<Compression>,
@@ -115,8 +117,6 @@ impl DatadogLogsConfig {
                     VecBuffer::new(batch_settings.size),
                     request_settings,
                     batch_settings.timeout,
-                    client,
-                    cx.acker(),
                 )
                 .sink_map_err(|e| error!("Fatal datadog_logs text sink error: {}", e));
 
@@ -340,53 +340,17 @@ impl HttpSink for DatadogLogsTextService {
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let body: Vec<u8> = events.iter().flat_map(|b| b.into_iter()).cloned().collect();
-
-        build_request(&self.config, body)
+        self.config.build_request(body)
     }
-}
-
-/// Build the request, GZipping the contents if the config specifies.
-fn build_request(
-    config: &DatadogLogsConfig,
-    body: Vec<u8>,
-) -> crate::Result<http::Request<Vec<u8>>> {
-    let uri = config.get_endpoint();
-    let request = Request::post(uri)
-        .header("Content-Type", "text/plain")
-        .header("DD-API-KEY", config.api_key.clone());
-
-    let (request, body) = match config.compression {
-        Compression::None => (request, body),
-        Compression::Gzip => {
-            let mut encoder = GzEncoder::new(
-                Vec::new(),
-                match config.compression_level {
-                    Some(level) if level <= 9 => flate2::Compression::new(level),
-                    _ => flate2::Compression::fast(),
-                },
-            );
-
-            encoder.write_all(&body)?;
-            (
-                request.header("Content-Encoding", "gzip"),
-                encoder.finish()?,
-            )
-        }
-    };
-
-    request
-        .header("Content-Length", body.len())
-        .body(body)
-        .map_err(Into::into)
 }
 
 /// The healthcheck is performed by sending an empty request to Datadog and checking
 /// the return.
-async fn healthcheck<T, O>(config: T, mut client: HttpClient) -> crate::Result<()>
+async fn healthcheck<T, O>(sink: T, mut client: HttpClient) -> crate::Result<()>
 where
     T: HttpSink<Output = Vec<O>>,
 {
-    let req = config.build_request(Vec::new()).await?.map(Body::from);
+    let req = sink.build_request(Vec::new()).await?.map(Body::from);
 
     #[tokio::test]
     async fn smoke_json() {
