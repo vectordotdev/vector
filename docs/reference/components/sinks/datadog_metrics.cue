@@ -60,7 +60,6 @@ components: sinks: datadog_metrics: {
 
   configuration: {
     api_key: {
-      common: true
       description: "Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)"
       required: true
       warnings: []
