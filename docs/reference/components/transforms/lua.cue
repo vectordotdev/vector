@@ -38,7 +38,6 @@ components: transforms: lua: {
 
   configuration: {
     hooks: {
-      common: true
       description: "Configures hooks handlers."
       groups: ["simple","inline","module"]
       required: true
@@ -58,7 +57,6 @@ components: transforms: lua: {
             }
           }
           process: {
-            common: true
             description: "A function which is called for each incoming event. It can produce new events using `emit` function."
             groups: ["simple","inline","module"]
             required: true
@@ -111,7 +109,6 @@ components: transforms: lua: {
       warnings: []
     }
     version: {
-      common: true
       description: "Transform API version. Specifying this version ensures that Vector does not break backward compatibility."
       groups: ["simple","inline","module"]
       required: true
