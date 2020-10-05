@@ -228,9 +228,9 @@ components: close({
             warnings: []
             type: bool: default: null
           }
-          "*.not_`[condition]`": {
+          "*.not_*": {
             common:      false
-            description: "Check if the given `[condition]` does not match."
+            description: "Allow you to negate any condition listed here."
             required:    false
             warnings: []
             type: string: {
