@@ -93,7 +93,6 @@ components: sinks: gcp_cloud_storage: {
       }
     }
     bucket: {
-      common: false
       description: "The GCS bucket name."
       required: true
       warnings: []
