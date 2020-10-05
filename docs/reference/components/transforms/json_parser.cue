@@ -48,7 +48,7 @@ components: transforms: json_parser: {
       description: "If `true` events with invalid JSON will be dropped, otherwise the event will be kept and passed through."
       required: true
       warnings: []
-      type: bool: default: null
+      type: bool: {}
     }
     field: {
       common: true
