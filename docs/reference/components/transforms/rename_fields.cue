@@ -1,7 +1,7 @@
 package metadata
 
 components: transforms: rename_fields: {
-  title: "#{component.title}"
+  title: "Rename Fields"
   short_description: "Accepts log events and allows you to rename one or more log fields."
   long_description: "Accepts log events and allows you to rename one or more log fields."
 
