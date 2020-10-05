@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: splunk_hec: {
-  title: "#{component.title}"
+  title: "Splunk HEC"
   short_description: "Batches log events to a [Splunk's HTTP Event Collector][urls.splunk_hec]."
   long_description: "The [Splunk HTTP Event Collector (HEC)][urls.splunk_hec] is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application."
 
@@ -23,6 +23,7 @@ components: sinks: splunk_hec: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
