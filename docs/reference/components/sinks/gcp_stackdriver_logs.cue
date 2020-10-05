@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: gcp_stackdriver_logs: {
-  title: "#{component.title}"
+  title: "GCP Stackdriver Logs"
   short_description: "Batches log events to [Google Cloud Platform's Stackdriver Logging service][urls.gcp_stackdriver_logging] via the [REST Interface][urls.gcp_stackdriver_logging_rest]."
   long_description: "[Stackdriver][urls.gcp_stackdriver] is Google Cloud's embedded observability suite designed to monitor, troubleshoot, and improve cloud infrastructure, software and application performance. Stackdriver enables you to efficiently build and run workloads, keeping applications available and performing well."
 
@@ -19,6 +19,7 @@ components: sinks: gcp_stackdriver_logs: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
