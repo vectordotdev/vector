@@ -40,26 +40,3 @@ impl<'a> InternalEvent for MetricToLogFailedSerialize {
         );
     }
 }
-
-#[derive(Debug)]
-pub(crate) struct MetricToLogFailedDeserialize {
-    pub error: Error,
-}
-
-impl<'a> InternalEvent for MetricToLogFailedDeserialize {
-    fn emit_logs(&self) {
-        warn!(
-            message = "LogEvent failed to deserialize from JSON.",
-            %self.error,
-            rate_limit_secs = 30
-        )
-    }
-
-    fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "metric_to_log",
-            "error_type" => "failed_deserialize",
-        );
-    }
-}
