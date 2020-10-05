@@ -44,4 +44,24 @@ components: transforms: swimlanes: {
 			type: object: configuration._conditions
 		}
 	}
+
+  examples: log: [
+    {
+      title: "Split by log level"
+      configuration: {
+        lanes: {
+          debug: "level.eq": "debug"
+          info: "level.eq": "info"
+          warn: "level.eq": "warn"
+          error: "level.eq": "error"
+        }
+      }
+      input: {
+        level: "info"
+      }
+      output: {
+        level: "info"
+      }
+    }
+  ]
 }
