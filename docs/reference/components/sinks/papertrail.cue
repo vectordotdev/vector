@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: papertrail: {
-  title: "#{component.title}"
+  title: "Papertrail"
   short_description: "Streams log events to [Papertrail][urls.papertrail] via [Syslog][urls.papertrail_syslog]."
   long_description: "[Papertrail][urls.papertrail] is a web-based log aggregation application used by developers and IT team to search and view logs in real time."
 
@@ -13,6 +13,7 @@ components: sinks: papertrail: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
