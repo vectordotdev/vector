@@ -55,7 +55,6 @@ components: transforms: tokenizer: {
       }
     }
     field_names: {
-      common: true
       description: "The log field names assigned to the resulting tokens, in order."
       required: true
       warnings: []
