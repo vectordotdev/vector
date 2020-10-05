@@ -16,13 +16,14 @@ As previously noted, our charts use Helm dependency system.
 Helm vendors it's dependencies, so, when working on Helm charts, it's important
 to keep the local dependencies up to date.
 
-To aid with this task, a script `scripts/helm-dependencies-update.sh` was
-created. It will update the dependencies of all our crates to each other in the
-proper order, making sure the changes are propagated to all the charts.
+To aid with this task, a script `scripts/helm-dependencies.sh` was created.
+Calling it with `update` argument will update the dependencies of all our crates
+to each other in the proper order, making sure the changes are propagated to all
+the charts.
 
 Typical development iteration cycle looks like this:
 
 1. Edit a file that is part of, for instance, the `vector-shared` chart, save it.
-2. `scripts/helm-dependencies-update.sh`
+2. `scripts/helm-dependencies.sh update`
 3. `helm install vector distribution/helm/vector` (or `helm template ...`, or
    whatever you prefer to test your work).
