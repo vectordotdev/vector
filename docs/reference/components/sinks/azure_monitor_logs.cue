@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: azure_monitor_logs: {
-  title: "#{component.title}"
+  title: "Azure Monitor Logs"
   short_description: "Batches log events to [Azure Monitor's][urls.azure_monitor] logs via the [REST endpoint][urls.azure_monitor_logs_endpoints]."
   long_description: "[Azure Monitor][urls.azure_monitor] is a service in Azure that provides performance and availability monitoring for applications and services in Azure, other cloud environments, or on-premises. Azure Monitor collects data from multiple sources into a common data platform where it can be analyzed for trends and anomalies."
 
@@ -19,6 +19,7 @@ components: sinks: azure_monitor_logs: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
