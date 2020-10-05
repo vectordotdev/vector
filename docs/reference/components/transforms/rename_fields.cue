@@ -60,6 +60,14 @@ components: transforms: rename_fields: {
   }
 
   how_it_works: {
+    complex_processing: {
+      title: "Complex Processing"
+      body: #"""
+      If you encounter limitations with the `rename_fields` transform then we recommend using a
+      [runtime](vector_programmable_transforms) transform. These transforms are designed for complex
+      processing and give you the power of full programming runtime.
+      """#
+    }
     conflicts: {
       title: "Conflicts"
       body: #"""
