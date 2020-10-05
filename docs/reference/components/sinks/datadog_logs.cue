@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: datadog_logs: {
-  title: "#{component.title}"
+  title: "Datadog Logs"
   short_description: "Streams log events to [Datadog's][urls.datadog] logs via the [TCP endpoint][urls.datadog_logs_endpoints]."
   long_description: "[Datadog][urls.datadog] is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform."
 
@@ -13,6 +13,7 @@ components: sinks: datadog_logs: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
