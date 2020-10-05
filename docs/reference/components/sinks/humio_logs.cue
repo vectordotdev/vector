@@ -100,7 +100,6 @@ components: sinks: humio_logs: {
       }
     }
     token: {
-      common: true
       description: "Your Humio ingestion token."
       required: true
       warnings: []
