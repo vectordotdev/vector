@@ -380,6 +380,7 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
+      - run: make cross-enable
       - run: make package-deb-x86_64
       - uses: actions/upload-artifact@v2
         with:
@@ -406,6 +407,7 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
+      - run: make cross-enable
       - run: make build-aarch64-unknown-linux-gnu
 
   # Github Actions don't support `matrix` at the job-level `if:` condition.
