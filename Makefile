@@ -1029,6 +1029,7 @@ helm-dependencies-update: ## Recursively update the dependencies of the Helm cha
 
 .PHONY: update-kubernetes-yaml
 update-kubernetes-yaml: ## Regenerate the Kubernetes YAML config
+update-kubernetes-yaml: helm-dependencies-update
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh update
 
 .PHONY: cargo-install-%
