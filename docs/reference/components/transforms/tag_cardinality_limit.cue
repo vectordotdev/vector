@@ -1,7 +1,7 @@
 package metadata
 
 components: transforms: tag_cardinality_limit: {
-  title: "#{component.title}"
+  title: "Tag Cardinality Limit"
   short_description: "Accepts metric events and allows you to limit the cardinality of metric tags to prevent downstream disruption of metrics services."
   long_description: "Accepts metric events and allows you to limit the cardinality of metric tags to prevent downstream disruption of metrics services."
 
