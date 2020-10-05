@@ -1,7 +1,7 @@
 package metadata
 
 components: transforms: regex_parser: {
-  title: "#{component.title}"
+  title: "Regex Parser"
   short_description: "Accepts log events and allows you to parse a log field's value with a [Regular Expression][urls.regex]."
   long_description: "Accepts log events and allows you to parse a log field's value with a [Regular Expression][urls.regex]."
 
