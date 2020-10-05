@@ -1,7 +1,7 @@
 package metadata
 
 components: transforms: coercer: {
-  title: "#{component.title}"
+  title: "Coercer"
   short_description: "Accepts log events and allows you to coerce log fields into fixed types."
   long_description: "Accepts log events and allows you to coerce log fields into fixed types."
 
