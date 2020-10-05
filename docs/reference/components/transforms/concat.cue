@@ -1,7 +1,7 @@
 package metadata
 
 components: transforms: concat: {
-  title: "#{component.title}"
+  title: "Concat"
   short_description: "Accepts log events and allows you to concat (substrings) of other fields to a new one."
   long_description: "Accepts log events and allows you to concat (substrings) of other fields to a new one."
 
