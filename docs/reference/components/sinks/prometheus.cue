@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: prometheus: {
-  title: "#{component.title}"
+  title: "Prometheus"
   short_description: "Exposes metric events to [Prometheus][urls.prometheus] metrics service."
   long_description: "[Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
 
