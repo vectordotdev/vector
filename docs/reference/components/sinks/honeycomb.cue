@@ -61,7 +61,6 @@ components: sinks: honeycomb: {
 
   configuration: {
     api_key: {
-      common: true
       description: "The team key that will be used to authenticate against Honeycomb."
       required: true
       warnings: []
@@ -70,7 +69,6 @@ components: sinks: honeycomb: {
       }
     }
     dataset: {
-      common: true
       description: "The dataset that Vector will send logs to."
       required: true
       warnings: []
