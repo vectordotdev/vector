@@ -102,7 +102,6 @@ components: sinks: gcp_stackdriver_logs: {
       }
     }
     log_id: {
-      common: false
       description: "The log ID to which to publish logs. This is a name you create to identify this log stream."
       required: true
       warnings: []
@@ -121,7 +120,6 @@ components: sinks: gcp_stackdriver_logs: {
       }
     }
     project_id: {
-      common: false
       description: "The project ID to which to publish logs. See the [Google Cloud Platform project management documentation][urls.gcp_projects] for more details.\n\nExactly one of `billing_account_id`, `folder_id`, `organization_id`, or `project_id` must be set."
       required: true
       warnings: []
@@ -138,7 +136,6 @@ components: sinks: gcp_stackdriver_logs: {
         examples: []
         options: {
           type: {
-            common: true
             description: "The monitored resource type. For example, the type of a Compute Engine VM instance is gce_instance.\n\nSee the [Google Cloud Platform monitored resource documentation][urls.gcp_resources] for more details."
             required: true
             warnings: []
