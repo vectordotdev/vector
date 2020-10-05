@@ -807,7 +807,6 @@ check-helm-dependencies: ## Check that Helm charts have up-to-date dependencies
 
 .PHONY: check-kubernetes-yaml
 check-kubernetes-yaml: ## Check that the generated Kubernetes YAML config is up to date
-check-kubernetes-yaml: helm-dependencies-update
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh check
 
 check-internal-events: ## Check that internal events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
@@ -1035,7 +1034,6 @@ helm-dependencies-update: ## Recursively update the dependencies of the Helm cha
 
 .PHONY: update-kubernetes-yaml
 update-kubernetes-yaml: ## Regenerate the Kubernetes YAML config
-update-kubernetes-yaml: helm-dependencies-update
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh update
 
 .PHONY: cargo-install-%
