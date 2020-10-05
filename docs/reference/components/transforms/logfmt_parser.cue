@@ -1,7 +1,7 @@
 package metadata
 
 components: transforms: logfmt_parser: {
-  title: "#{component.title}"
+  title: "Logfmt Parser"
   short_description: "Accepts log events and allows you to parse a log field's value in the [logfmt][urls.logfmt] format."
   long_description: "Accepts log events and allows you to parse a log field's value in the [logfmt][urls.logfmt] format."
 
