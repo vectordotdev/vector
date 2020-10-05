@@ -58,7 +58,6 @@ components: transforms: dedupe: {
       }
     }
     fields: {
-      common: true
       description: "Options controlling what fields to match against"
       required: true
       warnings: []
