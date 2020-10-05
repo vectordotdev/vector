@@ -32,7 +32,37 @@ struct LogplexSource {}
 
 impl HttpSource for LogplexSource {
     fn build_event(&self, body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
-        decode_message(body, header_map)
+        // Deal with headers
+        let msg_count = match usize::from_str(get_header(&header_map, "Logplex-Msg-Count")?) {
+            Ok(v) => v,
+            Err(e) => return Err(header_error_message("Logplex-Msg-Count", &e.to_string())),
+        };
+        let frame_id = get_header(&header_map, "Logplex-Frame-Id")?;
+        let drain_token = get_header(&header_map, "Logplex-Drain-Token")?;
+
+        emit!(HerokuLogplexRequestReceived {
+            msg_count,
+            frame_id,
+            drain_token
+        });
+
+        // Deal with body
+        let events = body_to_events(body);
+
+        if events.len() != msg_count {
+            let error_msg = format!(
+                "Parsed event count does not match message count header: {} vs {}",
+                events.len(),
+                msg_count
+            );
+
+            if cfg!(test) {
+                panic!(error_msg);
+            }
+            return Err(header_error_message("Logplex-Msg-Count", &error_msg));
+        }
+
+        Ok(events)
     }
 }
 
@@ -57,40 +87,6 @@ impl SourceConfig for LogplexConfig {
     fn source_type(&self) -> &'static str {
         "logplex"
     }
-}
-
-fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
-    // Deal with headers
-    let msg_count = match usize::from_str(get_header(&header_map, "Logplex-Msg-Count")?) {
-        Ok(v) => v,
-        Err(e) => return Err(header_error_message("Logplex-Msg-Count", &e.to_string())),
-    };
-    let frame_id = get_header(&header_map, "Logplex-Frame-Id")?;
-    let drain_token = get_header(&header_map, "Logplex-Drain-Token")?;
-
-    emit!(HerokuLogplexRequestReceived {
-        msg_count,
-        frame_id,
-        drain_token
-    });
-
-    // Deal with body
-    let events = body_to_events(body);
-
-    if events.len() != msg_count {
-        let error_msg = format!(
-            "Parsed event count does not match message count header: {} vs {}",
-            events.len(),
-            msg_count
-        );
-
-        if cfg!(test) {
-            panic!(error_msg);
-        }
-        return Err(header_error_message("Logplex-Msg-Count", &error_msg));
-    }
-
-    Ok(events)
 }
 
 fn get_header<'a>(header_map: &'a HeaderMap, name: &str) -> Result<&'a str, ErrorMessage> {
