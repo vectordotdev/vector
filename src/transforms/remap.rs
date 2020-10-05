@@ -19,9 +19,10 @@ inventory::submit! {
     TransformDescription::new::<RemapConfig>("remap")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Remap::new(self.clone())?))
     }
 

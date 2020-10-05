@@ -8,6 +8,7 @@ pub mod retries;
 pub mod rusoto;
 pub mod service;
 pub mod sink;
+pub mod statistic;
 pub mod tcp;
 #[cfg(test)]
 pub mod test;

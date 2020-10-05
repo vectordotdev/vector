@@ -55,9 +55,13 @@ inventory::submit! {
     SinkDescription::new::<CloudWatchMetricsSinkConfig>("aws_cloudwatch_metrics")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "aws_cloudwatch_metrics")]
 impl SinkConfig for CloudWatchMetricsSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(cx.resolver())?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = CloudWatchMetricsSvc::new(self.clone(), client, cx)?;

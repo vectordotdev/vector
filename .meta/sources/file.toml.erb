@@ -101,13 +101,13 @@ to `true` will tell Vector to read from the beginning of the file instead \
 of the stored checkpoint. \
 """
 
-[sources.file.options.fingerprinting]
+[sources.file.options.fingerprint]
 type = "table"
 description = """\
 Configuration for how the file source should identify files.\
 """
 
-[sources.file.options.fingerprinting.children.strategy]
+[sources.file.options.fingerprint.children.strategy]
 type = "string"
 default = "checksum"
 sort = 1
@@ -116,11 +116,11 @@ The strategy used to uniquely identify files. This is important for \
 [checkpointing](#checkpointing) when file rotation is used.\
 """
 
-[sources.file.options.fingerprinting.children.strategy.enum]
-checksum = "Read `fingerprint_bytes` bytes from the head of the file to uniquely identify files via a checksum."
+[sources.file.options.fingerprint.children.strategy.enum]
+checksum = "Read `bytes` bytes from the head of the file to uniquely identify files via a checksum."
 device_and_inode = "Uses the [device and inode][urls.inode] to unique identify files."
 
-[sources.file.options.fingerprinting.children.fingerprint_bytes]
+[sources.file.options.fingerprint.children.bytes]
 type = "uint"
 default = 256
 unit = "bytes"
@@ -130,7 +130,7 @@ The number of bytes read off the head of the file to generate a unique \
 fingerprint.\
 """
 
-[sources.file.options.fingerprinting.children.ignored_header_bytes]
+[sources.file.options.fingerprint.children.ignored_header_bytes]
 type = "uint"
 default = 0
 unit = "bytes"

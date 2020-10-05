@@ -114,11 +114,7 @@ inventory::submit! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        unimplemented!()
-    }
-
-    async fn build_async(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let (read, write) = evmap::new();
 
         // Check if the namespace is set to `""` which should mean that we do
@@ -513,10 +509,7 @@ mod integration_tests {
             endpoint: Some(HOST.clone()),
             ..Default::default()
         };
-        let mut transform = config
-            .build_async(TransformContext::new_test())
-            .await
-            .unwrap();
+        let mut transform = config.build(TransformContext::new_test()).await.unwrap();
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
@@ -562,10 +555,7 @@ mod integration_tests {
             fields: Some(vec!["public-ipv4".into(), "region".into()]),
             ..Default::default()
         };
-        let mut transform = config
-            .build_async(TransformContext::new_test())
-            .await
-            .unwrap();
+        let mut transform = config.build(TransformContext::new_test()).await.unwrap();
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
@@ -593,10 +583,7 @@ mod integration_tests {
             namespace: Some("ec2.metadata".into()),
             ..Default::default()
         };
-        let mut transform = config
-            .build_async(TransformContext::new_test())
-            .await
-            .unwrap();
+        let mut transform = config.build(TransformContext::new_test()).await.unwrap();
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
@@ -621,10 +608,7 @@ mod integration_tests {
             namespace: Some("".into()),
             ..Default::default()
         };
-        let mut transform = config
-            .build_async(TransformContext::new_test())
-            .await
-            .unwrap();
+        let mut transform = config.build(TransformContext::new_test()).await.unwrap();
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;

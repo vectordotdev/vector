@@ -100,9 +100,13 @@ inventory::submit! {
     SinkDescription::new_without_default::<HttpSinkConfig>("http")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         validate_headers(&self.headers, &self.auth)?;
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(cx.resolver(), tls)?;
@@ -370,9 +374,9 @@ mod tests {
 
     // TODO: Fix failure on GH Actions using macos-latest image.
     #[cfg(not(target_os = "macos"))]
-    #[test]
+    #[tokio::test]
     #[should_panic(expected = "Authorization header can not be used with defined auth options")]
-    fn http_headers_auth_conflict() {
+    async fn http_headers_auth_conflict() {
         let config = r#"
         uri = "http://$IN_ADDR/"
         encoding = "text"
@@ -387,7 +391,7 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
-        let _ = config.build(cx).unwrap();
+        let _ = config.build(cx).await.unwrap();
     }
 
     #[tokio::test]
@@ -411,7 +415,7 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
@@ -466,7 +470,7 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
@@ -518,7 +522,7 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);

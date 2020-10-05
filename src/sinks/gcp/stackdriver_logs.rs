@@ -110,11 +110,7 @@ lazy_static! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
-    fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        unimplemented!()
-    }
-
-    async fn build_async(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let creds = self.auth.make_credentials(Scope::LoggingWrite).await?;
 
         let batch = BatchSettings::default()
@@ -454,7 +450,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config.build_async(SinkContext::new_test()).await.is_ok() {
+        if config.build(SinkContext::new_test()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }

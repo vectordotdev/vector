@@ -38,7 +38,7 @@ pub struct HecSinkConfig {
     #[serde(alias = "host")]
     pub endpoint: String,
     #[serde(default = "default_host_key")]
-    pub host_key: Atom,
+    pub host_key: String,
     #[serde(default)]
     pub indexed_fields: Vec<Atom>,
     pub index: Option<String>,
@@ -75,17 +75,21 @@ pub enum Encoding {
     Json,
 }
 
-fn default_host_key() -> Atom {
-    Atom::from(crate::config::LogSchema::default().host_key())
+fn default_host_key() -> String {
+    crate::config::LogSchema::default().host_key().to_string()
 }
 
 inventory::submit! {
     SinkDescription::new::<HecSinkConfig>("splunk_hec")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "splunk_hec")]
 impl SinkConfig for HecSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         validate_host(&self.endpoint)?;
 
         let batch = BatchSettings::default()
@@ -149,7 +153,7 @@ impl HttpSink for HecSinkConfig {
 
         let mut event = event.into_log();
 
-        let host = event.get(&self.host_key).cloned();
+        let host = event.get(&Atom::from(self.host_key.to_owned())).cloned();
 
         let timestamp = match event.remove(&Atom::from(log_schema().timestamp_key())) {
             Some(Value::Timestamp(ts)) => ts,
@@ -443,7 +447,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let config = config(Encoding::Text, vec![]).await;
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let event = Event::from(message.clone());
@@ -462,7 +466,7 @@ mod integration_tests {
         let mut config = config(Encoding::Text, vec![]).await;
         config.source = Template::try_from("/var/log/syslog".to_string()).ok();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let event = Event::from(message.clone());
@@ -479,7 +483,7 @@ mod integration_tests {
 
         let mut config = config(Encoding::Text, vec![]).await;
         config.index = Some("custom_index".to_string());
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let event = Event::from(message.clone());
@@ -495,7 +499,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let config = config(Encoding::Text, vec![]).await;
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let (messages, events) = random_lines_with_stream(100, 10);
         sink.run(events).await.unwrap();
@@ -526,7 +530,7 @@ mod integration_tests {
 
         let indexed_fields = vec![Atom::from("asdf")];
         let config = config(Encoding::Json, indexed_fields).await;
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -546,7 +550,7 @@ mod integration_tests {
 
         let indexed_fields = vec![Atom::from("asdf")];
         let config = config(Encoding::Json, indexed_fields).await;
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -571,7 +575,7 @@ mod integration_tests {
         let mut config = config(Encoding::Json, indexed_fields).await;
         config.sourcetype = Template::try_from("_json".to_string()).ok();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -596,7 +600,7 @@ mod integration_tests {
             ..config(Encoding::Json, vec![Atom::from("asdf")]).await
         };
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
