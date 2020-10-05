@@ -11,6 +11,10 @@ components: transforms: remove_tags: {
     tls: enabled: false
   }
 
+  output: metrics: {
+    // Remove tags only acts on tags specified in the `tags` setting. It does not have a perscribed format.
+  }
+
   classes: {
     commonly_used: false
     function: "schema"
@@ -44,6 +48,17 @@ components: transforms: remove_tags: {
       type: "[string]": {
         examples: [["tag1","tag2"]]
       }
+    }
+  }
+
+  how_it_works: {
+    complex_processing: {
+      title: "Complex Processing"
+      body: #"""
+      If you encounter limitations with the `remove_tags` transform then we recommend using a
+      [runtime](vector_programmable_transforms) transform. These transforms are designed for complex
+      processing and give you the power of full programming runtime.
+      """#
     }
   }
 }
