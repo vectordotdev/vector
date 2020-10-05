@@ -6,26 +6,26 @@
 # If you want to create a PR to the Vector's Kubernetes config - please do not
 # edit this file directly. Instead, apply your changes to the Helm Chart.
 ---
-# Source: vector/templates/serviceaccount.yaml
+# Source: vector/charts/vector-agent/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: vector
+  name: vector-agent
   labels:
-    helm.sh/chart: vector-0.0.0
-    app.kubernetes.io/name: vector
+    helm.sh/chart: vector-agent-0.0.0
+    app.kubernetes.io/name: vector-agent
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
 ---
-# Source: vector/templates/configmap.yaml
+# Source: vector/charts/vector-agent/templates/configmap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: vector
+  name: vector-agent
   labels:
-    helm.sh/chart: vector-0.0.0
-    app.kubernetes.io/name: vector
+    helm.sh/chart: vector-agent-0.0.0
+    app.kubernetes.io/name: vector-agent
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
@@ -47,13 +47,13 @@ data:
     [sources.kubernetes_logs]
       type = "kubernetes_logs"
 ---
-# Source: vector/templates/rbac.yaml
+# Source: vector/charts/vector-agent/templates/rbac.yaml
 # Permissions to use Kubernetes API.
 # Requires that RBAC authorization is enabled.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: vector
+  name: vector-agent
 rules:
   - apiGroups:
       - ""
@@ -62,41 +62,41 @@ rules:
     verbs:
       - watch
 ---
-# Source: vector/templates/rbac.yaml
+# Source: vector/charts/vector-agent/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: vector
+  name: vector-agent
   labels:
-    helm.sh/chart: vector-0.0.0
-    app.kubernetes.io/name: vector
+    helm.sh/chart: vector-agent-0.0.0
+    app.kubernetes.io/name: vector-agent
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: vector
+  name: vector-agent
 subjects:
   - kind: ServiceAccount
-    name: vector
+    name: vector-agent
     namespace: vector
 ---
-# Source: vector/templates/daemonset.yaml
+# Source: vector/charts/vector-agent/templates/daemonset.yaml
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: vector
+  name: vector-agent
   labels:
-    helm.sh/chart: vector-0.0.0
-    app.kubernetes.io/name: vector
+    helm.sh/chart: vector-agent-0.0.0
+    app.kubernetes.io/name: vector-agent
     app.kubernetes.io/instance: vector
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: vector
+      app.kubernetes.io/name: vector-agent
       app.kubernetes.io/instance: vector
   minReadySeconds: 1
   updateStrategy:
@@ -104,11 +104,11 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: vector
+        app.kubernetes.io/name: vector-agent
         app.kubernetes.io/instance: vector
         vector.dev/exclude: "true"
     spec:
-      serviceAccountName: vector
+      serviceAccountName: vector-agent
       securityContext:
         {}
       containers:
@@ -176,7 +176,7 @@ spec:
             sources:
               # Managed `ConfigMap`.
               - configMap:
-                  name: vector
+                  name: vector-agent
                   optional: true
               # Custom `ConfigMap`.
               - configMap:
