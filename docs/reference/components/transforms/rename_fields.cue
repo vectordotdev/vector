@@ -45,7 +45,6 @@ components: transforms: rename_fields: {
       type: bool: default: false
     }
     fields: {
-      common: true
       description: "A table of old-key/new-key pairs representing the keys to be moved in the event."
       required: true
       warnings: []
