@@ -78,6 +78,7 @@ components: transforms: tag_cardinality_limit: {
       warnings: []
       type: uint: {
         default: 500
+        unit: null
       }
     }
   }
