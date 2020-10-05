@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: elasticsearch: {
-  title: "#{component.title}"
+  title: "Elasticsearch"
   short_description: "Batches log events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint][urls.elasticsearch_bulk]."
   long_description: "[Elasticsearch][urls.elasticsearch] is a search engine based on the Lucene library. It provides a distributed, multitenant-capable full-text search engine with an HTTP web interface and schema-free JSON documents. As a result, it is very commonly used to store and analyze log data. It ships with Kibana which is a simple interface for visualizing and exploring data in Elasticsearch."
 
@@ -23,6 +23,7 @@ components: sinks: elasticsearch: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
