@@ -433,7 +433,7 @@ mod tests {
         let endpoint = format!("http://{}", addr);
         config.endpoint = Some(endpoint.clone());
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let (rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
@@ -461,15 +461,13 @@ mod tests {
         )
         .unwrap();
 
-        let _ = config.build(cx.clone()).unwrap();
-
         let addr = next_addr();
         // Swap out the endpoint so we can force send it
         // to our local server
         let endpoint = format!("http://{}", addr);
         config.endpoint = Some(endpoint.clone());
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let (rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
