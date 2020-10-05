@@ -38,7 +38,6 @@ components: transforms: concat: {
 
   configuration: {
     items: {
-      common: true
       description: "A list of substring definitons in the format of source_field[start..end]. For both start and end negative values are counted from the end of the string."
       required: true
       warnings: []
@@ -57,7 +56,6 @@ components: transforms: concat: {
       }
     }
     target: {
-      common: true
       description: "The name for the new label."
       required: true
       warnings: []
