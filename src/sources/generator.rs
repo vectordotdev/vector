@@ -45,9 +45,10 @@ inventory::submit! {
 
 impl_generate_config_from_default!(GeneratorConfig);
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "generator")]
 impl SourceConfig for GeneratorConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,

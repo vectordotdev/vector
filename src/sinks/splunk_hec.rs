@@ -85,9 +85,13 @@ inventory::submit! {
 
 impl_generate_config_from_default!(HecSinkConfig);
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "splunk_hec")]
 impl SinkConfig for HecSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         validate_host(&self.endpoint)?;
 
         let batch = BatchSettings::default()
@@ -450,7 +454,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let config = config(Encoding::Text, vec![]).await;
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let event = Event::from(message.clone());
@@ -469,7 +473,7 @@ mod integration_tests {
         let mut config = config(Encoding::Text, vec![]).await;
         config.source = Template::try_from("/var/log/syslog".to_string()).ok();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let event = Event::from(message.clone());
@@ -486,7 +490,7 @@ mod integration_tests {
 
         let mut config = config(Encoding::Text, vec![]).await;
         config.index = Some("custom_index".to_string());
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let event = Event::from(message.clone());
@@ -502,7 +506,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let config = config(Encoding::Text, vec![]).await;
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let (messages, events) = random_lines_with_stream(100, 10);
         sink.run(events).await.unwrap();
@@ -533,7 +537,7 @@ mod integration_tests {
 
         let indexed_fields = vec![Atom::from("asdf")];
         let config = config(Encoding::Json, indexed_fields).await;
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -553,7 +557,7 @@ mod integration_tests {
 
         let indexed_fields = vec![Atom::from("asdf")];
         let config = config(Encoding::Json, indexed_fields).await;
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -578,7 +582,7 @@ mod integration_tests {
         let mut config = config(Encoding::Json, indexed_fields).await;
         config.sourcetype = Template::try_from("_json".to_string()).ok();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
@@ -603,7 +607,7 @@ mod integration_tests {
             ..config(Encoding::Json, vec![Atom::from("asdf")]).await
         };
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());

@@ -69,9 +69,10 @@ inventory::submit! {
 
 impl GenerateConfig for SocketConfig {}
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "socket")]
 impl SourceConfig for SocketConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -184,6 +185,7 @@ mod test {
                 ShutdownSignal::noop(),
                 tx,
             )
+            .await
             .unwrap()
             .compat();
         tokio::spawn(server);
@@ -209,6 +211,7 @@ mod test {
                 ShutdownSignal::noop(),
                 tx,
             )
+            .await
             .unwrap()
             .compat();
         tokio::spawn(server);
@@ -241,6 +244,7 @@ mod test {
                 ShutdownSignal::noop(),
                 tx,
             )
+            .await
             .unwrap()
             .compat();
         tokio::spawn(server);
@@ -288,6 +292,7 @@ mod test {
                 ShutdownSignal::noop(),
                 tx,
             )
+            .await
             .unwrap()
             .compat();
         tokio::spawn(server);
@@ -337,6 +342,7 @@ mod test {
                 ShutdownSignal::noop(),
                 tx,
             )
+            .await
             .unwrap()
             .compat();
         tokio::spawn(server);
@@ -382,6 +388,7 @@ mod test {
         // Start TCP Source
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
             .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
+            .await
             .unwrap()
             .compat();
         let source_handle = tokio::spawn(server);
@@ -423,6 +430,7 @@ mod test {
             ..TcpConfig::new(addr.into())
         })
         .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
+        .await
         .unwrap()
         .compat();
         let source_handle = tokio::spawn(server);
@@ -521,6 +529,7 @@ mod test {
                 shutdown_signal,
                 sender,
             )
+            .await
             .unwrap()
             .compat();
         let source_handle = tokio::spawn(server);
@@ -686,6 +695,7 @@ mod test {
                 ShutdownSignal::noop(),
                 sender,
             )
+            .await
             .unwrap()
             .compat();
         tokio::spawn(server);

@@ -39,9 +39,10 @@ inventory::submit! {
 
 impl GenerateConfig for PrometheusConfig {}
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "prometheus")]
 impl SourceConfig for PrometheusConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,

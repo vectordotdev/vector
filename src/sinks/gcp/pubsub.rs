@@ -72,11 +72,7 @@ lazy_static::lazy_static! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_pubsub")]
 impl SinkConfig for PubsubConfig {
-    fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        unimplemented!()
-    }
-
-    async fn build_async(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = PubsubSink::from_config(self).await?;
         let batch_settings = BatchSettings::default()
             .bytes(bytesize::mib(10u64))
@@ -215,7 +211,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config.build_async(SinkContext::new_test()).await.is_ok() {
+        if config.build(SinkContext::new_test()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }
@@ -243,10 +239,7 @@ mod integration_tests {
 
     async fn config_build(topic: &str) -> (VectorSink, crate::sinks::Healthcheck) {
         let cx = SinkContext::new_test();
-        config(topic)
-            .build_async(cx)
-            .await
-            .expect("Building sink failed")
+        config(topic).build(cx).await.expect("Building sink failed")
     }
 
     #[tokio::test]

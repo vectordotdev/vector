@@ -17,9 +17,10 @@ pub struct SwimlaneConfig {
     condition: AnyCondition,
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "swimlane")]
 impl TransformConfig for SwimlaneConfig {
-    fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Swimlane::new(self.condition.build()?)))
     }
 
@@ -72,9 +73,10 @@ inventory::submit! {
 
 impl GenerateConfig for SwimlanesConfig {}
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "swimlanes")]
 impl TransformConfig for SwimlanesConfig {
-    fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Err("this transform must be expanded".into())
     }
 

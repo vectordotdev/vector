@@ -86,9 +86,13 @@ inventory::submit! {
 
 impl GenerateConfig for KafkaSinkConfig {}
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "kafka")]
 impl SinkConfig for KafkaSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = KafkaSink::new(self.clone(), cx.acker())?;
         let hc = healthcheck(self.clone()).boxed();
         Ok((super::VectorSink::Futures01Sink(Box::new(sink)), hc))

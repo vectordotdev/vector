@@ -28,9 +28,10 @@ inventory::submit! {
 
 impl GenerateConfig for AddTagsConfig {}
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "add_tags")]
 impl TransformConfig for AddTagsConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(AddTags::new(self.tags.clone(), self.overwrite)))
     }
 

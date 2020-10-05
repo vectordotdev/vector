@@ -50,9 +50,10 @@ inventory::submit! {
 
 impl_generate_config_from_default!(ReduceConfig);
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let t = Reduce::new(self)?;
         Ok(Box::new(t))
     }
@@ -303,8 +304,8 @@ mod test {
         crate::test_util::test_generate_config::<ReduceConfig>();
     }
 
-    #[test]
-    fn reduce_from_condition() {
+    #[tokio::test]
+    async fn reduce_from_condition() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
 identifier_fields = [ "request_id" ]
@@ -315,6 +316,7 @@ identifier_fields = [ "request_id" ]
         )
         .unwrap()
         .build(TransformContext::new_test())
+        .await
         .unwrap();
 
         let mut outputs = Vec::new();
@@ -374,8 +376,8 @@ identifier_fields = [ "request_id" ]
         );
     }
 
-    #[test]
-    fn reduce_merge_strategies() {
+    #[tokio::test]
+    async fn reduce_merge_strategies() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
 identifier_fields = [ "request_id" ]
@@ -390,6 +392,7 @@ merge_strategies.baz = "max"
         )
         .unwrap()
         .build(TransformContext::new_test())
+        .await
         .unwrap();
 
         let mut outputs = Vec::new();
@@ -435,8 +438,8 @@ merge_strategies.baz = "max"
         assert_eq!(outputs.first().unwrap().as_log()[&"baz".into()], 3.into(),);
     }
 
-    #[test]
-    fn missing_identifier() {
+    #[tokio::test]
+    async fn missing_identifier() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
 identifier_fields = [ "request_id" ]
@@ -447,6 +450,7 @@ identifier_fields = [ "request_id" ]
         )
         .unwrap()
         .build(TransformContext::new_test())
+        .await
         .unwrap();
 
         let mut outputs = Vec::new();
@@ -505,8 +509,8 @@ identifier_fields = [ "request_id" ]
         );
     }
 
-    #[test]
-    fn arrays() {
+    #[tokio::test]
+    async fn arrays() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
 identifier_fields = [ "request_id" ]
@@ -520,6 +524,7 @@ merge_strategies.bar = "concat"
         )
         .unwrap()
         .build(TransformContext::new_test())
+        .await
         .unwrap();
 
         let mut outputs = Vec::new();

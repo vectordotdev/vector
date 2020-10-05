@@ -71,9 +71,10 @@ inventory::submit! {
 
 impl GenerateConfig for TagCardinalityLimitConfig {}
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(TagCardinalityLimit::new(self.clone())))
     }
 

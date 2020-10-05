@@ -27,9 +27,10 @@ inventory::submit! {
 
 impl GenerateConfig for RemoveFieldsConfig {}
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "remove_fields")]
 impl TransformConfig for RemoveFieldsConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(RemoveFields {
             fields: self.fields.clone(),
             drop_empty: self.drop_empty.unwrap_or(false),

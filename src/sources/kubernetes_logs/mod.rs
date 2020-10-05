@@ -81,9 +81,10 @@ impl GenerateConfig for Config {
 
 const COMPONENT_NAME: &str = "kubernetes_logs";
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "kubernetes_logs")]
 impl SourceConfig for Config {
-    fn build(
+    async fn build(
         &self,
         name: &str,
         globals: &GlobalOptions,

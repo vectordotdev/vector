@@ -28,9 +28,10 @@ inventory::submit! {
 
 impl GenerateConfig for StatsdConfig {}
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "statsd")]
 impl SourceConfig for StatsdConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,

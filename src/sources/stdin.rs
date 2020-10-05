@@ -44,9 +44,10 @@ inventory::submit! {
 
 impl_generate_config_from_default!(StdinConfig);
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,

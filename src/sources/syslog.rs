@@ -79,9 +79,10 @@ inventory::submit! {
 
 impl GenerateConfig for SyslogConfig {}
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "syslog")]
 impl SourceConfig for SyslogConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,

@@ -24,9 +24,10 @@ inventory::submit! {
 
 impl_generate_config_from_default!(InternalMetricsConfig);
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "internal_metrics")]
 impl SourceConfig for InternalMetricsConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,

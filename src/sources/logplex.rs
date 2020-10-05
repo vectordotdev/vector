@@ -9,7 +9,6 @@ use crate::{
     tls::TlsConfig,
     Pipeline,
 };
-use async_trait::async_trait;
 use bytes::{buf::BufExt, Bytes};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -41,20 +40,10 @@ impl HttpSource for LogplexSource {
     }
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "logplex")]
-#[async_trait]
 impl SourceConfig for LogplexConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
-        _out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        unimplemented!()
-    }
-
-    async fn build_async(
+    async fn build(
         &self,
         _: &str,
         _: &GlobalOptions,
@@ -198,7 +187,7 @@ mod tests {
         let address = next_addr();
         tokio::spawn(async move {
             LogplexConfig { address, tls: None }
-                .build_async(
+                .build(
                     "default",
                     &GlobalOptions::default(),
                     ShutdownSignal::noop(),

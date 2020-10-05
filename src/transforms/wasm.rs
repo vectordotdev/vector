@@ -51,9 +51,10 @@ inventory::submit! {
 
 impl GenerateConfig for WasmConfig {}
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "wasm")]
 impl TransformConfig for WasmConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Wasm::new(self.clone())?))
     }
 

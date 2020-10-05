@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GenerateConfig, GlobalOptions, SourceDescription},
+    config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
     internal_events::{
         ApacheMetricsErrorResponse, ApacheMetricsEventReceived, ApacheMetricsHttpError,
@@ -48,9 +48,10 @@ inventory::submit! {
 
 impl GenerateConfig for ApacheMetricsConfig {}
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "apache_metrics")]
-impl crate::config::SourceConfig for ApacheMetricsConfig {
-    fn build(
+impl SourceConfig for ApacheMetricsConfig {
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -290,6 +291,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             ShutdownSignal::noop(),
             tx,
         )
+        .await
         .unwrap()
         .compat();
         tokio::spawn(source);
@@ -344,6 +346,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             ShutdownSignal::noop(),
             tx,
         )
+        .await
         .unwrap()
         .compat();
         tokio::spawn(source);
@@ -384,6 +387,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             ShutdownSignal::noop(),
             tx,
         )
+        .await
         .unwrap()
         .compat();
         tokio::spawn(source);

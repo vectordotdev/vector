@@ -116,9 +116,10 @@ inventory::submit! {
 
 impl_generate_config_from_default!(DockerConfig);
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "docker")]
 impl SourceConfig for DockerConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -1039,6 +1040,7 @@ mod integration_tests {
                     ShutdownSignal::noop(),
                     sender,
                 )
+                .await
                 .unwrap()
                 .compat()
                 .await

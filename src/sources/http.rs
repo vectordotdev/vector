@@ -8,7 +8,6 @@ use crate::{
     tls::TlsConfig,
     Pipeline,
 };
-use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use codec::BytesDelimitedCodec;
@@ -65,20 +64,10 @@ impl HttpSource for SimpleHttpSource {
     }
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "http")]
-#[async_trait]
 impl SourceConfig for SimpleHttpConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
-        _out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        unimplemented!()
-    }
-
-    async fn build_async(
+    async fn build(
         &self,
         _: &str,
         _: &GlobalOptions,
@@ -245,7 +234,7 @@ mod tests {
                 headers,
                 tls: None,
             }
-            .build_async(
+            .build(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),

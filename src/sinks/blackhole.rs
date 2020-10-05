@@ -28,9 +28,13 @@ inventory::submit! {
 
 impl GenerateConfig for BlackholeConfig {}
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "blackhole")]
 impl SinkConfig for BlackholeConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = BlackholeSink::new(self.clone(), cx.acker());
         let healthcheck = future::ok(()).boxed();
 
