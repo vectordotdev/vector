@@ -3,6 +3,7 @@ use crate::{
     event::Event,
     sinks::{
         util::{
+            batch::{Batch, BatchError},
             encode_event,
             encoding::{EncodingConfig, EncodingConfiguration},
             http::{BatchedHttpSink, HttpClient, HttpSink},
@@ -11,6 +12,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
+    tls::{MaybeTlsSettings, TlsConfig},
 };
 use bytes::Bytes;
 use flate2::write::GzEncoder;
@@ -21,7 +23,7 @@ use hyper::body::Body;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use string_cache::DefaultAtom as Atom;
-use std::io::Write;
+use std::{io::Write, time::Duration};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -29,6 +31,7 @@ pub struct DatadogLogsConfig {
     endpoint: Option<String>,
     api_key: String,
     encoding: EncodingConfig<Encoding>,
+    tls: Option<TlsConfig>,
 
     #[serde(default)]
     compression: Compression,
@@ -61,9 +64,87 @@ impl GenerateConfig for DatadogLogsConfig {}
 impl DatadogLogsConfig {
     fn get_endpoint(&self) -> &str {
         match &self.endpoint {
-            Some(ref endpoint) => &endpoint,
+            Some(endpoint) => endpoint,
             None => "https://http-intake.logs.datadoghq.eu/v1/input",
         }
+    }
+
+    fn batch_settings<T: Batch>(&self) -> Result<BatchSettings<T>, BatchError> {
+        BatchSettings::default()
+            .bytes(bytesize::kib(100u64))
+            .timeout(1)
+            .parse_config(self.batch)
+    }
+
+    /// Builds the required BatchedHttpSink.
+    /// Since the DataDog sink can create one of two different sinks, this
+    /// extracts most of the shared functionality required to create either sink.
+    fn build_sink<T, B, O>(
+        &self,
+        cx: SinkContext,
+        service: T,
+        batch: B,
+        timeout: Duration,
+    ) -> crate::Result<(VectorSink, Healthcheck)>
+    where
+        O: 'static,
+        B: Batch<Output = Vec<O>> + std::marker::Send + 'static,
+        B::Output: std::marker::Send + Clone,
+        B::Input: std::marker::Send,
+        T: HttpSink<Input = B::Input, Output = B::Output> + Clone,
+    {
+        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
+
+        let tls_settings = MaybeTlsSettings::from_config(
+            &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
+            false,
+        )?;
+
+        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let healthcheck = healthcheck(service.clone(), client.clone()).boxed();
+        let sink = BatchedHttpSink::new(
+            service,
+            batch,
+            request_settings,
+            timeout,
+            client,
+            cx.acker(),
+        )
+        .sink_map_err(|e| error!("Fatal datadog_logs text sink error: {}", e));
+
+        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
+    }
+
+    /// Build the request, GZipping the contents if the config specifies.
+    fn build_request(&self, body: Vec<u8>) -> crate::Result<http::Request<Vec<u8>>> {
+        let uri = self.get_endpoint();
+        let request = Request::post(uri)
+            .header("Content-Type", "text/plain")
+            .header("DD-API-KEY", self.api_key.clone());
+
+        let (request, body) = match self.compression {
+            Compression::None => (request, body),
+            Compression::Gzip => {
+                let mut encoder = GzEncoder::new(
+                    Vec::new(),
+                    match self.compression_level {
+                        Some(level) if level <= 9 => flate2::Compression::new(level),
+                        _ => flate2::Compression::fast(),
+                    },
+                );
+
+                encoder.write_all(&body)?;
+                (
+                    request.header("Content-Encoding", "gzip"),
+                    encoder.finish()?,
+                )
+            }
+        };
+
+        request
+            .header("Content-Length", body.len())
+            .body(body)
+            .map_err(Into::into)
     }
 }
 
@@ -71,57 +152,31 @@ impl DatadogLogsConfig {
 #[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-
-        let client = HttpClient::new(cx.resolver(), None)?;
-
         // Create a different sink depending on which encoding we have chosen.
-        // Json and text have different batching strategies and so each needs to be
+        // Json and Text have different batching strategies and so each needs to be
         // handled differently.
         match self.encoding.codec {
             Encoding::Json => {
-                let batch_settings = BatchSettings::default()
-                    .bytes(bytesize::kib(100u64))
-                    .timeout(1)
-                    .parse_config(self.batch)?;
-
-                let service = DatadogLogsJsonService {
-                    config: self.clone(),
-                };
-                let healthcheck = healthcheck(service.clone(), client.clone()).boxed();
-                let sink = BatchedHttpSink::new(
-                    service,
+                let batch_settings = self.batch_settings()?;
+                self.build_sink(
+                    cx,
+                    DatadogLogsJsonService {
+                        config: self.clone(),
+                    },
                     JsonArrayBuffer::new(batch_settings.size),
-                    request_settings,
                     batch_settings.timeout,
-                    client,
-                    cx.acker(),
                 )
-                .sink_map_err(|e| error!("Fatal datadog_logs json sink error: {}", e));
-
-                Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
             }
             Encoding::Text => {
-                let batch_settings = BatchSettings::default()
-                    .bytes(bytesize::kib(100u64))
-                    .timeout(1)
-                    .parse_config(self.batch)?;
-
-                let service = DatadogLogsTextService {
-                    config: self.clone(),
-                };
-                let healthcheck = healthcheck(service.clone(), client.clone()).boxed();
-                let sink = BatchedHttpSink::new(
-                    service,
+                let batch_settings = self.batch_settings()?;
+                self.build_sink(
+                    cx,
+                    DatadogLogsTextService {
+                        config: self.clone(),
+                    },
                     VecBuffer::new(batch_settings.size),
-                    request_settings,
                     batch_settings.timeout,
-                    client,
-                    cx.acker(),
                 )
-                .sink_map_err(|e| error!("Fatal datadog_logs text sink error: {}", e));
-
-                Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
             }
         }
     }
@@ -168,7 +223,7 @@ impl HttpSink for DatadogLogsJsonService {
             .header("DD-API-KEY", self.config.api_key.clone());
 
         let body = serde_json::to_vec(&events)?;
-        build_request(&self.config, body)
+        self.config.build_request(body)
     }
 }
 
@@ -183,83 +238,45 @@ impl HttpSink for DatadogLogsTextService {
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let body: Vec<u8> = events.iter().flat_map(|b| b.into_iter()).cloned().collect();
-
-        build_request(&self.config, body)
+        self.config.build_request(body)
     }
-}
-
-/// Build the request, GZipping the contents if the config specifies.
-fn build_request(
-    config: &DatadogLogsConfig,
-    body: Vec<u8>,
-) -> crate::Result<http::Request<Vec<u8>>> {
-    let uri = config.get_endpoint();
-    let request = Request::post(uri)
-        .header("Content-Type", "text/plain")
-        .header("DD-API-KEY", config.api_key.clone());
-
-    let (request, body) = match config.compression {
-        Compression::None => (request, body),
-        Compression::Gzip => {
-            let mut encoder = GzEncoder::new(
-                Vec::new(),
-                match config.compression_level {
-                    Some(level) if level <= 9 => flate2::Compression::new(level),
-                    _ => flate2::Compression::fast(),
-                },
-            );
-
-            encoder.write_all(&body)?;
-            (
-                request.header("Content-Encoding", "gzip"),
-                encoder.finish()?,
-            )
-        }
-    };
-
-    request
-        .header("Content-Length", body.len())
-        .body(body)
-        .map_err(Into::into)
 }
 
 /// The healthcheck is performed by sending an empty request to Datadog and checking
 /// the return.
-async fn healthcheck<T, O>(config: T, mut client: HttpClient) -> crate::Result<()>
+async fn healthcheck<T, O>(sink: T, mut client: HttpClient) -> crate::Result<()>
 where
     T: HttpSink<Output = Vec<O>>,
 {
-    let req = config.build_request(Vec::new()).await?.map(Body::from);
+    let req = sink.build_request(Vec::new()).await?.map(Body::from);
 
     let res = client.send(req).await?;
 
     let status = res.status();
     let body = hyper::body::to_bytes(res.into_body()).await?;
 
-    if status == StatusCode::OK {
-        Ok(())
-    } else if status == StatusCode::UNAUTHORIZED {
-        let json: serde_json::Value = serde_json::from_slice(&body[..])?;
+    match status {
+        StatusCode::OK => Ok(()),
+        StatusCode::UNAUTHORIZED => {
+            let json: serde_json::Value = serde_json::from_slice(&body[..])?;
 
-        let message = if let Some(s) = json
-            .as_object()
-            .and_then(|o| o.get("error"))
-            .and_then(|s| s.as_str())
-        {
-            s.to_string()
-        } else {
-            "Token is not valid, 401 returned.".to_string()
-        };
+            Err(json
+                .as_object()
+                .and_then(|o| o.get("error"))
+                .and_then(|s| s.as_str())
+                .unwrap_or("Token is not valid, 401 returned.")
+                .to_string()
+                .into())
+        }
+        _ => {
+            let body = String::from_utf8_lossy(&body[..]);
 
-        Err(message.into())
-    } else {
-        let body = String::from_utf8_lossy(&body[..]);
-
-        Err(format!(
-            "Server returned unexpected error status: {} body: {}",
-            status, body
-        )
-        .into())
+            Err(format!(
+                "Server returned unexpected error status: {} body: {}",
+                status, body
+            )
+            .into())
+        }
     }
 }
 
