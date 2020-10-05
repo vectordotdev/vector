@@ -64,15 +64,22 @@ components: close({
         }
       }
       "object"?: {
-        examples?: [...{[Name=string]: _}]
+        examples: [{[Name=string]: _}, ...]
         options: #ConfigurationOptions | {}
       }
       "string"?: {
         if !required {
           default: string | null
         }
+
         enum?: [Name=_]: string
-        examples?: [...string]
+
+        examples: [...string] | *[
+          for k, v in enum {
+            k,
+          }
+        ]
+
         templateable?: bool
       }
       "uint"?: {
@@ -169,6 +176,120 @@ components: close({
     }
 
     configuration: #ConfigurationOptions & {
+      _conditions: {
+        examples: [
+          {
+            type: "check_fields"
+            "message.eq": "foo"
+            "message.not_eq": "foo"
+            "message.exists": true
+            "message.not_exists": true
+            "message.contains": "foo"
+            "message.not_contains": "foo"
+            "message.ends_with": "foo"
+            "message.not_ends_with": "foo"
+            "message.ip_cidr_contains": "10.0.0.0/8"
+            "message.not_ip_cidr_contains": "10.0.0.0/8"
+            "message.regex": " (any|of|these|five|words) "
+            "message.not_regex": " (any|of|these|five|words) "
+            "message.starts_with": "foo"
+            "message.not_starts_with": "foo"
+          }
+        ]
+        options: {
+          type: {
+            common:      true
+            description: "The type of the condition to execute."
+            required:    false
+            warnings: []
+            type: string: {
+              default: "check_fields"
+              enum: {
+                check_fields: "Allows you to check individual fields against a list of conditions."
+                is_log:       "Returns true if the event is a log."
+                is_metric:    "Returns true if the event is a metric."
+              }
+            }
+          }
+          "*.eq": {
+            common:      true
+            description: "Check whether a field's contents exactly matches the value specified, case sensitive. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
+            required:    false
+            warnings: []
+            type: string: {
+              default: null
+              examples: ["foo"]
+            }
+          }
+          "*.exists": {
+            common:      false
+            description: "Check whether a field exists or does not exist, depending on the provided value being `true` or `false` respectively."
+            required:    false
+            warnings: []
+            type: bool: default: null
+          }
+          "*.not_*": {
+            common:      false
+            description: "Allow you to negate any condition listed here."
+            required:    false
+            warnings: []
+            type: string: {
+              default: null
+              examples: []
+            }
+          }
+          "*.contains": {
+            common:      true
+            description: "Checks whether a string field contains a string argument, case sensitive. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
+            required:    false
+            warnings: []
+            type: string: {
+              default: null
+              examples: ["foo"]
+            }
+          }
+          "*.ends_with": {
+            common:      true
+            description: "Checks whether a string field ends with a string argument, case sensitive. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
+            required:    false
+            warnings: []
+            type: string: {
+              default: null
+              examples: ["suffix"]
+            }
+          }
+          "*.ip_cidr_contains": {
+            common:      false
+            description: "Checks whether an IP field is contained within a given [IP CIDR][urls.cidr] (works with IPv4 and IPv6). This may be a single string or a list of strings, in which case this evaluates to true if the IP field is contained within any of the CIDRs in the list."
+            required:    false
+            warnings: []
+            type: string: {
+              default: null
+              examples: ["10.0.0.0/8", "2000::/10", "192.168.0.0/16"]
+            }
+          }
+          "*.regex": {
+            common:      true
+            description: "Checks whether a string field matches a [regular expression][urls.regex]. Vector uses the [documented Rust Regex syntax][urls.rust_regex_syntax]. Note that this condition is considerably more expensive than a regular string match (such as `starts_with` or `contains`) so the use of those conditions are preferred where possible."
+            required:    false
+            warnings: []
+            type: string: {
+              default: null
+              examples: [" (any|of|these|five|words) "]
+            }
+          }
+          "*.starts_with": {
+            common:      true
+            description: "Checks whether a string field starts with a string argument, case sensitive. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
+            required:    false
+            warnings: []
+            type: string: {
+              default: null
+              examples: ["prefix"]
+            }
+          }
+        }
+      }
       "type": {
         description: "The component type. This is a required field for all components and tells Vector which component to use."
         required: true
