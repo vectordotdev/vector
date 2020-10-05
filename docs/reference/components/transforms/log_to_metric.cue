@@ -38,7 +38,6 @@ components: transforms: log_to_metric: {
 
   configuration: {
     metrics: {
-      common: true
       description: "A table of key/value pairs representing the keys to be added to the event."
       required: true
       warnings: []
