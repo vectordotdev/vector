@@ -526,7 +526,7 @@ ci-skip:
     - name: Mark the job as skipped
       run: exit 0
 
-ci-success:
+  ci-success:
     name: ci
     if: github.event_name == 'push' && success() && needs.changes.outputs.source == 'true'
     needs:
