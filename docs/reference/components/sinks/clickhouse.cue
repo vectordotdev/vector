@@ -88,7 +88,6 @@ components: sinks: clickhouse: {
         examples: []
         options: {
           password: {
-            common: true
             description: "The basic authentication password."
             required: true
             warnings: []
@@ -97,7 +96,6 @@ components: sinks: clickhouse: {
             }
           }
           strategy: {
-            common: true
             description: "The authentication strategy to use."
             required: true
             warnings: []
@@ -109,7 +107,6 @@ components: sinks: clickhouse: {
             }
           }
           token: {
-            common: true
             description: "The token to use for bearer authentication"
             required: true
             warnings: []
@@ -118,7 +115,6 @@ components: sinks: clickhouse: {
             }
           }
           user: {
-            common: true
             description: "The basic authentication user name."
             required: true
             warnings: []
@@ -140,7 +136,6 @@ components: sinks: clickhouse: {
       }
     }
     table: {
-      common: true
       description: "The table that data will be inserted into."
       required: true
       warnings: []
