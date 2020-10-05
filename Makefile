@@ -797,8 +797,9 @@ check-scripts: ## Check that scipts do not have common mistakes
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-scripts.sh
 
 .PHONY: check-helm
-check-helm: ## Check that the Helm Chart passes helm lint
-	${MAYBE_ENVIRONMENT_EXEC} helm lint distribution/helm/vector
+check-helm: ## Check that Helm charts pass helm lint
+check-helm: helm-dependencies-update
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-helm-lint.sh
 
 .PHONY: check-kubernetes-yaml
 check-kubernetes-yaml: ## Check that the generated Kubernetes YAML config is up to date
