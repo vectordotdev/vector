@@ -327,8 +327,7 @@ mod tests {
     fn create_event(key: &str, value: &str) -> Event {
         let mut log = Event::from("i am a log");
         log.as_mut_log().insert(key, value);
-        log.as_mut_log()
-            .insert(log_schema().timestamp_key(), ts());
+        log.as_mut_log().insert(log_schema().timestamp_key(), ts());
         log
     }
 

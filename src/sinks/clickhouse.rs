@@ -248,8 +248,8 @@ mod integration_tests {
     };
     use futures::{future, stream};
     use serde_json::Value;
-    use tokio::time::{timeout, Duration};
     use string_cache::DefaultAtom as Atom;
+    use tokio::time::{timeout, Duration};
 
     #[tokio::test]
     async fn insert_events() {

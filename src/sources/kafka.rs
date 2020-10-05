@@ -350,6 +350,9 @@ mod integration_test {
             events[0].as_log()[&Atom::from(log_schema().source_type_key())],
             "kafka".into()
         );
-        assert_eq!(events[0].as_log()[&Atom::from(log_schema().timestamp_key())], now.into());
+        assert_eq!(
+            events[0].as_log()[&Atom::from(log_schema().timestamp_key())],
+            now.into()
+        );
     }
 }

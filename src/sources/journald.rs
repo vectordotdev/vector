@@ -222,10 +222,7 @@ fn create_event(record: Record) -> Event {
                     (timestamp / 1_000_000) as i64,
                     (timestamp % 1_000_000) as u32 * 1_000,
                 );
-                log.insert(
-                    log_schema().timestamp_key(),
-                    Value::Timestamp(timestamp),
-                );
+                log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
             }
         }
     }
