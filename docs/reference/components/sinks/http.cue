@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: http: {
-  title: "#{component.title}"
+  title: "HTTP"
   short_description: "Batches log events to a generic [HTTP][urls.http] endpoint."
   long_description: "Batches log events to a generic [HTTP][urls.http] endpoint."
 
@@ -23,6 +23,7 @@ components: sinks: http: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
