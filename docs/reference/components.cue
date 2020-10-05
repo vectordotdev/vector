@@ -218,7 +218,7 @@ components: close({
             warnings: []
             type: string: {
               default: null
-              examples: ["this is the content to match against"]
+              examples: ["foo"]
             }
           }
           "*.exists": {
@@ -255,7 +255,7 @@ components: close({
             warnings: []
             type: string: {
               default: null
-              examples: ["-staging"]
+              examples: ["suffix"]
             }
           }
           "*.ip_cidr_contains": {
@@ -285,7 +285,7 @@ components: close({
             warnings: []
             type: string: {
               default: null
-              examples: ["staging-"]
+              examples: ["prefix"]
             }
           }
         }
