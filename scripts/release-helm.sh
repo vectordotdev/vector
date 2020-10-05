@@ -44,7 +44,8 @@ rm -rf "$REPO_DIR"
 mkdir -p "$REPO_DIR"
 
 # Ensure chart dependencies are up to date.
-scripts/helm-dependencies-update.sh
+echo "Validating the dependencies"
+scripts/helm-dependencies.sh validate
 
 # Read the shared scripting config.
 source "distribution/helm/scripting-config.sh"
