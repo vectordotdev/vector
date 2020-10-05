@@ -2,7 +2,8 @@ package metadata
 
 components: transforms: remap: {
   title: "Remap"
-  description: "Maps and parses log fields using a light-weight, fast, and robust syntax."
+  long_description: ""
+  short_description: "Maps and parses log fields using a light-weight, fast, and robust syntax."
 
   _features: {
   }
@@ -17,9 +18,12 @@ components: transforms: remap: {
   }
 
   support: {
+    input_types: ["log"]
+
     platforms: {
       "aarch64-unknown-linux-gnu": true
       "aarch64-unknown-linux-musl": true
+      "x86_64-apple-darwin": true
       "x86_64-pc-windows-msv": true
       "x86_64-unknown-linux-gnu": true
       "x86_64-unknown-linux-musl": true
