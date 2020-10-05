@@ -1,0 +1,155 @@
+package metadata
+
+components: sinks: influxdb_metrics: {
+  title: "#{component.title}"
+  short_description: "Batches metric events to [InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_api_v1] or [v2][urls.influxdb_http_api_v2] HTTP API."
+  long_description: "[InfluxDB][urls.influxdb] is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics."
+
+  _features: {
+    batch: {
+      enabled: true
+      common: false,
+      max_events: 20,
+      timeout_secs: 1
+    }
+    buffer: enabled: false
+    checkpoint: enabled: false
+    compression: enabled: false
+    encoding: enabled: false
+    healthcheck: enabled: true
+    multiline: enabled: false
+    request: {
+      enabled: true
+      common: false,
+      in_flight_limit: 5,
+      rate_limit_duration_secs: 1,
+      rate_limit_num: 5,
+      retry_initial_backoff_secs: 1,
+      retry_max_duration_secs: 10,
+      timeout_secs: 60
+    }
+    tls: enabled: false
+  }
+
+  classes: {
+    commonly_used: false
+    function: "transmit"
+    service_providers: ["InfluxData"]
+  }
+
+  statuses: {
+    delivery: "at_least_once"
+    development: "beta"
+  }
+
+  support: {
+      input_types: ["metric"]
+
+    platforms: {
+      "aarch64-unknown-linux-gnu": true
+      "aarch64-unknown-linux-musl": true
+      "x86_64-apple-darwin": true
+      "x86_64-pc-windows-msv": true
+      "x86_64-unknown-linux-gnu": true
+      "x86_64-unknown-linux-musl": true
+    }
+
+    requirements: []
+    warnings: []
+  }
+
+  configuration: {
+    bucket: {
+      description: "The destination bucket for writes into InfluxDB 2."
+      groups: ["v2"]
+      required: true
+      warnings: []
+      type: string: {
+        examples: ["vector-bucket","4d2225e4d3d49f75"]
+      }
+    }
+    consistency: {
+      common: true
+      description: "Sets the write consistency for the point for InfluxDB 1."
+      groups: ["v1"]
+      required: false
+      warnings: []
+      type: string: {
+        default: null
+        examples: ["any","one","quorum","all"]
+      }
+    }
+    database: {
+      description: "Sets the target database for the write into InfluxDB 1."
+      groups: ["v1"]
+      required: true
+      warnings: []
+      type: string: {
+        examples: ["vector-database","iot-store"]
+      }
+    }
+    namespace: {
+      common: true
+      description: "A prefix that will be added to all metric names."
+      groups: ["v1","v2"]
+      required: false
+      warnings: []
+      type: string: {
+        default: null
+        examples: ["service"]
+      }
+    }
+    org: {
+      description: "Specifies the destination organization for writes into InfluxDB 2."
+      groups: ["v2"]
+      required: true
+      warnings: []
+      type: string: {
+        examples: ["my-org","33f2cff0a28e5b63"]
+      }
+    }
+    password: {
+      common: true
+      description: "Sets the password for authentication if you’ve enabled authentication for the write into InfluxDB 1."
+      groups: ["v1"]
+      required: false
+      warnings: []
+      type: string: {
+        default: null
+        examples: ["${INFLUXDB_PASSWORD}","influxdb4ever"]
+      }
+    }
+    retention_policy_name: {
+      common: true
+      description: "Sets the target retention policy for the write into InfluxDB 1."
+      groups: ["v1"]
+      required: false
+      warnings: []
+      type: string: {
+        default: null
+        examples: ["autogen","one_day_only"]
+      }
+    }
+    token: {
+      description: "[Authentication token][urls.influxdb_authentication_token] for InfluxDB 2."
+      groups: ["v2"]
+      required: true
+      warnings: []
+      type: string: {
+        examples: ["${INFLUXDB_TOKEN}","ef8d5de700e7989468166c40fc8a0ccd"]
+      }
+    }
+    username: {
+      common: true
+      description: "Sets the username for authentication if you’ve enabled authentication for the write into InfluxDB 1."
+      groups: ["v1"]
+      required: false
+      warnings: []
+      type: string: {
+        default: null
+        examples: ["todd","vector-source"]
+      }
+    }
+  }
+}
+
