@@ -1,7 +1,7 @@
 package metadata
 
 components: transforms: filter: {
-  title: "#{component.title}"
+  title: "Filter"
   short_description: "Accepts log and metric events and allows you to select events based on a set of logical conditions."
   long_description: "Accepts log and metric events and allows you to select events based on a set of logical conditions."
 
