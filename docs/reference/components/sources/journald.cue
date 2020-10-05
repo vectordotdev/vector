@@ -3,7 +3,7 @@ package metadata
 components: sources: journald: {
   title: "#{component.title}"
   short_description: "Ingests data through [Systemd's][urls.systemd] [Journald][urls.journald] utility and outputs log events."
-  long_description: "[Journald][urls.journald] is a utility for accessing log data across a variety of system services. It was introduce with [Systemd][urls.systemd] to help system administrator collect, access, and route log data."
+  long_description: "[Journald][urls.journald] is a utility for accessing log data across a variety of system services. It was introduced with [Systemd][urls.systemd] to help system administrators collect, access, and route log data."
 
   _features: {
     checkpoint: enabled: true
@@ -74,7 +74,7 @@ components: sources: journald: {
     }
     exclude_units: {
       common: true
-      description: "The list of units names to exclude from monitoring. Unit names lacking a `\".\"` will have `\".service\"` appended to make them a valid service unit name."
+      description: "The list of unit names to exclude from monitoring. Unit names lacking a `\".\"` will have `\".service\"` appended to make them a valid service unit name."
       required: false
       warnings: []
       type: "[string]": {
@@ -84,7 +84,7 @@ components: sources: journald: {
     }
     include_units: {
       common: true
-      description: "The list of units names to monitor. If empty or not present, all units are accepted. Unit names lacking a `\".\"` will have `\".service\"` appended to make them a valid service unit name."
+      description: "The list of unit names to monitor. If empty or not present, all units are accepted. Unit names lacking a `\".\"` will have `\".service\"` appended to make them a valid service unit name."
       required: false
       warnings: []
       type: "[string]": {
