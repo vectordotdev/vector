@@ -1,7 +1,7 @@
 package metadata
 
 components: transforms: dedupe: {
-  title: "#{component.title}"
+  title: "Dedupe events"
   short_description: "Accepts log events and allows you to prevent duplicate Events from being outputted by using an LRU cache."
   long_description: "Accepts log events and allows you to prevent duplicate Events from being outputted by using an LRU cache."
 
