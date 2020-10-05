@@ -20,9 +20,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<MetricToLogConfig>("metric_to_log")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(MetricToLog::new(self.host_tag.clone())))
     }
 
@@ -101,14 +102,7 @@ mod tests {
 
     fn do_transform(metric: Metric) -> Option<LogEvent> {
         let event = Event::Metric(metric);
-        let mut transformer = toml::from_str::<MetricToLogConfig>(
-            r#"
-                host_tag = "host"
-            "#,
-        )
-        .unwrap()
-        .build(TransformContext::new_test())
-        .unwrap();
+        let mut transformer = MetricToLog::new(Some(Atom::from("host")));
 
         transformer.transform(event).map(|event| event.into_log())
     }
