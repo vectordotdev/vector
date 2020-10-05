@@ -66,7 +66,6 @@ components: sinks: influxdb_logs: {
 
   configuration: {
     bucket: {
-      common: true
       description: "The destination bucket for writes into InfluxDB 2."
       groups: ["v2"]
       required: true
@@ -87,7 +86,6 @@ components: sinks: influxdb_logs: {
       }
     }
     database: {
-      common: true
       description: "Sets the target database for the write into InfluxDB 1."
       groups: ["v1"]
       required: true
@@ -97,7 +95,6 @@ components: sinks: influxdb_logs: {
       }
     }
     namespace: {
-      common: true
       description: "A prefix that will be added to all metric names."
       groups: ["v1","v2"]
       required: true
@@ -107,7 +104,6 @@ components: sinks: influxdb_logs: {
       }
     }
     org: {
-      common: true
       description: "Specifies the destination organization for writes into InfluxDB 2."
       groups: ["v2"]
       required: true
@@ -150,7 +146,6 @@ components: sinks: influxdb_logs: {
       }
     }
     token: {
-      common: true
       description: "[Authentication token][urls.influxdb_authentication_token] for InfluxDB 2."
       groups: ["v2"]
       required: true
