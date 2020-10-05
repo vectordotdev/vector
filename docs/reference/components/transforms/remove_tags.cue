@@ -38,7 +38,6 @@ components: transforms: remove_tags: {
 
   configuration: {
     tags: {
-      common: true
       description: "The tag names to drop."
       required: true
       warnings: []
