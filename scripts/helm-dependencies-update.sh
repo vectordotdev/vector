@@ -15,5 +15,5 @@ set -x
 source "distribution/helm/scripting-config.sh"
 
 for CHART in "${DEPENDENCY_UPDATE_ORDER[@]}"; do
-  helm dependency update "distribution/helm/$CHART" --skip-refresh "$@"
+  helm dependency update --skip-refresh "distribution/helm/$CHART" "$@"
 done
