@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: aws_kinesis_streams: {
-  title: "#{component.title}"
+  title: "AWS Kinesis Data Streams"
   short_description: "Batches log events to [Amazon Web Service's Kinesis Data Stream service][urls.aws_kinesis_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html)."
   long_description: "[Amazon Kinesis Data Streams][urls.aws_kinesis_streams] is a scalable and durable real-time data streaming service that can continuously capture gigabytes of data per second from hundreds of thousands of sources. Making it an excellent candidate for streaming logs and metrics data."
 
@@ -23,6 +23,7 @@ components: sinks: aws_kinesis_streams: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
