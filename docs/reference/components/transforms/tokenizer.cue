@@ -1,7 +1,7 @@
 package metadata
 
 components: transforms: tokenizer: {
-  title: "#{component.title}"
+  title: "Tokenizer"
   short_description: "Accepts log events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names."
   long_description: "Accepts log events and allows you to tokenize a field's value by splitting on white space, ignoring special wrapping characters, and zip the tokens into ordered field names."
 
