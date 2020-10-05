@@ -39,12 +39,12 @@ impl Source {
         self.0.name.clone()
     }
 
-    /// The output type given by the source
+    /// Source output type
     async fn output_type(&self) -> SourceOutputType {
         self.0.output_type.into()
     }
 
-    /// Transforms that the source feeds in to
+    /// Transform outputs
     async fn transforms(&self) -> Vec<Transform> {
         filter_topology(|(_name, topology)| match topology {
             Topology::Transform(t) if t.0.inputs.contains(&self.0.name) => Some(t.clone()),
@@ -52,7 +52,8 @@ impl Source {
         })
     }
 
-    /// Sinks that the source feeds in to
+    //noinspection DuplicatedCode
+    /// Sink outputs
     async fn sinks(&self) -> Vec<Sink> {
         filter_topology(|(_name, topology)| match topology {
             Topology::Sink(s) if s.0.inputs.contains(&self.0.name) => Some(s.clone()),
@@ -91,6 +92,15 @@ impl Transform {
                 _ => None,
             })
             .collect()
+    }
+
+    //noinspection DuplicatedCode
+    /// Sink outputs
+    async fn sinks(&self) -> Vec<Sink> {
+        filter_topology(|(_name, topology)| match topology {
+            Topology::Sink(s) if s.0.inputs.contains(&self.0.name) => Some(s.clone()),
+            _ => None,
+        })
     }
 }
 
