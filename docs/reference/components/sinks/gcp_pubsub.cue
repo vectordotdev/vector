@@ -92,7 +92,6 @@ components: sinks: gcp_pubsub: {
       }
     }
     project: {
-      common: false
       description: "The project name to which to publish logs."
       required: true
       warnings: []
@@ -101,7 +100,6 @@ components: sinks: gcp_pubsub: {
       }
     }
     topic: {
-      common: false
       description: "The topic within the project to which to publish logs."
       required: true
       warnings: []
