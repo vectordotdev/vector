@@ -62,7 +62,6 @@ components: transforms: regex_parser: {
       type: bool: default: true
     }
     patterns: {
-      common: true
       description: "The Regular Expressions to apply. Do not include the leading or trailing `/` in any of the expressions."
       required: true
       warnings: []
