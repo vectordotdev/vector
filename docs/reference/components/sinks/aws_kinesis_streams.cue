@@ -79,7 +79,6 @@ components: sinks: aws_kinesis_streams: {
       }
     }
     stream_name: {
-      common: true
       description: "The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target Kinesis Logs stream."
       required: true
       warnings: []
