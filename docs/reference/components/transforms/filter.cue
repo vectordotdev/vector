@@ -38,7 +38,6 @@ components: transforms: filter: {
 
   configuration: {
     condition: {
-      common: true
       description: "The set of logical conditions to be matched against every input event. Only messages that pass all conditions will be forwarded."
       required: true
       warnings: []
