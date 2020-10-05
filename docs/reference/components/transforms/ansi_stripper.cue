@@ -1,7 +1,7 @@
 package metadata
 
 components: transforms: ansi_stripper: {
-  title: "#{component.title}"
+  title: "ANSI Stripper"
   short_description: "Accepts log events and allows you to strips ANSI escape sequences from the specified field."
   long_description: "Accepts log events and allows you to strips ANSI escape sequences from the specified field."
 
