@@ -235,7 +235,7 @@ components: close({
             warnings: []
             type: string: {
               default: null
-              examples: ["test"]
+              examples: []
             }
           }
           "*.contains": {
