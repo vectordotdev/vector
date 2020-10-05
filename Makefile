@@ -738,7 +738,7 @@ check: ## Run prerequisite code checks
 
 .PHONY: check-all
 check-all: ## Check everything
-check-all: check-fmt check-clippy check-style check-markdown check-meta
+check-all: check-fmt check-clippy check-style check-markdown check-docs
 check-all: check-version check-examples check-component-features
 check-all: check-scripts check-kubernetes-yaml
 
@@ -749,6 +749,10 @@ check-component-features: ## Check that all component features are setup properl
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
 	${MAYBE_ENVIRONMENT_EXEC} cargo clippy --workspace --all-targets --features all-integration-tests -- -D warnings
+
+.PHONY: check-docs
+check-docs: ## Check that all /docs file are valid
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-docs.sh
 
 .PHONY: check-fmt
 check-fmt: ## Check that all files are formatted properly
@@ -761,10 +765,6 @@ check-style: ## Check that all files are styled properly
 .PHONY: check-markdown
 check-markdown: ## Check that markdown is styled properly
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-markdown.sh
-
-.PHONY: check-meta
-check-meta: ## Check that all /.meta file are valid
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-meta.sh
 
 .PHONY: check-version
 check-version: ## Check that Vector's version is correct accounting for recent changes
