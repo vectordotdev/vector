@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tokio::net::UdpSocket;
 use tokio_util::{codec::BytesCodec, udp::UdpFramed};
-use tracing::field;
 
 pub mod parser;
 
@@ -27,9 +26,10 @@ inventory::submit! {
     SourceDescription::new_without_default::<StatsdConfig>("statsd")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "statsd")]
 impl SourceConfig for StatsdConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -59,7 +59,7 @@ fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> super::S
 
             info!(
                 message = "Listening.",
-                addr = &field::display(addr),
+                addr = %addr,
                 r#type = "udp"
             );
 

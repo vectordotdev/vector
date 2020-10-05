@@ -9,7 +9,6 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
-use async_trait::async_trait;
 use bytes::{buf::BufExt, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
@@ -75,20 +74,10 @@ fn default_socket_address() -> SocketAddr {
     SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), 8088)
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "splunk_hec")]
-#[async_trait]
 impl SourceConfig for SplunkConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
-        _out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        unimplemented!()
-    }
-
-    async fn build_async(
+    async fn build(
         &self,
         _: &str,
         _: &GlobalOptions,
@@ -792,7 +781,7 @@ mod tests {
                 token,
                 tls: None,
             }
-            .build_async(
+            .build(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
@@ -808,7 +797,7 @@ mod tests {
         (recv, address)
     }
 
-    fn sink(
+    async fn sink(
         address: SocketAddr,
         encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
         compression: Compression,
@@ -821,6 +810,7 @@ mod tests {
             ..HecSinkConfig::default()
         }
         .build(SinkContext::new_test())
+        .await
         .unwrap()
     }
 
@@ -829,7 +819,7 @@ mod tests {
         compression: Compression,
     ) -> (VectorSink, mpsc::Receiver<Event>) {
         let (source, address) = source().await;
-        let (sink, health) = sink(address, encoding, compression);
+        let (sink, health) = sink(address, encoding, compression).await;
         assert!(health.await.is_ok());
         (sink, source)
     }
@@ -1046,7 +1036,7 @@ mod tests {
 
         let message = "no_authorization";
         let (source, address) = source_with(None).await;
-        let (sink, health) = sink(address, Encoding::Text, Compression::Gzip);
+        let (sink, health) = sink(address, Encoding::Text, Compression::Gzip).await;
         assert!(health.await.is_ok());
 
         let event = channel_n(vec![message], sink, source).await.remove(0);

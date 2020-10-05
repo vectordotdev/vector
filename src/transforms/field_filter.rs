@@ -17,9 +17,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<FieldFilterConfig>("field_filter")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "field_filter")]
 impl TransformConfig for FieldFilterConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         warn!(
             message =
                 r#"The "field_filter" transform is deprecated, use the "filter" transform instead"#

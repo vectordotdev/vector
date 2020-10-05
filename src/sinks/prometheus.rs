@@ -1,8 +1,8 @@
 use crate::{
     buffers::Acker,
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::metric::{Metric, MetricKind, MetricValue},
-    sinks::util::{encode_namespace, MetricEntry, StreamSink},
+    event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
+    sinks::util::{encode_namespace, statistic::DistributionStatistic, MetricEntry, StreamSink},
     Event,
 };
 use async_trait::async_trait;
@@ -25,7 +25,6 @@ use std::{
     sync::{Arc, RwLock},
 };
 use stream_cancel::{Trigger, Tripwire};
-use tracing::field;
 
 const MIN_FLUSH_PERIOD_SECS: u64 = 1;
 
@@ -67,9 +66,13 @@ inventory::submit! {
     SinkDescription::new_without_default::<PrometheusSinkConfig>("prometheus")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "prometheus")]
 impl SinkConfig for PrometheusSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         if self.flush_period_secs < MIN_FLUSH_PERIOD_SECS {
             return Err(Box::new(BuildError::FlushPeriodTooShort {
                 min: MIN_FLUSH_PERIOD_SECS,
@@ -139,7 +142,14 @@ fn encode_metric_header(namespace: Option<&str>, metric: &Metric) -> String {
     let r#type = match &metric.value {
         MetricValue::Counter { .. } => "counter",
         MetricValue::Gauge { .. } => "gauge",
-        MetricValue::Distribution { statistic: _, .. } => "histogram",
+        MetricValue::Distribution {
+            statistic: StatisticKind::Histogram,
+            ..
+        } => "histogram",
+        MetricValue::Distribution {
+            statistic: StatisticKind::Summary,
+            ..
+        } => "summary",
         MetricValue::Set { .. } => "gauge",
         MetricValue::AggregatedHistogram { .. } => "histogram",
         MetricValue::AggregatedSummary { .. } => "summary",
@@ -177,7 +187,7 @@ fn encode_metric_datum(
             MetricValue::Distribution {
                 values,
                 sample_rates,
-                statistic: _,
+                statistic: StatisticKind::Histogram,
             } => {
                 // convert distributions into aggregated histograms
                 let mut counts = Vec::new();
@@ -216,6 +226,34 @@ fn encode_metric_datum(
                 let tags = encode_tags(tags);
                 s.push_str(&format!("{}_sum{} {}\n", fullname, tags, sum));
                 s.push_str(&format!("{}_count{} {}\n", fullname, tags, count));
+            }
+            MetricValue::Distribution {
+                values,
+                sample_rates,
+                statistic: StatisticKind::Summary,
+            } => {
+                if let Some(statistic) =
+                    DistributionStatistic::new(values, sample_rates, &[0.5, 0.75, 0.9, 0.95, 0.99])
+                {
+                    for (q, v) in statistic.quantiles.iter() {
+                        s.push_str(&format!(
+                            "{}{} {}\n",
+                            fullname,
+                            encode_tags_with_extra(tags, "quantile".to_string(), q.to_string()),
+                            v
+                        ));
+                    }
+                    let tags = encode_tags(tags);
+                    s.push_str(&format!("{}_sum{} {}\n", fullname, tags, statistic.sum));
+                    s.push_str(&format!("{}_count{} {}\n", fullname, tags, statistic.count));
+                    s.push_str(&format!("{}_min{} {}\n", fullname, tags, statistic.min));
+                    s.push_str(&format!("{}_max{} {}\n", fullname, tags, statistic.max));
+                    s.push_str(&format!("{}_avg{} {}\n", fullname, tags, statistic.avg));
+                } else {
+                    let tags = encode_tags(tags);
+                    s.push_str(&format!("{}_sum{} {}\n", fullname, tags, 0.0));
+                    s.push_str(&format!("{}_count{} {}\n", fullname, tags, 0));
+                }
             }
             MetricValue::AggregatedHistogram {
                 buckets,
@@ -308,7 +346,7 @@ fn handle(
 
     info!(
         message = "Request complete",
-        response_code = field::debug(response.status())
+        response_code = ?response.status()
     );
 
     response
@@ -352,8 +390,8 @@ impl PrometheusSink {
 
                     let response = info_span!(
                         "prometheus_server",
-                        method = field::debug(req.method()),
-                        path = field::debug(req.uri().path()),
+                        method = ?req.method(),
+                        path = ?req.uri().path(),
                     )
                     .in_scope(|| handle(req, namespace.as_deref(), &buckets, expired, &metrics));
 
@@ -377,9 +415,8 @@ impl PrometheusSink {
 #[async_trait]
 impl StreamSink for PrometheusSink {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        self.start_server_if_needed();
         while let Some(event) = input.next().await {
-            self.start_server_if_needed();
-
             let item = event.into_metric();
             let mut metrics = self.metrics.write().unwrap();
 
@@ -583,5 +620,29 @@ mod tests {
             "# HELP requests requests\n# TYPE requests summary\n".to_owned()
         );
         assert_eq!(frame, "requests{code=\"200\",quantile=\"0.01\"} 1.5\nrequests{code=\"200\",quantile=\"0.5\"} 2\nrequests{code=\"200\",quantile=\"0.99\"} 3\nrequests_sum{code=\"200\"} 12\nrequests_count{code=\"200\"} 6\n".to_owned());
+    }
+
+    #[test]
+    fn test_encode_distribution_summary() {
+        let metric = Metric {
+            name: "requests".to_owned(),
+            timestamp: None,
+            tags: Some(tags()),
+            kind: MetricKind::Absolute,
+            value: MetricValue::Distribution {
+                values: vec![1.0, 2.0, 3.0],
+                sample_rates: vec![3, 3, 2],
+                statistic: StatisticKind::Summary,
+            },
+        };
+
+        let header = encode_metric_header(None, &metric);
+        let frame = encode_metric_datum(None, &[], false, &metric);
+
+        assert_eq!(
+            header,
+            "# HELP requests requests\n# TYPE requests summary\n".to_owned()
+        );
+        assert_eq!(frame, "requests{code=\"200\",quantile=\"0.5\"} 2\nrequests{code=\"200\",quantile=\"0.75\"} 2\nrequests{code=\"200\",quantile=\"0.9\"} 3\nrequests{code=\"200\",quantile=\"0.95\"} 3\nrequests{code=\"200\",quantile=\"0.99\"} 3\nrequests_sum{code=\"200\"} 15\nrequests_count{code=\"200\"} 8\nrequests_min{code=\"200\"} 1\nrequests_max{code=\"200\"} 3\nrequests_avg{code=\"200\"} 1.875\n".to_owned());
     }
 }
