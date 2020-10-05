@@ -238,7 +238,7 @@ components: close({
               examples: ["test"]
             }
           }
-          "`[field_name]`.contains": {
+          "*.contains": {
             common:      true
             description: "Checks whether a string field contains a string argument. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
             required:    false
@@ -248,7 +248,7 @@ components: close({
               examples: ["foo"]
             }
           }
-          "`[field_name]`.ends_with": {
+          "*.ends_with": {
             common:      true
             description: "Checks whether a string field ends with a string argument. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
             required:    false
@@ -258,7 +258,7 @@ components: close({
               examples: ["-staging"]
             }
           }
-          "`[field_name]`.ip_cidr_contains": {
+          "*.ip_cidr_contains": {
             common:      false
             description: "Checks whether an IP field is contained within a given [IP CIDR][urls.cidr] (works with IPv4 and IPv6). This may be a single string or a list of strings, in which case this evaluates to true if the IP field is contained within any of the CIDRs in the list."
             required:    false
@@ -268,7 +268,7 @@ components: close({
               examples: ["10.0.0.0/8", "2000::/10", "192.168.0.0/16"]
             }
           }
-          "`[field_name]`.regex": {
+          "*.regex": {
             common:      true
             description: "Checks whether a string field matches a [regular expression][urls.regex]. Vector uses the [documented Rust Regex syntax][urls.rust_regex_syntax]. Note that this condition is considerably more expensive than a regular string match (such as `starts_with` or `contains`) so the use of those conditions are preferred where possible."
             required:    false
@@ -278,7 +278,7 @@ components: close({
               examples: [" (any|of|these|five|words) "]
             }
           }
-          "`[field_name]`.starts_with": {
+          "*.starts_with": {
             common:      true
             description: "Checks whether a string field starts with a string argument. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
             required:    false
