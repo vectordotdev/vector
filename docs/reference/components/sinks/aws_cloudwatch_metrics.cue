@@ -55,7 +55,6 @@ components: sinks: aws_cloudwatch_metrics: {
 
   configuration: {
     namespace: {
-      common: true
       description: "A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other."
       required: true
       warnings: []
