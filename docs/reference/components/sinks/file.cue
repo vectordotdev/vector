@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: file: {
-  title: "#{component.title}"
+  title: "File"
   short_description: "Streams log events to a file."
   long_description: "Streams log events to a file."
 
@@ -17,6 +17,7 @@ components: sinks: file: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
