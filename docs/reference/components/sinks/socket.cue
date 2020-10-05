@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: socket: {
-  title: "#{component.title}"
+  title: "Socket"
   short_description: "Streams log events to a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket."
   long_description: "Streams log events to a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket."
 
@@ -13,6 +13,7 @@ components: sinks: socket: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
