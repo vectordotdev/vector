@@ -516,15 +516,16 @@ jobs:
 ## and Bors merges the commit.
 ## 3. If needs.changes.outputs.source output is true and any jobs failed then Bors marks this as a failure and
 ## does not merge the commit.
-ci-skip:
-  name: ci
-  if: github.event_name == 'push' && success() && !needs.changes.outputs.source == 'true'
-  needs:
-    - changes
-  runs-on: ubuntu-latest
-  steps:
-    - name: Mark the job as skipped
-      run: exit 0
+
+  ci-skip:
+    name: ci
+    if: github.event_name == 'push' && success() && !needs.changes.outputs.source == 'true'
+    needs:
+      - changes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark the job as skipped
+        run: exit 0
 
   ci-success:
     name: ci
