@@ -5,20 +5,6 @@ on:
     branches:
       - staging
       - trying
-    paths:
-      - ".github/workflows/bors.yml"
-      - "lib/**"
-      - "proto/**"
-      - "scripts/**"
-      - "skaffold/**"
-      - "src/**"
-      - "tests/**"
-      - "build.rs"
-      - "Cargo.lock"
-      - "Cargo.toml"
-      - "docker-compose.yml"
-      - "Makefile"
-      - "rust-toolchain"
 
 env:
   AUTOINSTALL: true
@@ -43,9 +29,40 @@ jobs:
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
+  ## This job runs first to determine if all jobs need to be run.
+  ## If no changes to source were made then the build is skipped.
+  ## This is represented in the steps.filter.outputs.source output.
+  changes:
+    runs-on: ubuntu-latest
+    # Set job outputs to values from filter step
+    outputs:
+      source: ${{ steps.filter.outputs.source }}
+    steps:
+    # For pull requests it's not necessary to checkout the code
+    - uses: dorny/paths-filter@v2
+      id: filter
+      with:
+        filters: |
+          source:
+            - "benches/**"
+            - "lib/**"
+            - "proto/**"
+            - "scripts/**"
+            - "skaffold/**"
+            - "src/**"
+            - "tests/**"
+            - "build.rs"
+            - "Cargo.lock"
+            - "Cargo.toml"
+            - "docker-compose.yml"
+            - "Makefile"
+            - "rust-toolchain"
+
   test-linux:
     name: Unit - x86_64-unknown-linux-gnu
     runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -67,6 +84,8 @@ jobs:
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
     runs-on: macos-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - uses: actions/cache@v2
@@ -87,6 +106,8 @@ jobs:
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
     runs-on: windows-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - env:
@@ -96,6 +117,8 @@ jobs:
   test-misc:
     name: Shutdown - Linux
     runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -116,6 +139,8 @@ jobs:
   test-integration-aws:
     name: Integration - Linux, AWS
     runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -134,6 +159,8 @@ jobs:
   test-integration-clickhouse:
     name: Integration - Linux, Clickhouse
     runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -151,6 +178,8 @@ jobs:
   test-integration-docker:
     name: Integration - Linux, Docker
     runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -169,6 +198,8 @@ jobs:
   test-integration-elasticsearch:
     name: Integration - Linux, ES
     runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -187,6 +218,8 @@ jobs:
   test-integration-gcp:
     name: Integration - Linux, GCP
     runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -205,6 +238,8 @@ jobs:
   test-integration-humio:
     name: Integration - Linux, Humio
     runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -223,6 +258,8 @@ jobs:
   test-integration-influxdb:
     name: Integration - Linux, Influx
     runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -241,6 +278,8 @@ jobs:
   test-integration-kafka:
     name: Integration - Linux, Kafka
     runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -259,6 +298,8 @@ jobs:
   test-integration-loki:
     name: Integration - Linux, Loki
     runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -277,6 +318,8 @@ jobs:
   test-integration-pulsar:
     name: Integration - Linux, Pulsar
     runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -295,6 +338,8 @@ jobs:
   test-integration-splunk:
     name: Integration - Linux, Splunk
     runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -315,6 +360,8 @@ jobs:
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
     runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -339,6 +386,8 @@ jobs:
   build-aarch64-unknown-linux-gnu:
     name: Build - aarch64-unknown-linux-gnu
     runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -442,6 +491,8 @@ jobs:
   check-component-features:
     name: Component Features - Linux
     runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -458,10 +509,28 @@ jobs:
       - run: echo "::add-path::/home/runner/.local/bin"
       - run: make check-component-features
 
+## There are three possible exits from this workflow
+## 1. If the needs.changes.outputs.source output is not true the workflow is skipped and Bors will
+## merges the commit.
+## 2. If needs.changes.outputs.source output is true and all the jobs passed then the workflow is a success
+## and Bors merges the commit.
+## 3. If needs.changes.outputs.source output is true and any jobs failed then Bors marks this as a failure and
+## does not merge the commit.
+ci-skip:
+  name: ci
+  if: github.event_name == 'push' && success() && !needs.changes.outputs.source == 'true'
+  needs:
+    - changes
+  runs-on: ubuntu-latest
+  steps:
+    - name: Mark the job as skipped
+      run: exit 0
+
   ci-success:
     name: ci
-    if: github.event_name == 'push' && success()
+    if: github.event_name == 'push' && success() && needs.changes.outputs.source == 'true'
     needs:
+      - changes
       - test-linux
       - build-x86_64-unknown-linux-gnu
       - build-aarch64-unknown-linux-gnu
@@ -488,8 +557,9 @@ jobs:
 
   ci-failure:
     name: ci
-    if: github.event_name == 'push' && !success()
+    if: github.event_name == 'push' && !success() && needs.changes.outputs.source == 'true'
     needs:
+      - changes
       - test-linux
       - build-x86_64-unknown-linux-gnu
       - build-aarch64-unknown-linux-gnu
