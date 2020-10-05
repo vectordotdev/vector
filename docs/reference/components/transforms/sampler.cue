@@ -63,6 +63,7 @@ components: transforms: sampler: {
       warnings: []
       type: uint: {
         examples: [10]
+        unit: null
       }
     }
   }
