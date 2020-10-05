@@ -50,7 +50,7 @@ pub async fn start_validated(
     let mut running_topology = RunningTopology {
         inputs: HashMap::new(),
         outputs: HashMap::new(),
-        config: Config::default(),
+        config,
         shutdown_coordinator: SourceShutdownCoordinator::default(),
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
@@ -65,7 +65,6 @@ pub async fn start_validated(
     }
     running_topology.connect_diff(&diff, &mut pieces);
     running_topology.spawn_diff(&diff, pieces);
-    running_topology.config = config;
 
     Some((running_topology, abort_rx))
 }
@@ -595,6 +594,11 @@ impl RunningTopology {
 
         self.inputs.insert(name.to_string(), tx);
     }
+
+    /// Borrows the Config
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
 }
 
 fn handle_errors(
@@ -837,9 +841,10 @@ mod transient_state_tests {
         }
     }
 
+    #[async_trait::async_trait]
     #[typetag::serde(name = "mock")]
     impl SourceConfig for MockSourceConfig {
-        fn build(
+        async fn build(
             &self,
             _name: &str,
             _globals: &GlobalOptions,

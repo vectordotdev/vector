@@ -27,9 +27,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<RenameFieldsConfig>("rename_fields")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "rename_fields")]
 impl TransformConfig for RenameFieldsConfig {
-    fn build(&self, _exec: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _exec: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let mut fields = IndexMap::default();
         for (key, value) in self.fields.clone().all_fields() {
             fields.insert(

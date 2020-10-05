@@ -55,9 +55,13 @@ inventory::submit! {
     SinkDescription::new_without_default::<StatsdSinkConfig>("statsd")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "statsd")]
 impl SinkConfig for StatsdSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         // 1432 bytes is a recommended packet size to fit into MTU
         // https://github.com/statsd/statsd/blob/master/docs/metric_types.md#multi-metric-packets
         // However we need to leave some space for +1 extra trailing event in the buffer.

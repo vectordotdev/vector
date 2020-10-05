@@ -46,9 +46,13 @@ impl SocketSinkConfig {
     }
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "socket")]
 impl SinkConfig for SocketSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         match &self.mode {
             Mode::Tcp(config) => config.build(cx, self.encoding.clone()),
             Mode::Udp(config) => config.build(cx, self.encoding.clone()),
@@ -96,7 +100,7 @@ mod test {
             encoding: Encoding::Json.into(),
         };
         let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).unwrap();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let event = Event::from("raw log line");
         sink.run(stream::once(future::ready(event))).await.unwrap();
@@ -142,7 +146,7 @@ mod test {
         };
 
         let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).unwrap();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let mut receiver = CountReceiver::receive_lines(addr);
 
@@ -210,7 +214,7 @@ mod test {
             encoding: Encoding::Text.into(),
         };
         let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).unwrap();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
         let mut sink = sink.into_futures01sink().sink_compat();
 
         let msg_counter = Arc::new(AtomicUsize::new(0));
@@ -318,7 +322,7 @@ mod test {
         };
 
         let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).unwrap();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let (_, events) = random_lines_with_stream(1000, 10000);
         let _ = tokio::spawn(sink.run(events));
