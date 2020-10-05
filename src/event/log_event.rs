@@ -90,7 +90,11 @@ impl LogEvent {
             trace!(%segment, index, "Seeking segment.");
             self.fields.entry(segment)
         } else {
-            return Err("Lookups should have at least one segment.".into());
+            unreachable!(
+                "It is an invariant to have a `Lookup` without a contained `Segment`.\
+                `Lookup::is_valid` should catch this during `Lookup` creation, maybe it was not \
+                called?."
+            );
         };
 
         for (index, segment) in walker {
