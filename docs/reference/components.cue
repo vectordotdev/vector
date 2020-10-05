@@ -179,7 +179,7 @@ components: close({
       _conditions: {
         examples: [
           {
-            type: "check_field"
+            type: "check_fields"
             "message.eq": "foo"
             "message.not_eq": "foo"
             "message.exists": true
