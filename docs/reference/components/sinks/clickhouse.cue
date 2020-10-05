@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: clickhouse: {
-  title: "#{component.title}"
+  title: "Clickhouse"
   short_description: "Batches log events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http]."
   long_description: "[ClickHouse][urls.clickhouse] is an open-source column-oriented database management system that manages extremely large volumes of data, including non-aggregated data, in a stable and sustainable manner and allows generating custom data reports in real time. The system is linearly scalable and can be scaled up to store and process trillions of rows and petabytes of data. This makes it an best-in-class storage for logs and metrics data."
 
@@ -23,6 +23,7 @@ components: sinks: clickhouse: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
