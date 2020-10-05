@@ -213,7 +213,7 @@ components: close({
           }
           "*.eq": {
             common:      true
-            description: "Check whether a field's contents exactly matches the value specified. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
+            description: "Check whether a field's contents exactly matches the value specified, case sensitive. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
             required:    false
             warnings: []
             type: string: {
@@ -240,7 +240,7 @@ components: close({
           }
           "*.contains": {
             common:      true
-            description: "Checks whether a string field contains a string argument. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
+            description: "Checks whether a string field contains a string argument, case sensitive. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
             required:    false
             warnings: []
             type: string: {
@@ -250,7 +250,7 @@ components: close({
           }
           "*.ends_with": {
             common:      true
-            description: "Checks whether a string field ends with a string argument. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
+            description: "Checks whether a string field ends with a string argument, case sensitive. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
             required:    false
             warnings: []
             type: string: {
@@ -280,7 +280,7 @@ components: close({
           }
           "*.starts_with": {
             common:      true
-            description: "Checks whether a string field starts with a string argument. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
+            description: "Checks whether a string field starts with a string argument, case sensitive. This may be a single string or a list of strings, in which case this evaluates to true if any of the list matches."
             required:    false
             warnings: []
             type: string: {
