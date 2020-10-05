@@ -1,13 +1,9 @@
 package metadata
 
-import (
-  "strings"
-)
-
 components: sources: generator: {
   title: "#{component.title}"
-  short_description: strings.ToTitle(classes.function) + " log an internal data generator"
-  description: null
+  short_description: "Ingests data through an internal data generator and outputs log events."
+  long_description: "Ingests data through an internal data generator and outputs log events."
 
   _features: {
     checkpoint: enabled: false
@@ -23,10 +19,11 @@ components: sources: generator: {
 
   statuses: {
     delivery: "at_least_once"
-    development: "prod-ready"
+    development: "stable"
   }
 
   support: {
+
     platforms: {
       "aarch64-unknown-linux-gnu": true
       "aarch64-unknown-linux-musl": true
@@ -45,32 +42,36 @@ components: sources: generator: {
       common: false
       description: "The amount of time, in seconds, to pause between each batch of output lines. If not set, there will be no delay."
       required: false
-        type: float: {
-          default: null
-          examples: [1.0]
-        }
+      warnings: []
+      type: float: {
+        default: null
+        examples: [1.0]
+      }
     }
     count: {
       common: false
       description: "The number of times to repeat outputting the `lines`."
       required: false
-        type: uint: {
-          default: "infinite"
-        }
+      warnings: []
+      type: uint: {
+        default: 0
+        unit: null
+      }
     }
     lines: {
-      common: true
       description: "The list of lines to output."
       required: true
-        type: "[string]": {
-          examples: [["Line 1","Line 2"]]
-        }
+      warnings: []
+      type: "[string]": {
+        examples: [["Line 1","Line 2"]]
+      }
     }
     sequence: {
       common: false
       description: "If `true`, each output line will start with an increasing sequence number."
       required: false
-        type: bool: default: false
+      warnings: []
+      type: bool: default: false
     }
   }
 }
