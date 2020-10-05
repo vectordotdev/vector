@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: blackhole: {
-  title: "#{component.title}"
+  title: "Blackhole"
   short_description: "Streams log and metric events to a blackhole that simply discards data, designed for testing and benchmarking purposes."
   long_description: "Streams log and metric events to a blackhole that simply discards data, designed for testing and benchmarking purposes."
 
