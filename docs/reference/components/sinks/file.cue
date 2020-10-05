@@ -60,12 +60,10 @@ components: sinks: file: {
       required: false
       warnings: []
       type: uint: {
-        default: 30
-        unit: "seconds"
+        default: "30"
       }
     }
     path: {
-      common: true
       description: "File name to write events to."
       required: true
       warnings: []
