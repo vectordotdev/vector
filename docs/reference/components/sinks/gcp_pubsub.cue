@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: gcp_pubsub: {
-  title: "#{component.title}"
+  title: "GCP PubSub"
   short_description: "Batches log events to [Google Cloud Platform's Pubsub service][urls.gcp_pubsub] via the [REST Interface][urls.gcp_pubsub_rest]."
   long_description: "[GCP Pub/Sub][urls.gcp_pubsub] is a fully-managed real-time messaging service that allows you to send and receive messages between independent applications on the Google Cloud Platform."
 
@@ -19,6 +19,7 @@ components: sinks: gcp_pubsub: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
