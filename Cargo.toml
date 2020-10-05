@@ -44,7 +44,7 @@ members = [
 [dependencies]
 # Internal libs
 codec = { path = "lib/codec" }
-file-source = { path = "lib/file-source" }
+file-source = { path = "lib/file-source", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
 
@@ -287,7 +287,7 @@ sources = [
 ]
 sources-apache_metrics = []
 sources-docker = ["bollard"]
-sources-file = ["bytesize"]
+sources-file = ["bytesize", "file-source"]
 sources-generator = []
 sources-http = ["warp", "sources-tls"]
 sources-internal_metrics = []
@@ -302,7 +302,7 @@ sources-stdin = ["bytesize"]
 sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls", "syslog_loose"]
 sources-tls = []
 sources-vector = ["listenfd" ,"sources-tls"]
-sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser"]
+sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser", "file-source"]
 
 # Transforms
 transforms = [

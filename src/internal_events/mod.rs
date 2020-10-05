@@ -102,6 +102,7 @@ pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-docker")]
 pub use self::docker::*;
 pub use self::elasticsearch::*;
+#[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
 pub use self::file::*;
 #[cfg(feature = "sources-generator")]
 pub use self::generator::*;
@@ -181,6 +182,7 @@ macro_rules! emit {
 }
 
 // Modules that require emit! macro so they need to be defined after the macro.
+#[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
 mod file;
 mod windows;
 
