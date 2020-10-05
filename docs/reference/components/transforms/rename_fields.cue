@@ -119,5 +119,5 @@ components: transforms: rename_fields: {
         }
       ]
     }
-  } 
+  }
 }
