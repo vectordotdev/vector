@@ -84,7 +84,6 @@ components: sinks: http: {
         examples: []
         options: {
           password: {
-            common: true
             description: "The basic authentication password."
             required: true
             warnings: []
@@ -93,7 +92,6 @@ components: sinks: http: {
             }
           }
           strategy: {
-            common: true
             description: "The authentication strategy to use."
             required: true
             warnings: []
@@ -105,7 +103,6 @@ components: sinks: http: {
             }
           }
           token: {
-            common: true
             description: "The token to use for bearer authentication"
             required: true
             warnings: []
@@ -114,7 +111,6 @@ components: sinks: http: {
             }
           }
           user: {
-            common: true
             description: "The basic authentication user name."
             required: true
             warnings: []
@@ -136,7 +132,6 @@ components: sinks: http: {
       }
     }
     uri: {
-      common: true
       description: "The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI."
       required: true
       warnings: []
