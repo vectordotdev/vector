@@ -193,20 +193,9 @@ where
     }
 
     fn linger_elapsed(&mut self) -> bool {
-        let clue = self.capture_clue("linger_elapsed");
         match &mut self.linger {
-            Some(delay) => delay.poll_with_clue(clue).expect("timer error").is_ready(),
+            Some(linger) => linger.poll().expect("timer error").is_ready(),
             None => false,
-        }
-    }
-
-    fn capture_clue(&self, caller: &'static str) -> Clue {
-        Clue {
-            caller,
-            closing: self.closing,
-            batch_was_full: self.batch.was_full(),
-            batch_is_empty: self.batch.is_empty(),
-            service_was_not_ready: self.service_was_not_ready,
         }
     }
 }
@@ -297,7 +286,6 @@ where
                     // We have data but not a full batch and the linger time has not elapsed, so do
                     // not sent a request yet. Instead, poll the inner service to drive progress
                     // and defer readiness to the linger timeout if present.
-                    let clue = self.capture_clue("should_not_send");
                     if let Some(linger) = &mut self.linger {
                         self.service.poll_complete()?;
 
@@ -306,20 +294,8 @@ where
                         // we do get past it, that means the timer expired within the tiny window
                         // between the two `poll` calls and we should loop again because it's
                         // probably time to send a batch.
-                        //
-                        // But then things get tricky. As noted above, `should_send` calls `poll` on
-                        // `linger`. But we just called `poll` on `linger` ourselves and it
-                        // returned `Ready`. Normally, it's a contract violation to re-poll
-                        // a future that has returned `Ready`. But we also can't reset `linger`,
-                        // because then `should_send` would not know that it had expired and we
-                        // might not send a batch when we should.
-                        //
-                        // Our (temporary) solution here is the SafeLinger wrapper type, which
-                        // quacks like a future but doesn't mind being polled again after it
-                        // returns `Ready`. It's also instrumented to collect some clues as to the
-                        // circumstances of the double poll.
                         trace!("Polling batch linger.");
-                        try_ready!(linger.poll_with_clue(clue));
+                        try_ready!(linger.poll());
                     } else {
                         try_ready!(self.service.poll_complete());
                     }
@@ -352,7 +328,6 @@ where
 struct SafeLinger {
     inner: Box<dyn Future<Item = (), Error = Infallible> + Send>,
     finished: bool,
-    clues: Vec<Clue>,
 }
 
 impl SafeLinger {
@@ -360,35 +335,22 @@ impl SafeLinger {
         SafeLinger {
             inner: Box::new(delay_for(timeout).never_error().boxed().compat()),
             finished: false,
-            clues: Vec::new(),
         }
     }
 
-    fn poll_with_clue(&mut self, clue: Clue) -> Poll<(), Infallible> {
+    fn poll(&mut self) -> Poll<(), Infallible> {
         if self.finished {
-            self.clues.push(clue);
-            warn!(message = "Linger polled after ready.", clues = ?self.clues);
             Ok(Async::Ready(()))
         } else {
             match self.inner.poll() {
                 Ok(Async::Ready(())) => {
                     self.finished = true;
-                    self.clues.push(clue);
                     Ok(Async::Ready(()))
                 }
                 anything_else => anything_else,
             }
         }
     }
-}
-
-#[derive(Debug)]
-struct Clue {
-    caller: &'static str,
-    closing: bool,
-    batch_was_full: bool,
-    batch_is_empty: bool,
-    service_was_not_ready: bool,
 }
 
 // === PartitionBatchSink ===
