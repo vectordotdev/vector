@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: pulsar: {
-  title: "#{component.title}"
+  title: "Apache Pulsar"
   short_description: "Streams log events to [Apache Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol]."
   long_description: "[Pulsar][urls.pulsar] is a multi-tenant, high-performance solution for server-to-server messaging. Pulsar was originally developed by Yahoo, it is under the stewardship of the Apache Software Foundation. It is an excellent tool for streaming logs and metrics data."
 
@@ -13,6 +13,7 @@ components: sinks: pulsar: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
