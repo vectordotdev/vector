@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: honeycomb: {
-  title: "#{component.title}"
+  title: "Honeycomb"
   short_description: "Batches log events to [Honeycomb][urls.honeycomb] via the [batch events API][urls.honeycomb_batch]."
   long_description: "[Honeycomb][urls.honeycomb] provides full stack observability—designed for high cardinality data and collaborative problem solving, enabling engineers to deeply understand and debug production software together."
 
