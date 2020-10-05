@@ -87,7 +87,6 @@ components: sinks: aws_s3: {
       }
     }
     bucket: {
-      common: true
       description: "The S3 bucket name. Do not include a leading `s3://` or a trailing `/`."
       required: true
       warnings: []
