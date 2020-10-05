@@ -35,6 +35,23 @@ The address to accept connections on. The address _must_ include a port.\
 
 <%= render("_partials/fields/_tls_acceptor_options.toml", namespace: "sources.logplex.options", relevant: "") %>
 
+[sources.logplex.options.auth]
+type = "table"
+common = false
+description = "Options for HTTP Basic Authentication."
+
+[sources.logplex.options.auth.children.password]
+type = "string"
+examples = ["${HTTP_PASSWORD}", "password"]
+required = false
+description = "The basic authentication password."
+
+[sources.logplex.options.auth.children.user]
+type = "string"
+examples = ["${HTTP_USERNAME}", "username"]
+required = false
+description = "The basic authentication user name."
+
 [sources.logplex.fields.log.fields.message]
 type = "string"
 examples = ["This is one line from the plain text HTTP body"]
