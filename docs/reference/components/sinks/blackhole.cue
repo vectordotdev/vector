@@ -45,7 +45,6 @@ components: sinks: blackhole: {
 
   configuration: {
     print_amount: {
-      common: true
       description: "The number of events that must be received in order to print a summary of activity."
       required: true
       warnings: []
