@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: datadog_metrics: {
-  title: "#{component.title}"
+  title: "Datadog Metrics"
   short_description: "Batches metric events to [Datadog's][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics)."
   long_description: "[Datadog][urls.datadog] is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform."
 
