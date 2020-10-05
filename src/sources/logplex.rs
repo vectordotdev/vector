@@ -9,6 +9,7 @@ use crate::{
 };
 use bytes::{buf::BufExt, Bytes};
 use chrono::{DateTime, Utc};
+use headers::{Authorization, HeaderMapExt};
 use serde::{Deserialize, Serialize};
 use std::{
     io::{BufRead, BufReader},
@@ -18,9 +19,16 @@ use std::{
 use warp::http::{HeaderMap, StatusCode};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Auth {
+    username: String,
+    password: String,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LogplexConfig {
     address: SocketAddr,
     tls: Option<TlsConfig>,
+    auth: Option<Auth>,
 }
 
 inventory::submit! {
@@ -28,10 +36,24 @@ inventory::submit! {
 }
 
 #[derive(Clone, Default)]
-struct LogplexSource {}
+struct LogplexSource {
+    auth: Option<String>,
+}
 
 impl HttpSource for LogplexSource {
     fn build_event(&self, body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
+        if let Some(auth) = self.auth.as_ref() {
+            let header = get_header(&header_map, "authorization")?;
+            if auth != header {
+                let error_msg = format!("Invalid username/password");
+
+                if cfg!(test) {
+                    panic!(error_msg);
+                }
+                return Err(ErrorMessage::new(StatusCode::UNAUTHORIZED, error_msg));
+            }
+        }
+
         // Deal with headers
         let msg_count = match usize::from_str(get_header(&header_map, "Logplex-Msg-Count")?) {
             Ok(v) => v,
@@ -76,7 +98,8 @@ impl SourceConfig for LogplexConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let source = LogplexSource::default();
+        let auth = self.auth.as_ref().map(|auth| auth.as_header());
+        let source = LogplexSource { auth };
         source.run(self.address, "events", &self.tls, out, shutdown)
     }
 
@@ -86,6 +109,19 @@ impl SourceConfig for LogplexConfig {
 
     fn source_type(&self) -> &'static str {
         "logplex"
+    }
+}
+
+impl Auth {
+    fn as_header(&self) -> String {
+        let mut headers = HeaderMap::new();
+        headers.typed_insert(Authorization::basic(&self.username, &self.password));
+        headers
+            .get("authorization")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_owned()
     }
 }
 
@@ -160,7 +196,7 @@ fn line_to_event(line: String) -> Event {
 
 #[cfg(test)]
 mod tests {
-    use super::LogplexConfig;
+    use super::{Auth, LogplexConfig};
     use crate::shutdown::ShutdownSignal;
     use crate::{
         config::{log_schema, GlobalOptions, SourceConfig},
@@ -174,32 +210,38 @@ mod tests {
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
 
-    async fn source() -> (mpsc::Receiver<Event>, SocketAddr) {
+    async fn source(auth: Option<Auth>) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
         tokio::spawn(async move {
-            LogplexConfig { address, tls: None }
-                .build(
-                    "default",
-                    &GlobalOptions::default(),
-                    ShutdownSignal::noop(),
-                    sender,
-                )
-                .await
-                .unwrap()
-                .compat()
-                .await
-                .unwrap()
+            LogplexConfig {
+                address,
+                tls: None,
+                auth,
+            }
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                sender,
+            )
+            .await
+            .unwrap()
+            .compat()
+            .await
+            .unwrap()
         });
         wait_for_tcp(address).await;
         (recv, address)
     }
 
-    async fn send(address: SocketAddr, body: &str) -> u16 {
+    async fn send(address: SocketAddr, body: &str, auth: Option<Auth>) -> u16 {
         let len = body.lines().count();
-        reqwest::Client::new()
-            .post(&format!("http://{}/events", address))
-            .header("Logplex-Msg-Count", len)
+        let mut req = reqwest::Client::new().post(&format!("http://{}/events", address));
+        if let Some(auth) = auth {
+            req = req.basic_auth(auth.username, Some(auth.password));
+        }
+        req.header("Logplex-Msg-Count", len)
             .header("Logplex-Frame-Id", "frame-foo")
             .header("Logplex-Drain-Token", "drain-bar")
             .body(body.to_owned())
@@ -216,9 +258,14 @@ mod tests {
 
         let body = r#"267 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#;
 
-        let (rx, addr) = source().await;
+        let auth = Auth {
+            username: "vector_user".to_owned(),
+            password: "vector_pass".to_owned(),
+        };
 
-        assert_eq!(200, send(addr, body).await);
+        let (rx, addr) = source(Some(auth.clone())).await;
+
+        assert_eq!(200, send(addr, body, Some(auth)).await);
 
         let mut events = collect_n(rx, body.lines().count()).await.unwrap();
         let event = events.remove(0);
