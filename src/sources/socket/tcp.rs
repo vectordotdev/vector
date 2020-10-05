@@ -64,7 +64,7 @@ impl TcpSource for RawTcpSource {
         );
 
         let host_key = (self.config.host_key.clone())
-            .unwrap_or(Atom::from(crate::config::log_schema().host_key()));
+            .unwrap_or_else(|| Atom::from(crate::config::log_schema().host_key()));
 
         event.as_mut_log().insert(host_key, host);
 

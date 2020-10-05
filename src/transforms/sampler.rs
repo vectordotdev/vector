@@ -171,7 +171,7 @@ mod tests {
         let passing = events
             .into_iter()
             .filter(|s| {
-                !s.as_log()[&log_schema().message_key()]
+                !s.as_log()[&Atom::from(log_schema().message_key())]
                     .to_string_lossy()
                     .contains("na")
             })
@@ -184,7 +184,7 @@ mod tests {
         let passing = events
             .into_iter()
             .filter(|s| {
-                !s.as_log()[&log_schema().message_key()]
+                !s.as_log()[&Atom::from(log_schema().message_key())]
                     .to_string_lossy()
                     .contains("na")
             })

@@ -43,7 +43,7 @@ impl TransformConfig for GrokParserConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or(Atom::from(log_schema().message_key()));
+            .unwrap_or_else(|| Atom::from(log_schema().message_key()));
 
         let mut grok = grok::Grok::with_patterns();
 
@@ -137,6 +137,7 @@ mod tests {
     };
     use pretty_assertions::assert_eq;
     use serde_json::json;
+    use string_cache::DefaultAtom as Atom;
 
     async fn parse_log(
         event: &str,
@@ -198,9 +199,9 @@ mod tests {
         assert_eq!(2, event.keys().count());
         assert_eq!(
             event::Value::from("Help I'm stuck in an HTTP server"),
-            event[&log_schema().message_key()]
+            event[&Atom::from(log_schema().message_key())]
         );
-        assert!(!event[&log_schema().timestamp_key()]
+        assert!(!event[&Atom::from(log_schema().timestamp_key())]
             .to_string_lossy()
             .is_empty());
     }
@@ -246,9 +247,9 @@ mod tests {
         assert_eq!(2, event.keys().count());
         assert_eq!(
             event::Value::from("i am the only field"),
-            event[&log_schema().message_key()]
+            event[&Atom::from(log_schema().message_key())]
         );
-        assert!(!event[&log_schema().timestamp_key()]
+        assert!(!event[&Atom::from(log_schema().timestamp_key())]
             .to_string_lossy()
             .is_empty());
     }

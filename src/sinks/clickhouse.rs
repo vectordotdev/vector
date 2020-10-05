@@ -249,6 +249,7 @@ mod integration_tests {
     use futures::{future, stream};
     use serde_json::Value;
     use tokio::time::{timeout, Duration};
+    use string_cache::DefaultAtom as Atom;
 
     #[tokio::test]
     async fn insert_events() {
@@ -340,11 +341,11 @@ mod integration_tests {
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            log_schema().timestamp_key().clone(),
+            log_schema().timestamp_key(),
             format!(
                 "{}",
                 exp_event
-                    .get(&log_schema().timestamp_key())
+                    .get(&Atom::from(log_schema().timestamp_key()))
                     .unwrap()
                     .as_timestamp()
                     .unwrap()
@@ -400,11 +401,11 @@ timestamp_format = "unix""#,
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            log_schema().timestamp_key().clone(),
+            log_schema().timestamp_key(),
             format!(
                 "{}",
                 exp_event
-                    .get(&log_schema().timestamp_key())
+                    .get(&Atom::from(log_schema().timestamp_key()))
                     .unwrap()
                     .as_timestamp()
                     .unwrap()

@@ -328,7 +328,7 @@ mod tests {
         let mut log = Event::from("i am a log");
         log.as_mut_log().insert(key, value);
         log.as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts());
+            .insert(log_schema().timestamp_key(), ts());
         log
     }
 
@@ -550,7 +550,7 @@ mod tests {
         let mut event = Event::from("i am a log");
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts());
+            .insert(log_schema().timestamp_key(), ts());
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
 
@@ -600,7 +600,7 @@ mod tests {
         let mut event = Event::from("i am a log");
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts());
+            .insert(log_schema().timestamp_key(), ts());
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
         event.as_mut_log().insert("host", "local");

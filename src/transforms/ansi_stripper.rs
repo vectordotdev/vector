@@ -28,7 +28,7 @@ impl TransformConfig for AnsiStripperConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or(Atom::from(crate::config::log_schema().message_key()));
+            .unwrap_or_else(|| Atom::from(crate::config::log_schema().message_key()));
 
         Ok(Box::new(AnsiStripper {
             field: field.clone(),
@@ -83,6 +83,7 @@ mod tests {
         event::{Event, Value},
         transforms::Transform,
     };
+    use string_cache::DefaultAtom as Atom;
 
     macro_rules! assert_foo_bar {
         ($($in:expr),* $(,)?) => {
@@ -95,7 +96,7 @@ mod tests {
                 let event = transform.transform(event).unwrap();
 
                 assert_eq!(
-                    event.into_log().remove(&crate::config::log_schema().message_key()).unwrap(),
+                    event.into_log().remove(&Atom::from(crate::config::log_schema().message_key())).unwrap(),
                     Value::from("foo bar")
                 );
             )+

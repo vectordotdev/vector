@@ -285,7 +285,7 @@ mod integration_tests {
                 max_events: Some(1),
                 ..Default::default()
             },
-            host_key: log_schema().host_key().clone(),
+            host_key: log_schema().host_key().to_string(),
             ..Default::default()
         }
     }

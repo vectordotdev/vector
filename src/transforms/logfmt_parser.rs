@@ -28,7 +28,7 @@ impl TransformConfig for LogfmtConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or(Atom::from(crate::config::log_schema().message_key()));
+            .unwrap_or_else(|| Atom::from(crate::config::log_schema().message_key()));
         let conversions = parse_conversion_map(&self.types)?;
 
         Ok(Box::new(Logfmt {

@@ -1218,7 +1218,7 @@ mod tests {
         // Wait for before message
         let events = collect_n(out, 1).await.unwrap();
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             "before".into()
         );
 
@@ -1248,14 +1248,14 @@ mod tests {
         container_remove(&id, &docker).await;
 
         let log = events[0].as_log();
-        assert_eq!(log[&log_schema().message_key()], message.into());
+        assert_eq!(log[&Atom::from(log_schema().message_key())], message.into());
         assert_eq!(log[&super::CONTAINER], id.into());
         assert!(log.get(&super::CREATED_AT).is_some());
         assert_eq!(log[&super::IMAGE], "busybox".into());
         assert!(log.get(&format!("label.{}", label).into()).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
         assert_eq!(
-            events[0].as_log()[log_schema().source_type_key()],
+            events[0].as_log()[&Atom::from(log_schema().source_type_key())],
             "docker".into()
         );
     }
@@ -1276,11 +1276,11 @@ mod tests {
         container_remove(&id, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             message.into()
         );
         assert_eq!(
-            events[1].as_log()[&log_schema().message_key()],
+            events[1].as_log()[&Atom::from(log_schema().message_key())],
             message.into()
         );
     }
@@ -1304,7 +1304,7 @@ mod tests {
         container_remove(&id1, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             message.into()
         );
     }
@@ -1329,7 +1329,7 @@ mod tests {
         container_remove(&id1, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             message.into()
         );
     }
@@ -1351,14 +1351,14 @@ mod tests {
         container_remove(&id, &docker).await;
 
         let log = events[0].as_log();
-        assert_eq!(log[&log_schema().message_key()], message.into());
+        assert_eq!(log[&Atom::from(log_schema().message_key())], message.into());
         assert_eq!(log[&super::CONTAINER], id.into());
         assert!(log.get(&super::CREATED_AT).is_some());
         assert_eq!(log[&super::IMAGE], "busybox".into());
         assert!(log.get(&format!("label.{}", label).into()).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
         assert_eq!(
-            events[0].as_log()[log_schema().source_type_key()],
+            events[0].as_log()[&Atom::from(log_schema().source_type_key())],
             "docker".into()
         );
     }
@@ -1384,7 +1384,7 @@ mod tests {
         container_remove(&id, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             message.into()
         );
     }
@@ -1458,7 +1458,7 @@ mod tests {
         container_remove(&id, &docker).await;
 
         let log = events[0].as_log();
-        assert_eq!(log[&log_schema().message_key()], message.into());
+        assert_eq!(log[&Atom::from(log_schema().message_key())], message.into());
     }
 
     #[tokio::test]
@@ -1511,7 +1511,7 @@ mod tests {
             .map(|event| {
                 event
                     .into_log()
-                    .remove(crate::config::log_schema().message_key())
+                    .remove(&Atom::from(crate::config::log_schema().message_key()))
                     .unwrap()
                     .to_string_lossy()
             })

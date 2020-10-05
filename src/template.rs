@@ -336,7 +336,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts);
+            .insert(log_schema().timestamp_key(), ts);
 
         let template = Template::try_from("abcd-%F").unwrap();
 
@@ -350,7 +350,7 @@ mod tests {
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts);
+            .insert(log_schema().timestamp_key(), ts);
 
         let template = Template::try_from("abcd-%F_%T").unwrap();
 
@@ -368,7 +368,7 @@ mod tests {
         event.as_mut_log().insert("foo", "butts");
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts);
+            .insert(log_schema().timestamp_key(), ts);
 
         let template = Template::try_from("{{ foo }}-%F_%T").unwrap();
 
@@ -386,7 +386,7 @@ mod tests {
         event.as_mut_log().insert("format", "%F");
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts);
+            .insert(log_schema().timestamp_key(), ts);
 
         let template = Template::try_from("nested {{ format }} %T").unwrap();
 
@@ -404,7 +404,7 @@ mod tests {
         event.as_mut_log().insert("%F", "foo");
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts);
+            .insert(log_schema().timestamp_key(), ts);
 
         let template = Template::try_from("nested {{ %F }} %T").unwrap();
 

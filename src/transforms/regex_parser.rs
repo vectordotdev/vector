@@ -139,7 +139,7 @@ impl RegexParser {
         let field = config
             .field
             .clone()
-            .unwrap_or(Atom::from(crate::config::log_schema().message_key()));
+            .unwrap_or_else(|| Atom::from(crate::config::log_schema().message_key()));
 
         let patterns = match (&config.regex, &config.patterns.len()) {
             (None, 0) => {
@@ -192,7 +192,7 @@ impl RegexParser {
         Ok(Box::new(RegexParser::new(
             regexset,
             patterns,
-            field.clone(),
+            field,
             config.drop_field,
             config.drop_failed,
             config.target_field.clone(),

@@ -156,6 +156,7 @@ mod test {
         },
         thread,
     };
+    use string_cache::DefaultAtom as Atom;
     use tokio::{
         task::JoinHandle,
         time::{Duration, Instant},
@@ -193,7 +194,10 @@ mod test {
             .unwrap();
 
         let event = rx.compat().next().await.unwrap().unwrap();
-        assert_eq!(event.as_log()[&log_schema().host_key()], "127.0.0.1".into());
+        assert_eq!(
+            event.as_log()[&Atom::from(log_schema().host_key())],
+            "127.0.0.1".into()
+        );
     }
 
     #[tokio::test]
@@ -220,7 +224,7 @@ mod test {
 
         let event = rx.compat().next().await.unwrap().unwrap();
         assert_eq!(
-            event.as_log()[log_schema().source_type_key()],
+            event.as_log()[&Atom::from(log_schema().source_type_key())],
             "socket".into()
         );
     }
@@ -256,11 +260,14 @@ mod test {
         send_lines(addr, lines.into_iter()).await.unwrap();
 
         let event = rx.next().await.unwrap().unwrap();
-        assert_eq!(event.as_log()[&log_schema().message_key()], "short".into());
+        assert_eq!(
+            event.as_log()[&Atom::from(log_schema().message_key())],
+            "short".into()
+        );
 
         let event = rx.next().await.unwrap().unwrap();
         assert_eq!(
-            event.as_log()[&log_schema().message_key()],
+            event.as_log()[&Atom::from(log_schema().message_key())],
             "more short".into()
         );
     }
@@ -306,11 +313,14 @@ mod test {
             .unwrap();
 
         let event = rx.next().await.unwrap().unwrap();
-        assert_eq!(event.as_log()[&log_schema().message_key()], "short".into());
+        assert_eq!(
+            event.as_log()[&Atom::from(log_schema().message_key())],
+            "short".into()
+        );
 
         let event = rx.next().await.unwrap().unwrap();
         assert_eq!(
-            event.as_log()[&log_schema().message_key()],
+            event.as_log()[&Atom::from(log_schema().message_key())],
             "more short".into()
         );
     }
@@ -362,13 +372,13 @@ mod test {
 
         let event = rx.next().await.unwrap().unwrap();
         assert_eq!(
-            event.as_log()[&crate::config::log_schema().message_key()],
+            event.as_log()[&Atom::from(crate::config::log_schema().message_key())],
             "short".into()
         );
 
         let event = rx.next().await.unwrap().unwrap();
         assert_eq!(
-            event.as_log()[&crate::config::log_schema().message_key()],
+            event.as_log()[&Atom::from(crate::config::log_schema().message_key())],
             "more short".into()
         );
     }
@@ -397,7 +407,10 @@ mod test {
             .unwrap();
 
         let event = rx.compat().next().await.unwrap().unwrap();
-        assert_eq!(event.as_log()[&log_schema().message_key()], "test".into());
+        assert_eq!(
+            event.as_log()[&Atom::from(log_schema().message_key())],
+            "test".into()
+        );
 
         // Now signal to the Source to shut down.
         let deadline = Instant::now() + Duration::from_secs(10);
@@ -456,7 +469,7 @@ mod test {
         assert_eq!(100, events.len());
         for event in events {
             assert_eq!(
-                event.as_log()[&log_schema().message_key()],
+                event.as_log()[&Atom::from(log_schema().message_key())],
                 message.clone().into()
             );
         }
@@ -546,7 +559,7 @@ mod test {
         let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             "test".into()
         );
     }
@@ -560,11 +573,11 @@ mod test {
         let events = collect_n(rx, 2).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             "test".into()
         );
         assert_eq!(
-            events[1].as_log()[&log_schema().message_key()],
+            events[1].as_log()[&Atom::from(log_schema().message_key())],
             "test2".into()
         );
     }
@@ -578,11 +591,11 @@ mod test {
         let events = collect_n(rx, 2).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             "test".into()
         );
         assert_eq!(
-            events[1].as_log()[&log_schema().message_key()],
+            events[1].as_log()[&Atom::from(log_schema().message_key())],
             "test2".into()
         );
     }
@@ -596,7 +609,7 @@ mod test {
         let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[&log_schema().host_key()],
+            events[0].as_log()[&Atom::from(log_schema().host_key())],
             format!("{}", from).into()
         );
     }
@@ -610,7 +623,7 @@ mod test {
         let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[log_schema().source_type_key()],
+            events[0].as_log()[&Atom::from(log_schema().source_type_key())],
             "socket".into()
         );
     }
@@ -627,7 +640,7 @@ mod test {
         let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             "test".into()
         );
 
@@ -664,7 +677,10 @@ mod test {
         let events = collect_n(rx, 100).await.unwrap();
         assert_eq!(100, events.len());
         for event in events {
-            assert_eq!(event.as_log()[&log_schema().message_key()], "test".into());
+            assert_eq!(
+                event.as_log()[&Atom::from(log_schema().message_key())],
+                "test".into()
+            );
         }
 
         let deadline = Instant::now() + Duration::from_secs(10);
@@ -730,11 +746,11 @@ mod test {
 
         assert_eq!(1, events.len());
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             "test".into()
         );
         assert_eq!(
-            events[0].as_log()[log_schema().source_type_key()],
+            events[0].as_log()[&Atom::from(log_schema().source_type_key())],
             "socket".into()
         );
     }
@@ -750,11 +766,11 @@ mod test {
 
         assert_eq!(2, events.len());
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             "test".into()
         );
         assert_eq!(
-            events[1].as_log()[&log_schema().message_key()],
+            events[1].as_log()[&Atom::from(log_schema().message_key())],
             "test2".into()
         );
     }
@@ -770,11 +786,11 @@ mod test {
 
         assert_eq!(2, events.len());
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             "test".into()
         );
         assert_eq!(
-            events[1].as_log()[&log_schema().message_key()],
+            events[1].as_log()[&Atom::from(log_schema().message_key())],
             "test2".into()
         );
     }

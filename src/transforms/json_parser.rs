@@ -57,7 +57,7 @@ impl From<JsonParserConfig> for JsonParser {
     fn from(config: JsonParserConfig) -> JsonParser {
         let field = config
             .field
-            .unwrap_or(Atom::from(log_schema().message_key()));
+            .unwrap_or_else(|| Atom::from(log_schema().message_key()));
 
         JsonParser {
             field,
@@ -145,7 +145,10 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert!(event.as_log().get(&log_schema().message_key()).is_none());
+        assert!(event
+            .as_log()
+            .get(&Atom::from(log_schema().message_key()))
+            .is_none());
     }
 
     #[test]
@@ -159,7 +162,10 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert!(event.as_log().get(&log_schema().message_key()).is_some());
+        assert!(event
+            .as_log()
+            .get(&Atom::from(log_schema().message_key()))
+            .is_some());
     }
 
     #[test]
@@ -176,7 +182,7 @@ mod test {
         assert_eq!(event.as_log()[&Atom::from("greeting")], "hello".into());
         assert_eq!(event.as_log()[&Atom::from("name")], "bob".into());
         assert_eq!(
-            event.as_log()[&log_schema().message_key()],
+            event.as_log()[&Atom::from(log_schema().message_key())],
             r#"{"greeting": "hello", "name": "bob"}"#.into()
         );
     }
@@ -223,7 +229,7 @@ mod test {
         assert_eq!(event.as_log()[&Atom::from("greeting")], "hello".into());
         assert_eq!(event.as_log()[&Atom::from("name")], "bob".into());
         assert_eq!(
-            event.as_log()[&log_schema().message_key()],
+            event.as_log()[&Atom::from(log_schema().message_key())],
             r#" {"greeting": "hello", "name": "bob"}    "#.into()
         );
     }
@@ -304,7 +310,10 @@ mod test {
         let parsed = parser.transform(event.clone()).unwrap();
 
         assert_eq!(event, parsed);
-        assert_eq!(event.as_log()[&log_schema().message_key()], invalid.into());
+        assert_eq!(
+            event.as_log()[&Atom::from(log_schema().message_key())],
+            invalid.into()
+        );
 
         // Field
         let mut parser = JsonParser::from(JsonParserConfig {

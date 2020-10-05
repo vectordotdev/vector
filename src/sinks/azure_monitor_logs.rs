@@ -402,10 +402,7 @@ mod tests {
 
         let time_generated_field = headers.get("time-generated-field").unwrap();
         let timestamp_key = log_schema().timestamp_key();
-        assert_eq!(
-            time_generated_field.to_str().unwrap(),
-            timestamp_key.as_ref()
-        );
+        assert_eq!(time_generated_field.to_str().unwrap(), timestamp_key);
 
         let azure_resource_id = headers.get("x-ms-azureresourceid").unwrap();
         assert_eq!(
