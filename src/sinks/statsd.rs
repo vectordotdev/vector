@@ -386,7 +386,7 @@ mod test {
         };
 
         let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).unwrap();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let events = vec![
             Event::Metric(Metric {
