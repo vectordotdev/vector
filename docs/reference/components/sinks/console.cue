@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: console: {
-  title: "#{component.title}"
+  title: "Console"
   short_description: "Streams log and metric events to [standard output streams][urls.standard_streams], such as [STDOUT][urls.stdout] and [STDERR][urls.stderr]."
   long_description: "Streams log and metric events to [standard output streams][urls.standard_streams], such as [STDOUT][urls.stdout] and [STDERR][urls.stderr]."
 
@@ -13,6 +13,7 @@ components: sinks: console: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
