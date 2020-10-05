@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: logdna: {
-  title: "#{component.title}"
+  title: "LogDNA"
   short_description: "Batches log events to [LogDna][urls.logdna]'s HTTP Ingestion API."
   long_description: "[LogDNA][urls.logdna] is a log management system that allows engineering and DevOps to aggregate all system, server, and application logs into one platform. Collect, monitor, store, tail, and search application logs in with one command-line or web interface."
 
@@ -19,6 +19,7 @@ components: sinks: logdna: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
