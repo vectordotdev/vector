@@ -1,7 +1,7 @@
 package metadata
 
 components: sinks: aws_s3: {
-  title: "#{component.title}"
+  title: "AWS S3"
   short_description: "Batches log events to [Amazon Web Service's S3 service][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html)."
   long_description: "[Amazon Simple Storage Service (Amazon S3)][urls.aws_s3] is a scalable, high-speed, web-based cloud storage service designed for online backup and archiving of data and applications on Amazon Web Services. It is very commonly used to store log data."
 
@@ -23,6 +23,7 @@ components: sinks: aws_s3: {
     encoding: {
       enabled: true
       default: null
+      json: null
       ndjson: null
       text: null
     }
