@@ -58,7 +58,6 @@ components: transforms: sampler: {
       }
     }
     rate: {
-      common: true
       description: "The rate at which events will be forwarded, expressed as 1/N. For example, `rate = 10` means 1 out of every 10 events will be forwarded and the rest will be dropped."
       required: true
       warnings: []
