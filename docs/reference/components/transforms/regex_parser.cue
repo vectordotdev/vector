@@ -90,4 +90,32 @@ components: transforms: regex_parser: {
       }
     }
   }
+  examples: log: [
+    {
+      title: "Syslog 5424"
+      configuration: {
+        field: "message"
+        patterns: [#"^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$"#]
+        types: {
+          bytes_in: "int"
+          timestamp: "timestamp|%d/%m/%Y:%H:%M:%S %z"
+          status: "int"
+          bytes_out: "int"
+        }
+      }
+      input: {
+        "message": #"5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] "GET /embrace/supply-chains/dynamic/vertical" 201 20574"#
+      }
+      output: {
+        bytes_in: 5667
+        host: "5.86.210.12"
+        user_id: "zieme4647"
+        timestamp: "2019-06-19T17:20:49-0400"
+        method: "GET"
+        path: "/embrace/supply-chains/dynamic/vertical"
+        status: 201
+        bytes_out: 20574
+      }
+    }
+  ]
 }
