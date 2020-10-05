@@ -37,6 +37,13 @@ components: transforms: regex_parser: {
   }
 
   configuration: {
+    drop_failed: {
+      common: true
+      description: "If the event should be dropped if parsing fails."
+      required: false
+      warnings: []
+      type: bool: default: false
+    }
     drop_field: {
       common: true
       description: "If the specified `field` should be dropped (removed) after parsing."
@@ -118,4 +125,24 @@ components: transforms: regex_parser: {
       }
     }
   ]
+  how_it_works: {
+    failed_parsing: {
+      title: "Failed Parsing"
+      body: #"""
+            By default, if the input message text does not match any of the configured regular expression patterns, this transform will log an error message but leave the log event unchanged. If you instead wish to have this transform drop the event, set `drop_failed = true`.
+            """#
+    }
+    regex_debugger: {
+      title: "Regex Debugger"
+      body: #"""
+            If you are having difficulty with your regular expression not matching text, you may try debugging your patterns at [Regex 101](https://regex101.com/). This site includes a regular expression tester and debugger. The regular expression engine used by Vector is most similar to the "Go" implementation, so make sure that is selected in the "Flavor" menu.
+            """#
+    }
+    regex_syntax: {
+      title: "Regex Syntax"
+      body: #"""
+            Vector uses the Rust standard regular expression engine for pattern matching. Its syntax shares most of the features of Perl-style regular expressions, with a few exceptions. You can find examples of patterns in the [Rust regex module documentation](https://docs.rs/regex).
+            """#
+    }
+  }
 }
