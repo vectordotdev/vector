@@ -510,77 +510,89 @@ impl HostMetricsConfig {
         match heim::disk::partitions().await {
             Ok(partitions) => {
                 partitions
-                .filter_map(|result| filter_result(result, "Failed to load/parse partition data"))
-                // Filter on configured mountpoints
-                .map(|partition| {
-                    self.filesystem.mountpoints.contains_path(partition.mount_point()).and_some(partition)
-                })
-                .filter_map(|partition| async { partition })
-                // Filter on configured devices
-                .map(|partition| {
-                    (
-                        self.filesystem.devices.is_empty()
+                    .filter_map(|result| {
+                        filter_result(result, "Failed to load/parse partition data")
+                    })
+                    // Filter on configured mountpoints
+                    .map(|partition| {
+                        self.filesystem
+                            .mountpoints
+                            .contains_path(partition.mount_point())
+                            .and_some(partition)
+                    })
+                    .filter_map(|partition| async { partition })
+                    // Filter on configured devices
+                    .map(|partition| {
+                        (self.filesystem.devices.is_empty()
                             && partition
-                            .device()
-                            .map(|device| self.filesystem.devices.contains_path(device.as_ref()))
-                            .unwrap_or(true)
-                    )
-                    .and_some(partition)
-                })
-                .filter_map(|partition| async { partition })
-                // Filter on configured filesystems
-                .map(|partition| {
-                    self.filesystem.filesystems.contains_str(partition.file_system().as_str())
+                                .device()
+                                .map(|device| {
+                                    self.filesystem.devices.contains_path(device.as_ref())
+                                })
+                                .unwrap_or(true))
                         .and_some(partition)
-                })
-                .filter_map(|partition| async { partition })
-                // Load usage from the partition mount point
-                .filter_map(|partition| async {
-                    heim::disk::usage(partition.mount_point())
-                        .await
-                        .map(|usage| (partition, usage))
-                        .map_err(|error| {
-                            error!(message = "Failed to load partition usage data", %error, rate_limit_secs = 60)
-                        })
-                        .ok()
-                })
-                .map(|(partition, usage)| {
-                    let timestamp = Utc::now();
-                    let fs = partition.file_system();
-                    let mut tags = tags![
-                        "filesystem" => fs.as_str(),
-                        "mountpoint" => partition.mount_point().to_string_lossy()
-                    ];
-                    if let Some(device) = partition.device() {
-                        tags.insert("device".into(), device.to_string_lossy().into());
-                    }
-                    stream::iter(
-                        vec![
-                            self.gauge(
-                                "filesystem_free_bytes",
-                                timestamp,
-                                usage.free().get::<byte>() as f64,
-                                tags.clone()
-                            ),
-                            self.gauge(
-                                "filesystem_total_bytes",
-                                timestamp,
-                                usage.total().get::<byte>() as f64,
-                                tags.clone()
-                            ),
-                            self.gauge(
-                                "filesystem_used_bytes",
-                                timestamp,
-                                usage.used().get::<byte>() as f64,
-                                tags
-                            ),
-                        ]
-                        .into_iter(),
-                    )
-                })
-                .flatten()
-                .collect::<Vec<_>>()
-                .await
+                    })
+                    .filter_map(|partition| async { partition })
+                    // Filter on configured filesystems
+                    .map(|partition| {
+                        self.filesystem
+                            .filesystems
+                            .contains_str(partition.file_system().as_str())
+                            .and_some(partition)
+                    })
+                    .filter_map(|partition| async { partition })
+                    // Load usage from the partition mount point
+                    .filter_map(|partition| async {
+                        heim::disk::usage(partition.mount_point())
+                            .await
+                            .map_err(|error| {
+                                error!(
+                                    message = "Failed to load partition usage data",
+                                    mount_point = ?partition.mount_point(),
+                                    %error,
+                                    rate_limit_secs = 60,
+                                )
+                            })
+                            .map(|usage| (partition, usage))
+                            .ok()
+                    })
+                    .map(|(partition, usage)| {
+                        let timestamp = Utc::now();
+                        let fs = partition.file_system();
+                        let mut tags = tags![
+                            "filesystem" => fs.as_str(),
+                            "mountpoint" => partition.mount_point().to_string_lossy()
+                        ];
+                        if let Some(device) = partition.device() {
+                            tags.insert("device".into(), device.to_string_lossy().into());
+                        }
+                        stream::iter(
+                            vec![
+                                self.gauge(
+                                    "filesystem_free_bytes",
+                                    timestamp,
+                                    usage.free().get::<byte>() as f64,
+                                    tags.clone(),
+                                ),
+                                self.gauge(
+                                    "filesystem_total_bytes",
+                                    timestamp,
+                                    usage.total().get::<byte>() as f64,
+                                    tags.clone(),
+                                ),
+                                self.gauge(
+                                    "filesystem_used_bytes",
+                                    timestamp,
+                                    usage.used().get::<byte>() as f64,
+                                    tags,
+                                ),
+                            ]
+                            .into_iter(),
+                        )
+                    })
+                    .flatten()
+                    .collect::<Vec<_>>()
+                    .await
             }
             Err(error) => {
                 error!(message = "Failed to load partitions info", %error, rate_limit_secs = 60);
