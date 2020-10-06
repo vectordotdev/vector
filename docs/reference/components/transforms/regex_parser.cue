@@ -11,7 +11,6 @@ components: transforms: regex_parser: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
