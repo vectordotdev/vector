@@ -58,7 +58,7 @@ components: sources: logplex: {
   }
 
   output: logs: line: {
-    description: "An individual line from a file. Lines can be merged using the `multiline` options."
+    description: "An individual event from a batch of events received through an HTTP POST request."
     fields: {
       app_name: {
         description: "The app name field extracted from log message."
