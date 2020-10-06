@@ -62,16 +62,6 @@ components: sources: journald: {
       warnings: []
       type: bool: default: true
     }
-    data_dir: {
-      common: false
-      description: "The directory used to persist the journal checkpoint position. By default, the global `data_dir` is used. Please make sure the Vector project has write permissions to this dir."
-      required: false
-      warnings: []
-      type: string: {
-        default: null
-        examples: ["/var/lib/vector"]
-      }
-    }
     exclude_units: {
       common: true
       description: "The list of unit names to exclude from monitoring. Unit names lacking a `\".\"` will have `\".service\"` appended to make them a valid service unit name."
