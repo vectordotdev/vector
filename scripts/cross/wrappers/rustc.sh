@@ -14,32 +14,32 @@
 
 set -e
 
-self=$(dirname "$0")
+SELF=$(dirname "$0")
 
-libstdcxx_path="/usr/local/aarch64-linux-musl/lib"
-linker="$self/linker.sh"
+LIBSTDCXX_PATH="/usr/local/aarch64-linux-musl/lib"
+LINKER="${SELF}/linker.sh"
 
 # We don't get passed the target in any env var, so we'd have to parse cli args and look for the
 # `--target` flag :(
-target=""
+TARGET=""
 args=()
-for arg in "$@"; do
+for arg in "${@}"; do
     # FIXME: --target=bla is valid too, but we don't handle that
 
-    if [[ "$target" == "next" ]]; then
-        target="$arg"
+    if [[ "${TARGET}" == "next" ]]; then
+        target="${arg}"
     fi
 
-    if [[ "$arg" == "--target" ]]; then
+    if [[ "${arg}" == "--target" ]]; then
         target="next"
     fi
 
-    args+=("$arg")
+    args+=("${arg}")
 done
 
-if [[ "$target" == "aarch64-unknown-linux-musl" ]]; then
+if [[ "${TARGET}" == "aarch64-unknown-linux-musl" ]]; then
     # Pass `-Clinker` last to override the previous `-Clinker`.
-    rustc "-Lnative=$libstdcxx_path" "$@" "-Clinker=$linker"
+    rustc "-Lnative=${LIBSTDCXX_PATH}" "$@" "-Clinker=${LINKER}"
 else
-    rustc "$@"
+    rustc "${@}"
 fi

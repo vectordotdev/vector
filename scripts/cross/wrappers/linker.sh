@@ -20,10 +20,10 @@
 set -o errexit
 
 # Object to inject after the predefined crt start objects.
-inject_begin=${RUST_MUSL_INJECT_BEGIN:-crtbeginS.o}
+INJECT_BEGIN=${RUST_MUSL_INJECT_BEGIN:-crtbeginS.o}
 
 # Object to inject before the predefined crt end objects.
-inject_end=${RUST_MUSL_INJECT_BEGIN:-crtendS.o}
+INJECT_END=${RUST_MUSL_INJECT_END:-crtendS.o}
 
 # NB: We link the -S version of the objects because Rust produces position-independent executables.
 # The non-S version fails to link in that case.
@@ -40,7 +40,7 @@ else
     linker=${RUST_MUSL_LINKER}
 fi
 
-args=("-l:$inject_begin" "$@" "-l:$inject_end")
+args=("-l:${INJECT_BEGIN}" "$@" "-l:${INJECT_END}")
 
-echo invoking real linker: "$linker" "${args[@]}" >&2
-"$linker" "${args[@]}"
+echo invoking real linker: "${linker}" "${args[@]}" >&2
+"${linker}" "${args[@]}"
