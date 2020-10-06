@@ -5,16 +5,21 @@ components: sinks: azure_monitor_logs: {
   short_description: "Batches log events to [Azure Monitor's][urls.azure_monitor] logs via the [REST endpoint][urls.azure_monitor_logs_endpoints]."
   long_description: "[Azure Monitor][urls.azure_monitor] is a service in Azure that provides performance and availability monitoring for applications and services in Azure, other cloud environments, or on-premises. Azure Monitor collects data from multiple sources into a common data platform where it can be analyzed for trends and anomalies."
 
-  _features: {
+  classes: {
+    commonly_used: false
+    function: "transmit"
+    service_providers: ["Azure"]
+  }
+
+  features: {
     batch: {
       enabled: true
-      common: false,
-      max_bytes: 30000000,
-      max_events: null,
+      common: false
+      max_bytes: 30000000
+      max_events: null
       timeout_secs: 1
     }
     buffer: enabled: true
-    checkpoint: enabled: false
     compression: enabled: false
     encoding: {
       enabled: true
@@ -24,7 +29,6 @@ components: sinks: azure_monitor_logs: {
       text: null
     }
     healthcheck: enabled: true
-    multiline: enabled: false
     request: enabled: false
     tls: {
       enabled: true
@@ -33,12 +37,6 @@ components: sinks: azure_monitor_logs: {
       can_verify_hostname: true
       enabled_default: true
     }
-  }
-
-  classes: {
-    commonly_used: false
-    function: "transmit"
-    service_providers: ["Azure"]
   }
 
   statuses: {

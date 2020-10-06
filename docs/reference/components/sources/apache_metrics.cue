@@ -5,16 +5,16 @@ components: sources: apache_metrics: {
   long_description: "fill me in"
   short_description: "Collect metrics from an Apache HTTPD server."
 
-  _features: {
-    checkpoint: enabled: false
-    multiline: enabled: false
-    tls: enabled: false
-  }
-
   classes: {
     commonly_used: false
     deployment_roles: ["daemon", "sidecar"]
     function: "collect"
+  }
+
+  features: {
+    checkpoint: enabled: false
+    multiline: enabled: false
+    tls: enabled: false
   }
 
   statuses: {
@@ -51,7 +51,6 @@ components: sources: apache_metrics: {
   configuration: {
     endpoints: {
       description: "mod_status endpoints to scrape metrics from."
-      common: true
       required: true
       type: "[string]": {
         examples: [["http://localhost:8080/server-status/?auto"]]

@@ -5,22 +5,21 @@ components: sources: http: {
   long_description: ""
   short_description: "Receive logs through the HTTP protocol"
 
-  _features: {
+  classes: {
+    commonly_used: false
+    deployment_roles: ["service", "sidecar"]
+    function: "receive"
+  }
+
+  features: {
     checkpoint: enabled: false
     multiline: enabled: false
     tls: {
       enabled: true
       can_enable: false
       can_verify_certificate: true
-      can_verify_hostname: true
       enabled_default: false
     }
-  }
-
-  classes: {
-    commonly_used: false
-    deployment_roles: ["service", "sidecar"]
-    function: "receive"
   }
 
   statuses: {
@@ -99,7 +98,7 @@ components: sources: http: {
           description: "Any field contained in your JSON payload"
           relevant_when: "`encoding` != \"text\""
           required: false
-          type: _
+          type: "*": {}
         }
         timestamp: fields._timestamp
       }
