@@ -11,7 +11,6 @@ components: transforms: lua: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
