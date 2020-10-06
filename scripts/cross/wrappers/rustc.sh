@@ -22,24 +22,24 @@ LINKER="${SELF}/linker.sh"
 # We don't get passed the target in any env var, so we'd have to parse cli args and look for the
 # `--target` flag :(
 TARGET=""
-args=()
-for arg in "${@}"; do
+ARGS=()
+for ARG in "$@"; do
     # FIXME: --target=bla is valid too, but we don't handle that
 
     if [[ "${TARGET}" == "next" ]]; then
-        target="${arg}"
+        TARGET="${ARG}"
     fi
 
-    if [[ "${arg}" == "--target" ]]; then
-        target="next"
+    if [[ "${ARG}" == "--target" ]]; then
+        TARGET="next"
     fi
 
-    args+=("${arg}")
+    ARGS+=("${ARG}")
 done
 
 if [[ "${TARGET}" == "aarch64-unknown-linux-musl" ]]; then
     # Pass `-Clinker` last to override the previous `-Clinker`.
     rustc "-Lnative=${LIBSTDCXX_PATH}" "$@" "-Clinker=${LINKER}"
 else
-    rustc "${@}"
+    rustc "$@"
 fi

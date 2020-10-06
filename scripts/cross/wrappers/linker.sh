@@ -23,24 +23,24 @@ set -o errexit
 INJECT_BEGIN=${RUST_MUSL_INJECT_BEGIN:-crtbeginS.o}
 
 # Object to inject before the predefined crt end objects.
-INJECT_END=${RUST_MUSL_INJECT_END:-crtendS.o}
+INJECT_END=${RUST_MUSL_INJECT_BEGIN:-crtendS.o}
 
 # NB: We link the -S version of the objects because Rust produces position-independent executables.
 # The non-S version fails to link in that case.
 
 # The linker to forward to. Must accept GCC-style arguments (so must not be LD directly).
-linker=''
+LINKER=''
 if which x86_64-linux-musl-gcc; then
-    linker=x86_64-linux-musl-gcc
+    LINKER=x86_64-linux-musl-gcc
 elif which i686-linux-musl-gcc; then
-    linker=i686-linux-musl-gcc
+    LINKER=i686-linux-musl-gcc
 elif which aarch64-linux-musl-gcc; then
-    linker=aarch64-linux-musl-gcc
+    LINKER=aarch64-linux-musl-gcc
 else
-    linker=${RUST_MUSL_LINKER}
+    LINKER=${RUST_MUSL_LINKER}
 fi
 
-args=("-l:${INJECT_BEGIN}" "$@" "-l:${INJECT_END}")
+args=("-l:$INJECT_BEGIN" "$@" "-l:$INJECT_END")
 
-echo invoking real linker: "${linker}" "${args[@]}" >&2
-"${linker}" "${args[@]}"
+echo invoking real linker: "${LINKER}" "${args[@]}" >&2
+"${LINKER}" "${args[@]}"
