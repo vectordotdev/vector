@@ -11,7 +11,6 @@ components: transforms: rename_fields: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
