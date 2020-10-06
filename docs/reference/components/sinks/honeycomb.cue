@@ -5,7 +5,13 @@ components: sinks: honeycomb: {
   short_description: "Batches log events to [Honeycomb][urls.honeycomb] via the [batch events API][urls.honeycomb_batch]."
   long_description: "[Honeycomb][urls.honeycomb] provides full stack observability—designed for high cardinality data and collaborative problem solving, enabling engineers to deeply understand and debug production software together."
 
-  _features: {
+  classes: {
+    commonly_used: false
+    function: "transmit"
+    service_providers: ["Honeycomb"]
+  }
+
+  features: {
     batch: {
       enabled: true
       common: false,
@@ -14,14 +20,11 @@ components: sinks: honeycomb: {
       timeout_secs: 1
     }
     buffer: enabled: true
-    checkpoint: enabled: false
     compression: enabled: false
     encoding: enabled: false
     healthcheck: enabled: true
-    multiline: enabled: false
     request: {
       enabled: true
-      common: false,
       in_flight_limit: 5,
       rate_limit_duration_secs: 1,
       rate_limit_num: 5,
@@ -32,19 +35,13 @@ components: sinks: honeycomb: {
     tls: enabled: false
   }
 
-  classes: {
-    commonly_used: false
-    function: "transmit"
-    service_providers: ["Honeycomb"]
-  }
-
   statuses: {
     delivery: "at_least_once"
     development: "beta"
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
