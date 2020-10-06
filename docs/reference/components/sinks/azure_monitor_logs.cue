@@ -14,7 +14,6 @@ components: sinks: azure_monitor_logs: {
       timeout_secs: 1
     }
     buffer: enabled: true
-    checkpoint: enabled: false
     compression: enabled: false
     encoding: {
       enabled: true
@@ -24,7 +23,6 @@ components: sinks: azure_monitor_logs: {
       text: null
     }
     healthcheck: enabled: true
-    multiline: enabled: false
     request: enabled: false
     tls: {
       enabled: true

@@ -99,7 +99,7 @@ components: sources: http: {
           description: "Any field contained in your JSON payload"
           relevant_when: "`encoding` != \"text\""
           required: false
-          type: _
+          type: "*": {}
         }
         timestamp: fields._timestamp
       }
