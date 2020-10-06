@@ -40,7 +40,6 @@ components: transforms: dedupe: {
       required: false
       warnings: []
       type: object: {
-        examples: []
         options: {
           num_events: {
             common: true
@@ -60,7 +59,6 @@ components: transforms: dedupe: {
       required: true
       warnings: []
       type: object: {
-        examples: []
         options: {
           ignore: {
             common: false
