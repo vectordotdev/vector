@@ -5,7 +5,13 @@ components: sinks: new_relic_logs: {
   short_description: "Batches log events to [New Relic's log service][urls.new_relic] via their [log API][urls.new_relic_log_api]."
   long_description: "[New Relic][urls.new_relic] is a San Francisco, California-based technology company which develops cloud-based software to help website and application owners track the performances of their services."
 
-  _features: {
+  classes: {
+    commonly_used: false
+    function: "transmit"
+    service_providers: ["New Relic"]
+  }
+
+  features: {
     batch: {
       enabled: true
       common: false,
@@ -14,10 +20,9 @@ components: sinks: new_relic_logs: {
       timeout_secs: 1
     }
     buffer: enabled: true
-    checkpoint: enabled: false
     compression: {
       enabled: true
-      default: "none"
+      default: null
       gzip: true
     }
     encoding: {
@@ -28,10 +33,8 @@ components: sinks: new_relic_logs: {
       text: null
     }
     healthcheck: enabled: true
-    multiline: enabled: false
     request: {
       enabled: true
-      common: false,
       in_flight_limit: 100,
       rate_limit_duration_secs: 1,
       rate_limit_num: 100,
@@ -42,19 +45,13 @@ components: sinks: new_relic_logs: {
     tls: enabled: false
   }
 
-  classes: {
-    commonly_used: false
-    function: "transmit"
-    service_providers: ["New Relic"]
-  }
-
   statuses: {
     delivery: "at_least_once"
     development: "beta"
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
