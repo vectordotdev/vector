@@ -5,7 +5,13 @@ components: sinks: influxdb_metrics: {
   short_description: "Batches metric events to [InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_api_v1] or [v2][urls.influxdb_http_api_v2] HTTP API."
   long_description: "[InfluxDB][urls.influxdb] is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics."
 
-  _features: {
+  classes: {
+    commonly_used: false
+    function: "transmit"
+    service_providers: ["InfluxData"]
+  }
+
+  features: {
     batch: {
       enabled: true
       common: false,
@@ -13,14 +19,11 @@ components: sinks: influxdb_metrics: {
       timeout_secs: 1
     }
     buffer: enabled: false
-    checkpoint: enabled: false
     compression: enabled: false
     encoding: enabled: false
     healthcheck: enabled: true
-    multiline: enabled: false
     request: {
       enabled: true
-      common: false,
       in_flight_limit: 5,
       rate_limit_duration_secs: 1,
       rate_limit_num: 5,
@@ -31,19 +34,13 @@ components: sinks: influxdb_metrics: {
     tls: enabled: false
   }
 
-  classes: {
-    commonly_used: false
-    function: "transmit"
-    service_providers: ["InfluxData"]
-  }
-
   statuses: {
     delivery: "at_least_once"
     development: "beta"
   }
 
   support: {
-      input_types: ["metric"]
+    input_types: ["metric"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
