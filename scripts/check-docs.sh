@@ -21,7 +21,7 @@ if ! [ -x "$(command -v cue)" ]; then
   exit 1
 fi
 
-errors=$(cue vet ${DOCS_PATH}/*.cue ${DOCS_PATH}/**/*.cue)
+errors=$(cue vet --concrete --all-errors ${DOCS_PATH}/*.cue ${DOCS_PATH}/**/*.cue)
 
 if [ -n "$errors" ]; then
   printf "Failed!\n\n%s\n" "${errors}"
