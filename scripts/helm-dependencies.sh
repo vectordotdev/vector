@@ -24,6 +24,13 @@ list-chart-dependencies() {
   helm dependency list "$CHART" | tail -n +2 | sed '/^$/d' | awk '{ gsub("file://", "", $3); print $1, $3 }'
 }
 
+list() {
+  for CHART in "${DEPENDENCY_UPDATE_ORDER[@]}"; do
+    echo "=> $CHART"
+    list-chart-dependencies "distribution/helm/$CHART"
+  done
+}
+
 update() {
   for CHART in "${DEPENDENCY_UPDATE_ORDER[@]}"; do
     echo "=> $CHART"
@@ -46,13 +53,6 @@ update() {
       echo "Symlinking \"$DEPENDENCY_NAME\" with name \"$LINK_NAME\" and target \"$LINK_TARGET\"..."
       ln -sfn -T "$LINK_TARGET" "$LINK_NAME"
     done
-  done
-}
-
-list() {
-  for CHART in "${DEPENDENCY_UPDATE_ORDER[@]}"; do
-    echo "=> $CHART"
-    list-chart-dependencies "distribution/helm/$CHART"
   done
 }
 
@@ -85,16 +85,16 @@ Usage: $0 MODE
 Modes:
   update   - update Helm chart dependencies and vendor them to the respective
              charts/ dir of each chart.
-  list     - list the dependencies for each Helm chart.
   validate - check that vendored Helm chart dependencies are up-to-date with
              with their upstream counterparts.
+  list     - list the dependencies for each Helm chart.
 EOF
   exit 1
 }
 
 MODE="${1:-}"
 case "$MODE" in
-  update|list|validate)
+  list|update|validate)
     "$MODE"
     ;;
   *)
