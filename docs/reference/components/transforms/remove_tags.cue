@@ -44,4 +44,15 @@ components: transforms: remove_tags: {
       }
     }
   }
+
+  how_it_works: {
+    complex_processing: {
+      title: "Complex Processing"
+      body: #"""
+      If you encounter limitations with the `remove_tags` transform then we recommend using a
+      [runtime](vector_programmable_transforms) transform. These transforms are designed for complex
+      processing and give you the power of full programming runtime.
+      """#
+    }
+  }
 }
