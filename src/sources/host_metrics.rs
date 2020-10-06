@@ -1051,6 +1051,9 @@ mod tests {
         .await;
     }
 
+    // The Windows CI environment produces zero network metrics, causing
+    // this to always fail.
+    #[cfg(not(target_os = "windows"))]
     #[tokio::test]
     async fn generates_network_metrics() {
         let metrics = HostMetricsConfig::default().network_metrics().await;
@@ -1066,6 +1069,9 @@ mod tests {
         assert_eq!(count_tag(&metrics, "device"), metrics.len());
     }
 
+    // The Windows CI environment produces zero network metrics, causing
+    // this to always fail.
+    #[cfg(not(target_os = "windows"))]
     #[tokio::test]
     async fn network_metrics_filters_on_device() {
         assert_filtered_metrics("device", |devices| async {
@@ -1079,8 +1085,9 @@ mod tests {
         .await;
     }
 
-    #[tokio::test]
+    // Windows does not produce load average metrics.
     #[cfg(not(target_os = "windows"))]
+    #[tokio::test]
     async fn generates_loadavg_metrics() {
         let metrics = HostMetricsConfig::default().loadavg_metrics().await;
         assert_eq!(metrics.len(), 3);
