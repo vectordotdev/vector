@@ -89,7 +89,7 @@ components: sources: apache_metrics: {
 		}
 		apache_connections: {
 			description: "The total number of time the Apache server has been accessed."
-			type:        "guage"
+			type:        "gauge"
 			tags: {
 				endpoint: _endpoint
 				host:     _host
@@ -103,7 +103,7 @@ components: sources: apache_metrics: {
 		apache_cpu_load: {
 			description:   "The current CPU of the Apache server."
 			relevant_when: "`ExtendedStatus On`"
-			type:          "guage"
+			type:          "gauge"
 			tags: {
 				endpoint: _endpoint
 				host:     _host
@@ -134,7 +134,7 @@ components: sources: apache_metrics: {
 		}
 		apache_scoreboard: {
 			description: "The amount of times various Apache server tasks have been run."
-			type:        "guage"
+			type:        "gauge"
 			tags: {
 				endpoint: _endpoint
 				host:     _host
@@ -164,7 +164,7 @@ components: sources: apache_metrics: {
 		}
 		apache_workers: {
 			description: "Apache worker statuses."
-			type:        "guage"
+			type:        "gauge"
 			tags: {
 				endpoint: _endpoint
 				host:     _host
@@ -177,7 +177,7 @@ components: sources: apache_metrics: {
 		}
 		apache_up: {
 			description: "If the Apache server is up or not."
-			type:        "guage"
+			type:        "gauge"
 			tags: {
 				endpoint: _endpoint
 				host:     _host

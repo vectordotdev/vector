@@ -318,7 +318,7 @@ package metadata
 		name:     Name
 	}
 	name: Name
-	type: "counter" | "guage" | "histogram" | "summary"
+	type: "counter" | "gauge" | "histogram" | "summary"
 }
 
 components: close({
