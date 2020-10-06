@@ -5,7 +5,13 @@ components: sinks: splunk_hec: {
   short_description: "Batches log events to a [Splunk's HTTP Event Collector][urls.splunk_hec]."
   long_description: "The [Splunk HTTP Event Collector (HEC)][urls.splunk_hec] is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application."
 
-  _features: {
+  classes: {
+    commonly_used: true
+    function: "transmit"
+    service_providers: ["Splunk"]
+  }
+
+  features: {
     batch: {
       enabled: true
       common: false,
@@ -14,10 +20,9 @@ components: sinks: splunk_hec: {
       timeout_secs: 1
     }
     buffer: enabled: true
-    checkpoint: enabled: false
     compression: {
       enabled: true
-      default: "none"
+      default: null
       gzip: true
     }
     encoding: {
@@ -28,10 +33,8 @@ components: sinks: splunk_hec: {
       text: null
     }
     healthcheck: enabled: true
-    multiline: enabled: false
     request: {
       enabled: true
-      common: false,
       in_flight_limit: 10,
       rate_limit_duration_secs: 1,
       rate_limit_num: 10,
@@ -48,19 +51,13 @@ components: sinks: splunk_hec: {
     }
   }
 
-  classes: {
-    commonly_used: true
-    function: "transmit"
-    service_providers: ["Splunk"]
-  }
-
   statuses: {
     delivery: "at_least_once"
     development: "stable"
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
