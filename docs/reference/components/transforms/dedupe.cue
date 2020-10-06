@@ -11,7 +11,6 @@ components: transforms: dedupe: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
