@@ -5,10 +5,15 @@ components: sinks: datadog_logs: {
   short_description: "Streams log events to [Datadog's][urls.datadog] logs via the [TCP endpoint][urls.datadog_logs_endpoints]."
   long_description: "[Datadog][urls.datadog] is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform."
 
-  _features: {
+  classes: {
+    commonly_used: false
+    function: "transmit"
+    service_providers: ["Datadog"]
+  }
+
+  features: {
     batch: enabled: false
     buffer: enabled: true
-    checkpoint: enabled: false
     compression: enabled: false
     encoding: {
       enabled: true
@@ -18,7 +23,6 @@ components: sinks: datadog_logs: {
       text: null
     }
     healthcheck: enabled: true
-    multiline: enabled: false
     request: enabled: false
     tls: {
       enabled: true
@@ -29,19 +33,13 @@ components: sinks: datadog_logs: {
     }
   }
 
-  classes: {
-    commonly_used: false
-    function: "transmit"
-    service_providers: ["Datadog"]
-  }
-
   statuses: {
     delivery: "at_least_once"
     development: "beta"
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
