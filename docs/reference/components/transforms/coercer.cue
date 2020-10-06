@@ -11,7 +11,6 @@ components: transforms: coercer: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
