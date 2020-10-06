@@ -11,7 +11,6 @@ components: transforms: json_parser: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
