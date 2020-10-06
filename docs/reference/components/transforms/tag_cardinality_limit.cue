@@ -5,15 +5,13 @@ components: transforms: tag_cardinality_limit: {
   short_description: "Accepts metric events and allows you to limit the cardinality of metric tags to prevent downstream disruption of metrics services."
   long_description: "Accepts metric events and allows you to limit the cardinality of metric tags to prevent downstream disruption of metrics services."
 
-  _features: {
-    checkpoint: enabled: false
-    multiline: enabled: false
-    tls: enabled: false
-  }
-
   classes: {
     commonly_used: true
     function: "filter"
+  }
+
+  features: {
+    tls: enabled: false
   }
 
   statuses: {
@@ -21,7 +19,7 @@ components: transforms: tag_cardinality_limit: {
   }
 
   support: {
-      input_types: ["metric"]
+    input_types: ["metric"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
