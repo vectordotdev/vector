@@ -5,10 +5,15 @@ components: sinks: pulsar: {
   short_description: "Streams log events to [Apache Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol]."
   long_description: "[Pulsar][urls.pulsar] is a multi-tenant, high-performance solution for server-to-server messaging. Pulsar was originally developed by Yahoo, it is under the stewardship of the Apache Software Foundation. It is an excellent tool for streaming logs and metrics data."
 
-  _features: {
+  classes: {
+    commonly_used: false
+    function: "transmit"
+    service_providers: []
+  }
+
+  features: {
     batch: enabled: false
     buffer: enabled: false
-    checkpoint: enabled: false
     compression: enabled: false
     encoding: {
       enabled: true
@@ -18,15 +23,8 @@ components: sinks: pulsar: {
       text: null
     }
     healthcheck: enabled: true
-    multiline: enabled: false
     request: enabled: false
     tls: enabled: false
-  }
-
-  classes: {
-    commonly_used: false
-    function: "transmit"
-    service_providers: []
   }
 
   statuses: {
@@ -35,7 +33,7 @@ components: sinks: pulsar: {
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
