@@ -83,15 +83,23 @@ extraVolumeMounts: []
 
 # Storage options.
 storage:
+  # The storage mode to use to store `vector` data.
+  # Possible values:
+  # - `hostPath`
+  # - `managedPersistentVolumeClaim`
+  # - `existingPersistentVolumeClaim`
+  # - `empty`
+  mode: empty
+
   # Absolute path on the host to store `vector` data.
-  # If specified, but `persistentVolume.enabled` is `true`, then has no effect.
+  # If `mode` is set to anything other than `hostPath` has no effect.
   hostPath: ""
 
-  # If `enabled` is `true` then a `PersistentVolumeClaim` will be created and
-  # used to store `vector` data, otherwise `hostPath` is used.
-  persistentVolume:
-    # Whether to create `PersistentVolumeClaim`.
-    enabled: false
+  # Create `PersistentVolumeClaim` via the `volumeClaimTemplates` of
+  # the `StatefulSet` to store `vector` data.
+  # If `mode` is set to anything other than `managedPersistentVolumeClaim` has
+  # no effect.
+  managedPersistentVolumeClaim:
     # The size to allocate.
     size: 10Gi
     # If defined, then `storageClassName: <storageClass>`.
@@ -102,10 +110,17 @@ storage:
     # GKE, AWS & OpenStack).
     storageClass: ""
 
-    # Additional labels to apply to the created `PersistentVolumeClaims`.
+    # Additional labels to apply to the created `PersistentVolumeClaim`.
     labels: {}
-    # Additional annotations to apply to the created `PersistentVolumeClaims`.
+    # Additional annotations to apply to the created `PersistentVolumeClaim`.
     annotations: {}
+
+  # The name of the existing `PersistentVolumeClaim` to store `vector` data.
+  # Useful if you're running in a cluster that requires manually provisioning
+  # `PersistentVolume`s and binding them to the `PersistentVolumeClaim`s.
+  # If `mode` is set to anything other than `existingPersistentVolumeClaim` has
+  # no effect.
+  existingPersistentVolumeClaim: ""
 
 rbac:
   # Whether to create rbac resources or not. Disable for non-rbac clusters.
