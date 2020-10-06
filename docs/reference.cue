@@ -130,9 +130,14 @@ package metadata
     }
 
     if kind == "sink" {
-      compression: close({
-        enabled: bool | null
-      })
+      compression: {
+        enabled: bool
+
+        if enabled == true {
+          default: "gzip" | null
+          gzip: bool
+        }
+      }
     }
 
     if kind == "sink" {
@@ -161,9 +166,18 @@ package metadata
     }
 
     if kind == "sink" {
-      request: close({
+      request: {
         enabled: bool
-      })
+
+        if enabled {
+          in_flight_limit: uint8,
+          rate_limit_duration_secs: uint8,
+          rate_limit_num: uint8,
+          retry_initial_backoff_secs: uint8,
+          retry_max_duration_secs: uint8,
+          timeout_secs: uint8
+        }
+      }
     }
 
     if kind == "source" || kind == "sink" {

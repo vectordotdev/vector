@@ -5,7 +5,13 @@ components: sinks: aws_kinesis_firehose: {
   short_description: "Batches log events to [Amazon Web Service's Kinesis Data Firehose][urls.aws_kinesis_firehose] via the [`PutRecordBatch` API endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecordBatch.html)."
   long_description: "[Amazon Kinesis Data Firehose][urls.aws_kinesis_firehose] is a fully managed service for delivering real-time streaming data to destinations such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon Elasticsearch Service (Amazon ES), and Splunk."
 
-  _features: {
+  classes: {
+    commonly_used: false
+    function: "transmit"
+    service_providers: ["AWS"]
+  }
+
+  features: {
     batch: {
       enabled: true
       common: false,
@@ -14,10 +20,9 @@ components: sinks: aws_kinesis_firehose: {
       timeout_secs: 1
     }
     buffer: enabled: true
-    checkpoint: enabled: false
     compression: {
       enabled: true
-      default: "none"
+      default: null
       gzip: true
     }
     encoding: {
@@ -28,10 +33,8 @@ components: sinks: aws_kinesis_firehose: {
       text: null
     }
     healthcheck: enabled: true
-    multiline: enabled: false
     request: {
       enabled: true
-      common: false,
       in_flight_limit: 5,
       rate_limit_duration_secs: 1,
       rate_limit_num: 5,
@@ -40,12 +43,6 @@ components: sinks: aws_kinesis_firehose: {
       timeout_secs: 30
     }
     tls: enabled: false
-  }
-
-  classes: {
-    commonly_used: false
-    function: "transmit"
-    service_providers: ["AWS"]
   }
 
   statuses: {
