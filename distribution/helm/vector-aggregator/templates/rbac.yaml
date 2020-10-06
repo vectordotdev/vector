@@ -4,12 +4,6 @@ kind: ClusterRole
 metadata:
   name: {{ include "libvector.fullname" . }}
 rules:
-  - apiGroups:
-      - ""
-    resources:
-      - pods
-    verbs:
-      - watch
 {{- if .Values.psp.enabled }}
   - apiGroups:
       - policy
