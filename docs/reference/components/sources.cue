@@ -9,13 +9,13 @@ components: sources: [Name=string]: {
     function: "collect" | "receive" | "test"
   }
 
-  _features: {
+  features: {
     checkpoint: enabled: bool
     multiline: enabled: bool
   }
 
   configuration: {
-    if _features.checkpoint.enabled {
+    if features.checkpoint.enabled {
       data_dir: {
         common: false
         description: "The directory used to persist file checkpoint positions. By default, the [global `data_dir` option][docs.global-options#data_dir] is used. Please make sure the Vector project has write permissions to this dir."
@@ -27,7 +27,7 @@ components: sources: [Name=string]: {
       }
     }
 
-    if _features.multiline.enabled {
+    if features.multiline.enabled {
       multiline: {
         common: false
         description: "Multiline parsing configuration. If not specified, multiline parsing is disabled."
@@ -98,7 +98,7 @@ components: sources: [Name=string]: {
   }
 
   how_it_works: {
-    if _features.checkpoint.enabled {
+    if features.checkpoint.enabled {
       checkpointing: {
         title: "Checkpointing"
         body: #"""

@@ -6,22 +6,23 @@
 package metadata
 
 #ConfigurationOptions: [Name=string]: {
-  common: bool
   description: string
-  groups: [...string]
+  groups?: [...string]
   name: Name
   relevant_when?: string
   required: bool
+
   warnings: [...{
     visibility_level: "component" | "option"
     text: string
   }]
 
-  if required {
-    common: true
+  if !required {
+    common: bool
   }
 
   sort?: int8
+
   type: {
     "[string]"?: {
       if !required {
@@ -105,6 +106,82 @@ package metadata
     }
   }
 
+  features: close({
+    if kind == "sink" {
+      batch: close({
+        enabled: bool
+        common: bool,
+        max_bytes: uint | null,
+        max_events: uint | null,
+        timeout_secs: uint8
+      })
+    }
+
+    if kind == "sink" {
+      buffer: close({
+        enabled: bool | string
+      })
+    }
+
+    if kind == "source" {
+      checkpoint: close({
+        enabled: bool
+      })
+    }
+
+    if kind == "sink" {
+      compression: close({
+        enabled: bool | null
+      })
+    }
+
+    if kind == "sink" {
+      encoding: close({
+        enabled: true
+
+        if enabled {
+          default: null
+          json: null
+          ndjson: null
+          text: null
+        }
+      })
+    }
+
+    if kind == "sink" {
+      healthcheck: close({
+        enabled: bool
+      })
+    }
+
+    if kind == "source" {
+      multiline: close({
+        enabled: bool
+      })
+    }
+
+    if kind == "sink" {
+      request: close({
+        enabled: bool
+      })
+    }
+
+    if kind == "source" || kind == "sink" {
+      tls: {
+        enabled: bool
+
+        if enabled {
+          can_enable: bool
+          can_verify_certificate: bool
+          if kind == "sink" {
+            can_verify_hostname: bool
+          }
+          enabled_default: bool
+        }
+      }
+    }
+  })
+
   // The various statuses of this component.
   statuses: {
     if kind == "source" || kind == "sink" {
@@ -174,18 +251,20 @@ package metadata
   }
 
   // Markdown-based sections that describe how the component works.
-  how_it_works: [Name=string]: {
-    name: Name
-    title: string
-    body: string
-    sub_sections?: [...{
-      title: string
-      body: string
-    }]
-  }
+  how_it_works: #HowItWorks
 }
 
 #Fields: [Name=string]: #Fields | _
+
+#HowItWorks: [Name=string]: {
+  name: Name
+  title: string
+  body: string
+  sub_sections?: [...{
+    title: string
+    body: string
+  }]
+}
 
 #LogEvents: [Name=string]: {
   description: string
