@@ -49,6 +49,8 @@ urls: {
   aws_s3_sse: "https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingServerSideEncryption.html"
   aws_s3_storage_classes: "https://aws.amazon.com/s3/storage-classes/"
   aws_s3_tags: "https://docs.aws.amazon.com/AmazonS3/latest/user-guide/add-object-tags.html"
+  azure_monitor: "https://azure.microsoft.com/en-us/services/monitor/"
+  azure_monitor_logs_endpoints: "https://docs.microsoft.com/en-us/rest/api/monitor/"
   basic_auth: "https://en.wikipedia.org/wiki/Basic_access_authentication"
   big_query_streaming: "https://cloud.google.com/bigquery/streaming-data-into-bigquery"
   cargo_audit: "https://github.com/RustSec/cargo-audit"
