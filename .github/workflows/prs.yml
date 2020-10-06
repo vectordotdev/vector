@@ -33,7 +33,7 @@ jobs:
         source: ${{ steps.filter.outputs.source }}
         docs: ${{ steps.filter.outputs.docs }}
         markdown: ${{ steps.filter.outputs.markdown }}
-        cargo: ${{ steps.filter.outputs.cargo }}
+        cargo: ${{ steps.filter.outputs.dependencies }}
         internal_events: ${{ steps.filter.outputs.internal_events }}
         helm: ${{ steps.filter.outputs.helm }}
       steps:
@@ -62,9 +62,10 @@ jobs:
               - 'docs/**'
             markdown:
               - '**/**.md'
-            cargo:
+            dependencies:
               - 'Cargo.toml'
               - 'Cargo.lock'
+              - 'rust-toolchain'
             internal_events:
               - 'src/internal_events/**'
             helm:
@@ -105,7 +106,7 @@ jobs:
           - aarch64-unknown-linux-musl
     # We run cross checks when dependencies change to ensure they still build.
     # This helps us avoid adopting dependencies that aren't compatible with other architectures.
-    if: ${{ needs.changes.outputs.cargo == 'true' }}
+    if: ${{ needs.changes.outputs.dependencies == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -607,7 +608,7 @@ jobs:
         if: needs.changes.outputs.internal_events == 'true'
         run: make check-internal-events
       - name: Check cargo deny
-        if: needs.changes.outputs.cargo == 'true'
+        if: needs.changes.outputs.dependencies == 'true'
         uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check advisories
