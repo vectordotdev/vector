@@ -5,15 +5,13 @@ components: transforms: filter: {
   short_description: "Accepts log and metric events and allows you to select events based on a set of logical conditions."
   long_description: "Accepts log and metric events and allows you to select events based on a set of logical conditions."
 
-  _features: {
-    checkpoint: enabled: false
-    multiline: enabled: false
-    tls: enabled: false
-  }
-
   classes: {
     commonly_used: true
     function: "filter"
+  }
+
+  features: {
+    tls: enabled: false
   }
 
   statuses: {
@@ -21,7 +19,7 @@ components: transforms: filter: {
   }
 
   support: {
-      input_types: ["log","metric"]
+    input_types: ["log","metric"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
