@@ -2269,8 +2269,9 @@ dependencies = [
 
 [[package]]
 name = "leveldb-sys"
-version = "2.0.7"
-source = "git+https://github.com/jonas-schievink/leveldb-sys?branch=musl-stdcxx#e1d166489cd578d80504f5ed5b3284f8d4410f8d"
+version = "2.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "618aee5ba3d32cb8456420a9a454aa71c1af5b3e9c7a2ec20a0f3cbbe47246cb"
 dependencies = [
  "cmake",
  "libc",
