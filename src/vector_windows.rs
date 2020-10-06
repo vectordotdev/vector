@@ -22,19 +22,61 @@ pub mod service_control {
 
     use crate::internal_events::{
         WindowsServiceDoesNotExist, WindowsServiceInstall, WindowsServiceStart, WindowsServiceStop,
-        WindowsServiceUninstall,
+        WindowsServiceRestart, WindowsServiceUninstall,
     };
     use crate::vector_windows::SERVICE_TYPE;
     use std::ffi::OsString;
     use std::time::Duration;
-    use std::{fmt, thread};
+    use std::fmt;
 
-    #[derive(Debug, Clone, PartialEq)]
+    pub enum Error {
+        Service(windows_service::Error),
+        PollTimeout {
+            state: ServiceState,
+            expected_state: ServiceState,
+            timeout: Duration,
+        },
+    }
+
+    impl From<windows_service::Error> for Error {
+        fn from(err: windows_service::Error) -> Self {
+            Error::Service(err)
+        }
+    }
+
+    impl fmt::Display for Error {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match &*self {
+                Self::Service(error) => {
+                    if let windows_service::Error::Winapi(win_error) = error {
+                        write!(f, "{}", win_error)
+                    } else {
+                        write!(f, "{}", error)
+                    }
+                },
+                Self::PollTimeout {
+                    state,
+                    expected_state,
+                    timeout
+                } => write!(f, "Timeout occured after {:?} while waiting for state to become {:?}, but was {:?}",
+                timeout, expected_state, state),
+            }
+        }
+    }
+
+    #[derive(Debug, Copy, Clone, PartialEq)]
     pub enum ControlAction {
         Install,
         Uninstall,
         Start,
         Stop,
+        Restart,
+    }
+
+    #[derive(Debug, Copy, Clone, PartialEq)]
+    enum PollStatus {
+        NoTimeout,
+        Timeout(ServiceState),
     }
 
     impl fmt::Display for ControlAction {
@@ -66,11 +108,15 @@ pub mod service_control {
         }
     }
 
-    pub fn control(service_def: &ServiceDefinition, action: ControlAction) -> Result<()> {
+    pub fn control(
+        service_def: &ServiceDefinition,
+        action: ControlAction,
+    ) -> std::result::Result<(), Error> {
         match action {
-            ControlAction::Start => start_service(&service_def),
-            ControlAction::Stop => stop_service(&service_def),
-            ControlAction::Install => install_service(&service_def),
+            ControlAction::Start => start_service(&service_def).map_err(|e| e.into()),
+            ControlAction::Stop => stop_service(&service_def).map_err(|e| e.into()),
+            ControlAction::Restart => restart_service(&service_def),
+            ControlAction::Install => install_service(&service_def).map_err(|e| e.into()),
             ControlAction::Uninstall => uninstall_service(&service_def),
         }
     }
@@ -121,6 +167,41 @@ pub mod service_control {
         Ok(())
     }
 
+    fn restart_service(service_def: &ServiceDefinition) -> std::result::Result<(), Error> {
+        let service_access =
+            ServiceAccess::QUERY_STATUS | ServiceAccess::START | ServiceAccess::STOP;
+        let service = open_service(&service_def, service_access)?;
+        let service_status = service.query_status()?;
+
+        if service_status.current_state == ServiceState::StartPending
+            || service_status.current_state == ServiceState::Running
+        {
+            service.stop()?;
+        }
+
+        let timeout = Duration::from_secs(10);
+        let poll_status = poll_state(
+            &service,
+            ServiceState::Stopped,
+            timeout,
+            Duration::from_secs(1),
+        )?;
+
+        if let PollStatus::Timeout(state) = poll_status {
+            return Err(Error::PollTimeout {
+                state,
+                expected_state: ServiceState::Stopped,
+                timeout,
+            });
+        }
+
+        service.start(&[] as &[OsString])?;
+        emit!(WindowsServiceRestart {
+            name: &*service_def.name.to_string_lossy()
+        });
+        Ok(())
+    }
+
     fn install_service(service_def: &ServiceDefinition) -> Result<()> {
         let manager_access = ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE;
         let service_manager = ServiceManager::local_computer(None::<&str>, manager_access)?;
@@ -152,7 +233,7 @@ pub mod service_control {
         Ok(())
     }
 
-    fn uninstall_service(service_def: &ServiceDefinition) -> Result<()> {
+    fn uninstall_service(service_def: &ServiceDefinition) -> std::result::Result<(), Error> {
         let service_access =
             ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE;
         let service = open_service(&service_def, service_access)?;
@@ -164,7 +245,22 @@ pub mod service_control {
                 name: &*service_def.name.to_string_lossy(),
                 already_stopped: false,
             });
-            thread::sleep(Duration::from_secs(1));
+        }
+
+        let timeout = Duration::from_secs(10);
+        let poll_status = poll_state(
+            &service,
+            ServiceState::Stopped,
+            timeout,
+            Duration::from_secs(1),
+        )?;
+
+        if let PollStatus::Timeout(state) = poll_status {
+            return Err(Error::PollTimeout {
+                state,
+                expected_state: ServiceState::Stopped,
+                timeout,
+            });
         }
 
         service.delete()?;
@@ -191,6 +287,37 @@ pub mod service_control {
                 e
             })?;
         Ok(service)
+    }
+
+    fn poll_state(
+        service: &windows_service::service::Service,
+        state: ServiceState,
+        timeout: Duration,
+        wait_hint: Duration,
+    ) -> Result<PollStatus> {
+        let mut wait_index = 1;
+        let mut wait_time = Duration::default();
+
+        let poll_status = loop {
+            let service_status = service.query_status()?;
+            if service_status.current_state == state {
+                break PollStatus::NoTimeout;
+            }
+            debug!(
+                "Waiting for service to transition to state {:?}... {}",
+                state, wait_index
+            );
+            wait_index += 1;
+
+            wait_time += wait_hint;
+            if wait_time >= timeout {
+                break PollStatus::Timeout(service_status.current_state);
+            }
+
+            std::thread::sleep(wait_hint);
+        };
+
+        Ok(poll_status)
     }
 }
 
