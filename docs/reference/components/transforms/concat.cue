@@ -5,15 +5,13 @@ components: transforms: concat: {
   short_description: "Accepts log events and allows you to concat (substrings) of other fields to a new one."
   long_description: "Accepts log events and allows you to concat (substrings) of other fields to a new one."
 
-  _features: {
-    checkpoint: enabled: false
-    multiline: enabled: false
-    tls: enabled: false
-  }
-
   classes: {
     commonly_used: false
     function: "schema"
+  }
+
+  features: {
+    tls: enabled: false
   }
 
   statuses: {
@@ -21,7 +19,7 @@ components: transforms: concat: {
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
