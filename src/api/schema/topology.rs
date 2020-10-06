@@ -52,7 +52,6 @@ impl Source {
         })
     }
 
-    //noinspection DuplicatedCode
     /// Sink outputs
     async fn sinks(&self) -> Vec<Sink> {
         filter_topology(|(_name, topology)| match topology {
@@ -63,13 +62,13 @@ impl Source {
 }
 
 #[derive(Clone)]
-pub struct TransformData {
+pub struct InputsData {
     name: String,
     inputs: Vec<String>,
 }
 
 #[derive(Clone)]
-pub struct Transform(TransformData);
+pub struct Transform(InputsData);
 
 #[Object]
 impl Transform {
@@ -78,7 +77,6 @@ impl Transform {
         self.0.name.clone()
     }
 
-    //noinspection DuplicatedCode
     /// Source inputs
     async fn sources(&self) -> Vec<Source> {
         self.0
@@ -94,7 +92,6 @@ impl Transform {
             .collect()
     }
 
-    //noinspection DuplicatedCode
     /// Sink outputs
     async fn sinks(&self) -> Vec<Sink> {
         filter_topology(|(_name, topology)| match topology {
@@ -105,13 +102,7 @@ impl Transform {
 }
 
 #[derive(Clone)]
-pub struct SinkData {
-    name: String,
-    inputs: Vec<String>,
-}
-
-#[derive(Clone)]
-pub struct Sink(SinkData);
+pub struct Sink(InputsData);
 
 #[Object]
 impl Sink {
@@ -120,7 +111,6 @@ impl Sink {
         self.0.name.clone()
     }
 
-    //noinspection DuplicatedCode
     /// Source inputs
     async fn sources(&self) -> Vec<Source> {
         self.0
@@ -240,7 +230,7 @@ pub fn update_config(config: &Config) {
     for (name, transform) in config.transforms.iter() {
         new_topology.insert(
             name.to_string(),
-            Topology::Transform(Transform(TransformData {
+            Topology::Transform(Transform(InputsData {
                 name: name.to_owned(),
                 inputs: transform.inputs.clone(),
             })),
@@ -251,7 +241,7 @@ pub fn update_config(config: &Config) {
     for (name, sink) in config.sinks.iter() {
         new_topology.insert(
             name.to_string(),
-            Topology::Sink(Sink(SinkData {
+            Topology::Sink(Sink(InputsData {
                 name: name.to_owned(),
                 inputs: sink.inputs.clone(),
             })),
