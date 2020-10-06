@@ -11,7 +11,6 @@ components: transforms: logfmt_parser: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
