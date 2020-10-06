@@ -53,6 +53,8 @@ impl Function for FormatNumberFn {
             .map(ToOwned::to_owned)
             .collect::<Vec<String>>();
 
+        debug_assert!(parts.len() <= 2);
+
         // Manipulate fractional part based on configuration.
         match scale {
             Some(i) if i == 0 => parts.truncate(1),
