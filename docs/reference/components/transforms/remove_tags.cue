@@ -10,10 +10,6 @@ components: transforms: remove_tags: {
     function: "schema"
   }
 
-  features: {
-    tls: enabled: false
-  }
-
   statuses: {
     development: "stable"
   }
