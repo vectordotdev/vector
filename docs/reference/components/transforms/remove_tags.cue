@@ -11,7 +11,6 @@ components: transforms: remove_tags: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
