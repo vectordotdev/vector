@@ -11,7 +11,6 @@ components: transforms: add_tags: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
