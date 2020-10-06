@@ -87,10 +87,22 @@ spec:
         {{- else }}
         {{ fail "Please provide a valid storage.mode value" }}
         {{- end }}
-        # Vector config dir with a managed config map.
+        # Vector config dir.
         - name: config-dir
-          configMap:
-            name: {{ include "libvector.configMapName" . }}
+          projected:
+            sources:
+              # Managed `ConfigMap`.
+              - configMap:
+                  name: {{ include "libvector.configMapName" . }}
+                  optional: true
+              # Custom `ConfigMap`.
+              - configMap:
+                  name: vector-aggregator-config
+                  optional: true
+              # Custom `Secret`.
+              - secret:
+                  name: vector-aggregator-config
+                  optional: true
         # Extra volumes.
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
