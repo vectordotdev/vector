@@ -11,7 +11,6 @@ components: transforms: remove_fields: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
