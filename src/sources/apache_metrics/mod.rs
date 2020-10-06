@@ -19,6 +19,7 @@ use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::collections::BTreeMap;
+use std::convert::TryInto;
 use std::time::{Duration, Instant};
 
 mod parser;
@@ -98,13 +99,20 @@ fn apache_metrics(
         .map(move |url| {
             let https = HttpsConnector::new().expect("TLS initialization failed");
             let client = Client::builder().build(https);
+            let sanitized_url = sanitize_uri(url.clone())
+                .map_err(|e| {
+                    warn!(message = "Could not sanitize endpoint.", error = %e, rate_limit_secs = 10);
+                })
+                .ok();
 
             let request = Request::get(&url)
                 .body(Body::empty())
                 .expect("error creating request");
 
             let mut tags: BTreeMap<String, String> = BTreeMap::new();
-            tags.insert("endpoint".into(), url.to_string());
+            if let Some(sanitized_url) = sanitized_url {
+                tags.insert("endpoint".into(), sanitized_url.to_string());
+            }
             if let Some(host) = url.host() {
                 tags.insert("host".into(), host.into());
             }
@@ -203,6 +211,24 @@ fn apache_metrics(
     Box::new(task.boxed().compat())
 }
 
+/// Removes the username/password bits from the given URI
+fn sanitize_uri(u: http::Uri) -> Result<http::Uri, http::Error> {
+    let mut parts: http::uri::Parts = u.into();
+
+    if let Some(authority) = parts.authority {
+        let address = match (authority.host(), authority.port()) {
+            (host, Some(port)) => format!("{}:{}", host, port),
+            (host, None) => host.to_string(),
+        };
+
+        let authority = address.parse::<http::uri::Authority>()?;
+
+        parts.authority = Some(authority);
+    }
+
+    parts.try_into().map_err(Into::into)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -279,7 +305,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         let (tx, rx) = Pipeline::new_test();
 
         let source = ApacheMetricsConfig {
-            endpoints: vec![format!("http://{}", in_addr)],
+            endpoints: vec![format!("http://foo:bar@{}", in_addr)],
             scrape_interval_secs: 1,
             namespace: "apache".to_string(),
         }
@@ -304,7 +330,17 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             .collect::<Vec<_>>();
 
         match metrics.iter().find(|m| m.name == "apache_up") {
-            Some(m) => assert_eq!(m.value, MetricValue::Gauge { value: 1.0 }),
+            Some(m) => {
+                assert_eq!(m.value, MetricValue::Gauge { value: 1.0 });
+
+                match &m.tags {
+                    Some(tags) => {
+                        assert_eq!(tags.get("endpoint"), Some(&format!("http://{}", in_addr)));
+                        assert_eq!(tags.get("host"), Some(&format!("{}", in_addr)));
+                    }
+                    None => error!("no tags for metric {:?}", m),
+                }
+            }
             None => error!("could not find apache_up metric in {:?}", metrics),
         }
     }
