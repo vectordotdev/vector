@@ -1068,6 +1068,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(not(target_os = "windows"))]
     async fn generates_loadavg_metrics() {
         let metrics = HostMetricsConfig::default().loadavg_metrics().await;
         assert_eq!(metrics.len(), 3);
