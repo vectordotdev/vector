@@ -28,7 +28,15 @@ package metadata
 			if !required {
 				default: [...string] | null
 			}
-			examples?: [...[...string]]
+
+			enum?: [Name=_]: string
+
+			examples: [...[...string]] | *[[
+					for k, v in enum {
+					k
+				},
+			]]
+
 			templateable?: bool
 		}
 		"bool"?: {
