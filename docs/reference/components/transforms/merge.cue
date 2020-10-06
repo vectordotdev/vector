@@ -11,7 +11,6 @@ components: transforms: merge: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
