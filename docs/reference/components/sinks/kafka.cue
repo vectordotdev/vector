@@ -5,13 +5,18 @@ components: sinks: kafka: {
   short_description: "Streams log events to [Apache Kafka][urls.kafka] via the [Kafka protocol][urls.kafka_protocol]."
   long_description: "[Apache Kafka][urls.kafka] is an open-source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. These features make it an excellent candidate for durably storing logs and metrics data."
 
-  _features: {
+  classes: {
+    commonly_used: true
+    function: "transmit"
+    service_providers: ["AWS","Confluent"]
+  }
+
+  features: {
     batch: enabled: false
     buffer: enabled: true
-    checkpoint: enabled: false
     compression: {
       enabled: true
-      default: "none"
+      default: null
       gzip: true
     }
     encoding: {
@@ -22,7 +27,6 @@ components: sinks: kafka: {
       text: null
     }
     healthcheck: enabled: true
-    multiline: enabled: false
     request: enabled: false
     tls: {
       enabled: true
@@ -33,19 +37,13 @@ components: sinks: kafka: {
     }
   }
 
-  classes: {
-    commonly_used: true
-    function: "transmit"
-    service_providers: ["AWS","Confluent"]
-  }
-
   statuses: {
     delivery: "at_least_once"
     development: "stable"
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
