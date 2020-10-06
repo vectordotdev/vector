@@ -75,7 +75,7 @@ spec:
         - name: data-dir
         {{- if .Values.storage.persistentVolume.enabled }}
           persistentVolumeClaim:
-            claimName: datadir
+            claimName: {{ include "libvector.fullname" $ }}-data-dir
         {{- else if .Values.storage.hostPath }}
           hostPath:
             path: {{ .Values.storage.hostPath | quote }}
@@ -90,32 +90,30 @@ spec:
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-{{- if .Values.storage.persistentVolume.enabled }}
+{{- with .Values.storage.persistentVolume }}
+{{- if .enabled }}
   volumeClaimTemplates:
     - metadata:
-        name: data-dir
+        name: {{ include "libvector.fullname" $ }}-data-dir
         labels:
-          app.kubernetes.io/name: {{ template "vector.name" . }}
-          app.kubernetes.io/instance: {{ .Release.Name | quote }}
-        {{- with .Values.storage.persistentVolume.labels }}
+        {{- include "libvector.labels" $ | nindent 10 }}
+        {{- with .labels }}
           {{- toYaml . | nindent 10 }}
         {{- end }}
-        {{- with .Values.labels }}
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
-      {{- with .Values.storage.persistentVolume.annotations }}
+      {{- with .annotations }}
         annotations: {{- toYaml . | nindent 10 }}
       {{- end }}
       spec:
         accessModes: ["ReadWriteOnce"]
-      {{- if .Values.storage.persistentVolume.storageClass }}
-      {{- if (eq "-" .Values.storage.persistentVolume.storageClass) }}
+      {{- with .storageClass }}
+      {{- if (eq "-" .) }}
         storageClassName: ""
       {{- else }}
-        storageClassName: {{ .Values.storage.persistentVolume.storageClass | quote}}
+        storageClassName: {{ . | quote}}
       {{- end }}
       {{- end }}
         resources:
           requests:
-            storage: {{ .Values.storage.persistentVolume.size | quote }}
+            storage: {{ .size | quote }}
+{{- end }}
 {{- end }}
