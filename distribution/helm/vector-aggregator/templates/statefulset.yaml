@@ -5,12 +5,12 @@ metadata:
   labels:
     {{- include "libvector.labels" . | nindent 4 }}
 spec:
-  podManagementPolicy: "{{ .Values.podManagementPolicy }}"
-  replicas: {{ .Values.replicas }}
+  serviceName: {{ include "libvector.fullname" . }}
   selector:
     matchLabels:
       {{- include "libvector.selectorLabels" . | nindent 6 }}
-  serviceName: {{ include "libvector.fullname" . }}
+  podManagementPolicy: "{{ .Values.podManagementPolicy }}"
+  replicas: {{ .Values.replicas }}
   template:
     metadata:
     {{- with .Values.podAnnotations }}
