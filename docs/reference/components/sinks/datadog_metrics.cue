@@ -5,7 +5,13 @@ components: sinks: datadog_metrics: {
   short_description: "Batches metric events to [Datadog's][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics)."
   long_description: "[Datadog][urls.datadog] is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform."
 
-  _features: {
+  classes: {
+    commonly_used: false
+    function: "transmit"
+    service_providers: ["Datadog"]
+  }
+
+  features: {
     batch: {
       enabled: true
       common: false,
@@ -13,14 +19,11 @@ components: sinks: datadog_metrics: {
       timeout_secs: 1
     }
     buffer: enabled: false
-    checkpoint: enabled: false
     compression: enabled: false
     encoding: enabled: false
     healthcheck: enabled: true
-    multiline: enabled: false
     request: {
       enabled: true
-      common: false,
       in_flight_limit: 5,
       rate_limit_duration_secs: 1,
       rate_limit_num: 5,
@@ -31,19 +34,13 @@ components: sinks: datadog_metrics: {
     tls: enabled: false
   }
 
-  classes: {
-    commonly_used: false
-    function: "transmit"
-    service_providers: ["Datadog"]
-  }
-
   statuses: {
     delivery: "at_least_once"
     development: "beta"
   }
 
   support: {
-      input_types: ["metric"]
+    input_types: ["metric"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
