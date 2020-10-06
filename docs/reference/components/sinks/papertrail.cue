@@ -5,10 +5,15 @@ components: sinks: papertrail: {
   short_description: "Streams log events to [Papertrail][urls.papertrail] via [Syslog][urls.papertrail_syslog]."
   long_description: "[Papertrail][urls.papertrail] is a web-based log aggregation application used by developers and IT team to search and view logs in real time."
 
-  _features: {
+  classes: {
+    commonly_used: false
+    function: "transmit"
+    service_providers: ["Papertrail"]
+  }
+
+  features: {
     batch: enabled: false
     buffer: enabled: true
-    checkpoint: enabled: false
     compression: enabled: false
     encoding: {
       enabled: true
@@ -18,7 +23,6 @@ components: sinks: papertrail: {
       text: null
     }
     healthcheck: enabled: true
-    multiline: enabled: false
     request: enabled: false
     tls: {
       enabled: true
@@ -29,19 +33,13 @@ components: sinks: papertrail: {
     }
   }
 
-  classes: {
-    commonly_used: false
-    function: "transmit"
-    service_providers: ["Papertrail"]
-  }
-
   statuses: {
     delivery: "at_least_once"
     development: "beta"
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
