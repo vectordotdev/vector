@@ -42,6 +42,7 @@ jobs:
         with:
           filters: |
             source:
+              - ".github/workflows/prs.yml"
               - ".cargo/**"
               - "benches/**"
               - "lib/**"
