@@ -51,7 +51,7 @@ components: sinks: aws_kinesis_firehose: {
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
