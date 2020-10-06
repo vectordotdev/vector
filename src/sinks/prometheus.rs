@@ -2,7 +2,11 @@ use crate::{
     buffers::Acker,
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-    sinks::util::{encode_namespace, statistic::DistributionStatistic, MetricEntry, StreamSink},
+    sinks::util::{
+        encode_namespace,
+        statistic::{validate_quantiles, DistributionStatistic},
+        MetricEntry, StreamSink,
+    },
     Event,
 };
 use async_trait::async_trait;
@@ -32,8 +36,6 @@ const MIN_FLUSH_PERIOD_SECS: u64 = 1;
 enum BuildError {
     #[snafu(display("Flush period for sets must be greater or equal to {} secs", min))]
     FlushPeriodTooShort { min: u64 },
-    #[snafu(display("Quantiles must be in range [0.0,1.0]"))]
-    QuantileOutOfRange,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -87,13 +89,7 @@ impl SinkConfig for PrometheusSinkConfig {
             }));
         }
 
-        if !self
-            .quantiles
-            .iter()
-            .all(|&quantile| 0.0 <= quantile && quantile <= 1.0)
-        {
-            return Err(Box::new(BuildError::QuantileOutOfRange));
-        }
+        validate_quantiles(&self.quantiles)?;
 
         let sink = PrometheusSink::new(self.clone(), cx.acker());
         let healthcheck = future::ok(()).boxed();
