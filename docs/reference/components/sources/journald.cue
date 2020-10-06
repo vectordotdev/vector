@@ -5,16 +5,16 @@ components: sources: journald: {
   short_description: "Ingests data through [Systemd's][urls.systemd] [Journald][urls.journald] utility and outputs log events."
   long_description: "[Journald][urls.journald] is a utility for accessing log data across a variety of system services. It was introduced with [Systemd][urls.systemd] to help system administrators collect, access, and route log data."
 
-  _features: {
-    checkpoint: enabled: true
-    multiline: enabled: false
-    tls: enabled: false
-  }
-
   classes: {
     commonly_used: true
     deployment_roles: ["daemon"]
     function: "collect"
+  }
+
+  features: {
+    checkpoint: enabled: true
+    multiline: enabled: false
+    tls: enabled: false
   }
 
   statuses: {
