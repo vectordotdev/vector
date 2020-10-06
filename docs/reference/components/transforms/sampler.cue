@@ -11,7 +11,6 @@ components: transforms: sampler: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
