@@ -55,10 +55,16 @@ securityContext: {}
 # Extra env vars to pass to the `vector` container.
 env: []
 
+# Tolerations to set for the `Pod`s managed by `DaemonSet`.
+tolerations:
+  # This toleration is to have the `DaemonSet` runnable on master nodes.
+  # Remove it if your masters can't run pods.
+  - key: node-role.kubernetes.io/master
+    effect: NoSchedule
+
 # Various tweakables for the `Pod`s managed by `DaemonSet`.
 resources: {}
 nodeSelector: {}
-tolerations: []
 affinity: {}
 
 # Additional volumes to pass to the `Pod`s managed by `DaemonSet`.

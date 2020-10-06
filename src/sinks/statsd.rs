@@ -3,6 +3,7 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::Event,
+    internal_events::StatsdInvalidMetricReceived,
     sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
 };
 use futures::{future, FutureExt};
@@ -63,9 +64,13 @@ inventory::submit! {
     SinkDescription::new_without_default::<StatsdSinkConfig>("statsd")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "statsd")]
 impl SinkConfig for StatsdSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = StatsdSvc::new(self.clone(), cx.acker())?;
         Ok((sink, future::ok(()).boxed()))
     }
@@ -181,10 +186,12 @@ fn encode_event(event: Event, namespace: Option<&str>) -> Option<Vec<u8>> {
             }
         }
         _ => {
-            warn!(
-                "invalid metric sent to statsd sink ({:?}) ({:?})",
-                metric.kind, metric.value
-            );
+            emit!(StatsdInvalidMetricReceived {
+                value: &metric.value,
+                kind: &metric.kind,
+            });
+
+            return None;
         }
     };
 

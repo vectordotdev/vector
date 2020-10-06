@@ -543,3 +543,90 @@
       "a[6].equals" = "11881"
       "b.length_eq" = 1
       "b[0].equals" = "bar"
+
+[transforms.remap_function_sha2]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = sha2(.a)
+
+    if sha2(.b) == "725eb523fe006a6ee0071380bd3b4c57590abd44b88614cd3eddf594e3afe1ac" {
+        .b = sha2(.a + .b + "baz")
+    }
+  """
+[[tests]]
+  name = "remap_function_sha2"
+  [tests.input]
+    insert_at = "remap_function_sha2"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_sha2"
+    [[tests.outputs.conditions]]
+      "a.equals" = "d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d"
+      "b.equals" = "211adce11372368668b582f2a9420a2df7512856ff62f37b124b82d9f505b42f"
+
+[transforms.remap_function_sha3]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = sha3(.a)
+
+    if sha3(.b) == "03457d23880d7847fc3f58780dd58cda7237a7144ac6758e76d45cec0e06ba69440a855e913ef03790c618777f5b0ec25fc34c4b82d7538151745b120b4f8b37" {
+        .b = sha3(.a + .b + "baz")
+    }
+  """
+[[tests]]
+  name = "remap_function_sha3"
+  [tests.input]
+    insert_at = "remap_function_sha3"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_sha3"
+    [[tests.outputs.conditions]]
+      "a.equals" = "4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7"
+      "b.equals" = "dbae094156f1bf73d9f442f75eb01e52398eb667cd12ba1dcb95748fc0151880ea260310c1451570d60b37bef8655d01f62280e5e24e70cffe3a55c23c2d7351"
+
+[transforms.remap_function_parse_duration]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = parse_duration(.a, "ms")
+    .b = parse_duration("100ms", output = .b)
+  """
+[[tests]]
+  name = "remap_function_parse_duration"
+  [tests.input]
+    insert_at = "remap_function_parse_duration"
+    type = "log"
+    [tests.input.log_fields]
+      a = "2s"
+      b = "s"
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_duration"
+    [[tests.outputs.conditions]]
+      "a.equals" = 2000
+      "b.equals" = 0.1
+
+[transforms.remap_function_format_number]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = format_number(.a, scale = 2, decimal_separator = ",", grouping_separator = ".")
+  """
+[[tests]]
+  name = "remap_function_format_number"
+  [tests.input]
+    insert_at = "remap_function_format_number"
+    type = "log"
+    [tests.input.log_fields]
+      a = 1234.567
+  [[tests.outputs]]
+    extract_from = "remap_function_format_number"
+    [[tests.outputs.conditions]]
+      "a.equals" = "1.234,56"

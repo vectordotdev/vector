@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::Event,
+    event::{Event, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::KafkaAuthConfig,
     shutdown::ShutdownSignal,
@@ -76,9 +76,10 @@ inventory::submit! {
     SourceDescription::new_without_default::<KafkaSourceConfig>("kafka")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "kafka")]
 impl SourceConfig for KafkaSourceConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -131,7 +132,10 @@ fn kafka_source(
                             let mut event = Event::new_empty_log();
                             let log = event.as_mut_log();
 
-                            log.insert(log_schema().message_key().clone(), payload.to_vec());
+                            log.insert(
+                                log_schema().message_key().clone(),
+                                Value::from(Bytes::from(payload.to_owned())),
+                            );
 
                             // Extract timestamp from kafka message
                             let timestamp = msg
@@ -148,7 +152,10 @@ fn kafka_source(
                                 match msg.key() {
                                     None => (),
                                     Some(key) => {
-                                        log.insert(key_field.clone(), key.to_vec());
+                                        log.insert(
+                                            key_field.clone(),
+                                            Value::from(String::from_utf8_lossy(key).to_string()),
+                                        );
                                     }
                                 }
                             }

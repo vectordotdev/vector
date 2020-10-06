@@ -1,6 +1,9 @@
+use crate::{generate, get_version, list, unit_test, validate};
 use std::path::PathBuf;
 use structopt::{clap::AppSettings, StructOpt};
-use vector::{generate, list, unit_test, validate};
+
+#[cfg(windows)]
+use crate::service;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -14,7 +17,7 @@ pub struct Opts {
 
 impl Opts {
     pub fn get_matches() -> Self {
-        let version = vector::get_version();
+        let version = get_version();
         let app = Opts::clap().version(version.as_str()).global_settings(&[
             AppSettings::ColoredHelp,
             AppSettings::InferSubcommands,
@@ -108,6 +111,10 @@ pub enum SubCommand {
     /// Run Vector config unit tests, then exit. This command is experimental and therefore subject to change.
     /// For guidance on how to write unit tests check out: https://vector.dev/docs/setup/guides/unit-testing/
     Test(unit_test::Opts),
+
+    /// Manage the vector service.
+    #[cfg(windows)]
+    Service(service::Opts),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -152,4 +159,12 @@ impl std::str::FromStr for LogFormat {
             )),
         }
     }
+}
+
+pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {
+    for error in errors {
+        error!("Configuration error: {}", error);
+    }
+
+    exitcode::CONFIG
 }

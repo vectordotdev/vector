@@ -14,6 +14,8 @@ mod blackhole;
 mod coercer;
 #[cfg(feature = "transforms-concat")]
 mod concat;
+#[cfg(feature = "sinks-console")]
+mod console;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
 #[cfg(feature = "sources-docker")]
@@ -62,8 +64,10 @@ mod socket;
 mod split;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 mod splunk_hec;
+#[cfg(feature = "sinks-statsd")]
+mod statsd_sink;
 #[cfg(feature = "sources-statsd")]
-mod statsd;
+mod statsd_source;
 mod stdin;
 #[cfg(feature = "transforms-swimlanes")]
 mod swimlanes;
@@ -73,6 +77,7 @@ mod tag_cardinality_limit;
 mod tcp;
 #[cfg(feature = "transforms-tokenizer")]
 mod tokenizer;
+mod udp;
 mod unix;
 mod vector;
 #[cfg(feature = "wasm")]
@@ -94,11 +99,14 @@ pub use self::blackhole::*;
 pub(crate) use self::coercer::*;
 #[cfg(feature = "transforms-concat")]
 pub use self::concat::*;
+#[cfg(feature = "sinks-console")]
+pub use self::console::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-docker")]
 pub use self::docker::*;
 pub use self::elasticsearch::*;
+#[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
 pub use self::file::*;
 #[cfg(feature = "sources-generator")]
 pub use self::generator::*;
@@ -139,8 +147,10 @@ pub(crate) use self::socket::*;
 pub use self::split::*;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 pub(crate) use self::splunk_hec::*;
+#[cfg(feature = "sinks-statsd")]
+pub use self::statsd_sink::*;
 #[cfg(feature = "sources-statsd")]
-pub use self::statsd::*;
+pub use self::statsd_source::*;
 pub use self::stdin::*;
 #[cfg(feature = "transforms-swimlanes")]
 pub use self::swimlanes::*;
@@ -150,10 +160,13 @@ pub(crate) use self::tag_cardinality_limit::*;
 pub use self::tcp::*;
 #[cfg(feature = "transforms-tokenizer")]
 pub(crate) use self::tokenizer::*;
+pub use self::udp::*;
 pub use self::unix::*;
 pub use self::vector::*;
 #[cfg(feature = "wasm")]
 pub use self::wasm::*;
+#[cfg(windows)]
+pub use self::windows::*;
 
 pub trait InternalEvent {
     fn emit_logs(&self) {}
@@ -173,7 +186,9 @@ macro_rules! emit {
 }
 
 // Modules that require emit! macro so they need to be defined after the macro.
+#[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
 mod file;
+mod windows;
 
 const ELLIPSIS: &str = "[...]";
 
