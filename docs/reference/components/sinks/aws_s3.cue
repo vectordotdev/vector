@@ -5,7 +5,13 @@ components: sinks: aws_s3: {
   short_description: "Batches log events to [Amazon Web Service's S3 service][urls.aws_s3] via the [`PutObject` API endpoint](https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html)."
   long_description: "[Amazon Simple Storage Service (Amazon S3)][urls.aws_s3] is a scalable, high-speed, web-based cloud storage service designed for online backup and archiving of data and applications on Amazon Web Services. It is very commonly used to store log data."
 
-  _features: {
+  classes: {
+    commonly_used: true
+    function: "transmit"
+    service_providers: ["AWS"]
+  }
+
+  features: {
     batch: {
       enabled: true
       common: true,
@@ -14,7 +20,6 @@ components: sinks: aws_s3: {
       timeout_secs: 300
     }
     buffer: enabled: true
-    checkpoint: enabled: false
     compression: {
       enabled: true
       default: "gzip"
@@ -28,10 +33,8 @@ components: sinks: aws_s3: {
       text: null
     }
     healthcheck: enabled: true
-    multiline: enabled: false
     request: {
       enabled: true
-      common: false,
       in_flight_limit: 50,
       rate_limit_duration_secs: 1,
       rate_limit_num: 250,
@@ -42,19 +45,13 @@ components: sinks: aws_s3: {
     tls: enabled: false
   }
 
-  classes: {
-    commonly_used: true
-    function: "transmit"
-    service_providers: ["AWS"]
-  }
-
   statuses: {
     delivery: "at_least_once"
     development: "stable"
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
