@@ -68,8 +68,30 @@ jobs:
             helm:
               - 'distribution/helm/**'
 
+  # Remove this once https://github.com/timberio/vector/issues/3771 is closed.
+  # Then, modify the `cross-linux` job to run `test` instead of `build`.
   test-linux:
-    name: Unit - ${{ matrix.target }}
+    name: Test - x86_64-unknown-linux-gnu
+    runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
+    steps:
+      - uses: actions/checkout@v2
+      - run: make ci-sweep
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: make test
+
+  cross-linux:
+    name: Cross - ${{ matrix.target }}
     runs-on: ubuntu-20.04
     needs: changes
     strategy:
@@ -93,7 +115,10 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
-      - run: make cross-test-${{ matrix.target }}
+      # Why is this build, not check? Because we need to make sure the linking phase works.
+      # aarch64 and musl in particular are notoriously hard to link.
+      # While it may be tempting to slot a `check` in here for quickness, please don't.
+      - run: make cross-build-${{ matrix.target }}
 
   test-mac:
     name: Unit - Mac
