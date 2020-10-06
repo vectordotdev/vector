@@ -11,7 +11,6 @@ components: transforms: split: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
