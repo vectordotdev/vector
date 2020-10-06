@@ -5,7 +5,13 @@ components: sinks: gcp_cloud_storage: {
   short_description: "Batches log events to [Google Cloud Platform's Cloud Storage service](https://cloud.google.com/storage) via the [XML Interface](https://cloud.google.com/storage/docs/xml-api/overview)."
   long_description: "[Google Cloud Storage][urls.gcp_cloud_storage] is a RESTful online file storage web service for storing and accessing data on Google Cloud Platform infrastructure. The service combines the performance and scalability of Google's cloud with advanced security and sharing capabilities. This makes it a prime candidate for log data."
 
-  _features: {
+  classes: {
+    commonly_used: true
+    function: "transmit"
+    service_providers: ["GCP"]
+  }
+
+  features: {
     batch: {
       enabled: true
       common: false,
@@ -14,10 +20,9 @@ components: sinks: gcp_cloud_storage: {
       timeout_secs: 300
     }
     buffer: enabled: true
-    checkpoint: enabled: false
     compression: {
       enabled: true
-      default: "none"
+      default: null
       gzip: true
     }
     encoding: {
@@ -28,10 +33,8 @@ components: sinks: gcp_cloud_storage: {
       text: null
     }
     healthcheck: enabled: true
-    multiline: enabled: false
     request: {
       enabled: true
-      common: false,
       in_flight_limit: 25,
       rate_limit_duration_secs: 1,
       rate_limit_num: 1000,
@@ -48,19 +51,13 @@ components: sinks: gcp_cloud_storage: {
     }
   }
 
-  classes: {
-    commonly_used: true
-    function: "transmit"
-    service_providers: ["GCP"]
-  }
-
   statuses: {
     delivery: "at_least_once"
     development: "beta"
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
