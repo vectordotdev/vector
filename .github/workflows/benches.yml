@@ -7,7 +7,7 @@ on:
 
 env:
   VERBOSE: true
-  ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+  ENVIRONMENT_UPSTREAM: timberio/ci_image:${{ github.sha }}
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
   CI: true

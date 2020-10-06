@@ -1,14 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-if [[ -z "${CI:-}" ]]; then
-  echo "Aborted: this script is for use in CI, it may alter your system in an" \
-    "unwanted way" >&2
-  exit 1
-fi
-
-set -x
-
 KUBERNETES_VERSION="v1.18.6"
 HELM_VERSION="v3.2.4"
 

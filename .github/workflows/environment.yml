@@ -8,7 +8,7 @@ on:
 
 env:
   VERBOSE: true
-  ENVIRONMENT_UPSTREAM: docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+  ENVIRONMENT_UPSTREAM: timberio/ci_image:${{ github.sha }}
   CI: true
 
 jobs:
@@ -17,11 +17,11 @@ jobs:
     env:
       ENVIRONMENT_AUTOBUILD: true
     steps:
-      - run: docker login https://docker.pkg.github.com -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+      - run: docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
       - uses: actions/checkout@v2
       - run: make ci-sweep
       - name: prepare environment
         run: make environment-prepare
       - name: push image
         if: github.event_name != 'workflow_dispatch'
-        run: docker push docker.pkg.github.com/timberio/vector/environment:${{ github.sha }}
+        run: docker push timberio/ci_image:${{ github.sha }}
