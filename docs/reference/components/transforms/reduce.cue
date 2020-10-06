@@ -11,7 +11,6 @@ components: transforms: reduce: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
