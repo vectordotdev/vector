@@ -23,7 +23,6 @@ components: sources: stdin: {
   }
 
   support: {
-
     platforms: {
       "aarch64-unknown-linux-gnu": true
       "aarch64-unknown-linux-musl": true
@@ -43,9 +42,7 @@ components: sources: stdin: {
       description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.global-options#host_key]."
       required: false
       warnings: []
-      type: string: {
-        default: "host"
-      }
+      type: string: default: "host"
     }
     max_length: {
       common: false
