@@ -14,6 +14,9 @@ spec:
     - 'configMap'
     - 'secret'
   allowedHostPaths:
+    {{- if  and not .Values.storage.persistentVolume.enabled .Values.storage.hostPath }}
+    - pathPrefix: {{ .Values.storage.hostPath | quote }}
+    {{- end }}
     {{- range .Values.extraVolumes }}
     {{- if .hostPath }}
     - pathPrefix: {{ .hostPath.path }}
