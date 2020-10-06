@@ -5,7 +5,13 @@ components: sinks: elasticsearch: {
   short_description: "Batches log events to [Elasticsearch][urls.elasticsearch] via the [`_bulk` API endpoint][urls.elasticsearch_bulk]."
   long_description: "[Elasticsearch][urls.elasticsearch] is a search engine based on the Lucene library. It provides a distributed, multitenant-capable full-text search engine with an HTTP web interface and schema-free JSON documents. As a result, it is very commonly used to store and analyze log data. It ships with Kibana which is a simple interface for visualizing and exploring data in Elasticsearch."
 
-  _features: {
+  classes: {
+    commonly_used: true
+    function: "transmit"
+    service_providers: ["AWS","Azure","Elastic","GCP"]
+  }
+
+  features: {
     batch: {
       enabled: true
       common: false,
@@ -14,10 +20,9 @@ components: sinks: elasticsearch: {
       timeout_secs: 1
     }
     buffer: enabled: true
-    checkpoint: enabled: false
     compression: {
       enabled: true
-      default: "none"
+      default: null
       gzip: true
     }
     encoding: {
@@ -28,10 +33,8 @@ components: sinks: elasticsearch: {
       text: null
     }
     healthcheck: enabled: true
-    multiline: enabled: false
     request: {
       enabled: true
-      common: false,
       in_flight_limit: 5,
       rate_limit_duration_secs: 1,
       rate_limit_num: 5,
@@ -48,19 +51,13 @@ components: sinks: elasticsearch: {
     }
   }
 
-  classes: {
-    commonly_used: true
-    function: "transmit"
-    service_providers: ["AWS","Azure","Elastic","GCP"]
-  }
-
   statuses: {
     delivery: "at_least_once"
     development: "stable"
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
