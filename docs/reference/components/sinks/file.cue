@@ -5,13 +5,18 @@ components: sinks: file: {
   short_description: "Streams log events to a file."
   long_description: "Streams log events to a file."
 
-  _features: {
+  classes: {
+    commonly_used: false
+    function: "transmit"
+    service_providers: []
+  }
+
+  features: {
     batch: enabled: false
     buffer: enabled: false
-    checkpoint: enabled: false
     compression: {
       enabled: true
-      default: "none"
+      default: null
       gzip: true
     }
     encoding: {
@@ -22,15 +27,8 @@ components: sinks: file: {
       text: null
     }
     healthcheck: enabled: true
-    multiline: enabled: false
     request: enabled: false
     tls: enabled: false
-  }
-
-  classes: {
-    commonly_used: false
-    function: "transmit"
-    service_providers: []
   }
 
   statuses: {
@@ -39,7 +37,7 @@ components: sinks: file: {
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
