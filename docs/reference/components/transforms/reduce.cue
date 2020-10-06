@@ -73,12 +73,48 @@ components: transforms: reduce: {
     }
     merge_strategies: {
       common: false
-      description: "A map of field names to custom merge strategies. For each field specified this strategy will be used for combining events rather than the default behavior.\n\nThe default behavior is as follows:\n\n1. The first value of a string field is kept, subsequent values are discarded.\n2. For timestamp fields the first is kept and a new field `[field-name]_end` is\n   added with the last received timestamp value.\n3. Numeric values are summed."
+      description:  #"""
+                    A map of field names to custom merge strategies. For each
+                    field specified this strategy will be used for combining
+                    events rather than the default behavior.
+
+                    The default behavior is as follows:
+
+                    1. The first value of a string field is kept, subsequent
+                       values are discarded.
+                    2. For timestamp fields the first is kept and a new field
+                       `[field-name]_end` is added with the last received
+                       timestamp value.
+                    3. Numeric values are summed.
+                    """#
       required: false
       warnings: []
       type: object: {
-        examples: [{"method":"discard"},{"path":"discard"},{"duration_ms":"sum"},{"query":"array"}]
-        options: {}
+        examples: [
+          {
+            method: "discard"
+            path: "discard"
+            duration_ms: "sum"
+            query: "array"
+          }
+        ]
+        options: {
+          "*": {
+            description: "The custom merge strategy to use for a field."
+            required:    true
+            warnings: []
+            type: string: {
+              enum: {
+                array: "Each value is appended to an array."
+                concat: "Concatenate each string value (delimited with a space)."
+                discard: "Discard all but the first value found."
+                sum: "Sum all numeric values."
+                max: "The maximum of all numeric values."
+                min: "The minimum of all numeric values."
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -107,22 +143,4 @@ components: transforms: reduce: {
       }
     }
   ]
-
-  how_it_works: {
-    canonical_log_lines: {
-      title: "Use Cases"
-      body: #"""
-            This source works by scraping the configured
-            [Apache Status module][urls.apache_mod_status] endpoint
-            which exposes basic metrics about Apache's runtime.
-            """#
-      sub_sections: [
-        {
-          title: "Stripe's Canonical Log Lines",
-          body: #"""
-                """#
-        }
-      ]
-    }
-  }
 }
