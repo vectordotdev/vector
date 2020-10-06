@@ -5,15 +5,13 @@ components: transforms: lua: {
   short_description: "Accepts log and metric events and allows you to transform events with a full embedded [Lua][urls.lua] engine."
   long_description: "Accepts log and metric events and allows you to transform events with a full embedded [Lua][urls.lua] engine."
 
-  _features: {
-    checkpoint: enabled: false
-    multiline: enabled: false
-    tls: enabled: false
-  }
-
   classes: {
     commonly_used: true
     function: "program"
+  }
+
+  features: {
+    tls: enabled: false
   }
 
   statuses: {
@@ -21,7 +19,7 @@ components: transforms: lua: {
   }
 
   support: {
-      input_types: ["log","metric"]
+    input_types: ["log","metric"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
