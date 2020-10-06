@@ -11,7 +11,6 @@ components: transforms: log_to_metric: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
