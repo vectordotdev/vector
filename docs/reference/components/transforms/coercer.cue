@@ -5,15 +5,13 @@ components: transforms: coercer: {
   short_description: "Accepts log events and allows you to coerce log fields into fixed types."
   long_description: "Accepts log events and allows you to coerce log fields into fixed types."
 
-  _features: {
-    checkpoint: enabled: false
-    multiline: enabled: false
-    tls: enabled: false
-  }
-
   classes: {
     commonly_used: false
     function: "schema"
+  }
+
+  features: {
+    tls: enabled: false
   }
 
   statuses: {
@@ -21,7 +19,7 @@ components: transforms: coercer: {
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
