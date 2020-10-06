@@ -21,13 +21,13 @@ pub mod service_control {
     };
 
     use crate::internal_events::{
-        WindowsServiceDoesNotExist, WindowsServiceInstall, WindowsServiceStart, WindowsServiceStop,
-        WindowsServiceRestart, WindowsServiceUninstall,
+        WindowsServiceDoesNotExist, WindowsServiceInstall, WindowsServiceRestart,
+        WindowsServiceStart, WindowsServiceStop, WindowsServiceUninstall,
     };
     use crate::vector_windows::SERVICE_TYPE;
     use std::ffi::OsString;
-    use std::time::Duration;
     use std::fmt;
+    use std::time::Duration;
 
     pub enum Error {
         Service(windows_service::Error),
