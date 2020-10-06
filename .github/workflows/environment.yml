@@ -10,7 +10,7 @@ env:
   CI: true
 
 jobs:
-  path-context:
+  publish-new-environment:
     runs-on: ubuntu-latest
     steps:
       -
