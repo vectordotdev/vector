@@ -612,3 +612,21 @@
     [[tests.outputs.conditions]]
       "a.equals" = 2000
       "b.equals" = 0.1
+
+[transforms.remap_function_format_number]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = format_number(.a, scale = 2, decimal_separator = ",", grouping_separator = ".")
+  """
+[[tests]]
+  name = "remap_function_format_number"
+  [tests.input]
+    insert_at = "remap_function_format_number"
+    type = "log"
+    [tests.input.log_fields]
+      a = 1234.567
+  [[tests.outputs]]
+    extract_from = "remap_function_format_number"
+    [[tests.outputs.conditions]]
+      "a.equals" = "1.234,56"
