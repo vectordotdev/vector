@@ -1195,5 +1195,7 @@ mod tests {
         assert!(all_tags_match(&filtered_metrics_without_match, tag, |s| {
             !s.starts_with(key_prefix)
         }));
+
+        assert!(filtered_metrics_with.len() + filtered_metrics_without.len() <= all_metrics.len());
     }
 }
