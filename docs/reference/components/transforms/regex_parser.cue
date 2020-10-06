@@ -35,13 +35,6 @@ components: transforms: regex_parser: {
   }
 
   configuration: {
-    drop_failed: {
-      common: true
-      description: "If the event should be dropped if parsing fails."
-      required: false
-      warnings: []
-      type: bool: default: false
-    }
     drop_field: {
       common: true
       description: "If the specified `field` should be dropped (removed) after parsing."
@@ -93,54 +86,6 @@ components: transforms: regex_parser: {
         examples: [{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"},{"parent":{"child":"int"}}]
         options: {}
       }
-    }
-  }
-  examples: log: [
-    {
-      title: "Syslog 5424"
-      configuration: {
-        field: "message"
-        patterns: [#"^(?P<host>[\w\.]+) - (?P<user>[\w]+) (?P<bytes_in>[\d]+) \[(?P<timestamp>.*)\] "(?P<method>[\w]+) (?P<path>.*)" (?P<status>[\d]+) (?P<bytes_out>[\d]+)$"#]
-        types: {
-          bytes_in: "int"
-          timestamp: "timestamp|%d/%m/%Y:%H:%M:%S %z"
-          status: "int"
-          bytes_out: "int"
-        }
-      }
-      input: {
-        "message": #"5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] "GET /embrace/supply-chains/dynamic/vertical" 201 20574"#
-      }
-      output: {
-        bytes_in: 5667
-        host: "5.86.210.12"
-        user_id: "zieme4647"
-        timestamp: "2019-06-19T17:20:49-0400"
-        method: "GET"
-        path: "/embrace/supply-chains/dynamic/vertical"
-        status: 201
-        bytes_out: 20574
-      }
-    }
-  ]
-  how_it_works: {
-    failed_parsing: {
-      title: "Failed Parsing"
-      body: #"""
-            By default, if the input message text does not match any of the configured regular expression patterns, this transform will log an error message but leave the log event unchanged. If you instead wish to have this transform drop the event, set `drop_failed = true`.
-            """#
-    }
-    regex_debugger: {
-      title: "Regex Debugger"
-      body: #"""
-            If you are having difficulty with your regular expression not matching text, you may try debugging your patterns at [Regex 101][regex_tester]. This site includes a regular expression tester and debugger. The regular expression engine used by Vector is most similar to the "Go" implementation, so make sure that is selected in the "Flavor" menu.
-            """#
-    }
-    regex_syntax: {
-      title: "Regex Syntax"
-      body: #"""
-            Vector uses the Rust standard regular expression engine for pattern matching. Its syntax shares most of the features of Perl-style regular expressions, with a few exceptions. You can find examples of patterns in the [Rust regex module documentation][rust_regex_syntax].
-            """#
     }
   }
 }
