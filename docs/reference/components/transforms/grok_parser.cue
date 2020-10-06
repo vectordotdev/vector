@@ -11,7 +11,6 @@ components: transforms: grok_parser: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
