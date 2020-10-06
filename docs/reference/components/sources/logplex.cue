@@ -29,7 +29,6 @@ components: sources: logplex: {
   }
 
   support: {
-
     platforms: {
       "aarch64-unknown-linux-gnu": true
       "aarch64-unknown-linux-musl": true
@@ -55,6 +54,29 @@ components: sources: logplex: {
       type: string: {
         examples: ["0.0.0.0:80"]
       }
+    }
+  }
+
+  output: logs: line: {
+    description: "An individual line from a file. Lines can be merged using the `multiline` options."
+    fields: {
+      app_name: {
+        description: "The app name field extracted from log message."
+        required: true
+        type: string: examples: ["erlang"]
+      }
+      host: fields._host
+      message: {
+        description: "The message field, containing the plain text message."
+        required: true
+        type: string: examples: ["Hi from erlang"]
+      }
+      proc_id: {
+        description: "The procid field extracted from log message."
+        required: true
+        type: string: examples: ["console"]
+      }
+      timestamp: fields._timestamp
     }
   }
 }
