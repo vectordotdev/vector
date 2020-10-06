@@ -23,7 +23,46 @@ use hyper::body::Body;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use string_cache::DefaultAtom as Atom;
-use std::{io::Write, time::Duration};
+use std::{convert::TryFrom, io::Write, time::Duration};
+
+/// GZip compression level must be between 0 and 9.
+/// 0 is no compression, 9 is take as long as you like for maximum compression.
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(try_from = "u32")]
+#[serde(into = "u32")]
+pub struct CompressionLevel(flate2::Compression);
+
+impl CompressionLevel {
+    fn get_level(&self) -> flate2::Compression {
+        self.0
+    }
+}
+
+impl Into<u32> for CompressionLevel {
+    fn into(self) -> u32 {
+        self.0.level()
+    }
+}
+
+impl TryFrom<u32> for CompressionLevel {
+    type Error = String;
+
+    fn try_from(level: u32) -> Result<Self, Self::Error> {
+        if level > 9 {
+            Err("Gzip `compression_level` must be between 0 and 9.".into())
+        } else {
+            Ok(CompressionLevel(flate2::Compression::new(level)))
+        }
+    }
+}
+
+impl Default for CompressionLevel {
+    fn default() -> Self {
+        // Default the compression level to 6, which is the same as the Datadog agent.
+        // https://docs.datadoghq.com/agent/logs/log_transport/?tab=https#log-compression
+        CompressionLevel(flate2::Compression::new(6))
+    }
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -36,7 +75,8 @@ pub struct DatadogLogsConfig {
     #[serde(default)]
     compression: Compression,
 
-    compression_level: Option<u32>,
+    #[serde(default)]
+    compression_level: CompressionLevel,
 
     #[serde(default)]
     batch: BatchConfig,
@@ -124,13 +164,7 @@ impl DatadogLogsConfig {
         let (request, body) = match self.compression {
             Compression::None => (request, body),
             Compression::Gzip => {
-                let mut encoder = GzEncoder::new(
-                    Vec::new(),
-                    match self.compression_level {
-                        Some(level) if level <= 9 => flate2::Compression::new(level),
-                        _ => flate2::Compression::best(),
-                    },
-                );
+                let mut encoder = GzEncoder::new(Vec::new(), self.compression_level.get_level());
 
                 encoder.write_all(&body)?;
                 (
