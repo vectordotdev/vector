@@ -37,7 +37,7 @@ package metadata
       }
     }
     "object"?: {
-      examples: [{[Name=string]: _}, ...]
+      examples: [...{[Name=string]: _}]
       options: #ConfigurationOptions | {}
     }
     "string"?: {
