@@ -258,7 +258,7 @@ package metadata
             "\( k )"?: _ | *null
           }
         }
-        input: #Fields | string
+        input: #Fields | [#Fields, ...] | string
         "output": #Fields
       }
     ]
