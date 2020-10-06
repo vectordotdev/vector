@@ -5,15 +5,13 @@ components: transforms: aws_ec2_metadata: {
   short_description: "Accepts log events and allows you to enrich logs with AWS EC2 instance metadata."
   long_description: "Accepts log events and allows you to enrich logs with AWS EC2 instance metadata."
 
-  _features: {
-    checkpoint: enabled: false
-    multiline: enabled: false
-    tls: enabled: false
-  }
-
   classes: {
     commonly_used: false
     function: "enrich"
+  }
+
+  features: {
+    tls: enabled: false
   }
 
   statuses: {
@@ -21,7 +19,7 @@ components: transforms: aws_ec2_metadata: {
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
