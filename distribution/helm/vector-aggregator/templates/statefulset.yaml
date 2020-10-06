@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "libvector.labels" . | nindent 4 }}
 spec:
-  serviceName: {{ include "libvector.fullname" . }}
+  serviceName: {{ include "libvector.fullname" . }}-headless
   selector:
     matchLabels:
       {{- include "libvector.selectorLabels" . | nindent 6 }}

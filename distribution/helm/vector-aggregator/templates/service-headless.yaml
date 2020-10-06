@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "libvector.fullname" . }}-headless
+  labels:
+    {{- include "libvector.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    {{- include "libvector.selectorLabels" . | nindent 4 }}
