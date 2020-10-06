@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "vector.fullname" . }}
+  name: {{ include "libvector.fullname" . }}
   labels:
-    {{- include "vector.labels" . | nindent 4 }}
+    {{- include "libvector.labels" . | nindent 4 }}
 spec:
   ports:
     - name: metrics
@@ -11,4 +11,4 @@ spec:
       protocol: TCP
       targetPort: 9598
   selector:
-    {{- include "vector.selectorLabels" . | nindent 4 }}
+    {{- include "libvector.selectorLabels" . | nindent 4 }}

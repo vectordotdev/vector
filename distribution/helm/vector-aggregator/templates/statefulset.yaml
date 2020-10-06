@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "vector.fullname" . }}
+  name: {{ include "libvector.fullname" . }}
   labels:
-    {{- include "vector.labels" . | nindent 4 }}
+    {{- include "libvector.labels" . | nindent 4 }}
 spec:
   podManagementPolicy: "{{ .Values.podManagementPolicy }}"
   replicas: {{ .Values.replicas }}
   selector:
     matchLabels:
-      {{- include "vector.selectorLabels" . | nindent 6 }}
-  serviceName: {{ include "vector.fullname" . }}
+      {{- include "libvector.selectorLabels" . | nindent 6 }}
+  serviceName: {{ include "libvector.fullname" . }}
   template:
     metadata:
     {{- with .Values.podAnnotations }}
@@ -21,21 +21,21 @@ spec:
         {{- with .Values.podLabels }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
-        {{- include "vector.selectorLabels" . | nindent 8 }}
+        {{- include "libvector.selectorLabels" . | nindent 8 }}
         vector.dev/exclude: "true"
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "vector.serviceAccountName" . }}
+      serviceAccountName: {{ include "libvector.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: vector
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ include "vector.imageTag" . }}"
+          image: "{{ .Values.image.repository }}:{{ include "libvector.imageTag" . }}"
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
           env:
             {{- with .Values.env }}
@@ -83,7 +83,7 @@ spec:
         # Vector config dir with a managed config map.
         - name: config-dir
           configMap:
-            name: {{ include "vector.configMapName" . }}
+            name: {{ include "libvector.configMapName" . }}
         # Extra volumes.
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
