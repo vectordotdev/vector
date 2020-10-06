@@ -5,21 +5,19 @@ components: sinks: prometheus: {
   short_description: "Exposes metric events to [Prometheus][urls.prometheus] metrics service."
   long_description: "[Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
 
-  _features: {
-    batch: enabled: false
-    buffer: enabled: false
-    checkpoint: enabled: false
-    compression: enabled: false
-    encoding: enabled: false
-    multiline: enabled: false
-    request: enabled: false
-    tls: enabled: false
-  }
-
   classes: {
     commonly_used: true
     function: "transmit"
     service_providers: []
+  }
+
+  features: {
+    batch: enabled: false
+    buffer: enabled: false
+    compression: enabled: false
+    encoding: enabled: false
+    request: enabled: false
+    tls: enabled: false
   }
 
   statuses: {
@@ -28,7 +26,7 @@ components: sinks: prometheus: {
   }
 
   support: {
-      input_types: ["metric"]
+    input_types: ["metric"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
