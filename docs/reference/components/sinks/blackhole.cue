@@ -5,21 +5,19 @@ components: sinks: blackhole: {
   short_description: "Streams log and metric events to a blackhole that simply discards data, designed for testing and benchmarking purposes."
   long_description: "Streams log and metric events to a blackhole that simply discards data, designed for testing and benchmarking purposes."
 
-  _features: {
-    batch: enabled: false
-    buffer: enabled: false
-    checkpoint: enabled: false
-    compression: enabled: false
-    encoding: enabled: false
-    multiline: enabled: false
-    request: enabled: false
-    tls: enabled: false
-  }
-
   classes: {
     commonly_used: false
     function: "test"
     service_providers: []
+  }
+
+  features: {
+    batch: enabled: false
+    buffer: enabled: false
+    compression: enabled: false
+    encoding: enabled: false
+    request: enabled: false
+    tls: enabled: false
   }
 
   statuses: {
@@ -28,7 +26,7 @@ components: sinks: blackhole: {
   }
 
   support: {
-      input_types: ["log","metric"]
+    input_types: ["log","metric"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
