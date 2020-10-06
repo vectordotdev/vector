@@ -5,15 +5,13 @@ components: transforms: remove_tags: {
   short_description: "Accepts metric events and allows you to remove one or more metric tags."
   long_description: "Accepts metric events and allows you to remove one or more metric tags."
 
-  _features: {
-    checkpoint: enabled: false
-    multiline: enabled: false
-    tls: enabled: false
-  }
-
   classes: {
     commonly_used: false
     function: "schema"
+  }
+
+  features: {
+    tls: enabled: false
   }
 
   statuses: {
@@ -21,7 +19,7 @@ components: transforms: remove_tags: {
   }
 
   support: {
-      input_types: ["metric"]
+    input_types: ["metric"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
