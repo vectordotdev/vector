@@ -5,7 +5,13 @@ components: sinks: gcp_pubsub: {
   short_description: "Batches log events to [Google Cloud Platform's Pubsub service][urls.gcp_pubsub] via the [REST Interface][urls.gcp_pubsub_rest]."
   long_description: "[GCP Pub/Sub][urls.gcp_pubsub] is a fully-managed real-time messaging service that allows you to send and receive messages between independent applications on the Google Cloud Platform."
 
-  _features: {
+  classes: {
+    commonly_used: true
+    function: "transmit"
+    service_providers: ["GCP"]
+  }
+
+  features: {
     batch: {
       enabled: true
       common: false,
@@ -14,7 +20,6 @@ components: sinks: gcp_pubsub: {
       timeout_secs: 1
     }
     buffer: enabled: true
-    checkpoint: enabled: false
     compression: enabled: false
     encoding: {
       enabled: true
@@ -24,10 +29,8 @@ components: sinks: gcp_pubsub: {
       text: null
     }
     healthcheck: enabled: true
-    multiline: enabled: false
     request: {
       enabled: true
-      common: false,
       in_flight_limit: 5,
       rate_limit_duration_secs: 1,
       rate_limit_num: 100,
@@ -44,19 +47,13 @@ components: sinks: gcp_pubsub: {
     }
   }
 
-  classes: {
-    commonly_used: true
-    function: "transmit"
-    service_providers: ["GCP"]
-  }
-
   statuses: {
     delivery: "at_least_once"
     development: "beta"
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
