@@ -11,7 +11,6 @@ components: transforms: concat: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
