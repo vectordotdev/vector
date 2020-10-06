@@ -1,7 +1,7 @@
 package metadata
 
 components: sources: vector: {
-  title: "#{component.title}"
+  title: "Vector"
   short_description: "Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs log and metric events."
   long_description: "Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs log and metric events."
 
@@ -29,7 +29,6 @@ components: sources: vector: {
   }
 
   support: {
-
     platforms: {
       "aarch64-unknown-linux-gnu": true
       "aarch64-unknown-linux-musl": true
