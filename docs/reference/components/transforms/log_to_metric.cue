@@ -5,15 +5,13 @@ components: transforms: log_to_metric: {
   short_description: "Accepts log events and allows you to convert logs into one or more metrics."
   long_description: "Accepts log events and allows you to convert logs into one or more metrics."
 
-  _features: {
-    checkpoint: enabled: false
-    multiline: enabled: false
-    tls: enabled: false
-  }
-
   classes: {
     commonly_used: true
     function: "convert"
+  }
+
+  features: {
+    tls: enabled: false
   }
 
   statuses: {
@@ -21,7 +19,7 @@ components: transforms: log_to_metric: {
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
