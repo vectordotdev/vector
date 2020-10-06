@@ -9,24 +9,14 @@ components: sources: [Name=string]: {
     function: "collect" | "receive" | "test"
   }
 
-  _features: {
+  features: {
     checkpoint: enabled: bool
     multiline: enabled: bool
-    tls: {
-      enabled: bool
-
-      if enabled {
-        can_enable: bool
-        can_verify_certificate: bool
-        can_verify_hostname: bool
-        enabled_default: bool
-      }
-    }
   }
 
   configuration: {
-    if _features.checkpoint.enabled {
-      _data_dir: {
+    if features.checkpoint.enabled {
+      data_dir: {
         common: false
         description: "The directory used to persist file checkpoint positions. By default, the [global `data_dir` option][docs.global-options#data_dir] is used. Please make sure the Vector project has write permissions to this dir."
         required: false
@@ -37,7 +27,7 @@ components: sources: [Name=string]: {
       }
     }
 
-    if _features.multiline.enabled {
+    if features.multiline.enabled {
       multiline: {
         common: false
         description: "Multiline parsing configuration. If not specified, multiline parsing is disabled."
@@ -78,79 +68,6 @@ components: sources: [Name=string]: {
         }
       }
     }
-
-    if _features.tls.enabled {
-      tls: {
-        common: false
-        description: "Configures the TLS options for connections from this source."
-        required: false
-        type: object: options: {
-          if _features.tls.can_enable {
-            enabled: {
-              common: false
-              description: "Require TLS for incoming connections. If this is set, an identity certificate is also required."
-              required: false
-              type: bool: default: _features.tls.enabled_default
-            }
-          }
-
-          ca_file: {
-            common: false
-            description: "Absolute path to an additional CA certificate file, in DER or PEM format (X.509), or an in-line CA certificate in PEM format."
-            required: false
-            type: string: {
-              default: null
-              examples: ["/path/to/certificate_authority.crt"]
-            }
-          }
-          crt_file: {
-            common: false
-            description: "Absolute path to a certificate file used to identify this server, in DER or PEM format (X.509) or PKCS#12, or an in-line certificate in PEM format. If this is set, and is not a PKCS#12 archive, `key_file` must also be set. This is required if `enabled` is set to `true`."
-            required: false
-            type: string: {
-              default: null
-              examples: ["/path/to/host_certificate.crt"]
-            }
-          }
-          key_file: {
-            common: false
-            description: "Absolute path to a private key file used to identify this server, in DER or PEM format (PKCS#8), or an in-line private key in PEM format."
-            required: false
-            type: string: {
-              default: null
-              examples: ["/path/to/host_certificate.key"]
-            }
-          }
-          key_pass: {
-            common: false
-            description: "Pass phrase used to unlock the encrypted key file. This has no effect unless `key_file` is set."
-            required: false
-            type: string: {
-              default: null
-              examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
-            }
-          }
-
-          if _features.tls.enabled_default {
-            verify_certificate: {
-              common: false
-              description: "If `true`, Vector will require a TLS certificate from the connecting host and terminate the connection if the certificate is not valid. If `false` (the default), Vector will not request a certificate from the client."
-              required: false
-              type: bool: default: false
-            }
-          }
-
-          if _features.tls.can_verify_hostname {
-            verify_hostname: {
-              common: false
-              description: "If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote host name."
-              required: false
-              type: bool: default: true
-            }
-          }
-        }
-      }
-    }
   }
 
   output: {
@@ -181,7 +98,7 @@ components: sources: [Name=string]: {
   }
 
   how_it_works: {
-    if _features.checkpoint.enabled {
+    if features.checkpoint.enabled {
       checkpointing: {
         title: "Checkpointing"
         body: #"""
@@ -201,28 +118,6 @@ components: sources: [Name=string]: {
             By default, the `\( Name )` source will augment events with helpful
             context keys as shown in the "Output" section.
             """#
-    }
-
-    environment_variables: {
-      title: "Environment Variables"
-      body: #"""
-            Environment variables are supported through all of Vector's
-            configuration. Simply add ${MY_ENV_VAR} in your Vector
-            configuration file and the variable will be replaced before being
-            evaluated.
-
-            Learn more in the [configuration manual](/docs/manual/setup/configuration).
-            """#
-    }
-
-    if _features.tls.enabled {
-      tls: {
-        title: "Transport Layer Security (TLS)"
-        body: #"""
-              Vector uses [Openssl][urls.openssl] for TLS protocols. You can
-              enable and adjust TLS behavior via the `tls.*` options.
-              """#
-      }
     }
   }
 }
