@@ -5,22 +5,20 @@ components: sinks: statsd: {
   short_description: "Streams metric events to [StatsD][urls.statsd] metrics service."
   long_description: "[StatsD][urls.statsd] is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy][urls.etsy] in Node."
 
-  _features: {
-    batch: enabled: false
-    buffer: enabled: false
-    checkpoint: enabled: false
-    compression: enabled: false
-    encoding: enabled: false
-    healthcheck: enabled: true
-    multiline: enabled: false
-    request: enabled: false
-    tls: enabled: false
-  }
-
   classes: {
     commonly_used: false
     function: "transmit"
     service_providers: []
+  }
+
+  features: {
+    batch: enabled: false
+    buffer: enabled: false
+    compression: enabled: false
+    encoding: enabled: false
+    healthcheck: enabled: true
+    request: enabled: false
+    tls: enabled: false
   }
 
   statuses: {
@@ -29,7 +27,7 @@ components: sinks: statsd: {
   }
 
   support: {
-      input_types: ["metric"]
+    input_types: ["metric"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
