@@ -11,7 +11,6 @@ components: transforms: aws_ec2_metadata: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
