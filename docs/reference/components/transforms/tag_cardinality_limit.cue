@@ -11,7 +11,6 @@ components: transforms: tag_cardinality_limit: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
