@@ -46,7 +46,7 @@ components: sources: stdin: {
     }
     max_length: {
       common: false
-      description: "The maximum bytes size of a message before it is discarded."
+      description: "The maximum bytes size of a message before rest of it will be discarded."
       required: false
       warnings: []
       type: uint: {
@@ -55,4 +55,27 @@ components: sources: stdin: {
       }
     }
   }
+
+  examples: log: [
+    {
+      _line: #"""
+             2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
+             """#
+      _host: "123.456.789.111"
+      title: "HTTP server output"
+      configuration: {
+        host_key: _host
+      }
+      input: """
+             ```text
+             \( _line )
+             ```
+             """
+      output: {
+        timestamp: "<current_timestamp>"
+        message: _line
+        host: _host
+      }
+    }
+  ]
 }
