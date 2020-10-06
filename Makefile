@@ -826,7 +826,7 @@ package-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-g
 	@echo "Output to ${<}."
 
 .PHONY: package-x86_64-unknown-linux-musl
-package-x86_64-unknown-linux-musl: target/artifacts/vector-aarch64-unknown-linux-musl.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-musl` triple.
+package-x86_64-unknown-linux-musl: target/artifacts/vector-x86_64-unknown-linux-musl.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-musl` triple.
 	@echo "Output to ${<}."
 
 .PHONY: package-aarch64-unknown-linux-musl
