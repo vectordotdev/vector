@@ -5,7 +5,13 @@ components: sinks: humio_logs: {
   short_description: "Batches log events to [Humio][urls.humio] via the [HEC API][urls.humio_hec]."
   long_description: "[Humio][urls.humio] is a time-series logging and aggregation platform for unrestricted, comprehensive event analysis, On-Premises or in the Cloud. With 1TB/day of raw log ingest/node, in-memory stream processing, and live, shareable dashboards and alerts, you can instantly and in real-time explore, monitor, and visualize any system’s data."
 
-  _features: {
+  classes: {
+    commonly_used: false
+    function: "transmit"
+    service_providers: ["Humio"]
+  }
+
+  features: {
     batch: {
       enabled: true
       common: false,
@@ -14,10 +20,9 @@ components: sinks: humio_logs: {
       timeout_secs: 1
     }
     buffer: enabled: true
-    checkpoint: enabled: false
     compression: {
       enabled: true
-      default: "none"
+      default: null
       gzip: true
     }
     encoding: {
@@ -28,10 +33,8 @@ components: sinks: humio_logs: {
       text: null
     }
     healthcheck: enabled: true
-    multiline: enabled: false
     request: {
       enabled: true
-      common: false,
       in_flight_limit: 10,
       rate_limit_duration_secs: 1,
       rate_limit_num: 10,
@@ -42,19 +45,13 @@ components: sinks: humio_logs: {
     tls: enabled: false
   }
 
-  classes: {
-    commonly_used: false
-    function: "transmit"
-    service_providers: ["Humio"]
-  }
-
   statuses: {
     delivery: "at_least_once"
     development: "beta"
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
