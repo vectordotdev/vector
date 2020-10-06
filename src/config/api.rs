@@ -68,17 +68,16 @@ impl Options {
 
 #[test]
 fn bool_merge() {
-    let a = Options {
+    let mut a = Options {
         enabled: true,
         bind: None,
         playground: false,
     };
 
-    let mut b = a.clone();
-    b.merge(Options::default()).unwrap();
+    a.merge(Options::default()).unwrap();
 
     assert_eq!(
-        b,
+        a,
         Options {
             enabled: true,
             bind: default_bind(),
@@ -90,17 +89,16 @@ fn bool_merge() {
 #[test]
 fn bind_merge() {
     let address = SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 9000);
-    let a = Options {
+    let mut a = Options {
         enabled: true,
         bind: Some(address),
         playground: true,
     };
 
-    let mut b = a.clone();
-    b.merge(Options::default()).unwrap();
+    a.merge(Options::default()).unwrap();
 
     assert_eq!(
-        b,
+        a,
         Options {
             enabled: true,
             bind: Some(address),
