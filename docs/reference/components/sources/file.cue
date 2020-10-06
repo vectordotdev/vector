@@ -5,16 +5,16 @@ components: sources: file: {
   long_description: ""
   short_description: "Collect logs by tailing one more files."
 
-  _features: {
-    checkpoint: enabled: true
-    multiline: enabled: true
-    tls: enabled: false
-  }
-
   classes: {
     commonly_used: true
     deployment_roles: ["daemon", "sidecar"]
     function: "collect"
+  }
+
+  features: {
+    checkpoint: enabled: true
+    multiline: enabled: true
+    tls: enabled: false
   }
 
   statuses: {
@@ -121,7 +121,6 @@ components: sources: file: {
       }
     }
     include: {
-      common: true
       description: "Array of file patterns to include. [Globbing](#globbing) is supported."
       required: true
       type: "[string]": examples: [["/var/log/nginx/*.log"]]
