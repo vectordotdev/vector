@@ -30,7 +30,8 @@ impl Segment {
     #[tracing::instrument(skip(segment))]
     pub(crate) fn from_lookup(segment: Pair<'_, Rule>) -> crate::Result<Vec<Segment>> {
         let rule = segment.as_rule();
-        tracing::trace!(segment = segment.as_str(), ?rule, action = %"enter");
+        let full_segment = segment.as_str();
+        tracing::trace!(segment = %full_segment, ?rule, action = %"enter");
         let mut segments = Vec::default();
         for inner_segment in segment.into_inner() {
             match inner_segment.as_rule() {
@@ -50,14 +51,15 @@ impl Segment {
                 }
             }
         }
-        tracing::trace!(segment = ?segments, ?rule, action = %"exit");
+        tracing::trace!(segment = %full_segment, ?rule, action = %"exit");
         Ok(segments)
     }
 
     #[tracing::instrument(skip(segment))]
     pub(crate) fn from_path_segment(segment: Pair<'_, Rule>) -> crate::Result<Vec<Segment>> {
         let rule = segment.as_rule();
-        tracing::trace!(segment = segment.as_str(), ?rule, action = %"enter");
+        let full_segment = segment.as_str();
+        tracing::trace!(segment = %full_segment, ?rule, action = %"enter");
         let mut segments = Vec::default();
         for inner_segment in segment.into_inner() {
             match inner_segment.as_rule() {
@@ -76,14 +78,14 @@ impl Segment {
                 }
             }
         }
-        tracing::trace!(segment = ?segments, ?rule, action = %"exit");
+        tracing::trace!(segment = %full_segment, ?rule, action = %"exit");
         Ok(segments)
     }
 
     #[tracing::instrument(skip(segment))]
     pub(crate) fn from_path_index(segment: Pair<'_, Rule>) -> crate::Result<Segment> {
         let full_segment = segment.as_str();
-        tracing::trace!(segment = full_segment, rule = ?segment.as_rule(), action = %"enter");
+        tracing::trace!(segment = %full_segment, rule = ?segment.as_rule(), action = %"enter");
         let segment = segment.into_inner().next().expect(
             "Did not get pair inside path_index segment. This is an invariant. Please report it.",
         );
@@ -100,14 +102,14 @@ impl Segment {
             )
             .into()),
         };
-        tracing::trace!(segment = full_segment, rule = ?segment.as_rule(), action = %"exit");
+        tracing::trace!(segment = %full_segment, rule = ?segment.as_rule(), action = %"exit");
         retval
     }
 
     #[tracing::instrument(skip(segment))]
     pub(crate) fn from_quoted_path_segment(segment: Pair<'_, Rule>) -> crate::Result<Segment> {
         let full_segment = segment.as_str();
-        tracing::trace!(segment = full_segment, rule = ?segment.as_rule(), action = %"enter");
+        tracing::trace!(segment = %full_segment, rule = ?segment.as_rule(), action = %"enter");
         let segment = segment.into_inner().next()
             .expect("Did not get pair inside quoted_path_segment segment. This is an invariant. Please report it.");
         let retval = match segment.as_rule() {
@@ -126,7 +128,7 @@ impl Segment {
                 .into())
             }
         };
-        tracing::trace!(segment = full_segment, rule = ?segment.as_rule(), action = %"exit");
+        tracing::trace!(segment = %full_segment, rule = ?segment.as_rule(), action = %"exit");
         retval
     }
 }
