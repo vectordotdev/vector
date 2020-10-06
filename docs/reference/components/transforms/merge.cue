@@ -5,15 +5,13 @@ components: transforms: merge: {
   short_description: "Accepts log events and allows you to merge partial log events into a single event."
   long_description: "Accepts log events and allows you to merge partial log events into a single event."
 
-  _features: {
-    checkpoint: enabled: false
-    multiline: enabled: false
-    tls: enabled: false
-  }
-
   classes: {
     commonly_used: false
     function: "aggregate"
+  }
+
+  features: {
+    tls: enabled: false
   }
 
   statuses: {
@@ -21,7 +19,7 @@ components: transforms: merge: {
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
