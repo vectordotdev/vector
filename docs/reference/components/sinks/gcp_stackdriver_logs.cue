@@ -5,7 +5,13 @@ components: sinks: gcp_stackdriver_logs: {
   short_description: "Batches log events to [Google Cloud Platform's Stackdriver Logging service][urls.gcp_stackdriver_logging] via the [REST Interface][urls.gcp_stackdriver_logging_rest]."
   long_description: "[Stackdriver][urls.gcp_stackdriver] is Google Cloud's embedded observability suite designed to monitor, troubleshoot, and improve cloud infrastructure, software and application performance. Stackdriver enables you to efficiently build and run workloads, keeping applications available and performing well."
 
-  _features: {
+  classes: {
+    commonly_used: true
+    function: "transmit"
+    service_providers: ["GCP"]
+  }
+
+  features: {
     batch: {
       enabled: true
       common: false,
@@ -14,7 +20,6 @@ components: sinks: gcp_stackdriver_logs: {
       timeout_secs: 1
     }
     buffer: enabled: true
-    checkpoint: enabled: false
     compression: enabled: false
     encoding: {
       enabled: true
@@ -24,10 +29,8 @@ components: sinks: gcp_stackdriver_logs: {
       text: null
     }
     healthcheck: enabled: true
-    multiline: enabled: false
     request: {
       enabled: true
-      common: false,
       in_flight_limit: 5,
       rate_limit_duration_secs: 1,
       rate_limit_num: 1000,
@@ -44,19 +47,13 @@ components: sinks: gcp_stackdriver_logs: {
     }
   }
 
-  classes: {
-    commonly_used: true
-    function: "transmit"
-    service_providers: ["GCP"]
-  }
-
   statuses: {
     delivery: "at_least_once"
     development: "beta"
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
