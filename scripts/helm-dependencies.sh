@@ -29,18 +29,12 @@ update() {
     echo "=> $CHART"
 
     CHART_PATH="distribution/helm/$CHART"
-
-    DEPENDENCIES_STRING="$(list-chart-dependencies "$CHART_PATH")"
-    if [[ -z "$DEPENDENCIES_STRING" ]]; then
-      echo "No dependencies"
-      continue;
-    fi
-
     CHART_VENDORED_DEPENDENCIES_PATH="$CHART_PATH/charts"
+
     rm -rf "$CHART_VENDORED_DEPENDENCIES_PATH"
     mkdir -p "$CHART_VENDORED_DEPENDENCIES_PATH"
 
-    DEPENDENCIES=( "$DEPENDENCIES_STRING" )
+    mapfile -t DEPENDENCIES < <(list-chart-dependencies "$CHART_PATH")
     for DEPENDENCY_PAIR in "${DEPENDENCIES[@]}"; do
       read -ra KV <<<"$DEPENDENCY_PAIR"
       DEPENDENCY_NAME="${KV[0]}"
@@ -67,15 +61,9 @@ validate() {
     echo "=> $CHART"
 
     CHART_PATH="distribution/helm/$CHART"
-
-    DEPENDENCIES_STRING="$(list-chart-dependencies "$CHART_PATH")"
-    if [[ -z "$DEPENDENCIES_STRING" ]]; then
-      echo "No dependencies"
-      continue;
-    fi
-
     CHART_VENDORED_DEPENDENCIES_PATH="$CHART_PATH/charts"
-    DEPENDENCIES=( "$DEPENDENCIES_STRING" )
+
+    mapfile -t DEPENDENCIES < <(list-chart-dependencies "$CHART_PATH")
     for DEPENDENCY_PAIR in "${DEPENDENCIES[@]}"; do
       read -ra KV <<<"$DEPENDENCY_PAIR"
       DEPENDENCY_NAME="${KV[0]}"
