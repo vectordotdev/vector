@@ -46,11 +46,11 @@ update() {
       DEPENDENCY_NAME="${KV[0]}"
       DEPENDENCY_PATH="${KV[1]}"
 
-      COPY_FROM="$CHART_PATH/$DEPENDENCY_PATH"
-      COPY_TO="$CHART_VENDORED_DEPENDENCIES_PATH/$DEPENDENCY_NAME"
+      LINK_TARGET="../$DEPENDENCY_PATH"
+      LINK_NAME="$CHART_VENDORED_DEPENDENCIES_PATH/$DEPENDENCY_NAME"
 
-      echo "Copying \"$DEPENDENCY_NAME\" from \"$COPY_FROM\" to \"$COPY_TO\"..."
-      cp -r -T "$COPY_FROM" "$COPY_TO"
+      echo "Symlinking \"$DEPENDENCY_NAME\" with name \"$LINK_NAME\" and target \"$LINK_TARGET\"..."
+      ln -sfn -T "$LINK_TARGET" "$LINK_NAME"
     done
   done
 }
