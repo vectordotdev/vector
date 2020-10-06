@@ -11,7 +11,6 @@ components: transforms: ansi_stripper: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
