@@ -13,6 +13,7 @@ env:
   TEST_LOG: vector=debug
   VERBOSE: true
   CI: true
+  PROFILE: debug
 
 jobs:
   cancel-previous:
