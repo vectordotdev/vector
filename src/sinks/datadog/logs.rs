@@ -63,10 +63,9 @@ impl GenerateConfig for DatadogLogsConfig {}
 
 impl DatadogLogsConfig {
     fn get_endpoint(&self) -> &str {
-        match &self.endpoint {
-            Some(endpoint) => endpoint,
-            None => "https://http-intake.logs.datadoghq.eu/v1/input",
-        }
+        self.endpoint
+            .as_deref()
+            .unwrap_or("https://http-intake.logs.datadoghq.eu/v1/input")
     }
 
     fn batch_settings<T: Batch>(&self) -> Result<BatchSettings<T>, BatchError> {
@@ -129,7 +128,7 @@ impl DatadogLogsConfig {
                     Vec::new(),
                     match self.compression_level {
                         Some(level) if level <= 9 => flate2::Compression::new(level),
-                        _ => flate2::Compression::fast(),
+                        _ => flate2::Compression::best(),
                     },
                 );
 
