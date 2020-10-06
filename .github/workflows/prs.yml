@@ -42,6 +42,7 @@ jobs:
         with:
           filters: |
             source:
+              - ".cargo/**"
               - "benches/**"
               - "lib/**"
               - "proto/**"
