@@ -5,15 +5,13 @@ components: transforms: split: {
   short_description: "Accepts log events and allows you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
   long_description: "Accepts log events and allows you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
 
-  _features: {
-    checkpoint: enabled: false
-    multiline: enabled: false
-    tls: enabled: false
-  }
-
   classes: {
     commonly_used: false
     function: "parse"
+  }
+
+  features: {
+    tls: enabled: false
   }
 
   statuses: {
@@ -21,7 +19,7 @@ components: transforms: split: {
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
