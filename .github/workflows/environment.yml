@@ -17,7 +17,7 @@ jobs:
     env:
       ENVIRONMENT_AUTOBUILD: true
     steps:
-      - run: docker login -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
+      - run: docker login -u ${{ secrets.CI_DOCKER_USER }} -p ${{ secrets.CI_DOCKER_PASSWORD }}
       - uses: actions/checkout@v2
       - run: make ci-sweep
       - name: prepare environment
