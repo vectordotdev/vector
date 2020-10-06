@@ -1,3 +1,8 @@
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-args=-rdynamic"]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "link-args=-rdynamic"]
 
 [target.'cfg(target_env = "musl")']
 # Because the `cross` Docker container sets `CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER`, the
@@ -10,5 +15,8 @@ rustflags = "-Clinker=scripts/cross/wrappers/linker.sh"
 [target.x86_64-unknown-linux-musl]
 rustflags = "-Lnative=/usr/local/x86_64-linux-musl/lib"
 
-[target.x86_64-unknown-linux-gnu]
-rustflags = ["-C", "link-args=-rdynamic"]
+[target.aarch64-unknown-linux-musl]
+# Deliberately empty.
+# See `scripts/cross/wrappers/{linker,rustc}.sh`.
+# Basically, we need to carefully edit the ordering of links.
+# Rust doesn't let us have great control of that here, so for now we use those wrappers.

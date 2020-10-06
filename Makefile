@@ -822,19 +822,19 @@ package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-d
 package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
 
 .PHONY: package-x86_64-unknown-linux-gnu
-package-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build an archive of the x86_64-unknown-linux-gnu triple.
+package-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-gnu` triple.
 	@echo "Output to ${<}."
 
 .PHONY: package-x86_64-unknown-linux-musl
-package-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## Build the x86_64 musl archive
-	$(RUN) package-x86_64-unknown-linux-musl
+package-x86_64-unknown-linux-musl: target/artifacts/vector-aarch64-unknown-linux-musl.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-musl` triple.
+	@echo "Output to ${<}."
 
 .PHONY: package-aarch64-unknown-linux-musl
-package-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## Build an archive of the aarch64-unknown-linux-gnu triple.
-	$(RUN) package-aarch64-unknown-linux-musl
+package-aarch64-unknown-linux-musl: target/artifacts/vector-aarch64-unknown-linux-musl.tar.gz ## Build an archive suitable for the `aarch64-unknown-linux-musl` triple.
+	@echo "Output to ${<}."
 
 .PHONY: package-aarch64-unknown-linux-gnu
-package-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build the aarch64 archive
+package-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `aarch64-unknown-linux-gnu` triple.
 	@echo "Output to ${<}."
 
 # debs
