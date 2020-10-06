@@ -5,15 +5,13 @@ components: transforms: json_parser: {
   short_description: "Accepts log events and allows you to parse a log field value as JSON."
   long_description: "Accepts log events and allows you to parse a log field value as JSON."
 
-  _features: {
-    checkpoint: enabled: false
-    multiline: enabled: false
-    tls: enabled: false
-  }
-
   classes: {
     commonly_used: true
     function: "parse"
+  }
+
+  features: {
+    tls: enabled: false
   }
 
   statuses: {
@@ -21,7 +19,7 @@ components: transforms: json_parser: {
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
