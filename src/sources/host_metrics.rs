@@ -1158,7 +1158,7 @@ mod tests {
         })
         .await;
 
-        assert!(filtered_metrics_with.len() < all_metrics.len());
+        assert!(filtered_metrics_with.len() <= all_metrics.len());
         assert!(all_tags_match(&filtered_metrics_with, tag, |s| s == key));
 
         let filtered_metrics_with_match = get_metrics(FilterList {
@@ -1180,7 +1180,7 @@ mod tests {
         })
         .await;
 
-        assert!(filtered_metrics_without.len() < all_metrics.len());
+        assert!(filtered_metrics_without.len() <= all_metrics.len());
         assert!(all_tags_match(&filtered_metrics_without, tag, |s| s != key));
 
         let filtered_metrics_without_match = get_metrics(FilterList {
