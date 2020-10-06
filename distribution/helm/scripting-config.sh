@@ -10,6 +10,7 @@ DEPENDENCY_UPDATE_ORDER=(
 
   # Intermediate level.
   vector-agent
+  vector-aggregator
 
   # Highest level.
   vector
@@ -21,5 +22,6 @@ DEPENDENCY_UPDATE_ORDER=(
 # shellcheck disable=SC2034
 CHARTS_TO_PUBLISH=(
   vector-agent
+  vector-aggregator
   vector
 )
