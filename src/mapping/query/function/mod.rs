@@ -124,6 +124,7 @@ build_signatures! {
     tokenize => TokenizeFn,
     strip_ansi_escape_codes => StripAnsiEscapeCodesFn,
     parse_duration => ParseDurationFn,
+    format_number => FormatNumberFn,
 }
 
 /// A parameter definition accepted by a function.
