@@ -208,6 +208,7 @@ cross-%: export TRIPLE ?=$(subst ${SPACE},-,$(wordlist 2,99,${PAIR}))
 cross-%: export PROFILE ?= release
 cross-%: export RUSTFLAGS += -C link-arg=-s
 cross-%: cargo-install-cross
+	$(MAKE) -k cross-image-${TRIPLE}
 	cross ${COMMAND} \
 		$(if $(findstring release,$(PROFILE)),--release,) \
 		--target ${TRIPLE} \
@@ -219,6 +220,7 @@ target/%/vector: export TRIPLE ?=$(word 1,${PAIR})
 target/%/vector: export PROFILE ?=$(word 2,${PAIR})
 target/%/vector: export RUSTFLAGS += -C link-arg=-s
 target/%/vector: cargo-install-cross CARGO_HANDLES_FRESHNESS
+	$(MAKE) -k cross-image-${TRIPLE}
 	cross build \
 		$(if $(findstring release,$(PROFILE)),--release,) \
 		--target ${TRIPLE} \
@@ -249,6 +251,14 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 		--directory target/scratch/ \
 		./vector-${TRIPLE}
 	rm -rf target/scratch/
+
+.PHONY: cross-image-%
+cross-image-%: export TRIPLE =$($(strip @):cross-image-%=%)
+cross-image-%:
+	docker build \
+		--tag vector-cross-env:${TRIPLE} \
+		--file scripts/cross/${TRIPLE}.dockerfile \
+		scripts/cross
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
