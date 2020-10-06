@@ -14,6 +14,8 @@ mod blackhole;
 mod coercer;
 #[cfg(feature = "transforms-concat")]
 mod concat;
+#[cfg(feature = "sinks-console")]
+mod console;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
 #[cfg(feature = "sources-docker")]
@@ -97,11 +99,14 @@ pub use self::blackhole::*;
 pub(crate) use self::coercer::*;
 #[cfg(feature = "transforms-concat")]
 pub use self::concat::*;
+#[cfg(feature = "sinks-console")]
+pub use self::console::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-docker")]
 pub use self::docker::*;
 pub use self::elasticsearch::*;
+#[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
 pub use self::file::*;
 #[cfg(feature = "sources-generator")]
 pub use self::generator::*;
@@ -181,6 +186,7 @@ macro_rules! emit {
 }
 
 // Modules that require emit! macro so they need to be defined after the macro.
+#[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
 mod file;
 mod windows;
 
