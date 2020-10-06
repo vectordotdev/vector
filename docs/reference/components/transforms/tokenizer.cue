@@ -11,7 +11,6 @@ components: transforms: tokenizer: {
   }
 
   features: {
-    tls: enabled: false
   }
 
   statuses: {
