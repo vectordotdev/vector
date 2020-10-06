@@ -62,10 +62,16 @@ env: []
   #        name: secret
   #        key: password
 
+# Tolerations to set for the `Pod`s managed by `DaemonSet`.
+tolerations:
+  # This toleration is to have the `DaemonSet` runnable on master nodes.
+  # Remove it if your masters can't run pods.
+  - key: node-role.kubernetes.io/master
+    effect: NoSchedule
+
 # Various tweakables for the `Pod`s managed by `StatefulSet`.
 resources: {}
 nodeSelector: {}
-tolerations: []
 affinity: {}
 
 # Additional volumes to pass to the `Pod`s managed by `StatefulSet`.
@@ -74,6 +80,32 @@ extraVolumes: []
 # Additional volume mounts to pass to the `vector` container of the `Pod`s
 # managed by `StatefulSet`.
 extraVolumeMounts: []
+
+# Storage options.
+storage:
+  # Absolute path on the host to store `vector` data.
+  # If specified, but `persistentVolume.enabled` is `true`, then has no effect.
+  hostPath: ""
+
+  # If `enabled` is `true` then a `PersistentVolumeClaim` will be created and
+  # used to store `vector` data, otherwise `hostPath` is used.
+  persistentVolume:
+    # Whether to create `PersistentVolumeClaim`.
+    enabled: false
+    # The size to allocate.
+    size: 10Gi
+    # If defined, then `storageClassName: <storageClass>`.
+    # If set to "-", then `storageClassName: ""`, which disables dynamic
+    # provisioning.
+    # If undefined or empty (default), then no `storageClassName` spec is set,
+    # so the default provisioner will be chosen (gp2 on AWS, standard on
+    # GKE, AWS & OpenStack).
+    storageClass: ""
+
+    # Additional labels to apply to the created `PersistentVolumeClaims`.
+    labels: {}
+    # Additional annotations to apply to the created `PersistentVolumeClaims`.
+    annotations: {}
 
 rbac:
   # Whether to create rbac resources or not. Disable for non-rbac clusters.
@@ -99,7 +131,6 @@ logSchema:
   sourceTypeKey: "source_type"
   timestampKey: "timestamp"
 
-
 # Sources to add to the generated `vector` config
 sources: {}
   # source_name:
@@ -122,26 +153,3 @@ sinks: {}
   #   inputs: ["input1", "input2"]
   #   rawConfig: |
   #     option = "value"
-
-storage:
-  # Absolute path on host to store CockroachDB's data.
-  # If specified, but `persistentVolume.enabled` is `true`, then has no effect.
-  hostPath: ""
-
-  # If `enabled` is `true` then a PersistentVolumeClaim will be created and
-  # used to store Vector's data, otherwise `hostPath` is used.
-  persistentVolume:
-    enabled: false
-    size: 10Gi
-    # If defined, then `storageClassName: <storageClass>`.
-    # If set to "-", then `storageClassName: ""`, which disables dynamic
-    # provisioning.
-    # If undefined or empty (default), then no `storageClassName` spec is set,
-    # so the default provisioner will be chosen (gp2 on AWS, standard on
-    # GKE, AWS & OpenStack).
-    storageClass: ""
-
-    # Additional labels to apply to the created PersistentVolumeClaims.
-    labels: {}
-    # Additional annotations to apply to the created PersistentVolumeClaims.
-    annotations: {}
