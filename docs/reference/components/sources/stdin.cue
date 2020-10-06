@@ -56,6 +56,19 @@ components: sources: stdin: {
     }
   }
 
+  output: logs: line: {
+    description: "An individual event from STDIN."
+    fields: {
+      host: fields._host
+      message: {
+        description: "The raw message, unaltered."
+        required: true
+        type: string: examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
+      }
+      timestamp: fields._timestamp
+    }
+  }
+
   examples: log: [
     {
       _line: #"""
