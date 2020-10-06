@@ -5,7 +5,13 @@ components: sinks: http: {
   short_description: "Batches log events to a generic [HTTP][urls.http] endpoint."
   long_description: "Batches log events to a generic [HTTP][urls.http] endpoint."
 
-  _features: {
+  classes: {
+    commonly_used: true
+    function: "transmit"
+    service_providers: []
+  }
+
+  features: {
     batch: {
       enabled: true
       common: true,
@@ -14,10 +20,9 @@ components: sinks: http: {
       timeout_secs: 1
     }
     buffer: enabled: true
-    checkpoint: enabled: false
     compression: {
       enabled: true
-      default: "none"
+      default: null
       gzip: true
     }
     encoding: {
@@ -28,10 +33,8 @@ components: sinks: http: {
       text: null
     }
     healthcheck: enabled: true
-    multiline: enabled: false
     request: {
       enabled: true
-      common: true,
       in_flight_limit: 10,
       rate_limit_duration_secs: 1,
       rate_limit_num: 9000000000000000000,
@@ -48,19 +51,13 @@ components: sinks: http: {
     }
   }
 
-  classes: {
-    commonly_used: true
-    function: "transmit"
-    service_providers: []
-  }
-
   statuses: {
     delivery: "at_least_once"
     development: "stable"
   }
 
   support: {
-      input_types: ["log"]
+    input_types: ["log"]
 
     platforms: {
       "aarch64-unknown-linux-gnu": true
