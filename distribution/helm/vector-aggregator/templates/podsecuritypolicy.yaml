@@ -14,10 +14,6 @@ spec:
     - 'configMap'
     - 'secret'
   allowedHostPaths:
-    - pathPrefix: "/var/log"
-      readOnly: true
-    - pathPrefix: "/var/lib/docker/containers"
-      readOnly: true
     {{- range .Values.extraVolumes }}
     {{- if .hostPath }}
     - pathPrefix: {{ .hostPath.path }}
