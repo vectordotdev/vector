@@ -38,14 +38,15 @@ components: sources: http: {
 		}
 
 		requirements: [
-			"""
+			#"""
 				This component exposes a configured port. You must ensure your network
 				allows inbound access to this port if you want to accept requests from
 				remote sources.
-				""",
+				"""#,
 		]
 
 		warnings: []
+		notices: []
 	}
 
 	configuration: {

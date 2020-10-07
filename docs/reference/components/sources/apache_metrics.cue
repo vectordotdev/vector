@@ -33,19 +33,21 @@ components: sources: apache_metrics: {
 		}
 
 		requirements: [
-			"""
+			#"""
 				The Apache [Status module (`mod_status`)][urls.apache_mod_status] must
-				enabled and configured for this source to work.
-				""",
+				be enabled and configured for this source to work.
+				"""#,
 		]
 
 		warnings: [
 			"""
-				The [`ExtendedStatus` option][urls.apache_extended_status] has been known to
-				cause performance problems. If enabled, please monitor performance
-				carefully.
+				The [`ExtendedStatus` option][urls.apache_extended_status] has been
+				known to cause performance problems. If enabled, please monitor
+				performance carefully.
 				""",
 		]
+
+		notices: []
 	}
 
 	configuration: {

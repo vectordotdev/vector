@@ -24,6 +24,7 @@ package metadata
 	sort?: int8
 
 	type: {
+		"*"?: {}
 		"[string]"?: {
 			if !required {
 				default: [...string] | null
@@ -244,6 +245,11 @@ package metadata
 		// Any warnings for this component. This should address any "gotchas" as
 		// part of using this source.
 		warnings: [...string] | null
+
+		// Any notices for this component. This should include information that is
+		// useful to the user. For example, the `lua` transform notes the embedded
+		// Lua version.
+		notices: [...string] | null
 	}
 
 	configuration: #ConfigurationOptions
@@ -251,8 +257,8 @@ package metadata
 	// Output events for the component.
 	if kind == "source" || kind == "transform" {
 		output: {
-			logs?:    #LogEvents
-			metrics?: #MetricEvents
+			logs?:    #LogOutput
+			metrics?: #MetricOutput
 		}
 	}
 
@@ -266,8 +272,22 @@ package metadata
 						"\( k )"?: _ | *null
 					}
 				}
-				input:    #Fields | [#Fields, ...] | string
-				"output": #Fields
+				input:  #LogEvent | [#LogEvent, ...] | string
+				output: #LogEvent | null
+				notes?: string
+			},
+		]
+		metric: [
+			...{
+				title: string
+				"configuration": {
+					for k, v in configuration {
+						"\( k )"?: _ | *null
+					}
+				}
+				input:  #MetricEvent
+				output: #MetricEvent | null
+				notes?: string
 			},
 		]
 	}
@@ -276,7 +296,14 @@ package metadata
 	how_it_works: #HowItWorks
 }
 
-#Fields: [Name=string]: #Fields | _
+#LogEvent: [Name=string]: #LogEvent | _
+
+#MetricEvent: {
+	counter: {
+		value: uint
+	}
+	tags: [Name=string]: string
+}
 
 #HowItWorks: [Name=string]: {
 	name:  Name
@@ -288,7 +315,7 @@ package metadata
 	}]
 }
 
-#LogEvents: [Name=string]: {
+#LogOutput: [Name=string]: {
 	description: string
 	name:        Name
 	fields: [Name=string]: {
@@ -308,7 +335,7 @@ package metadata
 	}
 }
 
-#MetricEvents: [Name=string]: {
+#MetricOutput: [Name=string]: {
 	description:    string
 	relevant_when?: string
 	tags: [Name=string]: {
