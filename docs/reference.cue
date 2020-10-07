@@ -296,19 +296,23 @@ package metadata
 		name:           Name
 		relevant_when?: string
 		required:       bool
-		type: {
-			"*": {}
-			"string"?: {
-				examples: [string, ...string]
-			}
-			"string"?: {
-				enum: [Name=string]: string
-			}
-			"timestamp"?: {
-				examples: ["2020-11-01T21:15:47.443232Z"]
-			}
-			"object"?: {}
-		}
+		type:
+			close({"*": {}}) |
+			close({
+				"string":
+					close({
+						examples: [string, ...string]
+					}) |
+					close({
+						enum: [Name=string]: string
+					})
+			}) |
+			close({
+				timestamp: close({
+					examples: ["2020-11-01T21:15:47.443232Z"]
+				})
+			}) |
+			close({object: {}})
 	}
 }
 
