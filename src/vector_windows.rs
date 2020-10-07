@@ -29,6 +29,7 @@ pub mod service_control {
     use std::fmt;
     use std::time::Duration;
 
+    #[derive(Debug)]
     pub enum Error {
         Service(windows_service::Error),
         PollTimeout {
@@ -37,6 +38,8 @@ pub mod service_control {
             timeout: Duration,
         },
     }
+
+    impl std::error::Error for Error {}
 
     impl From<windows_service::Error> for Error {
         fn from(err: windows_service::Error) -> Self {
@@ -108,16 +111,15 @@ pub mod service_control {
         }
     }
 
-    pub fn control(
-        service_def: &ServiceDefinition,
-        action: ControlAction,
-    ) -> std::result::Result<(), Error> {
+    pub fn control(service_def: &ServiceDefinition, action: ControlAction) -> crate::Result<()> {
         match action {
-            ControlAction::Start => start_service(&service_def).map_err(|e| e.into()),
-            ControlAction::Stop => stop_service(&service_def).map_err(|e| e.into()),
-            ControlAction::Restart => restart_service(&service_def),
-            ControlAction::Install => install_service(&service_def).map_err(|e| e.into()),
-            ControlAction::Uninstall => uninstall_service(&service_def),
+            ControlAction::Start => start_service(&service_def).map_err(|e| Error::from(e).into()),
+            ControlAction::Stop => stop_service(&service_def).map_err(|e| Error::from(e).into()),
+            ControlAction::Restart => restart_service(&service_def).map_err(Into::into),
+            ControlAction::Install => {
+                install_service(&service_def).map_err(|e| Error::from(e).into())
+            }
+            ControlAction::Uninstall => uninstall_service(&service_def).map_err(Into::into),
         }
     }
 
@@ -167,7 +169,7 @@ pub mod service_control {
         Ok(())
     }
 
-    fn restart_service(service_def: &ServiceDefinition) -> std::result::Result<(), Error> {
+    fn restart_service(service_def: &ServiceDefinition) -> crate::Result<()> {
         let service_access =
             ServiceAccess::QUERY_STATUS | ServiceAccess::START | ServiceAccess::STOP;
         let service = open_service(&service_def, service_access)?;
@@ -192,7 +194,8 @@ pub mod service_control {
                 state,
                 expected_state: ServiceState::Stopped,
                 timeout,
-            });
+            }
+            .into());
         }
 
         service.start(&[] as &[OsString])?;
@@ -233,7 +236,7 @@ pub mod service_control {
         Ok(())
     }
 
-    fn uninstall_service(service_def: &ServiceDefinition) -> std::result::Result<(), Error> {
+    fn uninstall_service(service_def: &ServiceDefinition) -> crate::Result<()> {
         let service_access =
             ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE;
         let service = open_service(&service_def, service_access)?;
@@ -260,7 +263,8 @@ pub mod service_control {
                 state,
                 expected_state: ServiceState::Stopped,
                 timeout,
-            });
+            }
+            .into());
         }
 
         service.delete()?;
