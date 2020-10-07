@@ -64,8 +64,7 @@ async fn get_topology(addr: SocketAddr) -> exitcode::ExitCode {
 
     let mut table = Table::new();
     table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-
-    table.add_row(row!("NAME", "TYPE"));
+    table.set_titles(row!("NAME", "TYPE"));
 
     for data in res.data.unwrap().topology {
         table.add_row(row!(data.name, topology_type(data.on)));
