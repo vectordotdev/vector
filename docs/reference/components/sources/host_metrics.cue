@@ -1,32 +1,8 @@
 package metadata
 
-#IncludesExcludes: {
-	common:      false
-	description: "Lists of \(#term) patterns to include or exclude."
-	required:    false
-	type: object: options: {
-		includes: {
-			description: #"""
-				The list of \(#term) patterns for which to gather \(#metrics) metrics.
-				Defaults to including all \(#term)s.
-				The patterns are matched using [globbing](#globbing).
-				"""#
-			type: "[string]"
-		}
-		excludes: {
-			description: #"""
-				The list of \(#term) patterns for which to skip gathering \(#metrics) metrics.
-				Defaults to excluding no \(#term)s.
-				The patterns are matched using [globbing](#globbing).
-				"""#
-			type: "[string]"
-		}
-	}
-}
-
 components: sources: host_metrics: {
 	title:             "Host Metrics"
-	long_description:  "FIXME"
+	long_description:  "The host metrics source examines system data sources on the local system and generates metrics describing utilization of various system resources."
 	short_description: "Gather host-based metrics."
 
 	classes: {
@@ -56,11 +32,11 @@ components: sources: host_metrics: {
 			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: [
-		]
+		notices: []
 
-		warnings: [
-		]
+		requirements: []
+
+		warnings: []
 	}
 
 	configuration: {
@@ -100,12 +76,37 @@ components: sources: host_metrics: {
 			description: #"Options for the "disk" metrics collector."#
 			required:    false
 			type: object: options: {
-				devices: #IncludesExcludes & {
-					term:    "device name"
-					metrics: "I/O utilization"
+				devices: {
+					common:      false
+					required:    false
+					description: "Lists of device name patterns to include or exclude."
 					type: object: options: {
-						includes: examples: [["sda"], ["dm-*"]]
-						excludes: examples: [["sda"], ["dm-*"]]
+						includes: {
+							required: false
+							common:   false
+							description: #"""
+								The list of device name patterns for which to gather I/O utilization metrics.
+								Defaults to including all devices.
+								The patterns are matched using [globbing](#globbing).
+								"""#
+							type: "[string]": {
+								default: ["*"]
+								examples: [["sda"], ["dm-*"]]
+							}
+						}
+						excludes: {
+							required: false
+							common:   false
+							description: #"""
+								The list of device name patterns for which to gather I/O utilization metrics.
+								Defaults to excluding no devices.
+								The patterns are matched using [globbing](#globbing).
+								"""#
+							type: "[string]": {
+								default: []
+								examples: [["sda"], ["dm-*"]]
+							}
+						}
 					}
 				}
 			}
@@ -115,28 +116,103 @@ components: sources: host_metrics: {
 			description: #"Options for the "filesystem" metrics collector."#
 			required:    false
 			type: object: options: {
-				devices: #IncludesExcludes & {
-					term:    "device name"
-					metrics: "usage"
+				devices: {
+					common:      false
+					required:    false
+					description: "Lists of device name patterns to include or exclude."
 					type: object: options: {
-						includes: examples: [["sda"], ["dm-*"]]
-						excludes: examples: [["sda"], ["dm-*"]]
+						includes: {
+							required: false
+							common:   false
+							description: #"""
+								The list of device name patterns for which to gather usage metrics.
+								Defaults to including all devices.
+								The patterns are matched using [globbing](#globbing).
+								"""#
+							type: "[string]": {
+								default: ["*"]
+								examples: [["sda"], ["dm-*"]]
+							}
+						}
+						excludes: {
+							required: false
+							common:   false
+							description: #"""
+								The list of device name patterns for which to gather usage metrics.
+								Defaults to excluding no devices.
+								The patterns are matched using [globbing](#globbing).
+								"""#
+							type: "[string]": {
+								default: []
+								examples: [["sda"], ["dm-*"]]
+							}
+						}
 					}
 				}
-				filesystems: #IncludesExcludes & {
-					term:    "filesystem name"
-					metrics: "usage"
+				filesystems: {
+					common:      false
+					required:    false
+					description: "Lists of filesystem name patterns to include or exclude."
 					type: object: options: {
-						includes: examples: [["ntfs"], ["ext*"]]
-						excludes: examples: [["ntfs"], ["ext*"]]
+						includes: {
+							required: false
+							common:   false
+							description: #"""
+								The list of filesystem name patterns for which to gather usage metrics.
+								Defaults to including all filesystems.
+								The patterns are matched using [globbing](#globbing).
+								"""#
+							type: "[string]": {
+								default: ["*"]
+								examples: [["ntfs"], ["ext*"]]
+							}
+						}
+						excludes: {
+							required: false
+							common:   false
+							description: #"""
+								The list of filesystem name patterns for which to gather usage metrics.
+								Defaults to excluding no filesystems.
+								The patterns are matched using [globbing](#globbing).
+								"""#
+							type: "[string]": {
+								default: []
+								examples: [["ntfs"], ["ext*"]]
+							}
+						}
 					}
 				}
-				mountpoints: #IncludesExcludes & {
-					term:    "mount point path"
-					metrics: "usage"
+				mountpoints: {
+					common:      false
+					required:    false
+					description: "Lists of mount point path patterns to include or exclude."
 					type: object: options: {
-						includes: examples: [["/home"], ["/raid*"]]
-						excludes: examples: [["/home"], ["/raid*"]]
+						includes: {
+							required: false
+							common:   false
+							description: #"""
+								The list of mount point path patterns for which to gather usage metrics.
+								Defaults to including all mount points.
+								The patterns are matched using [globbing](#globbing).
+								"""#
+							type: "[string]": {
+								default: ["*"]
+								examples: [["/home"], ["/raid*"]]
+							}
+						}
+						excludes: {
+							required: false
+							common:   false
+							description: #"""
+								The list of mount point path patterns for which to gather usage metrics.
+								Defaults to excluding no mount points.
+								The patterns are matched using [globbing](#globbing).
+								"""#
+							type: "[string]": {
+								default: []
+								examples: [["/home"], ["/raid*"]]
+							}
+						}
 					}
 				}
 			}
@@ -146,12 +222,37 @@ components: sources: host_metrics: {
 			description: #"Options for the "network" metrics collector."#
 			required:    false
 			type: object: options: {
-				devices: #IncludesExcludes & {
-					term:    "device name"
-					metrics: "utilization"
+				devices: {
+					common:      false
+					required:    false
+					description: "Lists of device name patterns to include or exclude."
 					type: object: options: {
-						includes: examples: [["eth0"], ["enp?s*"]]
-						excludes: examples: [["eth0"], ["enp?s*"]]
+						includes: {
+							required: false
+							common:   false
+							description: #"""
+								The list of device name patterns for which to gather network utilization metrics.
+								Defaults to including all devices.
+								The patterns are matched using [globbing](#globbing).
+								"""#
+							type: "[string]": {
+								default: ["*"]
+								examples: [["sda"], ["dm-*"]]
+							}
+						}
+						excludes: {
+							required: false
+							common:   false
+							description: #"""
+								The list of device name patterns for which to gather network utilization metrics.
+								Defaults to excluding no devices.
+								The patterns are matched using [globbing](#globbing).
+								"""#
+							type: "[string]": {
+								default: []
+								examples: [["sda"], ["dm-*"]]
+							}
+						}
 					}
 				}
 			}
@@ -159,8 +260,133 @@ components: sources: host_metrics: {
 	}
 
 	output: metrics: {
-	}
+		_tags: {
+			host: {
+				description: "The hostname of the originating system."
+				required:    true
+				examples: ["myhostname"]
+			}
+			collector: {
+				description: "Which collector this metric comes from."
+				required:    true
+			}
+		}
 
-	how_it_works: {
+		host_cpu_seconds_total: {
+			description: "The number of CPU seconds accumulated in different operating modes."
+			type:        "counter"
+			tags:        _tags & {
+				collector: examples: ["cpu"]
+				cpu: {
+					description: "The index of the CPU core or socket."
+					required:    true
+					examples: ["1"]
+				}
+				mode: {
+					description: "Which mode the CPU was running in during the given time."
+					required:    true
+					examples: ["idle", "system", "user", "nice"]
+				}
+			}
+		}
+
+		_disk_device: {
+			description: "The disk device name."
+			required:    true
+			examples: ["sda", "sda1", "dm-1"]
+		}
+		_disk_counter: {
+			type: "counter"
+			tags: _tags & {
+				collector: examples: ["disk"]
+				device: _disk_device
+			}
+		}
+		host_disk_read_bytes_total:       _disk_counter & {description: "The accumulated number of bytes read in."}
+		host_disk_reads_completed_total:  _disk_counter & {description: "The accumulated number of read operations completed."}
+		host_disk_written_bytes_total:    _disk_counter & {description: "The accumulated number of bytes written out."}
+		host_disk_writes_completed_total: _disk_counter & {description: "The accumulated number of write operations completed."}
+
+		_filesystem_bytes: {
+			type: "gauge"
+			tags: _tags & {
+				collector: examples: ["filesystem"]
+				device: _disk_device
+				filesystem: {
+					description: "The name of the filesystem type."
+					required:    true
+					examples: ["ext4", "ntfs"]
+				}
+			}
+		}
+		host_filesystem_free_bytes:  _filesystem_bytes & {description: "The number of bytes free on the named filesystem."}
+		host_filesystem_total_bytes: _filesystem_bytes & {description: "The total number of bytes in the named filesystem."}
+		host_filesystem_used_bytes:  _filesystem_bytes & {description: "The number of bytes used on the named filesystem."}
+
+		_memory_gauge: {
+			type: "gauge"
+			tags: _tags & {
+				collector: examples: ["memory"]
+			}
+		}
+		_memory_counter: {
+			type: "counter"
+			tags: _tags & {
+				collector: examples: ["memory"]
+			}
+		}
+		_memory_linux: _memory_gauge & {relevant_when: "OS is Linux"}
+		_memory_macos: _memory_gauge & {relevant_when: "OS is MacOS X"}
+		_memory_nowin: {relevant_when: "OS is not Windows"}
+		host_memory_free_bytes:             _memory_gauge & {description:                 "The number of bytes of main memory not used."}
+		host_memory_available_bytes:        _memory_gauge & {description:                 "The number of bytes of main memory available."}
+		host_memory_swap_free_bytes:        _memory_gauge & {description:                 "The number of free bytes of swap space."}
+		host_memory_swap_total_bytes:       _memory_gauge & {description:                 "The total number of bytes of swap space."}
+		host_memory_swap_used_bytes:        _memory_gauge & {description:                 "The number of used bytes of swap space."}
+		host_memory_total_bytes:            _memory_gauge & {description:                 "The total number of bytes of main memory."}
+		host_memory_active_bytes:           _memory_gauge & _memory_nowin & {description: "The number of bytes of active main memory."}
+		host_memory_buffers_bytes:          _memory_linux & {description:                 "The number of bytes of main memory used by buffers."}
+		host_memory_cached_bytes:           _memory_linux & {description:                 "The number of bytes of main memory used by cached blocks."}
+		host_memory_shared_bytes:           _memory_linux & {description:                 "The number of bytes of main memory shared between processes."}
+		host_memory_used_bytes:             _memory_linux & {description:                 "The number of bytes of main memory used by programs or caches."}
+		host_memory_inactive_bytes:         _memory_macos & {description:                 "The number of bytes of main memory that is not active."}
+		host_memory_swapped_in_bytes_total: _memory_counter & _memory_nowin & {
+			description: "The number of bytes that have been swapped in to main memory."
+		}
+		host_memory_swapped_out_bytes_total: _memory_counter & _memory_nowin & {
+			description: "The number of bytes that have been swapped out from main memory."
+		}
+		host_memory_wired_bytes: _memory_macos & {description: "The number of wired bytes of main memory."}
+
+		_loadavg: {
+			type: "gauge"
+			tags: _tags & {
+				collector: examples: ["loadavg"]
+			}
+			relevant_when: "OS is not Windows"
+		}
+		host_load1:  _loadavg & {description: "System load averaged over the last 1 second."}
+		host_load5:  _loadavg & {description: "System load averaged over the last 5 seconds."}
+		host_load15: _loadavg & {description: "System load averaged over the last 15 seconds."}
+
+		_network_gauge: {
+			type: "gauge"
+			tags: _tags & {
+				collector: examples: ["network"]
+				device: {
+					description: "The network interface device name."
+					required:    true
+					examples: ["eth0", "enp5s3"]
+				}
+			}
+		}
+		_network_nomac:                           _network_gauge & {relevant_when: "OS is not MacOS"}
+		host_network_receive_bytes_total:         _network_gauge & {description:   "The number of bytes received on this interface."}
+		host_network_receive_errs_total:          _network_gauge & {description:   "The number of errors encountered during receives on this interface."}
+		host_network_receive_packets_total:       _network_gauge & {description:   "The number of packets received on this interface."}
+		host_network_transmit_bytes_total:        _network_gauge & {description:   "The number of bytes transmitted on this interface."}
+		host_network_transmit_errs_total:         _network_gauge & {description:   "The number of errors encountered during transmits on this interface."}
+		host_network_transmit_packets_drop_total: _network_nomac & {description:   "The number of packets dropped during transmits on this interface."}
+		host_network_transmit_packets_total:      _network_nomac & {description:   "The number of packets transmitted on this interface."}
 	}
 }
