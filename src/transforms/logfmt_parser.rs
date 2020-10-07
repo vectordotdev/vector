@@ -32,7 +32,7 @@ impl TransformConfig for LogfmtConfig {
         let conversions = parse_conversion_map(&self.types)?;
 
         Ok(Box::new(Logfmt {
-            field: field.clone(),
+            field,
             drop_field: self.drop_field,
             conversions,
         }))

@@ -40,7 +40,7 @@ impl TransformConfig for TokenizerConfig {
 
         Ok(Box::new(Tokenizer::new(
             self.field_names.clone(),
-            field.clone(),
+            field,
             drop_field,
             types,
         )))

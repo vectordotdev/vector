@@ -31,7 +31,7 @@ impl TransformConfig for AnsiStripperConfig {
             .unwrap_or_else(|| Atom::from(crate::config::log_schema().message_key()));
 
         Ok(Box::new(AnsiStripper {
-            field: field.clone(),
+            field,
         }))
     }
 
