@@ -17,37 +17,34 @@ pub async fn firehose(
     request: FirehoseRequest,
     out: Pipeline,
 ) -> Result<impl warp::Reply, reject::Rejection> {
-    match parse_records(request, request_id.as_str(), source_arn.as_str()).with_context(|| {
-        ParseRecords {
+    let events = parse_records(request, request_id.as_str(), source_arn.as_str())
+        .with_context(|| ParseRecords {
             request_id: request_id.clone(),
-        }
-    }) {
-        Ok(events) => {
-            let request_id = request_id.clone();
-            out.send_all(futures01::stream::iter_ok(events))
-                .compat()
-                .map_err(|err| {
-                    let err = RequestError::ShuttingDown {
-                        request_id: request_id.clone(),
-                        source: err,
-                    };
-                    // can only fail if receiving end disconnected, so we are shutting down,
-                    // probably not gracefully.
-                    error!("Failed to forward events, downstream is closed");
-                    error!("Tried to send the following event: {:?}", err);
-                    warp::reject::custom(err)
-                })
-                .map_ok(|_| {
-                    warp::reply::json(&FirehoseResponse {
-                        request_id: request_id.clone(),
-                        timestamp: Utc::now(),
-                        error_message: None,
-                    })
-                })
-                .await
-        }
-        Err(err) => Err(reject::custom(err)),
-    }
+        })
+        .map_err(|err| reject::custom(err))?;
+
+    let request_id = request_id.clone();
+    out.send_all(futures01::stream::iter_ok(events))
+        .compat()
+        .map_err(|err| {
+            let err = RequestError::ShuttingDown {
+                request_id: request_id.clone(),
+                source: err,
+            };
+            // can only fail if receiving end disconnected, so we are shutting down,
+            // probably not gracefully.
+            error!("Failed to forward events, downstream is closed");
+            error!("Tried to send the following event: {:?}", err);
+            warp::reject::custom(err)
+        })
+        .map_ok(|_| {
+            warp::reply::json(&FirehoseResponse {
+                request_id: request_id.clone(),
+                timestamp: Utc::now(),
+                error_message: None,
+            })
+        })
+        .await
 }
 
 /// Parses out events from the FirehoseRequest
@@ -56,7 +53,7 @@ fn parse_records(
     request_id: &str,
     source_arn: &str,
 ) -> std::io::Result<Vec<Event>> {
-    let records: Vec<Event> = request
+    request
         .records
         .iter()
         .map(|record| {
@@ -72,9 +69,7 @@ fn parse_records(
                 event
             })
         })
-        .collect::<std::io::Result<Vec<Event>>>()?;
-
-    Ok(records)
+        .collect()
 }
 
 /// Decodes a Firehose record from its base64 gzip format

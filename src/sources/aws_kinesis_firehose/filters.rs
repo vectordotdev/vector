@@ -11,10 +11,8 @@ use bytes::{buf::BufExt, Bytes};
 use chrono::Utc;
 use flate2::read::GzDecoder;
 use snafu::ResultExt;
-use std::convert::Infallible;
-use std::io;
-use warp::http::StatusCode;
-use warp::Filter;
+use std::{convert::Infallible, io};
+use warp::{http::StatusCode, Filter};
 
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
 pub fn firehose(
@@ -124,12 +122,12 @@ fn authenticate(
 
 /// Maps RequestError and warp errors to AWS Kinesis Firehose response structure
 async fn handle_firehose_rejection(err: warp::Rejection) -> Result<impl warp::Reply, Infallible> {
-    let request_id: Option<String>;
+    let request_id: Option<&str>;
     let message: String;
     let code: StatusCode;
 
     if let Some(e) = err.find::<RequestError>() {
-        message = format!("{}", e);
+        message = e.to_string();
         code = e.status();
         request_id = e.request_id();
     } else if let Some(e) = err.find::<warp::reject::MissingHeader>() {
@@ -143,12 +141,12 @@ async fn handle_firehose_rejection(err: warp::Rejection) -> Result<impl warp::Re
     }
 
     emit!(AwsKinesisFirehoseRequestError {
-        request_id: request_id.as_deref(),
+        request_id: request_id,
         error: message.as_str(),
     });
 
     let json = warp::reply::json(&FirehoseResponse {
-        request_id: request_id.unwrap_or_default(),
+        request_id: request_id.unwrap_or_default().to_string(),
         timestamp: Utc::now(),
         error_message: Some(message),
     });

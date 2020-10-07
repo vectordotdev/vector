@@ -76,21 +76,19 @@ inventory::submit! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shutdown::ShutdownSignal;
     use crate::{
-        config::{GlobalOptions, SourceConfig},
         event::{Event, LogEvent},
         log_event,
         test_util::{collect_ready, next_addr, wait_for_tcp},
-        Pipeline,
     };
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::{read::GzEncoder, Compression};
-    use futures::compat::Future01CompatExt;
     use futures01::sync::mpsc;
     use pretty_assertions::assert_eq;
-    use std::io::{Cursor, Read};
-    use std::net::SocketAddr;
+    use std::{
+        io::{Cursor, Read},
+        net::SocketAddr,
+    };
 
     async fn source(access_key: Option<String>) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();

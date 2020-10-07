@@ -53,30 +53,31 @@ impl warp::reject::Reject for RequestError {}
 
 impl RequestError {
     pub fn status(&self) -> StatusCode {
+        use RequestError::*;
         match *self {
-            RequestError::AccessKeyMissing { .. } => StatusCode::UNAUTHORIZED,
-            RequestError::AccessKeyInvalid { .. } => StatusCode::UNAUTHORIZED,
-            RequestError::Parse { .. } => StatusCode::UNAUTHORIZED,
-            RequestError::UnsupportedEncoding { .. } => StatusCode::BAD_REQUEST,
-            RequestError::ParseRecords { .. } => StatusCode::BAD_REQUEST,
-            RequestError::Decode { .. } => StatusCode::BAD_REQUEST,
-            RequestError::ShuttingDown { .. } => StatusCode::SERVICE_UNAVAILABLE,
-            RequestError::UnsupportedProtocolVersion { .. } => StatusCode::BAD_REQUEST,
+            AccessKeyMissing { .. } => StatusCode::UNAUTHORIZED,
+            AccessKeyInvalid { .. } => StatusCode::UNAUTHORIZED,
+            Parse { .. } => StatusCode::UNAUTHORIZED,
+            UnsupportedEncoding { .. } => StatusCode::BAD_REQUEST,
+            ParseRecords { .. } => StatusCode::BAD_REQUEST,
+            Decode { .. } => StatusCode::BAD_REQUEST,
+            ShuttingDown { .. } => StatusCode::SERVICE_UNAVAILABLE,
+            UnsupportedProtocolVersion { .. } => StatusCode::BAD_REQUEST,
         }
     }
 
-    pub fn request_id(&self) -> Option<String> {
+    pub fn request_id(&self) -> Option<&str> {
+        use RequestError::*;
         match *self {
-            RequestError::AccessKeyMissing { ref request_id, .. } => Some(request_id),
-            RequestError::AccessKeyInvalid { ref request_id, .. } => Some(request_id),
-            RequestError::Parse { ref request_id, .. } => Some(request_id),
-            RequestError::UnsupportedEncoding { ref request_id, .. } => Some(request_id),
-            RequestError::ParseRecords { ref request_id, .. } => Some(request_id),
-            RequestError::Decode { ref request_id, .. } => Some(request_id),
-            RequestError::ShuttingDown { ref request_id, .. } => Some(request_id),
-            RequestError::UnsupportedProtocolVersion { .. } => None,
+            AccessKeyMissing { ref request_id, .. } => Some(request_id),
+            AccessKeyInvalid { ref request_id, .. } => Some(request_id),
+            Parse { ref request_id, .. } => Some(request_id),
+            UnsupportedEncoding { ref request_id, .. } => Some(request_id),
+            ParseRecords { ref request_id, .. } => Some(request_id),
+            Decode { ref request_id, .. } => Some(request_id),
+            ShuttingDown { ref request_id, .. } => Some(request_id),
+            UnsupportedProtocolVersion { .. } => None,
         }
-        .map(|s| s.clone())
     }
 }
 
