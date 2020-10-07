@@ -64,13 +64,18 @@ impl InternalEvent for LogToMetricParseFloatError {
     }
 }
 
-pub(crate) struct LogToMetricRenderError {
-    pub error: String,
+pub(crate) struct LogToMetricTemplateRenderError {
+    pub missing_keys: Vec<String>,
 }
 
-impl InternalEvent for LogToMetricRenderError {
+impl InternalEvent for LogToMetricTemplateRenderError {
     fn emit_logs(&self) {
-        warn!(message = "Unable to render.", error = %self.error, rate_limit_secs = 30);
+        let error = format!("Keys {:?} do not exist on the event.", self.missing_keys);
+        warn!(
+            message = "Failed to render template.",
+            error = %error,
+            rate_limit_secs = 30
+        );
     }
 
     fn emit_metrics(&self) {

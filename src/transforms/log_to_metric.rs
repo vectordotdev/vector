@@ -6,7 +6,7 @@ use crate::{
     event::Value,
     internal_events::{
         LogToMetricEventProcessed, LogToMetricFieldNotFound, LogToMetricParseFloatError,
-        LogToMetricRenderError, LogToMetricTemplateParseError,
+        LogToMetricTemplateParseError, LogToMetricTemplateRenderError,
     },
     template::{Template, TemplateError},
     Event,
@@ -117,33 +117,33 @@ impl LogToMetric {
 enum TransformError {
     FieldNotFound { field: Atom },
     TemplateParseError(TemplateError),
-    RenderError(String),
+    TemplateRenderError { missing_keys: Vec<String> },
     ParseFloatError { field: Atom, error: ParseFloatError },
 }
 
 fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
     let template = Template::try_from(s).map_err(TransformError::TemplateParseError)?;
-    let name = template.render(&event).map_err(|e| {
-        TransformError::RenderError(format!(
-            "Keys ({:?}) do not exist on the event; dropping event.",
-            e
-        ))
-    })?;
-    Ok(String::from_utf8_lossy(&name.to_vec()).to_string())
+    template.render_string(&event).map_err(|missing_keys| {
+        // convert to String to avoid printing Atom in Debug format
+        let missing_keys = missing_keys
+            .into_iter()
+            .map(|k| k.to_string())
+            .collect::<Vec<String>>();
+        TransformError::TemplateRenderError { missing_keys }
+    })
 }
 
 fn render_tags(
     tags: &Option<IndexMap<Atom, String>>,
     event: &Event,
-) -> Option<BTreeMap<String, String>> {
-    match tags {
+) -> Result<Option<BTreeMap<String, String>>, TransformError> {
+    Ok(match tags {
         None => None,
         Some(tags) => {
             let mut map = BTreeMap::new();
             for (name, value) in tags {
-                if let Ok(tag) = render_template(value, event) {
-                    map.insert(name.to_string(), tag);
-                }
+                let tag = render_template(value, event)?;
+                map.insert(name.to_string(), tag);
             }
             if !map.is_empty() {
                 Some(map)
@@ -151,7 +151,7 @@ fn render_tags(
                 None
             }
         }
-    }
+    })
 }
 
 fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
@@ -188,7 +188,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = counter.name.as_ref().unwrap_or(&counter.field);
             let name = render_template(&name, &event)?;
 
-            let tags = render_tags(&counter.tags, &event);
+            let tags = render_tags(&counter.tags, &event)?;
 
             Ok(Metric {
                 name,
@@ -204,7 +204,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = hist.name.as_ref().unwrap_or(&hist.field);
             let name = render_template(&name, &event)?;
 
-            let tags = render_tags(&hist.tags, &event);
+            let tags = render_tags(&hist.tags, &event)?;
 
             Ok(Metric {
                 name,
@@ -224,7 +224,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = summary.name.as_ref().unwrap_or(&summary.field);
             let name = render_template(&name, &event)?;
 
-            let tags = render_tags(&summary.tags, &event);
+            let tags = render_tags(&summary.tags, &event)?;
 
             Ok(Metric {
                 name,
@@ -244,7 +244,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = gauge.name.as_ref().unwrap_or(&gauge.field);
             let name = render_template(&name, &event)?;
 
-            let tags = render_tags(&gauge.tags, &event);
+            let tags = render_tags(&gauge.tags, &event)?;
 
             Ok(Metric {
                 name,
@@ -265,7 +265,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = set.name.as_ref().unwrap_or(&set.field);
             let name = render_template(&name, &event)?;
 
-            let tags = render_tags(&set.tags, &event);
+            let tags = render_tags(&set.tags, &event)?;
 
             Ok(Metric {
                 name,
@@ -301,7 +301,9 @@ impl Transform for LogToMetric {
                 Err(TransformError::ParseFloatError { field, error }) => {
                     emit!(LogToMetricParseFloatError { field, error })
                 }
-                Err(TransformError::RenderError(error)) => emit!(LogToMetricRenderError { error }),
+                Err(TransformError::TemplateRenderError { missing_keys }) => {
+                    emit!(LogToMetricTemplateRenderError { missing_keys })
+                }
                 Err(TransformError::TemplateParseError(error)) => {
                     emit!(LogToMetricTemplateParseError { error })
                 }
