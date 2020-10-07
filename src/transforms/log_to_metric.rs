@@ -113,7 +113,7 @@ impl LogToMetric {
 }
 
 enum TransformError {
-    FieldNotFound,
+    FieldNotFound { field: Atom },
     TemplateError(TemplateError),
     RenderError(String),
     ParseError(&'static str),
@@ -164,7 +164,9 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
         MetricConfig::Counter(counter) => {
             let value = log
                 .get(&counter.field)
-                .ok_or(TransformError::FieldNotFound)?;
+                .ok_or_else(|| TransformError::FieldNotFound {
+                    field: counter.field.clone(),
+                })?;
             let value = if counter.increment_by_value {
                 value
                     .to_string_lossy()
@@ -188,7 +190,11 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             })
         }
         MetricConfig::Histogram(hist) => {
-            let value = log.get(&hist.field).ok_or(TransformError::FieldNotFound)?;
+            let value = log
+                .get(&hist.field)
+                .ok_or_else(|| TransformError::FieldNotFound {
+                    field: hist.field.clone(),
+                })?;
             let value = value
                 .to_string_lossy()
                 .parse()
@@ -214,7 +220,9 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
         MetricConfig::Summary(summary) => {
             let value = log
                 .get(&summary.field)
-                .ok_or(TransformError::FieldNotFound)?;
+                .ok_or_else(|| TransformError::FieldNotFound {
+                    field: summary.field.clone(),
+                })?;
             let value = value
                 .to_string_lossy()
                 .parse()
@@ -238,7 +246,11 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             })
         }
         MetricConfig::Gauge(gauge) => {
-            let value = log.get(&gauge.field).ok_or(TransformError::FieldNotFound)?;
+            let value = log
+                .get(&gauge.field)
+                .ok_or_else(|| TransformError::FieldNotFound {
+                    field: gauge.field.clone(),
+                })?;
             let value = value
                 .to_string_lossy()
                 .parse()
@@ -258,7 +270,11 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             })
         }
         MetricConfig::Set(set) => {
-            let value = log.get(&set.field).ok_or(TransformError::FieldNotFound)?;
+            let value = log
+                .get(&set.field)
+                .ok_or_else(|| TransformError::FieldNotFound {
+                    field: set.field.clone(),
+                })?;
             let value = value.to_string_lossy();
 
             let name = set.name.as_ref().unwrap_or(&set.field);
@@ -294,7 +310,9 @@ impl Transform for LogToMetric {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }
-                Err(TransformError::FieldNotFound) => emit!(LogToMetricFieldNotFound),
+                Err(TransformError::FieldNotFound { field }) => {
+                    emit!(LogToMetricFieldNotFound { field })
+                }
                 Err(TransformError::ParseError(error)) => emit!(LogToMetricParseError { error }),
                 Err(TransformError::RenderError(error)) => emit!(LogToMetricRenderError { error }),
                 Err(TransformError::TemplateError(error)) => {

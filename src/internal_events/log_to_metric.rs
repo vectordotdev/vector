@@ -1,5 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
+use string_cache::DefaultAtom;
 
 pub(crate) struct LogToMetricEventProcessed;
 
@@ -16,11 +17,13 @@ impl InternalEvent for LogToMetricEventProcessed {
     }
 }
 
-pub(crate) struct LogToMetricFieldNotFound;
+pub(crate) struct LogToMetricFieldNotFound {
+    pub field: DefaultAtom,
+}
 
 impl InternalEvent for LogToMetricFieldNotFound {
     fn emit_logs(&self) {
-        warn!(message = "Field not found.", rate_limit_sec = 30);
+        warn!(message = "Field not found.", missing_field = ?self.field, rate_limit_sec = 30);
     }
 
     fn emit_metrics(&self) {
