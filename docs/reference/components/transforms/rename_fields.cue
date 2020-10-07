@@ -31,6 +31,7 @@ components: transforms: rename_fields: {
 
     requirements: []
     warnings: []
+    notices: []
   }
 
   configuration: {
@@ -44,7 +45,12 @@ components: transforms: rename_fields: {
     fields: {
       description: "A table of old-key/new-key pairs representing the keys to be moved in the event."
       required: true
-      warnings: []
+      warnings: [
+        {
+          visibility_level: "option"
+          text: "Vector makes no guarantee on the order of execution. If two rename operations must be performed in a specific order, it is recommended to split them up across two separate rename transforms."
+        }
+      ]
       type: object: {
         examples: [{"old_field_name":"new_field_name"},{"parent":{"old_child_name":"parent.new_child_name"}}]
         options: {}
