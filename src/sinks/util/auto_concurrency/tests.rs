@@ -188,17 +188,11 @@ impl Service<Vec<Event>> for TestSink {
         stats.in_flight.adjust(1, now.into());
         let in_flight = stats.in_flight.level();
 
-        let params = self.params;
-        let delay = Duration::from_secs_f64(
-            params.delay
-                * (1.0
-                    + (in_flight - 1) as f64 * params.concurrency_scale
-                    + thread_rng().sample(Exp1) * params.jitter),
-        );
-
-        match params.concurrency_limit {
-            Some(limit) if in_flight >= limit => match params.concurrency_action {
+        match self.params.concurrency_limit {
+            Some(limit) if in_flight >= limit => match self.params.concurrency_action {
                 Behavior::Defer => {
+                    let delay =
+                        self.params.delay * (1.0 + thread_rng().sample(Exp1) * self.params.jitter);
                     respond_after(Err(Error::Deferred), delay, Arc::clone(&self.stats))
                 }
                 Behavior::Drop => {
@@ -206,19 +200,25 @@ impl Service<Vec<Event>> for TestSink {
                     Box::pin(pending())
                 }
             },
-            _ => respond_after(Ok(Response::Ok), delay, Arc::clone(&self.stats)),
+            _ => {
+                let delay = self.params.delay
+                    * (1.0
+                        + (in_flight - 1) as f64 * self.params.concurrency_scale
+                        + thread_rng().sample(Exp1) * self.params.jitter);
+                respond_after(Ok(Response::Ok), delay, Arc::clone(&self.stats))
+            }
         }
     }
 }
 
 fn respond_after(
     response: Result<Response, Error>,
-    delay: Duration,
+    delay: f64,
     stats: Arc<Mutex<Statistics>>,
 ) -> BoxFuture<'static, Result<Response, Error>> {
-    let now = Instant::now();
+    let then = Instant::now() + Duration::from_secs_f64(delay);
     Box::pin(async move {
-        delay_until(now + delay).await;
+        delay_until(then).await;
         let mut stats = stats.lock().expect("Poisoned stats lock");
         stats.in_flight.adjust(-1, Instant::now().into());
         response
