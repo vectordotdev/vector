@@ -30,9 +30,7 @@ impl TransformConfig for AnsiStripperConfig {
             .clone()
             .unwrap_or_else(|| Atom::from(crate::config::log_schema().message_key()));
 
-        Ok(Box::new(AnsiStripper {
-            field,
-        }))
+        Ok(Box::new(AnsiStripper { field }))
     }
 
     fn input_type(&self) -> DataType {
