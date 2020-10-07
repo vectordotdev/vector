@@ -17,7 +17,7 @@ components: sources: docker: {
 		production.
 		"""
 
-	_features: {
+	features: {
 		checkpoint: enabled: false
 		multiline: enabled:  true
 		tls: enabled:        false
