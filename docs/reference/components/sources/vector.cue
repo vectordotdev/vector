@@ -66,4 +66,16 @@ components: sources: vector: {
 			}
 		}
 	}
+
+	how_it_works: {
+		message_acking: {
+			title: "Message Ack'ing"
+			body: "Currently, Vector does not perform any application level message acknowledgement. While rare, this means the individual message could be lost."
+		}
+
+		tcp_protocol: {
+			title: "TCP Protocol"
+			body: "Upstream Vector instances forward data to downstream Vector instances via the TCP protocol."
+		}
+	}
 }
