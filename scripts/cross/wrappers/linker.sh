@@ -32,9 +32,9 @@ INJECT_END=${RUST_MUSL_INJECT_BEGIN:-crtendS.o}
 LINKER=''
 if [ -x "$(command -v x86_64-linux-musl-gcc)" ]; then
     LINKER=x86_64-linux-musl-gcc
-elif [ -x "$(command -v i686-linux-musl-gcc)" ];
+elif [ -x "$(command -v i686-linux-musl-gcc)" ]; then
     LINKER=i686-linux-musl-gcc
-elif [ -x "$(command -v aarch64-linux-musl-gcc)" ];
+elif [ -x "$(command -v aarch64-linux-musl-gcc)" ]; then
     LINKER=aarch64-linux-musl-gcc
 else
     LINKER=${RUST_MUSL_LINKER}
