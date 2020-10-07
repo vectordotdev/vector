@@ -67,6 +67,7 @@ jobs:
               - 'Cargo.lock'
               - 'rust-toolchain'
               - '.github/workflows/prs.yml'
+              - 'Makefile'
             internal_events:
               - 'src/internal_events/**'
             helm:

@@ -802,8 +802,8 @@ check-internal-events: ## Check that internal events satisfy patterns set in htt
 ##@ Packaging
 
 # archives
-.PHONY: package
 target/artifacts/vector-%.tar.gz: export TRIPLE :=$(@:target/artifacts/vector-%.tar.gz=%)
+target/artifacts/vector-%.tar.gz: override PROFILE =release
 target/artifacts/vector-%.tar.gz: target/%/release/vector.tar.gz
 	@echo "Built to ${<}, relocating to ${@}"
 	@mkdir -p target/artifacts/
