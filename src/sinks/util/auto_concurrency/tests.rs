@@ -39,6 +39,19 @@ use std::{
 use tokio::time::{self, delay_until, Duration, Instant};
 use tower::Service;
 
+#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+#[serde(rename_all = "lowercase")]
+enum Behavior {
+    #[derivative(Default)]
+    // Above the given limit, additional requests will return with an
+    // error.
+    Defer,
+    // Above the given limit, additional requests will be silently
+    // dropped.
+    Drop,
+}
+
 #[derive(Copy, Clone, Debug, Default, Deserialize, Serialize)]
 struct TestParams {
     // The number of requests to issue.
@@ -62,14 +75,10 @@ struct TestParams {
     #[serde(default)]
     concurrency_scale: f64,
 
-    // The number of outstanding requests at which requests will return
-    // with an error.
-    #[serde(default)]
-    concurrency_defer: usize,
+    concurrency_limit: Option<usize>,
 
-    // The number of outstanding requests at which requests will be dropped.
     #[serde(default)]
-    concurrency_drop: usize,
+    concurrency_action: Behavior,
 
     #[serde(default = "default_in_flight_limit")]
     in_flight_limit: InFlightLimit,
@@ -187,25 +196,33 @@ impl Service<Vec<Event>> for TestSink {
                     + thread_rng().sample(Exp1) * params.jitter),
         );
 
-        if params.concurrency_drop > 0 && in_flight >= params.concurrency_drop {
-            stats.in_flight.adjust(-1, now.into());
-            Box::pin(pending())
-        } else {
-            let stats2 = Arc::clone(&self.stats);
-            Box::pin(async move {
-                delay_until(now + delay).await;
-                let mut stats = stats2.lock().expect("Poisoned stats lock");
-                let in_flight = stats.in_flight.level();
-                stats.in_flight.adjust(-1, Instant::now().into());
-
-                if params.concurrency_defer > 0 && in_flight >= params.concurrency_defer {
-                    Err(Error::Deferred)
-                } else {
-                    Ok(Response::Ok)
+        match params.concurrency_limit {
+            Some(limit) if in_flight >= limit => match params.concurrency_action {
+                Behavior::Defer => {
+                    respond_after(Err(Error::Deferred), delay, Arc::clone(&self.stats))
                 }
-            })
+                Behavior::Drop => {
+                    stats.in_flight.adjust(-1, now.into());
+                    Box::pin(pending())
+                }
+            },
+            _ => respond_after(Ok(Response::Ok), delay, Arc::clone(&self.stats)),
         }
     }
+}
+
+fn respond_after(
+    response: Result<Response, Error>,
+    delay: Duration,
+    stats: Arc<Mutex<Statistics>>,
+) -> BoxFuture<'static, Result<Response, Error>> {
+    let now = Instant::now();
+    Box::pin(async move {
+        delay_until(now + delay).await;
+        let mut stats = stats.lock().expect("Poisoned stats lock");
+        stats.in_flight.adjust(-1, Instant::now().into());
+        response
+    })
 }
 
 impl EncodedLength for Event {
