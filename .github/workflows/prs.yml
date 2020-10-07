@@ -66,6 +66,8 @@ jobs:
               - 'src/internal_events/**'
             helm:
               - 'distribution/helm/**'
+            docker:
+              - 'distribution/docker/**'
 
   test-linux:
     name: Unit - x86_64-unknown-linux-gnu
@@ -421,6 +423,8 @@ jobs:
   compute-k8s-test-plan:
     name: Compute K8s test plan
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.source == 'true' || needs.changes.outputs.helm == 'true' || needs.changes.outputs.docker == 'true'
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -521,26 +525,19 @@ jobs:
   checks:
     name: Checks
     runs-on: ubuntu-20.04
+    container: timberio/ci_image
     needs: changes
     steps:
       - uses: actions/checkout@v2
         with:
           # check-version needs tags
           fetch-depth: 0 # fetch everything
-      - name: Clean up CI disk space
-        run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Bootstrap
-        run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - name: Prepare environment
-        run: bash scripts/environment/prepare.sh
-      - name: Setup Help
-        run: scripts/ci-setup-helm.sh
       - name: Enable Rust matcher
         run: echo "::add-matcher::.github/matchers/rust.json"
       - name: Make slim-builds
