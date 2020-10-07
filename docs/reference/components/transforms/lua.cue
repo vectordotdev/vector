@@ -31,9 +31,9 @@ components: transforms: lua: {
 		requirements: []
 		warnings: []
 		notices: [
-			"""
+			#"""
 				Vector embeds Lua `5.3`.
-				""",
+				"""#,
 		]
 	}
 
