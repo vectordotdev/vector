@@ -1,3 +1,5 @@
+#[cfg(feature = "api")]
+use crate::top;
 use crate::{generate, get_version, list, unit_test, validate};
 use std::path::PathBuf;
 use structopt::{clap::AppSettings, StructOpt};
@@ -111,6 +113,11 @@ pub enum SubCommand {
     /// Run Vector config unit tests, then exit. This command is experimental and therefore subject to change.
     /// For guidance on how to write unit tests check out: https://vector.dev/docs/setup/guides/unit-testing/
     Test(unit_test::Opts),
+
+    /// Display topology in the console. This is available when the `api` feature is enabled, since
+    /// observing topology requires an active/running API server.
+    #[cfg(feature = "api")]
+    Top(top::Opts),
 
     /// Manage the vector service.
     #[cfg(windows)]
