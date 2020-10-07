@@ -1,8 +1,86 @@
 use super::prelude::*;
 use bytes::Bytes;
-use lazy_static::lazy_static;
 use std::collections::BTreeMap;
-use std::ops::Deref;
+use std::convert::TryFrom;
+
+pub struct DynamicRegex {
+    pattern: String,
+    multiline: bool,
+    insensitive: bool,
+    global: bool,
+    compiled: Option<Result<regex::Regex>>,
+}
+
+impl DynamicRegex {
+    pub fn new(pattern: String, multiline: bool, insensitive: bool, global: bool) -> Self {
+        Self {
+            pattern,
+            multiline,
+            insensitive,
+            global,
+            compiled: None,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn is_global(&self) -> bool {
+        self.global
+    }
+
+    pub fn compile(&mut self) -> Result<&regex::Regex> {
+        if self.compiled.is_none() {
+            self.compiled = Some(
+                regex::RegexBuilder::new(&self.pattern)
+                    .case_insensitive(self.insensitive)
+                    .multi_line(self.multiline)
+                    .build()
+                    .map_err(|err| format!("invalid regex {}", err)),
+            );
+        }
+
+        self.compiled
+            .as_ref()
+            // We know this unwrap is safe because we have just populated the Option above.
+            .unwrap()
+            .as_ref()
+            .map_err(|err| err.to_string())
+    }
+}
+
+impl TryFrom<BTreeMap<String, Value>> for DynamicRegex {
+    type Error = String;
+
+    /// Create a regex from a map containing fields :
+    /// pattern - The regex pattern
+    /// flags   - flags including i => Case insensitive, g => Global, m => Multiline.
+    fn try_from(map: BTreeMap<String, Value>) -> std::result::Result<Self, Self::Error> {
+        let pattern = map
+            .get("pattern")
+            .ok_or_else(|| "field is not a regular expression".to_string())
+            .and_then(|value| match value {
+                Value::Bytes(ref bytes) => Ok(String::from_utf8_lossy(bytes)),
+                _ => Err("regex pattern is not a valid string".to_string()),
+            })?
+            .to_string();
+
+        let (global, insensitive, multiline) = match map.get("flags") {
+            None => (false, false, false),
+            Some(Value::Array(ref flags)) => {
+                flags
+                    .iter()
+                    .fold((false, false, false), |(g, i, m), flag| match flag {
+                        v if v == &Value::from(Bytes::from_static(b"g")) => (true, i, m),
+                        v if v == &Value::from(Bytes::from_static(b"i")) => (g, true, m),
+                        v if v == &Value::from(Bytes::from_static(b"m")) => (g, i, true),
+                        _ => (g, i, m),
+                    })
+            }
+            Some(_) => return Err("regular expression flags is not an array".to_string()),
+        };
+
+        Ok(DynamicRegex::new(pattern, multiline, insensitive, global))
+    }
+}
 
 #[derive(Debug)]
 pub(in crate::mapping) struct SplitFn {
@@ -23,49 +101,6 @@ impl SplitFn {
             pattern,
             limit,
         }
-    }
-}
-
-lazy_static! {
-    static ref I_FLAG: Value = Value::from(Bytes::from("i"));
-    static ref G_FLAG: Value = Value::from(Bytes::from("g"));
-    static ref M_FLAG: Value = Value::from(Bytes::from("m"));
-}
-
-/// Create a regex from a map containing fields :
-/// pattern - The regex pattern
-/// flags   - flags including i => Case insensitive, g => Global, m => Multiline.
-fn regex_from_map(mut map: BTreeMap<String, Value>) -> Result<(regex::Regex, bool)> {
-    let pattern = map
-        .remove("pattern")
-        .ok_or_else(|| "Field is not a regular expression".to_string())?;
-
-    let flags = match map.remove("flags") {
-        None => Value::from(Vec::<Value>::new()),
-        Some(flags) => flags,
-    };
-
-    match (flags, pattern) {
-        (Value::Array(ref flags), Value::Bytes(ref bytes)) => {
-            let (global, insensitive, multi_line) =
-                flags
-                    .iter()
-                    .fold((false, false, false), |(g, i, m), flag| match flag {
-                        v if v == G_FLAG.deref() => (true, i, m),
-                        v if v == I_FLAG.deref() => (g, true, m),
-                        v if v == M_FLAG.deref() => (g, i, true),
-                        _ => (g, i, m),
-                    });
-
-            let pattern = String::from_utf8_lossy(&bytes);
-            let regex = regex::RegexBuilder::new(&pattern)
-                .case_insensitive(insensitive)
-                .multi_line(multi_line)
-                .build()
-                .map_err(|err| format!("invalid regex {}", err))?;
-            Ok((regex, global))
-        }
-        _ => Err("Field regular expression is not a valid string".to_string()),
     }
 }
 
@@ -102,7 +137,8 @@ impl Function for SplitFn {
                 })
             }
             Value::Map(pattern) => {
-                let (regex, _global) = regex_from_map(pattern)?;
+                let mut regex = DynamicRegex::try_from(pattern)?;
+                let regex = regex.compile()?;
                 Ok(match &limit {
                     Some(ref limit) => to_value(Box::new(regex.splitn(&string, *limit))),
                     None => to_value(Box::new(regex.split(&string))),
@@ -121,7 +157,7 @@ impl Function for SplitFn {
             },
             Parameter {
                 keyword: "pattern",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)) || matches!(v, Value::Map(_)),
                 required: true,
             },
             Parameter {
