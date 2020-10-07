@@ -41,7 +41,9 @@ components: sources: journald: {
 				The Vector user must be part of the `systemd-journal` group in order to execute the `journalctl` binary. See the ["User Permissions" section][docs.sources.journald#user-permissions] for more info.
 				""",
 		]
+
 		warnings: []
+		notices: []
 	}
 
 	configuration: {

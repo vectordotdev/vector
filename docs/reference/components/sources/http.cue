@@ -46,6 +46,7 @@ components: sources: http: {
 		]
 
 		warnings: []
+		notices: []
 	}
 
 	configuration: {
