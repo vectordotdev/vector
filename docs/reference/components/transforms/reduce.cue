@@ -31,6 +31,7 @@ components: transforms: reduce: {
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {

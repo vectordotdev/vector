@@ -31,6 +31,7 @@ components: transforms: merge: {
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {
