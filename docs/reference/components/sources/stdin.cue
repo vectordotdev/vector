@@ -5,7 +5,7 @@ components: sources: stdin: {
   short_description: "Ingests data through [standard input (STDIN)][urls.stdin] and outputs log events."
   long_description: "Ingests data through [standard input (STDIN)][urls.stdin] and outputs log events."
 
-  _features: {
+  features: {
     checkpoint: enabled: false
     multiline: enabled: false
     tls: enabled: false
@@ -71,9 +71,9 @@ components: sources: stdin: {
 
   examples: log: [
     {
-      _line: #"""
+      _line: """
              2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
-             """#
+             """
       _host: "123.456.789.111"
       title: "HTTP server output"
       configuration: {
