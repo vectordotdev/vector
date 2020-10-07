@@ -82,13 +82,13 @@ impl InternalEvent for LogToMetricRenderError {
     }
 }
 
-pub(crate) struct LogToMetricTemplateError {
+pub(crate) struct LogToMetricTemplateParseError {
     pub error: crate::template::TemplateError,
 }
 
-impl InternalEvent for LogToMetricTemplateError {
+impl InternalEvent for LogToMetricTemplateParseError {
     fn emit_logs(&self) {
-        warn!(message = "Failed to parse.", error = %self.error, rate_limit_secs = 30);
+        warn!(message = "Failed to parse template.", error = %self.error, rate_limit_secs = 30);
     }
 
     fn emit_metrics(&self) {

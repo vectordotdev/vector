@@ -6,7 +6,7 @@ use crate::{
     event::Value,
     internal_events::{
         LogToMetricEventProcessed, LogToMetricFieldNotFound, LogToMetricParseFloatError,
-        LogToMetricRenderError, LogToMetricTemplateError,
+        LogToMetricRenderError, LogToMetricTemplateParseError,
     },
     template::{Template, TemplateError},
     Event,
@@ -116,13 +116,13 @@ impl LogToMetric {
 
 enum TransformError {
     FieldNotFound { field: Atom },
-    TemplateError(TemplateError),
+    TemplateParseError(TemplateError),
     RenderError(String),
     ParseFloatError { field: Atom, error: ParseFloatError },
 }
 
 fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
-    let template = Template::try_from(s).map_err(TransformError::TemplateError)?;
+    let template = Template::try_from(s).map_err(TransformError::TemplateParseError)?;
     let name = template.render(&event).map_err(|e| {
         TransformError::RenderError(format!(
             "Keys ({:?}) do not exist on the event; dropping event.",
@@ -302,8 +302,8 @@ impl Transform for LogToMetric {
                     emit!(LogToMetricParseFloatError { field, error })
                 }
                 Err(TransformError::RenderError(error)) => emit!(LogToMetricRenderError { error }),
-                Err(TransformError::TemplateError(error)) => {
-                    emit!(LogToMetricTemplateError { error })
+                Err(TransformError::TemplateParseError(error)) => {
+                    emit!(LogToMetricTemplateParseError { error })
                 }
             }
         }
