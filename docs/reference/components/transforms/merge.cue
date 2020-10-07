@@ -91,6 +91,10 @@ components: transforms: merge: {
 				{"message": "Third", "custom_string_field": "value3", "custom_int_field": 3},
 			]
 			output: {"message": "FirstSecondThird","custom_string_field": "value1value2value3","custom_int_field": 3}
+			notes: """
+			Notice that `custom_string_field` is concatenated and `custom_int_field`
+			overridden. This is because it was specified in the `fields` option.
+			"""
 		},
 	]
 }

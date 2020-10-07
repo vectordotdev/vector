@@ -268,6 +268,7 @@ package metadata
 				}
 				input:    #Fields | [#Fields, ...] | string
 				"output": #Fields
+				notes?:   string
 			},
 		]
 	}
