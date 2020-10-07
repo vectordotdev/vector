@@ -1,5 +1,0 @@
-[releases."0.9.2"]
-date = 2020-06-02
-commits = [
-{sha = "5b821916cbd6583fa7375cc9daba6bfe2031f4f8", message = "fix(sinks): ack and don't stop on request errors (#2666)", author = "Luke Steensen", date = 2020-05-27T11:22:47Z, pr_number = 2666, files_count = 1, insertions_count = 56, deletions_count = 17}
-]
