@@ -18,6 +18,14 @@ lazy_static::lazy_static! {
 }
 
 #[test]
+fn zero_len_not_allowed() {
+    crate::test_util::trace_init();
+    let input = "";
+    let maybe_lookup = Lookup::from_str(input);
+    assert!(maybe_lookup.is_err());
+}
+
+#[test]
 fn we_dont_parse_plain_strings_in_from() {
     crate::test_util::trace_init();
     let input = "some_key.still_the_same_key.this.is.going.in.via.from.and.should.not.get.parsed";

@@ -50,6 +50,15 @@ macro_rules! assert_downcast_matches {
     }};
 }
 
+pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
+    let test_file = match File::open(path) {
+        Ok(file) => file,
+        Err(e) => return Err(e.into()),
+    };
+    let value: serde_json::Value = serde_json::from_reader(test_file)?;
+    Ok(value)
+}
+
 pub fn next_addr() -> SocketAddr {
     let port = pick_unused_port().unwrap();
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
