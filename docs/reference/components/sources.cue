@@ -80,7 +80,7 @@ components: sources: [Name=string]: {
 				}
 
 				_timestamp: {
-					description: "The exact time the event was ingested into Vector."
+					description: string | *"The exact time the event was ingested into Vector."
 					required:    true
 					type: timestamp: {}
 				}
