@@ -232,6 +232,8 @@ default-msvc = ["api", "sources", "transforms", "sinks", "vendor-openssl", "vend
 # Use this section to turn off or on specific features for specific triples.
 target-x86_64-unknown-linux-gnu = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 target-aarch64-unknown-linux-gnu = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "leveldb", "rdkafka-cmake"]
+target-x86_64-unknown-linux-musl = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix",  "leveldb", "rdkafka-cmake"]
+target-aarch64-unknown-linux-musl = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix",  "leveldb", "rdkafka-cmake"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["jemallocator"]

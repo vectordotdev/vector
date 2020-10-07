@@ -138,7 +138,7 @@ impl TransformConfig for Ec2Metadata {
         let refresh_interval = self
             .refresh_interval_secs
             .map(Duration::from_secs)
-            .unwrap_or(Duration::from_secs(10));
+            .unwrap_or_else(|| Duration::from_secs(10));
         let fields = self
             .fields
             .clone()

@@ -119,7 +119,7 @@ impl Lookup {
             TomlValue::Boolean(b) => discoveries.insert(lookup, Value::from(b)),
             TomlValue::Datetime(dt) => {
                 let dt = dt.to_string();
-                discoveries.insert(Lookup::try_from(lookup)?, Value::from(dt))
+                discoveries.insert(lookup, Value::from(dt))
             }
             TomlValue::Array(vals) => {
                 for (i, val) in vals.into_iter().enumerate() {
