@@ -1,5 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
+use std::num::ParseFloatError;
 use string_cache::DefaultAtom;
 
 pub(crate) struct LogToMetricEventProcessed;
@@ -23,7 +24,11 @@ pub(crate) struct LogToMetricFieldNotFound {
 
 impl InternalEvent for LogToMetricFieldNotFound {
     fn emit_logs(&self) {
-        warn!(message = "Field not found.", missing_field = ?self.field, rate_limit_sec = 30);
+        warn!(
+            message = "Field not found.",
+            missing_field = %self.field,
+            rate_limit_sec = 30
+        );
     }
 
     fn emit_metrics(&self) {
@@ -35,13 +40,19 @@ impl InternalEvent for LogToMetricFieldNotFound {
     }
 }
 
-pub(crate) struct LogToMetricParseError<'a> {
-    pub error: &'a str,
+pub(crate) struct LogToMetricParseFloatError {
+    pub field: DefaultAtom,
+    pub error: ParseFloatError,
 }
 
-impl<'a> InternalEvent for LogToMetricParseError<'a> {
+impl InternalEvent for LogToMetricParseFloatError {
     fn emit_logs(&self) {
-        warn!(message = "Failed to parse.", error = %self.error, rate_limit_secs = 30);
+        warn!(
+            message = "Failed to parse field as float.",
+            field = %self.field,
+            error = %self.error,
+            rate_limit_secs = 30
+        );
     }
 
     fn emit_metrics(&self) {
