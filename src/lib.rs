@@ -99,3 +99,20 @@ mod built_info {
 pub fn get_hostname() -> std::io::Result<String> {
     Ok(hostname::get()?.to_string_lossy().into())
 }
+
+// This is a private implementation of the unstable `bool_to_option`
+// feature. This can be removed once this stabilizes:
+// https://github.com/rust-lang/rust/issues/64260
+trait BoolAndSome {
+    fn and_some<T>(self, value: T) -> Option<T>;
+}
+
+impl BoolAndSome for bool {
+    fn and_some<T>(self, value: T) -> Option<T> {
+        if self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+}
