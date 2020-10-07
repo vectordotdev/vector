@@ -41,6 +41,7 @@ components: sources: docker: {
 			"x86_64-pc-windows-msv":      true
 			"x86_64-unknown-linux-gnu":   true
 			"x86_64-unknown-linux-musl":  true
+			"x86_64-apple-darwin":        true
 		}
 
 		requirements: [
