@@ -299,13 +299,14 @@ package metadata
 		type:
 			close({"*": {}}) |
 			close({
-				"string":
-					close({
-						examples: [string, ...string]
-					}) |
-					close({
-						enum: [Name=string]: string
-					})
+				"string": close({
+					examples: [string, ...string]
+				})
+			}) |
+			close({
+				"enum": close({
+					values: [Name=string]: string
+				})
 			}) |
 			close({
 				timestamp: close({

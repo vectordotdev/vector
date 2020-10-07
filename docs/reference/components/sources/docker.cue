@@ -163,7 +163,7 @@ components: sources: docker: {
 				stream: {
 					description: "The [standard stream][urls.standard_streams] that the log was collected from."
 					required:    true
-					type: string: enum: {
+					type: enum: values: {
 						stdout: "The STDOUT stream"
 						stderr: "The STDERR stream"
 					}
