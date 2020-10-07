@@ -78,4 +78,19 @@ components: transforms: merge: {
 			}
 		}
 	}
+
+	examples: log: [
+		{
+			title: "With Merge Fields"
+			configuration: {
+				fields: ["message", "custom_string_field", "custom_int_field"]
+			}
+			input: [
+				{"message": "First","_partial": true,"custom_string_field": "value1","custom_int_field": 1},
+				{"message": "Second", "_partial": true, "custom_string_field": "value2", "custom_int_field": 2},
+				{"message": "Third", "custom_string_field": "value3", "custom_int_field": 3},
+			]
+			output: {"message": "FirstSecondThird","custom_string_field": "value1value2value3","custom_int_field": 3}
+		},
+	]
 }
