@@ -80,4 +80,30 @@ components: transforms: split: {
 			}
 		}
 	}
+
+	examples: log: [
+		{
+			title: "Split log message"
+			configuration: {
+				field: "message"
+				separator: ","
+				field_names: ["remote_addr", "user_id", "timestamp", "message", "status", "bytes"]
+				types: {
+					status: "int"
+					bytes: "int"
+				}
+			}
+			input: {
+				message: "5.86.210.12,zieme4647,19/06/2019:17:20:49 -0400,GET /embrace/supply-chains/dynamic/vertical,201,20574"
+			}
+			output: {
+				remote_addr: "5.86.210.12"
+				user_id: "zieme4647"
+				timestamp: "19/06/2019:17:20:49 -0400"
+				message: "GET /embrace/supply-chains/dynamic/vertical"
+				status: 201
+				bytes: 20574
+			}
+		}
+	]
 }
