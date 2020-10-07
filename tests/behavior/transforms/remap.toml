@@ -630,3 +630,29 @@
     extract_from = "remap_function_format_number"
     [[tests.outputs.conditions]]
       "a.equals" = "1.234,56"
+
+[transforms.remap_function_parse_url]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .parts = parse_url(.url)
+  """
+[[tests]]
+  name = "remap_function_parse_url"
+  [tests.input]
+    insert_at = "remap_function_parse_url"
+    type = "log"
+    [tests.input.log_fields]
+      url = "https://master.vector.dev/docs/reference/transforms/merge/?hello=world#configuration"
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_url"
+    [[tests.outputs.conditions]]
+      "parts.scheme.equals" = "https"
+      "parts.username.equals" = ""
+      "parts.password.equals" = "<null>"
+      "parts.host.equals" = "master.vector.dev"
+      "parts.port.equals" = "<null>"
+      "parts.path.equals" = "/docs/reference/transforms/merge/"
+      "parts.query.length_eq" = 1
+      "parts.query.hello.equals" = "world"
+      "parts.fragment.equals" = "configuration"
