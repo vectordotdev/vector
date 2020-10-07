@@ -7,7 +7,7 @@ import (
 components: sources: docker: {
   title: "Docker"
   short_description: strings.ToTitle(classes.function) + " logs through the Docker API"
-  description:  """
+  long_description:  """
                 [Docker][urls.docker] is an open platform for developing, shipping, and running
                 applications and services. Docker enables you to separate your services from
                 your infrastructure so you can ship quickly. With Docker, you can manage your
