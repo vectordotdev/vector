@@ -13,7 +13,7 @@ bundle install
 cd ..
 
 cd scripts
-npm install markdownlint-cli
+npm -g install markdownlint-cli
 cd ..
 
 pip3 install jsonschema==3.2.0
