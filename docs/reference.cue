@@ -307,6 +307,7 @@ package metadata
 			"timestamp"?: {
 				examples: ["2020-11-01T21:15:47.443232Z"]
 			}
+			"object"?: {}
 		}
 	}
 }
