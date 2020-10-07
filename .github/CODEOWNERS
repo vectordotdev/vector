@@ -78,7 +78,7 @@
 /scripts/upgrade-* @hoverbear
 /scripts/*docker* @MOZGIII
 /scripts/ci-setup-minikube.sh @MOZGIII
-/scripts/ci-setup-helm.sh @MOZGIII
+/scripts/environment/setup-helm.sh @MOZGIII
 /scripts/release-helm.sh @MOZGIII
 /scripts/deploy-kubernetes-test.sh @MOZGIII @JeanMertz
 /scripts/test-e2e-kubernetes.sh @MOZGIII @JeanMertz
