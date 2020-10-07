@@ -33,7 +33,7 @@ jobs:
         source: ${{ steps.filter.outputs.source }}
         docs: ${{ steps.filter.outputs.docs }}
         markdown: ${{ steps.filter.outputs.markdown }}
-        cargo: ${{ steps.filter.outputs.dependencies }}
+        dependencies: ${{ steps.filter.outputs.dependencies }}
         internal_events: ${{ steps.filter.outputs.internal_events }}
         helm: ${{ steps.filter.outputs.helm }}
       steps:
