@@ -120,7 +120,7 @@ components: sources: docker: {
 				"""
 			required: false
 			type: uint: {
-				unit: "seconds"
+				unit:    "seconds"
 				default: 1
 			}
 		}
