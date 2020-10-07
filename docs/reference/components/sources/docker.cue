@@ -83,7 +83,10 @@ components: sources: docker: {
 				all containers will be included.
 				"""
 			required: false
-			type: "[string]": examples: [["serene_", "serene_leakey", "ad08cc418cf9"]]
+			type: "[string]": {
+				examples: [["serene_", "serene_leakey", "ad08cc418cf9"]]
+				default: null
+			}
 		}
 		include_labels: {
 			common: true
@@ -93,7 +96,10 @@ components: sources: docker: {
 				described label's synatx in [docker object labels docs][urls.docker_object_labels].
 				"""
 			required: false
-			type: "[string]": examples: [["com.example.vendor=Timber Inc.", "com.example.name=Vector"]]
+			type: "[string]": {
+				examples: [["com.example.vendor=Timber Inc.", "com.example.name=Vector"]]
+				default: null
+			}
 		}
 		include_images: {
 			common: true
@@ -102,7 +108,10 @@ components: sources: docker: {
 				images will be included.
 				"""
 			required: false
-			type: "[string]": examples: [["httpd", "redis"]]
+			type: "[string]": {
+				examples: [["httpd", "redis"]]
+				default: null
+			}
 		}
 		retry_backoff_secs: {
 			common: false
@@ -110,7 +119,10 @@ components: sources: docker: {
 				The amount of time to wait before retrying after an error.
 				"""
 			required: false
-			type: uint: default: 1
+			type: uint: {
+				unit: "seconds"
+				default: 1
+			}
 		}
 	}
 
