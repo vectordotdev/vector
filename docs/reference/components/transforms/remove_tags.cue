@@ -31,6 +31,7 @@ components: transforms: remove_tags: {
 
     requirements: []
     warnings: []
+    notices: []
   }
 
   configuration: {
