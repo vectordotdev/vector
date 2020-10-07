@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2016
 set -euo pipefail
+shopt -s globstar
 
 # check-docs.sh
 #
@@ -13,14 +14,14 @@ set -euo pipefail
 
 DOCS_PATH="docs"
 
-echo "Validating ${DOCS_PATH}/**/*.c..."
+echo "Validating ${DOCS_PATH}/**/*.cue..."
 
 if ! [ -x "$(command -v cue)" ]; then
   echo 'Error: cue is not installed.' >&2
   exit 1
 fi
 
-errors=$(cue vet ${DOCS_PATH}/*.cue ${DOCS_PATH}/**/*.cue)
+errors=$(cue vet --concrete --all-errors ${DOCS_PATH}/*.cue ${DOCS_PATH}/**/*.cue)
 
 if [ -n "$errors" ]; then
   printf "Failed!\n\n%s\n" "${errors}"

@@ -1,14 +1,14 @@
 package metadata
 
 components: transforms: [Name=string]: {
-  kind: "transform"
+	kind: "transform"
 
-  // Example uses for the component.
-  examples: {
-    log: [
-      ...{
-        input: #Fields
-      }
-    ]
-  }
+	// Example uses for the component.
+	examples: {
+		log: [
+			...{
+				input: #Fields | [#Fields, ...]
+			},
+		]
+	}
 }
