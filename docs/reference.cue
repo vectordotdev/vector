@@ -24,6 +24,7 @@ package metadata
 	sort?: int8
 
 	type: {
+		"*"?: {}
 		"[string]"?: {
 			if !required {
 				default: [...string] | null
@@ -273,7 +274,7 @@ package metadata
 				}
 				input:  #LogEvent | [#LogEvent, ...] | string
 				output: #LogEvent | null
-				notes?:   string
+				notes?: string
 			},
 		]
 		metric: [
@@ -286,7 +287,7 @@ package metadata
 				}
 				input:  #MetricEvent
 				output: #MetricEvent | null
-				notes?:   string
+				notes?: string
 			},
 		]
 	}
