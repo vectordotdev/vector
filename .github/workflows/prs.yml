@@ -66,6 +66,7 @@ jobs:
               - 'Cargo.toml'
               - 'Cargo.lock'
               - 'rust-toolchain'
+              - '.github/workflows/prs.yml'
             internal_events:
               - 'src/internal_events/**'
             helm:
@@ -74,7 +75,7 @@ jobs:
   # Remove this once https://github.com/timberio/vector/issues/3771 is closed.
   # Then, modify the `cross-linux` job to run `test` instead of `build`.
   test-linux:
-    name: Test - x86_64-unknown-linux-gnu
+    name: Unit - x86_64-unknown-linux-gnu
     runs-on: ubuntu-20.04
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
