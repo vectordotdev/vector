@@ -4,15 +4,17 @@ use crate::{
     shutdown::ShutdownSignal,
     Event, Pipeline,
 };
+use chrono::Utc;
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     FutureExt, Stream, StreamExt, TryFutureExt,
 };
 use futures01::Sink;
-use mongodb::Client;
+use mongodb::{options::ClientOptions, Client};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::{interval, Duration};
+use url::Url;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 struct MongoDBMetricsConfig {
@@ -25,8 +27,9 @@ struct MongoDBMetricsConfig {
 
 #[derive(Debug)]
 struct MongoDBMetrics {
-    pub client: Client,
-    pub namespace: String,
+    client: Client,
+    namespace: String,
+    tags: BTreeMap<String, String>,
 }
 
 pub fn default_scrape_interval_secs() -> u64 {
@@ -83,9 +86,17 @@ impl SourceConfig for MongoDBMetricsConfig {
 
 impl MongoDBMetrics {
     async fn new(endpoint: &str, namespace: &str) -> crate::Result<Arc<MongoDBMetrics>> {
+        let client_options = ClientOptions::parse(endpoint).await?;
+
+        let mut tags: BTreeMap<String, String> = BTreeMap::new();
+        // TODO: Works only in Standalone mode
+        tags.insert("host".into(), client_options.hosts[0].hostname.clone());
+        tags.insert("endpoint".into(), sanitize_endpoint(endpoint)?);
+
         Ok(Arc::new(Self {
-            client: Client::with_uri_str(endpoint).await?,
+            client: Client::with_options(client_options)?,
             namespace: namespace.to_owned(),
+            tags,
         }))
     }
 
@@ -99,10 +110,18 @@ impl MongoDBMetrics {
     async fn collect(self: Arc<Self>) -> impl Stream<Item = Metric> {
         futures::stream::once(futures::future::ready(Metric {
             name: self.encode_namespace("up"),
-            timestamp: None,
-            tags: None,
+            timestamp: Some(Utc::now()),
+            tags: Some(self.tags.clone()),
             kind: MetricKind::Absolute,
             value: MetricValue::Gauge { value: 1.0 },
         }))
     }
+}
+
+// TODO: need to be improved (unwrap, standalone mode)
+fn sanitize_endpoint(endpoint: &str) -> crate::Result<String> {
+    let mut url = Url::parse(endpoint)?;
+    url.set_username("").unwrap();
+    url.set_password(None).unwrap();
+    Ok(url.to_string())
 }
