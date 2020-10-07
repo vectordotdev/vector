@@ -273,6 +273,7 @@ package metadata
 				}
 				input:  #LogEvent | [#LogEvent, ...] | string
 				output: #LogEvent | null
+				notes?:   string
 			},
 		]
 		metric: [
@@ -285,6 +286,7 @@ package metadata
 				}
 				input:  #MetricEvent
 				output: #MetricEvent | null
+				notes?:   string
 			},
 		]
 	}
