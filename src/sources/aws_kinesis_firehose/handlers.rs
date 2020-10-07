@@ -21,7 +21,7 @@ pub async fn firehose(
         .with_context(|| ParseRecords {
             request_id: request_id.clone(),
         })
-        .map_err(|err| reject::custom(err))?;
+        .map_err(reject::custom)?;
 
     let request_id = request_id.clone();
     out.send_all(futures01::stream::iter_ok(events))
