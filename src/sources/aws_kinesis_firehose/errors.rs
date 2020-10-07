@@ -5,10 +5,13 @@ use warp::http::StatusCode;
 #[derive(Debug, Snafu)]
 #[snafu(visibility = "pub")]
 pub enum RequestError {
-    #[snafu(display("X-Amz-Firehose-Access-Key required for request: {}", request_id))]
+    #[snafu(display(
+        "Missing access key. X-Amz-Firehose-Access-Key required for request: {}",
+        request_id
+    ))]
     AccessKeyMissing { request_id: String },
     #[snafu(display(
-        "X-Amz-Firehose-Access-Key does not match configured key for request: {}",
+        "Invalid access key. X-Amz-Firehose-Access-Key does not match configured access_key for request: {}",
         request_id
     ))]
     AccessKeyInvalid { request_id: String },
