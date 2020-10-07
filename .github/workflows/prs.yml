@@ -68,6 +68,7 @@ jobs:
               - 'rust-toolchain'
               - '.github/workflows/prs.yml'
               - 'Makefile'
+              - 'scripts/cross/**'
             internal_events:
               - 'src/internal_events/**'
             helm:
