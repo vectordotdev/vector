@@ -36,7 +36,13 @@ components: transforms: merge: {
 	configuration: {
 		fields: {
 			common:      true
-			description: "Fields to merge. The values of these fields will be merged into the first partial event. Fields not specified here will be ignored. Merging process takes the first partial event and the base, then it merges in the fields from each successive partial event, until a non-partial event arrives. Finally, the non-partial event fields are merged in, producing the resulting merged event."
+			description: """
+			Fields to merge.
+			The values of these fields will be merged into the first partial event.
+			Fields not specified here will be ignored.
+			Merging process takes the first partial event and the base, then it merges in the fields from each successive partial event, until a non-partial event arrives.
+			Finally, the non-partial event fields are merged in, producing the resulting merged event.
+			"""
 			required:    false
 			warnings: []
 			type: "[string]": {
@@ -46,7 +52,10 @@ components: transforms: merge: {
 		}
 		partial_event_marker_field: {
 			common:      true
-			description: "The field that indicates that the event is partial. A consequent stream of partial events along with the first non-partial event will be merged together."
+			description: """
+			The field that indicates that the event is partial.
+			A consequent stream of partial events along with the first non-partial event will be merged together.
+			"""
 			required:    false
 			warnings: []
 			type: string: {
@@ -56,7 +65,11 @@ components: transforms: merge: {
 		}
 		stream_discriminant_fields: {
 			common:      true
-			description: "An ordered list of fields to distinguish streams by. Each stream has a separate partial event merging state. Should be used to prevent events from unrelated sources from mixing together, as this affects partial event processing."
+			description: """
+			An ordered list of fields to distinguish streams by.
+			Each stream has a separate partial event merging state.
+			Should be used to prevent events from unrelated sources from mixing together, as this affects partial event processing.
+			"""
 			required:    false
 			warnings: []
 			type: "[string]": {
