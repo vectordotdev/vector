@@ -172,7 +172,7 @@ impl Lookup {
     /// Raise any errors that might stem from the lookup being invalid.
     #[instrument]
     fn is_valid(&self) -> crate::Result<()> {
-        if self.segments.len() == 0 {
+        if self.segments.is_empty() {
             return Err("Lookups must have at least 1 segment to be valid.".into());
         }
 
