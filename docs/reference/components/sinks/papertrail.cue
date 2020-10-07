@@ -12,7 +12,13 @@ components: sinks: papertrail: {
   }
 
   features: {
-    batch: enabled: false
+		batch: {
+			enabled:      false
+			common:       false
+			max_bytes:    null
+			max_events:   null
+			timeout_secs: 0
+		}
     buffer: enabled: true
     compression: enabled: false
     encoding: {
@@ -52,6 +58,7 @@ components: sinks: papertrail: {
 
     requirements: []
     warnings: []
+    notices: []
   }
 
   configuration: {
