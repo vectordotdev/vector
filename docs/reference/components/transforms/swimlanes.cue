@@ -5,12 +5,6 @@ components: transforms: swimlanes: {
 	short_description: "Accepts log events and allows you to route events across parallel streams using logical filters."
 	long_description:  "Accepts log events and allows you to route events across parallel streams using logical filters."
 
-	_features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
-
 	classes: {
 		commonly_used: false
 		function:      "route"
@@ -41,27 +35,27 @@ components: transforms: swimlanes: {
 			description: "A table of swimlane identifiers to logical conditions representing the filter of the swimlane. Each swimlane can then be referenced as an input by other components with the name `<transform_name>.<swimlane_id>`."
 			required:    true
 			warnings: []
-			type: object: configuration._conditions
+			type: object: components._conditions
 		}
 	}
 
-  examples: log: [
-    {
-      title: "Split by log level"
-      configuration: {
-        lanes: {
-          debug: "level.eq": "debug"
-          info: "level.eq": "info"
-          warn: "level.eq": "warn"
-          error: "level.eq": "error"
-        }
-      }
-      input: {
-        level: "info"
-      }
-      output: {
-        level: "info"
-      }
-    }
-  ]
+	examples: log: [
+		{
+			title: "Split by log level"
+			configuration: {
+				lanes: {
+					debug: "level.eq": "debug"
+					info: "level.eq":  "info"
+					warn: "level.eq":  "warn"
+					error: "level.eq": "error"
+				}
+			}
+			input: {
+				level: "info"
+			}
+			output: {
+				level: "info"
+			}
+		},
+	]
 }
