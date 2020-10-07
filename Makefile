@@ -255,7 +255,7 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 .PHONY: cross-image-%
 cross-image-%: export TRIPLE =$($(strip @):cross-image-%=%)
 cross-image-%:
-	docker build \
+	$(CONTAINER_TOOL) build \
 		--tag vector-cross-env:${TRIPLE} \
 		--file scripts/cross/${TRIPLE}.dockerfile \
 		scripts/cross
