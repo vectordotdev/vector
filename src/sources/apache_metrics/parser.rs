@@ -146,7 +146,7 @@ pub fn parse(
 pub fn encode_namespace(namespace: &str, name: &str) -> String {
     match namespace {
         "" => name.to_string(),
-        _ => format!("{}_{}", namespace, name),
+        _ => [namespace, name].join("_"),
     }
 }
 
