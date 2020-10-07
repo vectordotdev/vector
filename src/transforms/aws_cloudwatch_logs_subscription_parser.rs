@@ -23,9 +23,10 @@ inventory::submit! {
     TransformDescription::new::<AwsCloudwatchLogsSubscriptionParserConfig>("aws_cloudwatch_logs_subscription_parser")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "aws_cloudwatch_logs_subscription_parser")]
 impl TransformConfig for AwsCloudwatchLogsSubscriptionParserConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(AwsCloudwatchLogsSubscriptionParser::from(
             self.clone(),
         )))

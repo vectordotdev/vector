@@ -4,7 +4,6 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
-use async_trait::async_trait;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -21,20 +20,10 @@ pub struct AwsKinesisFirehoseConfig {
     tls: Option<TlsConfig>,
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "aws_kinesis_firehose")]
-#[async_trait]
 impl SourceConfig for AwsKinesisFirehoseConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
-        _out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        unimplemented!()
-    }
-
-    async fn build_async(
+    async fn build(
         &self,
         _: &str,
         _: &GlobalOptions,
@@ -99,7 +88,7 @@ mod tests {
                 tls: None,
                 access_key,
             }
-            .build_async(
+            .build(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
