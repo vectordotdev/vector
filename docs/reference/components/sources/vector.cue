@@ -5,7 +5,7 @@ components: sources: vector: {
   short_description: "Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs log and metric events."
   long_description: "Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs log and metric events."
 
-  _features: {
+  features: {
     checkpoint: enabled: false
     multiline: enabled: false
     tls: {
