@@ -30,11 +30,11 @@ INJECT_END=${RUST_MUSL_INJECT_BEGIN:-crtendS.o}
 
 # The linker to forward to. Must accept GCC-style arguments (so must not be LD directly).
 LINKER=''
-if which x86_64-linux-musl-gcc; then
+if [ -x "$(command -v x86_64-linux-musl-gcc)" ]; then
     LINKER=x86_64-linux-musl-gcc
-elif which i686-linux-musl-gcc; then
+elif [ -x "$(command -v i686-linux-musl-gcc)" ];
     LINKER=i686-linux-musl-gcc
-elif which aarch64-linux-musl-gcc; then
+elif [ -x "$(command -v aarch64-linux-musl-gcc)" ];
     LINKER=aarch64-linux-musl-gcc
 else
     LINKER=${RUST_MUSL_LINKER}
