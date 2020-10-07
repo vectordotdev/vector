@@ -16,3 +16,7 @@ indent_size = 4
 [Makefile]
 indent_style = tab
 indent_size = 4
+
+[*.cue]
+indent_style = tab
+indent_size = 4
