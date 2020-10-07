@@ -301,6 +301,9 @@ package metadata
 			"string"?: {
 				examples: [string, ...string]
 			}
+			"string"?: {
+				enum: [Name=string]: string
+			}
 			"timestamp"?: {
 				examples: ["2020-11-01T21:15:47.443232Z"]
 			}
