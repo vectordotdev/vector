@@ -28,6 +28,7 @@ components: transforms: swimlanes: {
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {

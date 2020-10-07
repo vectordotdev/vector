@@ -58,6 +58,7 @@ components: sinks: azure_monitor_logs: {
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {
