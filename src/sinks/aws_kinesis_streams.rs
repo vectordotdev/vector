@@ -75,9 +75,13 @@ inventory::submit! {
     SinkDescription::new_without_default::<KinesisSinkConfig>("aws_kinesis_streams")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "aws_kinesis_streams")]
 impl SinkConfig for KinesisSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(cx.resolver())?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = KinesisService::new(self.clone(), client, cx)?;

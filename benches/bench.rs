@@ -424,15 +424,21 @@ fn benchmark_regex(c: &mut Criterion) {
     c.bench(
         "regex",
         Benchmark::new("regex", move |b| {
+            let mut rt = runtime();
             b.iter_with_setup(
                 || {
-                    let parser =transforms::regex_parser::RegexParserConfig {
-                        // Many captures to stress the regex parser
-                        patterns: vec![r#"^(?P<addr>\d+\.\d+\.\d+\.\d+) (?P<user>\S+) (?P<auth>\S+) \[(?P<date>\d+/[A-Za-z]+/\d+:\d+:\d+:\d+ [+-]\d{4})\] "(?P<method>[A-Z]+) (?P<uri>[^"]+) HTTP/\d\.\d" (?P<code>\d+) (?P<size>\d+) "(?P<referrer>[^"]+)" "(?P<browser>[^"]+)""#.into()],
-                        field: None,
-                        drop_failed: true,
-                        ..Default::default()
-                    }.build(TransformContext::new_test()).unwrap();
+                    let parser = rt.block_on(async move {
+                        transforms::regex_parser::RegexParserConfig {
+                            // Many captures to stress the regex parser
+                            patterns: vec![r#"^(?P<addr>\d+\.\d+\.\d+\.\d+) (?P<user>\S+) (?P<auth>\S+) \[(?P<date>\d+/[A-Za-z]+/\d+:\d+:\d+:\d+ [+-]\d{4})\] "(?P<method>[A-Z]+) (?P<uri>[^"]+) HTTP/\d\.\d" (?P<code>\d+) (?P<size>\d+) "(?P<referrer>[^"]+)" "(?P<browser>[^"]+)""#.into()],
+                            field: None,
+                            drop_failed: true,
+                            ..Default::default()
+                        }
+                        .build(TransformContext::new_test())
+                        .await
+                        .unwrap()
+                    });
 
                     let src_lines = http_access_log_lines()
                         .take(num_lines)
@@ -678,6 +684,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
 }
 
 fn benchmark_remap(c: &mut Criterion) {
+    let mut rt = runtime();
     let add_fields_runner = |mut tform: Box<dyn Transform>| {
         let event = {
             let mut event = Event::from("augment me");
@@ -835,18 +842,21 @@ fn benchmark_remap(c: &mut Criterion) {
     });
 
     c.bench_function("remap: coerce with coercer", |b| {
-        let tform = toml::from_str::<CoercerConfig>(
-            r#"drop_unspecified = false
+        let tform = rt.block_on(async move {
+            toml::from_str::<CoercerConfig>(
+                r#"drop_unspecified = false
 
-               [types]
-               number = "int"
-               bool = "bool"
-               timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
-               "#,
-        )
-        .unwrap()
-        .build(TransformContext::new_test())
-        .unwrap();
+                   [types]
+                   number = "int"
+                   bool = "bool"
+                   timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
+                   "#,
+            )
+            .unwrap()
+            .build(TransformContext::new_test())
+            .await
+            .unwrap()
+        });
 
         b.iter(coerce_runner(tform))
     });

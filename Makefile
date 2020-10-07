@@ -41,7 +41,7 @@ export CURRENT_DIR = $(shell pwd)
 # Override this to automatically enter a container containing the correct, full, official build environment for Vector, ready for development
 export ENVIRONMENT ?= false
 # The upstream container we publish artifacts to on a successful master build.
-export ENVIRONMENT_UPSTREAM ?= docker.pkg.github.com/timberio/vector/environment
+export ENVIRONMENT_UPSTREAM ?= timberio/ci_image
 # Override to disable building the container, having it pull from the Github packages repo instead
 # TODO: Disable this by default. Blocked by `docker pull` from Github Packages requiring authenticated login
 export ENVIRONMENT_AUTOBUILD ?= true
@@ -482,7 +482,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-humio
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features humio-integration-tests --lib ::humio:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features humio-integration-tests --lib ::humio_logs::integration_tests:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-humio
 endif
@@ -738,7 +738,7 @@ check: ## Run prerequisite code checks
 
 .PHONY: check-all
 check-all: ## Check everything
-check-all: check-fmt check-clippy check-style check-markdown check-meta
+check-all: check-fmt check-clippy check-style check-markdown check-docs
 check-all: check-version check-examples check-component-features
 check-all: check-scripts check-kubernetes-yaml
 
@@ -749,6 +749,10 @@ check-component-features: ## Check that all component features are setup properl
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
 	${MAYBE_ENVIRONMENT_EXEC} cargo clippy --workspace --all-targets --features all-integration-tests -- -D warnings
+
+.PHONY: check-docs
+check-docs: ## Check that all /docs file are valid
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-docs.sh
 
 .PHONY: check-fmt
 check-fmt: ## Check that all files are formatted properly
@@ -761,10 +765,6 @@ check-style: ## Check that all files are styled properly
 .PHONY: check-markdown
 check-markdown: ## Check that markdown is styled properly
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-markdown.sh
-
-.PHONY: check-meta
-check-meta: ## Check that all /.meta file are valid
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-meta.sh
 
 .PHONY: check-version
 check-version: ## Check that Vector's version is correct accounting for recent changes

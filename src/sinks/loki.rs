@@ -69,9 +69,13 @@ inventory::submit! {
     SinkDescription::new_without_default::<LokiConfig>("loki")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "loki")]
 impl SinkConfig for LokiConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         if self.labels.is_empty() {
             return Err("`labels` must include at least one label.".into());
         }
@@ -304,7 +308,7 @@ mod integration_tests {
 
         *test_name = Template::try_from(stream.to_string()).unwrap();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let lines = random_lines(100).take(10).collect::<Vec<_>>();
 
@@ -341,7 +345,7 @@ mod integration_tests {
 
         *test_name = Template::try_from(stream.to_string()).unwrap();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let events = random_lines(100)
             .take(10)
@@ -375,7 +379,7 @@ mod integration_tests {
         )
         .unwrap();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let lines = random_lines(100).take(10).collect::<Vec<_>>();
 
