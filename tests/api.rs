@@ -11,10 +11,12 @@ mod tests {
     use futures::StreamExt;
     use graphql_client::*;
     use std::{
+        net::SocketAddr,
         sync::Once,
         time::{Duration, Instant},
     };
     use tokio::{select, sync::oneshot};
+    use url::Url;
     use vector::{
         self,
         api::{self, Server},
@@ -144,9 +146,11 @@ mod tests {
 
     // Creates and returns a new subscription client. Connection is re-attempted until
     // the specified timeout
-    async fn new_subscription_client(bind: std::net::SocketAddr) -> SubscriptionClient {
+    async fn new_subscription_client(addr: SocketAddr) -> SubscriptionClient {
+        let url = Url::parse(&*format!("ws://{}/graphql", addr)).unwrap();
+
         retry_until(
-            || make_subscription_client(bind),
+            || make_subscription_client(&url),
             Duration::from_millis(50),
             Duration::from_secs(10),
         )
