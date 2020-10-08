@@ -156,7 +156,8 @@ impl Sink for KafkaSink {
 
         let mut record = FutureRecord::to(&topic).key(&key).payload(&body[..]);
 
-        if let Some(Value::Timestamp(timestamp)) = item.as_log().get(&log_schema().timestamp_key())
+        if let Some(Value::Timestamp(timestamp)) =
+            item.as_log().get(&Atom::from(log_schema().timestamp_key()))
         {
             record = record.timestamp(timestamp.timestamp_millis());
         }
@@ -271,7 +272,7 @@ fn encode_event(
         Encoding::Json => serde_json::to_vec(&event.as_log()).unwrap(),
         Encoding::Text => event
             .as_log()
-            .get(&log_schema().message_key())
+            .get(&Atom::from(log_schema().message_key()))
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };

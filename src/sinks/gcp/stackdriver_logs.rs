@@ -178,7 +178,7 @@ impl HttpSink for StackdriverSink {
         entry.insert("severity".into(), json!(severity));
 
         // If the event contains a timestamp, send it in the main message so gcp can pick it up.
-        if let Some(timestamp) = log.get(&log_schema().timestamp_key()) {
+        if let Some(timestamp) = log.get(&Atom::from(log_schema().timestamp_key())) {
             entry.insert("timestamp".into(), json!(timestamp));
         }
 

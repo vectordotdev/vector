@@ -133,7 +133,7 @@ fn kafka_source(
                             let log = event.as_mut_log();
 
                             log.insert(
-                                log_schema().message_key().clone(),
+                                log_schema().message_key(),
                                 Value::from(Bytes::from(payload.to_owned())),
                             );
 
@@ -143,7 +143,7 @@ fn kafka_source(
                                 .to_millis()
                                 .and_then(|millis| Utc.timestamp_millis_opt(millis).latest())
                                 .unwrap_or_else(Utc::now);
-                            log.insert(log_schema().timestamp_key().clone(), timestamp);
+                            log.insert(log_schema().timestamp_key(), timestamp);
 
                             // Add source type
                             log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
@@ -153,7 +153,7 @@ fn kafka_source(
                                     None => (),
                                     Some(key) => {
                                         log.insert(
-                                            key_field.clone(),
+                                            key_field,
                                             Value::from(String::from_utf8_lossy(key).to_string()),
                                         );
                                     }
@@ -339,7 +339,7 @@ mod integration_test {
         let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             "my message".into()
         );
         assert_eq!(
@@ -347,9 +347,12 @@ mod integration_test {
             "my key".into()
         );
         assert_eq!(
-            events[0].as_log()[log_schema().source_type_key()],
+            events[0].as_log()[&Atom::from(log_schema().source_type_key())],
             "kafka".into()
         );
-        assert_eq!(events[0].as_log()[log_schema().timestamp_key()], now.into());
+        assert_eq!(
+            events[0].as_log()[&Atom::from(log_schema().timestamp_key())],
+            now.into()
+        );
     }
 }
