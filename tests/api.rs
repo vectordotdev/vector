@@ -150,7 +150,7 @@ mod tests {
         let url = Url::parse(&*format!("ws://{}/graphql", addr)).unwrap();
 
         retry_until(
-            || make_subscription_client(url),
+            || make_subscription_client(&url),
             Duration::from_millis(50),
             Duration::from_secs(10),
         )

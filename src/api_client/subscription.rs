@@ -217,7 +217,7 @@ impl SubscriptionClient {
 /// Connect to a GraphQL subscription endpoint and return an active client. Can be used for
 /// multiple subscriptions
 pub async fn make_subscription_client(
-    url: Url,
+    url: &Url,
 ) -> Result<SubscriptionClient, tungstenite::error::Error> {
     let (tx, _) = connect_async(url).await?;
     let client = SubscriptionClient::new(tx);

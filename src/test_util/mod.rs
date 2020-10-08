@@ -304,10 +304,10 @@ where
 }
 
 // Retries a func every `retry` duration until given an Ok(T); panics after `until` elapses
-pub async fn retry_until<F, Fut, T, E>(mut f: F, retry: Duration, until: Duration) -> T
+pub async fn retry_until<'a, F, Fut, T, E>(mut f: F, retry: Duration, until: Duration) -> T
 where
     F: FnMut() -> Fut,
-    Fut: Future<Output = Result<T, E>> + Send + 'static,
+    Fut: Future<Output = Result<T, E>> + Send + 'a,
 {
     let started = Instant::now();
     while started.elapsed() < until {
