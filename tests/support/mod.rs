@@ -13,6 +13,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Mutex,
 };
+use string_cache::DefaultAtom as Atom;
 use tracing::{error, info};
 use vector::config::{
     DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
@@ -159,14 +160,11 @@ impl Transform for MockTransform {
         match &mut event {
             Event::Log(log) => {
                 let mut v = log
-                    .get(&vector::config::log_schema().message_key())
+                    .get(&Atom::from(vector::config::log_schema().message_key()))
                     .unwrap()
                     .to_string_lossy();
                 v.push_str(&self.suffix);
-                log.insert(
-                    vector::config::log_schema().message_key().clone(),
-                    Value::from(v),
-                );
+                log.insert(vector::config::log_schema().message_key(), Value::from(v));
             }
             Event::Metric(metric) => match metric.value {
                 MetricValue::Counter { ref mut value } => {

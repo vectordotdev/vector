@@ -38,7 +38,7 @@ impl Cri {
             rp_config.patterns = vec![pattern.to_owned()];
 
             rp_config.types.insert(
-                crate::config::log_schema().timestamp_key().clone(),
+                Atom::from(crate::config::log_schema().timestamp_key()),
                 "timestamp|%+".to_owned(),
             );
 

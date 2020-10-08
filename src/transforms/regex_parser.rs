@@ -138,8 +138,8 @@ impl RegexParser {
     pub fn build(config: &RegexParserConfig) -> crate::Result<Box<dyn Transform>> {
         let field = config
             .field
-            .as_ref()
-            .unwrap_or(&crate::config::log_schema().message_key());
+            .clone()
+            .unwrap_or_else(|| Atom::from(crate::config::log_schema().message_key()));
 
         let patterns = match (&config.regex, &config.patterns.len()) {
             (None, 0) => {
@@ -192,7 +192,7 @@ impl RegexParser {
         Ok(Box::new(RegexParser::new(
             regexset,
             patterns,
-            field.clone(),
+            field,
             config.drop_field,
             config.drop_failed,
             config.target_field.clone(),

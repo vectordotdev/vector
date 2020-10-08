@@ -7,7 +7,6 @@ use crate::{
     template::Template,
 };
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
 
 const HOST: &str = "https://cloud.humio.com";
 
@@ -27,7 +26,7 @@ pub struct HumioLogsConfig {
     event_type: Option<Template>,
 
     #[serde(default = "default_host_key")]
-    pub host_key: Atom,
+    pub host_key: String,
 
     #[serde(default)]
     pub compression: Compression,
@@ -39,8 +38,8 @@ pub struct HumioLogsConfig {
     batch: BatchConfig,
 }
 
-fn default_host_key() -> Atom {
-    crate::config::LogSchema::default().host_key().clone()
+fn default_host_key() -> String {
+    crate::config::LogSchema::default().host_key().to_string()
 }
 
 inventory::submit! {
@@ -286,7 +285,7 @@ mod integration_tests {
                 max_events: Some(1),
                 ..Default::default()
             },
-            host_key: log_schema().host_key().clone(),
+            host_key: log_schema().host_key().to_string(),
             ..Default::default()
         }
     }

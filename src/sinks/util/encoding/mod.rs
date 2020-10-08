@@ -283,7 +283,7 @@ mod tests {
         let mut event = Event::from("Demo");
         let timestamp = event
             .as_mut_log()
-            .get(&log_schema().timestamp_key())
+            .get(&Atom::from(log_schema().timestamp_key()))
             .unwrap()
             .clone();
         let timestamp = timestamp.as_timestamp().unwrap();
@@ -295,7 +295,7 @@ mod tests {
 
         match event
             .as_mut_log()
-            .get(&log_schema().timestamp_key())
+            .get(&Atom::from(log_schema().timestamp_key()))
             .unwrap()
         {
             Value::Integer(_) => {}

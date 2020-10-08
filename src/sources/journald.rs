@@ -206,10 +206,10 @@ fn create_event(record: Record) -> Event {
     let mut log = LogEvent::from_iter(record);
     // Convert some journald-specific field names into Vector standard ones.
     if let Some(message) = log.remove(&MESSAGE) {
-        log.insert(log_schema().message_key().clone(), message);
+        log.insert(log_schema().message_key(), message);
     }
     if let Some(host) = log.remove(&HOSTNAME) {
-        log.insert(log_schema().host_key().clone(), host);
+        log.insert(log_schema().host_key(), host);
     }
     // Translate the timestamp, and so leave both old and new names.
     if let Some(timestamp) = log
@@ -222,15 +222,15 @@ fn create_event(record: Record) -> Event {
                     (timestamp / 1_000_000) as i64,
                     (timestamp % 1_000_000) as u32 * 1_000,
                 );
-                log.insert(
-                    log_schema().timestamp_key().clone(),
-                    Value::Timestamp(timestamp),
-                );
+                log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
             }
         }
     }
     // Add source type
-    log.try_insert(log_schema().source_type_key(), Bytes::from("journald"));
+    log.try_insert(
+        &Atom::from(log_schema().source_type_key()),
+        Bytes::from("journald"),
+    );
 
     log.into()
 }
@@ -665,7 +665,7 @@ mod tests {
             Value::Bytes("System Initialization".into())
         );
         assert_eq!(
-            received[0].as_log()[log_schema().source_type_key()],
+            received[0].as_log()[&Atom::from(log_schema().source_type_key())],
             "journald".into()
         );
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140001000));
@@ -747,11 +747,11 @@ mod tests {
     }
 
     fn message(event: &Event) -> Value {
-        event.as_log()[&log_schema().message_key()].clone()
+        event.as_log()[&Atom::from(log_schema().message_key())].clone()
     }
 
     fn timestamp(event: &Event) -> Value {
-        event.as_log()[&log_schema().timestamp_key()].clone()
+        event.as_log()[&Atom::from(log_schema().timestamp_key())].clone()
     }
 
     fn value_ts(secs: i64, usecs: u32) -> Value {

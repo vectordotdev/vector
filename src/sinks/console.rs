@@ -15,6 +15,7 @@ use futures::{
     FutureExt,
 };
 use serde::{Deserialize, Serialize};
+use string_cache::DefaultAtom as Atom;
 use tokio::io::{self, AsyncWriteExt};
 
 #[derive(Debug, Derivative, Deserialize, Serialize)]
@@ -91,11 +92,11 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
                 .ok(),
             Encoding::Text => {
                 let field = crate::config::log_schema().message_key();
-                match log.get(&field) {
+                match log.get(&Atom::from(field)) {
                     Some(v) => Some(v.to_string_lossy()),
                     None => {
                         emit!(ConsoleFieldNotFound {
-                            missing_field: field.to_string()
+                            missing_field: field,
                         });
                         None
                     }

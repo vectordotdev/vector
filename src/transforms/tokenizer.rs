@@ -30,17 +30,17 @@ impl TransformConfig for TokenizerConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
-            .as_ref()
-            .unwrap_or(&crate::config::log_schema().message_key());
+            .clone()
+            .unwrap_or_else(|| Atom::from(crate::config::log_schema().message_key()));
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)?;
 
         // don't drop the source field if it's getting overwritten by a parsed value
-        let drop_field = self.drop_field && !self.field_names.iter().any(|f| f == field);
+        let drop_field = self.drop_field && !self.field_names.iter().any(|f| **f == *field);
 
         Ok(Box::new(Tokenizer::new(
             self.field_names.clone(),
-            field.clone(),
+            field,
             drop_field,
             types,
         )))

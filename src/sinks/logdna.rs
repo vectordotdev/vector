@@ -13,6 +13,7 @@ use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::SystemTime;
+use string_cache::DefaultAtom as Atom;
 
 lazy_static::lazy_static! {
     static ref HOST: UriSerde = Uri::from_static("https://logs.logdna.com").into();
@@ -110,10 +111,10 @@ impl HttpSink for LogdnaConfig {
         let mut log = event.into_log();
 
         let line = log
-            .remove(&crate::config::log_schema().message_key())
+            .remove(&Atom::from(crate::config::log_schema().message_key()))
             .unwrap_or_else(|| String::from("").into());
         let timestamp = log
-            .remove(&crate::config::log_schema().timestamp_key())
+            .remove(&Atom::from(crate::config::log_schema().timestamp_key()))
             .unwrap_or_else(|| chrono::Utc::now().into());
 
         let mut map = serde_json::map::Map::new();
