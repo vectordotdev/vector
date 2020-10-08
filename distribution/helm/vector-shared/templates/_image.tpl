@@ -3,10 +3,17 @@
 Resolve the actual image tag to use.
 */}}
 {{- define "libvector.imageTag" -}}
-{{- if .Values.image.tag }}
-{{- .Values.image.tag }}
+{{- $localImage := default (dict) .Values.image }}
+{{- $global := default (dict) .Values.global }}
+{{- $global := default (dict) $global.vector }}
+{{- $globalImage := default (dict) $global.image }}
+{{- $resolvedImageTag := default $localImage.tag $globalImage.tag }}
+{{- if $resolvedImageTag }}
+{{- $resolvedImageTag }}
 {{- else }}
-{{- $version := default .Chart.AppVersion .Values.image.version }}
-{{- printf "%s-%s" $version .Values.image.base }}
+{{- $resolvedVersion := default $localImage.version $globalImage.version  }}
+{{- $resolvedBase := default $localImage.base $globalImage.base }}
+{{- $version := default .Chart.AppVersion $resolvedVersion }}
+{{- printf "%s-%s" $version $resolvedBase }}
 {{- end }}
 {{- end }}
