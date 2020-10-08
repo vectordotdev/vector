@@ -7,7 +7,7 @@ package metadata
 
 #ConfigurationOptions: [Name=string]: {
 	description: string
-groups?: [...string]
+	groups?: [...string]
 	name:           Name
 	relevant_when?: string
 	required:       bool
