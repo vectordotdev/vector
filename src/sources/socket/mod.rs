@@ -93,8 +93,7 @@ impl SourceConfig for SocketConfig {
             Mode::Udp(config) => {
                 let host_key = config
                     .host_key
-                    .clone()
-                    .unwrap_or_else(|| Atom::from(log_schema().host_key().clone()));
+                    .unwrap_or_else(|| Atom::from(log_schema().host_key()));
                 Ok(udp::udp(
                     config.address,
                     config.max_length,
@@ -107,7 +106,6 @@ impl SourceConfig for SocketConfig {
             Mode::Unix(config) => {
                 let host_key = config
                     .host_key
-                    .clone()
                     .unwrap_or_else(|| log_schema().host_key().to_string());
                 Ok(unix::unix(
                     config.path,
