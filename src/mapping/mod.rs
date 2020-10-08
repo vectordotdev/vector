@@ -26,7 +26,7 @@ impl Assignment {
 
 impl Function for Assignment {
     fn apply(&self, target: &mut Event) -> Result<()> {
-        let v = self.function.execute(&target)?;
+        let v: Value = self.function.execute(&target)?.into();
         target.as_mut_log().insert(&self.path, v);
         Ok(())
     }
@@ -116,7 +116,7 @@ impl IfStatement {
 
 impl Function for IfStatement {
     fn apply(&self, target: &mut Event) -> Result<()> {
-        match self.query.execute(target)? {
+        match self.query.execute(target)?.into() {
             Value::Boolean(true) => self.true_statement.apply(target),
             Value::Boolean(false) => self.false_statement.apply(target),
             _ => Err("query returned non-boolean value".to_string()),
@@ -214,10 +214,10 @@ impl MergeFn {
 
 impl Function for MergeFn {
     fn apply(&self, target: &mut Event) -> Result<()> {
-        let from_value = self.from.execute(target)?;
+        let from_value = self.from.execute(target)?.into();
         let deep = match &self.deep {
             None => false,
-            Some(deep) => match deep.execute(target)? {
+            Some(deep) => match deep.execute(target)?.into() {
                 Value::Boolean(value) => value,
                 _ => return Err("deep parameter passed to merge is a non-boolean value".into()),
             },

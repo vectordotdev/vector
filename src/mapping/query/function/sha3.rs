@@ -17,7 +17,7 @@ impl Sha3Fn {
 }
 
 impl Function for Sha3Fn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let value = required!(ctx, self.query, Value::Bytes(v) => v);
         let variant = optional!(ctx, self.variant, Value::Bytes(v) => v);
 
@@ -34,7 +34,7 @@ impl Function for Sha3Fn {
             }
         };
 
-        Ok(Value::Bytes(hash.into()))
+        Ok(Value::Bytes(hash.into()).into())
     }
 
     fn parameters() -> &'static [Parameter] {
@@ -129,7 +129,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event).map(Into::into), exp);
         }
     }
 

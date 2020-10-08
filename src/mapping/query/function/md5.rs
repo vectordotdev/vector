@@ -13,13 +13,13 @@ impl Md5Fn {
 }
 
 impl Function for Md5Fn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         use md5::{Digest, Md5};
 
-        match self.query.execute(ctx)? {
+        match self.query.execute(ctx)?.into() {
             Value::Bytes(bytes) => {
                 let md5 = hex::encode(Md5::digest(&bytes));
-                Ok(Value::Bytes(md5.into()))
+                Ok(Value::Bytes(md5.into()).into())
             }
             v => unexpected_type!(v),
         }
@@ -69,7 +69,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event).map(Into::into), exp);
         }
     }
 

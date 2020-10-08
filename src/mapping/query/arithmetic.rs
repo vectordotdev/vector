@@ -1,4 +1,5 @@
 use super::Function;
+use super::query_value::QueryValue;
 use crate::{
     event::{Event, Value},
     mapping::Result,
@@ -71,9 +72,9 @@ fn compare_number_types(
 }
 
 impl Function for Arithmetic {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
-        let left = self.left.execute(ctx);
-        let right = self.right.execute(ctx);
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
+        let left = self.left.execute(ctx).map(Into::into);
+        let right = self.right.execute(ctx).map(Into::into);
 
         // TODO: A lot of these comparisons could potentially be baked into the
         // Value type. However, we would need to agree on general rules as to
@@ -209,7 +210,7 @@ impl Function for Arithmetic {
                 },
                 vl => return Err(format!("unable to OR left-hand field type {:?}", vl)),
             },
-        })
+        }.into())
     }
 }
 
@@ -393,7 +394,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event).map(Into::into), exp);
         }
     }
 }

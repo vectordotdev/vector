@@ -7,7 +7,10 @@ pub(in crate::mapping) use not::NotFn;
 
 use super::Function;
 use crate::Event;
-use crate::{event::Value, mapping::Result};
+use crate::{
+    event::Value,
+    mapping::{query::query_value::QueryValue, Result},
+};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -16,6 +19,8 @@ use std::str::FromStr;
 mod prelude {
     pub(super) use super::{is_scalar_value, ArgumentList, Parameter};
     pub(super) use crate::event::{Event, Value};
+    pub(super) use crate::mapping::query::dynamic_regex::DynamicRegex;
+    pub(super) use crate::mapping::query::query_value::QueryValue;
     pub(super) use crate::mapping::query::Function;
     #[cfg(test)]
     pub(super) use crate::mapping::query::Literal;
@@ -34,7 +39,7 @@ macro_rules! unexpected_type {
 
 macro_rules! required {
     ($ctx:expr, $fn:expr, $($pattern:pat => $then:expr),+ $(,)?) => {
-        match $fn.execute($ctx)? {
+        match $fn.execute($ctx)?.into() {
             $($pattern => $then,)+
             v => unexpected_type!(v),
         }
@@ -46,7 +51,7 @@ macro_rules! optional {
         $fn.as_ref()
             .map(|v| v.execute($ctx))
             .transpose()?
-            .map(|v| match v {
+            .map(|v| match v.into() {
                 $($pattern => $then,)+
                 v => unexpected_type!(v),
             })
@@ -238,16 +243,18 @@ impl Argument {
 }
 
 impl Function for Argument {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let value = self.resolver.execute(ctx)?;
 
         // Ask the parameter if it accepts the given value.
-        if !(self.parameter.accepts)(&value) {
-            return Err(format!(
-                "invalid argument type '{}' for parameter '{}'",
-                value.kind(),
-                self.parameter.keyword
-            ));
+        if let QueryValue::Value(ref value) = value {
+            if !(self.parameter.accepts)(&value) {
+                return Err(format!(
+                    "invalid argument type '{}' for parameter '{}'",
+                    value.kind(),
+                    self.parameter.keyword
+                ));
+            }
         }
 
         Ok(value)

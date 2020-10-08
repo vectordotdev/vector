@@ -13,10 +13,13 @@ impl ParseJsonFn {
 }
 
 impl Function for ParseJsonFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
-        match self.query.execute(ctx)? {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
+        match self.query.execute(ctx)?.into() {
             Value::Bytes(b) => serde_json::from_slice(&b)
-                .map(|v: serde_json::Value| v.into())
+                .map(|v: serde_json::Value| {
+                    let v: Value = v.into();
+                    v.into()
+                })
                 .map_err(|err| format!("unable to parse json {}", err)),
             v => unexpected_type!(v),
         }
@@ -97,7 +100,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event).map(Into::into), exp);
         }
     }
 }

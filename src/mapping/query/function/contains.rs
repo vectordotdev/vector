@@ -26,7 +26,7 @@ impl ContainsFn {
 }
 
 impl Function for ContainsFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let substring = {
             let bytes = required!(ctx, self.substring, Value::Bytes(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
@@ -43,7 +43,7 @@ impl Function for ContainsFn {
                 .filter(|&case_sensitive| !case_sensitive)
                 .any(|_| value.to_lowercase().contains(&substring.to_lowercase()));
 
-        Ok(Value::from(contains))
+        Ok(Value::from(contains).into())
     }
 
     fn parameters() -> &'static [Parameter] {
@@ -144,7 +144,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event).map(Into::into), exp);
         }
     }
 }

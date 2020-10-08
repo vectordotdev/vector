@@ -13,10 +13,11 @@ impl StripWhitespaceFn {
 }
 
 impl Function for StripWhitespaceFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
-        match self.query.execute(ctx)? {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
+        match self.query.execute(ctx)?.into() {
             Value::Bytes(b) => std::str::from_utf8(&b)
                 .map(|s| Value::Bytes(b.slice_ref(s.trim().as_bytes())))
+                .map(Into::into)
                 .map_err(|_| {
                     "unable to strip white_space from non-unicode string types".to_owned()
                 }),
@@ -109,7 +110,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event).map(Into::into), exp);
         }
     }
 }

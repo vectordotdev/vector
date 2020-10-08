@@ -18,20 +18,21 @@ impl FormatTimestampFn {
 }
 
 impl Function for FormatTimestampFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
-        let format = match self.format.execute(ctx)? {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
+        let format = match self.format.execute(ctx)?.into() {
             Value::Bytes(b) => String::from_utf8_lossy(&b).into_owned(),
             v => unexpected_type!(v),
         };
 
         self.query
             .execute(ctx)
-            .map(|v| match v {
+            .map(|v| match v.into() {
                 Value::Timestamp(ts) => ts,
-                _ => unexpected_type!(v),
+                v => unexpected_type!(v),
             })
             .and_then(|ts| try_format(&ts, &format))
             .map(Value::from)
+            .map(Into::into)
     }
 
     fn parameters() -> &'static [Parameter] {
@@ -113,7 +114,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event).map(Into::into), exp);
         }
     }
 }

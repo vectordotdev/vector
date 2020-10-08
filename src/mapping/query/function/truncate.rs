@@ -25,10 +25,10 @@ impl TruncateFn {
 }
 
 impl Function for TruncateFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
-        let value = self.query.execute(ctx)?;
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
+        let value = self.query.execute(ctx)?.into();
         if let Value::Bytes(bytes) = value {
-            let limit = match self.limit.execute(ctx)? {
+            let limit = match self.limit.execute(ctx)?.into() {
                 // If the result of execution is a float, we take the floor as our limit.
                 Value::Float(f) => f.floor() as usize,
                 Value::Integer(i) if i >= 0 => i as usize,
@@ -37,7 +37,7 @@ impl Function for TruncateFn {
 
             let ellipsis = match &self.ellipsis {
                 None => false,
-                Some(v) => match v.execute(ctx)? {
+                Some(v) => match v.execute(ctx)?.into() {
                     Value::Boolean(value) => value,
                     v => unexpected_type!(v),
                 },
@@ -55,15 +55,15 @@ impl Function for TruncateFn {
 
                 if s.len() <= pos {
                     // No truncating necessary.
-                    Ok(Value::Bytes(bytes))
+                    Ok(Value::Bytes(bytes).into())
                 } else if ellipsis {
                     // Allocate a new string to add the ellipsis to.
                     let mut new = s[0..pos].to_string();
                     new.push_str("...");
-                    Ok(Value::Bytes(new.into()))
+                    Ok(Value::Bytes(new.into()).into())
                 } else {
                     // Just pull the relevant part out of the original parameter.
-                    Ok(Value::Bytes(bytes.slice(0..pos)))
+                    Ok(Value::Bytes(bytes.slice(0..pos)).into())
                 }
             } else {
                 // Not a valid utf8 string.
@@ -247,7 +247,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event).map(Into::into), exp);
         }
     }
 }

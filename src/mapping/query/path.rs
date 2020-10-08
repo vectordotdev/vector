@@ -1,6 +1,6 @@
-use super::Function;
+use super::{Function, query_value::QueryValue};
 use crate::{
-    event::{util::log::get_value, Event, PathIter, Value},
+    event::{util::log::get_value, Event, PathIter},
     mapping::Result,
 };
 
@@ -42,7 +42,7 @@ impl From<Vec<Vec<&str>>> for Path {
 }
 
 impl Function for Path {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         // Event.as_log returns a LogEvent struct rather than a naked
         // IndexMap<_, Value>, which means specifically for the first item in
         // the path we need to manually call .get.
@@ -86,7 +86,7 @@ impl Function for Path {
                 })?;
         }
 
-        Ok(value.clone())
+        Ok(value.clone().into())
     }
 }
 
@@ -94,6 +94,7 @@ impl Function for Path {
 mod tests {
     use super::*;
     use serde_json::json;
+    use crate::event::Value;
 
     #[test]
     fn check_path_query() {
@@ -182,7 +183,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event).map(Into::into), exp);
         }
     }
 }

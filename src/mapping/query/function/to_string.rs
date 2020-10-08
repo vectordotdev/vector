@@ -15,12 +15,15 @@ impl ToStringFn {
 }
 
 impl Function for ToStringFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         match self.query.execute(ctx) {
-            Ok(v) => Ok(match v {
-                Value::Bytes(_) => v,
-                _ => Value::Bytes(v.as_bytes()),
-            }),
+            Ok(v) => {
+                let value: Value = v.into();
+                Ok(match value {
+                    Value::Bytes(_) => value.into(),
+                    _ => Value::Bytes(value.as_bytes()).into(),
+                })
+            }
             Err(err) => match &self.default {
                 Some(v) => v.execute(ctx),
                 None => Err(err),
@@ -97,7 +100,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event).map(Into::into), exp);
         }
     }
 }

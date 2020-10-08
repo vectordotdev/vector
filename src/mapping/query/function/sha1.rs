@@ -13,13 +13,13 @@ impl Sha1Fn {
 }
 
 impl Function for Sha1Fn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         use sha1::{Digest, Sha1};
 
-        match self.query.execute(ctx)? {
+        match self.query.execute(ctx)?.into() {
             Value::Bytes(bytes) => {
                 let sha1 = hex::encode(Sha1::digest(&bytes));
-                Ok(Value::Bytes(sha1.into()))
+                Ok(Value::Bytes(sha1.into()).into())
             }
             v => unexpected_type!(v),
         }
@@ -69,7 +69,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event).map(Into::into), exp);
         }
     }
 

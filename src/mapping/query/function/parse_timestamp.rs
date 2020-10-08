@@ -26,8 +26,8 @@ impl ParseTimestampFn {
 }
 
 impl Function for ParseTimestampFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
-        let format = match self.format.execute(ctx)? {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
+        let format = match self.format.execute(ctx)?.into() {
             Value::Bytes(b) => format!("timestamp|{}", String::from_utf8_lossy(&b)),
             v => unexpected_type!(v),
         };
@@ -35,20 +35,25 @@ impl Function for ParseTimestampFn {
         let conversion: Conversion = format.parse().map_err(|e| format!("{}", e))?;
 
         let result = match self.query.execute(ctx) {
-            Ok(v) => match v {
-                Value::Bytes(_) => conversion.convert(v).map_err(|e| e.to_string()),
-                Value::Timestamp(_) => Ok(v),
-                _ => unexpected_type!(v),
+            Ok(v) => {
+                let value = v.into();
+                match value {
+                    Value::Bytes(_) => conversion.convert(value).map(Into::into).map_err(|e| e.to_string()),
+                    Value::Timestamp(_) => Ok(value.into()),
+                    _ => unexpected_type!(value),
+                }
             },
             Err(err) => Err(err),
         };
+
         if result.is_err() {
             if let Some(v) = &self.default {
-                return match v.execute(ctx)? {
+                return match v.execute(ctx)?.into() {
                     Value::Bytes(v) => conversion
                         .convert(Value::Bytes(v))
+                        .map(Into::into)
                         .map_err(|e| e.to_string()),
-                    Value::Timestamp(v) => Ok(Value::Timestamp(v)),
+                    Value::Timestamp(v) => Ok(Value::Timestamp(v).into()),
                     v => unexpected_type!(v),
                 };
             }
@@ -173,7 +178,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event).map(Into::into), exp);
         }
     }
 }
