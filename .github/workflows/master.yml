@@ -447,5 +447,5 @@ jobs:
       - uses: actions/checkout@v2
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
-      - run: echo "::add-path::/home/runner/.local/bin"
+      - run: echo "home/runner/.local/bin" >> "$GITHUB_PATH"
       - run: make check-component-features
