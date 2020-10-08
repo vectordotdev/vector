@@ -154,22 +154,22 @@ fn render_tags(
     })
 }
 
-fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
-    fn parse_field(log: &LogEvent, field: &Atom) -> Result<f64, TransformError> {
-        let value = log
-            .get(field)
-            .ok_or_else(|| TransformError::FieldNotFound {
-                field: field.clone(),
-            })?;
-        value
-            .to_string_lossy()
-            .parse()
-            .map_err(|error| TransformError::ParseFloatError {
-                field: field.clone(),
-                error,
-            })
-    }
+fn parse_field(log: &LogEvent, field: &Atom) -> Result<f64, TransformError> {
+    let value = log
+        .get(field)
+        .ok_or_else(|| TransformError::FieldNotFound {
+            field: field.clone(),
+        })?;
+    value
+        .to_string_lossy()
+        .parse()
+        .map_err(|error| TransformError::ParseFloatError {
+            field: field.clone(),
+            error,
+        })
+}
 
+fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
     let log = event.as_log();
 
     let timestamp = log
@@ -179,8 +179,18 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
     match config {
         MetricConfig::Counter(counter) => {
+            let value = log
+                .get(&counter.field)
+                .ok_or_else(|| TransformError::FieldNotFound {
+                    field: counter.field.clone(),
+                })?;
             let value = if counter.increment_by_value {
-                parse_field(&log, &counter.field)?
+                value.to_string_lossy().parse().map_err(|error| {
+                    TransformError::ParseFloatError {
+                        field: counter.field.clone(),
+                        error,
+                    }
+                })?
             } else {
                 1.0
             };
@@ -444,9 +454,8 @@ mod tests {
 
         let event = create_event("success", "42");
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform(event);
 
-        assert!(metric.is_none());
+        assert_eq!(transform.transform(event), None);
     }
 
     #[test]
@@ -519,7 +528,7 @@ mod tests {
         let event = create_event("status", "not a number");
         let mut transform = LogToMetric::new(config);
 
-        assert!(transform.transform(event).is_none());
+        assert_eq!(transform.transform(event), None);
     }
 
     #[test]
@@ -536,7 +545,7 @@ mod tests {
         let event = create_event("not foo", "not a number");
         let mut transform = LogToMetric::new(config);
 
-        assert!(transform.transform(event).is_none());
+        assert_eq!(transform.transform(event), None);
     }
 
     #[test]
