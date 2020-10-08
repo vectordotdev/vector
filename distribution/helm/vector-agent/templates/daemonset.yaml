@@ -35,7 +35,7 @@ spec:
         - name: vector
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ include "libvector.imageTag" . }}"
+          image: {{ include "libvector.image" . | quote }}
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
           args:
             - --config
