@@ -2,16 +2,12 @@ use crate::{api, config};
 use graphql_client::GraphQLQuery;
 use prettytable::{format, Table};
 use reqwest;
-use std::{net::SocketAddr, path::PathBuf};
+use std::net::SocketAddr;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Opts {
-    /// Any number of Vector config files to test. If none are specified the
-    /// default config path `/etc/vector/vector.toml` will be targeted.
-    paths: Vec<PathBuf>,
-
     /// How often the screen refreshes (in milliseconds)
     #[structopt(default_value = "500", short = "i", long)]
     refresh_interval: i32,
@@ -19,6 +15,14 @@ pub struct Opts {
     #[structopt(short, long)]
     remote: Option<SocketAddr>,
 }
+
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "graphql/schema.json",
+    query_path = "graphql/queries/health.graphql",
+    response_derives = "Debug"
+)]
+struct HealthQuery;
 
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -52,6 +56,13 @@ fn topology_type(topology_on: topology_query::TopologyQueryTopologyOn) -> &'stat
     }
 }
 
+async fn healthcheck(addr: SocketAddr) -> Result<bool, ()> {
+    let request_body = HealthQuery::build_query(health_query::Variables);
+    let res = query::<HealthQuery>(addr, &request_body).await.m;
+
+    res.
+}
+
 async fn get_topology(addr: SocketAddr) -> exitcode::ExitCode {
     let request_body = TopologyQuery::build_query(topology_query::Variables);
     let res = match query::<TopologyQuery>(addr, &request_body).await {
@@ -76,6 +87,8 @@ async fn get_topology(addr: SocketAddr) -> exitcode::ExitCode {
 }
 
 pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
+    let addr = opts.remote.or_else(|| config::api::default_bind());
+
     match config::load_from_paths(&opts.paths) {
         Ok(config) => match (opts.remote.is_some(), config.api.enabled) {
             // No remote; API not enabled locally
