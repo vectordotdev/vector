@@ -2,7 +2,7 @@ package metadata
 
 components: sources: syslog: {
   title: "#{component.title}"
-  short_description: "Ingests data through the [Syslog protocol][urls.syslog_5424] and outputs log events."
+  short_description: "Ingests data through the [Syslog 5424][urls.syslog_5424] and the [Syslog 3164][urls.syslog_3164] protocols and outputs log events."
   long_description: "[Syslog][urls.syslog] stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is used to collect various device logs from different machines and send them to a central location for monitoring and review."
 
   _features: {
@@ -29,7 +29,6 @@ components: sources: syslog: {
   }
 
   support: {
-
     platforms: {
       "aarch64-unknown-linux-gnu": true
       "aarch64-unknown-linux-musl": true
@@ -51,6 +50,7 @@ components: sources: syslog: {
     address: {
       description: "The TCP or UDP address to listen for connections on, or \"systemd#N\" to use the Nth socket passed by systemd socket activation."
       required: true
+      relevant_when: "`mode` = `tcp` or `udp`"
       warnings: []
       type: string: {
         examples: ["0.0.0.0:514","systemd","systemd#2"]
@@ -83,13 +83,14 @@ components: sources: syslog: {
         enum: {
           tcp: "Read incoming Syslog data over the TCP protocol."
           udp: "Read incoming Syslog data over the UDP protocol."
-          unix: "Read uncoming Syslog data through a Unix socker."
+          unix: "Read incoming Syslog data through a Unix socket."
         }
       }
     }
     path: {
       description: "The unix socket path. *This should be absolute path.*\n"
       required: true
+      relevant_when: "`mode` = `unix`"
       warnings: []
       type: string: {
         examples: ["/path/to/socket"]
