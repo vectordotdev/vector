@@ -19,17 +19,21 @@ if ! [ -x "$(command -v cue)" ]; then
   exit 1
 fi
 
-echo "Validating ${DOCS_PATH}/**/*.cue formatting."
+if [[ -z "${CI:-}" ]]; then
+  echo "Skipping local formatting - reserved for CI"
+else
+  echo "Validating ${DOCS_PATH}/**/*.cue formatting."
 
-cue fmt ${DOCS_PATH}/**/*.cue
-status="$(git status --porcelain)"
+  cue fmt ${DOCS_PATH}/**/*.cue
+  status="$(git status --porcelain)"
 
-[[ -z "$status" ]] || {
+  [[ -z "$status" ]] || {
 	echo >&2 "Incorrectly formatted Cue files"
 	echo >&2 "$status"
 	git diff
 	exit 1
-}
+  }
+fi
 
 echo "Validating ${DOCS_PATH}/**/*.cue..."
 
