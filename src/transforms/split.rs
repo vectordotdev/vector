@@ -29,10 +29,11 @@ inventory::submit! {
 impl TransformConfig for SplitConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let field = Atom::from(
-            self.field.as_ref()
+            self.field
+                .as_ref()
                 .map(|v| v.to_string())
-                .unwrap_or_else(|| crate::config::log_schema().message_key().to_string())
-            );
+                .unwrap_or_else(|| crate::config::log_schema().message_key().to_string()),
+        );
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)
             .map_err(|err| format!("{}", err))?;
