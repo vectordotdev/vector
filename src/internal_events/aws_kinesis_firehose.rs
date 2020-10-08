@@ -34,7 +34,7 @@ pub struct AwsKinesisFirehoseRequestError<'a> {
 impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
     fn emit_logs(&self) {
         error!(
-            message = "error handling request",
+            message = "Error occurred while handling request.",
             error = ?self.error,
             rate_limit_secs = 10
         );
