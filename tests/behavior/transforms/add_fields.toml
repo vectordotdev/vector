@@ -1,3 +1,18 @@
+[transforms.add_timestamp]
+  inputs = []
+  type = "add_fields"
+  fields."@timestamp" = 123
+[[tests]]
+  name = "add_timestamp"
+  [tests.input]
+    insert_at = "add_timestamp"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "add_timestamp"
+    [[tests.outputs.conditions]]
+      "@timestamp.equals" = 123
+
 [transforms.add_fields_nested]
   inputs = []
   type = "add_fields"
