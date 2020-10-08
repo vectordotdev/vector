@@ -29,7 +29,7 @@ const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = r#"
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: vector-config
+  name: vector-agent-config
 data:
   vector.toml: |
     [sinks.stdout]
