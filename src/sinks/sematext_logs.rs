@@ -31,18 +31,18 @@ pub struct SematextLogsConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<SematextLogsConfig>("sematext")
+    SinkDescription::new_without_default::<SematextLogsConfig>("sematext_logs")
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Region {
-    Na,
+    Us,
     Eu,
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "sematext")]
+#[typetag::serde(name = "sematext_logs")]
 impl SinkConfig for SematextLogsConfig {
     async fn build(
         &self,
@@ -50,11 +50,9 @@ impl SinkConfig for SematextLogsConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let endpoint = match (&self.endpoint, &self.region) {
             (Some(host), None) => host.clone(),
-            (None, Some(Region::Na)) => "https://logsene-receiver.sematext.com".to_owned(),
+            (None, Some(Region::Us)) => "https://logsene-receiver.sematext.com".to_owned(),
             (None, Some(Region::Eu)) => "https://logsene-receiver.eu.sematext.com".to_owned(),
-            (None, None) => {
-                return Err("Either `region` or `host` must be set.".into());
-            }
+            (None, None) => "https://logsene-receiver.sematext.com".to_owned(),
             (Some(_), Some(_)) => {
                 return Err("Only one of `region` and `host` can be set.".into());
             }
@@ -83,7 +81,7 @@ impl SinkConfig for SematextLogsConfig {
     }
 
     fn sink_type(&self) -> &'static str {
-        "sematext"
+        "sematext_logs"
     }
 }
 
@@ -116,7 +114,7 @@ mod tests {
     async fn smoke() {
         let (mut config, cx) = load_sink::<SematextLogsConfig>(
             r#"
-            region = "na"
+            region = "us"
             token = "mylogtoken"
         "#,
         )
