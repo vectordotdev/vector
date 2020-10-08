@@ -777,7 +777,7 @@ mod integration_tests {
         event::metric::{Metric, MetricKind, MetricValue},
         sinks::{
             influxdb::{
-                metrics::{InfluxDBConfig, InfluxDBSvc},
+                metrics::{default_summary_quantiles, InfluxDBConfig, InfluxDBSvc},
                 test_util::{onboarding_v2, BUCKET, ORG, TOKEN},
                 InfluxDB2Settings,
             },
@@ -823,6 +823,7 @@ mod integration_tests {
                 bucket: BUCKET.to_string(),
                 token: TOKEN.to_string(),
             }),
+            quantiles: default_summary_quantiles(),
             batch: Default::default(),
             request: Default::default(),
         };
