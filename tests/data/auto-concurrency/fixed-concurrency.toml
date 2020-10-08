@@ -9,12 +9,12 @@ in_flight_limit = 10
 [stats.in_flight]
 max = [10, 10]
 mode = [10, 10]
-mean = [8.5, 10.0]
+mean = [8.0, 10.0]
 
 [controller.in_flight]
 max = [10, 10]
 mode = [10, 10]
-mean = [8.5, 10.0]
+mean = [8.0, 10.0]
 
 [controller.concurrency_limit]
 min = [10, 10]
