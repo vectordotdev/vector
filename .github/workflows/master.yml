@@ -39,7 +39,6 @@ jobs:
           - aarch64-unknown-linux-musl
     # We run cross checks when dependencies change to ensure they still build.
     # This helps us avoid adopting dependencies that aren't compatible with other architectures.
-    if: ${{ needs.changes.outputs.dependencies == 'true' }}
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
