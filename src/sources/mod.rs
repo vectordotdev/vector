@@ -9,6 +9,8 @@ pub mod docker;
 pub mod file;
 #[cfg(feature = "sources-generator")]
 pub mod generator;
+#[cfg(feature = "sources-host_metrics")]
+mod host_metrics;
 #[cfg(feature = "sources-http")]
 pub mod http;
 #[cfg(feature = "sources-internal_metrics")]
