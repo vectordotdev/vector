@@ -1,4 +1,7 @@
-use crate::{api_client::query, config};
+use crate::{
+    api_client::{make_subscription_client, query},
+    config,
+};
 use graphql_client::GraphQLQuery;
 use prettytable::{format, Table};
 use reqwest;
@@ -31,6 +34,14 @@ struct HealthQuery;
     response_derives = "Debug"
 )]
 struct TopologyQuery;
+
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "graphql/schema.json",
+    query_path = "graphql/subscriptions/uptime_metrics.graphql",
+    response_derives = "Debug"
+)]
+struct UptimeMetricsSubscription;
 
 fn topology_type(topology_on: topology_query::TopologyQueryTopologyOn) -> &'static str {
     match topology_on {
