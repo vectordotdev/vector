@@ -113,25 +113,23 @@ pub mod service_control {
 
     pub fn control(service_def: &ServiceDefinition, action: ControlAction) -> crate::Result<()> {
         match action {
-            ControlAction::Start => start_service(&service_def).map_err(|e| Error::from(e).into()),
-            ControlAction::Stop => stop_service(&service_def).map_err(|e| Error::from(e).into()),
-            ControlAction::Restart => restart_service(&service_def).map_err(Into::into),
-            ControlAction::Install => {
-                install_service(&service_def).map_err(|e| Error::from(e).into())
-            }
-            ControlAction::Uninstall => uninstall_service(&service_def).map_err(Into::into),
+            ControlAction::Start => start_service(&service_def),
+            ControlAction::Stop => stop_service(&service_def),
+            ControlAction::Restart => restart_service(&service_def),
+            ControlAction::Install => install_service(&service_def),
+            ControlAction::Uninstall => uninstall_service(&service_def),
         }
     }
 
-    fn start_service(service_def: &ServiceDefinition) -> Result<()> {
+    fn start_service(service_def: &ServiceDefinition) -> crate::Result<()> {
         let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::START;
         let service = open_service(&service_def, service_access)?;
-        let service_status = service.query_status()?;
+        let service_status = service.query_status().map_err(Error::from)?;
 
         if service_status.current_state != ServiceState::StartPending
             || service_status.current_state != ServiceState::Running
         {
-            service.start(&[] as &[OsString])?;
+            service.start(&[] as &[OsString]).map_err(Error::from)?;
             emit!(WindowsServiceStart {
                 name: &*service_def.name.to_string_lossy(),
                 already_started: false,
@@ -146,15 +144,15 @@ pub mod service_control {
         Ok(())
     }
 
-    fn stop_service(service_def: &ServiceDefinition) -> Result<()> {
+    fn stop_service(service_def: &ServiceDefinition) -> crate::Result<()> {
         let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::STOP;
-        let service = open_service(&service_def, service_access)?;
-        let service_status = service.query_status()?;
+        let service = open_service(&service_def, service_access).map_err(Error::from)?;
+        let service_status = service.query_status().map_err(Error::from)?;
 
         if service_status.current_state != ServiceState::StopPending
             || service_status.current_state != ServiceState::Stopped
         {
-            service.stop()?;
+            service.stop().map_err(Error::from)?;
             emit!(WindowsServiceStop {
                 name: &*service_def.name.to_string_lossy(),
                 already_stopped: false,
@@ -172,13 +170,13 @@ pub mod service_control {
     fn restart_service(service_def: &ServiceDefinition) -> crate::Result<()> {
         let service_access =
             ServiceAccess::QUERY_STATUS | ServiceAccess::START | ServiceAccess::STOP;
-        let service = open_service(&service_def, service_access)?;
-        let service_status = service.query_status()?;
+        let service = open_service(&service_def, service_access).map_err(Error::from)?;
+        let service_status = service.query_status().map_err(Error::from)?;
 
         if service_status.current_state == ServiceState::StartPending
             || service_status.current_state == ServiceState::Running
         {
-            service.stop()?;
+            service.stop().map_err(Error::from)?;
         }
 
         let timeout = Duration::from_secs(10);
@@ -198,14 +196,14 @@ pub mod service_control {
             .into());
         }
 
-        service.start(&[] as &[OsString])?;
+        service.start(&[] as &[OsString]).map_err(Error::from)?;
         emit!(WindowsServiceRestart {
             name: &*service_def.name.to_string_lossy()
         });
         Ok(())
     }
 
-    fn install_service(service_def: &ServiceDefinition) -> Result<()> {
+    fn install_service(service_def: &ServiceDefinition) -> crate::Result<()> {
         let manager_access = ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE;
         let service_manager = ServiceManager::local_computer(None::<&str>, manager_access)?;
 
@@ -222,7 +220,9 @@ pub mod service_control {
             account_password: None,
         };
 
-        service_manager.create_service(&service_info, ServiceAccess::empty())?;
+        service_manager
+            .create_service(&service_info, ServiceAccess::empty())
+            .map_err(Error::from)?;
 
         emit!(WindowsServiceInstall {
             name: &*service_def.name.to_string_lossy(),
@@ -239,11 +239,11 @@ pub mod service_control {
     fn uninstall_service(service_def: &ServiceDefinition) -> crate::Result<()> {
         let service_access =
             ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE;
-        let service = open_service(&service_def, service_access)?;
+        let service = open_service(&service_def, service_access).map_err(Error::from)?;
 
-        let service_status = service.query_status()?;
+        let service_status = service.query_status().map_err(Error::from)?;
         if service_status.current_state != ServiceState::Stopped {
-            service.stop()?;
+            service.stop().map_err(Error::from)?;
             emit!(WindowsServiceStop {
                 name: &*service_def.name.to_string_lossy(),
                 already_stopped: false,
@@ -267,7 +267,7 @@ pub mod service_control {
             .into());
         }
 
-        service.delete()?;
+        service.delete().map_err(Error::from)?;
 
         emit!(WindowsServiceUninstall {
             name: &*service_def.name.to_string_lossy(),
