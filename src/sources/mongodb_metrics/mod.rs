@@ -158,7 +158,7 @@ impl MongoDBMetrics {
             .await
             .map_err(CollectError::Mongo)?;
 
-        // asserts
+        // asserts_total
         let doc = status.get_document("asserts").map_err(CollectError::Bson)?;
         macro_rules! add_assert_metric {
             ($name:expr) => {
@@ -208,7 +208,7 @@ impl MongoDBMetrics {
         add_connection_metric!("available");
         add_connection_metric!("current");
 
-        // extra_info
+        // extra_info_*
         let doc = status
             .get_document("extra_info")
             .map_err(CollectError::Bson)?;
@@ -235,7 +235,7 @@ impl MongoDBMetrics {
             },
         });
 
-        // instance
+        // instance_*
         metrics.push(Metric {
             name: self.encode_namespace("instance_local_time"),
             timestamp: Some(Utc::now()),
