@@ -4,7 +4,7 @@ extern crate matches;
 
 mod support;
 
-#[cfg(feature = "api")]
+#[cfg(all(feature = "api", feature = "api_client"))]
 mod tests {
     use crate::support::{sink, source};
     use chrono::Utc;
@@ -17,7 +17,8 @@ mod tests {
     use tokio::{select, sync::oneshot};
     use vector::{
         self,
-        api::{self, client::subscription::SubscriptionClient, Server},
+        api::{self, Server},
+        api_client::{make_subscription_client, SubscriptionClient},
         config::Config,
         internal_events::{emit, GeneratorEventProcessed, Heartbeat},
         test_util::{next_addr, retry_until},
@@ -145,7 +146,7 @@ mod tests {
     // the specified timeout
     async fn new_subscription_client(bind: std::net::SocketAddr) -> SubscriptionClient {
         retry_until(
-            || api::make_subscription_client(bind),
+            || make_subscription_client(bind),
             Duration::from_millis(50),
             Duration::from_secs(10),
         )
