@@ -106,7 +106,7 @@ jobs:
         with:
           name: "vector-debug-${{ matrix.target }}"
           path: "./target/${{ matrix.target }}/debug/vector"
-            
+
   # Remove this once https://github.com/timberio/vector/issues/3771 is closed.
   # Then, modify the `cross-linux` job to run `test` instead of `build`.
   test-linux:
