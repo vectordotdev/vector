@@ -22,6 +22,8 @@ set -euo pipefail
 #   $ scripts/deploy-kubernetes-test.sh down vector-test-qwerty vector
 #
 
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
 # Command to perform.
 COMMAND="${1:?"Specify the command (up/down) as the first argument"}"
 

@@ -1,7 +1,3 @@
-//! This test is optimized for very quick rebuilds as it doesn't use anything
-//! from the `vector` crate, and thus doesn't waste time in a tremendously long
-//! link step.
-
 use futures::{SinkExt, StreamExt};
 use k8s_openapi::{
     api::core::v1::{Container, Pod, PodSpec},

@@ -1,0 +1,21 @@
+[package]
+name = "k8s-e2e-tests"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+description = "End-to-end tests of Vector in the Kubernetes environment"
+
+[dev-dependencies]
+futures = "0.3"
+k8s-openapi = { version = "0.9", default-features = false, features = ["v1_15"] }
+k8s-test-framework = { version = "0.1", path = "../k8s-test-framework" }
+serde_json = "1"
+tokio = { version = "0.2", features = ["macros", "rt-threaded", "time"] }
+
+[features]
+all = ["agent"]
+agent = []
+
+[[test]]
+name = "vector-agent"
+required-features = ["agent"]
