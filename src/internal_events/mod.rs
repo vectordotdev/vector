@@ -30,6 +30,8 @@ mod generator;
 #[cfg(feature = "transforms-grok_parser")]
 mod grok_parser;
 mod heartbeat;
+#[cfg(feature = "sources-host_metrics")]
+mod host_metrics;
 mod http;
 #[cfg(all(unix, feature = "sources-journald"))]
 mod journald;
@@ -121,6 +123,8 @@ pub use self::generator::*;
 #[cfg(feature = "transforms-grok_parser")]
 pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;
+#[cfg(feature = "sources-host_metrics")]
+pub(crate) use self::host_metrics::*;
 pub use self::http::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
