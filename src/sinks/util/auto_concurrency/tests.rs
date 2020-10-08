@@ -72,7 +72,7 @@ struct LimitParams {
 impl LimitParams {
     fn action_at_level(&self, level: usize) -> Option<Action> {
         self.limit
-            .and_then(|limit| (level >= limit).and_some(self.action))
+            .and_then(|limit| (level > limit).and_some(self.action))
     }
 }
 
