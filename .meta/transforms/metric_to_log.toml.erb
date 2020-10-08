@@ -1,0 +1,65 @@
+[transforms.metric_to_log]
+title = "Metric to Log"
+allow_you_to_description = "convert metrics into logs"
+beta = true
+common = true
+function_category = "convert"
+input_types = ["metric"]
+output_types = ["log"]
+requirements = {}
+
+<%= render("_partials/fields/_component_options.toml", type: "transform", name: "metric_to_log") %>
+
+[transforms.metric_to_log.options.host_tag]
+type = "[string]"
+common = true
+required = false
+examples = [["hostname"]]
+description = """\
+Tag key that identifies the source host. Defaults to \
+[global `host_key` option][docs.reference.global-options#host_key].\
+"""
+
+[[transforms.metric_to_log.examples]]
+label = "Generic"
+body = """\
+Given the following metric event input:
+
+```json
+{
+    "name": "histogram",
+    "timestamp": "2020-08-01T21:15:47+00:00",
+    "tags": {
+        "host": "my.host.com",
+        "code": "200"
+    },
+    "kind": "absolute",
+    "aggregated_histogram": {
+        "buckets": [1.0, 2.0],
+        "counts": [10, 20],
+        "count": 30,
+        "sum": 50.0
+    }
+}
+```
+
+The output is the following log event:
+
+```json
+{
+    "name": "histogram",
+    "timestamp": "2020-08-01T21:15:47+00:00",
+    "host": "my.host.com",
+    "tags": {
+        "code": "200"
+    },
+    "kind": "absolute",
+    "aggregated_histogram": {
+        "buckets": [1.0, 2.0],
+        "counts": [10, 20],
+        "count": 30,
+        "sum": 50.0
+    }
+}
+```\
+"""
