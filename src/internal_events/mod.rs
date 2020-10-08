@@ -23,6 +23,8 @@ mod docker;
 mod elasticsearch;
 #[cfg(feature = "sources-generator")]
 mod generator;
+#[cfg(feature = "transforms-geoip")]
+mod geoip;
 #[cfg(feature = "transforms-grok_parser")]
 mod grok_parser;
 mod heartbeat;
@@ -40,8 +42,6 @@ mod kubernetes_logs;
 #[cfg(feature = "transforms-log_to_metric")]
 mod log_to_metric;
 mod logplex;
-#[cfg(feature = "transforms-geoip")]
-mod geoip;
 #[cfg(feature = "transforms-lua")]
 mod lua;
 mod process;
@@ -114,6 +114,8 @@ pub use self::elasticsearch::*;
 pub use self::file::*;
 #[cfg(feature = "sources-generator")]
 pub use self::generator::*;
+#[cfg(feature = "transforms-geoip")]
+pub(crate) use self::geoip::*;
 #[cfg(feature = "transforms-grok_parser")]
 pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;
@@ -140,8 +142,6 @@ pub use self::prometheus::*;
 pub(crate) use self::reduce::*;
 #[cfg(feature = "transforms-regex_parser")]
 pub(crate) use self::regex_parser::*;
-#[cfg(feature = "transforms-geoip")]
-pub(crate) use self::geoip::*;
 pub use self::remap::*;
 #[cfg(feature = "transforms-remove_fields")]
 pub use self::remove_fields::*;
