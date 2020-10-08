@@ -17,6 +17,7 @@ use crate::{
         start_topology,
         stats::{HistogramStats, LevelTimeHistogram, WeightedSumStats},
     },
+    BoolAndSome,
 };
 use core::task::Context;
 use futures::{
@@ -29,7 +30,8 @@ use rand::{distributions::Exp1, prelude::*};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
+    fmt,
     fs::{read_dir, File},
     io::Read,
     path::PathBuf,
@@ -42,7 +44,7 @@ use tower::Service;
 #[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(rename_all = "lowercase")]
-enum Behavior {
+enum Action {
     #[derivative(Default)]
     // Above the given limit, additional requests will return with an
     // error.
@@ -50,6 +52,28 @@ enum Behavior {
     // Above the given limit, additional requests will be silently
     // dropped.
     Drop,
+}
+
+#[derive(Copy, Clone, Debug, Default, Deserialize, Serialize)]
+struct LimitParams {
+    // The scale is the amount a request's delay increases at higher
+    // levels of the variable.
+    #[serde(default)]
+    scale: f64,
+
+    // The limit is the level above which more requests will be denied.
+    limit: Option<usize>,
+
+    // The action specifies how over-limit requests will be denied.
+    #[serde(default)]
+    action: Action,
+}
+
+impl LimitParams {
+    fn action_at_level(&self, level: usize) -> Option<Action> {
+        self.limit
+            .and_then(|limit| (level >= limit).and_some(self.action))
+    }
 }
 
 #[derive(Copy, Clone, Debug, Default, Deserialize, Serialize)]
@@ -70,15 +94,11 @@ struct TestParams {
     #[serde(default)]
     jitter: f64,
 
-    // The concurrency scale is the rate at which requests' delay
-    // increases at higher concurrency levels.
     #[serde(default)]
-    concurrency_scale: f64,
-
-    concurrency_limit: Option<usize>,
+    concurrency: LimitParams,
 
     #[serde(default)]
-    concurrency_action: Behavior,
+    rate: LimitParams,
 
     #[serde(default = "default_in_flight_limit")]
     in_flight_limit: InFlightLimit,
@@ -185,27 +205,32 @@ impl Service<Vec<Event>> for TestSink {
     fn call(&mut self, _request: Vec<Event>) -> Self::Future {
         let now = Instant::now();
         let mut stats = self.stats.lock().expect("Poisoned stats lock");
-        stats.in_flight.adjust(1, now.into());
+        stats.add_request(now);
         let in_flight = stats.in_flight.level();
+        let rate = stats.requests.len();
 
-        match self.params.concurrency_limit {
-            Some(limit) if in_flight >= limit => match self.params.concurrency_action {
-                Behavior::Defer => {
-                    let delay =
-                        self.params.delay * (1.0 + thread_rng().sample(Exp1) * self.params.jitter);
-                    respond_after(Err(Error::Deferred), delay, Arc::clone(&self.stats))
-                }
-                Behavior::Drop => {
-                    stats.in_flight.adjust(-1, now.into());
-                    Box::pin(pending())
-                }
-            },
-            _ => {
+        let action = self
+            .params
+            .concurrency
+            .action_at_level(in_flight)
+            .or(self.params.rate.action_at_level(rate));
+        match action {
+            None => {
                 let delay = self.params.delay
                     * (1.0
-                        + (in_flight - 1) as f64 * self.params.concurrency_scale
+                        + (in_flight - 1) as f64 * self.params.concurrency.scale
+                        + rate as f64 * self.params.rate.scale
                         + thread_rng().sample(Exp1) * self.params.jitter);
                 respond_after(Ok(Response::Ok), delay, Arc::clone(&self.stats))
+            }
+            Some(Action::Defer) => {
+                let delay =
+                    self.params.delay * (1.0 + thread_rng().sample(Exp1) * self.params.jitter);
+                respond_after(Err(Error::Deferred), delay, Arc::clone(&self.stats))
+            }
+            Some(Action::Drop) => {
+                stats.in_flight.adjust(-1, now.into());
+                Box::pin(pending())
             }
         }
     }
@@ -248,9 +273,33 @@ impl RetryLogic for TestRetryLogic {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 struct Statistics {
     in_flight: LevelTimeHistogram,
+    requests: VecDeque<Instant>,
+}
+
+impl fmt::Debug for Statistics {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        fmt.debug_struct("Statistics")
+            .field("in_flight", &self.in_flight)
+            .field("requests", &self.requests.len())
+            .finish()
+    }
+}
+
+impl Statistics {
+    fn add_request(&mut self, now: Instant) {
+        let then = now - Duration::from_secs(1);
+        while let Some(&first) = self.requests.get(0) {
+            if first > then {
+                break;
+            }
+            self.requests.pop_front();
+        }
+        self.requests.push_back(now);
+        self.in_flight.adjust(1, now.into());
+    }
 }
 
 #[derive(Debug)]

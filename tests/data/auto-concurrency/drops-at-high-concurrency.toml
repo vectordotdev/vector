@@ -1,8 +1,8 @@
 [params]
 requests = 500
 delay = 0.100
-concurrency_limit = 5
-concurrency_action = "drop"
+concurrency.limit = 5
+concurrency.action = "drop"
 
 [stats.in_flight]
 max = [4, 5]
