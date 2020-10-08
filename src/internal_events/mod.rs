@@ -40,6 +40,8 @@ mod kubernetes_logs;
 #[cfg(feature = "transforms-log_to_metric")]
 mod log_to_metric;
 mod logplex;
+#[cfg(feature = "transforms-geoip")]
+mod geoip;
 #[cfg(feature = "transforms-lua")]
 mod lua;
 mod process;
@@ -138,6 +140,8 @@ pub use self::prometheus::*;
 pub(crate) use self::reduce::*;
 #[cfg(feature = "transforms-regex_parser")]
 pub(crate) use self::regex_parser::*;
+#[cfg(feature = "transforms-geoip")]
+pub(crate) use self::geoip::*;
 pub use self::remap::*;
 #[cfg(feature = "transforms-remove_fields")]
 pub use self::remove_fields::*;

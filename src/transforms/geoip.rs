@@ -2,6 +2,7 @@ use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
+    internal_events::{GeoipIpAddressParseError, GeoipFieldDoesNotExist, GeoipEventProcessed},
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -153,16 +154,10 @@ impl Transform for Geoip {
                     }
                 }
             } else {
-                debug!(
-                    message = "IP Address not parsed correctly.",
-                    ipaddr = %ipaddress,
-                );
+                emit!(GeoipIpAddressParseError { address: &ipaddress });
             }
         } else {
-            debug!(
-                message = "Field does not exist.",
-                field = self.source.as_ref(),
-            );
+            emit!(GeoipFieldDoesNotExist { field: &self.source });
         };
 
         let json_value = if self.has_isp_db() {
