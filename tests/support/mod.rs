@@ -4,17 +4,15 @@
 #![allow(clippy::type_complexity)]
 #![allow(dead_code)]
 
-use assert_cmd::prelude::*;
 use async_trait::async_trait;
 use futures::{future, FutureExt};
 use futures01::{sink::Sink, stream, sync::mpsc::Receiver, Async, Future, Stream};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
-    fs::OpenOptions,
+    fs::{create_dir, OpenOptions},
     io::Write,
     path::PathBuf,
-    process::Command,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc, Mutex,
@@ -91,7 +89,7 @@ pub fn overwrite_file(path: PathBuf, config: &str) {
 
 pub fn create_directory() -> PathBuf {
     let path = temp_dir();
-    Command::new("mkdir").arg(path.clone()).assert().success();
+    create_dir(path.clone()).unwrap();
     path
 }
 
