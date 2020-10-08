@@ -154,19 +154,15 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "1.17.21"
+version = "1.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c63cfe5fe3bdeb3d8b8ea18c69dbe3cb36ffca8b4a27a9162c68a5dd5699c5e"
+checksum = "cf4196945e3cedacf6e42e0e2efe97f5d9c9ca0bf973a674c58ca37720fa9091"
 dependencies = [
- "Inflector",
- "anyhow",
  "async-graphql-derive",
  "async-graphql-parser",
  "async-stream 0.2.1",
  "async-trait",
- "base64 0.12.3",
  "bson",
- "byteorder",
  "bytes 0.5.6",
  "chrono",
  "chrono-tz",
@@ -177,7 +173,6 @@ dependencies = [
  "indexmap",
  "itertools 0.9.0",
  "log",
- "mime",
  "multer",
  "once_cell",
  "parking_lot",
@@ -195,9 +190,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "1.17.21"
+version = "1.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3083836856a6cd63f4f91c7bf7e7b110c11979a49386bfdd5644c2c9a281707b"
+checksum = "1a5abf43fe40a9620458abd93178499aa336445abbd48fba8e25a1a8a7fd5415"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -210,23 +205,21 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-parser"
-version = "1.17.3"
+version = "1.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82bad60689666ebc06a856788c8394161fcd88522647cbc8593447c6441461f4"
+checksum = "ef77d1893f105bac47c649f2f28bf22d3b2f257a6f21ac90144c1d13e8532715"
 dependencies = [
- "arrayvec",
  "pest",
  "pest_derive",
  "serde",
  "serde_json",
- "thiserror",
 ]
 
 [[package]]
 name = "async-graphql-warp"
-version = "1.17.18"
+version = "1.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e70ad27d14123c4d4210e501fb3c2a56f315540965690b9cd0e182acd3213167"
+checksum = "19229af971dbee34b2956581505fdd1df85c81aef27f44c98560d6b527c4bddd"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -6144,7 +6137,6 @@ dependencies = [
  "flate2",
  "futures 0.1.29",
  "futures 0.3.5",
- "futures-util",
  "getset",
  "glob 0.3.0",
  "goauth",

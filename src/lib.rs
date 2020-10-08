@@ -35,6 +35,8 @@ pub mod wasm;
 pub mod internal_events;
 #[cfg(feature = "api")]
 pub mod api;
+#[cfg(feature = "api_client")]
+pub mod api_client;
 pub mod app;
 pub mod async_read;
 pub mod heartbeat;

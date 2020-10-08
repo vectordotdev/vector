@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
     boxed::Box,
-    net::SocketAddr,
     pin::Pin,
     sync::{Arc, RwLock, Weak},
 };
@@ -22,6 +21,7 @@ use tokio_tungstenite::{
     tungstenite::{self, Error, Message},
     WebSocketStream,
 };
+use url::Url;
 use uuid::Uuid;
 use weak_table::WeakValueHashMap;
 
@@ -217,9 +217,8 @@ impl SubscriptionClient {
 /// Connect to a GraphQL subscription endpoint and return an active client. Can be used for
 /// multiple subscriptions
 pub async fn make_subscription_client(
-    addr: SocketAddr,
+    url: &Url,
 ) -> Result<SubscriptionClient, tungstenite::error::Error> {
-    let url = &*format!("ws://{}:{}/graphql", addr.ip(), addr.port());
     let (tx, _) = connect_async(url).await?;
     let client = SubscriptionClient::new(tx);
 
