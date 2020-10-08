@@ -168,7 +168,7 @@ impl Transform for Geoip {
         if let Ok(json_value) = json_value {
             event.as_mut_log().insert(target_field, json_value);
         }
-
+        emit!(GeoipEventProcessed);
         Some(event)
     }
 }
