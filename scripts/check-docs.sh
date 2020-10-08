@@ -22,12 +22,12 @@ fi
 echo "Validating ${DOCS_PATH}/**/*.cue formatting."
 
 cue fmt ${DOCS_PATH}/**/*.cue
-status="$(git status --porcelain)"
+status="$(git status --porcelain docs)"
 
 [[ -z "$status" ]] || {
 	echo >&2 "Incorrectly formatted Cue files"
 	echo >&2 "$status"
-	git diff
+	git diff docs
 	exit 1
 }
 
