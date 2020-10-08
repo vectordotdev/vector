@@ -142,8 +142,15 @@ fn render_tags(
         Some(tags) => {
             let mut map = BTreeMap::new();
             for (name, value) in tags {
-                let tag = render_template(value, event)?;
-                map.insert(name.to_string(), tag);
+                match render_template(value, event) {
+                    Ok(tag) => {
+                        map.insert(name.to_string(), tag);
+                    }
+                    Err(TransformError::TemplateRenderError { missing_keys }) => {
+                        emit!(LogToMetricTemplateRenderError { missing_keys });
+                    }
+                    Err(other) => return Err(other),
+                }
             }
             if !map.is_empty() {
                 Some(map)
