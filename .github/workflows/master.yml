@@ -1,7 +1,8 @@
-name: Pull Request Checks
+name: Master Test Suite
 
 on:
-  pull_request: {}
+  push:
+    branches: master
 
 env:
   AUTOINSTALL: true
@@ -70,28 +71,6 @@ jobs:
             docker:
               - 'distribution/docker/**'
 
-  # Remove this once https://github.com/timberio/vector/issues/3771 is closed.
-  # Then, modify the `cross-linux` job to run `test` instead of `build`.
-  test-linux:
-    name: Unit - x86_64-unknown-linux-gnu
-    runs-on: ubuntu-20.04
-    needs: changes
-    if: ${{ needs.changes.outputs.source == 'true' }}
-    steps:
-      - uses: actions/checkout@v2
-      - run: make ci-sweep
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test
-
   cross-linux:
     name: Cross - ${{ matrix.target }}
     runs-on: ubuntu-20.04
@@ -127,6 +106,28 @@ jobs:
         with:
           name: "vector-debug-${{ matrix.target }}"
           path: "./target/${{ matrix.target }}/debug/vector"
+
+  # Remove this once https://github.com/timberio/vector/issues/3771 is closed.
+  # Then, modify the `cross-linux` job to run `test` instead of `build`.
+  test-linux:
+    name: Unit - x86_64-unknown-linux-gnu
+    runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
+    steps:
+      - uses: actions/checkout@v2
+      - run: make ci-sweep
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: make test
 
   test-mac:
     name: Unit - Mac
@@ -521,70 +522,12 @@ jobs:
   check-component-features:
     name: Component Features - Linux
     runs-on: ubuntu-20.04
+    container: timberio/ci_image
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
-      - run: make ci-sweep
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: echo "::add-path::/home/runner/.local/bin"
       - run: make check-component-features
-
-  checks:
-    name: Checks
-    runs-on: ubuntu-20.04
-    container: timberio/ci_image
-    needs: changes
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          # check-version needs tags
-          fetch-depth: 0 # fetch everything
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
-      - name: Make slim-builds
-        run: make slim-builds
-      - name: Check markdown
-        if: needs.changes.outputs.markdown == 'true'
-        run: make check-markdown
-      - name: Check Cue docs
-        if: needs.changes.outputs.docs == 'true'
-        run: make check-docs
-      - name: Check code format
-        run: make check-fmt
-      - name: Check clippy
-        if: needs.changes.outputs.source == 'true'
-        run: make check-clippy
-      - name: Check version
-        run: make check-version
-      - name: Check scripts
-        run: make check-scripts
-      - name: Check helm
-        if: needs.changes.outputs.helm == 'true'
-        run: make check-helm
-      - name: Check that generated Kubernetes YAML doesn't diverge from Helm
-        if: needs.changes.outputs.helm == 'true'
-        run: make check-kubernetes-yaml
-      - name: Check internal events
-        if: needs.changes.outputs.internal_events == 'true'
-        run: make check-internal-events
-      - name: Check cargo deny
-        if: needs.changes.outputs.dependencies == 'true'
-        uses: EmbarkStudios/cargo-deny-action@v1
-        with:
-          command: check advisories
