@@ -54,7 +54,7 @@ impl Function for SplitFn {
                     None => to_value(Box::new(string.split(&pattern))),
                 })
             }
-            Value::Map(pattern) => {
+            pattern@Value::Map(_) => {
                 let mut regex = DynamicRegex::try_from(pattern)?;
                 let regex = regex.compile()?;
                 Ok(match &limit {
