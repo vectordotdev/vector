@@ -15,7 +15,7 @@ use crate::{
     sources::generator::GeneratorConfig,
     test_util::{
         start_topology,
-        stats::{HistogramStats, LevelTimeHistogram, WeightedSumStats},
+        stats::{HistogramStats, LevelTimeHistogram, TimeHistogram, WeightedSumStats},
     },
     BoolAndSome,
 };
@@ -205,7 +205,7 @@ impl Service<Vec<Event>> for TestSink {
     fn call(&mut self, _request: Vec<Event>) -> Self::Future {
         let now = Instant::now();
         let mut stats = self.stats.lock().expect("Poisoned stats lock");
-        stats.add_request(now);
+        stats.start_request(now);
         let in_flight = stats.in_flight.level();
         let rate = stats.requests.len();
 
@@ -229,7 +229,7 @@ impl Service<Vec<Event>> for TestSink {
                 respond_after(Err(Error::Deferred), delay, Arc::clone(&self.stats))
             }
             Some(Action::Drop) => {
-                stats.in_flight.adjust(-1, now.into());
+                stats.end_request(now);
                 Box::pin(pending())
             }
         }
@@ -245,7 +245,7 @@ fn respond_after(
     Box::pin(async move {
         delay_until(then).await;
         let mut stats = stats.lock().expect("Poisoned stats lock");
-        stats.in_flight.adjust(-1, Instant::now().into());
+        stats.end_request(Instant::now());
         response
     })
 }
@@ -276,6 +276,7 @@ impl RetryLogic for TestRetryLogic {
 #[derive(Default)]
 struct Statistics {
     in_flight: LevelTimeHistogram,
+    rate: TimeHistogram,
     requests: VecDeque<Instant>,
 }
 
@@ -283,13 +284,27 @@ impl fmt::Debug for Statistics {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         fmt.debug_struct("Statistics")
             .field("in_flight", &self.in_flight)
+            .field("rate", &self.rate.stats())
             .field("requests", &self.requests.len())
             .finish()
     }
 }
 
 impl Statistics {
-    fn add_request(&mut self, now: Instant) {
+    fn start_request(&mut self, now: Instant) {
+        self.drop_old_requests(now);
+        self.requests.push_back(now);
+        self.rate.add(self.requests.len(), now.into());
+        self.in_flight.adjust(1, now.into());
+    }
+
+    fn end_request(&mut self, now: Instant) {
+        self.drop_old_requests(now);
+        self.rate.add(self.requests.len(), now.into());
+        self.in_flight.adjust(-1, now.into());
+    }
+
+    fn drop_old_requests(&mut self, now: Instant) {
         let then = now - Duration::from_secs(1);
         while let Some(&first) = self.requests.get(0) {
             if first > then {
@@ -297,8 +312,6 @@ impl Statistics {
             }
             self.requests.pop_front();
         }
-        self.requests.push_back(now);
-        self.in_flight.adjust(1, now.into());
     }
 }
 
@@ -497,6 +510,7 @@ struct ControllerResults {
 #[derive(Debug, Deserialize)]
 struct StatsResults {
     in_flight: Option<ResultTest>,
+    rate: Option<ResultTest>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -516,6 +530,11 @@ async fn run_compare(file_path: PathBuf, input: TestInput) {
     if let Some(test) = input.stats.in_flight {
         let in_flight = results.stats.in_flight.stats().unwrap();
         failures.extend(test.compare_histogram(in_flight, "stats in_flight"));
+    }
+
+    if let Some(test) = input.stats.rate {
+        let rate = results.stats.rate.stats().unwrap();
+        failures.extend(test.compare_histogram(rate, "stats rate"));
     }
 
     if let Some(test) = input.controller.in_flight {

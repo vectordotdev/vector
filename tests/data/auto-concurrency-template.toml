@@ -17,6 +17,11 @@ max = [,]
 mean = [,]
 mode = [,]
 
+[stats.rate]
+max = [,]
+mean = [,]
+mode = [,]
+
 [controller.concurrency_limit]
 max = [,]
 mean = [,]

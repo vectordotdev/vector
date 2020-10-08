@@ -9,6 +9,10 @@ max = [4, 5]
 mean = [3.0, 4.0]
 mode = [3, 5]
 
+[stats.rate]
+max = [55, 56]
+mean = [30, 31]
+
 # Since our internal framework doesn't track the dropped requests, the
 # values won't be representative of the actual number of requests in
 # flight.
