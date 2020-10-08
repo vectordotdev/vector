@@ -203,7 +203,7 @@ mod test {
             },
         });
         assert_eq!(
-            r#"{"name":"users","timestamp":null,"tags":null,"kind":"incremental","set":{"values":["bob"]}}"#,
+            r#"{"name":"users","kind":"incremental","set":{"values":["bob"]}}"#,
             encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
         );
     }
@@ -222,7 +222,7 @@ mod test {
             },
         });
         assert_eq!(
-            r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","distribution":{"values":[10.0],"sample_rates":[1],"statistic":"histogram"}}"#,
+            r#"{"name":"glork","kind":"incremental","distribution":{"values":[10.0],"sample_rates":[1],"statistic":"histogram"}}"#,
             encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
         );
     }
