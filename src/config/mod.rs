@@ -10,7 +10,6 @@ use snafu::{ResultExt, Snafu};
 use std::fs::DirBuilder;
 use std::path::PathBuf;
 
-#[cfg(feature = "api")]
 pub mod api;
 mod builder;
 mod compiler;

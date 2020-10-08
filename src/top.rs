@@ -1,9 +1,9 @@
-use crate::{api, config};
+use crate::{api_client::query, config};
 use graphql_client::GraphQLQuery;
 use prettytable::{format, Table};
 use reqwest;
-use std::net::SocketAddr;
 use structopt::StructOpt;
+use url::Url;
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -13,7 +13,7 @@ pub struct Opts {
     refresh_interval: i32,
 
     #[structopt(short, long)]
-    remote: Option<SocketAddr>,
+    remote: Option<Url>,
 }
 
 #[derive(GraphQLQuery)]
@@ -32,22 +32,6 @@ struct HealthQuery;
 )]
 struct TopologyQuery;
 
-async fn query<T: GraphQLQuery>(
-    addr: SocketAddr,
-    request_body: &graphql_client::QueryBody<T::Variables>,
-) -> Result<graphql_client::Response<T::ResponseData>, reqwest::Error> {
-    let url = format!("http://{}:{}/graphql", addr.ip(), addr.port());
-    let client = reqwest::Client::new();
-
-    client
-        .post(&url)
-        .json(&request_body)
-        .send()
-        .await?
-        .json()
-        .await
-}
-
 fn topology_type(topology_on: topology_query::TopologyQueryTopologyOn) -> &'static str {
     match topology_on {
         topology_query::TopologyQueryTopologyOn::Source => "source",
@@ -56,22 +40,25 @@ fn topology_type(topology_on: topology_query::TopologyQueryTopologyOn) -> &'stat
     }
 }
 
-async fn healthcheck(addr: SocketAddr) -> Result<bool, ()> {
+async fn healthcheck(url: &Url) -> Result<bool, ()> {
     let request_body = HealthQuery::build_query(health_query::Variables);
-    let res = query::<HealthQuery>(addr, &request_body).await.m;
+    let res = query::<HealthQuery>(url, &request_body)
+        .await
+        .map_err(|_| ())?;
 
-    res.
+    // Health (currently) always returns `true`, so there should be no instance where
+    // a server is both accessible and also returns `false`. However, this may change in the
+    // future, where the health is a more inclusive indicator of overall topological health,
+    // so I think this is worth leaving in.
+    match res.data.ok_or(())?.health {
+        true => Ok(true),
+        false => Err(()),
+    }
 }
 
-async fn get_topology(addr: SocketAddr) -> exitcode::ExitCode {
+async fn print_topology(url: &Url) -> Result<(), reqwest::Error> {
     let request_body = TopologyQuery::build_query(topology_query::Variables);
-    let res = match query::<TopologyQuery>(addr, &request_body).await {
-        Ok(res) => res,
-        _ => {
-            eprintln!("Vector GraphQL query failed");
-            return exitcode::UNAVAILABLE;
-        }
-    };
+    let res = query::<TopologyQuery>(url, &request_body).await?;
 
     let mut table = Table::new();
     table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
@@ -83,29 +70,29 @@ async fn get_topology(addr: SocketAddr) -> exitcode::ExitCode {
 
     table.printstd();
 
-    exitcode::OK
+    Ok(())
 }
 
 pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    let addr = opts.remote.or_else(|| config::api::default_bind());
+    let url = opts.remote.clone().unwrap_or_else(|| {
+        let addr = config::api::default_bind().unwrap();
+        Url::parse(&*format!("http://{}/graphql", addr)).unwrap()
+    });
 
-    match config::load_from_paths(&opts.paths) {
-        Ok(config) => match (opts.remote.is_some(), config.api.enabled) {
-            // No remote; API not enabled locally
-            (false, false) => {
-                println!("To view topology, api.enabled must be set to `true`, or an explicit --remote provided.");
-                exitcode::CONFIG
-            }
-
-            // No remote; API is enabled
-            (false, true) => {
-                let server = api::Server::start(&config);
-                get_topology(server.addr()).await
-            }
-
-            // Remote
-            (true, _) => get_topology(opts.remote.unwrap()).await,
-        },
-        _ => exitcode::CONFIG,
+    // Check that the GraphQL server is reachable
+    match healthcheck(&url).await {
+        Ok(t) if t => (),
+        _ => {
+            eprintln!("Vector API server not reachable");
+            return exitcode::UNAVAILABLE;
+        }
     }
+
+    // Print topology
+    if print_topology(&url).await.is_err() {
+        eprintln!("Couldn't retrieve topology");
+        return exitcode::UNAVAILABLE;
+    }
+
+    exitcode::OK
 }

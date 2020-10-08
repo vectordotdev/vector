@@ -63,7 +63,7 @@ pub mod stream;
 pub mod template;
 pub mod test_util;
 pub mod tls;
-#[cfg(feature = "api")]
+#[cfg(feature = "api_client")]
 mod top;
 pub mod topology;
 pub mod trace;
