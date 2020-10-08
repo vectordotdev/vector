@@ -15,7 +15,7 @@ env:
   VERBOSE: true
   CI: true
   PROFILE: debug
-    
+
 jobs:
   changes:
       runs-on: ubuntu-latest
