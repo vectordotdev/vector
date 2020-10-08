@@ -6,8 +6,8 @@ RUN yum install -y epel-release && \
     yum clean all && \
     yum makecache
 RUN yum install -y \
-        make openssl-devel cmake3 git \
-        gcc gcc-c++ libstdc++-static sudo && \
+        make openssl-devel cmake3 git rpm-build curl git2u-all \
+        gcc gcc-c++ libstdc++-static sudo rename && \
     yum clean all
 RUN ln -s /usr/bin/cmake3 /usr/bin/cmake
 
@@ -22,12 +22,9 @@ RUN cd /tmp && \
   cmark-gfm --version
 
 RUN echo "%sudo         ALL = (ALL) NOPASSWD: ALL" >> /etc/sudoers.d/sudo
-RUN useradd -m -G wheel \
-    -u $(echo "${USER}" | cut -d: -f1) \
-    # -g $(echo "${USER}" | cut -d: -f2) \
-    runner
+RUN useradd -m -G wheel runner
 
-USER ${USER}
+USER runner
 RUN curl https://sh.rustup.rs -sSf | sh -s -- --no-modify-path --default-toolchain none -y
 ENV PATH=/home/runner/.cargo/bin:$PATH
 RUN echo "export PATH=/home/runner/.cargo/bin:$PATH" >> ~/bashrc

@@ -845,7 +845,7 @@ package-deb: ## Build the deb package
 
 .PHONY: package-deb-x86_64
 package-deb-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 deb package
-	$(RUN) package-deb-x86_64
+	@scripts/package-deb.sh
 
 .PHONY: package-deb-aarch64
 package-deb-aarch64: package-aarch64-unknown-linux-musl  ## Build the aarch64 deb package
