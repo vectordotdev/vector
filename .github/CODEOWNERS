@@ -28,6 +28,7 @@
 /docs/reference/components/sources/apache_metrics/ @jszwedko
 /docs/reference/components/sources/docker.cue @fanatid
 /docs/reference/components/sources/generator.cue @bruceg
+/docs/reference/components/sources/host_metrics.cue @bruceg
 /docs/reference/components/sources/journald.cue @bruceg
 /docs/reference/components/sources/stdin.cue @bruceg
 /docs/reference/components/sources/syslog.cue @lukesteensen
@@ -127,6 +128,7 @@
 /src/sources/apache_metrics/ @jszwedko
 /src/sources/docker.rs @fanatid
 /src/sources/generator.rs @bruceg
+/src/sources/host_metrics.rs @bruceg
 /src/sources/journald.rs @bruceg
 /src/sources/stdin.rs @bruceg
 /src/sources/syslog.rs @lukesteensen

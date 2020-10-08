@@ -7,7 +7,7 @@ components: transforms: [Name=string]: {
 	examples: {
 		log: [
 			...{
-				input: #Fields | [#Fields, ...]
+				input: #LogEvent | [#LogEvent, ...]
 			},
 		]
 	}

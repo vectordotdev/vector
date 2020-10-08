@@ -14,12 +14,24 @@ shopt -s globstar
 
 DOCS_PATH="docs"
 
-echo "Validating ${DOCS_PATH}/**/*.cue..."
-
 if ! [ -x "$(command -v cue)" ]; then
   echo 'Error: cue is not installed.' >&2
   exit 1
 fi
+
+echo "Validating ${DOCS_PATH}/**/*.cue formatting."
+
+cue fmt ${DOCS_PATH}/**/*.cue
+status="$(git status --porcelain)"
+
+[[ -z "$status" ]] || {
+	echo >&2 "Incorrectly formatted Cue files"
+	echo >&2 "$status"
+	git diff
+	exit 1
+}
+
+echo "Validating ${DOCS_PATH}/**/*.cue..."
 
 errors=$(cue vet --concrete --all-errors ${DOCS_PATH}/*.cue ${DOCS_PATH}/**/*.cue)
 

@@ -34,6 +34,7 @@ components: sources: file: {
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {

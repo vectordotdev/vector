@@ -31,6 +31,7 @@ components: transforms: regex_parser: {
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {
