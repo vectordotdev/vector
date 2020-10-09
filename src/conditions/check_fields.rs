@@ -9,7 +9,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 use std::str::FromStr;
-use string_cache::DefaultAtom as Atom;
+
 
 #[derive(Deserialize, Serialize, Clone, Derivative)]
 #[serde(untagged)]
@@ -35,7 +35,7 @@ pub trait CheckFieldsPredicate: std::fmt::Debug + Send + Sync {
 
 #[derive(Debug, Clone)]
 struct EqualsPredicate {
-    target: Atom,
+    target: String,
     arg: CheckFieldsPredicateArg,
 }
 
@@ -77,7 +77,7 @@ impl CheckFieldsPredicate for EqualsPredicate {
             Event::Metric(m) => m
                 .tags
                 .as_ref()
-                .and_then(|t| t.get(self.target.as_ref()))
+                .and_then(|t| t.get(&self.target))
                 .map_or(false, |v| match &self.arg {
                     CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.as_bytes(),
                     _ => false,
@@ -90,7 +90,7 @@ impl CheckFieldsPredicate for EqualsPredicate {
 
 #[derive(Debug, Clone)]
 struct ContainsPredicate {
-    target: Atom,
+    target: String,
     arg: Vec<String>,
 }
 
@@ -129,7 +129,7 @@ impl CheckFieldsPredicate for ContainsPredicate {
 
 #[derive(Debug, Clone)]
 struct StartsWithPredicate {
-    target: Atom,
+    target: String,
     arg: Vec<String>,
 }
 
@@ -170,7 +170,7 @@ impl CheckFieldsPredicate for StartsWithPredicate {
 
 #[derive(Debug, Clone)]
 struct EndsWithPredicate {
-    target: Atom,
+    target: String,
     arg: Vec<String>,
 }
 
@@ -209,7 +209,7 @@ impl CheckFieldsPredicate for EndsWithPredicate {
 
 #[derive(Debug, Clone)]
 struct NotEqualsPredicate {
-    target: Atom,
+    target: String,
     arg: Vec<String>,
 }
 
@@ -244,7 +244,7 @@ impl CheckFieldsPredicate for NotEqualsPredicate {
             Event::Metric(m) => m
                 .tags
                 .as_ref()
-                .and_then(|t| t.get(self.target.as_ref()))
+                .and_then(|t| t.get(&self.target))
                 .map_or(false, |v| {
                     !self.arg.iter().any(|s| v.as_bytes() == s.as_bytes())
                 }),
@@ -256,7 +256,7 @@ impl CheckFieldsPredicate for NotEqualsPredicate {
 
 #[derive(Debug, Clone)]
 struct RegexPredicate {
-    target: Atom,
+    target: String,
     regex: Regex,
 }
 
@@ -286,7 +286,7 @@ impl CheckFieldsPredicate for RegexPredicate {
             Event::Metric(metric) => metric
                 .tags
                 .as_ref()
-                .and_then(|tags| tags.get(self.target.as_ref()))
+                .and_then(|tags| tags.get(&self.target))
                 .map_or(false, |field| self.regex.is_match(field)),
         }
     }
@@ -296,7 +296,7 @@ impl CheckFieldsPredicate for RegexPredicate {
 
 #[derive(Debug, Clone)]
 struct ExistsPredicate {
-    target: Atom,
+    target: String,
     arg: bool,
 }
 
@@ -322,7 +322,7 @@ impl CheckFieldsPredicate for ExistsPredicate {
             Event::Metric(m) => m
                 .tags
                 .as_ref()
-                .map_or(false, |t| t.contains_key(self.target.as_ref())),
+                .map_or(false, |t| t.contains_key(&self.target)),
         }) == self.arg
     }
 }
@@ -331,7 +331,7 @@ impl CheckFieldsPredicate for ExistsPredicate {
 
 #[derive(Debug, Clone)]
 struct IpCidrPredicate {
-    target: Atom,
+    target: String,
     cidrs: Vec<IpCidr>,
 }
 
@@ -401,7 +401,7 @@ impl CheckFieldsPredicate for NegatePredicate {
 
 #[derive(Debug, Clone)]
 struct LengthEqualsPredicate {
-    target: Atom,
+    target: String,
     arg: i64,
 }
 

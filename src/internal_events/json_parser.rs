@@ -1,7 +1,7 @@
 use super::InternalEvent;
 use metrics::counter;
 use serde_json::Error;
-use string_cache::DefaultAtom as Atom;
+
 
 #[derive(Debug)]
 pub(crate) struct JsonParserEventProcessed;
@@ -18,7 +18,7 @@ impl InternalEvent for JsonParserEventProcessed {
 
 #[derive(Debug)]
 pub(crate) struct JsonParserFailedParse<'a> {
-    pub field: &'a Atom,
+    pub field: &'a str,
     pub value: &'a str,
     pub error: Error,
 }
@@ -43,7 +43,7 @@ impl<'a> InternalEvent for JsonParserFailedParse<'a> {
 
 #[derive(Debug)]
 pub(crate) struct JsonParserTargetExists<'a> {
-    pub target_field: &'a Atom,
+    pub target_field: &'a str,
 }
 
 impl<'a> InternalEvent for JsonParserTargetExists<'a> {

@@ -18,7 +18,7 @@ use std::{
         Arc, Mutex,
     },
 };
-use string_cache::DefaultAtom as Atom;
+
 use tracing::{error, info};
 use vector::config::{
     DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,

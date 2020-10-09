@@ -5,13 +5,9 @@ use crate::{
         Transform,
     },
 };
-use lazy_static::lazy_static;
 use snafu::{OptionExt, Snafu};
-use string_cache::DefaultAtom as Atom;
 
-lazy_static! {
-    pub static ref MULTILINE_TAG: Atom = Atom::from("multiline_tag");
-}
+pub const MULTILINE_TAG: &str = "multiline_tag";
 
 /// Parser for the CRI log format.
 ///
@@ -38,7 +34,7 @@ impl Cri {
             rp_config.patterns = vec![pattern.to_owned()];
 
             rp_config.types.insert(
-                Atom::from(crate::config::log_schema().timestamp_key()),
+                crate::config::log_schema().timestamp_key().to_string(),
                 "timestamp|%+".to_owned(),
             );
 
@@ -71,7 +67,7 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
 
     // For partial messages add a partial event indicator.
     if is_partial {
-        log.insert(event::PARTIAL_STR, true);
+        log.insert(&*event::PARTIAL, true);
     }
 
     Ok(())

@@ -5,15 +5,11 @@ use crate::{
     transforms::Transform,
 };
 use chrono::{DateTime, Utc};
-use lazy_static::lazy_static;
 use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
-use string_cache::DefaultAtom as Atom;
 
-lazy_static! {
-    pub static ref TIME: Atom = Atom::from("time");
-    pub static ref LOG: Atom = Atom::from("log");
-}
+pub const TIME: &str = "time";
+pub const LOG: &str = "log";
 
 /// Parser for the docker log format.
 ///
@@ -36,7 +32,7 @@ impl Transform for Docker {
 /// Parses `message` as json object and removes it.
 fn parse_json(log: &mut LogEvent) -> Option<()> {
     let to_parse = log
-        .remove(&Atom::from(log_schema().message_key()))?
+        .remove(log_schema().message_key())?
         .as_bytes();
 
     match serde_json::from_slice(to_parse.as_ref()) {
@@ -92,7 +88,7 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
 
     // For partial messages add a partial event indicator.
     if is_partial {
-        log.insert(event::PARTIAL_STR, true);
+        log.insert(&*event::PARTIAL, true);
     }
 
     Ok(())

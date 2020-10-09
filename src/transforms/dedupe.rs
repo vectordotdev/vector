@@ -10,13 +10,13 @@ use crate::{
 use bytes::Bytes;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
+
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub enum FieldMatchConfig {
     #[serde(rename = "match")]
-    MatchFields(Vec<Atom>),
+    MatchFields(Vec<String>),
     #[serde(rename = "ignore")]
     IgnoreFields(Vec<String>),
     #[serde(skip)]
@@ -123,7 +123,7 @@ type TypeId = u8;
 #[derive(PartialEq, Eq, Hash)]
 enum CacheEntry {
     Match(Vec<Option<(TypeId, Bytes)>>),
-    Ignore(Vec<(Atom, TypeId, Bytes)>),
+    Ignore(Vec<(String, TypeId, Bytes)>),
 }
 
 /// Assigns a unique number to each of the types supported by Event::Value.
@@ -172,7 +172,7 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
             for (field_name, value) in event.as_log().all_fields() {
                 if !fields.contains(&field_name) {
                     entry.push((
-                        Atom::from(field_name),
+                        field_name,
                         type_id_for_value(&value),
                         value.as_bytes(),
                     ));
@@ -206,9 +206,9 @@ mod tests {
     use crate::transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig};
     use crate::{event::Event, event::Value, transforms::Transform};
     use std::collections::BTreeMap;
-    use string_cache::DefaultAtom as Atom;
+    
 
-    fn make_match_transform(num_events: usize, fields: Vec<Atom>) -> Dedupe {
+    fn make_match_transform(num_events: usize, fields: Vec<String>) -> Dedupe {
         Dedupe::new(DedupeConfig {
             cache: CacheConfig { num_events },
             fields: { FieldMatchConfig::MatchFields(fields) },

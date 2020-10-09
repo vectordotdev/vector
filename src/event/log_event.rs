@@ -6,7 +6,6 @@ use std::{
     iter::FromIterator,
     fmt::{Debug, Display},
 };
-use string_cache::DefaultAtom;
 
 #[derive(PartialEq, Debug, Clone, Default)]
 pub struct LogEvent {
@@ -192,16 +191,16 @@ impl std::ops::Index<&str> for LogEvent {
     }
 }
 
-impl<K: Into<DefaultAtom>, V: Into<Value>> Extend<(K, V)> for LogEvent {
+impl<K: AsRef<str>, V: Into<Value>> Extend<(K, V)> for LogEvent {
     fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
         for (k, v) in iter {
-            self.insert(k.into(), v.into());
+            self.insert(k.as_ref(), v.into());
         }
     }
 }
 
 // Allow converting any kind of appropriate key/value iterator directly into a LogEvent.
-impl<K: Into<DefaultAtom>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
+impl<K: AsRef<str>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
         let mut log_event = LogEvent::default();
         log_event.extend(iter);

@@ -8,13 +8,13 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
-use string_cache::DefaultAtom as Atom;
+
 
 #[derive(Deserialize, Serialize, Debug, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct CoercerConfig {
-    types: HashMap<Atom, String>,
+    types: HashMap<String, String>,
     drop_unspecified: bool,
 }
 
@@ -49,7 +49,7 @@ impl TransformConfig for CoercerConfig {
 }
 
 pub struct Coercer {
-    types: HashMap<Atom, Conversion>,
+    types: HashMap<String, Conversion>,
     drop_unspecified: bool,
 }
 

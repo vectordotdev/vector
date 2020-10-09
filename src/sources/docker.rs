@@ -33,7 +33,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{collections::HashMap, convert::TryFrom, env};
-use string_cache::DefaultAtom as Atom;
+
 use tokio::sync::mpsc;
 
 /// The beginning of image names of vector docker images packaged by vector.
@@ -42,11 +42,11 @@ const VECTOR_IMAGE_NAME: &str = "timberio/vector";
 lazy_static! {
     static ref STDERR: Bytes = "stderr".into();
     static ref STDOUT: Bytes = "stdout".into();
-    static ref IMAGE: Atom = Atom::from("image");
-    static ref CREATED_AT: Atom = Atom::from("container_created_at");
-    static ref NAME: Atom = Atom::from("container_name");
-    static ref STREAM: Atom = Atom::from("stream");
-    static ref CONTAINER: Atom = Atom::from("container_id");
+    static ref IMAGE: &'static str = "image";
+    static ref CREATED_AT: &'static str = "container_created_at";
+    static ref NAME: &'static str = "container_name";
+    static ref STREAM: &'static str = "stream";
+    static ref CONTAINER: &'static str = "container_id";
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -55,7 +55,7 @@ pub struct DockerConfig {
     include_containers: Option<Vec<String>>, // Starts with actually, not include
     include_labels: Option<Vec<String>>,
     include_images: Option<Vec<String>>,
-    partial_event_marker_field: Option<Atom>,
+    partial_event_marker_field: Option<String>,
     auto_partial_merge: bool,
     multiline: Option<MultilineConfig>,
     retry_backoff_secs: u64,
@@ -67,7 +67,7 @@ impl Default for DockerConfig {
             include_containers: None,
             include_labels: None,
             include_images: None,
-            partial_event_marker_field: Some(event::PARTIAL.clone()),
+            partial_event_marker_field: Some(event::PARTIAL.to_string()),
             auto_partial_merge: true,
             multiline: None,
             retry_backoff_secs: 2,
@@ -742,7 +742,7 @@ impl ContainerLogInfo {
     fn new_event(
         &mut self,
         log_output: LogOutput,
-        partial_event_marker_field: Option<Atom>,
+        partial_event_marker_field: Option<String>,
         auto_partial_merge: bool,
         partial_event_merge_state: &mut Option<LogEventMergeState>,
     ) -> Option<Event> {
@@ -867,7 +867,7 @@ impl ContainerLogInfo {
                 // current message being the initial one.
                 if let Some(partial_event_merge_state) = partial_event_merge_state {
                     partial_event_merge_state
-                        .merge_in_next_event(log_event, &[Atom::from(log_schema().message_key())]);
+                        .merge_in_next_event(log_event, vec![log_schema().message_key().to_string()]);
                 } else {
                     *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
                 };
@@ -880,7 +880,7 @@ impl ContainerLogInfo {
             // Otherwise it's just a regular event that we return as-is.
             match partial_event_merge_state.take() {
                 Some(partial_event_merge_state) => partial_event_merge_state
-                    .merge_in_final_event(log_event, &[Atom::from(log_schema().message_key())]),
+                    .merge_in_final_event(log_event, vec![log_schema().message_key().to_string()]),
                 None => log_event,
             }
         } else {
@@ -910,7 +910,7 @@ impl ContainerLogInfo {
 
 struct ContainerMetadata {
     /// label.key -> String
-    labels: Vec<(Atom, Value)>,
+    labels: Vec<(String, Value)>,
     /// name -> String
     name: Value,
     /// image -> String
@@ -970,7 +970,7 @@ fn line_agg_adapter(
         let mut log_event = event.into_log();
 
         let message_value = log_event
-            .remove(&Atom::from(log_schema().message_key()))
+            .remove(log_schema().message_key())
             .expect("message must exist in the event");
         let stream_value = log_event
             .get(&*STREAM)
@@ -1230,7 +1230,7 @@ mod integration_tests {
         // Wait for before message
         let events = collect_n(out, 1).await.unwrap();
         assert_eq!(
-            events[0].as_log()[&Atom::from(log_schema().message_key())],
+            events[0].as_log()[log_schema().message_key()],
             "before".into()
         );
 
@@ -1267,7 +1267,7 @@ mod integration_tests {
         assert!(log.get(format!("label.{}", label)).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
         assert_eq!(
-            events[0].as_log()[&Atom::from(log_schema().source_type_key())],
+            events[0].as_log()[log_schema().source_type_key()],
             "docker".into()
         );
     }
@@ -1288,11 +1288,11 @@ mod integration_tests {
         container_remove(&id, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&Atom::from(log_schema().message_key())],
+            events[0].as_log()[log_schema().message_key()],
             message.into()
         );
         assert_eq!(
-            events[1].as_log()[&Atom::from(log_schema().message_key())],
+            events[1].as_log()[log_schema().message_key()],
             message.into()
         );
     }
@@ -1316,7 +1316,7 @@ mod integration_tests {
         container_remove(&id1, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&Atom::from(log_schema().message_key())],
+            events[0].as_log()[log_schema().message_key()],
             message.into()
         );
     }
@@ -1341,7 +1341,7 @@ mod integration_tests {
         container_remove(&id1, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&Atom::from(log_schema().message_key())],
+            events[0].as_log()[log_schema().message_key()],
             message.into()
         );
     }
@@ -1370,7 +1370,7 @@ mod integration_tests {
         assert!(log.get(format!("label.{}", label)).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
         assert_eq!(
-            events[0].as_log()[&Atom::from(log_schema().source_type_key())],
+            events[0].as_log()[log_schema().source_type_key()],
             "docker".into()
         );
     }
@@ -1396,7 +1396,7 @@ mod integration_tests {
         container_remove(&id, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&Atom::from(log_schema().message_key())],
+            events[0].as_log()[log_schema().message_key()],
             message.into()
         );
     }
@@ -1470,7 +1470,7 @@ mod integration_tests {
         container_remove(&id, &docker).await;
 
         let log = events[0].as_log();
-        assert_eq!(log[&Atom::from(log_schema().message_key())], message.into());
+        assert_eq!(log[log_schema().message_key()], message.into());
     }
 
     #[tokio::test]
@@ -1523,7 +1523,7 @@ mod integration_tests {
             .map(|event| {
                 event
                     .into_log()
-                    .remove(&Atom::from(crate::config::log_schema().message_key()))
+                    .remove(&*crate::config::log_schema().message_key())
                     .unwrap()
                     .to_string_lossy()
             })

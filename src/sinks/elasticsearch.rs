@@ -498,7 +498,7 @@ mod tests {
     use http::{Response, StatusCode};
     use pretty_assertions::assert_eq;
     use serde_json::json;
-    use string_cache::DefaultAtom as Atom;
+    
 
     #[test]
     fn generate_config() {
@@ -515,7 +515,7 @@ mod tests {
         maybe_set_id(id_key, &mut action, &mut event);
 
         assert_eq!(json!({"_id": "bar"}), action);
-        assert_eq!(None, event.as_log().get(&Atom::from("foo")));
+        assert_eq!(None, event.as_log().get("foo"));
     }
 
     #[test]
@@ -562,7 +562,7 @@ mod tests {
             index: Some(String::from("{{ idx }}")),
             encoding: EncodingConfigWithDefault {
                 codec: Encoding::Default,
-                except_fields: Some(vec![Atom::from("idx"), Atom::from("timestamp")]),
+                except_fields: Some(vec!["idx".to_string(), "timestamp".to_string()]),
                 ..Default::default()
             },
             endpoint: String::from("https://example.com"),
@@ -600,7 +600,7 @@ mod integration_tests {
     use serde_json::{json, Value};
     use std::fs::File;
     use std::io::Read;
-    use string_cache::DefaultAtom as Atom;
+    
 
     #[test]
     fn ensure_pipeline_in_params() {
@@ -670,7 +670,7 @@ mod integration_tests {
         let expected = json!({
             "message": "raw log line",
             "foo": "bar",
-            "timestamp": input_event.as_log()[&Atom::from(crate::config::log_schema().timestamp_key())],
+            "timestamp": input_event.as_log()[crate::config::log_schema().timestamp_key()],
         });
         assert_eq!(expected, value);
     }

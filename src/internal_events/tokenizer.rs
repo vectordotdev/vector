@@ -1,6 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
-use string_cache::DefaultAtom as Atom;
+
 
 #[derive(Debug)]
 pub(crate) struct TokenizerEventProcessed;
@@ -13,7 +13,7 @@ impl InternalEvent for TokenizerEventProcessed {
 
 #[derive(Debug)]
 pub(crate) struct TokenizerFieldMissing<'a> {
-    pub field: &'a Atom,
+    pub field: &'a str,
 }
 
 impl<'a> InternalEvent for TokenizerFieldMissing<'a> {
@@ -32,7 +32,7 @@ impl<'a> InternalEvent for TokenizerFieldMissing<'a> {
 
 #[derive(Debug)]
 pub(crate) struct TokenizerConvertFailed<'a> {
-    pub field: &'a Atom,
+    pub field: &'a str,
     pub error: crate::types::Error,
 }
 

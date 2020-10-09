@@ -78,7 +78,7 @@ impl Transform for Remap {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use string_cache::DefaultAtom as Atom;
+    
 
     #[test]
     fn generate_config() {
@@ -88,7 +88,7 @@ mod tests {
     fn get_field_string(event: &Event, field: &str) -> String {
         event
             .as_log()
-            .get(&Atom::from(field))
+            .get(field)
             .unwrap()
             .to_string_lossy()
     }

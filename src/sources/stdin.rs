@@ -132,7 +132,7 @@ mod tests {
     use futures::compat::Future01CompatExt;
     use futures01::{Async::*, Stream};
     use std::io::Cursor;
-    use string_cache::DefaultAtom as Atom;
+    
 
     #[test]
     fn generate_config() {
@@ -179,7 +179,7 @@ mod tests {
         assert_eq!(
             Ready(Some("hello world".into())),
             event.map(|event| event.map(|event| event.as_log()
-                [&Atom::from(log_schema().message_key())]
+                [log_schema().message_key()]
                 .to_string_lossy()))
         );
 
@@ -188,7 +188,7 @@ mod tests {
         assert_eq!(
             Ready(Some("hello world again".into())),
             event.map(|event| event.map(|event| event.as_log()
-                [&Atom::from(log_schema().message_key())]
+                [log_schema().message_key()]
                 .to_string_lossy()))
         );
 

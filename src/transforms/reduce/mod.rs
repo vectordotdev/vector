@@ -16,7 +16,7 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
 use std::time::{Duration, Instant};
-use string_cache::DefaultAtom as Atom;
+
 
 mod merge_strategy;
 
@@ -144,7 +144,7 @@ impl ReduceState {
 pub struct Reduce {
     expire_after: Duration,
     flush_period: Duration,
-    identifier_fields: Vec<Atom>,
+    identifier_fields: Vec<String>,
     merge_strategies: IndexMap<String, MergeStrategy>,
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
     ends_when: Option<Box<dyn Condition>>,
@@ -162,7 +162,6 @@ impl Reduce {
             .identifier_fields
             .clone()
             .into_iter()
-            .map(Atom::from)
             .collect();
 
         Ok(Reduce {

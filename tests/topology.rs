@@ -12,7 +12,7 @@ use std::{
         Arc,
     },
 };
-use string_cache::DefaultAtom as Atom;
+
 use tokio::time::{delay_for, Duration};
 use vector::{config::Config, event::Event, test_util::start_topology, topology};
 

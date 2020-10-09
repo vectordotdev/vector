@@ -9,15 +9,15 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
-use string_cache::DefaultAtom as Atom;
+
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct TokenizerConfig {
-    pub field_names: Vec<Atom>,
-    pub field: Option<Atom>,
+    pub field_names: Vec<String>,
+    pub field: Option<String>,
     pub drop_field: bool,
-    pub types: HashMap<Atom, String>,
+    pub types: HashMap<String, String>,
 }
 
 inventory::submit! {
@@ -33,7 +33,7 @@ impl TransformConfig for TokenizerConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| Atom::from(crate::config::log_schema().message_key()));
+            .unwrap_or_else(|| crate::config::log_schema().message_key().to_string());
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)?;
 
@@ -62,17 +62,17 @@ impl TransformConfig for TokenizerConfig {
 }
 
 pub struct Tokenizer {
-    field_names: Vec<(Atom, Vec<PathComponent>, Conversion)>,
-    field: Atom,
+    field_names: Vec<(String, Vec<PathComponent>, Conversion)>,
+    field: String,
     drop_field: bool,
 }
 
 impl Tokenizer {
     pub fn new(
-        field_names: Vec<Atom>,
-        field: Atom,
+        field_names: Vec<String>,
+        field: String,
         drop_field: bool,
-        types: HashMap<Atom, Conversion>,
+        types: HashMap<String, Conversion>,
     ) -> Self {
         let field_names = field_names
             .into_iter()
@@ -129,7 +129,7 @@ mod tests {
         config::{TransformConfig, TransformContext},
         Event,
     };
-    use string_cache::DefaultAtom as Atom;
+    
 
     #[test]
     fn generate_config() {
@@ -144,7 +144,7 @@ mod tests {
         types: &[(&str, &str)],
     ) -> LogEvent {
         let event = Event::from(text);
-        let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<Atom>>();
+        let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<String>>();
         let field = field.map(|f| f.into());
         let mut parser = TokenizerConfig {
             field_names,

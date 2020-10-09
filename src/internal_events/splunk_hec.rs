@@ -1,7 +1,7 @@
 use super::InternalEvent;
 use metrics::counter;
 use serde_json::Error;
-use string_cache::DefaultAtom as Atom;
+
 
 #[cfg(feature = "sources-splunk_hec")]
 pub(crate) use self::source::*;
@@ -39,7 +39,7 @@ impl InternalEvent for SplunkEventEncodeError {
 
 #[derive(Debug)]
 pub struct SplunkSourceTypeMissingKeys {
-    pub keys: Vec<Atom>,
+    pub keys: Vec<String>,
 }
 
 impl InternalEvent for SplunkSourceTypeMissingKeys {
@@ -58,7 +58,7 @@ impl InternalEvent for SplunkSourceTypeMissingKeys {
 
 #[derive(Debug)]
 pub struct SplunkSourceMissingKeys {
-    pub keys: Vec<Atom>,
+    pub keys: Vec<String>,
 }
 
 impl InternalEvent for SplunkSourceMissingKeys {

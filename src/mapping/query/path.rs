@@ -3,12 +3,12 @@ use crate::{
     event::{util::log::get_value, Event, PathIter, Value},
     mapping::Result,
 };
-use string_cache::DefaultAtom as Atom;
+
 
 #[derive(Debug)]
 pub(in crate::mapping) struct Path {
     // TODO: Switch to String once Event API is cleaned up.
-    path: Vec<Vec<Atom>>,
+    path: Vec<Vec<String>>,
 }
 
 impl From<&str> for Path {
@@ -27,7 +27,7 @@ impl From<Vec<Vec<String>>> for Path {
                 .iter()
                 .map(|c| {
                     c.iter()
-                        .map(|p| Atom::from(p.replace(".", "\\.")))
+                        .map(|p| p.replace(".", "\\."))
                         .collect()
                 })
                 .collect(),
@@ -43,7 +43,7 @@ impl From<Vec<Vec<&str>>> for Path {
                 .iter()
                 .map(|c| {
                     c.iter()
-                        .map(|p| Atom::from(p.replace(".", "\\.")))
+                        .map(|p| p.replace(".", "\\."))
                         .collect()
                 })
                 .collect(),

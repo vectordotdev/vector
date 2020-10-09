@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::collections::HashMap;
 use std::str;
-use string_cache::DefaultAtom as Atom;
+
 
 #[derive(Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
@@ -25,14 +25,14 @@ pub struct RegexParserConfig {
     /// TODO: Remove at a future point in time.
     pub regex: Option<String>,
     pub patterns: Vec<String>,
-    pub field: Option<Atom>,
+    pub field: Option<String>,
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
     pub drop_failed: bool,
-    pub target_field: Option<Atom>,
+    pub target_field: Option<String>,
     #[derivative(Default(value = "true"))]
     pub overwrite_target: bool,
-    pub types: HashMap<Atom, String>,
+    pub types: HashMap<String, String>,
 }
 
 inventory::submit! {
@@ -64,21 +64,21 @@ impl TransformConfig for RegexParserConfig {
 pub struct RegexParser {
     regexset: RegexSet,
     patterns: Vec<CompiledRegex>, // indexes correspend to RegexSet
-    field: Atom,
+    field: String,
     drop_field: bool,
     drop_failed: bool,
-    target_field: Option<Atom>,
+    target_field: Option<String>,
     overwrite_target: bool,
 }
 
 struct CompiledRegex {
     regex: Regex,
-    capture_names: Vec<(usize, Atom, Conversion)>,
+    capture_names: Vec<(usize, String, Conversion)>,
     capture_locs: CaptureLocations,
 }
 
 impl CompiledRegex {
-    fn new(regex: Regex, types: &HashMap<Atom, Conversion>) -> CompiledRegex {
+    fn new(regex: Regex, types: &HashMap<String, Conversion>) -> CompiledRegex {
         // Calculate the location (index into the capture locations) of
         // each named capture, and the required type coercion.
         let capture_names = regex
@@ -86,8 +86,7 @@ impl CompiledRegex {
             .enumerate()
             .filter_map(|(idx, cn)| {
                 cn.map(|cn| {
-                    let cn = Atom::from(cn);
-                    let conv = types.get(&cn).unwrap_or(&Conversion::Bytes);
+                    let conv = types.get(cn).unwrap_or(&Conversion::Bytes);
                     (idx, cn, conv.clone())
                 })
             })
@@ -105,7 +104,7 @@ impl CompiledRegex {
     fn captures<'a>(
         &'a mut self,
         value: &'a [u8],
-    ) -> Option<impl Iterator<Item = (Atom, Value)> + 'a> {
+    ) -> Option<impl Iterator<Item = (String, Value)> + 'a> {
         match self.regex.captures_read(&mut self.capture_locs, value) {
             Some(_) => {
                 let capture_locs = &self.capture_locs;
@@ -141,7 +140,7 @@ impl RegexParser {
         let field = config
             .field
             .clone()
-            .unwrap_or_else(|| Atom::from(crate::config::log_schema().message_key()));
+            .unwrap_or_else(|| crate::config::log_schema().message_key().to_string());
 
         let patterns = match (&config.regex, &config.patterns.len()) {
             (None, 0) => {
@@ -206,12 +205,12 @@ impl RegexParser {
     pub fn new(
         regexset: RegexSet,
         patterns: Vec<Regex>,
-        field: Atom,
+        field: String,
         mut drop_field: bool,
         drop_failed: bool,
-        target_field: Option<Atom>,
+        target_field: Option<String>,
         overwrite_target: bool,
-        types: HashMap<Atom, Conversion>,
+        types: HashMap<String, Conversion>,
     ) -> Self {
         // Build a buffer of the regex capture locations and names to avoid
         // repeated allocations.
@@ -278,7 +277,7 @@ impl Transform for RegexParser {
 
                 log.extend(captures.map(|(name, value)| {
                     let name = target_field
-                        .map(|target| Atom::from(format!("{}.{}", target, name)))
+                        .map(|target| format!("{}.{}", target, name))
                         .unwrap_or_else(|| name.clone());
                     (name, value)
                 }));

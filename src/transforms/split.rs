@@ -8,16 +8,16 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
-use string_cache::DefaultAtom as Atom;
+
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct SplitConfig {
-    pub field_names: Vec<Atom>,
+    pub field_names: Vec<String>,
     pub separator: Option<String>,
-    pub field: Option<Atom>,
+    pub field: Option<String>,
     pub drop_field: bool,
-    pub types: HashMap<Atom, String>,
+    pub types: HashMap<String, String>,
 }
 
 inventory::submit! {
@@ -30,12 +30,7 @@ impl_generate_config_from_default!(SplitConfig);
 #[typetag::serde(name = "split")]
 impl TransformConfig for SplitConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        let field = Atom::from(
-            self.field
-                .as_ref()
-                .map(|v| v.to_string())
-                .unwrap_or_else(|| crate::config::log_schema().message_key().to_string()),
-        );
+        let field = self.field.clone().unwrap_or_else(|| crate::config::log_schema().message_key().to_string());
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)
             .map_err(|err| format!("{}", err))?;
@@ -66,19 +61,19 @@ impl TransformConfig for SplitConfig {
 }
 
 pub struct Split {
-    field_names: Vec<(Atom, Conversion)>,
+    field_names: Vec<(String, Conversion)>,
     separator: Option<String>,
-    field: Atom,
+    field: String,
     drop_field: bool,
 }
 
 impl Split {
     pub fn new(
-        field_names: Vec<Atom>,
+        field_names: Vec<String>,
         separator: Option<String>,
-        field: Atom,
+        field: String,
         drop_field: bool,
-        types: HashMap<Atom, Conversion>,
+        types: HashMap<String, Conversion>,
     ) -> Self {
         let field_names = field_names
             .into_iter()
@@ -147,7 +142,7 @@ mod tests {
         config::{TransformConfig, TransformContext},
         Event,
     };
-    use string_cache::DefaultAtom as Atom;
+    
 
     #[test]
     fn generate_config() {
@@ -184,7 +179,7 @@ mod tests {
         types: &[(&str, &str)],
     ) -> LogEvent {
         let event = Event::from(text);
-        let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<Atom>>();
+        let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<String>>();
         let field = field.map(|f| f.into());
         let mut parser = SplitConfig {
             field_names,

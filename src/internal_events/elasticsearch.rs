@@ -1,6 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
-use string_cache::DefaultAtom as Atom;
+
 
 #[derive(Debug)]
 pub struct ElasticSearchEventReceived {
@@ -21,7 +21,7 @@ impl InternalEvent for ElasticSearchEventReceived {
 
 #[derive(Debug)]
 pub struct ElasticSearchMissingKeys {
-    pub keys: Vec<Atom>,
+    pub keys: Vec<String>,
 }
 
 impl InternalEvent for ElasticSearchMissingKeys {

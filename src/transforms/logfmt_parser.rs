@@ -7,14 +7,14 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
-use string_cache::DefaultAtom as Atom;
+
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct LogfmtConfig {
-    pub field: Option<Atom>,
+    pub field: Option<String>,
     pub drop_field: bool,
-    pub types: HashMap<Atom, String>,
+    pub types: HashMap<String, String>,
 }
 
 inventory::submit! {
@@ -30,7 +30,7 @@ impl TransformConfig for LogfmtConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| Atom::from(crate::config::log_schema().message_key()));
+            .unwrap_or_else(|| crate::config::log_schema().message_key().into());
         let conversions = parse_conversion_map(&self.types)?;
 
         Ok(Box::new(Logfmt {
@@ -54,9 +54,9 @@ impl TransformConfig for LogfmtConfig {
 }
 
 pub struct Logfmt {
-    field: Atom,
+    field: String,
     drop_field: bool,
-    conversions: HashMap<Atom, Conversion>,
+    conversions: HashMap<String, Conversion>,
 }
 
 impl Transform for Logfmt {
@@ -68,7 +68,7 @@ impl Transform for Logfmt {
             let pairs = logfmt::parse(value)
                 .into_iter()
                 // Filter out pairs with None value (i.e. non-logfmt data)
-                .filter_map(|logfmt::Pair { key, val }| val.map(|val| (Atom::from(key), val)));
+                .filter_map(|logfmt::Pair { key, val }| val.map(|val| (key, val)));
 
             for (key, val) in pairs {
                 if key == self.field {
@@ -100,7 +100,7 @@ impl Transform for Logfmt {
         } else {
             debug!(
                 message = "Field does not exist.",
-                field = self.field.as_ref(),
+                field = %self.field,
                 rate_limit_secs = 30
             );
         };
