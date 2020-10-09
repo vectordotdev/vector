@@ -1,6 +1,6 @@
 use super::Region;
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricValue},
     internal_events::SematextMetricsInvalidMetricReceived,
     sinks::influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
@@ -40,8 +40,10 @@ struct SematextMetricsConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<SematextMetricsConfig>("sematext_metrics")
+    SinkDescription::new::<SematextMetricsConfig>("sematext_metrics")
 }
+
+impl GenerateConfig for SematextMetricsConfig {}
 
 async fn healthcheck(endpoint: String, mut client: HttpClient) -> Result<()> {
     let uri = format!("{}/health", endpoint);
