@@ -16,6 +16,7 @@ use futures::{
 use futures01::Sink;
 use hyper::{Body, Client, Request};
 use hyper_openssl::HttpsConnector;
+use parser::encode_namespace;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::collections::BTreeMap;
@@ -132,7 +133,7 @@ fn apache_metrics(
 
                             let results = parser::parse(&body, &namespace, Utc::now(), Some(&tags))
                                 .chain(vec![Ok(Metric {
-                                    name: "apache_up".into(),
+                                    name: encode_namespace(&namespace, "up"),
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,
@@ -165,7 +166,7 @@ fn apache_metrics(
                             });
                             Some(
                                 stream::iter(vec![Metric {
-                                    name: "apache_up".into(),
+                                    name: encode_namespace(&namespace, "up"),
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,
@@ -182,7 +183,7 @@ fn apache_metrics(
                             });
                             Some(
                                 stream::iter(vec![Metric {
-                                    name: "apache_up".into(),
+                                    name: encode_namespace(&namespace, "up"),
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,
@@ -281,7 +282,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         let source = ApacheMetricsConfig {
             endpoints: vec![format!("http://{}", in_addr)],
             scrape_interval_secs: 1,
-            namespace: "apache".to_string(),
+            namespace: "custom".to_string(),
         }
         .build(
             "default",
@@ -303,7 +304,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             .map(|e| e.into_metric())
             .collect::<Vec<_>>();
 
-        match metrics.iter().find(|m| m.name == "apache_up") {
+        match metrics.iter().find(|m| m.name == "custom_up") {
             Some(m) => assert_eq!(m.value, MetricValue::Gauge { value: 1.0 }),
             None => error!("could not find apache_up metric in {:?}", metrics),
         }
@@ -377,7 +378,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         let source = ApacheMetricsConfig {
             endpoints: vec![format!("http://{}", in_addr)],
             scrape_interval_secs: 1,
-            namespace: "apache".to_string(),
+            namespace: "custom".to_string(),
         }
         .build(
             "default",
@@ -399,7 +400,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             .map(|e| e.into_metric())
             .collect::<Vec<_>>();
 
-        match metrics.iter().find(|m| m.name == "apache_up") {
+        match metrics.iter().find(|m| m.name == "custom_up") {
             Some(m) => assert_eq!(m.value, MetricValue::Gauge { value: 0.0 }),
             None => error!("could not find apache_up metric in {:?}", metrics),
         }

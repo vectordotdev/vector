@@ -593,6 +593,7 @@ mod integration_tests {
     use serde_json::{json, Value};
     use std::fs::File;
     use std::io::Read;
+    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn ensure_pipeline_in_params() {
@@ -662,7 +663,7 @@ mod integration_tests {
         let expected = json!({
             "message": "raw log line",
             "foo": "bar",
-            "timestamp": input_event.as_log()[&crate::config::log_schema().timestamp_key()],
+            "timestamp": input_event.as_log()[&Atom::from(crate::config::log_schema().timestamp_key())],
         });
         assert_eq!(expected, value);
     }
