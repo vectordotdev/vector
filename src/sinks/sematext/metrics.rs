@@ -62,14 +62,15 @@ async fn healthcheck(endpoint: String, mut client: HttpClient) -> Result<()> {
 const ENDPOINT: &str = "https://spm-receiver.sematext.com";
 const EU_ENDPOINT: &str = "https://spm-receiver.eu.sematext.com";
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "sematext_metrics")]
 impl SinkConfig for SematextMetricsConfig {
-    fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = HttpClient::new(cx.resolver(), None)?;
 
         let endpoint = match (&self.endpoint, &self.region) {
             (Some(endpoint), None) => endpoint.clone(),
-            (None, Some(Region::Na)) => ENDPOINT.to_owned(),
+            (None, Some(Region::Us)) => ENDPOINT.to_owned(),
             (None, Some(Region::Eu)) => EU_ENDPOINT.to_owned(),
             (None, None) => {
                 return Err("Either `region` or `endpoint` must be set.".into());
@@ -315,8 +316,6 @@ mod tests {
         )
         .unwrap();
 
-        let _ = config.build(cx.clone()).unwrap();
-
         let addr = test_util::next_addr();
         // Swap out the endpoint so we can force send it
         // to our local server
@@ -324,7 +323,7 @@ mod tests {
         config.endpoint = Some(endpoint.clone());
         config.region = None;
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let (rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
