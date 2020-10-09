@@ -26,6 +26,8 @@ mod generator;
 #[cfg(feature = "transforms-grok_parser")]
 mod grok_parser;
 mod heartbeat;
+#[cfg(feature = "sources-host_metrics")]
+mod host_metrics;
 mod http;
 #[cfg(all(unix, feature = "sources-journald"))]
 mod journald;
@@ -40,6 +42,8 @@ mod log_to_metric;
 mod logplex;
 #[cfg(feature = "transforms-lua")]
 mod lua;
+#[cfg(feature = "transforms-metric_to_log")]
+mod metric_to_log;
 mod process;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
@@ -113,6 +117,8 @@ pub use self::generator::*;
 #[cfg(feature = "transforms-grok_parser")]
 pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;
+#[cfg(feature = "sources-host_metrics")]
+pub(crate) use self::host_metrics::*;
 pub use self::http::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
@@ -127,6 +133,8 @@ pub(crate) use self::log_to_metric::*;
 pub use self::logplex::*;
 #[cfg(feature = "transforms-lua")]
 pub use self::lua::*;
+#[cfg(feature = "transforms-metric_to_log")]
+pub(crate) use self::metric_to_log::*;
 pub use self::process::*;
 #[cfg(feature = "sources-prometheus")]
 pub use self::prometheus::*;

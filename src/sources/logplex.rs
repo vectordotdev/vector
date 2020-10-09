@@ -15,6 +15,7 @@ use std::{
     net::SocketAddr,
     str::FromStr,
 };
+use string_cache::DefaultAtom as Atom;
 use warp::http::{HeaderMap, StatusCode};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -136,10 +137,10 @@ fn line_to_event(line: String) -> Event {
         let log = event.as_mut_log();
 
         if let Ok(ts) = timestamp.parse::<DateTime<Utc>>() {
-            log.insert(log_schema().timestamp_key().clone(), ts);
+            log.insert(log_schema().timestamp_key(), ts);
         }
 
-        log.insert(log_schema().host_key().clone(), hostname.to_owned());
+        log.insert(log_schema().host_key(), hostname.to_owned());
 
         log.insert("app_name", app_name.to_owned());
         log.insert("proc_id", proc_id.to_owned());
@@ -155,9 +156,10 @@ fn line_to_event(line: String) -> Event {
     };
 
     // Add source type
-    event
-        .as_mut_log()
-        .try_insert(log_schema().source_type_key(), Bytes::from("logplex"));
+    event.as_mut_log().try_insert(
+        &Atom::from(log_schema().source_type_key()),
+        Bytes::from("logplex"),
+    );
 
     event
 }
@@ -177,6 +179,7 @@ mod tests {
     use futures01::sync::mpsc;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
+    use string_cache::DefaultAtom as Atom;
 
     async fn source() -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
@@ -229,18 +232,21 @@ mod tests {
         let log = event.as_log();
 
         assert_eq!(
-            log[&log_schema().message_key()],
+            log[&Atom::from(log_schema().message_key())],
             r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
         );
         assert_eq!(
-            log[&log_schema().timestamp_key()],
+            log[&Atom::from(log_schema().timestamp_key())],
             "2020-01-08T22:33:57.353034+00:00"
                 .parse::<DateTime<Utc>>()
                 .unwrap()
                 .into()
         );
-        assert_eq!(log[&log_schema().host_key()], "host".into());
-        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
+        assert_eq!(log[&Atom::from(log_schema().host_key())], "host".into());
+        assert_eq!(
+            log[&Atom::from(log_schema().source_type_key())],
+            "logplex".into()
+        );
     }
 
     #[test]
@@ -249,16 +255,22 @@ mod tests {
         let event = super::line_to_event(body.into());
         let log = event.as_log();
 
-        assert_eq!(log[&log_schema().message_key()], "foo bar baz".into());
         assert_eq!(
-            log[&log_schema().timestamp_key()],
+            log[&Atom::from(log_schema().message_key())],
+            "foo bar baz".into()
+        );
+        assert_eq!(
+            log[&Atom::from(log_schema().timestamp_key())],
             "2020-01-08T22:33:57.353034+00:00"
                 .parse::<DateTime<Utc>>()
                 .unwrap()
                 .into()
         );
-        assert_eq!(log[&log_schema().host_key()], "host".into());
-        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
+        assert_eq!(log[&Atom::from(log_schema().host_key())], "host".into());
+        assert_eq!(
+            log[&Atom::from(log_schema().source_type_key())],
+            "logplex".into()
+        );
     }
 
     #[test]
@@ -268,11 +280,14 @@ mod tests {
         let log = event.as_log();
 
         assert_eq!(
-            log[&log_schema().message_key()],
+            log[&Atom::from(log_schema().message_key())],
             "what am i doing here".into()
         );
-        assert!(log.get(&log_schema().timestamp_key()).is_some());
-        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
+        assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
+        assert_eq!(
+            log[&Atom::from(log_schema().source_type_key())],
+            "logplex".into()
+        );
     }
 
     #[test]
@@ -281,15 +296,21 @@ mod tests {
         let event = super::line_to_event(body.into());
         let log = event.as_log();
 
-        assert_eq!(log[&log_schema().message_key()], "i'm not that long".into());
         assert_eq!(
-            log[&log_schema().timestamp_key()],
+            log[&Atom::from(log_schema().message_key())],
+            "i'm not that long".into()
+        );
+        assert_eq!(
+            log[&Atom::from(log_schema().timestamp_key())],
             "2020-01-08T22:33:57.353034+00:00"
                 .parse::<DateTime<Utc>>()
                 .unwrap()
                 .into()
         );
-        assert_eq!(log[&log_schema().host_key()], "host".into());
-        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
+        assert_eq!(log[&Atom::from(log_schema().host_key())], "host".into());
+        assert_eq!(
+            log[&Atom::from(log_schema().source_type_key())],
+            "logplex".into()
+        );
     }
 }
