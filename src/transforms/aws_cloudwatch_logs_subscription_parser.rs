@@ -1,6 +1,9 @@
 use super::Transform;
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
+    },
     event::Event,
     internal_events::{
         AwsCloudwatchLogsSubscriptionParserEventProcessed,
@@ -45,6 +48,8 @@ impl TransformConfig for AwsCloudwatchLogsSubscriptionParserConfig {
     }
 }
 
+impl GenerateConfig for AwsCloudwatchLogsSubscriptionParserConfig {}
+
 #[derive(Debug)]
 pub struct AwsCloudwatchLogsSubscriptionParser {
     field: Atom,
@@ -58,7 +63,7 @@ impl From<AwsCloudwatchLogsSubscriptionParserConfig> for AwsCloudwatchLogsSubscr
             field: config
                 .field
                 .as_ref()
-                .unwrap_or_else(|| log_schema().message_key())
+                .unwrap_or_else(|| &Atom::from(log_schema().message_key()))
                 .clone(),
         }
     }

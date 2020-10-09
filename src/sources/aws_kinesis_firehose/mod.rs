@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, SinkDescription, SourceConfig},
+    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
@@ -59,8 +59,10 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<AwsKinesisFirehoseConfig>("aws_kinesis_firehose")
+    SourceDescription::new::<AwsKinesisFirehoseConfig>("aws_kinesis_firehose")
 }
+
+impl GenerateConfig for AwsKinesisFirehoseConfig {}
 
 #[cfg(test)]
 mod tests {
