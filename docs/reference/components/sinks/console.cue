@@ -13,7 +13,7 @@ components: sinks: console: {
 
 	features: {
 		batch: {
-			enabled: false
+			enabled:      false
 			common:       false
 			max_bytes:    30000000
 			max_events:   null
