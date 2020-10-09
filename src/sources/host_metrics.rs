@@ -125,6 +125,8 @@ inventory::submit! {
     SourceDescription::new::<HostMetricsConfig>("host_metrics")
 }
 
+impl_generate_config_from_default!(HostMetricsConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "host_metrics")]
 impl SourceConfig for HostMetricsConfig {

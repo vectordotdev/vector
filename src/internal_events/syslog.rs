@@ -12,14 +12,8 @@ impl InternalEvent for SyslogEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "source",
-            "component_type" => "syslog",
-        );
-        counter!("bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "syslog",
-        );
+        counter!("events_processed", 1);
+        counter!("bytes_processed", self.byte_size as u64);
     }
 }
 
@@ -34,11 +28,7 @@ impl InternalEvent for SyslogUdpReadError {
     }
 
     fn emit_metrics(&self) {
-        counter!("udp_read_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "syslog",
-            "mode" => "udp",
-        );
+        counter!("udp_read_errors", 1, "mode" => "udp");
     }
 }
 
@@ -53,10 +43,6 @@ impl InternalEvent for SyslogUdpUtf8Error {
     }
 
     fn emit_metrics(&self) {
-        counter!("udp_utf8_convert_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "syslog",
-            "mode" => "udp",
-        );
+        counter!("udp_utf8_convert_errors", 1, "mode" => "udp");
     }
 }
