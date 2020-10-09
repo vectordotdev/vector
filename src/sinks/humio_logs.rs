@@ -25,6 +25,9 @@ pub struct HumioLogsConfig {
 
     event_type: Option<Template>,
 
+    #[serde(default = "default_host_key")]
+    pub host_key: String,
+
     #[serde(default)]
     pub compression: Compression,
 
@@ -33,6 +36,10 @@ pub struct HumioLogsConfig {
 
     #[serde(default)]
     batch: BatchConfig,
+}
+
+fn default_host_key() -> String {
+    crate::config::LogSchema::default().host_key().to_string()
 }
 
 inventory::submit! {
@@ -89,6 +96,7 @@ impl HumioLogsConfig {
             compression: self.compression,
             batch: self.batch,
             request: self.request,
+            host_key: self.host_key.clone(),
             ..Default::default()
         }
     }
@@ -137,7 +145,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::{SinkConfig, SinkContext},
+        config::{log_schema, SinkConfig, SinkContext},
         sinks::util::Compression,
         test_util::random_string,
         Event,
@@ -161,7 +169,10 @@ mod integration_tests {
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
-        let event = Event::from(message.clone());
+        let host = "192.168.1.1".to_string();
+        let mut event = Event::from(message.clone());
+        let log = event.as_mut_log();
+        log.insert(log_schema().host_key(), host.clone());
 
         sink.run(stream::once(future::ready(event))).await.unwrap();
 
@@ -183,6 +194,7 @@ mod integration_tests {
                 .error_msg
                 .unwrap_or_else(|| "no error message".to_string())
         );
+        assert_eq!(Some(host), entry.host);
     }
 
     #[tokio::test]
@@ -273,6 +285,7 @@ mod integration_tests {
                 max_events: Some(1),
                 ..Default::default()
             },
+            host_key: log_schema().host_key().to_string(),
             ..Default::default()
         }
     }
@@ -394,6 +407,9 @@ mutation {{
 
         #[serde(rename = "@source")]
         source: Option<String>,
+
+        #[serde(rename = "@host")]
+        host: Option<String>,
 
         // fields parsed from ingested log
         #[serde(flatten)]

@@ -1,16 +1,14 @@
 use getset::{Getters, Setters};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom;
-
 pub static LOG_SCHEMA: OnceCell<LogSchema> = OnceCell::new();
 
 lazy_static::lazy_static! {
     static ref LOG_SCHEMA_DEFAULT: LogSchema = LogSchema {
-        message_key: DefaultAtom::from("message"),
-        timestamp_key: DefaultAtom::from("timestamp"),
-        host_key: DefaultAtom::from("host"),
-        source_type_key: DefaultAtom::from("source_type"),
+        message_key: String::from("message"),
+        timestamp_key: String::from("timestamp"),
+        host_key: String::from("host"),
+        source_type_key: String::from("source_type"),
     };
 }
 pub fn log_schema() -> &'static LogSchema {
@@ -21,17 +19,13 @@ pub fn log_schema() -> &'static LogSchema {
 #[serde(default)]
 pub struct LogSchema {
     #[serde(default = "LogSchema::default_message_key")]
-    #[getset(get = "pub", set = "pub(crate)")]
-    message_key: DefaultAtom,
+    message_key: String,
     #[serde(default = "LogSchema::default_timestamp_key")]
-    #[getset(get = "pub", set = "pub(crate)")]
-    timestamp_key: DefaultAtom,
+    timestamp_key: String,
     #[serde(default = "LogSchema::default_host_key")]
-    #[getset(get = "pub", set = "pub(crate)")]
-    host_key: DefaultAtom,
+    host_key: String,
     #[serde(default = "LogSchema::default_source_type_key")]
-    #[getset(get = "pub", set = "pub(crate)")]
-    source_type_key: DefaultAtom,
+    source_type_key: String,
 }
 
 impl Default for LogSchema {
@@ -46,17 +40,43 @@ impl Default for LogSchema {
 }
 
 impl LogSchema {
-    fn default_message_key() -> DefaultAtom {
-        DefaultAtom::from("message")
+    fn default_message_key() -> String {
+        String::from("message")
     }
-    fn default_timestamp_key() -> DefaultAtom {
-        DefaultAtom::from("timestamp")
+    fn default_timestamp_key() -> String {
+        String::from("timestamp")
     }
-    fn default_host_key() -> DefaultAtom {
-        DefaultAtom::from("host")
+    fn default_host_key() -> String {
+        String::from("host")
     }
-    fn default_source_type_key() -> DefaultAtom {
-        DefaultAtom::from("source_type")
+    fn default_source_type_key() -> String {
+        String::from("source_type")
+    }
+
+    pub fn message_key(&self) -> &str {
+        &self.message_key
+    }
+    pub fn timestamp_key(&self) -> &str {
+        &self.timestamp_key
+    }
+    pub fn host_key(&self) -> &str {
+        &self.host_key
+    }
+    pub fn source_type_key(&self) -> &str {
+        &self.source_type_key
+    }
+
+    pub fn set_message_key(&mut self, v: String) {
+        self.message_key = v;
+    }
+    pub fn set_timestamp_key(&mut self, v: String) {
+        self.timestamp_key = v;
+    }
+    pub fn set_host_key(&mut self, v: String) {
+        self.host_key = v;
+    }
+    pub fn set_source_type_key(&mut self, v: String) {
+        self.source_type_key = v;
     }
 
     pub fn merge(&mut self, other: LogSchema) -> Result<(), Vec<String>> {
@@ -69,21 +89,21 @@ impl LogSchema {
             {
                 errors.push("conflicting values for 'log_schema.host_key' found".to_owned());
             } else {
-                self.set_host_key(other.host_key().clone());
+                self.set_host_key(other.host_key().to_string());
             }
             if self.message_key() != LOG_SCHEMA_DEFAULT.message_key()
                 && self.message_key() != other.message_key()
             {
                 errors.push("conflicting values for 'log_schema.message_key' found".to_owned());
             } else {
-                self.set_message_key(other.message_key().clone());
+                self.set_message_key(other.message_key().to_string());
             }
             if self.timestamp_key() != LOG_SCHEMA_DEFAULT.timestamp_key()
                 && self.timestamp_key() != other.timestamp_key()
             {
                 errors.push("conflicting values for 'log_schema.timestamp_key' found".to_owned());
             } else {
-                self.set_timestamp_key(other.timestamp_key().clone());
+                self.set_timestamp_key(other.timestamp_key().to_string());
             }
         }
 

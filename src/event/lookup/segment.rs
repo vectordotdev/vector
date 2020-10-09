@@ -30,7 +30,8 @@ impl Segment {
     #[tracing::instrument(skip(segment))]
     pub(crate) fn from_lookup(segment: Pair<'_, Rule>) -> crate::Result<Vec<Segment>> {
         let rule = segment.as_rule();
-        tracing::trace!(segment = segment.as_str(), ?rule, action = %"enter");
+        let full_segment = segment.as_str();
+        tracing::trace!(segment = %full_segment, ?rule, action = %"enter");
         let mut segments = Vec::default();
         for inner_segment in segment.into_inner() {
             match inner_segment.as_rule() {
@@ -50,19 +51,20 @@ impl Segment {
                 }
             }
         }
-        tracing::trace!(segment = ?segments, ?rule, action = %"exit");
+        tracing::trace!(segment = %full_segment, ?rule, action = %"exit");
         Ok(segments)
     }
 
     #[tracing::instrument(skip(segment))]
     pub(crate) fn from_path_segment(segment: Pair<'_, Rule>) -> crate::Result<Vec<Segment>> {
         let rule = segment.as_rule();
-        tracing::trace!(segment = segment.as_str(), ?rule, action = %"enter");
+        let full_segment = segment.as_str();
+        tracing::trace!(segment = %full_segment, ?rule, action = %"enter");
         let mut segments = Vec::default();
         for inner_segment in segment.into_inner() {
             match inner_segment.as_rule() {
                 Rule::path_field_name => {
-                    tracing::trace!(segment = inner_segment.as_str(), rule = ?inner_segment.as_rule(), action = %"push");
+                    tracing::trace!(segment = %inner_segment.as_str(), rule = ?inner_segment.as_rule(), action = %"push");
                     segments.push(Segment::field(inner_segment.as_str().to_owned()))
                 }
                 Rule::path_index => segments.push(Segment::from_path_index(inner_segment)?),
@@ -76,21 +78,21 @@ impl Segment {
                 }
             }
         }
-        tracing::trace!(segment = ?segments, ?rule, action = %"exit");
+        tracing::trace!(segment = %full_segment, ?rule, action = %"exit");
         Ok(segments)
     }
 
     #[tracing::instrument(skip(segment))]
     pub(crate) fn from_path_index(segment: Pair<'_, Rule>) -> crate::Result<Segment> {
         let full_segment = segment.as_str();
-        tracing::trace!(segment = full_segment, rule = ?segment.as_rule(), action = %"enter");
+        tracing::trace!(segment = %full_segment, rule = ?segment.as_rule(), action = %"enter");
         let segment = segment.into_inner().next().expect(
             "Did not get pair inside path_index segment. This is an invariant. Please report it.",
         );
         let retval = match segment.as_rule() {
             Rule::inner_path_index => {
                 let index = segment.as_str().parse()?;
-                tracing::trace!(segment = index, rule = ?segment.as_rule(), action = %"push");
+                tracing::trace!(segment = %index, rule = ?segment.as_rule(), action = %"push");
                 Ok(Segment::index(index))
             }
             _ => Err(format!(
@@ -100,19 +102,19 @@ impl Segment {
             )
             .into()),
         };
-        tracing::trace!(segment = full_segment, rule = ?segment.as_rule(), action = %"exit");
+        tracing::trace!(segment = %full_segment, rule = ?segment.as_rule(), action = %"exit");
         retval
     }
 
     #[tracing::instrument(skip(segment))]
     pub(crate) fn from_quoted_path_segment(segment: Pair<'_, Rule>) -> crate::Result<Segment> {
         let full_segment = segment.as_str();
-        tracing::trace!(segment = full_segment, rule = ?segment.as_rule(), action = %"enter");
+        tracing::trace!(segment = %full_segment, rule = ?segment.as_rule(), action = %"enter");
         let segment = segment.into_inner().next()
             .expect("Did not get pair inside quoted_path_segment segment. This is an invariant. Please report it.");
         let retval = match segment.as_rule() {
             Rule::inner_quoted_string => {
-                tracing::trace!(segment = segment.as_str(), rule = ?segment.as_rule(), action = %"push");
+                tracing::trace!(segment = %segment.as_str(), rule = ?segment.as_rule(), action = %"push");
                 Ok(Segment::field(
                     String::from(r#"""#) + segment.as_str() + r#"""#,
                 ))
@@ -126,7 +128,7 @@ impl Segment {
                 .into())
             }
         };
-        tracing::trace!(segment = full_segment, rule = ?segment.as_rule(), action = %"exit");
+        tracing::trace!(segment = %full_segment, rule = ?segment.as_rule(), action = %"exit");
         retval
     }
 }
