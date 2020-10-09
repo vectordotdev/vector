@@ -61,16 +61,15 @@ package metadata
 			templateable?: bool
 		}}) |
 		close({"uint": {
-				if !required {
-					default: uint | null
-				}
-				examples?: [...uint]
-				unit: "bytes" | "logs" | "milliseconds" | "seconds" | null
-			}}) |
-		close({"object": {
-				examples: [...{[Name=string]: _}]
-				options: #ConfigurationOptions | {}
+			if !required {
+				default: uint | null
 			}
+			examples?: [...uint]
+			unit: "bytes" | "logs" | "milliseconds" | "seconds" | null
+		}}) |
+		close({"object": {
+			examples: [...{[Name=string]: _}]
+			options: #ConfigurationOptions | {}
 		}})
 }
 
