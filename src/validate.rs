@@ -7,7 +7,7 @@ use exitcode::ExitCode;
 use std::{fmt, fs::remove_dir_all, path::PathBuf};
 use structopt::StructOpt;
 
-const TEMPORARY_DIRECTORY: &'static str = "validate_tmp";
+const TEMPORARY_DIRECTORY: &str = "validate_tmp";
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
