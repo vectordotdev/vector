@@ -15,6 +15,7 @@ pub struct Opts {
     pub sub_command: Option<SubCommand>,
 }
 
+
 impl Opts {
     pub fn get_matches() -> Self {
         let version = get_version();
