@@ -496,8 +496,8 @@ mod test {
         let event = parser.transform(event).unwrap();
         let event = event.as_log();
 
-        assert_eq!(event[&Atom::from("that.greeting")], "hello".into());
-        assert_eq!(event[&Atom::from("that.name")], "bob".into());
+        assert_eq!(event["that.greeting"], "hello".into());
+        assert_eq!(event["that.name"], "bob".into());
     }
 
     #[test]
@@ -513,9 +513,9 @@ mod test {
         let event = parser.transform(event).unwrap();
         let event = event.as_log();
 
-        assert_eq!(event[&"message".into()], message.into());
-        assert_eq!(event.get(&"message.greeting".into()), None);
-        assert_eq!(event.get(&"message.name".into()), None);
+        assert_eq!(event["message"], message.into());
+        assert_eq!(event.get("message.greeting"), None);
+        assert_eq!(event.get("message.name"), None);
     }
 
     #[test]
@@ -532,11 +532,11 @@ mod test {
         let event = parser.transform(event).unwrap();
         let event = event.as_log();
 
-        match event.get(&"message".into()) {
+        match event.get("message") {
             Some(crate::event::Value::Map(_)) => (),
             _ => panic!("\"message\" is not a map"),
         }
-        assert_eq!(event[&Atom::from("message.greeting")], "hello".into());
-        assert_eq!(event[&Atom::from("message.name")], "bob".into());
+        assert_eq!(event["message.greeting"], "hello".into());
+        assert_eq!(event["message.name"], "bob".into());
     }
 }

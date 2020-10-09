@@ -215,8 +215,8 @@ fn create_event(record: Record) -> Event {
     }
     // Translate the timestamp, and so leave both old and new names.
     if let Some(timestamp) = log
-        .get(&SOURCE_TIMESTAMP)
-        .or_else(|| log.get(&RECEIVED_TIMESTAMP))
+        .get(&*SOURCE_TIMESTAMP)
+        .or_else(|| log.get(&*RECEIVED_TIMESTAMP))
     {
         if let Value::Bytes(timestamp) = timestamp {
             if let Ok(timestamp) = String::from_utf8_lossy(timestamp).parse::<u64>() {
@@ -766,6 +766,6 @@ mod tests {
     }
 
     fn priority(event: &Event) -> Value {
-        event.as_log()[&"PRIORITY".into()].clone()
+        event.as_log()["PRIORITY"].clone()
     }
 }

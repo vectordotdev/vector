@@ -17,11 +17,11 @@ fn add_fields(c: &mut Criterion) {
     let key = "the key";
     let value = "this is the value";
 
-    let key_atom_native = key.into();
+    let key_atom_native = key;
     let value_bytes_native = Bytes::from(value).into();
-    let key_atom_v1 = key.into();
+    let key_atom_v1 = key;
     let value_bytes_v1 = Bytes::from(value).into();
-    let key_atom_v2 = key.into();
+    let key_atom_v2 = key;
     let value_bytes_v2 = Bytes::from(value).into();
 
     c.bench(

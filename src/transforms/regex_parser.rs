@@ -340,9 +340,9 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log[&"status".into()], "1234".into());
-        assert_eq!(log[&"time".into()], "5678".into());
-        assert!(log.get(&"message".into()).is_some());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["time"], "5678".into());
+        assert!(log.get("message").is_some());
     }
 
     #[tokio::test]
@@ -355,8 +355,8 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log.get(&"status".into()), None);
-        assert!(log.get(&"message".into()).is_some());
+        assert_eq!(log.get("status"), None);
+        assert!(log.get("message").is_some());
     }
 
     #[tokio::test]
@@ -369,9 +369,9 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log[&"status".into()], "1234".into());
-        assert_eq!(log[&"time".into()], "5678".into());
-        assert!(log.get(&"message".into()).is_none());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["time"], "5678".into());
+        assert!(log.get("message").is_none());
     }
 
     #[tokio::test]
@@ -384,8 +384,8 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log[&"status".into()], "1234".into());
-        assert_eq!(log[&"message".into()], "yes".into());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["message"], "yes".into());
     }
 
     #[tokio::test]
@@ -398,7 +398,7 @@ mod tests {
         .await
         .unwrap();
 
-        assert!(log.get(&"message".into()).is_some());
+        assert!(log.get(&"message").is_some());
     }
 
     #[tokio::test]
@@ -441,9 +441,9 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log[&"message".into()], message.into());
-        assert_eq!(log.get(&"message.status".into()), None);
-        assert_eq!(log.get(&"message.time".into()), None);
+        assert_eq!(log["message"], message.into());
+        assert_eq!(log.get("message.status"), None);
+        assert_eq!(log.get("message.time"), None);
     }
 
     #[tokio::test]
@@ -488,7 +488,7 @@ mod tests {
         let log = do_transform("1234", r#"['(?P<status>\d+)?']"#, "")
             .await
             .unwrap();
-        assert_eq!(log[&"status".into()], "1234".into());
+        assert_eq!(log["status"], "1234".into());
     }
 
     #[tokio::test]
@@ -496,7 +496,7 @@ mod tests {
         let log = do_transform("none", r#"['(?P<status>\d+)?']"#, "")
             .await
             .unwrap();
-        assert!(log.get(&"status".into()).is_none());
+        assert!(log.get("status").is_none());
     }
 
     #[tokio::test]
@@ -513,9 +513,9 @@ mod tests {
         )
         .await
         .expect("Failed to parse log");
-        assert_eq!(log[&"check".into()], Value::Boolean(false));
-        assert_eq!(log[&"status".into()], Value::Integer(1234));
-        assert_eq!(log[&"time".into()], Value::Float(6789.01));
+        assert_eq!(log["check"], Value::Boolean(false));
+        assert_eq!(log["status"], Value::Integer(1234));
+        assert_eq!(log["time"], Value::Float(6789.01));
     }
 
     #[tokio::test]
@@ -538,11 +538,11 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log[&"id1".into()], Value::Integer(1234));
-        assert_eq!(log.get(&"id2".into()), None);
-        assert_eq!(log.get(&"time".into()), None);
-        assert_eq!(log.get(&"check".into()), None);
-        assert!(log.get(&"message".into()).is_some());
+        assert_eq!(log["id1"], Value::Integer(1234));
+        assert_eq!(log.get("id2"), None);
+        assert_eq!(log.get("time"), None);
+        assert_eq!(log.get("check"), None);
+        assert!(log.get("message").is_some());
     }
 
     #[tokio::test]
@@ -566,10 +566,10 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log.get(&"id1".into()), None);
-        assert_eq!(log[&"id2".into()], Value::Integer(1234));
-        assert_eq!(log[&"time".into()], Value::Float(235.42));
-        assert_eq!(log[&"check".into()], Value::Boolean(true));
-        assert!(log.get(&"message".into()).is_some());
+        assert_eq!(log.get("id1"), None);
+        assert_eq!(log["id2"], Value::Integer(1234));
+        assert_eq!(log["time"], Value::Float(235.42));
+        assert_eq!(log["check"], Value::Boolean(true));
+        assert!(log.get("message").is_some());
     }
 }

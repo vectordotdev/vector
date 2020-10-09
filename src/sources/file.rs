@@ -447,8 +447,8 @@ mod tests {
         let event = create_event(line, file, &host_key, &hostname, &file_key);
         let log = event.into_log();
 
-        assert_eq!(log[&"file".into()], "some_file.rs".into());
-        assert_eq!(log[&"host".into()], "Some.Machine".into());
+        assert_eq!(log["file"], "some_file.rs".into());
+        assert_eq!(log["host"], "Some.Machine".into());
         assert_eq!(
             log[&Atom::from(log_schema().message_key())],
             "hello world".into()
@@ -500,14 +500,14 @@ mod tests {
             if line.starts_with("hello") {
                 assert_eq!(line, format!("hello {}", hello_i));
                 assert_eq!(
-                    event.as_log()[&"file".into()].to_string_lossy(),
+                    event.as_log()["file"].to_string_lossy(),
                     path1.to_str().unwrap()
                 );
                 hello_i += 1;
             } else {
                 assert_eq!(line, format!("goodbye {}", goodbye_i));
                 assert_eq!(
-                    event.as_log()[&"file".into()].to_string_lossy(),
+                    event.as_log()["file"].to_string_lossy(),
                     path2.to_str().unwrap()
                 );
                 goodbye_i += 1;
@@ -562,7 +562,7 @@ mod tests {
 
         for event in received {
             assert_eq!(
-                event.as_log()[&"file".into()].to_string_lossy(),
+                event.as_log()["file"].to_string_lossy(),
                 path.to_str().unwrap()
             );
 
@@ -628,7 +628,7 @@ mod tests {
 
         for event in received {
             assert_eq!(
-                event.as_log()[&"file".into()].to_string_lossy(),
+                event.as_log()["file"].to_string_lossy(),
                 path.to_str().unwrap()
             );
 
@@ -737,7 +737,7 @@ mod tests {
                 .0
                 .unwrap();
             assert_eq!(
-                received.as_log()[&"file".into()].to_string_lossy(),
+                received.as_log()["file"].to_string_lossy(),
                 path.to_str().unwrap()
             );
         }
@@ -774,7 +774,7 @@ mod tests {
                 .0
                 .unwrap();
             assert_eq!(
-                received.as_log()[&"source".into()].to_string_lossy(),
+                received.as_log()["source"].to_string_lossy(),
                 path.to_str().unwrap()
             );
         }
@@ -1047,7 +1047,7 @@ mod tests {
         let before_lines = received
             .iter()
             .filter(|event| {
-                event.as_log()[&"file".into()]
+                event.as_log()["file"]
                     .to_string_lossy()
                     .ends_with("before")
             })
@@ -1056,7 +1056,7 @@ mod tests {
         let after_lines = received
             .iter()
             .filter(|event| {
-                event.as_log()[&"file".into()]
+                event.as_log()["file"]
                     .to_string_lossy()
                     .ends_with("after")
             })

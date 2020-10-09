@@ -344,11 +344,11 @@ identifier_fields = [ "request_id" ]
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 1".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"counter".into()],
+            outputs.first().unwrap().as_log()["counter"],
             Value::from(8)
         );
 
@@ -363,15 +363,15 @@ identifier_fields = [ "request_id" ]
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 2".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"extra_field".into()],
+            outputs.first().unwrap().as_log()["extra_field"],
             "value1".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"counter".into()],
+            outputs.first().unwrap().as_log()["counter"],
             Value::from(7)
         );
     }
@@ -424,18 +424,18 @@ merge_strategies.baz = "max"
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 1".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"foo".into()],
+            outputs.first().unwrap().as_log()["foo"],
             "first foo second foo".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"bar".into()],
+            outputs.first().unwrap().as_log()["bar"],
             Value::Array(vec!["first bar".into(), 2.into(), "third bar".into()]),
         );
-        assert_eq!(outputs.first().unwrap().as_log()[&"baz".into()], 3.into(),);
+        assert_eq!(outputs.first().unwrap().as_log()["baz"], 3.into(),);
     }
 
     #[tokio::test]
@@ -478,11 +478,11 @@ identifier_fields = [ "request_id" ]
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 1".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"counter".into()],
+            outputs.first().unwrap().as_log()["counter"],
             Value::from(8)
         );
 
@@ -496,15 +496,15 @@ identifier_fields = [ "request_id" ]
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 2".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"extra_field".into()],
+            outputs.first().unwrap().as_log()["extra_field"],
             "value1".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"counter".into()],
+            outputs.first().unwrap().as_log()["counter"],
             Value::from(7)
         );
     }
@@ -556,13 +556,13 @@ merge_strategies.bar = "concat"
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"foo".into()],
+            outputs.first().unwrap().as_log()["foo"],
             json!([[1, 3], [5, 7], "done"]).into()
         );
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"bar".into()],
+            outputs.first().unwrap().as_log()["bar"],
             json!([1, 3, 5, 7, "done"]).into()
         );
 
@@ -583,11 +583,11 @@ merge_strategies.bar = "concat"
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"foo".into()],
+            outputs.first().unwrap().as_log()["foo"],
             json!([[2, 4], [6, 8], "done"]).into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"bar".into()],
+            outputs.first().unwrap().as_log()["bar"],
             json!([2, 4, 6, 8, "done"]).into()
         );
     }

@@ -99,10 +99,10 @@ mod tests {
 
         let new_event = transform.transform(event).unwrap();
 
-        assert!(new_event.as_log().get(&"to_remove".into()).is_none());
-        assert!(new_event.as_log().get(&"unknown".into()).is_none());
+        assert!(new_event.as_log().get("to_remove").is_none());
+        assert!(new_event.as_log().get("unknown").is_none());
         assert_eq!(
-            new_event.as_log()[&"to_keep".into()],
+            new_event.as_log()["to_keep"],
             "another value".into()
         );
     }

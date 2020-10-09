@@ -148,13 +148,13 @@ mod tests {
         let event = create_event(line, &host_key, &hostname);
         let log = event.into_log();
 
-        assert_eq!(log[&"host".into()], "Some.Machine".into());
+        assert_eq!(log["host"], "Some.Machine".into());
         assert_eq!(
-            log[&Atom::from(log_schema().message_key())],
+            log[log_schema().message_key()],
             "hello world".into()
         );
         assert_eq!(
-            log[&Atom::from(log_schema().source_type_key())],
+            log[log_schema().source_type_key()],
             "stdin".into()
         );
     }

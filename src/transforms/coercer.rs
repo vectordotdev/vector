@@ -136,20 +136,20 @@ mod tests {
     #[tokio::test]
     async fn converts_valid_fields() {
         let log = parse_it("").await;
-        assert_eq!(log[&"number".into()], Value::Integer(1234));
-        assert_eq!(log[&"bool".into()], Value::Boolean(true));
+        assert_eq!(log["number"], Value::Integer(1234));
+        assert_eq!(log["bool"], Value::Boolean(true));
     }
 
     #[tokio::test]
     async fn leaves_unnamed_fields_as_is() {
         let log = parse_it("").await;
-        assert_eq!(log[&"other".into()], Value::Bytes("no".into()));
+        assert_eq!(log["other"], Value::Bytes("no".into()));
     }
 
     #[tokio::test]
     async fn drops_nonconvertible_fields() {
         let log = parse_it("").await;
-        assert!(log.get(&"float".into()).is_none());
+        assert!(log.get("float").is_none());
     }
 
     #[tokio::test]

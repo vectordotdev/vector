@@ -1006,14 +1006,14 @@ mod tests {
         sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
-        assert_eq!(event.as_log()[&"greeting".into()], "hello".into());
-        assert_eq!(event.as_log()[&"name".into()], "bob".into());
+        assert_eq!(event.as_log()["greeting"], "hello".into());
+        assert_eq!(event.as_log()["name"], "bob".into());
         assert!(event
             .as_log()
-            .get(&Atom::from(log_schema().timestamp_key()))
+            .get(log_schema().timestamp_key())
             .is_some());
         assert_eq!(
-            event.as_log()[&Atom::from(log_schema().source_type_key())],
+            event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
         );
     }

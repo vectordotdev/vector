@@ -14,9 +14,9 @@ pub struct LogEvent {
 }
 
 impl LogEvent {
-    #[instrument(skip(self, key), fields(key = %key))]
-    pub fn get(&self, key: &DefaultAtom) -> Option<&Value> {
-        util::log::get(&self.fields, key)
+    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
+    pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
+        util::log::get(&self.fields, key.as_ref())
     }
 
     #[instrument(skip(self, key), fields(key = %key.as_ref()))]
@@ -189,10 +189,10 @@ impl TryInto<serde_json::Value> for LogEvent {
     }
 }
 
-impl std::ops::Index<&DefaultAtom> for LogEvent {
+impl std::ops::Index<&str> for LogEvent {
     type Output = Value;
 
-    fn index(&self, key: &DefaultAtom) -> &Value {
+    fn index(&self, key: &str) -> &Value {
         self.get(key)
             .expect(&*format!("Key is not found: {:?}", key))
     }

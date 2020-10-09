@@ -115,9 +115,9 @@ mod test {
         Lua::new().context(|ctx| {
             let event = ctx.load(lua_event).eval::<Event>().unwrap();
             let log = event.as_log();
-            assert_eq!(log[&"field".into()], Value::Bytes("example".into()));
+            assert_eq!(log["field"], Value::Bytes("example".into()));
             assert_eq!(
-                log[&"nested.field".into()],
+                log["nested.field"],
                 Value::Bytes("another example".into())
             );
         });

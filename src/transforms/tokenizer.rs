@@ -163,26 +163,26 @@ mod tests {
     async fn tokenizer_adds_parsed_field_to_event() {
         let log = parse_log("1234 5678", "status time", None, false, &[]).await;
 
-        assert_eq!(log[&"status".into()], "1234".into());
-        assert_eq!(log[&"time".into()], "5678".into());
-        assert!(log.get(&"message".into()).is_some());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["time"], "5678".into());
+        assert!(log.get("message").is_some());
     }
 
     #[tokio::test]
     async fn tokenizer_does_drop_parsed_field() {
         let log = parse_log("1234 5678", "status time", Some("message"), true, &[]).await;
 
-        assert_eq!(log[&"status".into()], "1234".into());
-        assert_eq!(log[&"time".into()], "5678".into());
-        assert!(log.get(&"message".into()).is_none());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["time"], "5678".into());
+        assert!(log.get("message").is_none());
     }
 
     #[tokio::test]
     async fn tokenizer_does_not_drop_same_name_parsed_field() {
         let log = parse_log("1234 yes", "status message", Some("message"), true, &[]).await;
 
-        assert_eq!(log[&"status".into()], "1234".into());
-        assert_eq!(log[&"message".into()], "yes".into());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["message"], "yes".into());
     }
 
     #[tokio::test]
@@ -196,10 +196,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(log[&"number".into()], Value::Float(42.3));
-        assert_eq!(log[&"flag".into()], Value::Boolean(true));
-        assert_eq!(log[&"code".into()], Value::Integer(1234));
-        assert_eq!(log[&"rest".into()], Value::Bytes("word".into()));
+        assert_eq!(log["number"], Value::Float(42.3));
+        assert_eq!(log["flag"], Value::Boolean(true));
+        assert_eq!(log["code"], Value::Integer(1234));
+        assert_eq!(log["rest"], Value::Bytes("word".into()));
     }
 
     #[tokio::test]
@@ -212,8 +212,8 @@ mod tests {
             &[("code", "integer"), ("who", "string"), ("why", "string")],
         )
         .await;
-        assert_eq!(log[&"code".into()], Value::Integer(1234));
-        assert_eq!(log[&"who".into()], Value::Bytes("-".into()));
-        assert_eq!(log[&"why".into()], Value::Bytes("foo".into()));
+        assert_eq!(log["code"], Value::Integer(1234));
+        assert_eq!(log["who"], Value::Bytes("-".into()));
+        assert_eq!(log["why"], Value::Bytes("foo".into()));
     }
 }

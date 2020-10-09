@@ -527,32 +527,32 @@ mod integration_tests {
         let log = event.as_log();
 
         assert_eq!(
-            log.get(&"availability-zone".into()),
+            log.get("availability-zone"),
             Some(&"ww-region-1a".into())
         );
-        assert_eq!(log.get(&"public-ipv4".into()), Some(&"192.1.1.1".into()));
+        assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
         assert_eq!(
-            log.get(&"public-hostname".into()),
+            log.get("public-hostname"),
             Some(&"mock-public-hostname".into())
         );
-        assert_eq!(log.get(&"local-ipv4".into()), Some(&"192.1.1.2".into()));
+        assert_eq!(log.get(&"local-ipv4"), Some(&"192.1.1.2".into()));
         assert_eq!(
-            log.get(&"local-hostname".into()),
+            log.get("local-hostname"),
             Some(&"mock-hostname".into())
         );
         assert_eq!(
-            log.get(&"instance-id".into()),
+            log.get("instance-id"),
             Some(&"i-096fba6d03d36d262".into())
         );
         assert_eq!(
-            log.get(&"ami-id".into()),
+            log.get("ami-id"),
             Some(&"ami-05f27d4d6770a43d2".into())
         );
-        assert_eq!(log.get(&"instance-type".into()), Some(&"t2.micro".into()));
-        assert_eq!(log.get(&"region".into()), Some(&"us-east-1".into()));
-        assert_eq!(log.get(&"vpc-id".into()), Some(&"mock-vpc-id".into()));
-        assert_eq!(log.get(&"subnet-id".into()), Some(&"mock-subnet-id".into()));
-        assert_eq!(log.get(&"role-name[0]".into()), Some(&"mock-user".into()));
+        assert_eq!(log.get("instance-type"), Some(&"t2.micro".into()));
+        assert_eq!(log.get("region"), Some(&"us-east-1".into()));
+        assert_eq!(log.get("vpc-id"), Some(&"mock-vpc-id".into()));
+        assert_eq!(log.get("subnet-id"), Some(&"mock-subnet-id".into()));
+        assert_eq!(log.get("role-name[0]"), Some(&"mock-user".into()));
     }
 
     #[tokio::test]
@@ -572,15 +572,15 @@ mod integration_tests {
         let event = transform.transform(event).unwrap();
         let log = event.as_log();
 
-        assert_eq!(log.get(&"availability-zone".into()), None);
-        assert_eq!(log.get(&"public-ipv4".into()), Some(&"192.1.1.1".into()));
-        assert_eq!(log.get(&"public-hostname".into()), None);
-        assert_eq!(log.get(&"local-ipv4".into()), None);
-        assert_eq!(log.get(&"local-hostname".into()), None);
-        assert_eq!(log.get(&"instance-id".into()), None,);
-        assert_eq!(log.get(&"instance-type".into()), None,);
-        assert_eq!(log.get(&"ami-id".into()), None);
-        assert_eq!(log.get(&"region".into()), Some(&"us-east-1".into()));
+        assert_eq!(log.get("availability-zone"), None);
+        assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
+        assert_eq!(log.get("public-hostname"), None);
+        assert_eq!(log.get("local-ipv4"), None);
+        assert_eq!(log.get("local-hostname"), None);
+        assert_eq!(log.get("instance-id"), None,);
+        assert_eq!(log.get("instance-type"), None,);
+        assert_eq!(log.get("ami-id"), None);
+        assert_eq!(log.get("region"), Some(&"us-east-1".into()));
     }
 
     #[tokio::test]
@@ -601,11 +601,11 @@ mod integration_tests {
         let log = event.as_log();
 
         assert_eq!(
-            log.get(&"ec2.metadata.availability-zone".into()),
+            log.get("ec2.metadata.availability-zone"),
             Some(&"ww-region-1a".into())
         );
         assert_eq!(
-            log.get(&"ec2.metadata.public-ipv4".into()),
+            log.get("ec2.metadata.public-ipv4"),
             Some(&"192.1.1.1".into())
         );
 
@@ -626,9 +626,9 @@ mod integration_tests {
         let log = event.as_log();
 
         assert_eq!(
-            log.get(&"availability-zone".into()),
+            log.get("availability-zone"),
             Some(&"ww-region-1a".into())
         );
-        assert_eq!(log.get(&"public-ipv4".into()), Some(&"192.1.1.1".into()));
+        assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
     }
 }
