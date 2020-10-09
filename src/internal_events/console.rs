@@ -2,11 +2,11 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct ConsoleFieldNotFound {
-    pub missing_field: String,
+pub struct ConsoleFieldNotFound<'a> {
+    pub missing_field: &'a str,
 }
 
-impl InternalEvent for ConsoleFieldNotFound {
+impl<'a> InternalEvent for ConsoleFieldNotFound<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "Field not found; dropping event.",

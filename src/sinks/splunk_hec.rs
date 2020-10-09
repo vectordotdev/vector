@@ -38,7 +38,7 @@ pub struct HecSinkConfig {
     #[serde(alias = "host")]
     pub endpoint: String,
     #[serde(default = "default_host_key")]
-    pub host_key: Atom,
+    pub host_key: String,
     #[serde(default)]
     pub indexed_fields: Vec<Atom>,
     pub index: Option<String>,
@@ -75,8 +75,8 @@ pub enum Encoding {
     Json,
 }
 
-fn default_host_key() -> Atom {
-    crate::config::LogSchema::default().host_key().clone()
+fn default_host_key() -> String {
+    crate::config::LogSchema::default().host_key().to_string()
 }
 
 inventory::submit! {
@@ -153,9 +153,9 @@ impl HttpSink for HecSinkConfig {
 
         let mut event = event.into_log();
 
-        let host = event.get(&self.host_key).cloned();
+        let host = event.get(&Atom::from(self.host_key.to_owned())).cloned();
 
-        let timestamp = match event.remove(&log_schema().timestamp_key()) {
+        let timestamp = match event.remove(&Atom::from(log_schema().timestamp_key())) {
             Some(Value::Timestamp(ts)) => ts,
             _ => chrono::Utc::now(),
         };
@@ -174,7 +174,7 @@ impl HttpSink for HecSinkConfig {
         let event = match self.encoding.codec() {
             Encoding::Json => json!(event),
             Encoding::Text => json!(event
-                .get(&log_schema().message_key())
+                .get(&Atom::from(log_schema().message_key()))
                 .map(|v| v.to_string_lossy())
                 .unwrap_or_else(|| "".into())),
         };
