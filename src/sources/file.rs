@@ -84,6 +84,8 @@ pub struct FileConfig {
 #[serde(tag = "strategy", rename_all = "snake_case")]
 pub enum FingerprintConfig {
     Checksum {
+        // Deprecated name
+        #[serde(alias = "fingerprint_bytes")]
         bytes: usize,
         ignored_header_bytes: usize,
     },
