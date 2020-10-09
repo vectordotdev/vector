@@ -17,7 +17,7 @@ components: sinks: console: {
 			common:       false
 			max_bytes:    null
 			max_events:   null
-			timeout_secs: 1
+			timeout_secs: 0
 		}
 		buffer: enabled:      false
 		compression: enabled: false
