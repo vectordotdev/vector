@@ -57,19 +57,16 @@ impl LogEvent {
     }
 
     #[instrument(skip(self, key), fields(key = %key.as_ref()))]
-    pub fn try_insert<V>(&mut self, key: impl AsRef<str>, value: V)
-    where
-        V: Into<Value> + Debug,
-    {
+    pub fn try_insert(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
         let key = key.as_ref();
         if !self.contains(key) {
             self.insert(key, value);
         }
     }
 
-    #[instrument(skip(self, key), fields(key = %key))]
-    pub fn remove(&mut self, key: &DefaultAtom) -> Option<Value> {
-        util::log::remove(&mut self.fields, &key, false)
+    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
+    pub fn remove(&mut self, key: impl AsRef<str>) -> Option<Value> {
+        util::log::remove(&mut self.fields, key.as_ref(), false)
     }
 
     #[instrument(skip(self, key), fields(key = %key.as_ref()))]

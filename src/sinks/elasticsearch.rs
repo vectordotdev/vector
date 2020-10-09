@@ -482,7 +482,7 @@ async fn finish_signer(
 }
 
 fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event: &mut Event) {
-    if let Some(val) = key.and_then(|k| event.as_mut_log().remove(&k.as_ref().into())) {
+    if let Some(val) = key.and_then(|k| event.as_mut_log().remove(k)) {
         let val = val.to_string_lossy();
 
         doc.as_object_mut()

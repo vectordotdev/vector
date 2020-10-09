@@ -60,7 +60,7 @@ impl Transform for Cri {
 fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     // Detect if this is a partial event.
     let multiline_tag = log
-        .remove(&MULTILINE_TAG)
+        .remove(&*MULTILINE_TAG)
         .context(MultilineTagFieldMissing)?;
     let multiline_tag = match multiline_tag {
         Value::Bytes(val) => val,

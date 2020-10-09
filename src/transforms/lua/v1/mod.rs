@@ -162,7 +162,7 @@ impl rlua::UserData for LuaEvent {
                         this.inner.as_mut_log().insert(key, Value::Boolean(boolean));
                     }
                     Some(rlua::Value::Nil) | None => {
-                        this.inner.as_mut_log().remove(&key.into());
+                        this.inner.as_mut_log().remove(key);
                     }
                     _ => {
                         info!(
@@ -171,7 +171,7 @@ impl rlua::UserData for LuaEvent {
                             field = key.as_str(),
                             rate_limit_secs = 30
                         );
-                        this.inner.as_mut_log().remove(&key.into());
+                        this.inner.as_mut_log().remove(key);
                     }
                 }
 
