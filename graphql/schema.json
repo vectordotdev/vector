@@ -406,6 +406,18 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "eventsProcessed",
+              "description": "Metric indicating events processed for the current sink",
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "EventsProcessed",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -500,6 +512,18 @@
                     }
                   }
                 }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "eventsProcessed",
+              "description": "Metric indicating events processed for the current source",
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "EventsProcessed",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -741,6 +765,18 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "eventsProcessed",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "EventsProcessed",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -829,6 +865,18 @@
                     }
                   }
                 }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "eventsProcessed",
+              "description": "Metric indicating events processed for the current transform",
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "EventsProcessed",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
