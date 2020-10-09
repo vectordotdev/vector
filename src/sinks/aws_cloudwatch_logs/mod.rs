@@ -1,7 +1,7 @@
 mod request;
 
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::{Event, LogEvent, Value},
     region::RegionOrEndpoint,
@@ -83,8 +83,10 @@ pub struct CloudwatchLogsSinkConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<CloudwatchLogsSinkConfig>("aws_cloudwatch_logs")
+    SinkDescription::new::<CloudwatchLogsSinkConfig>("aws_cloudwatch_logs")
 }
+
+impl GenerateConfig for CloudwatchLogsSinkConfig {}
 
 #[cfg(test)]
 fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {

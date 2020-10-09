@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -49,8 +49,10 @@ pub struct LogdnaConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<LogdnaConfig>("logdna")
+    SinkDescription::new::<LogdnaConfig>("logdna")
 }
+
+impl GenerateConfig for LogdnaConfig {}
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]

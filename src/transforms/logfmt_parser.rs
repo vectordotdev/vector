@@ -21,6 +21,8 @@ inventory::submit! {
     TransformDescription::new::<LogfmtConfig>("logfmt_parser")
 }
 
+impl_generate_config_from_default!(LogfmtConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {
@@ -115,6 +117,11 @@ mod tests {
         event::{LogEvent, Value},
         Event,
     };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<LogfmtConfig>();
+    }
 
     async fn parse_log(text: &str, drop_field: bool, types: &[(&str, &str)]) -> LogEvent {
         let event = Event::from(text);

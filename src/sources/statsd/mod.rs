@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GlobalOptions, SourceConfig, SourceDescription},
+    config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     Event, Pipeline,
@@ -23,8 +23,10 @@ struct StatsdConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<StatsdConfig>("statsd")
+    SourceDescription::new::<StatsdConfig>("statsd")
 }
+
+impl GenerateConfig for StatsdConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "statsd")]

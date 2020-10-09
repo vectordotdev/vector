@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{SwimlanesEventDiscarded, SwimlanesEventProcessed},
 };
@@ -68,8 +68,10 @@ pub struct SwimlanesConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<SwimlanesConfig>("swimlanes")
+    TransformDescription::new::<SwimlanesConfig>("swimlanes")
 }
+
+impl GenerateConfig for SwimlanesConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "swimlanes")]

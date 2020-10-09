@@ -22,6 +22,8 @@ inventory::submit! {
     TransformDescription::new::<CoercerConfig>("coercer")
 }
 
+impl_generate_config_from_default!(CoercerConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {
@@ -98,6 +100,11 @@ mod tests {
         Event,
     };
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<CoercerConfig>();
+    }
 
     async fn parse_it(extra: &str) -> LogEvent {
         let mut event = Event::from("dummy message");

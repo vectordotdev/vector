@@ -14,6 +14,8 @@ inventory::submit! {
     ConditionDescription::new::<IsLogConfig>("is_log")
 }
 
+impl_generate_config_from_default!(IsLogConfig);
+
 #[typetag::serde(name = "is_log")]
 impl ConditionConfig for IsLogConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
@@ -51,6 +53,11 @@ mod test {
         event::metric::{Metric, MetricKind, MetricValue},
         Event,
     };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<IsLogConfig>();
+    }
 
     #[test]
     fn is_log_basic() {

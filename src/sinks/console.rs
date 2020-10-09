@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::ConsoleFieldNotFound,
     sinks::util::{
@@ -43,8 +43,10 @@ pub enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<ConsoleSinkConfig>("console")
+    SinkDescription::new::<ConsoleSinkConfig>("console")
 }
+
+impl GenerateConfig for ConsoleSinkConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "console")]

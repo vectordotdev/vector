@@ -40,6 +40,8 @@ inventory::submit! {
     SourceDescription::new::<StdinConfig>("stdin")
 }
 
+impl_generate_config_from_default!(StdinConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
@@ -131,6 +133,11 @@ mod tests {
     use futures01::{Async::*, Stream};
     use std::io::Cursor;
     use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<StdinConfig>();
+    }
 
     #[test]
     fn stdin_create_event() {

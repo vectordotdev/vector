@@ -83,6 +83,8 @@ inventory::submit! {
     SinkDescription::new::<HecSinkConfig>("splunk_hec")
 }
 
+impl_generate_config_from_default!(HecSinkConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "splunk_hec")]
 impl SinkConfig for HecSinkConfig {
@@ -279,6 +281,11 @@ mod tests {
     use chrono::Utc;
     use serde::Deserialize;
     use std::collections::BTreeMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<HecSinkConfig>();
+    }
 
     #[derive(Deserialize, Debug)]
     struct HecEventJson {

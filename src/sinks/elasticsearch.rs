@@ -98,6 +98,8 @@ inventory::submit! {
     SinkDescription::new::<ElasticSearchConfig>("elasticsearch")
 }
 
+impl_generate_config_from_default!(ElasticSearchConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
@@ -497,6 +499,11 @@ mod tests {
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ElasticSearchConfig>();
+    }
 
     #[test]
     fn removes_and_sets_id_from_custom_field() {

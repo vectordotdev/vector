@@ -1,7 +1,7 @@
 use crate::expiring_hash_map::ExpiringHashMap;
 use crate::{
     buffers::Acker,
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -45,8 +45,10 @@ pub struct FileSinkConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<FileSinkConfig>("file")
+    SinkDescription::new::<FileSinkConfig>("file")
 }
+
+impl GenerateConfig for FileSinkConfig {}
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(rename_all = "snake_case")]

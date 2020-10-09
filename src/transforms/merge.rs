@@ -36,6 +36,8 @@ inventory::submit! {
     TransformDescription::new::<MergeConfig>("merge")
 }
 
+impl_generate_config_from_default!(MergeConfig);
+
 impl Default for MergeConfig {
     fn default() -> Self {
         Self {
@@ -144,6 +146,11 @@ mod test {
     use crate::event::{self, Event};
     use crate::transforms::Transform;
     use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<MergeConfig>();
+    }
 
     fn make_partial(mut event: Event) -> Event {
         event.as_mut_log().insert(event::PARTIAL.clone(), true);

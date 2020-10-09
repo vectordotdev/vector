@@ -60,6 +60,8 @@ inventory::submit! {
     SinkDescription::new::<PubsubConfig>("gcp_pubsub")
 }
 
+impl_generate_config_from_default!(PubsubConfig);
+
 lazy_static::lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
         rate_limit_num: Some(100),
@@ -194,6 +196,11 @@ async fn healthcheck(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<PubsubConfig>();
+    }
 
     #[tokio::test]
     async fn fails_missing_creds() {

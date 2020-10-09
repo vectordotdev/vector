@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::event::Lookup;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     internal_events::{RemoveFieldsEventProcessed, RemoveFieldsFieldMissing},
     Event,
 };
@@ -22,8 +22,10 @@ pub struct RemoveFields {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<RemoveFieldsConfig>("remove_fields")
+    TransformDescription::new::<RemoveFieldsConfig>("remove_fields")
 }
+
+impl GenerateConfig for RemoveFieldsConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "remove_fields")]

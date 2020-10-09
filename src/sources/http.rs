@@ -1,5 +1,7 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+    },
     event::{Event, Value},
     shutdown::ShutdownSignal,
     sources::util::{ErrorMessage, HttpSource},
@@ -27,8 +29,10 @@ pub struct SimpleHttpConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<SimpleHttpConfig>("http")
+    SourceDescription::new::<SimpleHttpConfig>("http")
 }
+
+impl GenerateConfig for SimpleHttpConfig {}
 
 #[derive(Clone)]
 struct SimpleHttpSource {

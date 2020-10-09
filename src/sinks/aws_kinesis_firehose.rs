@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::Event,
     region::RegionOrEndpoint,
@@ -68,8 +68,10 @@ pub enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<KinesisFirehoseSinkConfig>("aws_kinesis_firehose")
+    SinkDescription::new::<KinesisFirehoseSinkConfig>("aws_kinesis_firehose")
 }
+
+impl GenerateConfig for KinesisFirehoseSinkConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_kinesis_firehose")]

@@ -80,6 +80,8 @@ inventory::submit! {
     SourceDescription::new::<JournaldConfig>("journald")
 }
 
+impl_generate_config_from_default!(JournaldConfig);
+
 type Record = HashMap<Atom, String>;
 
 #[async_trait::async_trait]
@@ -510,6 +512,11 @@ mod checkpointer_tests {
     use super::*;
     use tempfile::tempdir;
     use tokio::fs::read_to_string;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<JournaldConfig>();
+    }
 
     #[tokio::test]
     async fn journald_checkpointer_works() {

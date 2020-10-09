@@ -112,6 +112,8 @@ inventory::submit! {
     SourceDescription::new::<DockerConfig>("docker")
 }
 
+impl_generate_config_from_default!(DockerConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "docker")]
 impl SourceConfig for DockerConfig {
@@ -985,8 +987,18 @@ fn line_agg_adapter(
     })
 }
 
-#[cfg(all(test, feature = "docker-integration-tests"))]
+#[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<DockerConfig>();
+    }
+}
+
+#[cfg(all(test, feature = "docker-integration-tests"))]
+mod integration_tests {
     use super::*;
     use crate::{
         test_util::{collect_n, trace_init},

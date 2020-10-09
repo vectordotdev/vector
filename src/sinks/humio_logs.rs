@@ -43,8 +43,10 @@ fn default_host_key() -> String {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<HumioLogsConfig>("humio_logs")
+    SinkDescription::new::<HumioLogsConfig>("humio_logs")
 }
+
+impl_generate_config_from_default!(HumioLogsConfig);
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
@@ -109,6 +111,11 @@ mod tests {
     use crate::sinks::util::{http::HttpSink, test::load_sink};
     use chrono::Utc;
     use serde::Deserialize;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<HumioLogsConfig>();
+    }
 
     #[derive(Deserialize, Debug)]
     struct HecEventJson {

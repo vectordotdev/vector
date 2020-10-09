@@ -145,6 +145,8 @@ inventory::submit! {
     SinkDescription::new::<DatadogConfig>("datadog_metrics")
 }
 
+impl_generate_config_from_default!(DatadogConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogConfig {
@@ -495,6 +497,11 @@ mod tests {
     use http::{Method, Uri};
     use pretty_assertions::assert_eq;
     use std::sync::atomic::AtomicI64;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<DatadogConfig>();
+    }
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)

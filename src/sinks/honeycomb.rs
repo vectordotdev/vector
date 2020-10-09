@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     sinks::util::{
         http::{BatchedHttpSink, HttpClient, HttpSink},
@@ -33,8 +33,10 @@ pub struct HoneycombConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<HoneycombConfig>("honeycomb")
+    SinkDescription::new::<HoneycombConfig>("honeycomb")
 }
+
+impl GenerateConfig for HoneycombConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "honeycomb")]

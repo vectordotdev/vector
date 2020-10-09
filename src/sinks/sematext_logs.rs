@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::elasticsearch::{ElasticSearchConfig, Encoding},
     sinks::util::{
         encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
@@ -32,8 +32,10 @@ pub struct SematextLogsConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<SematextLogsConfig>("sematext_logs")
+    SinkDescription::new::<SematextLogsConfig>("sematext_logs")
 }
+
+impl GenerateConfig for SematextLogsConfig {}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

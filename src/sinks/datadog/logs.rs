@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::{
         util::{self, encoding::EncodingConfig, tcp::TcpSink, Encoding, StreamSinkOld, UriSerde},
@@ -22,8 +22,10 @@ pub struct DatadogLogsConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<DatadogLogsConfig>("datadog_logs")
+    SinkDescription::new::<DatadogLogsConfig>("datadog_logs")
 }
+
+impl GenerateConfig for DatadogLogsConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_logs")]

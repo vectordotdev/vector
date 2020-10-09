@@ -36,6 +36,8 @@ inventory::submit! {
     TransformDescription::new::<GrokParserConfig>("grok_parser")
 }
 
+impl_generate_config_from_default!(GrokParserConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "grok_parser")]
 impl TransformConfig for GrokParserConfig {
@@ -138,6 +140,11 @@ mod tests {
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<GrokParserConfig>();
+    }
 
     async fn parse_log(
         event: &str,

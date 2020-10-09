@@ -96,6 +96,8 @@ inventory::submit! {
     SinkDescription::new::<StackdriverConfig>("gcp_stackdriver_logs")
 }
 
+impl_generate_config_from_default!(StackdriverConfig);
+
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
         rate_limit_num: Some(1000),
@@ -276,6 +278,11 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use serde_json::value::RawValue;
     use std::iter::FromIterator;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<StackdriverConfig>();
+    }
 
     #[test]
     fn encode_valid() {

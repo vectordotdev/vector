@@ -139,6 +139,8 @@ inventory::submit! {
     SinkDescription::new::<S3SinkConfig>("aws_s3")
 }
 
+impl_generate_config_from_default!(S3SinkConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
@@ -417,6 +419,11 @@ mod tests {
     use crate::event::Event;
 
     use std::collections::BTreeMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<S3SinkConfig>();
+    }
 
     #[test]
     fn s3_encode_event_text() {

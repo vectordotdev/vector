@@ -69,6 +69,8 @@ inventory::submit! {
     SinkDescription::new::<AzureMonitorLogsConfig>("azure_monitor_logs")
 }
 
+impl_generate_config_from_default!(AzureMonitorLogsConfig);
+
 /// Max number of bytes in request body
 const MAX_BATCH_SIZE_MB: u64 = 30;
 /// API endpoint for submitting logs
@@ -302,6 +304,11 @@ mod tests {
     use crate::event::LogEvent;
     use serde_json::value::RawValue;
     use std::iter::FromIterator;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AzureMonitorLogsConfig>();
+    }
 
     fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
         let now = chrono::Utc::now();

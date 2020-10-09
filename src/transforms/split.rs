@@ -24,6 +24,8 @@ inventory::submit! {
     TransformDescription::new::<SplitConfig>("split")
 }
 
+impl_generate_config_from_default!(SplitConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "split")]
 impl TransformConfig for SplitConfig {
@@ -146,6 +148,11 @@ mod tests {
         Event,
     };
     use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SplitConfig>();
+    }
 
     #[test]
     fn split_whitespace() {

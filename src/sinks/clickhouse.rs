@@ -51,6 +51,8 @@ inventory::submit! {
     SinkDescription::new::<ClickhouseConfig>("clickhouse")
 }
 
+impl_generate_config_from_default!(ClickhouseConfig);
+
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
@@ -220,6 +222,11 @@ impl RetryLogic for ClickhouseRetryLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ClickhouseConfig>();
+    }
 
     #[test]
     fn encode_valid() {

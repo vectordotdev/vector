@@ -1,5 +1,7 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+    },
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     shutdown::ShutdownSignal,
@@ -25,8 +27,10 @@ pub struct LogplexConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<LogplexConfig>("logplex")
+    SourceDescription::new::<LogplexConfig>("logplex")
 }
+
+impl GenerateConfig for LogplexConfig {}
 
 #[derive(Clone, Default)]
 struct LogplexSource {}

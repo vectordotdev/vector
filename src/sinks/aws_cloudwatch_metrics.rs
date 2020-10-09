@@ -55,6 +55,8 @@ inventory::submit! {
     SinkDescription::new::<CloudWatchMetricsSinkConfig>("aws_cloudwatch_metrics")
 }
 
+impl_generate_config_from_default!(CloudWatchMetricsSinkConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_cloudwatch_metrics")]
 impl SinkConfig for CloudWatchMetricsSinkConfig {
@@ -271,6 +273,11 @@ mod tests {
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
     use rusoto_cloudwatch::PutMetricDataInput;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<CloudWatchMetricsSinkConfig>();
+    }
 
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {

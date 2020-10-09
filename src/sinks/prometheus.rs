@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     sinks::util::{encode_namespace, statistic::DistributionStatistic, MetricEntry, StreamSink},
     Event,
@@ -63,7 +63,19 @@ pub fn default_flush_period_secs() -> u64 {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<PrometheusSinkConfig>("prometheus")
+    SinkDescription::new::<PrometheusSinkConfig>("prometheus")
+}
+
+impl GenerateConfig for PrometheusSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(&Self {
+            namespace: None,
+            address: default_address(),
+            buckets: default_histogram_buckets(),
+            flush_period_secs: default_flush_period_secs(),
+        })
+        .unwrap()
+    }
 }
 
 #[async_trait::async_trait]
@@ -457,6 +469,11 @@ mod tests {
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<PrometheusSinkConfig>();
+    }
 
     fn tags() -> BTreeMap<String, String> {
         vec![("code".to_owned(), "200".to_owned())]

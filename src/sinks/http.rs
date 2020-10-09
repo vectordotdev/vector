@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -97,8 +97,10 @@ pub enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<HttpSinkConfig>("http")
+    SinkDescription::new::<HttpSinkConfig>("http")
 }
+
+impl GenerateConfig for HttpSinkConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "http")]
