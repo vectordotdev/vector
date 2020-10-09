@@ -9,19 +9,19 @@ rate.action = "defer"
 # drop down repeatedly.
 
 [stats.in_flight]
-max = [15, 15]
+max = [9, 9]
 mean = [8.0, 9.0]
 
 [stats.rate]
-max = [105, 110]
-mean = [73, 74]
+max = [81, 110]
+mean = [73, 75]
 
 [controller.in_flight]
-max = [15, 15]
+max = [9, 9]
 mean = [8.0, 9.0]
 
 [controller.concurrency_limit]
-max = [15, 15]
+max = [9, 9]
 mean = [8.0, 9.0]
 
 [controller.observed_rtt]
