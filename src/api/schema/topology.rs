@@ -64,7 +64,7 @@ impl Source {
         })
     }
 
-    /// Metric indicating events processed against the current source
+    /// Metric indicating events processed for the current source
     async fn events_processed(&self) -> Option<metrics::EventsProcessed> {
         metrics::topology_events_processed(self.0.name.clone())
     }
@@ -108,6 +108,11 @@ impl Transform {
             _ => None,
         })
     }
+
+    /// Metric indicating events processed for the current transform
+    async fn events_processed(&self) -> Option<metrics::EventsProcessed> {
+        metrics::topology_events_processed(self.0.name.clone())
+    }
 }
 
 #[derive(Clone)]
@@ -149,9 +154,17 @@ impl Sink {
             })
             .collect()
     }
+
+    /// Metric indicating events processed for the current sink
+    async fn events_processed(&self) -> Option<metrics::EventsProcessed> {
+        metrics::topology_events_processed(self.0.name.clone())
+    }
 }
 
-#[Interface(field(name = "name", type = "String"))]
+#[Interface(
+    field(name = "name", type = "String"),
+    field(name = "events_processed", type = "Option<metrics::EventsProcessed>")
+)]
 #[derive(Clone)]
 pub enum Topology {
     Source(Source),

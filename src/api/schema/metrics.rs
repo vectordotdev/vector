@@ -9,8 +9,9 @@ use tokio::stream::{Stream, StreamExt};
 use tokio::time::Duration;
 
 lazy_static! {
-    static ref GLOBAL_CONTROLLER: Arc<Mutex<&'static Controller>> =
-        Arc::new(Mutex::new(get_controller().unwrap()));
+    static ref GLOBAL_CONTROLLER: Arc<Mutex<&'static Controller>> = Arc::new(Mutex::new(
+        get_controller().expect("Metrics system not initialized. Please report.")
+    ));
 }
 
 pub struct Uptime(Metric);
