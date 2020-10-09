@@ -6,6 +6,9 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+const INVARIANT: &str =
+    "It is an invariant for the API to be active but not have a TOPOLOGY. Please report this.";
+
 #[Enum]
 pub enum SourceOutputType {
     Any,
@@ -82,7 +85,7 @@ impl Transform {
         self.0
             .inputs
             .iter()
-            .filter_map(|name| match TOPOLOGY.read().unwrap().get(name) {
+            .filter_map(|name| match TOPOLOGY.read().expect(INVARIANT).get(name) {
                 Some(t) => match t {
                     Topology::Source(s) => Some(s.clone()),
                     _ => None,
@@ -116,7 +119,7 @@ impl Sink {
         self.0
             .inputs
             .iter()
-            .filter_map(|name| match TOPOLOGY.read().unwrap().get(name) {
+            .filter_map(|name| match TOPOLOGY.read().expect(INVARIANT).get(name) {
                 Some(topology) => match topology {
                     Topology::Source(s) => Some(s.clone()),
                     _ => None,
@@ -131,7 +134,7 @@ impl Sink {
         self.0
             .inputs
             .iter()
-            .filter_map(|name| match TOPOLOGY.read().unwrap().get(name) {
+            .filter_map(|name| match TOPOLOGY.read().expect(INVARIANT).get(name) {
                 Some(topology) => match topology {
                     Topology::Transform(t) => Some(t.clone()),
                     _ => None,
@@ -184,7 +187,7 @@ impl TopologyQuery {
 fn filter_topology<T>(map_func: impl Fn((&String, &Topology)) -> Option<T>) -> Vec<T> {
     TOPOLOGY
         .read()
-        .unwrap()
+        .expect(INVARIANT)
         .iter()
         .filter_map(map_func)
         .collect()
@@ -249,5 +252,5 @@ pub fn update_config(config: &Config) {
     }
 
     // override the old hashmap
-    *TOPOLOGY.write().unwrap() = new_topology
+    *TOPOLOGY.write().expect(INVARIANT) = new_topology
 }
