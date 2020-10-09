@@ -60,6 +60,7 @@ components: sinks: influxdb_logs: {
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {
