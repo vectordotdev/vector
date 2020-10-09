@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     wasm::WasmModule,
 };
@@ -46,8 +46,10 @@ impl Into<WasmModuleConfig> for WasmConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<WasmConfig>("wasm")
+    TransformDescription::new::<WasmConfig>("wasm")
 }
+
+impl GenerateConfig for WasmConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "wasm")]

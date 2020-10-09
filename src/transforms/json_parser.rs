@@ -24,6 +24,8 @@ inventory::submit! {
     TransformDescription::new::<JsonParserConfig>("json_parser")
 }
 
+impl_generate_config_from_default!(JsonParserConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "json_parser")]
 impl TransformConfig for JsonParserConfig {
@@ -136,6 +138,11 @@ mod test {
     use crate::{config::log_schema, event::Event, transforms::Transform};
     use serde_json::json;
     use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<JsonParserConfig>();
+    }
 
     #[test]
     fn json_parser_drop_field() {

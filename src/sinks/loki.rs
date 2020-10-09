@@ -13,7 +13,7 @@
 //! does not match, we will add a default label `{agent="vector"}`.
 
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
     sinks::util::{
         buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
@@ -67,8 +67,10 @@ enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<LokiConfig>("loki")
+    SinkDescription::new::<LokiConfig>("loki")
 }
+
+impl GenerateConfig for LokiConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "loki")]

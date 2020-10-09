@@ -1,6 +1,9 @@
 use super::Transform;
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
+    },
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::LogEvent,
     event::Value,
@@ -85,8 +88,10 @@ pub struct LogToMetric {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<LogToMetricConfig>("log_to_metric")
+    TransformDescription::new::<LogToMetricConfig>("log_to_metric")
 }
+
+impl GenerateConfig for LogToMetricConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "log_to_metric")]

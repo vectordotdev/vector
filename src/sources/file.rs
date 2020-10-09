@@ -140,6 +140,8 @@ inventory::submit! {
     SourceDescription::new::<FileConfig>("file")
 }
 
+impl_generate_config_from_default!(FileConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "file")]
 impl SourceConfig for FileConfig {
@@ -333,6 +335,11 @@ mod tests {
     use string_cache::DefaultAtom as Atom;
     use tempfile::tempdir;
     use tokio::time::{delay_for, timeout, Duration};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<FileConfig>();
+    }
 
     fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {
