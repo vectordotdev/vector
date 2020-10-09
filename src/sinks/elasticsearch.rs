@@ -98,9 +98,15 @@ inventory::submit! {
     SinkDescription::new::<ElasticSearchConfig>("elasticsearch")
 }
 
+impl_generate_config_from_default!(ElasticSearchConfig);
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
         let client = HttpClient::new(cx.resolver(), common.tls_settings.clone())?;
 
@@ -495,6 +501,11 @@ mod tests {
     use string_cache::DefaultAtom as Atom;
 
     #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ElasticSearchConfig>();
+    }
+
+    #[test]
     fn removes_and_sets_id_from_custom_field() {
         let id_key = Some("foo");
         let mut event = Event::from("butts");
@@ -589,6 +600,7 @@ mod integration_tests {
     use serde_json::{json, Value};
     use std::fs::File;
     use std::io::Read;
+    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn ensure_pipeline_in_params() {
@@ -597,7 +609,7 @@ mod integration_tests {
 
         let config = ElasticSearchConfig {
             endpoint: "http://localhost:9200".into(),
-            index: Some(index.clone()),
+            index: Some(index),
             pipeline: Some(pipeline.clone()),
             ..config()
         };
@@ -621,7 +633,7 @@ mod integration_tests {
         let base_url = common.base_url.clone();
 
         let cx = SinkContext::new_test();
-        let (sink, _hc) = config.build(cx.clone()).unwrap();
+        let (sink, _hc) = config.build(cx.clone()).await.unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("my_id", "42");
@@ -658,7 +670,7 @@ mod integration_tests {
         let expected = json!({
             "message": "raw log line",
             "foo": "bar",
-            "timestamp": input_event.as_log()[&crate::config::log_schema().timestamp_key()],
+            "timestamp": input_event.as_log()[&Atom::from(crate::config::log_schema().timestamp_key())],
         });
         assert_eq!(expected, value);
     }
@@ -737,29 +749,29 @@ mod integration_tests {
         let base_url = common.base_url.clone();
 
         let cx = SinkContext::new_test();
-        let (sink, healthcheck) = config.build(cx.clone()).expect("Building config failed");
+        let (sink, healthcheck) = config
+            .build(cx.clone())
+            .await
+            .expect("Building config failed");
 
         healthcheck.await.expect("Health check failed");
 
         let (input, events) = random_events_with_stream(100, 100);
-        match break_events {
-            true => {
-                // Break all but the first event to simulate some kind of partial failure
-                let mut doit = false;
-                sink.run(events.map(move |mut event| {
-                    if doit {
-                        event.as_mut_log().insert("_type", 1);
-                    }
-                    doit = true;
-                    event
-                }))
-                .await
-                .expect("Sending events failed");
-            }
-            false => {
-                sink.run(events).await.expect("Sending events failed");
-            }
-        };
+        if break_events {
+            // Break all but the first event to simulate some kind of partial failure
+            let mut doit = false;
+            sink.run(events.map(move |mut event| {
+                if doit {
+                    event.as_mut_log().insert("_type", 1);
+                }
+                doit = true;
+                event
+            }))
+            .await
+            .expect("Sending events failed");
+        } else {
+            sink.run(events).await.expect("Sending events failed");
+        }
 
         // make sure writes all all visible
         flush(cx.resolver(), common)

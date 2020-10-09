@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::Event,
+    event::{Event, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::KafkaAuthConfig,
     shutdown::ShutdownSignal,
@@ -73,12 +73,15 @@ fn default_auto_offset_reset() -> String {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<KafkaSourceConfig>("kafka")
+    SourceDescription::new::<KafkaSourceConfig>("kafka")
 }
 
+impl_generate_config_from_default!(KafkaSourceConfig);
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "kafka")]
 impl SourceConfig for KafkaSourceConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -131,7 +134,10 @@ fn kafka_source(
                             let mut event = Event::new_empty_log();
                             let log = event.as_mut_log();
 
-                            log.insert(log_schema().message_key().clone(), payload.to_vec());
+                            log.insert(
+                                log_schema().message_key(),
+                                Value::from(Bytes::from(payload.to_owned())),
+                            );
 
                             // Extract timestamp from kafka message
                             let timestamp = msg
@@ -139,7 +145,7 @@ fn kafka_source(
                                 .to_millis()
                                 .and_then(|millis| Utc.timestamp_millis_opt(millis).latest())
                                 .unwrap_or_else(Utc::now);
-                            log.insert(log_schema().timestamp_key().clone(), timestamp);
+                            log.insert(log_schema().timestamp_key(), timestamp);
 
                             // Add source type
                             log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
@@ -148,7 +154,10 @@ fn kafka_source(
                                 match msg.key() {
                                     None => (),
                                     Some(key) => {
-                                        log.insert(key_field.clone(), key.to_vec());
+                                        log.insert(
+                                            key_field,
+                                            Value::from(String::from_utf8_lossy(key).to_string()),
+                                        );
                                     }
                                 }
                             }
@@ -222,6 +231,11 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer> 
 mod test {
     use super::{kafka_source, KafkaSourceConfig};
     use crate::{shutdown::ShutdownSignal, Pipeline};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<KafkaSourceConfig>();
+    }
 
     fn make_config() -> KafkaSourceConfig {
         KafkaSourceConfig {
@@ -332,7 +346,7 @@ mod integration_test {
         let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             "my message".into()
         );
         assert_eq!(
@@ -340,9 +354,12 @@ mod integration_test {
             "my key".into()
         );
         assert_eq!(
-            events[0].as_log()[log_schema().source_type_key()],
+            events[0].as_log()[&Atom::from(log_schema().source_type_key())],
             "kafka".into()
         );
-        assert_eq!(events[0].as_log()[log_schema().timestamp_key()], now.into());
+        assert_eq!(
+            events[0].as_log()[&Atom::from(log_schema().timestamp_key())],
+            now.into()
+        );
     }
 }

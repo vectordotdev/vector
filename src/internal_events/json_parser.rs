@@ -12,16 +12,14 @@ impl InternalEvent for JsonParserEventProcessed {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "json_parser",
-        );
+        counter!("events_processed", 1);
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct JsonParserFailedParse<'a> {
     pub field: &'a Atom,
+    pub value: &'a str,
     pub error: Error,
 }
 
@@ -30,15 +28,14 @@ impl<'a> InternalEvent for JsonParserFailedParse<'a> {
         warn!(
             message = "Event failed to parse as JSON.",
             field = %self.field,
-            %self.error,
+            value = %self.value,
+            error = %self.error,
             rate_limit_secs = 30
         )
     }
 
     fn emit_metrics(&self) {
         counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "json_parser",
             "error_type" => "failed_parse",
         );
     }
@@ -60,8 +57,6 @@ impl<'a> InternalEvent for JsonParserTargetExists<'a> {
 
     fn emit_metrics(&self) {
         counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "json_parser",
             "error_type" => "target_field_exists",
         );
     }

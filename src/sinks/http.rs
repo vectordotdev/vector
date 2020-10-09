@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -20,6 +20,7 @@ use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -96,12 +97,18 @@ pub enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<HttpSinkConfig>("http")
+    SinkDescription::new::<HttpSinkConfig>("http")
 }
 
+impl GenerateConfig for HttpSinkConfig {}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         validate_headers(&self.headers, &self.auth)?;
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(cx.resolver(), tls)?;
@@ -157,7 +164,7 @@ impl HttpSink for HttpSinkConfig {
 
         let body = match &self.encoding.codec() {
             Encoding::Text => {
-                if let Some(v) = event.get(&crate::config::log_schema().message_key()) {
+                if let Some(v) = event.get(&Atom::from(crate::config::log_schema().message_key())) {
                     let mut b = v.to_string_lossy().into_bytes();
                     b.push(b'\n');
                     b
@@ -369,9 +376,9 @@ mod tests {
 
     // TODO: Fix failure on GH Actions using macos-latest image.
     #[cfg(not(target_os = "macos"))]
-    #[test]
+    #[tokio::test]
     #[should_panic(expected = "Authorization header can not be used with defined auth options")]
-    fn http_headers_auth_conflict() {
+    async fn http_headers_auth_conflict() {
         let config = r#"
         uri = "http://$IN_ADDR/"
         encoding = "text"
@@ -386,7 +393,7 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
-        let _ = config.build(cx).unwrap();
+        let _ = config.build(cx).await.unwrap();
     }
 
     #[tokio::test]
@@ -410,7 +417,7 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
@@ -465,7 +472,7 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
@@ -517,7 +524,7 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);

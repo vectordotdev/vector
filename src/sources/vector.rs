@@ -1,6 +1,6 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     event::proto,
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     shutdown::ShutdownSignal,
@@ -37,12 +37,15 @@ impl VectorConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<VectorConfig>("vector")
+    SourceDescription::new::<VectorConfig>("vector")
 }
 
+impl GenerateConfig for VectorConfig {}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "vector")]
 impl SourceConfig for VectorConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -119,13 +122,14 @@ mod test {
                 ShutdownSignal::noop(),
                 tx,
             )
+            .await
             .unwrap()
             .compat();
         tokio::spawn(server);
         wait_for_tcp(addr).await;
 
         let cx = SinkContext::new_test();
-        let (sink, _) = sink.build(cx).unwrap();
+        let (sink, _) = sink.build(cx).await.unwrap();
 
         let events = vec![
             Event::from("test"),

@@ -12,9 +12,7 @@ bundle update --bundler
 bundle install
 cd ..
 
-cd scripts
-npm install markdownlint-cli
-cd ..
+sudo npm -g install markdownlint-cli
 
 pip3 install jsonschema==3.2.0
 pip3 install remarshal==0.11.2

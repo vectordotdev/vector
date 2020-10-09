@@ -1,8 +1,10 @@
 // Using a shared mod like this is probably not the best idea, since we have to
 // disable the `dead_code` lint, as we don't need all of the helpers from here
 // all over the place.
+#![allow(clippy::type_complexity)]
 #![allow(dead_code)]
 
+use async_trait::async_trait;
 use futures::{future, FutureExt};
 use futures01::{sink::Sink, stream, sync::mpsc::Receiver, Async, Future, Stream};
 use serde::{Deserialize, Serialize};
@@ -11,6 +13,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Mutex,
 };
+use string_cache::DefaultAtom as Atom;
 use tracing::{error, info};
 use vector::config::{
     DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
@@ -93,9 +96,10 @@ impl MockSourceConfig {
     }
 }
 
+#[async_trait]
 #[typetag::serde(name = "mock")]
 impl SourceConfig for MockSourceConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -156,14 +160,11 @@ impl Transform for MockTransform {
         match &mut event {
             Event::Log(log) => {
                 let mut v = log
-                    .get(&vector::config::log_schema().message_key())
+                    .get(&Atom::from(vector::config::log_schema().message_key()))
                     .unwrap()
                     .to_string_lossy();
                 v.push_str(&self.suffix);
-                log.insert(
-                    vector::config::log_schema().message_key().clone(),
-                    Value::from(v),
-                );
+                log.insert(vector::config::log_schema().message_key(), Value::from(v));
             }
             Event::Metric(metric) => match metric.value {
                 MetricValue::Counter { ref mut value } => {
@@ -217,9 +218,10 @@ impl MockTransformConfig {
     }
 }
 
+#[async_trait]
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    fn build(&self, _cx: TransformContext) -> Result<Box<dyn Transform>, vector::Error> {
+    async fn build(&self, _cx: TransformContext) -> Result<Box<dyn Transform>, vector::Error> {
         Ok(Box::new(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,
@@ -270,13 +272,14 @@ enum HealthcheckError {
     Unhealthy,
 }
 
+#[async_trait]
 #[typetag::serialize(name = "mock")]
 impl<T> SinkConfig for MockSinkConfig<T>
 where
     T: Sink<SinkItem = Event> + std::fmt::Debug + Clone + Send + Sync + 'static,
     <T as Sink>::SinkError: std::fmt::Debug,
 {
-    fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
+    async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         let sink = self.sink.clone().unwrap();
         let sink = sink.sink_map_err(|error| {
             error!(message = "Ingesting an event failed at mock sink", ?error)

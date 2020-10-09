@@ -1,7 +1,7 @@
 mod request;
 
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::{Event, LogEvent, Value},
     region::RegionOrEndpoint,
@@ -34,6 +34,7 @@ use std::{
     fmt,
     task::{Context, Poll},
 };
+use string_cache::DefaultAtom as Atom;
 use tokio::sync::oneshot;
 use tower::{
     buffer::Buffer,
@@ -82,8 +83,10 @@ pub struct CloudwatchLogsSinkConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<CloudwatchLogsSinkConfig>("aws_cloudwatch_logs")
+    SinkDescription::new::<CloudwatchLogsSinkConfig>("aws_cloudwatch_logs")
 }
+
+impl GenerateConfig for CloudwatchLogsSinkConfig {}
 
 #[cfg(test)]
 fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {
@@ -166,9 +169,13 @@ impl CloudwatchLogsSinkConfig {
     }
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let batch = BatchSettings::default()
             .bytes(1_048_576)
             .events(10_000)
@@ -411,7 +418,7 @@ fn encode_log(
     mut log: LogEvent,
     encoding: &EncodingConfig<Encoding>,
 ) -> Result<InputLogEvent, CloudwatchLogsError> {
-    let timestamp = match log.remove(&log_schema().timestamp_key()) {
+    let timestamp = match log.remove(&Atom::from(log_schema().timestamp_key())) {
         Some(Value::Timestamp(ts)) => ts.timestamp_millis(),
         _ => Utc::now().timestamp_millis(),
     };
@@ -419,7 +426,7 @@ fn encode_log(
     let message = match encoding.codec() {
         Encoding::Json => serde_json::to_string(&log).unwrap(),
         Encoding::Text => log
-            .get(&log_schema().message_key())
+            .get(&Atom::from(log_schema().message_key()))
             .map(|v| v.to_string_lossy())
             .unwrap_or_else(|| "".into()),
     };
@@ -789,7 +796,7 @@ mod tests {
         event.insert("key", "value");
         let encoded = encode_log(event.clone(), &Encoding::Json.into()).unwrap();
 
-        let ts = if let Value::Timestamp(ts) = event[&log_schema().timestamp_key()] {
+        let ts = if let Value::Timestamp(ts) = event[&Atom::from(log_schema().timestamp_key())] {
             ts.timestamp_millis()
         } else {
             panic!()
@@ -804,7 +811,7 @@ mod tests {
         event.insert("key", "value");
         let encoded = encode_log(event, &Encoding::Json.into()).unwrap();
         let map: HashMap<Atom, String> = serde_json::from_str(&encoded.message[..]).unwrap();
-        assert!(map.get(&log_schema().timestamp_key()).is_none());
+        assert!(map.get(&Atom::from(log_schema().timestamp_key())).is_none());
     }
 
     #[test]
@@ -824,7 +831,7 @@ mod tests {
                 let mut event = Event::new_empty_log();
                 event
                     .as_mut_log()
-                    .insert(&log_schema().timestamp_key(), timestamp);
+                    .insert(&Atom::from(log_schema().timestamp_key()), timestamp);
                 encode_log(event.into_log(), &Encoding::Text.into()).unwrap()
             })
             .collect();
@@ -877,7 +884,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -885,7 +892,7 @@ mod integration_tests {
         sink.run(events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
+        request.log_stream_name = stream_name;
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
@@ -921,7 +928,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
         let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
 
@@ -934,9 +941,10 @@ mod integration_tests {
             if doit {
                 let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
 
-                event
-                    .as_mut_log()
-                    .insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
+                event.as_mut_log().insert(
+                    Atom::from(log_schema().timestamp_key()),
+                    Value::Timestamp(timestamp),
+                );
             }
             doit = true;
 
@@ -945,7 +953,7 @@ mod integration_tests {
         let _ = sink.run(events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
+        request.log_stream_name = stream_name;
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
@@ -984,7 +992,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
         let now = chrono::Utc::now();
 
@@ -997,7 +1005,7 @@ mod integration_tests {
             let mut event = Event::from(line.clone());
             event
                 .as_mut_log()
-                .insert(log_schema().timestamp_key(), now + offset);
+                .insert(Atom::from(log_schema().timestamp_key()), now + offset);
             events.push(event);
             line
         };
@@ -1017,7 +1025,7 @@ mod integration_tests {
         sink.run(stream::iter(events)).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
+        request.log_stream_name = stream_name;
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some((now - Duration::days(30)).timestamp_millis());
 
@@ -1053,7 +1061,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -1061,7 +1069,7 @@ mod integration_tests {
         sink.run(events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
+        request.log_stream_name = stream_name;
         request.log_group_name = group_name;
         request.start_time = Some(timestamp.timestamp_millis());
 
@@ -1102,7 +1110,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -1116,8 +1124,8 @@ mod integration_tests {
             .unwrap();
 
         let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
-        request.log_group_name = group_name.into();
+        request.log_stream_name = stream_name;
+        request.log_group_name = group_name;
         request.start_time = Some(timestamp.timestamp_millis());
 
         let response = create_client_test().get_log_events(request).await.unwrap();
@@ -1152,7 +1160,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
         let timestamp = chrono::Utc::now();
 

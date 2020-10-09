@@ -14,6 +14,8 @@ mod blackhole;
 mod coercer;
 #[cfg(feature = "transforms-concat")]
 mod concat;
+#[cfg(feature = "sinks-console")]
+mod console;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
 #[cfg(feature = "sources-docker")]
@@ -24,6 +26,8 @@ mod generator;
 #[cfg(feature = "transforms-grok_parser")]
 mod grok_parser;
 mod heartbeat;
+#[cfg(feature = "sources-host_metrics")]
+mod host_metrics;
 mod http;
 #[cfg(all(unix, feature = "sources-journald"))]
 mod journald;
@@ -38,6 +42,8 @@ mod log_to_metric;
 mod logplex;
 #[cfg(feature = "transforms-lua")]
 mod lua;
+#[cfg(feature = "transforms-metric_to_log")]
+mod metric_to_log;
 mod process;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
@@ -62,8 +68,10 @@ mod socket;
 mod split;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 mod splunk_hec;
+#[cfg(feature = "sinks-statsd")]
+mod statsd_sink;
 #[cfg(feature = "sources-statsd")]
-mod statsd;
+mod statsd_source;
 mod stdin;
 #[cfg(feature = "transforms-swimlanes")]
 mod swimlanes;
@@ -73,6 +81,7 @@ mod tag_cardinality_limit;
 mod tcp;
 #[cfg(feature = "transforms-tokenizer")]
 mod tokenizer;
+mod udp;
 mod unix;
 mod vector;
 #[cfg(feature = "wasm")]
@@ -94,17 +103,22 @@ pub use self::blackhole::*;
 pub(crate) use self::coercer::*;
 #[cfg(feature = "transforms-concat")]
 pub use self::concat::*;
+#[cfg(feature = "sinks-console")]
+pub use self::console::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-docker")]
 pub use self::docker::*;
 pub use self::elasticsearch::*;
+#[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
 pub use self::file::*;
 #[cfg(feature = "sources-generator")]
 pub use self::generator::*;
 #[cfg(feature = "transforms-grok_parser")]
 pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;
+#[cfg(feature = "sources-host_metrics")]
+pub(crate) use self::host_metrics::*;
 pub use self::http::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
@@ -119,6 +133,8 @@ pub(crate) use self::log_to_metric::*;
 pub use self::logplex::*;
 #[cfg(feature = "transforms-lua")]
 pub use self::lua::*;
+#[cfg(feature = "transforms-metric_to_log")]
+pub(crate) use self::metric_to_log::*;
 pub use self::process::*;
 #[cfg(feature = "sources-prometheus")]
 pub use self::prometheus::*;
@@ -139,8 +155,10 @@ pub(crate) use self::socket::*;
 pub use self::split::*;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
 pub(crate) use self::splunk_hec::*;
+#[cfg(feature = "sinks-statsd")]
+pub use self::statsd_sink::*;
 #[cfg(feature = "sources-statsd")]
-pub use self::statsd::*;
+pub use self::statsd_source::*;
 pub use self::stdin::*;
 #[cfg(feature = "transforms-swimlanes")]
 pub use self::swimlanes::*;
@@ -150,10 +168,13 @@ pub(crate) use self::tag_cardinality_limit::*;
 pub use self::tcp::*;
 #[cfg(feature = "transforms-tokenizer")]
 pub(crate) use self::tokenizer::*;
+pub use self::udp::*;
 pub use self::unix::*;
 pub use self::vector::*;
 #[cfg(feature = "wasm")]
 pub use self::wasm::*;
+#[cfg(windows)]
+pub use self::windows::*;
 
 pub trait InternalEvent {
     fn emit_logs(&self) {}
@@ -173,7 +194,9 @@ macro_rules! emit {
 }
 
 // Modules that require emit! macro so they need to be defined after the macro.
+#[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
 mod file;
+mod windows;
 
 const ELLIPSIS: &str = "[...]";
 

@@ -1,7 +1,7 @@
 use super::InternalEvent;
 use crate::sources::apache_metrics;
 use http::Uri;
-use metrics::{counter, timing};
+use metrics::{counter, histogram};
 use std::time::Instant;
 
 #[derive(Debug)]
@@ -16,16 +16,8 @@ impl InternalEvent for ApacheMetricsEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "events_processed", self.count as u64,
-            "component_kind" => "source",
-            "component_type" => "apache_metrics",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "apache_metrics",
-        );
+        counter!("events_processed", self.count as u64);
+        counter!("bytes_processed", self.byte_size as u64);
     }
 }
 
@@ -41,14 +33,8 @@ impl InternalEvent for ApacheMetricsRequestCompleted {
     }
 
     fn emit_metrics(&self) {
-        counter!("requests_completed", 1,
-            "component_kind" => "source",
-            "component_type" => "apache_metrics",
-        );
-        timing!("request_duration_nanoseconds", self.start, self.end,
-            "component_kind" => "source",
-            "component_type" => "apache_metrics",
-        );
+        counter!("requests_completed", 1);
+        histogram!("request_duration_nanoseconds", self.end - self.start);
     }
 }
 
@@ -69,10 +55,7 @@ impl InternalEvent for ApacheMetricsParseError {
     }
 
     fn emit_metrics(&self) {
-        counter!("parse_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "apache_metrics",
-        );
+        counter!("parse_errors", 1);
     }
 }
 
@@ -88,10 +71,7 @@ impl InternalEvent for ApacheMetricsErrorResponse {
     }
 
     fn emit_metrics(&self) {
-        counter!("http_error_response", 1,
-            "component_kind" => "source",
-            "component_type" => "apache_metrics",
-        );
+        counter!("http_error_response", 1);
     }
 }
 
@@ -107,9 +87,6 @@ impl InternalEvent for ApacheMetricsHttpError {
     }
 
     fn emit_metrics(&self) {
-        counter!("http_request_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "apache_metrics",
-        );
+        counter!("http_request_errors", 1);
     }
 }

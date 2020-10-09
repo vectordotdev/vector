@@ -13,7 +13,6 @@ use std::io::{self, Read, Seek, Write};
 use std::path::{Path, PathBuf};
 use std::time::{self, Duration};
 use tokio::time::delay_for;
-use tracing::field;
 
 use crate::metadata_ext::PortableFileExt;
 use crate::paths_provider::PathsProvider;
@@ -71,7 +70,6 @@ where
         C: Sink<(Bytes, String)> + Unpin,
         <C as Sink<(Bytes, String)>>::Error: std::error::Error,
     {
-        let mut line_buffer = Vec::new();
         let mut fingerprint_buffer = Vec::new();
 
         let mut fp_map: IndexMap<FileFingerprint, FileWatcher> = Default::default();
@@ -154,22 +152,22 @@ where
                             if watcher.path == path {
                                 trace!(
                                     message = "Continue watching file.",
-                                    path = field::debug(&path),
+                                    path = ?path,
                                 );
                             } else {
                                 // matches a file with a different path
                                 if !was_found_this_cycle {
                                     info!(
                                         message = "Watched file has been renamed.",
-                                        path = field::debug(&path),
-                                        old_path = field::debug(&watcher.path)
+                                        path = ?path,
+                                        old_path = ?watcher.path
                                     );
                                     watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
                                 } else {
                                     info!(
                                         message = "More than one file has the same fingerprint.",
-                                        path = field::debug(&path),
-                                        old_path = field::debug(&watcher.path)
+                                        path = ?path,
+                                        old_path = ?watcher.path
                                     );
                                     let (old_path, new_path) = (&watcher.path, &path);
                                     if let (Ok(old_modified_time), Ok(new_modified_time)) = (
@@ -179,8 +177,8 @@ where
                                         if old_modified_time < new_modified_time {
                                             info!(
                                                 message = "switching to watch most recently modified file.",
-                                                new_modified_time = field::debug(&new_modified_time),
-                                                old_modified_time = field::debug(&old_modified_time),
+                                                new_modified_time = ?new_modified_time,
+                                                old_modified_time = ?old_modified_time,
                                             );
                                             watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
                                         }
@@ -204,52 +202,53 @@ where
                 }
 
                 let mut bytes_read: usize = 0;
-                while let Ok(sz) = watcher.read_line(&mut line_buffer, self.max_line_bytes) {
-                    if sz > 0 {
-                        trace!(
-                            message = "read bytes.",
-                            path = field::debug(&watcher.path),
-                            bytes = field::debug(sz)
-                        );
-
-                        bytes_read += sz;
-
-                        if !line_buffer.is_empty() {
-                            lines.push((
-                                line_buffer.clone().into(),
-                                watcher.path.to_str().expect("not a valid path").to_owned(),
-                            ));
-                            line_buffer.clear();
-                        }
-                    } else {
-                        // Should the file be removed
-                        if let Some(grace_period) = self.remove_after {
-                            if watcher.last_read_success().elapsed() >= grace_period {
-                                // Try to remove
-                                match remove_file(&watcher.path) {
-                                    Ok(()) => {
-                                        self.emitter.emit_file_deleted(&watcher.path);
-                                        watcher.set_dead();
-                                    }
-                                    Err(error) => {
-                                        // We will try again after some time.
-                                        self.emitter.emit_file_delete_failed(&watcher.path, error);
-                                    }
-                                }
-                            }
-                        }
-
+                while let Ok(Some(line)) = watcher.read_line() {
+                    if line.is_empty() {
                         break;
                     }
+
+                    let sz = line.len();
+                    trace!(
+                        message = "read bytes.",
+                        path = ?watcher.path,
+                        bytes = ?sz
+                    );
+
+                    bytes_read += sz;
+
+                    lines.push((
+                        line,
+                        watcher.path.to_str().expect("not a valid path").to_owned(),
+                    ));
+
                     if bytes_read > self.max_read_bytes {
                         maxed_out_reading_single_file = true;
                         break;
                     }
                 }
+
                 if bytes_read > 0 {
                     global_bytes_read = global_bytes_read.saturating_add(bytes_read);
                     checkpointer.set_checkpoint(file_id, watcher.get_file_position());
+                } else {
+                    // Should the file be removed
+                    if let Some(grace_period) = self.remove_after {
+                        if watcher.last_read_success().elapsed() >= grace_period {
+                            // Try to remove
+                            match remove_file(&watcher.path) {
+                                Ok(()) => {
+                                    self.emitter.emit_file_deleted(&watcher.path);
+                                    watcher.set_dead();
+                                }
+                                Err(error) => {
+                                    // We will try again after some time.
+                                    self.emitter.emit_file_delete_failed(&watcher.path, error);
+                                }
+                            }
+                        }
+                    }
                 }
+
                 // Do not move on to newer files if we are behind on an older file
                 if self.oldest_first && maxed_out_reading_single_file {
                     break;
@@ -321,7 +320,12 @@ where
         } else {
             checkpointer.get_checkpoint(file_id).unwrap_or(0)
         };
-        match FileWatcher::new(path.clone(), file_position, self.ignore_before) {
+        match FileWatcher::new(
+            path.clone(),
+            file_position,
+            self.ignore_before,
+            self.max_line_bytes,
+        ) {
             Ok(mut watcher) => {
                 if file_position == 0 {
                     self.emitter.emit_file_added(&path);
@@ -405,7 +409,7 @@ impl Checkpointer {
 #[derive(Clone)]
 pub enum Fingerprinter {
     Checksum {
-        fingerprint_bytes: usize,
+        bytes: usize,
         ignored_header_bytes: usize,
     },
     FirstLineChecksum {
@@ -431,10 +435,10 @@ impl Fingerprinter {
             }
             Fingerprinter::Checksum {
                 ignored_header_bytes,
-                fingerprint_bytes,
+                bytes,
             } => {
                 let i = ignored_header_bytes as u64;
-                let b = fingerprint_bytes;
+                let b = bytes;
                 buffer.resize(b, 0u8);
                 let mut fp = fs::File::open(path)?;
                 fp.seek(io::SeekFrom::Start(i))?;
@@ -500,9 +504,9 @@ mod test {
     use tempfile::tempdir;
 
     #[test]
-    fn test_checksum_fingerprinting() {
+    fn test_checksum_fingerprint() {
         let fingerprinter = Fingerprinter::Checksum {
-            fingerprint_bytes: 256,
+            bytes: 256,
             ignored_header_bytes: 0,
         };
 
@@ -539,7 +543,7 @@ mod test {
     }
 
     #[test]
-    fn test_first_line_checksum_fingerprinting() {
+    fn test_first_line_checksum_fingerprint() {
         let max_line_length = 64;
         let fingerprinter = Fingerprinter::FirstLineChecksum { max_line_length };
 
@@ -606,7 +610,7 @@ mod test {
     }
 
     #[test]
-    fn test_inode_fingerprinting() {
+    fn test_inode_fingerprint() {
         let fingerprinter = Fingerprinter::DevInode;
 
         let target_dir = tempdir().unwrap();

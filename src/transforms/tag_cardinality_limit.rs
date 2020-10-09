@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     internal_events::{
         TagCardinalityLimitEventProcessed, TagCardinalityLimitRejectingEvent,
         TagCardinalityLimitRejectingTag, TagCardinalityValueLimitReached,
@@ -66,12 +66,15 @@ fn default_cache_size() -> usize {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<TagCardinalityLimitConfig>("tag_cardinality_limit")
+    TransformDescription::new::<TagCardinalityLimitConfig>("tag_cardinality_limit")
 }
 
+impl GenerateConfig for TagCardinalityLimitConfig {}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(TagCardinalityLimit::new(self.clone())))
     }
 

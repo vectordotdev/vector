@@ -1,6 +1,6 @@
 use super::InternalEvent;
 use crate::sources::prometheus::parser::ParserError;
-use metrics::{counter, timing};
+use metrics::{counter, histogram};
 use std::borrow::Cow;
 use std::time::Instant;
 
@@ -16,16 +16,8 @@ impl InternalEvent for PrometheusEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "events_processed", self.count as u64,
-            "component_kind" => "source",
-            "component_type" => "prometheus",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "prometheus",
-        );
+        counter!("events_processed", self.count as u64);
+        counter!("bytes_processed", self.byte_size as u64);
     }
 }
 
@@ -41,14 +33,8 @@ impl InternalEvent for PrometheusRequestCompleted {
     }
 
     fn emit_metrics(&self) {
-        counter!("requests_completed", 1,
-            "component_kind" => "source",
-            "component_type" => "prometheus",
-        );
-        timing!("request_duration_nanoseconds", self.start, self.end,
-            "component_kind" => "source",
-            "component_type" => "prometheus",
-        );
+        counter!("requests_completed", 1);
+        histogram!("request_duration_nanoseconds", self.end - self.start);
     }
 }
 
@@ -70,10 +56,7 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("parse_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "prometheus",
-        );
+        counter!("parse_errors", 1);
     }
 }
 
@@ -89,10 +72,7 @@ impl InternalEvent for PrometheusErrorResponse {
     }
 
     fn emit_metrics(&self) {
-        counter!("http_error_response", 1,
-            "component_kind" => "source",
-            "component_type" => "prometheus",
-        );
+        counter!("http_error_response", 1);
     }
 }
 
@@ -108,9 +88,6 @@ impl InternalEvent for PrometheusHttpError {
     }
 
     fn emit_metrics(&self) {
-        counter!("http_request_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "prometheus",
-        );
+        counter!("http_request_errors", 1);
     }
 }

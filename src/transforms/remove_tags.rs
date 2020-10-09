@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     internal_events::RemoveTagsEventProcessed,
     Event,
 };
@@ -18,12 +18,15 @@ pub struct RemoveTags {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<RemoveTagsConfig>("remove_tags")
+    TransformDescription::new::<RemoveTagsConfig>("remove_tags")
 }
 
+impl GenerateConfig for RemoveTagsConfig {}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "remove_tags")]
 impl TransformConfig for RemoveTagsConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(RemoveTags::new(self.tags.clone())))
     }
 

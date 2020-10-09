@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     sinks::{
         influxdb::{
@@ -20,6 +20,7 @@ use http::{Request, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -70,12 +71,15 @@ pub enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<InfluxDBLogsConfig>("influxdb_logs")
+    SinkDescription::new::<InfluxDBLogsConfig>("influxdb_logs")
 }
 
+impl GenerateConfig for InfluxDBLogsConfig {}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_logs")]
 impl SinkConfig for InfluxDBLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         // let mut config = self.clone();
         let mut tags: HashSet<String> = self.tags.clone().into_iter().collect();
         tags.insert(log_schema().host_key().to_string());
@@ -150,10 +154,12 @@ impl HttpSink for InfluxDBLogsSink {
         let measurement = encode_namespace(Some(&self.namespace), '.', "vector");
 
         // Timestamp
-        let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
-            Some(Value::Timestamp(ts)) => Some(ts),
-            _ => None,
-        });
+        let timestamp = encode_timestamp(
+            match event.remove(&Atom::from(log_schema().timestamp_key())) {
+                Some(Value::Timestamp(ts)) => Some(ts),
+                _ => None,
+            },
+        );
 
         // Tags + Fields
         let mut tags: BTreeMap<String, String> = BTreeMap::new();
@@ -471,7 +477,7 @@ mod tests {
         .unwrap();
 
         // Make sure we can build the config
-        let _ = config.build(cx.clone()).unwrap();
+        let _ = config.build(cx.clone()).await.unwrap();
 
         let addr = next_addr();
         // Swap out the host so we can force send it
@@ -479,7 +485,7 @@ mod tests {
         let host = format!("http://{}", addr);
         config.endpoint = host;
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
@@ -534,7 +540,7 @@ mod tests {
         .unwrap();
 
         // Make sure we can build the config
-        let _ = config.build(cx.clone()).unwrap();
+        let _ = config.build(cx.clone()).await.unwrap();
 
         let addr = next_addr();
         // Swap out the host so we can force send it
@@ -542,7 +548,7 @@ mod tests {
         let host = format!("http://{}", addr);
         config.endpoint = host;
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
@@ -662,7 +668,7 @@ mod integration_tests {
             tls: None,
         };
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let mut events = Vec::new();
 
@@ -698,10 +704,10 @@ mod integration_tests {
             .unwrap();
         let string = res.text().await.unwrap();
 
-        let lines = string.split("\n").collect::<Vec<&str>>();
-        let header = lines[0].split(",").collect::<Vec<&str>>();
-        let record1 = lines[1].split(",").collect::<Vec<&str>>();
-        let record2 = lines[2].split(",").collect::<Vec<&str>>();
+        let lines = string.split('\n').collect::<Vec<&str>>();
+        let header = lines[0].split(',').collect::<Vec<&str>>();
+        let record1 = lines[1].split(',').collect::<Vec<&str>>();
+        let record2 = lines[2].split(',').collect::<Vec<&str>>();
 
         // measurement
         assert_eq!(
