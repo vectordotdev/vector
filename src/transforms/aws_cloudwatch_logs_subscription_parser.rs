@@ -62,8 +62,7 @@ impl From<AwsCloudwatchLogsSubscriptionParserConfig> for AwsCloudwatchLogsSubscr
         AwsCloudwatchLogsSubscriptionParser {
             field: config
                 .field
-                .unwrap_or_else(|| Atom::from(log_schema().message_key()))
-                .clone(),
+                .unwrap_or_else(|| Atom::from(log_schema().message_key())),
         }
     }
 }
@@ -116,8 +115,8 @@ fn subscription_event_to_events<'a>(
                 let mut event = event.clone();
                 let log = event.as_mut_log();
 
-                log.insert(log_schema().message_key().clone(), log_event.message);
-                log.insert(log_schema().timestamp_key().clone(), log_event.timestamp);
+                log.insert(log_schema().message_key(), log_event.message);
+                log.insert(log_schema().timestamp_key(), log_event.timestamp);
                 log.insert("id", log_event.id);
                 log.insert("log_group", log_group.clone());
                 log.insert("log_stream", log_stream.clone());
