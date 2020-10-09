@@ -2,7 +2,7 @@ use crate::{
     api_client::{make_subscription_client, query},
     config,
 };
-use futures::stream::StreamExt;
+use format_num::format_num;
 use graphql_client::GraphQLQuery;
 use prettytable::{format, Table};
 use reqwest;
@@ -74,10 +74,16 @@ async fn print_topology(url: &Url) -> Result<(), reqwest::Error> {
 
     let mut table = Table::new();
     table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-    table.set_titles(row!("NAME", "TYPE"));
+    table.set_titles(row!("NAME", "TYPE", r->"EVENTS"));
 
     for data in res.data.unwrap().topology {
-        table.add_row(row!(data.name, topology_type(data.on)));
+        table.add_row(row!(
+            data.name,
+            topology_type(data.on),
+            r->format_num!(",.0", data.events_processed
+                .map(|ep| ep.events_processed)
+                .unwrap_or(0.0))
+        ));
     }
 
     table.printstd();
@@ -85,23 +91,23 @@ async fn print_topology(url: &Url) -> Result<(), reqwest::Error> {
     Ok(())
 }
 
-async fn metrics(url: &Url) -> Result<(), ()> {
-    let client = make_subscription_client(&url).await.map_err(|_| ())?;
-
-    let request_body =
-        UptimeMetricsSubscription::build_query(uptime_metrics_subscription::Variables);
-
-    let subscription = client
-        .start::<UptimeMetricsSubscription>(&request_body)
-        .await
-        .map_err(|_| ())?;
-
-    for data in subscription.stream().iter() {
-        println!("{:?}", data)
-    }
-
-    Ok(())
-}
+// async fn metrics(url: &Url) -> Result<(), ()> {
+//     let client = make_subscription_client(&url).await.map_err(|_| ())?;
+//
+//     let request_body =
+//         UptimeMetricsSubscription::build_query(uptime_metrics_subscription::Variables);
+//
+//     let subscription = client
+//         .start::<UptimeMetricsSubscription>(&request_body)
+//         .await
+//         .map_err(|_| ())?;
+//
+//     for data in subscription.stream().iter() {
+//         println!("{:?}", data)
+//     }
+//
+//     Ok(())
+// }
 
 pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let url = opts.remote.clone().unwrap_or_else(|| {
@@ -118,7 +124,7 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
         }
     }
 
-    if metrics(&url).await.is_err() {
+    if print_topology(&url).await.is_err() {
         eprintln!("Couldn't retrieve topology");
         return exitcode::UNAVAILABLE;
     }
