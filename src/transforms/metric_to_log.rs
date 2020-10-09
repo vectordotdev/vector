@@ -51,7 +51,7 @@ impl MetricToLog {
             timestamp_key: Atom::from("timestamp"),
             host_tag: Atom::from(format!(
                 "tags.{}",
-                host_tag.unwrap_or_else(|| Atom::from(log_schema().host_key().clone()))
+                host_tag.unwrap_or_else(|| Atom::from(log_schema().host_key()))
             )),
         }
     }
