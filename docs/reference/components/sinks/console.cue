@@ -25,7 +25,6 @@ components: sinks: console: {
 			enabled: true
 			default: null
 			json:    null
-			ndjson:  null
 			text:    null
 		}
 		healthcheck: enabled: true
