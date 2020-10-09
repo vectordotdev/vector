@@ -111,17 +111,6 @@ components: sinks: influxdb_logs: {
 				examples: ["my-org", "33f2cff0a28e5b63"]
 			}
 		}
-		password: {
-			common:      true
-			description: "Sets the password for authentication if you’ve enabled authentication for the write into InfluxDB 1."
-			groups: ["v1"]
-			required: false
-			warnings: []
-			type: string: {
-				default: null
-				examples: ["${INFLUXDB_PASSWORD}", "influxdb4ever"]
-			}
-		}
 		retention_policy_name: {
 			common:      true
 			description: "Sets the target retention policy for the write into InfluxDB 1."
@@ -162,6 +151,17 @@ components: sinks: influxdb_logs: {
 			type: string: {
 				default: null
 				examples: ["todd", "vector-source"]
+			}
+		}
+		password: {
+			common:      true
+			description: "Sets the password for authentication if you’ve enabled authentication for the write into InfluxDB 1."
+			groups: ["v1"]
+			required: false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["${INFLUXDB_PASSWORD}", "influxdb4ever"]
 			}
 		}
 	}
