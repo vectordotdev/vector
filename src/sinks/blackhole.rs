@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     emit,
     internal_events::BlackholeEventReceived,
     sinks::util::StreamSink,
@@ -24,8 +24,10 @@ pub struct BlackholeConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<BlackholeConfig>("blackhole")
+    SinkDescription::new::<BlackholeConfig>("blackhole")
 }
+
+impl GenerateConfig for BlackholeConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "blackhole")]

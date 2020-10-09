@@ -21,10 +21,11 @@ extern crate pest_derive;
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
+#[macro_use]
+pub mod config;
 pub mod buffers;
 pub mod cli;
 pub mod conditions;
-pub mod config;
 pub mod dns;
 pub mod event;
 pub mod expiring_hash_map;

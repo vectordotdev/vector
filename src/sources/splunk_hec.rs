@@ -47,8 +47,10 @@ pub struct SplunkConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<SplunkConfig>("splunk_hec")
+    SourceDescription::new::<SplunkConfig>("splunk_hec")
 }
+
+impl_generate_config_from_default!(SplunkConfig);
 
 impl SplunkConfig {
     #[cfg(test)]
@@ -766,6 +768,11 @@ mod tests {
     use futures01::sync::mpsc;
     use std::net::SocketAddr;
     use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SplunkConfig>();
+    }
 
     /// Splunk token
     const TOKEN: &str = "token";

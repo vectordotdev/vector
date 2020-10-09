@@ -73,8 +73,10 @@ fn default_auto_offset_reset() -> String {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<KafkaSourceConfig>("kafka")
+    SourceDescription::new::<KafkaSourceConfig>("kafka")
 }
+
+impl_generate_config_from_default!(KafkaSourceConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "kafka")]
@@ -229,6 +231,11 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer> 
 mod test {
     use super::{kafka_source, KafkaSourceConfig};
     use crate::{shutdown::ShutdownSignal, Pipeline};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<KafkaSourceConfig>();
+    }
 
     fn make_config() -> KafkaSourceConfig {
         KafkaSourceConfig {

@@ -43,6 +43,8 @@ inventory::submit! {
     SourceDescription::new::<GeneratorConfig>("generator")
 }
 
+impl_generate_config_from_default!(GeneratorConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "generator")]
 impl SourceConfig for GeneratorConfig {
@@ -118,6 +120,11 @@ mod tests {
     use futures01::{stream::Stream, sync::mpsc, Async::*};
     use std::time::{Duration, Instant};
     use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<GeneratorConfig>();
+    }
 
     async fn runit(config: &str) -> mpsc::Receiver<Event> {
         let (tx, rx) = Pipeline::new_test();
