@@ -12,7 +12,9 @@ components: sinks: console: {
 	}
 
 	features: {
-		batch: enabled:       false
+		batch: {
+			enabled: false
+		}
 		buffer: enabled:      false
 		compression: enabled: false
 		encoding: {
@@ -22,8 +24,9 @@ components: sinks: console: {
 			ndjson:  null
 			text:    null
 		}
-		request: enabled: false
-		tls: enabled:     false
+		healthcheck: enabled: true
+		request: enabled:     false
+		tls: enabled:         false
 	}
 
 	statuses: {
@@ -45,6 +48,7 @@ components: sinks: console: {
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {
