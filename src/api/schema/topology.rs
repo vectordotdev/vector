@@ -1,3 +1,4 @@
+use super::metrics;
 use crate::config::{Config, DataType};
 use async_graphql::{Enum, Interface, Object};
 use lazy_static::lazy_static;
@@ -61,6 +62,11 @@ impl Source {
             Topology::Sink(s) if s.0.inputs.contains(&self.0.name) => Some(s.clone()),
             _ => None,
         })
+    }
+
+    /// Metric indicating events processed against the current source
+    async fn events_processed(&self) -> Option<metrics::EventsProcessed> {
+        metrics::topology_events_processed(self.0.name.clone())
     }
 }
 

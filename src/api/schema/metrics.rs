@@ -1,10 +1,17 @@
 use crate::event::{Event, Metric, MetricValue};
-use crate::metrics::{capture_metrics, get_controller};
+use crate::metrics::{capture_metrics, get_controller, Controller};
 use async_graphql::{validators::IntRange, Interface, Object, Subscription};
 use async_stream::stream;
 use chrono::{DateTime, Utc};
+use lazy_static::lazy_static;
+use std::sync::{Arc, Mutex};
 use tokio::stream::{Stream, StreamExt};
 use tokio::time::Duration;
+
+lazy_static! {
+    static ref GLOBAL_CONTROLLER: Arc<Mutex<&'static Controller>> =
+        Arc::new(Mutex::new(get_controller().unwrap()));
+}
 
 pub struct Uptime(Metric);
 
@@ -152,4 +159,24 @@ fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
             }
         }
     }
+}
+
+/// Get the events processed by topology component name
+pub fn topology_events_processed(topology_name: String) -> Option<EventsProcessed> {
+    let key = String::from("component_name");
+
+    capture_metrics(
+        *GLOBAL_CONTROLLER
+            .lock()
+            .expect("Couldn't acquire metrics lock. Please report."),
+    )
+    .find(|ev| match ev {
+        Event::Metric(m)
+            if m.name.as_str().eq("events_processed") && m.tag_matches(&key, &topology_name) =>
+        {
+            true
+        }
+        _ => false,
+    })
+    .and_then(|ev| Some(EventsProcessed(ev.into_metric())))
 }
