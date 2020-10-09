@@ -48,7 +48,7 @@ pub struct AddFieldsFieldOverwritten<'a> {
 
 impl<'a> InternalEvent for AddFieldsFieldOverwritten<'a> {
     fn emit_logs(&self) {
-        error!(message = "Field overwritten.", %self.field, rate_limit_secs = 30);
+        debug!(message = "Field overwritten.", %self.field, rate_limit_secs = 30);
     }
 }
 
@@ -59,6 +59,6 @@ pub struct AddFieldsFieldNotOverwritten<'a> {
 
 impl<'a> InternalEvent for AddFieldsFieldNotOverwritten<'a> {
     fn emit_logs(&self) {
-        error!(message = "Field not overwritten.", %self.field, rate_limit_secs = 30);
+        debug!(message = "Field not overwritten.", %self.field, rate_limit_secs = 30);
     }
 }

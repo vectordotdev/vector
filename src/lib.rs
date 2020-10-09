@@ -1,7 +1,7 @@
 #![recursion_limit = "256"] // for async-stream
 #![allow(clippy::approx_constant)]
 #![allow(clippy::float_cmp)]
-#![allow(clippy::block_in_if_condition_stmt)]
+#![allow(clippy::blocks_in_if_conditions)]
 #![allow(clippy::match_wild_err_arm)]
 #![allow(clippy::new_ret_no_self)]
 #![allow(clippy::too_many_arguments)]
@@ -22,6 +22,7 @@ extern crate pest_derive;
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 pub mod buffers;
+pub mod cli;
 pub mod conditions;
 pub mod config;
 pub mod dns;
@@ -34,6 +35,9 @@ pub mod wasm;
 pub mod internal_events;
 #[cfg(feature = "api")]
 pub mod api;
+#[cfg(feature = "api_client")]
+pub mod api_client;
+pub mod app;
 pub mod async_read;
 pub mod heartbeat;
 #[cfg(feature = "rdkafka")]
@@ -46,6 +50,7 @@ pub mod metrics;
 pub(crate) mod pipeline;
 pub mod region;
 pub mod serde;
+pub mod service;
 pub mod shutdown;
 pub mod signal;
 pub mod sinks;
@@ -60,6 +65,8 @@ pub mod transforms;
 pub mod types;
 pub mod unit_test;
 pub mod validate;
+#[cfg(windows)]
+pub mod vector_windows;
 
 pub use event::Event;
 pub use pipeline::Pipeline;
@@ -93,4 +100,21 @@ mod built_info {
 
 pub fn get_hostname() -> std::io::Result<String> {
     Ok(hostname::get()?.to_string_lossy().into())
+}
+
+// This is a private implementation of the unstable `bool_to_option`
+// feature. This can be removed once this stabilizes:
+// https://github.com/rust-lang/rust/issues/64260
+trait BoolAndSome {
+    fn and_some<T>(self, value: T) -> Option<T>;
+}
+
+impl BoolAndSome for bool {
+    fn and_some<T>(self, value: T) -> Option<T> {
+        if self {
+            Some(value)
+        } else {
+            None
+        }
+    }
 }

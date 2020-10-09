@@ -59,9 +59,13 @@ pub enum Encoding {
     Default,
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let batch = BatchSettings::default()
             .bytes(bytesize::mib(10u64))
             .timeout(1)
@@ -244,6 +248,7 @@ mod integration_tests {
     };
     use futures::{future, stream};
     use serde_json::Value;
+    use string_cache::DefaultAtom as Atom;
     use tokio::time::{timeout, Duration};
 
     #[tokio::test]
@@ -273,7 +278,7 @@ mod integration_tests {
             .create_table(&table, "host String, timestamp String, message String")
             .await;
 
-        let (sink, _hc) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
@@ -322,7 +327,7 @@ mod integration_tests {
             )
             .await;
 
-        let (sink, _hc) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
@@ -336,11 +341,11 @@ mod integration_tests {
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            log_schema().timestamp_key().clone(),
+            log_schema().timestamp_key(),
             format!(
                 "{}",
                 exp_event
-                    .get(&log_schema().timestamp_key())
+                    .get(&Atom::from(log_schema().timestamp_key()))
                     .unwrap()
                     .as_timestamp()
                     .unwrap()
@@ -382,7 +387,7 @@ timestamp_format = "unix""#,
             )
             .await;
 
-        let (sink, _hc) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
@@ -396,11 +401,11 @@ timestamp_format = "unix""#,
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            log_schema().timestamp_key().clone(),
+            log_schema().timestamp_key(),
             format!(
                 "{}",
                 exp_event
-                    .get(&log_schema().timestamp_key())
+                    .get(&Atom::from(log_schema().timestamp_key()))
                     .unwrap()
                     .as_timestamp()
                     .unwrap()
@@ -437,7 +442,7 @@ timestamp_format = "unix""#,
             .create_table(&table, "host String, timestamp String")
             .await;
 
-        let (sink, _hc) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");

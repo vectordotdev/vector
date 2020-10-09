@@ -43,9 +43,10 @@ inventory::submit! {
     SourceDescription::new::<GeneratorConfig>("generator")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "generator")]
 impl SourceConfig for GeneratorConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -116,6 +117,7 @@ mod tests {
     use futures::compat::Future01CompatExt;
     use futures01::{stream::Stream, sync::mpsc, Async::*};
     use std::time::{Duration, Instant};
+    use string_cache::DefaultAtom as Atom;
 
     async fn runit(config: &str) -> mpsc::Receiver<Event> {
         let (tx, rx) = Pipeline::new_test();
@@ -130,7 +132,7 @@ mod tests {
 
     #[tokio::test]
     async fn copies_lines() {
-        let message_key = log_schema().message_key();
+        let message_key = Atom::from(log_schema().message_key());
         let mut rx = runit(
             r#"lines = ["one", "two"]
                count = 1"#,
@@ -169,7 +171,7 @@ mod tests {
 
     #[tokio::test]
     async fn adds_sequence() {
-        let message_key = log_schema().message_key();
+        let message_key = Atom::from(log_schema().message_key());
         let mut rx = runit(
             r#"lines = ["one", "two"]
                count = 2

@@ -1,10 +1,11 @@
 mod health;
 mod metrics;
+pub mod topology;
 
 use async_graphql::{EmptyMutation, GQLMergedObject, GQLMergedSubscription, Schema, SchemaBuilder};
 
 #[derive(GQLMergedObject, Default)]
-pub struct Query(health::HealthQuery);
+pub struct Query(health::HealthQuery, topology::TopologyQuery);
 
 #[derive(GQLMergedSubscription, Default)]
 pub struct Subscription(health::HealthSubscription, metrics::MetricsSubscription);

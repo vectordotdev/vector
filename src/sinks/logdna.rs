@@ -13,6 +13,7 @@ use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::SystemTime;
+use string_cache::DefaultAtom as Atom;
 
 lazy_static::lazy_static! {
     static ref HOST: UriSerde = Uri::from_static("https://logs.logdna.com").into();
@@ -59,9 +60,13 @@ pub enum Encoding {
     Default,
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "logdna")]
 impl SinkConfig for LogdnaConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch_settings = BatchSettings::default()
             .bytes(bytesize::mib(10u64))
@@ -106,10 +111,10 @@ impl HttpSink for LogdnaConfig {
         let mut log = event.into_log();
 
         let line = log
-            .remove(&crate::config::log_schema().message_key())
+            .remove(&Atom::from(crate::config::log_schema().message_key()))
             .unwrap_or_else(|| String::from("").into());
         let timestamp = log
-            .remove(&crate::config::log_schema().timestamp_key())
+            .remove(&Atom::from(crate::config::log_schema().timestamp_key()))
             .unwrap_or_else(|| chrono::Utc::now().into());
 
         let mut map = serde_json::map::Map::new();
@@ -280,7 +285,7 @@ mod tests {
         .unwrap();
 
         // Make sure we can build the config
-        let _ = config.build(cx.clone()).unwrap();
+        let _ = config.build(cx.clone()).await.unwrap();
 
         let addr = next_addr();
         // Swap out the host so we can force send it
@@ -288,7 +293,7 @@ mod tests {
         let endpoint = format!("http://{}", addr).parse::<http::Uri>().unwrap();
         config.endpoint = Some(endpoint.into());
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);

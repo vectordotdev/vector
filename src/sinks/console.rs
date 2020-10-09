@@ -2,6 +2,7 @@ use crate::{
     buffers::Acker,
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
+    internal_events::ConsoleFieldNotFound,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
@@ -14,6 +15,7 @@ use futures::{
     FutureExt,
 };
 use serde::{Deserialize, Serialize};
+use string_cache::DefaultAtom as Atom;
 use tokio::io::{self, AsyncWriteExt};
 
 #[derive(Debug, Derivative, Deserialize, Serialize)]
@@ -44,9 +46,13 @@ inventory::submit! {
     SinkDescription::new_without_default::<ConsoleSinkConfig>("console")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "console")]
 impl SinkConfig for ConsoleSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let encoding = self.encoding.clone();
 
         let output: Box<dyn io::AsyncWrite + Send + Sync + Unpin> = match self.target {
@@ -75,39 +81,37 @@ impl SinkConfig for ConsoleSinkConfig {
     }
 }
 
-fn encode_event(
-    mut event: Event,
-    encoding: &EncodingConfig<Encoding>,
-) -> Result<String, serde_json::Error> {
+fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<String> {
     encoding.apply_rules(&mut event);
     match event {
         Event::Log(log) => match encoding.codec() {
-            Encoding::Json => serde_json::to_string(&log),
+            Encoding::Json => serde_json::to_string(&log)
+                .map_err(|error| {
+                    error!("Error encoding json: {}.", error);
+                })
+                .ok(),
             Encoding::Text => {
-                let s = log
-                    .get(&crate::config::log_schema().message_key())
-                    .map(|v| v.to_string_lossy())
-                    .unwrap_or_else(|| "".into());
-                Ok(s)
+                let field = crate::config::log_schema().message_key();
+                match log.get(&Atom::from(field)) {
+                    Some(v) => Some(v.to_string_lossy()),
+                    None => {
+                        emit!(ConsoleFieldNotFound {
+                            missing_field: field,
+                        });
+                        None
+                    }
+                }
             }
         },
         Event::Metric(metric) => match encoding.codec() {
-            Encoding::Json => serde_json::to_string(&metric),
-            Encoding::Text => Ok(format!("{}", metric)),
+            Encoding::Json => serde_json::to_string(&metric)
+                .map_err(|error| {
+                    error!("Error encoding json: {}.", error);
+                })
+                .ok(),
+            Encoding::Text => Some(format!("{}", metric)),
         },
     }
-}
-
-async fn write_event_to_output(
-    mut output: impl io::AsyncWrite + Send + Unpin,
-    event: Event,
-    encoding: &EncodingConfig<Encoding>,
-) -> Result<(), std::io::Error> {
-    let mut buf =
-        encode_event(event, encoding).map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
-    buf.push('\n');
-    output.write_all(buf.as_bytes()).await?;
-    Ok(())
 }
 
 struct WriterSink {
@@ -120,10 +124,16 @@ struct WriterSink {
 impl StreamSink for WriterSink {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
-            write_event_to_output(&mut self.output, event, &self.encoding)
-                .await
-                .expect("console sink error");
             self.acker.ack(1);
+            if let Some(mut buf) = encode_event(event, &self.encoding) {
+                buf.push('\n');
+                if let Err(error) = self.output.write_all(buf.as_bytes()).await {
+                    // Error when writing to stdout/stderr is likely irrecoverable,
+                    // so stop the sink.
+                    error!("Error writing to output: {}. Stopping sink.", error);
+                    return Err(());
+                }
+            }
         }
         Ok(())
     }
@@ -193,7 +203,7 @@ mod test {
             },
         });
         assert_eq!(
-            r#"{"name":"users","timestamp":null,"tags":null,"kind":"incremental","set":{"values":["bob"]}}"#,
+            r#"{"name":"users","kind":"incremental","set":{"values":["bob"]}}"#,
             encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
         );
     }
@@ -212,7 +222,7 @@ mod test {
             },
         });
         assert_eq!(
-            r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","distribution":{"values":[10.0],"sample_rates":[1],"statistic":"histogram"}}"#,
+            r#"{"name":"glork","kind":"incremental","distribution":{"values":[10.0],"sample_rates":[1],"statistic":"histogram"}}"#,
             encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
         );
     }

@@ -10,6 +10,7 @@ use crate::{
 use bytes::Bytes;
 use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -24,9 +25,10 @@ inventory::submit! {
     SinkDescription::new_without_default::<DatadogLogsConfig>("datadog_logs")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "datadog_logs")]
 impl SinkConfig for DatadogLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let (host, port) = if let Some(uri) = &self.endpoint {
             let host = uri
                 .host()
@@ -73,15 +75,15 @@ fn encode_event(
 ) -> Option<Bytes> {
     let log = event.as_mut_log();
 
-    if let Some(message) = log.remove(&log_schema().message_key()) {
+    if let Some(message) = log.remove(&Atom::from(log_schema().message_key())) {
         log.insert("message", message);
     }
 
-    if let Some(timestamp) = log.remove(&log_schema().timestamp_key()) {
+    if let Some(timestamp) = log.remove(&Atom::from(log_schema().timestamp_key())) {
         log.insert("date", timestamp);
     }
 
-    if let Some(host) = log.remove(&log_schema().host_key()) {
+    if let Some(host) = log.remove(&Atom::from(log_schema().host_key())) {
         log.insert("host", host);
     }
 

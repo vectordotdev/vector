@@ -1,11 +1,12 @@
-use crate::event::timestamp_to_string;
+use crate::{event::timestamp_to_string, Result};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
 use serde::{Serialize, Serializer};
 use std::collections::BTreeMap;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::iter::FromIterator;
+use toml::value::Value as TomlValue;
 
 #[derive(PartialEq, Debug, Clone, is_enum_variant)]
 pub enum Value {
@@ -20,7 +21,7 @@ pub enum Value {
 }
 
 impl Serialize for Value {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -44,15 +45,39 @@ impl From<Bytes> for Value {
     }
 }
 
-impl From<Vec<u8>> for Value {
-    fn from(bytes: Vec<u8>) -> Self {
-        Value::Bytes(bytes.into())
+impl<T: Into<Value>> From<Vec<T>> for Value {
+    fn from(set: Vec<T>) -> Self {
+        Value::from_iter(set.into_iter().map(|v| v.into()))
     }
 }
 
 impl From<String> for Value {
     fn from(string: String) -> Self {
         Value::Bytes(string.into())
+    }
+}
+
+impl TryFrom<TomlValue> for Value {
+    type Error = crate::Error;
+
+    fn try_from(toml: TomlValue) -> crate::Result<Self> {
+        Ok(match toml {
+            TomlValue::String(s) => Self::from(s),
+            TomlValue::Integer(i) => Self::from(i),
+            TomlValue::Array(a) => Self::from(
+                a.into_iter()
+                    .map(Value::try_from)
+                    .collect::<Result<Vec<_>>>()?,
+            ),
+            TomlValue::Table(t) => Self::from(
+                t.into_iter()
+                    .map(|(k, v)| Value::try_from(v).map(|v| (k, v)))
+                    .collect::<Result<BTreeMap<_, _>>>()?,
+            ),
+            TomlValue::Datetime(dt) => Self::from(dt.to_string().parse::<DateTime<Utc>>()?),
+            TomlValue::Boolean(b) => Self::from(b),
+            TomlValue::Float(f) => Self::from(f),
+        })
     }
 }
 
@@ -90,15 +115,15 @@ impl From<BTreeMap<String, Value>> for Value {
     }
 }
 
-impl From<Vec<Value>> for Value {
-    fn from(value: Vec<Value>) -> Self {
-        Value::Array(value)
-    }
-}
-
 impl FromIterator<Value> for Value {
     fn from_iter<I: IntoIterator<Item = Value>>(iter: I) -> Self {
         Value::Array(iter.into_iter().collect::<Vec<Value>>())
+    }
+}
+
+impl FromIterator<(String, Value)> for Value {
+    fn from_iter<I: IntoIterator<Item = (String, Value)>>(iter: I) -> Self {
+        Value::Map(iter.into_iter().collect::<BTreeMap<String, Value>>())
     }
 }
 
@@ -154,7 +179,7 @@ impl From<serde_json::Value> for Value {
 impl TryInto<serde_json::Value> for Value {
     type Error = crate::Error;
 
-    fn try_into(self) -> Result<serde_json::Value, Self::Error> {
+    fn try_into(self) -> std::result::Result<serde_json::Value, Self::Error> {
         match self {
             Value::Boolean(v) => Ok(serde_json::Value::from(v)),
             Value::Integer(v) => Ok(serde_json::Value::from(v)),

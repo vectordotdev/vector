@@ -2,6 +2,7 @@ use super::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, St
 use crate::{
     config::SinkContext,
     dns::{Resolver, ResolverFuture},
+    internal_events::UdpSendIncomplete,
     sinks::{Healthcheck, VectorSink},
 };
 use bytes::Bytes;
@@ -12,7 +13,6 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::Duration;
 use tokio::time::{delay_for, Delay};
 use tokio_retry::strategy::ExponentialBackoff;
-use tracing::field;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -163,7 +163,7 @@ impl Sink for UdpSink {
             Ok(Async::Ready(socket)) => {
                 debug!(
                     message = "sending event.",
-                    bytes = &field::display(line.len())
+                    bytes = %line.len()
                 );
                 match socket.send(&line) {
                     Err(error) => {
@@ -171,7 +171,15 @@ impl Sink for UdpSink {
                         error!(message = "send failed", %error);
                         Ok(AsyncSink::NotReady(line))
                     }
-                    Ok(_) => Ok(AsyncSink::Ready),
+                    Ok(sent) => {
+                        if sent != line.len() {
+                            emit!(UdpSendIncomplete {
+                                data_size: line.len(),
+                                sent,
+                            });
+                        }
+                        Ok(AsyncSink::Ready)
+                    }
                 }
             }
             Ok(Async::NotReady) => Ok(AsyncSink::NotReady(line)),

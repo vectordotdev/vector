@@ -35,7 +35,6 @@ use std::time::Duration;
 use std::{collections::HashMap, convert::TryFrom, env};
 use string_cache::DefaultAtom as Atom;
 use tokio::sync::mpsc;
-use tracing::field;
 
 /// The beginning of image names of vector docker images packaged by vector.
 const VECTOR_IMAGE_NAME: &str = "timberio/vector";
@@ -113,9 +112,10 @@ inventory::submit! {
     SourceDescription::new::<DockerConfig>("docker")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "docker")]
 impl SourceConfig for DockerConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -347,11 +347,7 @@ impl DockerSource {
                 let names = container.names.unwrap();
                 let image = container.image.unwrap();
 
-                trace!(
-                    message = "found already running container.",
-                    id = field::display(&id),
-                    names = field::debug(&names)
-                );
+                trace!(message = "found already running container.", %id, ?names);
 
                 if !self.exclude_vector(id.as_str(), image.as_str()) {
                     return;
@@ -369,7 +365,7 @@ impl DockerSource {
                         }
                     }),
                 ) {
-                    trace!(message = "container excluded.", id = field::display(&id));
+                    trace!(message = "container excluded.", %id);
                     return;
                 }
 
@@ -869,7 +865,7 @@ impl ContainerLogInfo {
                 // current message being the initial one.
                 if let Some(partial_event_merge_state) = partial_event_merge_state {
                     partial_event_merge_state
-                        .merge_in_next_event(log_event, &[log_schema().message_key().clone()]);
+                        .merge_in_next_event(log_event, &[Atom::from(log_schema().message_key())]);
                 } else {
                     *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
                 };
@@ -882,7 +878,7 @@ impl ContainerLogInfo {
             // Otherwise it's just a regular event that we return as-is.
             match partial_event_merge_state.take() {
                 Some(partial_event_merge_state) => partial_event_merge_state
-                    .merge_in_final_event(log_event, &[log_schema().message_key().clone()]),
+                    .merge_in_final_event(log_event, &[Atom::from(log_schema().message_key())]),
                 None => log_event,
             }
         } else {
@@ -935,7 +931,7 @@ impl ContainerMetadata {
                     .map(|(key, value)| {
                         (
                             ("label.".to_owned() + key).into(),
-                            value.as_bytes().to_owned().into(),
+                            Value::from(value.to_owned()),
                         )
                     })
                     .collect()
@@ -972,7 +968,7 @@ fn line_agg_adapter(
         let mut log_event = event.into_log();
 
         let message_value = log_event
-            .remove(log_schema().message_key())
+            .remove(&Atom::from(log_schema().message_key()))
             .expect("message must exist in the event");
         let stream_value = log_event
             .get(&STREAM)
@@ -1030,6 +1026,7 @@ mod tests {
                     ShutdownSignal::noop(),
                     sender,
                 )
+                .await
                 .unwrap()
                 .compat()
                 .await
@@ -1221,7 +1218,7 @@ mod tests {
         // Wait for before message
         let events = collect_n(out, 1).await.unwrap();
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             "before".into()
         );
 
@@ -1251,14 +1248,14 @@ mod tests {
         container_remove(&id, &docker).await;
 
         let log = events[0].as_log();
-        assert_eq!(log[&log_schema().message_key()], message.into());
+        assert_eq!(log[&Atom::from(log_schema().message_key())], message.into());
         assert_eq!(log[&super::CONTAINER], id.into());
         assert!(log.get(&super::CREATED_AT).is_some());
         assert_eq!(log[&super::IMAGE], "busybox".into());
         assert!(log.get(&format!("label.{}", label).into()).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
         assert_eq!(
-            events[0].as_log()[log_schema().source_type_key()],
+            events[0].as_log()[&Atom::from(log_schema().source_type_key())],
             "docker".into()
         );
     }
@@ -1279,11 +1276,11 @@ mod tests {
         container_remove(&id, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             message.into()
         );
         assert_eq!(
-            events[1].as_log()[&log_schema().message_key()],
+            events[1].as_log()[&Atom::from(log_schema().message_key())],
             message.into()
         );
     }
@@ -1307,7 +1304,7 @@ mod tests {
         container_remove(&id1, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             message.into()
         );
     }
@@ -1332,7 +1329,7 @@ mod tests {
         container_remove(&id1, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             message.into()
         );
     }
@@ -1354,14 +1351,14 @@ mod tests {
         container_remove(&id, &docker).await;
 
         let log = events[0].as_log();
-        assert_eq!(log[&log_schema().message_key()], message.into());
+        assert_eq!(log[&Atom::from(log_schema().message_key())], message.into());
         assert_eq!(log[&super::CONTAINER], id.into());
         assert!(log.get(&super::CREATED_AT).is_some());
         assert_eq!(log[&super::IMAGE], "busybox".into());
         assert!(log.get(&format!("label.{}", label).into()).is_some());
         assert_eq!(events[0].as_log()[&super::NAME], name.into());
         assert_eq!(
-            events[0].as_log()[log_schema().source_type_key()],
+            events[0].as_log()[&Atom::from(log_schema().source_type_key())],
             "docker".into()
         );
     }
@@ -1387,7 +1384,7 @@ mod tests {
         container_remove(&id, &docker).await;
 
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[&Atom::from(log_schema().message_key())],
             message.into()
         );
     }
@@ -1461,7 +1458,7 @@ mod tests {
         container_remove(&id, &docker).await;
 
         let log = events[0].as_log();
-        assert_eq!(log[&log_schema().message_key()], message.into());
+        assert_eq!(log[&Atom::from(log_schema().message_key())], message.into());
     }
 
     #[tokio::test]
@@ -1514,7 +1511,7 @@ mod tests {
             .map(|event| {
                 event
                     .into_log()
-                    .remove(crate::config::log_schema().message_key())
+                    .remove(&Atom::from(crate::config::log_schema().message_key()))
                     .unwrap()
                     .to_string_lossy()
             })

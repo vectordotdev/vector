@@ -190,12 +190,10 @@ mod tests {
             ),
             (
                 Event::from(""),
-                Ok(Value::from("docious".bytes().collect::<Vec<_>>())),
+                Ok(Value::from("docious")),
                 SliceFn::new(
                     Box::new(Literal::from(Value::from(
-                        "Supercalifragilisticexpialidocious"
-                            .bytes()
-                            .collect::<Vec<_>>(),
+                        "Supercalifragilisticexpialidocious",
                     ))),
                     -7,
                     None,
@@ -203,12 +201,10 @@ mod tests {
             ),
             (
                 Event::from(""),
-                Ok(Value::from("cali".bytes().collect::<Vec<_>>())),
+                Ok(Value::from("cali")),
                 SliceFn::new(
                     Box::new(Literal::from(Value::from(
-                        "Supercalifragilisticexpialidocious"
-                            .bytes()
-                            .collect::<Vec<_>>(),
+                        "Supercalifragilisticexpialidocious",
                     ))),
                     5,
                     Some(9),

@@ -30,8 +30,8 @@ use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::task::Context;
 use std::task::Poll;
+use string_cache::DefaultAtom as Atom;
 use tower::{Service, ServiceBuilder};
-use tracing::field;
 use tracing_futures::Instrument;
 use uuid::Uuid;
 
@@ -139,9 +139,13 @@ inventory::submit! {
     SinkDescription::new::<S3SinkConfig>("aws_s3")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(cx.resolver())?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = self.new(client, cx)?;
@@ -327,9 +331,9 @@ fn build_request(
 
     debug!(
         message = "sending events.",
-        bytes = &field::debug(inner.len()),
-        bucket = &field::debug(&bucket),
-        key = &field::debug(&key)
+        bytes = ?inner.len(),
+        bucket = ?bucket,
+        key = ?key
     );
 
     Request {
@@ -396,7 +400,7 @@ fn encode_event(
             .expect("Failed to encode event as json, this is a bug!"),
         Encoding::Text => {
             let mut bytes = log
-                .get(&log_schema().message_key())
+                .get(&Atom::from(log_schema().message_key()))
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             bytes.push(b'\n');
@@ -617,7 +621,7 @@ mod integration_tests {
 
         let config = S3SinkConfig {
             compression: Compression::Gzip,
-            filename_time_format: Some("%S%f".into()),
+            filename_time_format: Some("%s%f".into()),
             ..config(10000).await
         };
 

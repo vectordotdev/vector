@@ -98,9 +98,13 @@ inventory::submit! {
     SinkDescription::new::<ElasticSearchConfig>("elasticsearch")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
         let client = HttpClient::new(cx.resolver(), common.tls_settings.clone())?;
 
@@ -589,6 +593,7 @@ mod integration_tests {
     use serde_json::{json, Value};
     use std::fs::File;
     use std::io::Read;
+    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn ensure_pipeline_in_params() {
@@ -621,7 +626,7 @@ mod integration_tests {
         let base_url = common.base_url.clone();
 
         let cx = SinkContext::new_test();
-        let (sink, _hc) = config.build(cx.clone()).unwrap();
+        let (sink, _hc) = config.build(cx.clone()).await.unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("my_id", "42");
@@ -658,7 +663,7 @@ mod integration_tests {
         let expected = json!({
             "message": "raw log line",
             "foo": "bar",
-            "timestamp": input_event.as_log()[&crate::config::log_schema().timestamp_key()],
+            "timestamp": input_event.as_log()[&Atom::from(crate::config::log_schema().timestamp_key())],
         });
         assert_eq!(expected, value);
     }
@@ -737,7 +742,10 @@ mod integration_tests {
         let base_url = common.base_url.clone();
 
         let cx = SinkContext::new_test();
-        let (sink, healthcheck) = config.build(cx.clone()).expect("Building config failed");
+        let (sink, healthcheck) = config
+            .build(cx.clone())
+            .await
+            .expect("Building config failed");
 
         healthcheck.await.expect("Health check failed");
 

@@ -86,9 +86,10 @@ inventory::submit! {
     TransformDescription::new_without_default::<LogToMetricConfig>("log_to_metric")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(LogToMetric::new(self.clone())))
     }
 
@@ -155,7 +156,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
     let log = event.as_log();
 
     let timestamp = log
-        .get(&log_schema().timestamp_key())
+        .get(&Atom::from(log_schema().timestamp_key()))
         .and_then(Value::as_timestamp)
         .cloned();
 
@@ -326,8 +327,7 @@ mod tests {
     fn create_event(key: &str, value: &str) -> Event {
         let mut log = Event::from("i am a log");
         log.as_mut_log().insert(key, value);
-        log.as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts());
+        log.as_mut_log().insert(log_schema().timestamp_key(), ts());
         log
     }
 
@@ -549,7 +549,7 @@ mod tests {
         let mut event = Event::from("i am a log");
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts());
+            .insert(log_schema().timestamp_key(), ts());
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
 
@@ -599,7 +599,7 @@ mod tests {
         let mut event = Event::from("i am a log");
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts());
+            .insert(log_schema().timestamp_key(), ts());
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
         event.as_mut_log().insert("host", "local");

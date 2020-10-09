@@ -27,6 +27,7 @@ use std::{
     fmt,
     task::{Context, Poll},
 };
+use string_cache::DefaultAtom as Atom;
 use tower::Service;
 use tracing_futures::Instrument;
 
@@ -70,9 +71,13 @@ inventory::submit! {
     SinkDescription::new_without_default::<KinesisFirehoseSinkConfig>("aws_kinesis_firehose")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "aws_kinesis_firehose")]
 impl SinkConfig for KinesisFirehoseSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let client = self.create_client(cx.resolver())?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = KinesisFirehoseService::new(self.clone(), client, cx)?;
@@ -234,7 +239,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
         Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
 
         Encoding::Text => log
-            .get(&crate::config::log_schema().message_key())
+            .get(&Atom::from(crate::config::log_schema().message_key()))
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };

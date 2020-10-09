@@ -69,7 +69,9 @@ pub struct FileConfig {
     pub host_key: Option<String>,
     pub data_dir: Option<PathBuf>,
     pub glob_minimum_cooldown: u64, // millis
-    pub fingerprinting: FingerprintingConfig,
+    // Deprecated name
+    #[serde(alias = "fingerprinting")]
+    pub fingerprint: FingerprintConfig,
     pub message_start_indicator: Option<String>,
     pub multi_line_timeout: u64, // millis
     pub multiline: Option<MultilineConfig>,
@@ -80,26 +82,26 @@ pub struct FileConfig {
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 #[serde(tag = "strategy", rename_all = "snake_case")]
-pub enum FingerprintingConfig {
+pub enum FingerprintConfig {
     Checksum {
-        fingerprint_bytes: usize,
+        bytes: usize,
         ignored_header_bytes: usize,
     },
     #[serde(rename = "device_and_inode")]
     DevInode,
 }
 
-impl From<FingerprintingConfig> for Fingerprinter {
-    fn from(config: FingerprintingConfig) -> Fingerprinter {
+impl From<FingerprintConfig> for Fingerprinter {
+    fn from(config: FingerprintConfig) -> Fingerprinter {
         match config {
-            FingerprintingConfig::Checksum {
-                fingerprint_bytes,
+            FingerprintConfig::Checksum {
+                bytes,
                 ignored_header_bytes,
             } => Fingerprinter::Checksum {
-                fingerprint_bytes,
+                bytes,
                 ignored_header_bytes,
             },
-            FingerprintingConfig::DevInode => Fingerprinter::DevInode,
+            FingerprintConfig::DevInode => Fingerprinter::DevInode,
         }
     }
 }
@@ -117,8 +119,8 @@ impl Default for FileConfig {
             start_at_beginning: false,
             ignore_older: None,
             max_line_bytes: default_max_line_bytes(),
-            fingerprinting: FingerprintingConfig::Checksum {
-                fingerprint_bytes: 256,
+            fingerprint: FingerprintConfig::Checksum {
+                bytes: 256,
                 ignored_header_bytes: 0,
             },
             host_key: None,
@@ -138,9 +140,10 @@ inventory::submit! {
     SourceDescription::new::<FileConfig>("file")
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "file")]
 impl SourceConfig for FileConfig {
-    fn build(
+    async fn build(
         &self,
         name: &str,
         globals: &GlobalOptions,
@@ -153,12 +156,17 @@ impl SourceConfig for FileConfig {
         // other
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
 
-        if let Some(ref config) = self.multiline {
-            let _: line_agg::Config = config.try_into()?;
-        }
+        // Clippy rule, because async_trait?
+        #[allow(clippy::suspicious_else_formatting)]
+        {
+            if let Some(ref config) = self.multiline {
+                let _: line_agg::Config = config.try_into()?;
+            }
 
-        if let Some(ref indicator) = self.message_start_indicator {
-            Regex::new(indicator).with_context(|| InvalidMessageStartIndicator { indicator })?;
+            if let Some(ref indicator) = self.message_start_indicator {
+                Regex::new(indicator)
+                    .with_context(|| InvalidMessageStartIndicator { indicator })?;
+            }
         }
 
         Ok(file_source(self, data_dir, shutdown, out))
@@ -195,7 +203,7 @@ pub fn file_source(
         max_line_bytes: config.max_line_bytes,
         data_dir,
         glob_minimum_cooldown,
-        fingerprinter: config.fingerprinting.clone().into(),
+        fingerprinter: config.fingerprint.clone().into(),
         oldest_first: config.oldest_first,
         remove_after: config.remove_after.map(Duration::from_secs),
         emitter: FileSourceInternalEventsEmitter,
@@ -322,13 +330,14 @@ mod tests {
         future::Future,
         io::{Seek, Write},
     };
+    use string_cache::DefaultAtom as Atom;
     use tempfile::tempdir;
     use tokio::time::{delay_for, timeout, Duration};
 
     fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {
-            fingerprinting: FingerprintingConfig::Checksum {
-                fingerprint_bytes: 8,
+            fingerprint: FingerprintConfig::Checksum {
+                bytes: 8,
                 ignored_header_bytes: 0,
             },
             data_dir: Some(dir.path().to_path_buf()),
@@ -364,35 +373,35 @@ mod tests {
         .unwrap();
         assert_eq!(config, FileConfig::default());
         assert_eq!(
-            config.fingerprinting,
-            FingerprintingConfig::Checksum {
-                fingerprint_bytes: 256,
+            config.fingerprint,
+            FingerprintConfig::Checksum {
+                bytes: 256,
                 ignored_header_bytes: 0,
             }
         );
 
         let config: FileConfig = toml::from_str(
             r#"
-        [fingerprinting]
+        [fingerprint]
         strategy = "device_and_inode"
         "#,
         )
         .unwrap();
-        assert_eq!(config.fingerprinting, FingerprintingConfig::DevInode);
+        assert_eq!(config.fingerprint, FingerprintConfig::DevInode);
 
         let config: FileConfig = toml::from_str(
             r#"
-        [fingerprinting]
+        [fingerprint]
         strategy = "checksum"
-        fingerprint_bytes = 128
+        bytes = 128
         ignored_header_bytes = 512
         "#,
         )
         .unwrap();
         assert_eq!(
-            config.fingerprinting,
-            FingerprintingConfig::Checksum {
-                fingerprint_bytes: 128,
+            config.fingerprint,
+            FingerprintConfig::Checksum {
+                bytes: 128,
                 ignored_header_bytes: 512,
             }
         );
@@ -431,8 +440,14 @@ mod tests {
 
         assert_eq!(log[&"file".into()], "some_file.rs".into());
         assert_eq!(log[&"host".into()], "Some.Machine".into());
-        assert_eq!(log[&log_schema().message_key()], "hello world".into());
-        assert_eq!(log[log_schema().source_type_key()], "file".into());
+        assert_eq!(
+            log[&Atom::from(log_schema().message_key())],
+            "hello world".into()
+        );
+        assert_eq!(
+            log[&Atom::from(log_schema().source_type_key())],
+            "file".into()
+        );
     }
 
     #[tokio::test]
@@ -472,7 +487,7 @@ mod tests {
         let mut goodbye_i = 0;
 
         for event in received {
-            let line = event.as_log()[&log_schema().message_key()].to_string_lossy();
+            let line = event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy();
             if line.starts_with("hello") {
                 assert_eq!(line, format!("hello {}", hello_i));
                 assert_eq!(
@@ -542,7 +557,7 @@ mod tests {
                 path.to_str().unwrap()
             );
 
-            let line = event.as_log()[&log_schema().message_key()].to_string_lossy();
+            let line = event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy();
 
             if pre_trunc {
                 assert_eq!(line, format!("pretrunc {}", i));
@@ -608,7 +623,7 @@ mod tests {
                 path.to_str().unwrap()
             );
 
-            let line = event.as_log()[&log_schema().message_key()].to_string_lossy();
+            let line = event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy();
 
             if pre_rot {
                 assert_eq!(line, format!("prerot {}", i));
@@ -667,7 +682,7 @@ mod tests {
         let mut is = [0; 3];
 
         for event in received {
-            let line = event.as_log()[&log_schema().message_key()].to_string_lossy();
+            let line = event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy();
             let mut split = line.split(' ');
             let file = split.next().unwrap().parse::<usize>().unwrap();
             assert_ne!(file, 4);
@@ -790,7 +805,7 @@ mod tests {
                 received.as_log().keys().collect::<HashSet<_>>(),
                 vec![
                     log_schema().host_key().to_string(),
-                    log_schema().message_key().to_string(),
+                    Atom::from(log_schema().message_key()).to_string(),
                     log_schema().timestamp_key().to_string(),
                     log_schema().source_type_key().to_string()
                 ]
@@ -830,7 +845,9 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
+                .map(|event| {
+                    event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy()
+                })
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["zeroth line", "first line"]);
         }
@@ -851,7 +868,9 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
+                .map(|event| {
+                    event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy()
+                })
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["second line"]);
         }
@@ -877,7 +896,9 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
+                .map(|event| {
+                    event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy()
+                })
                 .collect::<Vec<_>>();
             assert_eq!(
                 lines,
@@ -914,7 +935,9 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
+                .map(|event| {
+                    event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy()
+                })
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["first line"]);
         }
@@ -939,7 +962,9 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
+                .map(|event| {
+                    event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy()
+                })
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["second line"]);
         }
@@ -1017,7 +1042,7 @@ mod tests {
                     .to_string_lossy()
                     .ends_with("before")
             })
-            .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
+            .map(|event| event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy())
             .collect::<Vec<_>>();
         let after_lines = received
             .iter()
@@ -1026,7 +1051,7 @@ mod tests {
                     .to_string_lossy()
                     .ends_with("after")
             })
-            .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy())
+            .map(|event| event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(before_lines, vec!["second line"]);
         assert_eq!(after_lines, vec!["_first line", "_second line"]);
@@ -1075,7 +1100,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&log_schema().message_key())
+                    .get(&Atom::from(log_schema().message_key()))
                     .unwrap()
                     .clone()
             })
@@ -1137,7 +1162,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&log_schema().message_key())
+                    .get(&Atom::from(log_schema().message_key()))
                     .unwrap()
                     .clone()
             })
@@ -1212,7 +1237,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&log_schema().message_key())
+                    .get(&Atom::from(log_schema().message_key()))
                     .unwrap()
                     .clone()
             })
@@ -1279,7 +1304,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&log_schema().message_key())
+                    .get(&Atom::from(log_schema().message_key()))
                     .unwrap()
                     .clone()
             })
@@ -1344,7 +1369,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&log_schema().message_key())
+                    .get(&Atom::from(log_schema().message_key()))
                     .unwrap()
                     .clone()
             })
@@ -1406,7 +1431,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&log_schema().message_key())
+                    .get(&Atom::from(log_schema().message_key()))
                     .unwrap()
                     .clone()
             })
@@ -1446,7 +1471,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&log_schema().message_key())
+                    .get(&Atom::from(log_schema().message_key()))
                     .unwrap()
                     .clone()
             })

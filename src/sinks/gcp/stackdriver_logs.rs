@@ -110,11 +110,7 @@ lazy_static! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
-    fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        unimplemented!()
-    }
-
-    async fn build_async(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let creds = self.auth.make_credentials(Scope::LoggingWrite).await?;
 
         let batch = BatchSettings::default()
@@ -182,7 +178,7 @@ impl HttpSink for StackdriverSink {
         entry.insert("severity".into(), json!(severity));
 
         // If the event contains a timestamp, send it in the main message so gcp can pick it up.
-        if let Some(timestamp) = log.get(&log_schema().timestamp_key()) {
+        if let Some(timestamp) = log.get(&Atom::from(log_schema().timestamp_key())) {
             entry.insert("timestamp".into(), json!(timestamp));
         }
 
@@ -454,7 +450,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config.build_async(SinkContext::new_test()).await.is_ok() {
+        if config.build(SinkContext::new_test()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }
