@@ -83,11 +83,11 @@ components: sinks: sematext_metrics: {
 		metric_types: {
 			title: "Metric Types"
 			body: #"""
-                               [Sematext monitoring](https://sematext.com/docs/monitoring/) accepts metrics which contain a single value. 
+                               [Sematext monitoring](https://sematext.com/docs/monitoring/) accepts metrics which contain a single value.
                                These are the Counter and Gauge Vector metric types.
 
                                <Alert type="info">
-                               Other metric types are not supported. The following metric types will not be sent to Sematext: 
+                               Other metric types are not supported. The following metric types will not be sent to Sematext:
 
                                `aggregated_histogram`, `aggregated_summary`, `distribution`, `set`
                                </Alert>
