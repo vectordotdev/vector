@@ -23,9 +23,9 @@ package metadata
 
 	sort?: int8
 
-	type: {
-		"*"?: {}
-		"[string]"?: {
+	type:
+		close({"*": {}}) |
+		close({"[string]": {
 			if !required {
 				default: [...string] | null
 			}
@@ -39,17 +39,13 @@ package metadata
 			]]
 
 			templateable?: bool
-		}
-		"bool"?: {
+		}}) |
+		close({"bool": {
 			if !required {
 				default: bool | null
 			}
-		}
-		"object"?: {
-			examples: [...{[Name=string]: _}]
-			options: #ConfigurationOptions | {}
-		}
-		"string"?: {
+		}}) |
+		close({"string": {
 			if !required {
 				default: string | null
 			}
@@ -63,15 +59,19 @@ package metadata
 			]
 
 			templateable?: bool
-		}
-		"uint"?: {
-			if !required {
-				default: uint | null
+		}}) |
+		close({"uint": {
+				if !required {
+					default: uint | null
+				}
+				examples?: [...uint]
+				unit: "bytes" | "logs" | "milliseconds" | "seconds" | null
+			}}) |
+		close({"object": {
+				examples: [...{[Name=string]: _}]
+				options: #ConfigurationOptions | {}
 			}
-			examples?: [...uint]
-			unit: "bytes" | "logs" | "milliseconds" | "seconds" | null
-		}
-	}
+		}})
 }
 
 #Components: [Type=string]: {
