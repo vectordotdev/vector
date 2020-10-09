@@ -7,11 +7,11 @@ delay = 0.100
 
 [stats.in_flight]
 max = [22, 29]
-mean = [10.0, 13.0]
+mean = [10.0, 14.0]
 
 [controller.in_flight]
 max = [22, 29]
-mean = [10.0, 13.0]
+mean = [10.0, 14.0]
 
 [controller.concurrency_limit]
 max = [22, 30]
