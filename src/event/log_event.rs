@@ -35,11 +35,7 @@ impl LogEvent {
     }
 
     #[instrument(skip(self, key), fields(key = %key.as_ref()))]
-    pub fn insert<K, V>(&mut self, key: K, value: V) -> Option<Value>
-    where
-        K: AsRef<str>,
-        V: Into<Value> + Debug,
-    {
+    pub fn insert(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) -> Option<Value> {
         util::log::insert(&mut self.fields, key.as_ref(), value.into())
     }
 
@@ -60,13 +56,14 @@ impl LogEvent {
         self.fields.insert(key.into(), value.into());
     }
 
-    #[instrument(skip(self, key), fields(key = %key))]
-    pub fn try_insert<V>(&mut self, key: &DefaultAtom, value: V)
+    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
+    pub fn try_insert<V>(&mut self, key: impl AsRef<str>, value: V)
     where
         V: Into<Value> + Debug,
     {
+        let key = key.as_ref();
         if !self.contains(key) {
-            self.insert(key.clone(), value);
+            self.insert(key, value);
         }
     }
 
