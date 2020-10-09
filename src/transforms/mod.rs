@@ -9,6 +9,8 @@ pub mod add_fields;
 pub mod add_tags;
 #[cfg(feature = "transforms-ansi_stripper")]
 pub mod ansi_stripper;
+#[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
+pub mod aws_cloudwatch_logs_subscription_parser;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub mod aws_ec2_metadata;
 #[cfg(feature = "transforms-coercer")]

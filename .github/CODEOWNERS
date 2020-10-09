@@ -126,6 +126,7 @@
 /src/sinks/util/auto_concurrency @bruceg
 
 /src/sources/apache_metrics/ @jszwedko
+/src/sources/aws_kinesis_firehose/ @jszwedko
 /src/sources/docker.rs @fanatid
 /src/sources/generator.rs @bruceg
 /src/sources/host_metrics.rs @bruceg
@@ -143,6 +144,7 @@
 
 /src/transforms/add_tags.rs @lukesteensen
 /src/transforms/ansi_stripper.rs @JeanMertz
+/src/transforms/aws_cloudwatch_logs_subscription_parser.rs @jszwedko
 /src/transforms/coercer.rs @bruceg
 /src/transforms/filter.rs @bruceg
 /src/transforms/field_filter.rs @lukesteensen
