@@ -15,7 +15,7 @@ components: sinks: console: {
 		batch: {
 			enabled:      false
 			common:       false
-			max_bytes:    30000000
+			max_bytes:    null
 			max_events:   null
 			timeout_secs: 1
 		}
