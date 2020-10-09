@@ -6,10 +6,7 @@ pub struct AddFieldsEventProcessed;
 
 impl InternalEvent for AddFieldsEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "add_fields",
-        );
+        counter!("events_processed", 1);
     }
 }
 
@@ -24,10 +21,7 @@ impl<'a> InternalEvent for AddFieldsTemplateRenderingError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "add_fields",
-        );
+        counter!("processing_errors", 1);
     }
 }
 
@@ -43,10 +37,7 @@ impl<'a> InternalEvent for AddFieldsTemplateInvalid<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "add_fields",
-        );
+        counter!("processing_errors", 1);
     }
 }
 

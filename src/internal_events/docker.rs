@@ -19,14 +19,8 @@ impl<'a> InternalEvent for DockerEventReceived<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-                 "component_kind" => "source",
-                 "component_name" => "docker",
-        );
-        counter!("bytes_processed", self.byte_size as u64,
-                 "component_kind" => "source",
-                 "component_name" => "docker",
-        );
+        counter!("events_processed", 1);
+        counter!("bytes_processed", self.byte_size as u64);
     }
 }
 
@@ -46,10 +40,7 @@ impl<'a> InternalEvent for DockerContainerEventReceived<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("container_events_processed", 1,
-                 "component_kind" => "source",
-                 "component_name" => "docker",
-        );
+        counter!("container_events_processed", 1);
     }
 }
 
@@ -67,10 +58,7 @@ impl<'a> InternalEvent for DockerContainerWatch<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("containers_watched", 1,
-                 "component_kind" => "source",
-                 "component_name" => "docker",
-        );
+        counter!("containers_watched", 1);
     }
 }
 
@@ -88,10 +76,7 @@ impl<'a> InternalEvent for DockerContainerUnwatch<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("containers_unwatched", 1,
-                 "component_kind" => "source",
-                 "component_name" => "docker",
-        );
+        counter!("containers_unwatched", 1);
     }
 }
 
@@ -112,10 +97,7 @@ impl<'a> InternalEvent for DockerCommunicationError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("communication_errors", 1,
-                 "component_kind" => "source",
-                 "component_name" => "docker",
-        );
+        counter!("communication_errors", 1);
     }
 }
 
@@ -136,10 +118,7 @@ impl<'a> InternalEvent for DockerContainerMetadataFetchFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("container_metadata_fetch_errors", 1,
-                 "component_kind" => "source",
-                 "component_name" => "docker",
-        );
+        counter!("container_metadata_fetch_errors", 1);
     }
 }
 
@@ -160,10 +139,7 @@ impl<'a> InternalEvent for DockerTimestampParseFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("timestamp_parse_errors", 1,
-                 "component_kind" => "source",
-                 "component_name" => "docker",
-        );
+        counter!("timestamp_parse_errors", 1);
     }
 }
 
@@ -186,9 +162,6 @@ impl<'a> InternalEvent for DockerLoggingDriverUnsupported<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("logging_driver_errors", 1,
-                 "component_kind" => "source",
-                 "component_name" => "docker",
-        );
+        counter!("logging_driver_errors", 1);
     }
 }

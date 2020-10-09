@@ -12,16 +12,8 @@ impl InternalEvent for KafkaEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "events_processed", 1,
-            "component_kind" => "source",
-            "component_type" => "kafka",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "kafka",
-        );
+        counter!("events_processed", 1);
+        counter!("bytes_processed", self.byte_size as u64);
     }
 }
 
@@ -36,11 +28,7 @@ impl InternalEvent for KafkaOffsetUpdateFailed {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "consumer_offset_updates_failed", 1,
-            "component_kind" => "source",
-            "component_type" => "kafka",
-        );
+        counter!("consumer_offset_updates_failed", 1);
     }
 }
 
@@ -55,11 +43,7 @@ impl InternalEvent for KafkaEventFailed {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "events_failed", 1,
-            "component_kind" => "source",
-            "component_type" => "kafka",
-        );
+        counter!("events_failed", 1);
     }
 }
 

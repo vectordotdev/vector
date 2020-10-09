@@ -12,9 +12,7 @@ impl InternalEvent for UnixSocketConnectionEstablished<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("unix_socket_connections_established", 1,
-            "component_kind" => "sink",
-        );
+        counter!("unix_socket_connections_established", 1);
     }
 }
 
@@ -34,9 +32,7 @@ impl InternalEvent for UnixSocketConnectionFailure<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("unix_socket_connection_failures", 1,
-            "component_kind" => "sink",
-        );
+        counter!("unix_socket_connection_failures", 1);
     }
 }
 
@@ -69,15 +65,7 @@ pub struct UnixSocketEventSent {
 
 impl InternalEvent for UnixSocketEventSent {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "sink",
-            "component_type" => "socket",
-            "mode" => "unix",
-        );
-        counter!("bytes_processed", self.byte_size as u64,
-            "component_kind" => "sink",
-            "component_type" => "socket",
-            "mode" => "unix",
-        );
+        counter!("events_processed", 1, "mode" => "unix");
+        counter!("bytes_processed", self.byte_size as u64, "mode" => "unix");
     }
 }

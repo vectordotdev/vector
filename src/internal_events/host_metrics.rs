@@ -12,10 +12,6 @@ impl InternalEvent for HostMetricsEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "events_processed", self.count as u64,
-            "component_kind" => "source",
-            "component_type" => "host_metrics",
-        );
+        counter!("events_processed", self.count as u64);
     }
 }

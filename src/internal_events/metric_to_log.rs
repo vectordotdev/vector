@@ -11,10 +11,7 @@ impl InternalEvent for MetricToLogEventProcessed {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "metric_to_log",
-        );
+        counter!("events_processed", 1);
     }
 }
 
@@ -33,10 +30,6 @@ impl<'a> InternalEvent for MetricToLogFailedSerialize {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "metric_to_log",
-            "error_type" => "failed_serialize",
-        );
+        counter!("processing_errors", 1, "error_type" => "failed_serialize");
     }
 }

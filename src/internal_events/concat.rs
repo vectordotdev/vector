@@ -6,10 +6,7 @@ pub struct ConcatEventProcessed;
 
 impl InternalEvent for ConcatEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "add_fields",
-        );
+        counter!("events_processed", 1);
     }
 }
 
@@ -36,10 +33,7 @@ impl<'a> InternalEvent for ConcatSubstringError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "concat",
-        );
+        counter!("processing_errors", 1);
     }
 }
 

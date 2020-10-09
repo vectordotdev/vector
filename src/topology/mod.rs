@@ -445,8 +445,9 @@ impl RunningTopology {
         let task = new_pieces.tasks.remove(name).unwrap();
         let span = error_span!(
             "sink",
-            topology_component_name = %task.name(),
-            topology_component_type = %task.typetag(),
+            component_kind = "sink",
+            component_name = %task.name(),
+            component_type = %task.typetag(),
         );
         let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task.compat());
@@ -459,8 +460,9 @@ impl RunningTopology {
         let task = new_pieces.tasks.remove(name).unwrap();
         let span = error_span!(
             "transform",
-            topology_component_name = %task.name(),
-            topology_component_type = %task.typetag(),
+            component_kind = "transform",
+            component_name = %task.name(),
+            component_type = %task.typetag(),
         );
         let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task.compat());
@@ -473,8 +475,9 @@ impl RunningTopology {
         let task = new_pieces.tasks.remove(name).unwrap();
         let span = error_span!(
             "source",
-            topology_component_name = %task.name(),
-            topology_component_type = %task.typetag(),
+            component_kind = "source",
+            component_name = %task.name(),
+            component_type = %task.typetag(),
         );
         let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span.clone());
         let spawned = tokio::spawn(task.compat());

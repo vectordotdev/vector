@@ -6,10 +6,7 @@ pub(crate) struct DedupeEventProcessed;
 
 impl InternalEvent for DedupeEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "dedupe",
-        );
+        counter!("events_processed", 1);
     }
 }
 
@@ -28,9 +25,6 @@ impl InternalEvent for DedupeEventDiscarded {
     }
 
     fn emit_metrics(&self) {
-        counter!("duplicate_events_discarded", 1,
-            "component_kind" => "transform",
-            "component_type" => "dedupe",
-        );
+        counter!("duplicate_events_discarded", 1);
     }
 }

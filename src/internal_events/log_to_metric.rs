@@ -9,10 +9,7 @@ impl InternalEvent for LogToMetricEventProcessed {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "log_to_metric",
-        );
+        counter!("events_processed", 1);
     }
 }
 
@@ -25,8 +22,6 @@ impl InternalEvent for LogToMetricFieldNotFound {
 
     fn emit_metrics(&self) {
         counter!("processing_errors", 1,
-                 "component_kind" => "transform",
-                 "component_type" => "log_to_metric",
                  "error_type" => "field_not_found",
         );
     }
@@ -43,8 +38,6 @@ impl<'a> InternalEvent for LogToMetricParseError<'a> {
 
     fn emit_metrics(&self) {
         counter!("processing_errors", 1,
-                 "component_kind" => "transform",
-                 "component_type" => "log_to_metric",
                  "error_type" => "parse_error",
         );
     }
@@ -61,8 +54,6 @@ impl InternalEvent for LogToMetricRenderError {
 
     fn emit_metrics(&self) {
         counter!("processing_errors", 1,
-                 "component_kind" => "transform",
-                 "component_type" => "log_to_metric",
                  "error_type" => "render_error",
         );
     }
@@ -79,8 +70,6 @@ impl InternalEvent for LogToMetricTemplateError {
 
     fn emit_metrics(&self) {
         counter!("processing_errors", 1,
-                 "component_kind" => "transform",
-                 "component_type" => "log_to_metric",
                  "error_type" => "template_error",
         );
     }

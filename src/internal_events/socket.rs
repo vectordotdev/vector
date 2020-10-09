@@ -30,16 +30,8 @@ impl InternalEvent for SocketEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "source",
-            "component_type" => "socket",
-            "mode" => self.mode.as_str(),
-        );
-        counter!("bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "socket",
-            "mode" => self.mode.as_str(),
-        );
+        counter!("events_processed", 1, "mode" => self.mode.as_str());
+        counter!("bytes_processed", self.byte_size as u64, "mode" => self.mode.as_str());
     }
 }
 
@@ -55,10 +47,6 @@ impl InternalEvent for SocketReceiveError {
     }
 
     fn emit_metrics(&self) {
-        counter!("socket_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "socket",
-            "mode" => self.mode.as_str(),
-        );
+        counter!("socket_errors", 1, "mode" => self.mode.as_str());
     }
 }

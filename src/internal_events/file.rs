@@ -22,14 +22,10 @@ impl InternalEvent for FileEventReceived<'_> {
     fn emit_metrics(&self) {
         counter!(
             "events_processed", 1,
-            "component_kind" => "source",
-            "component_type" => "file",
             "file" => self.file.to_owned(),
         );
         counter!(
             "bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "file",
             "file" => self.file.to_owned(),
         );
     }
@@ -51,8 +47,6 @@ impl<'a> InternalEvent for FileChecksumFailed<'a> {
     fn emit_metrics(&self) {
         counter!(
             "checksum_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "file",
             "file" => self.path.to_string_lossy().into_owned(),
         );
     }
@@ -76,8 +70,6 @@ impl<'a> InternalEvent for FileFingerprintReadFailed<'a> {
     fn emit_metrics(&self) {
         counter!(
             "fingerprint_read_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "file",
             "file" => self.path.to_string_lossy().into_owned(),
         );
     }
@@ -102,8 +94,6 @@ impl<'a> InternalEvent for FileDeleteFailed<'a> {
     fn emit_metrics(&self) {
         counter!(
             "file_delete_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "file",
             "file" => self.path.to_string_lossy().into_owned(),
         );
     }
@@ -125,8 +115,6 @@ impl<'a> InternalEvent for FileDeleted<'a> {
     fn emit_metrics(&self) {
         counter!(
             "files_deleted", 1,
-            "component_kind" => "source",
-            "component_type" => "file",
             "file" => self.path.to_string_lossy().into_owned(),
         );
     }
@@ -148,8 +136,6 @@ impl<'a> InternalEvent for FileUnwatched<'a> {
     fn emit_metrics(&self) {
         counter!(
             "files_unwatched", 1,
-            "component_kind" => "source",
-            "component_type" => "file",
             "file" => self.path.to_string_lossy().into_owned(),
         );
     }
@@ -173,8 +159,6 @@ impl<'a> InternalEvent for FileWatchFailed<'a> {
     fn emit_metrics(&self) {
         counter!(
             "file_watch_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "file",
             "file" => self.path.to_string_lossy().into_owned(),
         );
     }
@@ -198,8 +182,6 @@ impl<'a> InternalEvent for FileResumed<'a> {
     fn emit_metrics(&self) {
         counter!(
             "files_resumed", 1,
-            "component_kind" => "source",
-            "component_type" => "file",
             "file" => self.path.to_string_lossy().into_owned(),
         );
     }
@@ -221,8 +203,6 @@ impl<'a> InternalEvent for FileAdded<'a> {
     fn emit_metrics(&self) {
         counter!(
             "files_added", 1,
-            "component_kind" => "source",
-            "component_type" => "file",
             "file" => self.path.to_string_lossy().into_owned(),
         );
     }
@@ -239,11 +219,7 @@ impl InternalEvent for FileCheckpointed {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "checkpoints", self.count as u64,
-            "component_kind" => "source",
-            "component_type" => "file",
-        );
+        counter!("checkpoints", self.count as u64);
     }
 }
 
@@ -258,11 +234,7 @@ impl InternalEvent for FileCheckpointWriteFailed {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "checkpoint_write_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "file",
-        );
+        counter!("checkpoint_write_errors", 1);
     }
 }
 

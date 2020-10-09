@@ -14,16 +14,8 @@ impl InternalEvent for ElasticSearchEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "events_processed", 1,
-            "component_kind" => "sink",
-            "component_type" => "elasticsearch",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "sink",
-            "component_type" => "elasticsearch",
-        );
+        counter!("events_processed", 1);
+        counter!("bytes_processed", self.byte_size as u64);
     }
 }
 
@@ -42,10 +34,6 @@ impl InternalEvent for ElasticSearchMissingKeys {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "missing_keys", 1,
-            "component_kind" => "sink",
-            "component_type" => "elasticsearch",
-        );
+        counter!("missing_keys", 1);
     }
 }

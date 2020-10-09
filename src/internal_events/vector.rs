@@ -9,16 +9,8 @@ pub struct VectorEventSent {
 
 impl InternalEvent for VectorEventSent {
     fn emit_metrics(&self) {
-        counter!(
-            "events_processed", 1,
-            "component_kind" => "sink",
-            "component_type" => "vector",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "sink",
-            "component_type" => "vector",
-        );
+        counter!("events_processed", 1);
+        counter!("bytes_processed", self.byte_size as u64);
     }
 }
 
@@ -29,20 +21,12 @@ pub struct VectorEventReceived {
 
 impl InternalEvent for VectorEventReceived {
     fn emit_logs(&self) {
-        trace!(message = "Received one event.",);
+        trace!(message = "Received one event.");
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "events_processed", 1,
-            "component_kind" => "source",
-            "component_type" => "vector",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "vector",
-        );
+        counter!("events_processed", 1);
+        counter!("bytes_processed", self.byte_size as u64);
     }
 }
 
@@ -57,10 +41,6 @@ impl InternalEvent for VectorProtoDecodeError {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "protobuf_decode_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "vector",
-        );
+        counter!("protobuf_decode_errors", 1);
     }
 }

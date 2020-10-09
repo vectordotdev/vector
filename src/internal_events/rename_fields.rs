@@ -6,10 +6,7 @@ pub struct RenameFieldsEventProcessed;
 
 impl InternalEvent for RenameFieldsEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "rename_fields",
-        );
+        counter!("events_processed", 1);
     }
 }
 
