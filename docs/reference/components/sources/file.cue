@@ -56,7 +56,7 @@ components: sources: file: {
 				examples: ["file"]
 			}
 		}
-		fingerprinting: {
+		fingerprint: {
 			common:      false
 			description: "Configuration for how the file source should identify files."
 			required:    false
@@ -68,13 +68,13 @@ components: sources: file: {
 					type: string: {
 						default: "checksum"
 						enum: {
-							checksum:         "Read `fingerprint_bytes` bytes from the head of the file to uniquely identify files via a checksum."
+							checksum:         "Read `bytes` bytes from the head of the file to uniquely identify files via a checksum."
 							device_and_inode: "Uses the [device and inode][urls.inode] to unique identify files."
 						}
 						examples: ["checksum", "device_and_inode"]
 					}
 				}
-				fingerprint_bytes: {
+				bytes: {
 					common:        false
 					description:   "The number of bytes read off the head of the file to generate a unique fingerprint."
 					relevant_when: "`strategy` = \"checksum\""
@@ -313,8 +313,8 @@ components: sources: file: {
 				"""#
 		}
 
-		fingerprinting: {
-			title: "Fingerprinting"
+		fingerprint: {
+			title: "fingerprint"
 			body: #"""
 				By default, Vector identifies files by creating a
 				[cyclic redundancy check](urls.crc) (CRC) on the first 256 bytes of
@@ -361,9 +361,9 @@ components: sources: file: {
 
 						```text
 						foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)
-						  from foobar.rb:6:in `bar'
-						  from foobar.rb:2:in `foo'
-						  from foobar.rb:9:in `<main>'
+							from foobar.rb:6:in `bar'
+							from foobar.rb:2:in `foo'
+							from foobar.rb:9:in `<main>'
 						```
 
 						To consume these lines as a single event, use the following Vector
@@ -371,24 +371,24 @@ components: sources: file: {
 
 						```toml
 						[sources.my_file_source]
-						  type = "file"
-						  # ...
+							type = "file"
+							# ...
 
-						  [sources.my_file_source.multiline]
-						    start_pattern = "^[^\\s]"
-						    mode = "continue_through"
-						    condition_pattern = "^[\\s]+from"
-						    timeout_ms = 1000
+							[sources.my_file_source.multiline]
+								start_pattern = "^[^\\s]"
+								mode = "continue_through"
+								condition_pattern = "^[\\s]+from"
+								timeout_ms = 1000
 						```
 
 						* `start_pattern`, set to `^[^\\s]`, tells Vector that new
-						  multi-line events should _not_ start  with white-space.
+							multi-line events should _not_ start  with white-space.
 						* `mode`, set to `continue_through`, tells Vector continue
-						  aggregating lines until the `condition_pattern` is no longer
-						  valid (excluding the invalid line).
+							aggregating lines until the `condition_pattern` is no longer
+							valid (excluding the invalid line).
 						* `condition_pattern`, set to `^[\\s]+from`, tells Vector to
-						  continue aggregating lines if they start with white-space
-						  followed by `from`.
+							continue aggregating lines if they start with white-space
+							followed by `from`.
 						"""
 				},
 				{
@@ -408,23 +408,23 @@ components: sources: file: {
 
 						```toml
 						[sources.my_file_source]
-						  type = "file"
-						  # ...
+							type = "file"
+							# ...
 
-						  [sources.my_file_source.multiline]
-						    start_pattern = "\\$"
-						    mode = "continue_past"
-						    condition_pattern = "\\$"
-						    timeout_ms = 1000
+							[sources.my_file_source.multiline]
+								start_pattern = "\\$"
+								mode = "continue_past"
+								condition_pattern = "\\$"
+								timeout_ms = 1000
 						```
 
 						* `start_pattern`, set to `\\$`, tells Vector that new multi-line
-						  events start with lines that end in `\`.
+							events start with lines that end in `\`.
 						* `mode`, set to `continue_past`, tells Vector continue
-						  aggregating lines, plus one additional line, until
-						  `condition_pattern` is false.
+							aggregating lines, plus one additional line, until
+							`condition_pattern` is false.
 						* `condition_pattern`, set to `\\$`, tells Vector to continue
-						  aggregating lines if they _end_ with a `\` character.
+							aggregating lines if they _end_ with a `\` character.
 						"""#
 				},
 				{
@@ -444,25 +444,25 @@ components: sources: file: {
 
 						```toml
 						[sources.my_file_source]
-						  type = "file"
-						  # ...
+							type = "file"
+							# ...
 
-						  [sources.my_file_source.multiline]
-						    start_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
-						    mode = "halt_before"
-						    condition_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
-						    timeout_ms = 1000
+							[sources.my_file_source.multiline]
+								start_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
+								mode = "halt_before"
+								condition_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
+								timeout_ms = 1000
 						```
 
 						* `start_pattern`, set to `^\[[0-9]{4}-[0-9]{2}-[0-9]{2}`, tells
-						  Vector that new multi-line events start with a timestamp
-						  sequence.
+							Vector that new multi-line events start with a timestamp
+							sequence.
 						* `mode`, set to `halt_before`, tells Vector to continue
-						  aggregating lines as long as the `condition_pattern` does not
-						  match.
+							aggregating lines as long as the `condition_pattern` does not
+							match.
 						* `condition_pattern`, set to `^\[[0-9]{4}-[0-9]{2}-[0-9]{2}`,
-						  tells Vector to continue aggregating up until a line starts with
-						  a timestamp sequence.
+							tells Vector to continue aggregating up until a line starts with
+							a timestamp sequence.
 						"""##
 				},
 			]
