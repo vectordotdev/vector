@@ -14,6 +14,7 @@ use codec::BytesDelimitedCodec;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::net::SocketAddr;
+use string_cache::DefaultAtom as Atom;
 use tokio_util::codec::Decoder;
 use warp::http::{HeaderMap, HeaderValue, StatusCode};
 
@@ -57,7 +58,9 @@ impl HttpSource for SimpleHttpSource {
                 // Add source type
                 let key = log_schema().source_type_key();
                 for event in events.iter_mut() {
-                    event.as_mut_log().try_insert(key, Bytes::from("http"));
+                    event
+                        .as_mut_log()
+                        .try_insert(&Atom::from(key), Bytes::from("http"));
                 }
                 events
             })
@@ -156,7 +159,7 @@ fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
 fn json_parse_object(value: JsonValue) -> Result<Event, ErrorMessage> {
     let mut event = Event::new_empty_log();
     let log = event.as_mut_log();
-    log.insert(log_schema().timestamp_key().clone(), Utc::now()); // Add timestamp
+    log.insert(log_schema().timestamp_key(), Utc::now()); // Add timestamp
     match value {
         JsonValue::Object(map) => {
             for (k, v) in map {
@@ -287,16 +290,28 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[&log_schema().message_key()], "test body".into());
-            assert!(log.get(&log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(
+                log[&Atom::from(log_schema().message_key())],
+                "test body".into()
+            );
+            assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
+            assert_eq!(
+                log[&Atom::from(log_schema().source_type_key())],
+                "http".into()
+            );
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[&log_schema().message_key()], "test body 2".into());
-            assert!(log.get(&log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(
+                log[&Atom::from(log_schema().message_key())],
+                "test body 2".into()
+            );
+            assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
+            assert_eq!(
+                log[&Atom::from(log_schema().source_type_key())],
+                "http".into()
+            );
         }
     }
 
@@ -315,16 +330,28 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[&log_schema().message_key()], "test body".into());
-            assert!(log.get(&log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(
+                log[&Atom::from(log_schema().message_key())],
+                "test body".into()
+            );
+            assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
+            assert_eq!(
+                log[&Atom::from(log_schema().source_type_key())],
+                "http".into()
+            );
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log[&log_schema().message_key()], "test body 2".into());
-            assert!(log.get(&log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert_eq!(
+                log[&Atom::from(log_schema().message_key())],
+                "test body 2".into()
+            );
+            assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
+            assert_eq!(
+                log[&Atom::from(log_schema().source_type_key())],
+                "http".into()
+            );
         }
     }
 
@@ -344,12 +371,12 @@ mod tests {
         assert!(events
             .remove(1)
             .as_log()
-            .get(&log_schema().timestamp_key())
+            .get(&Atom::from(log_schema().timestamp_key()))
             .is_some());
         assert!(events
             .remove(0)
             .as_log()
-            .get(&log_schema().timestamp_key())
+            .get(&Atom::from(log_schema().timestamp_key()))
             .is_some());
     }
 
@@ -367,15 +394,21 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key")], "value".into());
-            assert!(log.get(&log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
+            assert_eq!(
+                log[&Atom::from(log_schema().source_type_key())],
+                "http".into()
+            );
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key2")], "value2".into());
-            assert!(log.get(&log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
+            assert_eq!(
+                log[&Atom::from(log_schema().source_type_key())],
+                "http".into()
+            );
         }
     }
 
@@ -397,15 +430,21 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key1")], "value1".into());
-            assert!(log.get(&log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
+            assert_eq!(
+                log[&Atom::from(log_schema().source_type_key())],
+                "http".into()
+            );
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key2")], "value2".into());
-            assert!(log.get(&log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
+            assert_eq!(
+                log[&Atom::from(log_schema().source_type_key())],
+                "http".into()
+            );
         }
     }
 
@@ -443,8 +482,11 @@ mod tests {
                 "false".into()
             );
             assert_eq!(log[&Atom::from("AbsentHeader")], "".into());
-            assert!(log.get(&log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
+            assert_eq!(
+                log[&Atom::from(log_schema().source_type_key())],
+                "http".into()
+            );
         }
     }
 }

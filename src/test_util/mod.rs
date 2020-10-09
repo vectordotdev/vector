@@ -58,6 +58,15 @@ where
     toml::from_str::<T>(&cfg).expect("Invalid config generated");
 }
 
+pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
+    let test_file = match File::open(path) {
+        Ok(file) => file,
+        Err(e) => return Err(e.into()),
+    };
+    let value: serde_json::Value = serde_json::from_reader(test_file)?;
+    Ok(value)
+}
+
 pub fn next_addr() -> SocketAddr {
     let port = pick_unused_port().unwrap();
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
@@ -303,10 +312,10 @@ where
 }
 
 // Retries a func every `retry` duration until given an Ok(T); panics after `until` elapses
-pub async fn retry_until<F, Fut, T, E>(mut f: F, retry: Duration, until: Duration) -> T
+pub async fn retry_until<'a, F, Fut, T, E>(mut f: F, retry: Duration, until: Duration) -> T
 where
     F: FnMut() -> Fut,
-    Fut: Future<Output = Result<T, E>> + Send + 'static,
+    Fut: Future<Output = Result<T, E>> + Send + 'a,
 {
     let started = Instant::now();
     while started.elapsed() < until {
