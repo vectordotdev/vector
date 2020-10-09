@@ -16,11 +16,6 @@ impl<'a> InternalEvent for ConsoleFieldNotFound<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "processing_errors", 1,
-            "component_kind" => "sink",
-            "component_type" => "console",
-            "error_type" => "field_not_found",
-        );
+        counter!("processing_errors", 1, "error_type" => "field_not_found");
     }
 }
