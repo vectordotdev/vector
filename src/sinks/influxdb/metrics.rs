@@ -814,7 +814,7 @@ mod integration_tests {
         };
 
         let events: Vec<_> = (0..10).map(create_event).collect();
-        let (sink, _) = config.build(cx).expect("error when building config");
+        let (sink, _) = config.build(cx).await.expect("error when building config");
         sink.run(stream::iter(events)).await.unwrap();
 
         let res = query_v1(
