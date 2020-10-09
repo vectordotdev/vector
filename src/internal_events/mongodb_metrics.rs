@@ -1,6 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
-use mongodb::{bson::document::ValueAccessError, error::Error as MongoError};
+use mongodb::{bson, error::Error as MongoError};
 
 pub struct MongoDBMetricsRequestError<'a> {
     pub error: MongoError,
@@ -21,7 +21,7 @@ impl<'a> InternalEvent for MongoDBMetricsRequestError<'a> {
 }
 
 pub struct MongoDBMetricsBsonParseError<'a> {
-    pub error: ValueAccessError,
+    pub error: bson::de::Error,
     pub endpoint: &'a str,
 }
 
