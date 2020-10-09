@@ -4,6 +4,7 @@ use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
     iter::FromIterator,
+    fmt::{Debug, Display},
 };
 use string_cache::DefaultAtom;
 
@@ -13,70 +14,83 @@ pub struct LogEvent {
 }
 
 impl LogEvent {
+    #[instrument(skip(self, key), fields(key = %key))]
     pub fn get(&self, key: &DefaultAtom) -> Option<&Value> {
         util::log::get(&self.fields, key)
     }
 
+    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
         self.fields.get(key.as_ref())
     }
 
+    #[instrument(skip(self, key), fields(key = %key))]
     pub fn get_mut(&mut self, key: &DefaultAtom) -> Option<&mut Value> {
         util::log::get_mut(&mut self.fields, key)
     }
 
+    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
     pub fn contains(&self, key: impl AsRef<str>) -> bool {
         util::log::contains(&self.fields, key.as_ref())
     }
 
+    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
     pub fn insert<K, V>(&mut self, key: K, value: V) -> Option<Value>
     where
         K: AsRef<str>,
-        V: Into<Value>,
+        V: Into<Value> + Debug,
     {
         util::log::insert(&mut self.fields, key.as_ref(), value.into())
     }
 
+    #[instrument(skip(self, key), fields(key = ?key))]
     pub fn insert_path<V>(&mut self, key: Vec<PathComponent>, value: V) -> Option<Value>
     where
-        V: Into<Value>,
+        V: Into<Value> + Debug,
     {
         util::log::insert_path(&mut self.fields, key, value.into())
     }
 
+    #[instrument(skip(self, key), fields(key = %key))]
     pub fn insert_flat<K, V>(&mut self, key: K, value: V)
     where
-        K: Into<String>,
-        V: Into<Value>,
+        K: Into<String> + Display,
+        V: Into<Value> + Debug,
     {
         self.fields.insert(key.into(), value.into());
     }
 
+    #[instrument(skip(self, key), fields(key = %key))]
     pub fn try_insert<V>(&mut self, key: &DefaultAtom, value: V)
     where
-        V: Into<Value>,
+        V: Into<Value> + Debug,
     {
         if !self.contains(key) {
             self.insert(key.clone(), value);
         }
     }
 
+    #[instrument(skip(self, key), fields(key = %key))]
     pub fn remove(&mut self, key: &DefaultAtom) -> Option<Value> {
         util::log::remove(&mut self.fields, &key, false)
     }
 
+    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
     pub fn remove_prune(&mut self, key: impl AsRef<str>, prune: bool) -> Option<Value> {
         util::log::remove(&mut self.fields, key.as_ref(), prune)
     }
 
+    #[instrument(skip(self))]
     pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
         util::log::keys(&self.fields)
     }
 
+    #[instrument(skip(self))]
     pub fn all_fields(&self) -> impl Iterator<Item = (String, &Value)> + Serialize {
         util::log::all_fields(&self.fields)
     }
 
+    #[instrument(skip(self))]
     pub fn is_empty(&self) -> bool {
         self.fields.is_empty()
     }
