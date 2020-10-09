@@ -78,7 +78,7 @@ components: transforms: add_fields: {
 	how_it_works: {
 		conflicts: {
 			title: "Conflicts"
-			body: ""
+			body:  ""
 			sub_sections: [
 				{
 					title: "Key Conflicts"
