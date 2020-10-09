@@ -14,6 +14,10 @@ components: sinks: console: {
 	features: {
 		batch: {
 			enabled: false
+			common:       false
+			max_bytes:    30000000
+			max_events:   null
+			timeout_secs: 1
 		}
 		buffer: enabled:      false
 		compression: enabled: false
