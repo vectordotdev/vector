@@ -6,6 +6,7 @@ use nix::{
     unistd::Pid,
 };
 use std::{
+    io::Write,
     net::SocketAddr,
     path::PathBuf,
     process::{Child, Command},
