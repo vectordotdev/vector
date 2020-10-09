@@ -273,7 +273,7 @@ package metadata
 					}
 				}
 				input:  #LogEvent | [#LogEvent, ...] | string
-				output: #LogEvent | null
+				output: #LogEvent | [#LogEvent, ...] | null
 				notes?: string
 			},
 		]
@@ -325,6 +325,9 @@ package metadata
 		required:       bool
 		type: {
 			"*": {}
+			"[string]"?: {
+				examples: [[string, ...string], ...[string, ...string]]
+			}
 			"string"?: {
 				examples: [string, ...string]
 			}
