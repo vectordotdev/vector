@@ -179,5 +179,5 @@ pub fn topology_events_processed(topology_name: String) -> Option<EventsProcesse
         }
         _ => false,
     })
-    .and_then(|ev| Some(EventsProcessed(ev.into_metric())))
+    .map(|ev| EventsProcessed(ev.into_metric()))
 }
