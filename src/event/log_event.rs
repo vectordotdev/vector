@@ -24,9 +24,9 @@ impl LogEvent {
         self.fields.get(key.as_ref())
     }
 
-    #[instrument(skip(self, key), fields(key = %key))]
-    pub fn get_mut(&mut self, key: &DefaultAtom) -> Option<&mut Value> {
-        util::log::get_mut(&mut self.fields, key)
+    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
+    pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
+        util::log::get_mut(&mut self.fields, key.as_ref())
     }
 
     #[instrument(skip(self, key), fields(key = %key.as_ref()))]
