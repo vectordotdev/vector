@@ -144,7 +144,7 @@ impl ser::Serialize for Compression {
                     0 => map.serialize_entry("level", "none")?,
                     1 => map.serialize_entry("level", "fast")?,
                     6 => map.serialize_entry("level", "default")?,
-                    9 => map.serialize_entry("level", "fast")?,
+                    9 => map.serialize_entry("level", "best")?,
                     level => map.serialize_entry("level", level)?,
                 };
             }
