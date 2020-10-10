@@ -309,7 +309,7 @@ _values: {
 	}
 }
 
-#HowItWorks: [Name=string]: {
+#HowItWorks: [Name=string]: close({
 	name:  Name
 	title: string
 	body:  string
@@ -317,7 +317,7 @@ _values: {
 		title: string
 		body:  string
 	}]
-}
+})
 
 #LogEvent: {
 	host?:      string | null
@@ -326,31 +326,33 @@ _values: {
 	#Any
 }
 
-#LogOutput: [Name=string]: {
+#LogOutput: [Name=string]: close({
 	description: string
 	name:        Name
 	fields:      #Schema
-}
+})
 
 #MetricEvent: {
-	counter: {
+	counter: close({
 		value: uint
-	}
+	})
 	tags: [Name=string]: string
 }
 
-#MetricOutput: [Name=string]: {
+#MetricOutput: [Name=string]: close({
 	description:    string
 	relevant_when?: string
-	tags: [Name=string]: {
-		description: string
-		examples: [string, ...]
-		required: bool
-		name:     Name
-	}
+	tags: #Tags
 	name: Name
 	type: "counter" | "gauge" | "histogram" | "summary"
-}
+})
+
+#Tags: [Name=string]: close({
+	description: string
+	examples: [string, ...]
+	required: bool
+	name:     Name
+})
 
 #Platforms: {
 	"aarch64-unknown-linux-gnu":  bool
@@ -467,13 +469,13 @@ _values: {
 	//
 	// For example, the `sinks.http.headers.*` option allows for arbitrary
 	// key/value pairs.
-	{"*": {}} |
-	{"[string]": #TypeArrayOfStrings & {_args: required: Args.required}} |
-	{"bool": #TypeBool & {_args: required: Args.required}} |
-	{"object": #TypeObject & {_args: required: Args.required}} |
-	{"string": #TypeString & {_args: required: Args.required}} |
-	{"timestamp": #TypeTimestamp & {_args: required: Args.required}} |
-	{"uint": #TypeUint & {_args: required: Args.required}}
+	close({"*": close({})}) |
+	close({"[string]": #TypeArrayOfStrings & {_args: required: Args.required}}) |
+	close({"bool": #TypeBool & {_args: required: Args.required}}) |
+	close({"object": #TypeObject & {_args: required: Args.required}}) |
+	close({"string": #TypeString & {_args: required: Args.required}}) |
+	close({"timestamp": #TypeTimestamp & {_args: required: Args.required}}) |
+	close({"uint": #TypeUint & {_args: required: Args.required}})
 }
 
 #TypeBool: {
@@ -493,7 +495,7 @@ _values: {
 	examples: [...#Any]
 
 	// `options` represent the child options for this option.
-	options: #Schema | {}
+	options: #Schema
 }
 
 #TypeArrayOfStrings: {
