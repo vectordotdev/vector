@@ -344,8 +344,10 @@ _values: {
 	relevant_when?: string
 	tags:           #Tags
 	name:           Name
-	type:           "counter" | "gauge" | "histogram" | "summary"
+	type:           #MetricType
 })
+
+#MetricType: "counter" | "gauge" | "histogram" | "summary"
 
 #Tags: [Name=string]: close({
 	description: string
