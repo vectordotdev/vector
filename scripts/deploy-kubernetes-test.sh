@@ -96,7 +96,9 @@ down() {
     $VECTOR_TEST_KUBECTL delete --namespace "$NAMESPACE" -f "$CUSTOM_RESOURCE_CONFIGS_FILE"
   fi
 
-  $VECTOR_TEST_HELM delete --namespace "$NAMESPACE" "vector"
+  if $VECTOR_TEST_HELM status --namespace "$NAMESPACE" "vector" &>/dev/null; then
+    $VECTOR_TEST_HELM delete --namespace "$NAMESPACE" "vector"
+  fi
 
   $VECTOR_TEST_KUBECTL delete namespace "$NAMESPACE"
 }
