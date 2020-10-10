@@ -5,7 +5,7 @@ authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "End-to-end tests of Vector in the Kubernetes environment"
 
-[dev-dependencies]
+[dependencies]
 futures = "0.3"
 k8s-openapi = { version = "0.9", default-features = false, features = ["v1_15"] }
 k8s-test-framework = { version = "0.1", path = "../k8s-test-framework" }
