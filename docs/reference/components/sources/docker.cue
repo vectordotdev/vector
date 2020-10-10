@@ -209,6 +209,17 @@ components: sources: docker: {
 	]
 
 	how_it_works: {
+		connecting_to_docker: {
+			title: "Connecting To The Docker Daemon"
+			body: #"""
+				Vector will automatically attempt to connect to the docker daemon for you. If
+				the user that Vector is running under can run `docker ps` then Vector will be
+				able to connect. Vector will also respect if `DOCKER_HOST` and
+				`DOCKER_VERIFY_TLS` are set (as well as other Docker environment variables).
+				See the [Docker daemon docs][urls.docker_daemon_socket_option].
+				"""#
+		}
+
 		docker_integration_strategy: {
 			title: "Docker Integration Strategy"
 			body: #"""
@@ -228,48 +239,61 @@ components: sources: docker: {
 			sub_sections: [
 				{
 					title: "Alternate Strategies"
-					body:	#"""
-							First, it's worth mentioning that Vector strives to guide you towards the
-							optimal observability setup without presenting you with unnecessary details or
-							questions. Unfortunately, there are circumstances where trade-offs must be made
-							and you must determine which trade-offs are appropriate. Docker is one of these
-							circumstances.
+					body: #"""
+						First, it's worth mentioning that Vector strives to guide you towards the
+						optimal observability setup without presenting you with unnecessary details or
+						questions. Unfortunately, there are circumstances where trade-offs must be made
+						and you must determine which trade-offs are appropriate. Docker is one of these
+						circumstances.
 
-							Second, if you have a large container-based deployment you should consider using
-							a platform Kubernetes. These platforms provide alternate log collection means
-							that side-step the Docker logging problems. For supported platforms see Vector's
-							[Platforms installation section][docs.installation.platforms].
+						Second, if you have a large container-based deployment you should consider using
+						a platform Kubernetes. These platforms provide alternate log collection means
+						that side-step the Docker logging problems. For supported platforms see Vector's
+						[Platforms installation section][docs.installation.platforms].
 
-							Finally, if you cannot use a container orchestrator then you can configure a
-							compatible [Docker logging driver][urls.docker_logging_drivers] with a matching
-							[Vector source][docs.sources]. For example:
+						Finally, if you cannot use a container orchestrator then you can configure a
+						compatible [Docker logging driver][urls.docker_logging_drivers] with a matching
+						[Vector source][docs.sources]. For example:
 
-							1. The [Docker `syslog` driver][urls.docker_logging_driver_syslog] with the
-							   [Vector `syslog` source][docs.sources.syslog].
-							2. The [Docker `journald` driver][urls.docker_logging_driver_journald] with the
-							   [Vector `journald` source][docs.sources.journald].
-							3. The [Docker `splunk` driver][urls.docker_logging_driver_splunk] with the
-							   [Vector `splunk_hec` source][docs.sources.splunk_hec].
+						1. The [Docker `syslog` driver][urls.docker_logging_driver_syslog] with the
+						   [Vector `syslog` source][docs.sources.syslog].
+						2. The [Docker `journald` driver][urls.docker_logging_driver_journald] with the
+						   [Vector `journald` source][docs.sources.journald].
+						3. The [Docker `splunk` driver][urls.docker_logging_driver_splunk] with the
+						   [Vector `splunk_hec` source][docs.sources.splunk_hec].
 
-							To our knowledge there is no discernible difference in performance or stability
-							between any of these. If we had to recommend one, we would recommend the
-							`syslog` combination.
-							"""#
-				}
+						To our knowledge there is no discernible difference in performance or stability
+						between any of these. If we had to recommend one, we would recommend the
+						`syslog` combination.
+						"""#
+				},
 			]
+		}
+
+		docker_logging_drivers: {
+			title: "Docker Logging Drivers"
+			body: #"""
+				In order for the Vector `docker` source to work properly, you must configure
+				the [`json-file`][urls.docker_logging_driver_json_file] (default) or
+				[`journald`][urls.docker_logging_driver_journald] Docker logging drivers.
+				This is a requirement of the [Docker daemon][urls.docker_daemon], which Vector
+				uses to integrate. See the
+				[Docker Integration Strategy section](#docker-integration-strategy) for more
+				info.
+				"""#
 		}
 
 		message_merging: {
 			title: "Merging Split Messages"
-			body:	#"""
-					Docker, by default, will split log messages that exceed 16kb. This can be a
-					rather frustrating problem because it produces malformed log messages that are
-					difficult to work with. Vector's `docker` source solves this by default,
-					automatically merging these messages into a single message. You can turn this
-					off via the `auto_partial_merge` option. Furthermore, you can adjust the marker
-					that we use to determine if an event is partial via the
-					`partial_event_marker_field` option.
-					"""#
+			body: #"""
+				Docker, by default, will split log messages that exceed 16kb. This can be a
+				rather frustrating problem because it produces malformed log messages that are
+				difficult to work with. Vector's `docker` source solves this by default,
+				automatically merging these messages into a single message. You can turn this
+				off via the `auto_partial_merge` option. Furthermore, you can adjust the marker
+				that we use to determine if an event is partial via the
+				`partial_event_marker_field` option.
+				"""#
 		}
 	}
 }
