@@ -8,7 +8,7 @@ components: sinks: sematext_metrics: {
 	classes: {
 		commonly_used: false
 		function:      "transmit"
-		service_proveders: ["Sematext"]
+		service_providers: ["Sematext"]
 	}
 
 	features: {
@@ -23,7 +23,6 @@ components: sinks: sematext_metrics: {
 		compression: enabled: false
 		healthcheck: enabled: true
 		request: enabled:     false
-		encoding: enabled:    false
 		tls: enabled:         false
 	}
 
@@ -33,7 +32,7 @@ components: sinks: sematext_metrics: {
 	}
 
 	support: {
-		input_types: ["metrics"]
+		input_types: ["metric"]
 
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
@@ -51,19 +50,15 @@ components: sinks: sematext_metrics: {
 
 	configuration: {
 		region: {
-			common:        true
 			description:   "The region destination to send metrics to. This option is required if `endpoint` is not set."
-			required:      false
+			required:      true
 			relevant_when: "`endpoint` is not set"
 			warnings: []
-			type: string: {
-				enum: ["us", "eu"]
-			}
+			type: [string]: ["us", "eu"]
 		}
 		endpoint: {
-			common:        false
 			description:   "The endpoint that will be used to send metrics to. This option is required if `region` is not set."
-			required:      false
+			required:      true
 			relevant_when: "`region` is not set"
 			warnings: []
 			type: string: {
