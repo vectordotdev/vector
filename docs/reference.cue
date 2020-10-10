@@ -6,7 +6,7 @@
 package metadata
 
 #ConfigurationOptions: [Name=string]: {
-	// `desription` describes the option in a succient fashion. Usually 1 to
+	// `description` describes the option in a succinct fashion. Usually 1 to
 	// 2 sentences.
 	description: string
 
@@ -33,7 +33,7 @@ package metadata
 	// `required` requires the option to be set.
 	required:       bool
 
-	// `warnings` warn the user about aspect of the option.
+	// `warnings` warn the user about some aspects of the option.
 	//
 	// For example, the `tls.verify_hostname` option has a warning about
 	// reduced security if the option is disabled.
@@ -44,8 +44,8 @@ package metadata
 
 	if !required {
 		// `common` specifes that the option is commonly used. It will bring the
-		// option to the top of the documents, surfacing it from other
-		// non-common options.
+		// option to the top of the documents, surfacing it from other,
+		// less common, options.
 		common: bool
 	}
 
@@ -53,7 +53,7 @@ package metadata
 	sort?: int8
 
 	// `types` sets the option's value type. External tagging is used since
-	// each type has it's own set of fields.
+	// each type has its own set of fields.
 	type: {
 		// `*` represents a wildcard type.
 		//
@@ -179,8 +179,8 @@ package metadata
 	// `classes` represent the various classifications for this component
 	classes: {
 		// `commonly_used` specifies if the component is commonly used or not.
-		// Setting this to `true` will surface the component from othere
-		// non commonly used components.
+		// Setting this to `true` will surface the component from other,
+		// less commonly used, components.
 		commonly_used: bool
 
 		if kind == "source" {
@@ -188,7 +188,7 @@ package metadata
 			// certain deployment contexts.
 			//
 			// * `daemon` - Vector is installed as a single process on the host.
-			// * `sidecar` - Vector is installed along side each process it is
+			// * `sidecar` - Vector is installed alongside each process it is
 			//   monitoring. Therefore, there might be multiple Vector processes
 			//   on the host.
 			// * `service` - Vector receives data from one or more upstream
@@ -202,7 +202,7 @@ package metadata
 		// * `stream` - one event at a time
 		egress_method: "batch" | "stream"
 
-		// `function` specified the functions behavior categories. This helps
+		// `function` specifies the functions behavior categories. This helps
 		// with component filtering. Each component type will allow different
 		// functions.
 		function: string
@@ -244,7 +244,7 @@ package metadata
 		}
 
 		if kind == "source" {
-			// `checkpoint` describes how the component checkpoints it's read
+			// `checkpoint` describes how the component checkpoints its read
 			// position.
 			checkpoint: close({
 				enabled: bool
@@ -330,14 +330,14 @@ package metadata
 	// `statuses` communicates the various statuses of the component.
 	statuses: {
 		if kind == "source" || kind == "sink" {
-			// The delivery status. At least once means we guarantee that events
-			// will be delivered at least once. Best effort means there is potential
+			// The delivery status: "At least once" means we guarantee that events
+			// will be delivered at least once. "Best effort" means there is potential
 			// for data loss.
 			delivery: "at_least_once" | "best_effort"
 		}
 
-		// The developmnet status of this component. Beta means the component is
-		// new and has not proven to be stable. Prod ready means that component
+		// The development status of this component. "Beta" means the component is
+		// new and has not proven to be stable. "Stable" means that component
 		// is reliable and settled.
 		development: "beta" | "stable" | "deprecated"
 	}
@@ -368,15 +368,15 @@ package metadata
 		// `journalctl` binary.
 		requirements: [...string] | null
 
-		// `warnings` describes any warning the user should know about the
+		// `warnings` describes any warnings the user should know about the
 		// component.
 		//
 		// For example, the `grok_parser` might offer a performance warning
 		// since the `regex_parser` and other transforms are faster.
 		warnings: [...string] | null
 
-		// `notices` communicate useful information to the user that is neither
-		// a requirement or warning.
+		// `notices` communicates useful information to the user that is neither
+		// a requirement or a warning.
 		//
 		// For example, the `lua` transform offers a Lua version notice that
 		// communicate which version of Lua is embedded.
@@ -443,7 +443,7 @@ package metadata
 
 	// `how_it_works` contain sections that further describe the component's
 	// behavior. This is like a mini-manual for the component and should help
-	// answer any obvious questions the user might have. Options can links
+	// answer any obvious questions the user might have. Options can link
 	// to these sections for deeper explanations of behavior.
 	how_it_works: #HowItWorks
 }
