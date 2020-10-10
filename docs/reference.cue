@@ -105,6 +105,12 @@ package metadata
 			deployment_roles: ["daemon" | "service" | "sidecar", ...]
 		}
 
+		// `egress_method` documents how the component outputs events.
+		//
+		// * `batch` - one or more events at a time
+		// * `stream` - one event at a time
+		egress_method: "batch" | "stream"
+
 		// The behavior function for this component. This is used as a filter to
 		// help users find components that serve a function.
 		function: string
@@ -116,7 +122,7 @@ package metadata
 	}
 
 	features: close({
-		if kind == "sink" {
+		if kind == "sink" && classes.egress_method == "batch" {
 			batch: close({
 				enabled:      bool
 				common:       bool
@@ -273,7 +279,15 @@ package metadata
 					}
 				}
 				input:  #LogEvent | [#LogEvent, ...] | string
-				output: #LogEvent | [#LogEvent, ...] | null
+
+				if classes.egress_method == "batch" {
+					output: [#LogEvent, ...] | null
+				}
+
+				if classes.egress_method == "stream" {
+					output: #LogEvent | null
+				}
+
 				notes?: string
 			},
 		]
@@ -286,7 +300,15 @@ package metadata
 					}
 				}
 				input:  #MetricEvent
-				output: #MetricEvent | null
+
+				if classes.egress_method == "batch" {
+					output: [#MetricEvent, ...] | null
+				}
+
+				if classes.egress_method == "stream" {
+					output: #MetricEvent | null
+				}
+
 				notes?: string
 			},
 		]

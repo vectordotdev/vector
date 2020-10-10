@@ -7,11 +7,11 @@ components: transforms: reduce: {
 
 	classes: {
 		commonly_used: false
+		egress_method: "stream"
 		function:      "aggregate"
 	}
 
-	features: {
-	}
+	features: {}
 
 	statuses: {
 		development: "beta"

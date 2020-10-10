@@ -8,6 +8,7 @@ components: sources: host_metrics: {
 	classes: {
 		commonly_used: false
 		deployment_roles: ["daemon"]
+		egress_method: "batch"
 		function: "collect"
 	}
 

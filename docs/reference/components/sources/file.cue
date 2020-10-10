@@ -8,6 +8,7 @@ components: sources: file: {
 	classes: {
 		commonly_used: true
 		deployment_roles: ["daemon", "sidecar"]
+		egress_method: "stream"
 		function: "collect"
 	}
 
