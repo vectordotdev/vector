@@ -12,6 +12,7 @@ data:
     # Configuration for vector.
     # Docs: https://vector.dev/docs/
 
+    # Data dir is location controlled at the `StatefulSet`.
     data_dir = "{{ .Values.globalOptions.dataDir }}"
 
     {{- with .Values.logSchema }}
