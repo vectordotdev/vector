@@ -130,6 +130,15 @@ psp:
   # Whether to create `PodSecurityPolicy` or not.
   enabled: false
 
+# Configuration for both regular and headless `Service`.
+service:
+  # Additional ports to expose.
+  ports: []
+    # - name: http
+    #   port: 1234
+    #   protocol: TCP
+    #   targetPort: 1234
+
 # Set this to non-empty value to use existing `ConfigMap` for `vector`, instead
 # of using a generated one.
 existingConfigMap: ""

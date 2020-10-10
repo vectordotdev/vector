@@ -6,9 +6,6 @@ metadata:
     {{- include "libvector.labels" . | nindent 4 }}
 spec:
   ports:
-    - name: metrics
-      port: 9598
-      protocol: TCP
-      targetPort: 9598
+    {{- include "vector-aggregator.servicePorts" . | nindent 4 }}
   selector:
     {{- include "libvector.selectorLabels" . | nindent 4 }}
