@@ -320,8 +320,8 @@ _values: {
 }
 
 #LogEvent: {
-	host?: string | null
-	message?: string | null
+	host?:      string | null
+	message?:   string | null
 	timestamp?: string | null
 	#Any
 }
@@ -329,7 +329,7 @@ _values: {
 #LogOutput: [Name=string]: {
 	description: string
 	name:        Name
-	fields: #Schema
+	fields:      #Schema
 }
 
 #MetricEvent: {
