@@ -1,0 +1,5 @@
+vector-agent: {}
+  # See the possible settings at the `vector-agent` chart.
+
+vector-aggregator: {}
+  # See the possible settings at the `vector-aggregator` chart.
