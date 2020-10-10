@@ -8,7 +8,8 @@ components: sources: journald: {
 	classes: {
 		commonly_used: true
 		deployment_roles: ["daemon"]
-		function: "collect"
+		egress_method: "batch"
+		function:      "collect"
 	}
 
 	features: {
@@ -110,7 +111,7 @@ components: sources: journald: {
 			input: {
 				"2019-07-26 20:30:27 reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s"
 			}
-			output: {
+			output: [{
 				timestamp:                "2019-07-26T20:30:27.000443Z"
 				message:                  "reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s"
 				host:                     "lorien.example.com"
@@ -134,7 +135,7 @@ components: sources: journald: {
 				"_SYSTEMD_UNIT":          "ntpd.service"
 				"_SYSTEMD_SLICE":         "system.slice"
 				"_SYSTEMD_INVOCATION_ID": "496ad5cd046d48e29f37f559a6d176f8"
-			}
+			}]
 		},
 	]
 	how_it_works: {

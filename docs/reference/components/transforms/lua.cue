@@ -7,6 +7,7 @@ components: transforms: lua: {
 
 	classes: {
 		commonly_used: true
+		egress_method: "stream"
 		function:      "program"
 	}
 
