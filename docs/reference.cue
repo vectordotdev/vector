@@ -8,6 +8,7 @@ package metadata
 _values: {
 	current_timestamp: "2020-10-10T17:07:36.452332Z"
 	local_host:        "my-host.local"
+	remote_host:       "34.33.222.212"
 }
 
 // `#Any` allows for any value.
