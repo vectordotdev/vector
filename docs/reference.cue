@@ -342,9 +342,9 @@ _values: {
 #MetricOutput: [Name=string]: close({
 	description:    string
 	relevant_when?: string
-	tags: #Tags
-	name: Name
-	type: "counter" | "gauge" | "histogram" | "summary"
+	tags:           #Tags
+	name:           Name
+	type:           "counter" | "gauge" | "histogram" | "summary"
 })
 
 #Tags: [Name=string]: close({
