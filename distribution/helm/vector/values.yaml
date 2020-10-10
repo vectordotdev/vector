@@ -1,5 +1,24 @@
-vector-agent: {}
+vector-agent:
   # See the possible settings at the `vector-agent` chart.
 
-vector-aggregator: {}
+  # Since we're deploying both `vector-agent` and `vector-aggregator`,
+  # configure the built-in vector sink to send data over to aggregator out of
+  # the box.
+  vectorSink:
+    # Enable vector sink to send the data over to the `vector-aggregator`.
+    enabled: true
+    # By default, send over the logs from the built-in `kubernetes_logs` source.
+    inputs: [kubernetes_logs]
+    # Configure the host to point to the `vector-aggregator`.
+    host: "vector-aggregator"
+    # Set the port to match the one used by `vector-aggregator`.
+    port: "9000"
+
+vector-aggregator:
   # See the possible settings at the `vector-aggregator` chart.
+
+  # Pass some setting here explicitly to guarantee they match values set at
+  # `vector-agent`.
+  vectorSource:
+    # Use the same port that's specified at `vector-agent`.
+    listenPort: "9000"

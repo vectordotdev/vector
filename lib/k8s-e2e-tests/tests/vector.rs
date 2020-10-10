@@ -6,18 +6,9 @@ use k8s_test_framework::{
 const HELM_CHART_VECTOR: &str = "vector";
 
 const HELM_VALUES_STDOUT_SINK: &str = r#"
-vector-agent:
-  sinks:
-    vector-sink:
-      type: "vector"
-      inputs: ["kubernetes_logs"]
-      rawConfig: |
-        address = "vector-aggregator:9000"
-
 vector-aggregator:
   vectorSource:
     sourceId: vector
-    listenPort: 9000
 
   sinks:
     stdout:
@@ -29,7 +20,7 @@ vector-aggregator:
 "#;
 
 /// This test validates that vector picks up logs with an agent and
-/// delivers them to the aggregator.
+/// delivers them to the aggregator out of the box.
 #[tokio::test]
 async fn logs() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
