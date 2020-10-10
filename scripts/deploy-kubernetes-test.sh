@@ -77,8 +77,8 @@ up() {
 
   split-container-image "$CONTAINER_IMAGE"
   HELM_VALUES+=(
-    --set "image.repository=$CONTAINER_IMAGE_REPOSITORY"
-    --set "image.tag=$CONTAINER_IMAGE_TAG"
+    --set "global.vector.image.repository=$CONTAINER_IMAGE_REPOSITORY"
+    --set "global.vector.image.tag=$CONTAINER_IMAGE_TAG"
   )
 
   set -x
