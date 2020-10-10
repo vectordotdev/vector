@@ -12,7 +12,7 @@ components: sources: syslog: {
 	configuration: sources.socket.configuration
 
 	output: logs: line: {
-		description: "Fix me"
+		description: "An individual Syslog event"
 		fields: {
 			appname: {
 				description: "The appname extracted from the Syslog formatted line. If a appname is not found, then the key will not be added."
@@ -123,4 +123,24 @@ components: sources: syslog: {
 			}
 		},
 	]
+
+	how_it_works: {
+		parsing: {
+			title: "Parsing"
+			body: #"""
+				Vector makes a _best effort_ to parse the various Syslog formats out in the
+				wild. This includes [RFC 6587][urls.syslog_6587], [RFC 5424][urls.syslog_5424],
+				[RFC 3164][urls.syslog_3164], and other common variations (such as the Nginx
+				Syslog style). It's unfortunate that the Syslog specification is not more
+				accurately followed, but we hope Vector insulates you from these deviations.
+
+				If parsing fails, Vector will include the entire Syslog line in the `message`
+				key. If you find this happening often, we recommend using the
+				[`socket` source][docs.sources.socket] combined with the
+				[`regex_parser` transform][docs.transforms.regex_parser] to implement your own
+				ingestion and parsing scheme. Or, [open an issue][urls.new_feature_request]
+				requesting support for your specific format.
+				"""#
+		}
+	}
 }
