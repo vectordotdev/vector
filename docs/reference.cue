@@ -12,7 +12,7 @@ _values: {
 // `#Any` allows for any value.
 #Any: _ | {[_=string]: #Any}
 
-// `#Classes` represent component classifications.
+// `#Classes` represent various `#Components` classifications.
 #Classes: {
 	_args: kind: string
 	let Args = _args
@@ -23,13 +23,12 @@ _values: {
 	commonly_used: bool
 
 	if Args.kind == "source" {
+		// `deployment_roles` clarify when the component should be used under
+		// different deployment contexts.
 		deployment_roles: [#DeploymentRole, ...]
 	}
 
 	// `egress_method` documents how the component outputs events.
-	//
-	// * `batch` - one or more events at a time
-	// * `stream` - one event at a time
 	egress_method: #EgressMethod
 
 	// `function` specifies the functions behavior categories. This helps
@@ -48,10 +47,13 @@ _values: {
 	}
 }
 
+// `#ComponentKind` represent the kind of component.
+#ComponentKind: "sink" | "source" | "transform"
+
 // `#Components` are any transform, source, or sink.
 #Components: [Type=string]: {
 	// `kind` specified the component kind. This is set automatically.
-	kind: "sink" | "source" | "transform"
+	kind: #ComponentKind
 	let Kind = kind
 
 	// `long_description` describes the components with a single paragraph.
@@ -150,6 +152,14 @@ _values: {
 	how_it_works: #HowItWorks
 }
 
+// `#DeliveryStatus` documents the delivery guarantee.
+//
+// * `at_least_once` - The event will be delivered at least once and
+// could be delivered more than once.
+// * `best_effort` - We will make a best effort to deliver the event,
+// but the event is not guaranteed to be delivered.
+#DeliveryStatus: "at_least_once" | "best_effort"
+
 // `#DeploymentRoles` clarify when a component should be used under
 // certain deployment contexts.
 //
@@ -161,6 +171,18 @@ _values: {
 //   sources, typically over a network protocol.
 #DeploymentRole: "daemon" | "service" | "sidecar"
 
+// `#DevelopmentStatus` documents the development status of the component.
+//
+// * `beta` - The component is early in it's development cylce and the
+// API and reliability are not settled.
+// * `stable` - The component is production ready.
+// * `deprecated` - The component will be removed in a future version.
+#DevelopmentStatus: "beta" | "stable" | "deprecated"
+
+// `#EgressMethod` specified how a component outputs events.
+//
+// * `batch` - one or more events at a time
+// * `stream` - one event at a time
 #EgressMethod: "batch" | "stream"
 
 // `enum` restricts the value to a set of values.
@@ -171,6 +193,10 @@ _values: {
 //                }
 #Enum: [Name=_]: string
 
+// `#EventType` represents one of Vector's supported event types.
+//
+// * `log` - log event
+// * `metric` - metric event
 #EventType: "log" | "metric"
 
 #Features: {
@@ -303,23 +329,17 @@ _values: {
 		name:           Name
 		relevant_when?: string
 		required:       bool
-		type: #Type & {_args: "required": required}
+		type:           #Type & {_args: "required": required}
 
 	}
 }
 
 #LogOutputType: {
-			{"*": {}} |
-			{"[string]": {
-				examples: [[string, ...string], ...[string, ...string]]
-			}} |
-			{"string": {
-				examples: [string, ...string]
-			}} |
-			{"timestamp": {
-				examples: [_values.current_timestamp]
-			}}
-		}
+	{"*": {}} |
+	{"[string]": {examples: [[string, ...string], ...[string, ...string]]}} |
+	{"string": {examples: [string, ...string]}} |
+	{"timestamp": {examples: [_values.current_timestamp]}}
+}
 
 #MetricEvent: {
 	counter: {
@@ -362,8 +382,8 @@ _values: {
 	// specify that here. We accept a string to allow for the expression of
 	// complex requirements.
 	//
-	//               relevant_when: '`strategy` = "fingerprint"'
-	//               relevant_when: '`strategy` = "fingerprint" or "inode"'
+	//              relevant_when: '`strategy` = "fingerprint"'
+	//              relevant_when: '`strategy` = "fingerprint" or "inode"'
 	relevant_when?: string
 
 	// `required` requires the option to be set.
@@ -404,22 +424,10 @@ _values: {
 	let Args = _args
 
 	if Args.kind == "source" || Args.kind == "sink" {
-		// `delivery` documents the delivery guarantee.
-		//
-		// * `at_least_once` - The event will be delivered at least once and
-		// could be delivered more than once.
-		// * `best_effort` - We will make a best effort to deliver the event,
-		// but the event is not guaranteed to be delivered.
-		delivery: "at_least_once" | "best_effort"
+		delivery: #DeliveryStatus
 	}
 
-	// `development` documents the development status of the component.
-	//
-	// * `beta` - The component is early in it's development cylce and the
-	// API and reliability are not settled.
-	// * `stable` - The component is production ready.
-	// * `deprecated` - The component will be removed in a future version.
-	development: "beta" | "stable" | "deprecated"
+	development: #DevelopmentStatus
 }
 
 #Support: {
@@ -587,8 +595,10 @@ _values: {
 
 	// `unit` clarifies the value's unit. While this should be included
 	// as the suffix in the name, this helps to explicitly clarify that.
-	unit: "bytes" | "logs" | "milliseconds" | "seconds" | null
+	unit: #Unit | null
 }
+
+#Unit: "bytes" | "logs" | "milliseconds" | "seconds"
 
 components: close({
 	sources:    #Components
