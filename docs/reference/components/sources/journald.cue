@@ -112,9 +112,9 @@ components: sources: journald: {
 				"2019-07-26 20:30:27 reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s"
 			}
 			output: [{
-				timestamp:                "2019-07-26T20:30:27.000443Z"
+				timestamp:                _values.current_timestamp
 				message:                  "reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s"
-				host:                     "lorien.example.com"
+				host:                     _values.local_host
 				"__REALTIME_TIMESTAMP":   "1564173027000443"
 				"__MONOTONIC_TIMESTAMP":  "98694000446"
 				"_BOOT_ID":               "124c781146e841ae8d9b4590df8b9231"
