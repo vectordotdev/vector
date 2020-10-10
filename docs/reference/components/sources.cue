@@ -71,6 +71,54 @@ components: sources: [Name=string]: {
 	}
 
 	output: {
+		_passthrough_counter: {
+			description: data_model.schema.metric.type.object.options.counter.description
+			tags: {
+				"*": {
+					description: "Any tags present on the metric."
+					examples: [_values.local_host]
+					required: false
+				}
+			}
+			type: "counter"
+		}
+
+		_passthrough_gauge: {
+			description: data_model.schema.metric.type.object.options.gauge.description
+			tags: {
+				"*": {
+					description: "Any tags present on the metric."
+					examples: [_values.local_host]
+					required: false
+				}
+			}
+			type: "gauge"
+		}
+
+		_passthrough_histogram: {
+			description: data_model.schema.metric.type.object.options.histogram.description
+			tags: {
+				"*": {
+					description: "Any tags present on the metric."
+					examples: [_values.local_host]
+					required: false
+				}
+			}
+			type: "gauge"
+		}
+
+		_passthrough_summary: {
+			description: data_model.schema.metric.type.object.options.summary.description
+			tags: {
+				"*": {
+					description: "Any tags present on the metric."
+					examples: [_values.local_host]
+					required: false
+				}
+			}
+			type: "gauge"
+		}
+
 		logs?: [Name=string]: {
 			fields: {
 				_current_timestamp: {
