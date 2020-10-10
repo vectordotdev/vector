@@ -6,102 +6,193 @@
 package metadata
 
 #ConfigurationOptions: [Name=string]: {
+	// `desription` describes the option in a succient fashion. Usually 1 to
+	// 2 sentences.
 	description: string
+
+	// `groups` groups options into categories.
+	//
+	// For example, the `influxdb_logs` sink supports both v1 and v2 of Influxdb
+	// and relevant options are placed in those groups.
 	groups?: [...string]
+
+	// `name` sets the name for this option. It is automatically set for you
+	// via the key you use.
 	name:           Name
+
+	// `relevant_when` clarifies when an option is relevant.
+	//
+	// For example, if an option depends on the value of another option you can
+	// specify that here. We accept a string to allow for the expression of
+	// complex requirements.
+	//
+	// 		relevant_when: '`strategy` = "fingerprint"'
+	//		relevant_when: '`strategy` = "fingerprint" or "inode"'
 	relevant_when?: string
+
+	// `required` requires the option to be set.
 	required:       bool
 
+	// `warnings` warn the user about aspect of the option.
+	//
+	// For example, the `tls.verify_hostname` option has a warning about
+	// reduced security if the option is disabled.
 	warnings: [...{
 		visibility_level: "component" | "option"
 		text:             string
 	}]
 
 	if !required {
+		// `common` specifes that the option is commonly used. It will bring the
+		// option to the top of the documents, surfacing it from other
+		// non-common options.
 		common: bool
 	}
 
+	// `sort` sorts the option, otherwise options will be sorted alphabetically.
 	sort?: int8
 
+	// `types` sets the option's value type. External tagging is used since
+	// each type has it's own set of fields.
 	type: {
+		// `*` represents a wildcard type.
+		//
+		// For example, the `sinks.http.headers.*` option allows for arbitrary
+		// key/value pairs.
 		"*"?: {}
+
+		// `[string]` represents an array of strings type.
 		"[string]"?: {
 			if !required {
+				// `default` sets the default value.
 				default: [...string] | null
 			}
 
+			// `enum` restricts the value to a set of values.
+			//
+			//		enum: {
+			//			json: "Encodes the data via application/json"
+			//			text: "Encodes the data via text/plain"
+			//		}
 			enum?: [Name=_]: string
 
+
+			// `examples` clarify values through examples. This should be used
+			// when examples cannot be derived from the `default` or `enum`
+			// options.
 			examples: [...[...string]] | *[[
 					for k, v in enum {
 					k
 				},
 			]]
 
+			// `templateable` means that the option supports dynamic templated
+			// values.
 			templateable?: bool
 		}
+
+		// `bool` represents a boolean tool.
 		"bool"?: {
 			if !required {
+				// `default` sets the default value.
 				default: bool | null
 			}
 		}
+
+		// `object` represents an object type that contains child options.
 		"object"?: {
+			// `examples` clarify values through examples. This should be used
+			// when examples cannot be derived from the `default` or `enum`
+			// options.
 			examples: [...{[Name=string]: _}]
+
+			// `options` represent the child options for this option.
 			options: #ConfigurationOptions | {}
 		}
+
+		// `strings` represents a string type.
 		"string"?: {
 			if !required {
+				// `default` sets the default value.
 				default: string | null
 			}
 
+			// `enum` restricts the value to a set of values.
+			//
+			//		enum: {
+			//			json: "Encodes the data via application/json"
+			//			text: "Encodes the data via text/plain"
+			//		}
 			enum?: [Name=_]: string
 
+			// `examples` demonstrates example values. This should be used when
+			// examples cannot be derived from the `default` or `enum` options.
 			examples: [...string] | *[
 					for k, v in enum {
 					k
 				},
 			]
 
+			// `templateable` means that the option supports dynamic templated
+			// values.
 			templateable?: bool
 		}
+
+		// `uint` represents a positive integer type.
 		"uint"?: {
 			if !required {
+				// `default` sets the default value.
 				default: uint | null
 			}
+
+			// `examples` clarify values through examples. This should be used
+			// when examples cannot be derived from the `default` or `enum`
+			// options.
 			examples?: [...uint]
+
+			// `unit` clarifies the value's unit. While this should be included
+			// as the suffix in the name, this helps to explicitly clarify that.
 			unit: "bytes" | "logs" | "milliseconds" | "seconds" | null
 		}
 	}
 }
 
 #Components: [Type=string]: {
-	// The component kind. This is set automatically.
+	// `kind` specified the component kind. This is set automatically.
 	kind: "sink" | "source" | "transform"
 
-	// A long description of the component, full of relevant keywords for SEO
-	// purposes.
+	// `long_description` describes the components with a single paragraph.
+	// It is used for SEO purposes and should be full of relevant keywords.
 	long_description: string
 
-	// A short, one sentence description.
+	// `short_description` describes the component in one sentence.
 	short_description: string
 
-	// The component title, used in text. For example, the `http` source has
-	// a title of "HTTP".
+	// `title` is the human friendly title for the component.
+	//
+	// For example, the `http` sink has a `HTTP` title.
 	title: string
 
-	// The component type. This is set automatically.
+	// `type` is the component identifier. This is set automatically.
 	type: Type
 
-	// Classes represent the various classifications for this component
+	// `classes` represent the various classifications for this component
 	classes: {
-		// Is this component commonly used? If so, we'll feature it in various
-		// sections in our documentation.
+		// `commonly_used` specifies if the component is commonly used or not.
+		// Setting this to `true` will surface the component from othere
+		// non commonly used components.
 		commonly_used: bool
 
 		if kind == "source" {
-			// The deploment roles that this source is applicable in.
-			// For example, you would not use the `file` source in the `service`
-			// role.
+			// `deployment_roles` clarify when a component should be used under
+			// certain deployment contexts.
+			//
+			// * `daemon` - Vector is installed as a single process on the host.
+			// * `sidecar` - Vector is installed along side each process it is
+			//   monitoring. Therefore, there might be multiple Vector processes
+			//   on the host.
+			// * `service` - Vector receives data from one or more upstream
+			//   sources, typically over a network protocol.
 			deployment_roles: ["daemon" | "service" | "sidecar", ...]
 		}
 
@@ -111,18 +202,31 @@ package metadata
 		// * `stream` - one event at a time
 		egress_method: "batch" | "stream"
 
-		// The behavior function for this component. This is used as a filter to
-		// help users find components that serve a function.
+		// `function` specified the functions behavior categories. This helps
+		// with component filtering. Each component type will allow different
+		// functions.
 		function: string
 
 		if kind == "sink" {
-			// Any service providers that host the downstream service.
+			// `service_providers` specify the service providers that support
+			// and host this service. This helps users find relevant sinks.
+			//
+			// For example, "AWS" is a service provider for many services, and
+			// a user on AWS can use this to filter for AWS supported
+			// components.
 			service_providers: [...string]
 		}
 	}
 
+	// `features` describes the various supported features of the component.
+	// Setting these helps to reduce boilerplate.
+	//
+	// For example, the `tls` feature will automatically add the appropriate
+	// `tls` options and `how_it_works` sections.
 	features: close({
 		if kind == "sink" && classes.egress_method == "batch" {
+			// `batch` describes how the component batches data. This is only
+			// relevant if a component has an `egress_method` of "batch".
 			batch: close({
 				enabled:      bool
 				common:       bool
@@ -133,18 +237,22 @@ package metadata
 		}
 
 		if kind == "sink" {
+			// `buffer` describes how the component buffers data.
 			buffer: close({
 				enabled: bool | string
 			})
 		}
 
 		if kind == "source" {
+			// `checkpoint` describes how the component checkpoints it's read
+			// position.
 			checkpoint: close({
 				enabled: bool
 			})
 		}
 
 		if kind == "sink" {
+			// `compression` describes how the component compresses data.
 			compression: {
 				enabled: bool
 
@@ -156,6 +264,7 @@ package metadata
 		}
 
 		if kind == "sink" {
+			// `encoding` describes how the component encodes data.
 			encoding: close({
 				enabled: true
 
@@ -169,18 +278,23 @@ package metadata
 		}
 
 		if kind == "sink" {
+			// `healtcheck` notes if a component offers a healthcheck on boot.
 			healthcheck: close({
 				enabled: bool
 			})
 		}
 
 		if kind == "source" {
+			// `multiline` should be enabled for sources that offer the ability
+			// to merge multiple lines together.
 			multiline: close({
 				enabled: bool
 			})
 		}
 
 		if kind == "sink" {
+			// `request` describes how the component issues and manages external
+			// requests.
 			request: {
 				enabled: bool
 
@@ -196,6 +310,8 @@ package metadata
 		}
 
 		if kind == "source" || kind == "sink" {
+			// `tls` describes if the component secures network communication
+			// via TLS.
 			tls: {
 				enabled: bool
 
@@ -211,7 +327,7 @@ package metadata
 		}
 	})
 
-	// The various statuses of this component.
+	// `statuses` communicates the various statuses of the component.
 	statuses: {
 		if kind == "source" || kind == "sink" {
 			// The delivery status. At least once means we guarantee that events
@@ -226,14 +342,16 @@ package metadata
 		development: "beta" | "stable" | "deprecated"
 	}
 
-	// Various support details for the component.
+	// `support` communicates the varying levels of support of the component.
 	support: {
 		if kind == "transform" || kind == "sink" {
 			input_types: ["log" | "metric", ...]
 		}
 
-		// The platforms that this component is available in. It is possible for
-		// Vector to disable some components on a per-platform basis.
+		// `platforms` describes which platforms this component is available on.
+		//
+		// For example, the `journald` source is only available on Linux
+		// environments.
 		platforms: {
 			"aarch64-unknown-linux-gnu":  bool
 			"aarch64-unknown-linux-musl": bool
@@ -243,32 +361,41 @@ package metadata
 			"x86_64-unknown-linux-musl":  bool
 		}
 
-		// Any requirements for this component to work properly. This should note
-		// external dependencies or configuration. These will be displayed
-		// prominently at the top of the component's docs.
+		// `requirements` describes any external requirements that the component
+		// needs to function properly.
+		//
+		// For example, the `journald` source requires the presence of the
+		// `journalctl` binary.
 		requirements: [...string] | null
 
-		// Any warnings for this component. This should address any "gotchas" as
-		// part of using this source.
+		// `warnings` describes any warning the user should know about the
+		// component.
+		//
+		// For example, the `grok_parser` might offer a performance warning
+		// since the `regex_parser` and other transforms are faster.
 		warnings: [...string] | null
 
-		// Any notices for this component. This should include information that is
-		// useful to the user. For example, the `lua` transform notes the embedded
-		// Lua version.
+		// `notices` communicate useful information to the user that is neither
+		// a requirement or warning.
+		//
+		// For example, the `lua` transform offers a Lua version notice that
+		// communicate which version of Lua is embedded.
 		notices: [...string] | null
 	}
 
 	configuration: #ConfigurationOptions
 
-	// Output events for the component.
 	if kind == "source" || kind == "transform" {
+		// `output` documents output of the component. This is very important
+		// as it communicate which events and fields are emitted.
 		output: {
 			logs?:    #LogOutput
 			metrics?: #MetricOutput
 		}
 	}
 
-	// Example uses for the component.
+	// `examples` demonstrates various ways to use the component using an
+	// input, output, and example configuration.
 	examples: {
 		log: [
 			...{
@@ -314,7 +441,10 @@ package metadata
 		]
 	}
 
-	// Markdown-based sections that describe how the component works.
+	// `how_it_works` contain sections that further describe the component's
+	// behavior. This is like a mini-manual for the component and should help
+	// answer any obvious questions the user might have. Options can links
+	// to these sections for deeper explanations of behavior.
 	how_it_works: #HowItWorks
 }
 
