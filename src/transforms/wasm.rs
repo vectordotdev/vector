@@ -1,12 +1,17 @@
 use super::Transform;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        BuildMode, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
+    },
     event::Event,
+    validate::validate_dir,
     wasm::WasmModule,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::{env, mem};
 use vector_wasm::{Role, WasmModuleConfig};
 
 pub mod defaults {
@@ -15,6 +20,8 @@ pub mod defaults {
         HEAP_MEMORY_SIZE
     }
 }
+
+pub(super) const TEMPORARY_DIRECTORY: &str = "validate_tmp_wasm_artifact_cache";
 
 /// Transform specific information needed to construct a [`WasmModuleConfig`].
 // Note: We have a separate type here for crate boundary purposes.
@@ -54,8 +61,23 @@ impl GenerateConfig for WasmConfig {}
 #[async_trait::async_trait]
 #[typetag::serde(name = "wasm")]
 impl TransformConfig for WasmConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(Wasm::new(self.clone())?))
+    async fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+        let mut config = self.clone();
+        if cx.mode == BuildMode::Validate {
+            // To avoid creating directories and caches in runtime directory,
+            // we create them in a tmp directory and manually check that we
+            // can create directory/files in original directory.
+
+            // Change artifact_cache path to tmp directory
+            let mut tmp = env::temp_dir();
+            tmp.push(TEMPORARY_DIRECTORY);
+            let cache_dir = mem::replace(&mut config.artifact_cache, tmp);
+
+            // Manually check that we have adequate access.
+            validate_dir(&cache_dir, "artifact_cache".to_owned())?;
+        }
+
+        Ok(Box::new(Wasm::new(config)?))
     }
 
     fn input_type(&self) -> DataType {

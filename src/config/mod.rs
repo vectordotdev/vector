@@ -249,11 +249,15 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync {
 #[derive(Debug, Clone)]
 pub struct TransformContext {
     pub(super) resolver: Resolver,
+    pub(super) mode: BuildMode,
 }
 
 impl TransformContext {
     pub fn new_test() -> Self {
-        Self { resolver: Resolver }
+        Self {
+            resolver: Resolver,
+            mode: BuildMode::Normal,
+        }
     }
 
     pub fn resolver(&self) -> Resolver {
@@ -335,6 +339,16 @@ impl Config {
 
 fn healthcheck_default() -> bool {
     true
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BuildMode {
+    /// Normal runtime
+    Normal,
+    /// Validate command
+    ///
+    /// Components should only change their behavior for this mode if necessary.
+    Validate,
 }
 
 #[cfg(all(

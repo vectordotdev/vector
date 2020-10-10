@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, Config, ConfigDiff},
+    config::{self, BuildMode, Config, ConfigDiff},
     topology::{self, builder::Pieces},
 };
 use colored::*;
@@ -98,7 +98,7 @@ async fn validate_components(
         .set(config.global.log_schema.clone())
         .expect("Couldn't set schema");
 
-    match topology::builder::build_pieces(config, diff).await {
+    match topology::builder::build_pieces(config, diff, BuildMode::Validate).await {
         Ok(pieces) => {
             fmt.success("Component configuration");
             Some(pieces)
@@ -174,6 +174,78 @@ fn create_tmp_directory(config: &mut Config, fmt: &mut Formatter) -> Option<Path
 fn remove_tmp_directory(path: PathBuf) {
     if let Err(error) = remove_dir_all(&path) {
         error!(message = "Failed to remove temporary directory.", path = ?path, error = %error);
+    }
+}
+
+#[cfg(feature = "wasm")]
+pub use self::validate_dir::*;
+
+#[cfg(feature = "wasm")]
+pub mod validate_dir {
+    use super::*;
+    use snafu::Snafu;
+    use std::path::Path;
+    use std::{fs, io};
+
+    #[derive(Debug, Snafu)]
+    pub enum ValidateDirError {
+        #[snafu(display("{:?} directory {:?} must be writeable.", name, path))]
+        ReadOnly { name: String, path: PathBuf },
+        #[snafu(display(
+            "Can't fetch {:?} directory {:?} metadata. Error: {:?}",
+            name,
+            path,
+            error
+        ))]
+        MetadataError {
+            name: String,
+            path: PathBuf,
+            error: io::Error,
+        },
+        #[snafu(display("{:?} path {:?} must be directory.", name, path))]
+        NotDirectory { name: String, path: PathBuf },
+        #[snafu(display("Root directory of {:?} path {:?} doesn't exist.", name, path))]
+        NoRoot { name: String, path: PathBuf },
+    }
+
+    /// Validates that directory can be created and/or is writeable.
+    ///
+    /// Name of the field.
+    pub fn validate_dir(path: &Path, name: String) -> Result<(), ValidateDirError> {
+        if path.is_dir() {
+            for path in path.ancestors() {
+                match fs::metadata(path) {
+                    Ok(metadata) if metadata.permissions().readonly() => {
+                        return Err(ValidateDirError::ReadOnly {
+                            name,
+                            path: path.to_path_buf(),
+                        });
+                    }
+                    // Found writeable directory.
+                    Ok(_) => return Ok(()),
+
+                    // Continue with ancestor
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => (),
+                    Err(error) => {
+                        return Err(ValidateDirError::MetadataError {
+                            name,
+                            path: path.to_path_buf(),
+                            error,
+                        });
+                    }
+                }
+            }
+
+            Err(ValidateDirError::NoRoot {
+                name,
+                path: path.to_path_buf(),
+            })
+        } else {
+            Err(ValidateDirError::NotDirectory {
+                name,
+                path: path.to_path_buf(),
+            })
+        }
     }
 }
 

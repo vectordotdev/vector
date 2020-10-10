@@ -1,5 +1,5 @@
 use vector::{
-    config::{self, ConfigDiff},
+    config::{self, BuildMode, ConfigDiff},
     topology,
 };
 
@@ -9,7 +9,7 @@ async fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
             let diff = ConfigDiff::initial(&c);
             match (
                 config::warnings(&c),
-                topology::builder::build_pieces(&c, &diff).await,
+                topology::builder::build_pieces(&c, &diff, BuildMode::Normal).await,
             ) {
                 (Some(warnings), Ok(_pieces)) => Ok(warnings),
                 (None, Ok(_pieces)) => Ok(vec![]),

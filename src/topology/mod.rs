@@ -12,7 +12,7 @@ mod task;
 
 use crate::{
     buffers,
-    config::{Config, ConfigDiff},
+    config::{BuildMode, Config, ConfigDiff},
     shutdown::SourceShutdownCoordinator,
     topology::{builder::Pieces, task::Task},
 };
@@ -70,7 +70,7 @@ pub async fn start_validated(
 }
 
 pub async fn build_or_log_errors(config: &Config, diff: &ConfigDiff) -> Option<Pieces> {
-    match builder::build_pieces(config, diff).await {
+    match builder::build_pieces(config, diff, BuildMode::Normal).await {
         Err(errors) => {
             for error in errors {
                 error!("Configuration error: {}", error);

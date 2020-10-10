@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     buffers,
-    config::{DataType, SinkContext, TransformContext},
+    config::{BuildMode, DataType, SinkContext, TransformContext},
     dns::Resolver,
     event::Event,
     shutdown::SourceShutdownCoordinator,
@@ -32,6 +32,7 @@ pub struct Pieces {
 pub async fn build_pieces(
     config: &super::Config,
     diff: &ConfigDiff,
+    mode: BuildMode,
 ) -> Result<Pieces, Vec<String>> {
     let mut inputs = HashMap::new();
     let mut outputs = HashMap::new();
@@ -100,7 +101,7 @@ pub async fn build_pieces(
 
         let typetag = transform.inner.transform_type();
 
-        let cx = TransformContext { resolver };
+        let cx = TransformContext { resolver, mode };
 
         let input_type = transform.inner.input_type();
         let transform = match transform.inner.build(cx).await {
