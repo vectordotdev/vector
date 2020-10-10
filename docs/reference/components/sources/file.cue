@@ -178,13 +178,13 @@ components: sources: file: {
 				required:    true
 				type: string: examples: ["/var/log/apache/access.log"]
 			}
-			host: fields._host
+			host: fields._local_host
 			message: {
 				description: "The raw line from the file."
 				required:    true
 				type: string: examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
 			}
-			timestamp: fields._timestamp
+			timestamp: fields._current_timestamp
 		}
 	}
 
@@ -203,8 +203,9 @@ components: sources: file: {
 				"""
 			output: {
 				file:      _file
+				host:      _values.local_host
 				message:   _line
-				timestamp: "2020-10-01T11:23:25.333432Z"
+				timestamp: _values.current_timestamp
 			}
 		},
 	]

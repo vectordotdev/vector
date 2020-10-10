@@ -265,7 +265,7 @@ components: sources: host_metrics: {
 			host: {
 				description: "The hostname of the originating system."
 				required:    true
-				examples: ["myhostname"]
+				examples: [_values.local_host]
 			}
 			collector: {
 				description: "Which collector this metric comes from."

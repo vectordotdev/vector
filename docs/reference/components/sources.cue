@@ -73,28 +73,19 @@ components: sources: [Name=string]: {
 	output: {
 		logs?: [Name=string]: {
 			fields: {
-				_host: {
+				_local_host: {
 					description: "The local hostname, equivalent to the `gethostname` command."
 					required:    true
-					type: string: examples: ["host.mydomain.com"]
+					type: string: examples: [_values.local_host]
 				}
 
-				_timestamp: {
+				_current_timestamp: {
 					description: "The exact time the event was ingested into Vector."
 					required:    true
 					type: timestamp: {}
 				}
 			}
 		}
-	}
-
-	// Example uses for the component.
-	examples: {
-		log: [
-			...{
-				input: string
-			},
-		]
 	}
 
 	how_it_works: {

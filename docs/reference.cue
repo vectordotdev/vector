@@ -7,6 +7,7 @@ package metadata
 
 _values: {
 	current_timestamp: "2020-10-10T17:07:36.452332Z"
+	local_host:        "my-host.local"
 }
 
 // `#Any` allows for any value.
@@ -109,7 +110,14 @@ _values: {
 						"\( k )"?: _ | *null
 					}
 				}
-				input: #LogEvent | [#LogEvent, ...] | string
+
+				if kind == "source" {
+					input: string
+				}
+
+				if kind != "source" {
+					input: #LogEvent | [#LogEvent, ...]
+				}
 
 				if classes.egress_method == "batch" {
 					output: [#LogEvent, ...] | null

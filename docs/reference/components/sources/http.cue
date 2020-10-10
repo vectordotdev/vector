@@ -90,7 +90,7 @@ components: sources: http: {
 					required:      true
 					type: string: examples: ["Hello world"]
 				}
-				timestamp: fields._timestamp
+				timestamp: fields._current_timestamp
 			}
 		}
 		structured: {
@@ -103,7 +103,7 @@ components: sources: http: {
 					required:      false
 					type: "*": {}
 				}
-				timestamp: fields._timestamp
+				timestamp: fields._current_timestamp
 			}
 		}
 	}
@@ -111,7 +111,6 @@ components: sources: http: {
 	examples: log: [
 		{
 			_line:       "Hello world"
-			_host:       "123.456.789.111"
 			_user_agent: "my-service/v2.1"
 			title:       "text/plain"
 			configuration: {
@@ -123,21 +122,20 @@ components: sources: http: {
              ```http
              Content-Type: text/plain
              User-Agent: \( _user_agent )
-             X-Forwarded-For: \( _host )
+             X-Forwarded-For: \( _values.local_host )
 
              \( _line )
              ```
              """
 			output: [{
-				host:         _host
+				host:         _values.local_host
 				message:      _line
-				timestamp:    "2020-10-01T11:23:25.333432Z"
+				timestamp:    _values.current_timestamp
 				"User-Agent": _user_agent
 			}]
 		},
 		{
 			_line:       "{\"key\": \"val\"}"
-			_host:       "123.456.789.111"
 			_user_agent: "my-service/v2.1"
 			title:       "application/json"
 			configuration: {
@@ -149,15 +147,15 @@ components: sources: http: {
              ```http
              Content-Type: application/json
              User-Agent: \( _user_agent )
-             X-Forwarded-For: \( _host )
+             X-Forwarded-For: \( _values.local_host )
 
              \( _line )
              ```
              """
 			output: [{
-				host:         _host
+				host:         _values.local_host
 				key:          "val"
-				timestamp:    "2020-10-01T11:23:25.333432Z"
+				timestamp:    _values.current_timestamp
 				"User-Agent": _user_agent
 			}]
 		},
