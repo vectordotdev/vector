@@ -123,8 +123,9 @@ logSchema:
   sourceTypeKey: "source_type"
   timestampKey: "timestamp"
 
-# The "built-in" kubernetes logs source. Will be added by default, unless
-# explicitly disabled.
+# The "built-in" kubernetes logs source to collect logs from the `Pod`s running
+# on the `Node`.
+# Will be added by default, unless explicitly disabled.
 kubernetesLogsSource:
   # Disable to omit the kubernetes logs source from being added.
   enabled: true
