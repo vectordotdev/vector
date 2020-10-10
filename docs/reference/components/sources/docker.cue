@@ -27,7 +27,7 @@ components: sources: docker: {
 		commonly_used: false
 		deployment_roles: ["daemon"]
 		egress_method: "stream"
-		function: "collect"
+		function:      "collect"
 	}
 
 	statuses: {
@@ -182,10 +182,10 @@ components: sources: docker: {
 	examples: log: [
 		{
 			_container_name: "flog"
-			_image: "mingrammer/flog"
-			_message: "150.75.72.205 - - [03/Oct/2020:16:11:29 +0000] \"HEAD /initiatives HTTP/1.1\" 504 117"
-			_stream: "stdout"
-			title:       "Dummy Logs"
+			_image:          "mingrammer/flog"
+			_message:        "150.75.72.205 - - [03/Oct/2020:16:11:29 +0000] \"HEAD /initiatives HTTP/1.1\" 504 117"
+			_stream:         "stdout"
+			title:           "Dummy Logs"
 			configuration: {
 				include_images: [_image]
 			}
