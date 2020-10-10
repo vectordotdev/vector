@@ -66,7 +66,7 @@ _values: {
 
 	// `name` sets the name for this option. It is automatically set for you
 	// via the key you use.
-	name:           Name
+	name: Name
 
 	// `relevant_when` clarifies when an option is relevant.
 	//
@@ -74,12 +74,12 @@ _values: {
 	// specify that here. We accept a string to allow for the expression of
 	// complex requirements.
 	//
-	// 		relevant_when: '`strategy` = "fingerprint"'
-	//		relevant_when: '`strategy` = "fingerprint" or "inode"'
+	//               relevant_when: '`strategy` = "fingerprint"'
+	//               relevant_when: '`strategy` = "fingerprint" or "inode"'
 	relevant_when?: string
 
 	// `required` requires the option to be set.
-	required:       bool
+	required: bool
 
 	// `warnings` warn the user about some aspects of the option.
 	//
@@ -107,7 +107,7 @@ _values: {
 #Components: [Type=string]: {
 	// `kind` specified the component kind. This is set automatically.
 	kind: "sink" | "source" | "transform"
-	let Kind =  kind
+	let Kind = kind
 
 	// `long_description` describes the components with a single paragraph.
 	// It is used for SEO purposes and should be full of relevant keywords.
@@ -207,16 +207,16 @@ _values: {
 
 // `enum` restricts the value to a set of values.
 //
-//		enum: {
-//			json: "Encodes the data via application/json"
-//			text: "Encodes the data via text/plain"
-//		}
+//                enum: {
+//                 json: "Encodes the data via application/json"
+//                 text: "Encodes the data via text/plain"
+//                }
 #Enum: [Name=_]: string
 
 #Features: {
 	_args: {
 		egress_method: string
-		kind: string
+		kind:          string
 	}
 	let args = _args
 
@@ -409,12 +409,11 @@ _values: {
 
 	// `enum` restricts the value to a set of values.
 	//
-	//		enum: {
-	//			json: "Encodes the data via application/json"
-	//			text: "Encodes the data via text/plain"
-	//		}
+	//      enum: {
+	//       json: "Encodes the data via application/json"
+	//       text: "Encodes the data via text/plain"
+	//      }
 	enum?: #Enum
-
 
 	// `examples` clarify values through examples. This should be used
 	// when examples cannot be derived from the `default` or `enum`
@@ -441,10 +440,10 @@ _values: {
 
 	// `enum` restricts the value to a set of values.
 	//
-	//		enum: {
-	//			json: "Encodes the data via application/json"
-	//			text: "Encodes the data via text/plain"
-	//		}
+	//      enum: {
+	//       json: "Encodes the data via application/json"
+	//       text: "Encodes the data via text/plain"
+	//      }
 	enum?: #Enum
 
 	// `examples` demonstrates example values. This should be used when
