@@ -26,6 +26,7 @@ components: sources: docker: {
 	classes: {
 		commonly_used: false
 		deployment_roles: ["daemon"]
+		egress_method: "stream"
 		function: "collect"
 	}
 
@@ -62,6 +63,7 @@ components: sources: docker: {
 				[`kubernetes_logs` source](kubernetes_logs) instead.
 				""",
 		]
+		notices: []
 	}
 
 	configuration: {
@@ -150,11 +152,6 @@ components: sources: docker: {
 					required:    true
 					type: string: examples: ["ubuntu:latest", "busybox", "timberio/vector:latest-alpine"]
 				}
-				labels: {
-					description: "[Docker object labels][urls.docker_object_labels]. Each label is inserted with it's exact key/value pair."
-					required:    true
-					type: object: {}
-				}
 				message: {
 					description: "The raw log message."
 					required:    true
@@ -163,13 +160,20 @@ components: sources: docker: {
 				stream: {
 					description: "The [standard stream][urls.standard_streams] that the log was collected from."
 					required:    true
-					type: enum: values: {
+					type: string: enum: {
 						stdout: "The STDOUT stream"
 						stderr: "The STDERR stream"
 					}
 				}
-				timestamp: fields._timestamp & {
+				timestamp: {
 					description: "The UTC timestamp extracted from the Docker log event."
+					required:    true
+					type: timestamp: {}
+				}
+				"*": {
+					description: "Each container label is inserted with it's exact key/value pair."
+					required:    true
+					type: string: examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
 				}
 			}
 		}
@@ -177,28 +181,29 @@ components: sources: docker: {
 
 	examples: log: [
 		{
-			_line:       "Hello world"
-			_host:       "123.456.789.111"
-			_user_agent: "my-service/v2.1"
+			_container_name: "flog"
+			_image: "mingrammer/flog"
+			_message: "150.75.72.205 - - [03/Oct/2020:16:11:29 +0000] \"HEAD /initiatives HTTP/1.1\" 504 117"
+			_stream: "stdout"
 			title:       "Dummy Logs"
 			configuration: {
-				include_images: ["mingrammer/flog"]
+				include_images: [_image]
 			}
 			input: """
 				 ```json
 				 {
-				   "stream": "stdout",
-				   "message": "150.75.72.205 - - [03/Oct/2020:16:11:29 +0000] \"HEAD /initiatives HTTP/1.1\" 504 117"
+				   "stream": \(_stream),
+				   "message": \(_message)
 				 }
 				```
 				"""
 			output: {
 				container_created_at: "2020-10-03T16:11:29.443232Z"
 				container_id:         "fecc98177eca7fb75a2b2186c418bf9a0cd3a05a1169f2e2293bf8987a9d96ab"
-				container_name:       "flog"
-				image:                "mingrammer/flog"
-				message:              "150.75.72.205 - - [03/Oct/2020:16:11:29 +0000] \"HEAD /initiatives HTTP/1.1\" 504 117"
-				stream:               "stdout"
+				container_name:       _container_name
+				image:                _image
+				message:              _message
+				stream:               _stream
 			}
 		},
 	]
