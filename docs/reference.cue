@@ -323,7 +323,7 @@ _values: {
 	host?: string | null
 	message?: string | null
 	timestamp?: string | null
-	{[Name=string]: #Any}
+	#Any
 }
 
 #LogOutput: [Name=string]: {
