@@ -9,6 +9,8 @@ _values: {
 	current_timestamp: "2020-10-10T17:07:36.452332Z"
 }
 
+#Any: _ | {[_=string]: #Any}
+
 #Classes: {
 	_args: kind: string
 	let args = _args
@@ -351,16 +353,16 @@ _values: {
 		relevant_when?: string
 		required:       bool
 		type: {
-			"*": {}
-			"[string]"?: {
+			{"*": {}} |
+			{"[string]": {
 				examples: [[string, ...string], ...[string, ...string]]
-			}
-			"string"?: {
+			}} |
+			{"string": {
 				examples: [string, ...string]
-			}
-			"timestamp"?: {
+			}} |
+			{"timestamp": {
 				examples: [_values.current_timestamp]
-			}
+			}}
 		}
 	}
 }
@@ -392,7 +394,7 @@ _values: {
 	// `examples` clarify values through examples. This should be used
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
-	examples: [...{[Name=string]: _}]
+	examples: [...#Any]
 
 	// `options` represent the child options for this option.
 	options: #Options | {}
@@ -486,22 +488,22 @@ _values: {
 	//
 	// For example, the `sinks.http.headers.*` option allows for arbitrary
 	// key/value pairs.
-	"*"?: {}
+	{"*": {}} |
 
 	// `[string]` represents an array of strings type.
-	"[string]"?: #OptionTypeArrayOfStrings & {_args: required: args.required}
+	{"[string]": #OptionTypeArrayOfStrings & {_args: required: args.required}} |
 
 	// `bool` represents a boolean tool.
-	"bool"?: #OptionTypeBool & {_args: required: args.required}
+	{"bool": #OptionTypeBool & {_args: required: args.required}} |
 
 	// `object` represents an object type that contains child options.
-	"object"?: #OptionTypeObject & {_args: required: args.required}
+	{"object": #OptionTypeObject & {_args: required: args.required}} |
 
 	// `strings` represents a string type.
-	"string"?: #OptionTypeString & {_args: required: args.required}
+	{"string": #OptionTypeString & {_args: required: args.required}} |
 
 	// `uint` represents a positive integer type.
-	"uint"?: #OptionTypeUint & {_args: required: args.required}
+	{"uint": #OptionTypeUint & {_args: required: args.required}}
 }
 
 #Statuses: {
