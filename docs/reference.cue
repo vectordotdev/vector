@@ -319,7 +319,12 @@ _values: {
 	}]
 }
 
-#LogEvent: [Name=string]: #LogEvent | _
+#LogEvent: {
+	host?: string | null
+	message?: string | null
+	timestamp?: string | null
+	{[Name=string]: #Any}
+}
 
 #LogOutput: [Name=string]: {
 	description: string
@@ -330,15 +335,7 @@ _values: {
 		relevant_when?: string
 		required:       bool
 		type:           #Type & {_args: "required": required}
-
 	}
-}
-
-#LogOutputType: {
-	{"*": {}} |
-	{"[string]": {examples: [[string, ...string], ...[string, ...string]]}} |
-	{"string": {examples: [string, ...string]}} |
-	{"timestamp": {examples: [_values.current_timestamp]}}
 }
 
 #MetricEvent: {
@@ -466,6 +463,8 @@ _values: {
 	notices: [...string] | null
 }
 
+#Timestamp: =~"^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.\\d{6}Z"
+
 #Type: {
 	_args: required: bool
 	let Args = _args
@@ -570,13 +569,13 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: uint | null
+		default: #Timestamp | null
 	}
 
 	// `examples` clarify values through examples. This should be used
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
-	examples?: [...uint]
+	examples?: [...#Timestamp]
 }
 
 #TypeUint: {
