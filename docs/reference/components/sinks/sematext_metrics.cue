@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: sematext_metrics: {
 	title:             "Sematext Metrics"
-	short_description: ""
+	short_description: "Batches metric events to [Sematext][urls.sematext] to the [Sematext monitoring][urls.sematext_monitoring] service."
 	long_description:  "[Sematext][urls.sematext] is a hosted monitoring platform for metrics based on InfluxDB. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time."
 
 	classes: {
