@@ -31,7 +31,7 @@ data:
         encoding = "json"
 "#;
 
-/// This test validates that vector picks up logs at the simplest case
+/// This test validates that vector-agent picks up logs at the simplest case
 /// possible - a new pod is deployed and prints to stdout, and we assert that
 /// vector picks that up.
 #[tokio::test]
@@ -113,7 +113,7 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// This test validates that vector properly merges a log message that
+/// This test validates that vector-agent properly merges a log message that
 /// kubernetes has internally split into multiple partial log lines.
 #[tokio::test]
 async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
@@ -195,7 +195,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// This test validates that vector picks up preexisting logs - logs that
+/// This test validates that vector-agent picks up preexisting logs - logs that
 /// existed before vector was deployed.
 #[tokio::test]
 async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
@@ -279,8 +279,8 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// This test validates that vector picks up multiple log lines, and that they
-/// arrive at the proper order.
+/// This test validates that vector-agent picks up multiple log lines, and that
+/// they arrive at the proper order.
 #[tokio::test]
 async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
@@ -362,7 +362,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// This test validates that vector properly annotates log events with pod
+/// This test validates that vector-agent properly annotates log events with pod
 /// metadata obtained from the k8s API.
 #[tokio::test]
 async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
@@ -459,7 +459,7 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// This test validates that vector properly filters out the logs that are
+/// This test validates that vector-agent properly filters out the logs that are
 /// requested to be excluded from collection, based on k8s API `Pod` labels.
 #[tokio::test]
 async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
@@ -612,7 +612,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// This test validates that vector properly collects logs from multiple
+/// This test validates that vector-agent properly collects logs from multiple
 /// `Namespace`s and `Pod`s.
 #[tokio::test]
 async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
@@ -709,9 +709,9 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// This test validates that vector helm chart properly allows configuration via
-/// an additional config file, i.e. it can combine the managed and custom config
-/// files.
+/// This test validates that vector-agent helm chart properly allows
+/// configuration via an additional config file, i.e. it can combine the managed
+/// and custom config files.
 #[tokio::test]
 async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
     let _guard = lock();
