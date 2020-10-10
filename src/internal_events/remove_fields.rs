@@ -6,10 +6,7 @@ pub struct RemoveFieldsEventProcessed;
 
 impl InternalEvent for RemoveFieldsEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "remove_fields",
-        );
+        counter!("events_processed", 1);
     }
 }
 
