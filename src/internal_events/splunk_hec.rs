@@ -13,16 +13,8 @@ pub(crate) struct SplunkEventSent {
 
 impl InternalEvent for SplunkEventSent {
     fn emit_metrics(&self) {
-        counter!(
-            "events_processed", 1,
-            "component_kind" => "sink",
-            "component_type" => "splunk_hec",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "sink",
-            "component_type" => "splunk_hec",
-        );
+        counter!("events_processed", 1);
+        counter!("bytes_processed", self.byte_size as u64);
     }
 }
 
@@ -41,11 +33,7 @@ impl InternalEvent for SplunkEventEncodeError {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "encode_errors", 1,
-            "component_kind" => "sink",
-            "component_type" => "splunk_hec",
-        );
+        counter!("encode_errors", 1);
     }
 }
 
@@ -64,11 +52,7 @@ impl InternalEvent for SplunkSourceTypeMissingKeys {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "sourcetype_missing_keys", 1,
-            "component_kind" => "sink",
-            "component_type" => "splunk_hec",
-        );
+        counter!("sourcetype_missing_keys", 1);
     }
 }
 
@@ -87,11 +71,7 @@ impl InternalEvent for SplunkSourceMissingKeys {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "source_missing_keys", 1,
-            "component_kind" => "sink",
-            "component_type" => "splunk_hec",
-        );
+        counter!("source_missing_keys", 1);
     }
 }
 
@@ -110,11 +90,7 @@ mod source {
         }
 
         fn emit_metrics(&self) {
-            counter!(
-                "events_processed", 1,
-                "component_kind" => "source",
-                "component_type" => "splunk_hec",
-            );
+            counter!("events_processed", 1);
         }
     }
 
@@ -133,11 +109,7 @@ mod source {
         }
 
         fn emit_metrics(&self) {
-            counter!(
-                "request_received", 1,
-                "component_kind" => "source",
-                "component_type" => "splunk_hec",
-            );
+            counter!("request_received", 1);
         }
     }
 
@@ -173,11 +145,7 @@ mod source {
         }
 
         fn emit_metrics(&self) {
-            counter!(
-                "request_errors", 1,
-                "component_kind" => "source",
-                "component_type" => "splunk_hec",
-            );
+            counter!("request_errors", 1);
         }
     }
 }
