@@ -1,6 +1,9 @@
 use super::Transform;
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
+    },
     event::Event,
     internal_events::{SamplerEventDiscarded, SamplerEventProcessed},
 };
@@ -19,8 +22,10 @@ pub struct SamplerConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<SamplerConfig>("sampler")
+    TransformDescription::new::<SamplerConfig>("sampler")
 }
+
+impl GenerateConfig for SamplerConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "sampler")]
@@ -54,7 +59,7 @@ pub struct Sampler {
 
 impl Sampler {
     pub fn new(rate: u64, key_field: Option<Atom>, pass_list: RegexSet) -> Self {
-        let key_field = key_field.unwrap_or_else(|| log_schema().message_key().clone());
+        let key_field = key_field.unwrap_or_else(|| Atom::from(log_schema().message_key()));
         Self {
             rate,
             key_field,
@@ -171,7 +176,7 @@ mod tests {
         let passing = events
             .into_iter()
             .filter(|s| {
-                !s.as_log()[&log_schema().message_key()]
+                !s.as_log()[&Atom::from(log_schema().message_key())]
                     .to_string_lossy()
                     .contains("na")
             })
@@ -184,7 +189,7 @@ mod tests {
         let passing = events
             .into_iter()
             .filter(|s| {
-                !s.as_log()[&log_schema().message_key()]
+                !s.as_log()[&Atom::from(log_schema().message_key())]
                     .to_string_lossy()
                     .contains("na")
             })

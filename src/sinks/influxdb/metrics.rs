@@ -62,6 +62,8 @@ inventory::submit! {
     SinkDescription::new::<InfluxDBConfig>("influxdb_metrics")
 }
 
+impl_generate_config_from_default!(InfluxDBConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDBConfig {
@@ -336,6 +338,11 @@ mod tests {
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use crate::sinks::influxdb::test_util::{assert_fields, split_line_protocol, tags, ts};
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<InfluxDBConfig>();
+    }
 
     #[test]
     fn test_encode_counter() {

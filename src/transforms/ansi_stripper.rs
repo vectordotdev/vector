@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Value,
     internal_events::{
         ANSIStripperEventProcessed, ANSIStripperFailed, ANSIStripperFieldInvalid,
@@ -18,8 +18,10 @@ pub struct AnsiStripperConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<AnsiStripperConfig>("ansi_stripper")
+    TransformDescription::new::<AnsiStripperConfig>("ansi_stripper")
 }
+
+impl GenerateConfig for AnsiStripperConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "ansi_stripper")]
@@ -27,12 +29,10 @@ impl TransformConfig for AnsiStripperConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
-            .as_ref()
-            .unwrap_or(&crate::config::log_schema().message_key());
+            .clone()
+            .unwrap_or_else(|| Atom::from(crate::config::log_schema().message_key()));
 
-        Ok(Box::new(AnsiStripper {
-            field: field.clone(),
-        }))
+        Ok(Box::new(AnsiStripper { field }))
     }
 
     fn input_type(&self) -> DataType {
@@ -83,6 +83,7 @@ mod tests {
         event::{Event, Value},
         transforms::Transform,
     };
+    use string_cache::DefaultAtom as Atom;
 
     macro_rules! assert_foo_bar {
         ($($in:expr),* $(,)?) => {
@@ -95,7 +96,7 @@ mod tests {
                 let event = transform.transform(event).unwrap();
 
                 assert_eq!(
-                    event.into_log().remove(&crate::config::log_schema().message_key()).unwrap(),
+                    event.into_log().remove(&Atom::from(crate::config::log_schema().message_key())).unwrap(),
                     Value::from("foo bar")
                 );
             )+
