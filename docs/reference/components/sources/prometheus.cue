@@ -1,20 +1,21 @@
 package metadata
 
 components: sources: prometheus: {
-  title: "#{component.title}"
+  title: "Prometheus"
   short_description: "Ingests data through the [Prometheus text exposition format][urls.prometheus_text_based_exposition_format] and outputs metric events."
   long_description: "[Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
-
-  _features: {
-    checkpoint: enabled: false
-    multiline: enabled: false
-    tls: enabled: false
-  }
 
   classes: {
     commonly_used: false
     deployment_roles: ["daemon","sidecar"]
+    egress_method: "batch"
     function: "receive"
+  }
+
+  features: {
+    checkpoint: enabled: false
+    multiline: enabled: false
+    tls: enabled: false
   }
 
   statuses: {
@@ -23,7 +24,6 @@ components: sources: prometheus: {
   }
 
   support: {
-
     platforms: {
       "aarch64-unknown-linux-gnu": true
       "aarch64-unknown-linux-musl": true
@@ -35,6 +35,7 @@ components: sources: prometheus: {
 
     requirements: []
     warnings: []
+    notices: []
   }
 
   configuration: {
@@ -56,5 +57,12 @@ components: sources: prometheus: {
         unit: "seconds"
       }
     }
+  }
+
+  output: metrics: {
+  	counter: output._passthrough_counter
+  	gauge: output._passthrough_gauge
+  	histogram: output._passthrough_histogram
+  	summary: output._passthrough_summary
   }
 }
