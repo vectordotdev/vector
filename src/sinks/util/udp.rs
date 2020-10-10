@@ -254,7 +254,7 @@ impl Sink for UdpSink {
                         if sent != line.len() {
                             emit!(UdpSendIncomplete {
                                 data_size: line.len(),
-                                sent: sent,
+                                sent,
                             });
                         }
                         Ok(AsyncSink::Ready)
