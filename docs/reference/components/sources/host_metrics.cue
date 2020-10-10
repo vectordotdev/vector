@@ -8,7 +8,8 @@ components: sources: host_metrics: {
 	classes: {
 		commonly_used: false
 		deployment_roles: ["daemon"]
-		function: "collect"
+		egress_method: "batch"
+		function:      "collect"
 	}
 
 	features: {
@@ -264,7 +265,7 @@ components: sources: host_metrics: {
 			host: {
 				description: "The hostname of the originating system."
 				required:    true
-				examples: ["myhostname"]
+				examples: [_values.local_host]
 			}
 			collector: {
 				description: "Which collector this metric comes from."
