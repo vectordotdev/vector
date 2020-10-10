@@ -207,4 +207,24 @@ components: sources: docker: {
 			}
 		},
 	]
+
+	how_it_works: {
+		docker_integration_strategy: {
+			title: "Docker Integration Strategy"
+			body: #"""
+				There are two primary ways through which you can integrate with Docker to
+receive its logs:
+
+1. Interact with the [Docker daemon][urls.docker_daemon] directly via the
+   `docker logs` command. (simplest)
+2. Configure a compatible [Docker logging driver][urls.docker_logging_drivers]
+   with a matching [Vector source][docs.sources]. (advanced)
+
+The Vector `docker` source implements option 1. This is the simplest option,
+but it is prone to performance and stability issues with _large_ deployments. If
+you experience this, please see the
+[Alternate Strategies section](#alternate-strategies) below.
+				"""#
+		}
+	}
 }
