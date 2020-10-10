@@ -6,7 +6,12 @@ metadata:
   labels:
     {{- include "libvector.labels" . | nindent 4 }}
 data:
-  vector.toml: |
+  # We leave `vector.toml` file name available to let externally managed config
+  # maps to provide it.
+  managed.toml: |
+    # Configuration for vector.
+    # Docs: https://vector.dev/docs/
+
     data_dir = "{{ .Values.globalOptions.dataDir }}"
 
     {{- with .Values.logSchema }}
