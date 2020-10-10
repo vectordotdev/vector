@@ -17,6 +17,17 @@ data:
       timestamp_key = "{{ .timestampKey }}"
     {{- end }}
 
+    {{- if .Values.vectorSource.enabled }}
+    # Accept logs from Vector agents.
+    [sources.{{ .Values.vectorSource.sourceId }}]
+      type = "vector"
+      address = "{{ .Values.vectorSource.listenAddress }}:{{ .Values.vectorSource.listenPort }}"
+
+      {{- with .Values.vectorSource.rawConfig }}
+      {{- . | nindent 6 }}
+      {{- end }}
+    {{- end }}
+
     {{- range $sourceId, $source := .Values.sources }}
     [sources.{{ $sourceId }}]
       type = "{{ $source.type }}"

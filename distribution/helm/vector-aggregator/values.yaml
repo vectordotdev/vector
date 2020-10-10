@@ -155,6 +155,20 @@ logSchema:
   sourceTypeKey: "source_type"
   timestampKey: "timestamp"
 
+# The "built-in" vector source, for accepting logs from the vector agents.
+# Will be added by default, unless explicitly disabled.
+vectorSource:
+  # Disable to omit the vector source from being added.
+  enabled: true
+  # The name to use for the "built-in" vector source.
+  sourceId: vector
+  # The address to listen at.
+  listenAddress: "0.0.0.0"
+  # The port to listen at.
+  listenPort: "9000"
+  # Raw TOML config to embed at the vector source.
+  rawConfig: null
+
 # Sources to add to the generated `vector` config
 sources: {}
   # source_name:
