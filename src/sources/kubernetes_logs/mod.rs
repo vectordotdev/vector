@@ -12,7 +12,7 @@ use crate::internal_events::{
 };
 use crate::kubernetes as k8s;
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     dns::Resolver,
     shutdown::ShutdownSignal,
     sources,
@@ -65,7 +65,18 @@ pub struct Config {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<Config>(COMPONENT_NAME)
+    SourceDescription::new::<Config>(COMPONENT_NAME)
+}
+
+impl GenerateConfig for Config {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(&Self {
+            self_node_name: default_self_node_name_env_template(),
+            auto_partial_merge: true,
+            ..Default::default()
+        })
+        .unwrap()
+    }
 }
 
 const COMPONENT_NAME: &str = "kubernetes_logs";
@@ -340,4 +351,12 @@ fn create_event(line: Bytes, file: &str) -> Event {
 /// as it should be at the generated config file.
 fn default_self_node_name_env_template() -> String {
     format!("${{{}}}", SELF_NODE_NAME_ENV_KEY.to_owned())
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::Config>();
+    }
 }
