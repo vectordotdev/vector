@@ -84,16 +84,7 @@ components: transforms: regex_parser: {
 				examples: ["root_field", "parent.child"]
 			}
 		}
-		types: {
-			common:      true
-			description: "Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types."
-			required:    false
-			warnings: []
-			type: object: {
-				examples: [{"status": "int"}, {"duration": "float"}, {"success": "bool"}, {"timestamp": "timestamp|%F"}, {"timestamp": "timestamp|%a %b %e %T %Y"}, {"parent": {"child": "int"}}]
-				options: {}
-			}
-		}
+		types: components._types
 	}
 
 	examples: log: [

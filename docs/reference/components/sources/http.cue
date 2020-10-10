@@ -97,6 +97,7 @@ components: sources: http: {
 			description: "An individual line from a `application/json` request"
 			fields: {
 				"*": {
+					common:        false
 					description:   "Any field contained in your JSON payload"
 					relevant_when: "`encoding` != \"text\""
 					required:      false
