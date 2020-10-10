@@ -7,11 +7,11 @@ components: transforms: regex_parser: {
 
 	classes: {
 		commonly_used: true
+		egress_method: "stream"
 		function:      "parse"
 	}
 
-	features: {
-	}
+	features: {}
 
 	statuses: {
 		development: "stable"

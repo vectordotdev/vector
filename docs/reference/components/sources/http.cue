@@ -8,7 +8,8 @@ components: sources: http: {
 	classes: {
 		commonly_used: false
 		deployment_roles: ["service", "sidecar"]
-		function: "receive"
+		egress_method: "batch"
+		function:      "receive"
 	}
 
 	features: {
@@ -126,12 +127,12 @@ components: sources: http: {
              \( _line )
              ```
              """
-			output: {
+			output: [{
 				host:         _host
 				message:      _line
 				timestamp:    "2020-10-01T11:23:25.333432Z"
 				"User-Agent": _user_agent
-			}
+			}]
 		},
 		{
 			_line:       "{\"key\": \"val\"}"
@@ -152,12 +153,12 @@ components: sources: http: {
              \( _line )
              ```
              """
-			output: {
+			output: [{
 				host:         _host
 				key:          "val"
 				timestamp:    "2020-10-01T11:23:25.333432Z"
 				"User-Agent": _user_agent
-			}
+			}]
 		},
 	]
 }
