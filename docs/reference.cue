@@ -87,7 +87,7 @@ _values: {
 	// `support` communicates the varying levels of support of the component.
 	support: #Support & {_args: kind: Kind}
 
-	configuration: #Options
+	configuration: #Schema
 
 	if kind == "source" || kind == "transform" {
 		// `output` documents output of the component. This is very important
@@ -329,13 +329,7 @@ _values: {
 #LogOutput: [Name=string]: {
 	description: string
 	name:        Name
-	fields: [Name=string]: {
-		description:    string
-		name:           Name
-		relevant_when?: string
-		required:       bool
-		type:           #Type & {_args: "required": required}
-	}
+	fields: #Schema
 }
 
 #MetricEvent: {
@@ -358,7 +352,16 @@ _values: {
 	type: "counter" | "gauge" | "histogram" | "summary"
 }
 
-#Options: [Name=string]: {
+#Platforms: {
+	"aarch64-unknown-linux-gnu":  bool
+	"aarch64-unknown-linux-musl": bool
+	"x86_64-apple-darwin":        bool
+	"x86_64-pc-windows-msv":      bool
+	"x86_64-unknown-linux-gnu":   bool
+	"x86_64-unknown-linux-musl":  bool
+}
+
+#Schema: [Name=string]: {
 	// `desription` describes the option in a succinct fashion. Usually 1 to
 	// 2 sentences.
 	description: string
@@ -405,15 +408,6 @@ _values: {
 	// `types` sets the option's value type. External tagging is used since
 	// each type has its own set of fields.
 	type: #Type & {_args: "required": required}
-}
-
-#Platforms: {
-	"aarch64-unknown-linux-gnu":  bool
-	"aarch64-unknown-linux-musl": bool
-	"x86_64-apple-darwin":        bool
-	"x86_64-pc-windows-msv":      bool
-	"x86_64-unknown-linux-gnu":   bool
-	"x86_64-unknown-linux-musl":  bool
 }
 
 #Statuses: {
@@ -499,7 +493,7 @@ _values: {
 	examples: [...#Any]
 
 	// `options` represent the child options for this option.
-	options: #Options | {}
+	options: #Schema | {}
 }
 
 #TypeArrayOfStrings: {
