@@ -8,6 +8,7 @@ components: sources: logplex: {
 	classes: {
 		commonly_used: false
 		deployment_roles: ["service"]
+		egress_method: "batch"
 		function: "receive"
 	}
 
@@ -18,7 +19,6 @@ components: sources: logplex: {
 			enabled: true
 			can_enable: true
 			can_verify_certificate: true
-			can_verify_hostname: false
 			enabled_default: false
 		}
 	}
@@ -44,6 +44,7 @@ components: sources: logplex: {
 			""",
 		]
 		warnings: []
+		notices: []
 	}
 
 	configuration: {
@@ -65,7 +66,7 @@ components: sources: logplex: {
 				required: true
 				type: string: examples: ["erlang"]
 			}
-			host: fields._host
+			host: fields._local_host
 			message: {
 				description: "The message field, containing the plain text message."
 				required: true
@@ -76,7 +77,7 @@ components: sources: logplex: {
 				required: true
 				type: string: examples: ["console"]
 			}
-			timestamp: fields._timestamp
+			timestamp: fields._current_timestamp
 		}
 	}
 }
