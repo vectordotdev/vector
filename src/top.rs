@@ -18,10 +18,10 @@ struct HumanWriter {
 }
 
 impl HumanWriter {
-    fn new() -> Box<Self> {
-        Box::new(Self {
+    fn new() -> Self {
+        Self {
             f: human_format::Formatter::new(),
-        })
+        }
     }
 }
 
@@ -36,10 +36,10 @@ struct LocaleWriter {
 }
 
 impl LocaleWriter {
-    fn new() -> Box<Self> {
-        Box::new(Self {
+    fn new() -> Self {
+        Self {
             buf: num_format::Buffer::new(),
-        })
+        }
     }
 }
 
@@ -53,9 +53,9 @@ impl StatsWriter for LocaleWriter {
 
 fn new_formatter(humanize: bool) -> Box<dyn StatsWriter> {
     if humanize {
-        HumanWriter::new()
+        Box::new(HumanWriter::new())
     } else {
-        LocaleWriter::new()
+        Box::new(LocaleWriter::new())
     }
 }
 
