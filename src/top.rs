@@ -2,12 +2,62 @@ use crate::{
     api_client::{make_subscription_client, query},
     config,
 };
-use format_num::format_num;
 use graphql_client::GraphQLQuery;
+use human_format;
 use prettytable::{format, Table};
 use reqwest;
 use structopt::StructOpt;
 use url::Url;
+
+trait StatsWriter {
+    fn kb(&mut self, n: f64) -> String;
+}
+
+struct HumanWriter {
+    f: human_format::Formatter,
+}
+
+impl HumanWriter {
+    fn new() -> Box<Self> {
+        Box::new(Self {
+            f: human_format::Formatter::new(),
+        })
+    }
+}
+
+impl StatsWriter for HumanWriter {
+    fn kb(&mut self, n: f64) -> String {
+        self.f.with_decimals(2).format(n)
+    }
+}
+
+struct LocaleWriter {
+    buf: num_format::Buffer,
+}
+
+impl LocaleWriter {
+    fn new() -> Box<Self> {
+        Box::new(Self {
+            buf: num_format::Buffer::new(),
+        })
+    }
+}
+
+impl StatsWriter for LocaleWriter {
+    fn kb(&mut self, n: f64) -> String {
+        self.buf
+            .write_formatted(&(n as i64), &num_format::Locale::en);
+        self.buf.to_string()
+    }
+}
+
+fn new_formatter(humanize: bool) -> Box<dyn StatsWriter> {
+    if humanize {
+        HumanWriter::new()
+    } else {
+        LocaleWriter::new()
+    }
+}
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -17,7 +67,10 @@ pub struct Opts {
     refresh_interval: i32,
 
     #[structopt(short, long)]
-    remote: Option<Url>,
+    url: Option<Url>,
+
+    #[structopt(short, long)]
+    humanize: bool,
 }
 
 #[derive(GraphQLQuery)]
@@ -68,7 +121,10 @@ async fn healthcheck(url: &Url) -> Result<bool, ()> {
     }
 }
 
-async fn print_topology(url: &Url) -> Result<(), reqwest::Error> {
+async fn print_topology(
+    url: &Url,
+    mut formatter: Box<dyn StatsWriter>,
+) -> Result<(), reqwest::Error> {
     let request_body = TopologyQuery::build_query(topology_query::Variables);
     let res = query::<TopologyQuery>(url, &request_body).await?;
 
@@ -80,10 +136,10 @@ async fn print_topology(url: &Url) -> Result<(), reqwest::Error> {
         table.add_row(row!(
             data.name,
             topology_type(data.on),
-            r->format_num!(",.0", data.events_processed
+            r->formatter.kb(data
+                .events_processed
                 .map(|ep| ep.events_processed)
-                .unwrap_or(0.0))
-        ));
+                .unwrap_or(0.00))));
     }
 
     table.printstd();
@@ -110,7 +166,7 @@ async fn print_topology(url: &Url) -> Result<(), reqwest::Error> {
 // }
 
 pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    let url = opts.remote.clone().unwrap_or_else(|| {
+    let url = opts.url.clone().unwrap_or_else(|| {
         let addr = config::api::default_bind().unwrap();
         Url::parse(&*format!("http://{}/graphql", addr)).unwrap()
     });
@@ -124,7 +180,10 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
         }
     }
 
-    if print_topology(&url).await.is_err() {
+    if print_topology(&url, new_formatter(opts.humanize))
+        .await
+        .is_err()
+    {
         eprintln!("Couldn't retrieve topology");
         return exitcode::UNAVAILABLE;
     }

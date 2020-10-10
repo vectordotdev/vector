@@ -105,7 +105,8 @@ reqwest = { version = "0.10.6", features = ["json"], optional = true }
 tokio-tungstenite = {version = "0.11.0", optional = true }
 weak-table = { version = "0.3.0", optional = true }
 prettytable-rs = { version = "0.8.0", optional = true }
-format_num = { version = "0.1.0", optional = true }
+num-format = { version = "0.4.0", optional = true }
+human_format = { version = "1.0.3", optional = true }
 
 # External libs
 derivative = "1.0"
@@ -276,7 +277,8 @@ api_client = [
   "weak-table",
   "prettytable-rs",
   "reqwest",
-  "format_num"
+  "num-format",
+  "human_format"
 ]
 
 # Sources
