@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     emit,
     internal_events::BlackholeEventReceived,
     sinks::util::StreamSink,
@@ -9,6 +9,7 @@ use crate::{
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
+use string_cache::DefaultAtom as Atom;
 
 pub struct BlackholeSink {
     total_events: usize,
@@ -23,8 +24,10 @@ pub struct BlackholeConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<BlackholeConfig>("blackhole")
+    SinkDescription::new::<BlackholeConfig>("blackhole")
 }
+
+impl GenerateConfig for BlackholeConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "blackhole")]
@@ -65,7 +68,7 @@ impl StreamSink for BlackholeSink {
         while let Some(event) = input.next().await {
             let message_len = match event {
                 Event::Log(log) => log
-                    .get(&crate::config::log_schema().message_key())
+                    .get(&Atom::from(crate::config::log_schema().message_key()))
                     .map(|v| v.as_bytes().len())
                     .unwrap_or(0),
                 Event::Metric(metric) => {

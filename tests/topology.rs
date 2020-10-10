@@ -12,6 +12,7 @@ use std::{
         Arc,
     },
 };
+use string_cache::DefaultAtom as Atom;
 use tokio::time::{delay_for, Duration};
 use vector::{config::Config, event::Event, test_util::start_topology, topology};
 
@@ -32,7 +33,7 @@ fn basic_config_with_sink_failing_healthcheck() -> Config {
 fn into_message(event: Event) -> String {
     event
         .as_log()
-        .get(&vector::config::log_schema().message_key())
+        .get(&Atom::from(vector::config::log_schema().message_key()))
         .unwrap()
         .to_string_lossy()
 }
@@ -82,7 +83,7 @@ async fn topology_shutdown_while_active() {
     );
     for event in processed_events {
         assert_eq!(
-            event.as_log()[&vector::config::log_schema().message_key()],
+            event.as_log()[&Atom::from(vector::config::log_schema().message_key())],
             "test transformed".to_owned().into()
         );
     }

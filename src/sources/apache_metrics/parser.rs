@@ -143,6 +143,13 @@ pub fn parse(
         .into_iter()
 }
 
+pub fn encode_namespace(namespace: &str, name: &str) -> String {
+    match namespace {
+        "" => name.to_string(),
+        _ => [namespace, name].join("_"),
+    }
+}
+
 fn line_to_metrics<'a>(
     key: &str,
     value: &str,
@@ -372,13 +379,6 @@ fn score_to_metric(
         value: MetricValue::Gauge {
             value: count.into(),
         },
-    }
-}
-
-fn encode_namespace(namespace: &str, name: &str) -> String {
-    match namespace {
-        "" => name.to_string(),
-        _ => format!("{}_{}", namespace, name),
     }
 }
 
