@@ -489,21 +489,26 @@ _values: {
 	// For example, the `sinks.http.headers.*` option allows for arbitrary
 	// key/value pairs.
 	{"*": {}} |
+	{"[string]": #OptionTypeArrayOfStrings & {_args: required: args.required}
 
-	// `[string]` represents an array of strings type.
-	{"[string]": #OptionTypeArrayOfStrings & {_args: required: args.required}} |
+		// `[string]` represents an array of strings type.
+	} |
+	{"bool": #OptionTypeBool & {_args: required: args.required}
 
-	// `bool` represents a boolean tool.
-	{"bool": #OptionTypeBool & {_args: required: args.required}} |
+		// `bool` represents a boolean tool.
+	} |
+	{"object": #OptionTypeObject & {_args: required: args.required}
 
-	// `object` represents an object type that contains child options.
-	{"object": #OptionTypeObject & {_args: required: args.required}} |
+		// `object` represents an object type that contains child options.
+	} |
+	{"string": #OptionTypeString & {_args: required: args.required}
 
-	// `strings` represents a string type.
-	{"string": #OptionTypeString & {_args: required: args.required}} |
+		// `strings` represents a string type.
+	} |
+	{"uint": #OptionTypeUint & {_args: required: args.required}
 
-	// `uint` represents a positive integer type.
-	{"uint": #OptionTypeUint & {_args: required: args.required}}
+		// `uint` represents a positive integer type.
+	}
 }
 
 #Statuses: {
