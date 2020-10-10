@@ -9,7 +9,7 @@ components: sources: http: {
 		commonly_used: false
 		deployment_roles: ["service", "sidecar"]
 		egress_method: "batch"
-		function: "receive"
+		function:      "receive"
 	}
 
 	features: {

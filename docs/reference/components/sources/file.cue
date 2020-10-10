@@ -9,7 +9,7 @@ components: sources: file: {
 		commonly_used: true
 		deployment_roles: ["daemon", "sidecar"]
 		egress_method: "stream"
-		function: "collect"
+		function:      "collect"
 	}
 
 	features: {

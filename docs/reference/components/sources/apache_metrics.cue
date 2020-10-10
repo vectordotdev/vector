@@ -9,7 +9,7 @@ components: sources: apache_metrics: {
 		commonly_used: false
 		deployment_roles: ["daemon", "sidecar"]
 		egress_method: "batch"
-		function: "collect"
+		function:      "collect"
 	}
 
 	features: {

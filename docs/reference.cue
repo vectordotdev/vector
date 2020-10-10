@@ -278,7 +278,7 @@ package metadata
 						"\( k )"?: _ | *null
 					}
 				}
-				input:  #LogEvent | [#LogEvent, ...] | string
+				input: #LogEvent | [#LogEvent, ...] | string
 
 				if classes.egress_method == "batch" {
 					output: [#LogEvent, ...] | null
@@ -299,7 +299,7 @@ package metadata
 						"\( k )"?: _ | *null
 					}
 				}
-				input:  #MetricEvent
+				input: #MetricEvent
 
 				if classes.egress_method == "batch" {
 					output: [#MetricEvent, ...] | null

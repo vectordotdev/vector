@@ -9,7 +9,7 @@ components: sources: aws_kinesis_firehose: {
 		commonly_used: false
 		deployment_roles: ["service"]
 		egress_method: "batch"
-		function: "receive"
+		function:      "receive"
 	}
 
 	features: {

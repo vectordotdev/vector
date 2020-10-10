@@ -9,7 +9,7 @@ components: sources: journald: {
 		commonly_used: true
 		deployment_roles: ["daemon"]
 		egress_method: "batch"
-		function: "collect"
+		function:      "collect"
 	}
 
 	features: {
