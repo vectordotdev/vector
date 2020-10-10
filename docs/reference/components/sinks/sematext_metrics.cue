@@ -9,6 +9,7 @@ components: sinks: sematext_metrics: {
 		commonly_used: false
 		function:      "transmit"
 		service_providers: ["Sematext"]
+		egress_method: "batch"
 	}
 
 	features: {
@@ -54,7 +55,13 @@ components: sinks: sematext_metrics: {
 			required:      true
 			relevant_when: "`endpoint` is not set"
 			warnings: []
-			type: [string]: ["us", "eu"]
+			type: [string]: {
+				enum: {
+					us: "United States"
+					eu: "Europe"
+				}
+				examples: [ "us"]
+			}
 		}
 		endpoint: {
 			description:   "The endpoint that will be used to send metrics to. This option is required if `region` is not set."
