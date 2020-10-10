@@ -7,6 +7,7 @@ components: sinks: azure_monitor_logs: {
 
 	classes: {
 		commonly_used: false
+		egress_method: "batch"
 		function:      "transmit"
 		service_providers: ["Azure"]
 	}
@@ -58,6 +59,7 @@ components: sinks: azure_monitor_logs: {
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {

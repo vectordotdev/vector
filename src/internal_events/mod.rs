@@ -8,6 +8,10 @@ mod apache_metrics;
 #[cfg(feature = "api")]
 mod api;
 mod auto_concurrency;
+#[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
+mod aws_cloudwatch_logs_subscription_parser;
+#[cfg(feature = "sources-aws_kinesis_firehose")]
+mod aws_kinesis_firehose;
 mod aws_kinesis_streams;
 mod blackhole;
 #[cfg(feature = "transforms-coercer")]
@@ -26,6 +30,8 @@ mod generator;
 #[cfg(feature = "transforms-grok_parser")]
 mod grok_parser;
 mod heartbeat;
+#[cfg(feature = "sources-host_metrics")]
+mod host_metrics;
 mod http;
 #[cfg(all(unix, feature = "sources-journald"))]
 mod journald;
@@ -40,6 +46,8 @@ mod log_to_metric;
 mod logplex;
 #[cfg(feature = "transforms-lua")]
 mod lua;
+#[cfg(feature = "transforms-metric_to_log")]
+mod metric_to_log;
 mod process;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
@@ -93,6 +101,10 @@ pub use self::apache_metrics::*;
 #[cfg(feature = "api")]
 pub use self::api::*;
 pub use self::auto_concurrency::*;
+#[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
+pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
+#[cfg(feature = "sources-aws_kinesis_firehose")]
+pub use self::aws_kinesis_firehose::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
 #[cfg(feature = "transforms-coercer")]
@@ -113,6 +125,8 @@ pub use self::generator::*;
 #[cfg(feature = "transforms-grok_parser")]
 pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;
+#[cfg(feature = "sources-host_metrics")]
+pub(crate) use self::host_metrics::*;
 pub use self::http::*;
 #[cfg(all(unix, feature = "sources-journald"))]
 pub(crate) use self::journald::*;
@@ -127,6 +141,8 @@ pub(crate) use self::log_to_metric::*;
 pub use self::logplex::*;
 #[cfg(feature = "transforms-lua")]
 pub use self::lua::*;
+#[cfg(feature = "transforms-metric_to_log")]
+pub(crate) use self::metric_to_log::*;
 pub use self::process::*;
 #[cfg(feature = "sources-prometheus")]
 pub use self::prometheus::*;

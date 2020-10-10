@@ -1,0 +1,215 @@
+name: Pull Request Test Suite
+
+on:
+  pull_request: {}
+
+env:
+  AUTOINSTALL: true
+  AWS_ACCESS_KEY_ID: "dummy"
+  AWS_SECRET_ACCESS_KEY: "dummy"
+  CONTAINER_TOOL: "docker"
+  RUST_BACKTRACE: full
+  RUST_TEST_THREADS: 1
+  TEST_LOG: vector=debug
+  VERBOSE: true
+  CI: true
+  PROFILE: debug
+
+jobs:
+  changes:
+      runs-on: ubuntu-latest
+      # Set job outputs to values from filter step
+      outputs:
+        source: ${{ steps.filter.outputs.source }}
+        docs: ${{ steps.filter.outputs.docs }}
+        markdown: ${{ steps.filter.outputs.markdown }}
+        dependencies: ${{ steps.filter.outputs.dependencies }}
+        internal_events: ${{ steps.filter.outputs.internal_events }}
+        helm: ${{ steps.filter.outputs.helm }}
+      steps:
+      - uses: styfle/cancel-workflow-action@0.4.1
+        if: github.ref != 'refs/heads/master'
+        with:
+          access_token: ${{ secrets.GITHUB_TOKEN }}
+      # For pull requests it's not necessary to checkout the code
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            source:
+              - ".github/workflows/prs.yml"
+              - ".cargo/**"
+              - "benches/**"
+              - "lib/**"
+              - "proto/**"
+              - "scripts/**"
+              - "skaffold/**"
+              - "src/**"
+              - "tests/**"
+              - "build.rs"
+              - "Cargo.lock"
+              - "Cargo.toml"
+              - "docker-compose.yml"
+              - "Makefile"
+              - "rust-toolchain"
+            docs:
+              - 'docs/**'
+            markdown:
+              - '**/**.md'
+            dependencies:
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'rust-toolchain'
+              - '.github/workflows/prs.yml'
+              - 'Makefile'
+              - 'scripts/cross/**'
+            internal_events:
+              - 'src/internal_events/**'
+            helm:
+              - 'distribution/helm/**'
+            docker:
+              - 'distribution/docker/**'
+
+  # Remove this once https://github.com/timberio/vector/issues/3771 is closed.
+  # Then, modify the `cross-linux` job to run `test` instead of `build`.
+  test-linux:
+    name: Unit - x86_64-unknown-linux-gnu
+    runs-on: ubuntu-20.04
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
+    steps:
+      - uses: actions/checkout@v2
+      - run: make ci-sweep
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: make test
+
+  cross-linux:
+    name: Cross - ${{ matrix.target }}
+    runs-on: ubuntu-20.04
+    needs: changes
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - x86_64-unknown-linux-musl
+          - aarch64-unknown-linux-gnu
+          - aarch64-unknown-linux-musl
+    # We run cross checks when dependencies change to ensure they still build.
+    # This helps us avoid adopting dependencies that aren't compatible with other architectures.
+    if: ${{ needs.changes.outputs.dependencies == 'true' }}
+    steps:
+      - uses: actions/checkout@v2
+      - run: make ci-sweep
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      # Why is this build, not check? Because we need to make sure the linking phase works.
+      # aarch64 and musl in particular are notoriously hard to link.
+      # While it may be tempting to slot a `check` in here for quickness, please don't.
+      - run: make cross-build-${{ matrix.target }}
+      - uses: actions/upload-artifact@v2
+        with:
+          name: "vector-debug-${{ matrix.target }}"
+          path: "./target/${{ matrix.target }}/debug/vector"
+
+  test-mac:
+    name: Unit - Mac
+    # Full CI suites for this platform were only recently introduced.
+    # Some failures are permitted until we can properly correct them.
+    continue-on-error: true
+    runs-on: macos-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: bash scripts/environment/bootstrap-macos-10.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: make test
+
+  test-windows:
+    name: Unit - Windows
+    # Full CI suites for this platform were only recently introduced.
+    # Some failures are permitted until we can properly correct them.
+    continue-on-error: true
+    runs-on: windows-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
+    steps:
+      - uses: actions/checkout@v2
+      - env:
+          RUSTFLAGS: "-D warnings"
+        run: cargo test --no-fail-fast --no-default-features --features default-msvc
+
+  checks:
+    name: Checks
+    runs-on: ubuntu-20.04
+    container: timberio/ci_image
+    needs: changes
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          # check-version needs tags
+          fetch-depth: 0 # fetch everything
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
+      - name: Make slim-builds
+        run: make slim-builds
+      - name: Check markdown
+        if: needs.changes.outputs.markdown == 'true'
+        run: make check-markdown
+      - name: Check Cue docs
+        if: needs.changes.outputs.docs == 'true'
+        run: make check-docs
+      - name: Check code format
+        run: make check-fmt
+      - name: Check clippy
+        if: needs.changes.outputs.source == 'true'
+        run: make check-clippy
+      - name: Check version
+        run: make check-version
+      - name: Check scripts
+        run: make check-scripts
+      - name: Check helm
+        if: needs.changes.outputs.helm == 'true'
+        run: make check-helm
+      - name: Check that generated Kubernetes YAML doesn't diverge from Helm
+        if: needs.changes.outputs.helm == 'true'
+        run: make check-kubernetes-yaml
+      - name: Check internal events
+        if: needs.changes.outputs.internal_events == 'true'
+        run: make check-internal-events
+      - name: Check cargo deny
+        if: needs.changes.outputs.dependencies == 'true'
+        uses: EmbarkStudios/cargo-deny-action@v1
+        with:
+          command: check advisories
