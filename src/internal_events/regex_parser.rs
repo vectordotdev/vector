@@ -41,7 +41,7 @@ pub(crate) struct RegexParserMissingField<'a> {
 
 impl InternalEvent for RegexParserMissingField<'_> {
     fn emit_logs(&self) {
-        debug!(message = "Field does not exist.", field = %self.field);
+        warn!(message = "Field does not exist.", field = %self.field);
     }
 
     fn emit_metrics(&self) {
