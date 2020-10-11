@@ -131,11 +131,7 @@ impl HttpSink for LogdnaConfig {
         }
 
         if !map.contains_key("env") {
-            if let Some(default_env) = &self.default_env {
-                map.insert("env".to_string(), json!(default_env.as_str()));
-            } else {
-                map.insert("env".to_string(), json!("production"));
-            }
+            map.insert("env".to_string(), json!(self.default_env.as_ref().map(|s| s.as_str()).unwrap_or("production")));
         }
 
         if !map.contains_key("app") && !map.contains_key("file") {
