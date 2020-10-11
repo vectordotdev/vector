@@ -187,7 +187,7 @@ pub mod validate_dir {
     use std::collections::hash_map::DefaultHasher;
     use std::path::Path;
     use std::{
-        env, fs,
+        env,
         hash::{Hash, Hasher},
         io,
     };
@@ -200,12 +200,12 @@ pub mod validate_dir {
             "Can't fetch {:?} directory {:?} metadata. Error: {:?}",
             name,
             path,
-            error
+            source
         ))]
         MetadataError {
             name: String,
             path: PathBuf,
-            error: io::Error,
+            source: io::Error,
         },
         #[snafu(display("{:?} path {:?} must be directory.", name, path))]
         NotDirectory { name: String, path: PathBuf },
@@ -225,44 +225,65 @@ pub mod validate_dir {
     }
 
     /// Validates that directory can be created and/or is writeable.
-    /// Returns a tmp path that can be used instead.
+    /// Returns a path to tmp directory that can be used instead.
     ///
     /// Name of the field.
     pub fn validate_dir(path: &Path, name: String) -> Result<PathBuf, ValidateDirError> {
-        if path.is_dir() {
-            for ancestor in path.ancestors() {
-                match fs::metadata(ancestor) {
-                    Ok(metadata) if metadata.permissions().readonly() => {
-                        return Err(ValidateDirError::ReadOnly {
-                            name,
-                            path: ancestor.to_path_buf(),
-                        });
-                    }
-                    // Found writeable directory.
-                    Ok(_) => {
-                        // We create a tmp directory whose name depends on artifact_cache path.
-                        // This is to simulate group access dependency between multiple (vector,OS group)
-                        // pairs. Without this, false dependecy between the pairs would be created because
-                        // of which validate command could falsly fail.
-                        let mut tmp = env::temp_dir();
+        if let Some(exists) = path.ancestors().find(|ancestor| ancestor.exists()) {
+            // Construct cannonical form of the existing path.
+            let canonical = exists.canonicalize().context(CanonicalizeError {
+                name: name.clone(),
+                path: exists.to_path_buf(),
+            })?;
 
-                        // Construct cannonical form of the path.
-                        let mut canonical = ancestor.canonicalize().context(CanonicalizeError {
-                            name,
-                            path: ancestor.to_path_buf(),
-                        })?;
-                        let suffix = path
-                            .strip_prefix(ancestor)
-                            .expect("Ancestor of path must be it's prefix.");
-                        canonical.push(suffix);
+            let metadata = canonical.metadata().context(MetadataError {
+                name: name.clone(),
+                path: canonical.to_path_buf(),
+            })?;
 
-                        // Construct directory name dependent on canonical path.
-                        let mut hasher = DefaultHasher::new();
-                        canonical.hash(&mut hasher);
-                        tmp.push(format!("vector_validate_{}", hasher.finish()));
+            if metadata.is_file() {
+                return Err(ValidateDirError::NotDirectory {
+                    name,
+                    path: canonical.to_path_buf(),
+                });
+            }
 
-                        return Ok(tmp);
-                    }
+            if metadata.permissions().readonly() {
+                return Err(ValidateDirError::ReadOnly {
+                    name,
+                    path: canonical.to_path_buf(),
+                });
+            }
+
+            // Found existing writeable directory.
+
+            // We create a tmp directory whose name depends on path.
+            // This is to simulate group access dependency between multiple (vector,OS group)
+            // pairs. Without this, false dependecy between the pairs would be created because
+            // of which validate command could falsly fail.
+            let mut tmp = env::temp_dir();
+
+            // Construct cannonical form of the path.
+            let mut canonical = canonical;
+            let suffix = path
+                .strip_prefix(exists)
+                .expect("Ancestor of path must be it's prefix.");
+            canonical.push(suffix);
+
+            // Construct directory name dependent on canonical path.
+            let mut hasher = DefaultHasher::new();
+            canonical.hash(&mut hasher);
+            tmp.push(format!("vector_validate_{}", hasher.finish()));
+
+            Ok(tmp)
+        } else {
+            Err(ValidateDirError::NoRoot {
+                name,
+                path: path.to_path_buf(),
+            })
+        }
+    }
+
 
                     // Continue with ancestor
                     Err(error) if error.kind() == io::ErrorKind::NotFound => (),
