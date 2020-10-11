@@ -1,5 +1,5 @@
 ---
-name: Bug Report
+name: Bug
 about: Let us know about an unexpected error, a crash, or an incorrect behavior.
 labels: 'type: bug'
 assignees: ''

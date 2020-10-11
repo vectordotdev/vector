@@ -1,7 +1,7 @@
 ---
-name: Feature Request
-about: Suggest a new feature or enhancement.
-labels: 'type: feature'
+name: Enhancement
+about: Suggest an enhancement to an existing feature.
+labels: 'type: enhancement'
 assignees: ''
 title: ''
 
