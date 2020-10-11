@@ -8242,6 +8242,14 @@ require('custom_module')
   api_key = "${LOGDNA_API_KEY}"
   api_key = "ef8d5de700e7989468166c40fc8a0ccd"
 
+  # The default environment that will be set for events that do not contain an `env` field.
+  #
+  # * optional
+  # * default: "production"
+  # * type: string
+  default_env = "production"
+  default_env = "staging"
+
   # The default app that will be set for events that do not contain a `file` or
   # `app` field.
   #

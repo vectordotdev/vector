@@ -75,6 +75,16 @@ components: sinks: logdna: {
 				examples: ["vector", "myapp"]
 			}
 		}
+		default_env: {
+			common:      false
+			description: "The default environment that will be set for events that do not contain an `env` field."
+			required:    false
+			warnings: []
+			type: string: {
+				default: "production"
+				examples: ["staging", "production"]
+			}
+		}
 		hostname: {
 			description: "The hostname that will be attached to each batch of events."
 			required:    true
