@@ -111,6 +111,11 @@ components: transforms: log_to_metric: {
 
 	input: {
 		logs:    true
-		metrics: true
+		metrics: false
 	}
+
+	// TODO: Something simmilar to this should be added
+	// output: {
+	//   metrics: #MetricOutput
+	//  }
 }
