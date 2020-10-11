@@ -44,7 +44,6 @@ scopes:
   - healthchecks # Anything related to Vector's healtchecks
   - internal docs # Anything related to Vector's internal documentation
   - logs # Anything related to Vector's log events
-  - mapping # Anything related to mapping data within Vector
   - marketing # Anything related to marketing Vector
   - metrics # Anything related to Vector's metrics events
   - networking # Anything related to Vector's networking
@@ -57,6 +56,7 @@ scopes:
   - releasing # Anything related to releasing Vector
   - reliability # Anything related to Vector's reliability
   - reload # Anything related to reloading Vector (updating configuration)
+  - remap # Anything related to the Timber Remap Language
   - rfcs # Anything related to Vector's internal RFCs
   - security # Anything related to security
   - setup # Anything related to setting up or installing Vector
@@ -165,6 +165,7 @@ scopes:
   - aws_kinesis_firehose sink # Anything `aws_kinesis_firehose` sink related
   - aws_kinesis_streams sink # Anything `aws_kinesis_streams` sink related
   - aws_s3 sink # Anything `aws_s3` sink related
+  - azure_monitor_logs sink # Anything `azure_monitor_logs` sink related
   - blackhole sink # Anything `blackhole` sink related
   - clickhouse sink # Anything `clickhouse` sink related
   - console sink # Anything `console` sink related
