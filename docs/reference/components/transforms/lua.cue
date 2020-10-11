@@ -269,7 +269,7 @@ components: transforms: lua: {
 				}
 				input: {
 					counter: {
-						value: 2
+						value: 2.0
 					}
 					tags: {
 						tag_to_rename: "old value"
@@ -278,7 +278,7 @@ components: transforms: lua: {
 				}
 				output: {
 					counter: {
-						value: 2
+						value: 2.0
 					}
 					tags: {
 						tag:         "new value"
@@ -297,7 +297,7 @@ components: transforms: lua: {
 				}
 				input: {
 					counter: {
-						value: 2
+						value: 2.0
 					}
 					tags: {
 						tag_to_rename: "old value"

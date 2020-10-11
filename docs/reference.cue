@@ -8,6 +8,7 @@ package metadata
 _values: {
 	current_timestamp: "2020-10-10T17:07:36.452332Z"
 	local_host:        "my-host.local"
+	remote_host:       "34.33.222.212"
 }
 
 // `#Any` allows for any value.
@@ -177,7 +178,7 @@ _values: {
 //   on the host.
 // * `service` - Vector receives data from one or more upstream
 //   sources, typically over a network protocol.
-#DeploymentRole: "daemon" | "service" | "sidecar"
+#DeploymentRole: "aggregator" | "daemon" | "sidecar"
 
 // `#DevelopmentStatus` documents the development status of the component.
 //
@@ -341,10 +342,17 @@ _values: {
 })
 
 #MetricEvent: {
-	counter: close({
-		value: uint
-	})
 	tags: [Name=string]: string
+	close({counter: #MetricEventCounter}) |
+	close({gauge: #MetricEventGauge})
+}
+
+#MetricEventCounter: {
+	value: float
+}
+
+#MetricEventGauge: {
+	value: float
 }
 
 #MetricOutput: [Name=string]: close({
@@ -480,32 +488,45 @@ _values: {
 	// For example, the `sinks.http.headers.*` option allows for arbitrary
 	// key/value pairs.
 	close({"*": close({})}) |
+	close({"[float]": #TypeArrayOfFloats & {_args: required: Args.required}}) |
 	close({"[string]": #TypeArrayOfStrings & {_args: required: Args.required}}) |
+	close({"[uint]": #TypeArrayOfUints & {_args: required: Args.required}}) |
 	close({"bool": #TypeBool & {_args: required: Args.required}}) |
+	close({"float": #TypeFloat & {_args: required: Args.required}}) |
 	close({"object": #TypeObject & {_args: required: Args.required}}) |
 	close({"string": #TypeString & {_args: required: Args.required}}) |
 	close({"timestamp": #TypeTimestamp & {_args: required: Args.required}}) |
 	close({"uint": #TypeUint & {_args: required: Args.required}})
 }
 
-#TypeBool: {
+#TypeArrayOfFloats: {
 	_args: required: bool
 	let Args = _args
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: bool | null
+		default: [...float] | null
 	}
-}
 
-#TypeObject: {
 	// `examples` clarify values through examples. This should be used
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
-	examples: [...#Any]
+	examples: [...[...float]]
+}
 
-	// `options` represent the child options for this option.
-	options: #Schema
+#TypeArrayOfUints: {
+	_args: required: bool
+	let Args = _args
+
+	if !Args.required {
+		// `default` sets the default value.
+		default: [...uint] | null
+	}
+
+	// `examples` clarify values through examples. This should be used
+	// when examples cannot be derived from the `default` or `enum`
+	// options.
+	examples: [...[...uint]]
 }
 
 #TypeArrayOfStrings: {
@@ -537,6 +558,41 @@ _values: {
 	// `templateable` means that the option supports dynamic templated
 	// values.
 	templateable?: bool
+}
+
+#TypeBool: {
+	_args: required: bool
+	let Args = _args
+
+	if !Args.required {
+		// `default` sets the default value.
+		default: bool | null
+	}
+}
+
+#TypeFloat: {
+	_args: required: bool
+	let Args = _args
+
+	if !Args.required {
+		// `default` sets the default value.
+		default: float | null
+	}
+
+	// `examples` clarify values through examples. This should be used
+	// when examples cannot be derived from the `default` or `enum`
+	// options.
+	examples?: [...float]
+}
+
+#TypeObject: {
+	// `examples` clarify values through examples. This should be used
+	// when examples cannot be derived from the `default` or `enum`
+	// options.
+	examples: [...#Any]
+
+	// `options` represent the child options for this option.
+	options: #Schema
 }
 
 #TypeString: {
@@ -609,4 +665,8 @@ components: close({
 	sources:    #Components
 	transforms: #Components
 	sinks:      #Components
+})
+
+data_model: close({
+	schema: #Schema
 })
