@@ -21,18 +21,20 @@ inventory::submit! {
     TransformDescription::new::<LogfmtConfig>("logfmt_parser")
 }
 
+impl_generate_config_from_default!(LogfmtConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
-            .as_ref()
-            .unwrap_or(&crate::config::log_schema().message_key());
+            .clone()
+            .unwrap_or_else(|| Atom::from(crate::config::log_schema().message_key()));
         let conversions = parse_conversion_map(&self.types)?;
 
         Ok(Box::new(Logfmt {
-            field: field.clone(),
+            field,
             drop_field: self.drop_field,
             conversions,
         }))
@@ -115,6 +117,11 @@ mod tests {
         event::{LogEvent, Value},
         Event,
     };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<LogfmtConfig>();
+    }
 
     async fn parse_log(text: &str, drop_field: bool, types: &[(&str, &str)]) -> LogEvent {
         let event = Event::from(text);
