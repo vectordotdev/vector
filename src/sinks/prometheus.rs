@@ -82,6 +82,7 @@ impl GenerateConfig for PrometheusSinkConfig {
             namespace: None,
             address: default_address(),
             buckets: default_histogram_buckets(),
+            quantiles: default_summary_quantiles(),
             flush_period_secs: default_flush_period_secs(),
         })
         .unwrap()
