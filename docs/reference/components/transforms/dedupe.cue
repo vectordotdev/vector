@@ -1,13 +1,14 @@
 package metadata
 
 components: transforms: dedupe: {
-	title: "Dedupe events"
+	title:             "Dedupe events"
 	short_description: "Accepts log events and allows you to prevent duplicate Events from being outputted by using an LRU cache."
-	long_description: "Accepts log events and allows you to prevent duplicate Events from being outputted by using an LRU cache."
+	long_description:  "Accepts log events and allows you to prevent duplicate Events from being outputted by using an LRU cache."
 
 	classes: {
 		commonly_used: false
-		function: "filter"
+		egress_method: "stream"
+		function:      "filter"
 	}
 
 	features: {
@@ -21,34 +22,35 @@ components: transforms: dedupe: {
 		input_types: ["log"]
 
 		platforms: {
-			"aarch64-unknown-linux-gnu": true
+			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin": true
-			"x86_64-pc-windows-msv": true
-			"x86_64-unknown-linux-gnu": true
-			"x86_64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {
 		cache: {
-			common: false
+			common:      false
 			description: "Options controlling how we cache recent Events for future duplicate checking."
-			required: false
+			required:    false
 			warnings: []
 			type: object: {
 				options: {
 					num_events: {
-						common: true
+						common:      true
 						description: "The number of recent Events to cache and compare new incoming Events against."
-						required: false
+						required:    false
 						warnings: []
 						type: uint: {
 							default: 5000
-							unit: null
+							unit:    null
 						}
 					}
 				}
@@ -56,14 +58,14 @@ components: transforms: dedupe: {
 		}
 		fields: {
 			description: "Options controlling what fields to match against."
-			required: true
+			required:    true
 			warnings: []
 			type: object: {
 				options: {
 					ignore: {
-						common: false
+						common:      false
 						description: "The field names to ignore when deciding if an Event is a duplicate. Incompatible with the `fields.match` option."
-						required: false
+						required:    false
 						warnings: []
 						type: "[string]": {
 							default: null
@@ -71,9 +73,9 @@ components: transforms: dedupe: {
 						}
 					}
 					match: {
-						common: true
+						common:      true
 						description: "The field names considered when deciding if an Event is a duplicate. This can also be globally set via the [global `log_schema` options][docs.reference.global-options#log_schema]. Incompatible with the `fields.ignore` option."
-						required: false
+						required:    false
 						warnings: []
 						type: "[string]": {
 							default: ["timestamp", "host", "message"]
