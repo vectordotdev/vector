@@ -18,8 +18,6 @@ components: transforms: lua: {
 	}
 
 	support: {
-		input_types: ["log", "metric"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -209,6 +207,18 @@ components: transforms: lua: {
 					"2": "Lua transform API version 2"
 				}
 			}
+		}
+	}
+
+	input: {
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
 		}
 	}
 

@@ -19,8 +19,6 @@ components: transforms: dedupe: {
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -85,6 +83,11 @@ components: transforms: dedupe: {
 				}
 			}
 		}
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 
 	how_it_works: {

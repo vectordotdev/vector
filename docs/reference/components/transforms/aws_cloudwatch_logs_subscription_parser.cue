@@ -18,8 +18,6 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -42,6 +40,11 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 			warnings: []
 			type: string: default: "message"
 		}
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 
 	output: logs: line: {

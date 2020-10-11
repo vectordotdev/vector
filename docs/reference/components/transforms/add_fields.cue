@@ -18,8 +18,6 @@ components: transforms: add_fields: {
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -70,6 +68,11 @@ components: transforms: add_fields: {
 			warnings: []
 			type: bool: default: true
 		}
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 
 	how_it_works: {
