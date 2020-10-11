@@ -23,6 +23,7 @@ use encoding::{EncodingConfig, EncodingConfiguration};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::borrow::Cow;
+use string_cache::DefaultAtom as Atom;
 
 pub use batch::{Batch, BatchConfig, BatchSettings, BatchSize, PushResult};
 pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
@@ -68,7 +69,7 @@ pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Op
         Encoding::Json => serde_json::to_vec(&log),
         Encoding::Text => {
             let bytes = log
-                .get(&crate::config::log_schema().message_key())
+                .get(&Atom::from(crate::config::log_schema().message_key()))
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             Ok(bytes)

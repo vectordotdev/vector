@@ -28,7 +28,8 @@ apt install --yes \
     gnupg2 \
     wget \
     gawk \
-    yarn
+    yarn \
+    sudo
 
 # Cue
 TEMP=$(mktemp -d)

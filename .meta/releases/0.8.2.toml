@@ -1,8 +1,0 @@
-[releases."0.8.2"]
-date = 2020-03-06
-commits = [
-{sha = "361f5d1688a1573e9794c4decb0aec26e731de70", message = "fix(cli): Enable file sink in generate subcmd (#1989)", author = "Ashley Jeffs", date = 2020-03-05T09:25:36Z, files_count = 1, insertions_count = 5, deletions_count = 1},
-{sha = "b709ce7a15e1b42bcaae765902968158b10567ac", message = "fix(lua transform): Explicitly call GC in `lua` transform (#1990)", author = "Alexander Rodin", date = 2020-03-06T11:37:19Z, files_count = 1, insertions_count = 25, deletions_count = 8},
-{sha = "bc81e26f137de5a7ff2b8f893d7839a2052bb8a8", message = "docs: Fix broken links", author = "Alexander Rodin", date = 2020-03-06T12:26:59Z, files_count = 5, insertions_count = 9, deletions_count = 7},
-{sha = "ee998b2078c7019481a25881ee71764e1260c6a5", message = "chore(testing): Use new Homebrew installer in CI", author = "Alexander Rodin", date = 2020-03-06T12:51:52Z, files_count = 1, insertions_count = 1, deletions_count = 1}
-]

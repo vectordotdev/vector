@@ -26,9 +26,28 @@ use std::str::FromStr;
 
 /// Lookups are pre-validated event lookup paths.
 ///
-/// They are intended to handle user input from a configuration.
+/// These are owned, ordered sets of segments. Segments represent parts of a path such as
+/// `pies.banana.slices[0]`. The segments would be `["pies", "banana", "slices", 0]`. You can "walk"
+/// a lookup with an `iter()` call.
 ///
-/// Generally, these shouldn't be created on the hot path.
+/// # Building
+///
+/// You build `Lookup`s from `String`s and other string-like objects with a `from()` or `try_from()`
+/// call. **These do not parse the buffer.**
+///
+/// From there, you can `push` and `pop` onto the `Lookup`.
+///
+/// # Parsing
+///
+/// To parse buffer into a `Lookup`, use the `std::str::FromStr` implementation. If you're working
+/// something that's not able to be a `str`, you should consult `std::str::from_utf8` and handle the
+/// possible error.
+///
+// # TODO
+//
+// It would be very useful to add an unowned variant and have this structure use it in a
+// self-referencing manner. This would allow for unowned Lookups which would enable more API
+// flexibility. Consider `Path`/`PathBuf` or `String`/`Str`.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct Lookup {
     segments: Vec<Segment>,
@@ -38,9 +57,11 @@ impl<'a> TryFrom<Pair<'a, Rule>> for Lookup {
     type Error = crate::Error;
 
     fn try_from(pair: Pair<'a, Rule>) -> Result<Self, Self::Error> {
-        Ok(Self {
+        let retval = Self {
             segments: Segment::from_lookup(pair)?,
-        })
+        };
+        retval.is_valid()?;
+        Ok(retval)
     }
 }
 
@@ -68,18 +89,25 @@ impl Display for Lookup {
 }
 
 impl Lookup {
+    /// Push onto the internal list of segments.
+    #[instrument]
     pub fn push(&mut self, segment: Segment) {
+        trace!(length = %self.segments.len(), "Pushing.");
         self.segments.push(segment)
     }
 
+    #[instrument]
     pub fn pop(&mut self) -> Option<Segment> {
+        trace!(length = %self.segments.len(), "Popping.");
         self.segments.pop()
     }
 
+    #[instrument]
     pub fn iter(&self) -> Iter<'_, Segment> {
         self.segments.iter()
     }
 
+    #[instrument]
     pub fn from_indexmap(
         values: IndexMap<String, TomlValue>,
     ) -> crate::Result<IndexMap<Lookup, Value>> {
@@ -90,6 +118,7 @@ impl Lookup {
         Ok(discoveries)
     }
 
+    #[instrument]
     pub fn from_toml_table(value: TomlValue) -> crate::Result<IndexMap<Lookup, Value>> {
         let mut discoveries = IndexMap::new();
         match value {
@@ -107,6 +136,7 @@ impl Lookup {
         }
     }
 
+    #[instrument]
     fn recursive_step(
         lookup: Lookup,
         value: TomlValue,
@@ -119,7 +149,7 @@ impl Lookup {
             TomlValue::Boolean(b) => discoveries.insert(lookup, Value::from(b)),
             TomlValue::Datetime(dt) => {
                 let dt = dt.to_string();
-                discoveries.insert(Lookup::try_from(lookup)?, Value::from(dt))
+                discoveries.insert(lookup, Value::from(dt))
             }
             TomlValue::Array(vals) => {
                 for (i, val) in vals.into_iter().enumerate() {
@@ -136,6 +166,16 @@ impl Lookup {
                 None
             }
         };
+        Ok(())
+    }
+
+    /// Raise any errors that might stem from the lookup being invalid.
+    #[instrument]
+    fn is_valid(&self) -> crate::Result<()> {
+        if self.segments.is_empty() {
+            return Err("Lookups must have at least 1 segment to be valid.".into());
+        }
+
         Ok(())
     }
 }
@@ -164,6 +204,7 @@ impl From<String> for Lookup {
         Self {
             segments: vec![Segment::field(input)],
         }
+        // We know this must be at least one segment.
     }
 }
 
@@ -172,6 +213,7 @@ impl From<&str> for Lookup {
         Self {
             segments: vec![Segment::field(input.to_owned())],
         }
+        // We know this must be at least one segment.
     }
 }
 
@@ -180,6 +222,7 @@ impl From<string_cache::DefaultAtom> for Lookup {
         Self {
             segments: vec![Segment::field(input.to_string())],
         }
+        // We know this must be at least one segment.
     }
 }
 
