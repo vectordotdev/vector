@@ -96,11 +96,13 @@ goauth = { version = "0.7.1", optional = true }
 smpl_jwt = { version = "0.5.0", optional = true }
 
 # API
-async-graphql = { version = "1.17.21", optional = true }
-async-graphql-warp = { version = "1.17.18", optional = true }
+async-graphql = { version = "1.18.2", optional = true }
+async-graphql-warp = { version = "1.18.1", optional = true }
+
+# API client
 graphql_client = { version = "0.9.0", optional = true }
+reqwest = { version = "0.10.6", features = ["json"], optional = true }
 tokio-tungstenite = {version = "0.11.0", optional = true }
-futures-util = {version = "0.3.5", optional = true }
 weak-table = { version = "0.3.0", optional = true }
 
 # External libs
@@ -117,7 +119,7 @@ openssl-probe = "0.1.2"
 string_cache = "0.7.3"
 flate2 = "1.0.6"
 async-compression = { version = "0.3.5", features = ["tokio-02", "gzip"] }
-structopt = "0.3.13"
+structopt = "0.3.19"
 indexmap = {version = "1.5.1", features = ["serde-1"]}
 http = "0.2"
 typetag = "0.1"
@@ -163,7 +165,7 @@ bloom = "0.3.2"
 pulsar = { version = "1.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
 task-compat = "0.1"
 cidr-utils = "0.4.2"
-pin-project = "0.4.23"
+pin-project = "0.4.26"
 k8s-openapi = { version = "0.9", features = ["v1_15"], optional = true }
 portpicker = "0.1.0"
 sha-1 = "0.9"
@@ -172,6 +174,8 @@ sha3 = "0.9"
 md-5 = "0.9"
 hex = "0.4.2"
 chrono-tz = "0.5.3"
+heim = { version = "0.1.0-beta.3", optional = true, features = ["full"] }
+uom = { version = "0.29.0", optional = true }
 rust_decimal = "1.8.1"
 
 # For WASM
@@ -180,7 +184,7 @@ lucetc = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863da
 lucet-runtime = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
 lucet-wasi = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
 anyhow = { version = "1.0.28", optional = true }
-async-stream = "0.2.1"
+async-stream = "0.3.0"
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1"
@@ -219,19 +223,21 @@ k8s-test-framework = { version = "0.1", path = "lib/k8s-test-framework" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
-default-musl = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
+default = ["api", "api_client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+default-musl = ["api", "api_client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
+default-cmake = ["api", "api_client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
+default-msvc = ["api", "api_client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
 
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
 target-x86_64-unknown-linux-gnu = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 target-aarch64-unknown-linux-gnu = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "leveldb", "rdkafka-cmake"]
+target-x86_64-unknown-linux-musl = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix",  "leveldb", "rdkafka-cmake"]
+target-aarch64-unknown-linux-musl = ["sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix",  "leveldb", "rdkafka-cmake"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["jemallocator"]
@@ -258,18 +264,24 @@ kubernetes = ["k8s-openapi", "evmap"]
 api = [
   "async-graphql",
   "async-graphql-warp",
+]
+
+# API client
+api_client = [
   "graphql_client",
+  "reqwest",
   "tokio-tungstenite",
-  "futures-util",
   "weak-table",
 ]
 
 # Sources
 sources = [
   "sources-apache_metrics",
+  "sources-aws_kinesis_firehose",
   "sources-docker",
   "sources-file",
   "sources-generator",
+  "sources-host_metrics",
   "sources-http",
   "sources-internal_metrics",
   "sources-journald",
@@ -286,9 +298,11 @@ sources = [
   "sources-kubernetes-logs",
 ]
 sources-apache_metrics = []
+sources-aws_kinesis_firehose = ["base64", "sources-tls", "warp"]
 sources-docker = ["bollard"]
 sources-file = ["bytesize", "file-source"]
 sources-generator = []
+sources-host_metrics = ["heim", "uom"]
 sources-http = ["warp", "sources-tls"]
 sources-internal_metrics = []
 sources-journald = []
@@ -309,6 +323,7 @@ transforms = [
   "transforms-add_fields",
   "transforms-add_tags",
   "transforms-ansi_stripper",
+  "transforms-aws_cloudwatch_logs_subscription_parser",
   "transforms-aws_ec2_metadata",
   "transforms-coercer",
   "transforms-concat",
@@ -322,6 +337,7 @@ transforms = [
   "transforms-logfmt_parser",
   "transforms-lua",
   "transforms-merge",
+  "transforms-metric_to_log",
   "transforms-regex_parser",
   "transforms-remap",
   "transforms-remove_fields",
@@ -337,6 +353,7 @@ transforms = [
 transforms-add_fields = []
 transforms-add_tags = []
 transforms-ansi_stripper = []
+transforms-aws_cloudwatch_logs_subscription_parser= []
 transforms-aws_ec2_metadata = ["evmap"]
 transforms-coercer = []
 transforms-concat = []
@@ -350,6 +367,7 @@ transforms-log_to_metric = []
 transforms-logfmt_parser = ["logfmt"]
 transforms-lua = ["rlua"]
 transforms-merge = []
+transforms-metric_to_log = []
 transforms-regex_parser = []
 transforms-remap = []
 transforms-remove_fields = []
