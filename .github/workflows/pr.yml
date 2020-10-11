@@ -43,7 +43,7 @@ jobs:
         with:
           filters: |
             source:
-              - ".github/workflows/prs.yml"
+              - ".github/workflows/pr.yml"
               - ".cargo/**"
               - "benches/**"
               - "lib/**"
@@ -66,7 +66,7 @@ jobs:
               - 'Cargo.toml'
               - 'Cargo.lock'
               - 'rust-toolchain'
-              - '.github/workflows/prs.yml'
+              - '.github/workflows/pr.yml'
               - 'Makefile'
               - 'scripts/cross/**'
             internal_events:
