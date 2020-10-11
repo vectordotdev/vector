@@ -7,18 +7,12 @@ components: sinks: console: {
 
 	classes: {
 		commonly_used: false
+		egress_method: "stream"
 		function:      "test"
 		service_providers: []
 	}
 
 	features: {
-		batch: {
-			enabled:      false
-			common:       false
-			max_bytes:    null
-			max_events:   null
-			timeout_secs: 0
-		}
 		buffer: enabled:      false
 		compression: enabled: false
 		encoding: {
@@ -38,8 +32,6 @@ components: sinks: console: {
 	}
 
 	support: {
-		input_types: ["log", "metric"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -67,6 +59,18 @@ components: sinks: console: {
 					stderr: "Output will be written to [STDERR][urls.stderr]"
 				}
 			}
+		}
+	}
+
+	input: {
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
 		}
 	}
 }
