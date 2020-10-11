@@ -492,7 +492,7 @@ _values: {
 
 #Type: {
 	_args: {
-		arrays: true
+		arrays:   true
 		required: bool
 	}
 	let Args = _args
@@ -507,7 +507,7 @@ _values: {
 
 #TypePrimitive: {
 	_args: {
-		arrays: true
+		arrays:   true
 		required: bool
 	}
 	let Args = _args
@@ -531,7 +531,7 @@ _values: {
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: [..._] | null
+		default: [...] | null
 	}
 
 	// Set `required` to `true` to force disable defaults. Defaults should
