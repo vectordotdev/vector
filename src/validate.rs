@@ -284,28 +284,50 @@ pub mod validate_dir {
         }
     }
 
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::test_util::{temp_dir, temp_file};
+        use std::fs::File;
 
-                    // Continue with ancestor
-                    Err(error) if error.kind() == io::ErrorKind::NotFound => (),
-                    Err(error) => {
-                        return Err(ValidateDirError::MetadataError {
-                            name,
-                            path: ancestor.to_path_buf(),
-                            error,
-                        });
-                    }
-                }
-            }
+        #[test]
+        fn file() {
+            let path = temp_file();
+            let _ = File::create(&path).unwrap();
+            assert!(validate_dir(&path, "".to_owned()).is_err());
+        }
 
-            Err(ValidateDirError::NoRoot {
-                name,
-                path: path.to_path_buf(),
-            })
-        } else {
-            Err(ValidateDirError::NotDirectory {
-                name,
-                path: path.to_path_buf(),
-            })
+        #[test]
+        fn directory() {
+            assert!(validate_dir(&temp_dir(), "".to_owned()).is_ok());
+        }
+
+        #[test]
+        fn non_existing() {
+            let mut path = std::env::temp_dir();
+            path.push("validate_non_existing_directory_ff83");
+            assert!(validate_dir(&path, "".to_owned()).is_ok());
+        }
+
+        #[test]
+        fn relative() {
+            assert!(validate_dir(&Path::new("./cache"), "".to_owned()).is_ok());
+        }
+
+        #[test]
+        fn tmp_dir_diff() {
+            assert_ne!(
+                validate_dir(&Path::new("./cache"), "".to_owned()).unwrap(),
+                validate_dir(&Path::new("/tmp/file.txt"), "".to_owned()).unwrap()
+            );
+        }
+
+        #[test]
+        fn tmp_dir_same() {
+            assert_eq!(
+                validate_dir(&Path::new("./cache"), "".to_owned()).unwrap(),
+                validate_dir(&Path::new("./cache"), "".to_owned()).unwrap()
+            );
         }
     }
 }
