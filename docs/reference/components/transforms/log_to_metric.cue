@@ -8,7 +8,7 @@ components: transforms: log_to_metric: {
 	classes: {
 		commonly_used: true
 		function:      "convert"
-		egress_method: "stream"
+		egress_method: "batch"
 	}
 
 	features: {
@@ -119,6 +119,174 @@ components: transforms: log_to_metric: {
 		logs:    true
 		metrics: false
 	}
+
+	output: metrics: {
+		counter:   output._passthrough_counter
+		gauge:     output._passthrough_gauge
+		histogram: output._passthrough_histogram
+		set:       output._passthrough_set
+		summary:   output._passthrough_summary
+	}
+
+	examples: [
+		{
+			title: "Counters"
+			configuration: {
+				metrics: [
+					{
+						type:  "counter"
+						field: "status"
+						name:  "response_total"
+						tags: {
+							status: "{{status}}"
+							host:   "{{host}}"
+						}
+					},
+				]
+			}
+			input: log: {
+				host:    "10.22.11.222"
+				message: "Sent 200 in 54.2ms"
+				status:  200
+			}
+			output: [{metric: {
+				name: "time_ms"
+				tags: {
+					status: "200"
+					host:   "10.22.11.222"
+				}
+				counter: {
+					value: 1.0
+				}
+			}}]
+		},
+		{
+			title: "Gauge"
+			configuration: {
+				metrics: [
+					{
+						type:  "gauge"
+						field: "1m_load_avg"
+						name:  "1m_load_avg"
+						tags: host: "{{host}}"
+					},
+					{
+						type:  "gauge"
+						field: "5m_load_avg"
+						name:  "5m_load_avg"
+						tags: host: "{{host}}"
+					},
+					{
+						type:  "gauge"
+						field: "15m_load_avg"
+						name:  "15m_load_avg"
+						tags: host: "{{host}}"
+					},
+				]
+			}
+			input: log: {
+				host:           "10.22.11.222"
+				message:        "CPU activity sample"
+				"1m_load_avg":  78.2
+				"5m_load_avg":  56.2
+				"15m_load_avg": 48.7
+			}
+			output: [
+				{metric: {
+					name: "1m_load_avg"
+					tags: {
+						host: "10.22.11.222"
+					}
+					gauge: {
+						value: 78.2
+					}
+				}},
+				{metric: {
+					name: "5m_load_avg"
+					tags: {
+						host: "10.22.11.222"
+					}
+					gauge: {
+						value: 56.2
+					}
+				}},
+				{metric: {
+					name: "15m_load_avg"
+					tags: {
+						host: "10.22.11.222"
+					}
+					gauge: {
+						value: 48.7
+					}
+				}},
+			]
+		},
+		{
+			title: "Histograms"
+			configuration: {
+				metrics: [
+					{
+						type:  "histogram"
+						field: "time"
+						name:  "time_ms"
+						tags: {
+							status: "{{status}}"
+							host:   "{{host}}"
+						}
+					},
+				]
+			}
+			input: log: {
+				host:    "10.22.11.222"
+				message: "Sent 200 in 54.2ms"
+				status:  200
+				time:    54.2
+			}
+			output: [{metric: {
+				name: "time_ms"
+				tags: {
+					status: "200"
+					host:   "10.22.11.222"
+				}
+				distribution: {
+					values: [54.2]
+					sample_rates: [1.0]
+					statistic: "histogram"
+				}
+			}}]
+		},
+		{
+			title: "Sets"
+			configuration: {
+				metrics: [
+					{
+						type:  "histogram"
+						field: "time"
+						name:  "time_ms"
+						tags: {
+							status: "{{status}}"
+							host:   "{{host}}"
+						}
+					},
+				]
+			}
+			input: log: {
+				host:        "10.22.11.222"
+				message:     "Sent 200 in 54.2ms"
+				remote_addr: "233.221.232.22"
+			}
+			output: [{metric: {
+				name: "time_ms"
+				tags: {
+					status: "200"
+					host:   "10.22.11.222"
+				}
+				set: {
+					values: ["233.221.232.22"]
+				}
+			}}]
+		},
+	]
 
 	how_it_works: {
 		multiple_metrics: {

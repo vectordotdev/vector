@@ -80,7 +80,7 @@ components: transforms: regex_parser: {
 				examples: ["root_field", "parent.child"]
 			}
 		}
-		types: components._types
+		types: configuration._types
 	}
 
 	input: {
@@ -88,7 +88,7 @@ components: transforms: regex_parser: {
 		metrics: false
 	}
 
-	examples: log: [
+	examples: [
 		{
 			title: "Syslog 5424"
 			configuration: {
@@ -101,10 +101,10 @@ components: transforms: regex_parser: {
 					bytes_out: "int"
 				}
 			}
-			input: {
+			input: log: {
 				"message": #"5.86.210.12 - zieme4647 5667 [19/06/2019:17:20:49 -0400] "GET /embrace/supply-chains/dynamic/vertical" 201 20574"#
 			}
-			output: {
+			output: log: {
 				bytes_in:  5667
 				host:      "5.86.210.12"
 				user_id:   "zieme4647"
