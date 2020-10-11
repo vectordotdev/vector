@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::proto,
     internal_events::VectorEventSent,
     sinks::util::{tcp::TcpSink, StreamSinkOld},
@@ -34,8 +34,10 @@ enum BuildError {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<VectorSinkConfig>("vector")
+    SinkDescription::new::<VectorSinkConfig>("vector")
 }
+
+impl GenerateConfig for VectorSinkConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "vector")]

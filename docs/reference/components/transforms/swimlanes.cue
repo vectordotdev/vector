@@ -7,8 +7,11 @@ components: transforms: swimlanes: {
 
 	classes: {
 		commonly_used: false
+		egress_method: "stream"
 		function:      "route"
 	}
+
+	features: {}
 
 	statuses: {
 		development: "beta"
@@ -28,6 +31,7 @@ components: transforms: swimlanes: {
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {

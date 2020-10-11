@@ -12,16 +12,8 @@ impl InternalEvent for StdinEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "events_processed", 1,
-            "component_kind" => "source",
-            "component_type" => "stdin",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "stdin",
-        );
+        counter!("events_processed", 1);
+        counter!("bytes_processed", self.byte_size as u64);
     }
 }
 
@@ -36,10 +28,6 @@ impl InternalEvent for StdinReadFailed {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "stdin_reads_failed", 1,
-            "component_kind" => "source",
-            "component_type" => "stdin",
-        );
+        counter!("stdin_reads_failed", 1);
     }
 }
