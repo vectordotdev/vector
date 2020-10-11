@@ -9,13 +9,8 @@ use crate::{
     wasm::WasmModule,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::{hash_map::DefaultHasher, HashMap};
+use std::collections::HashMap;
 use std::path::PathBuf;
-use std::{
-    env,
-    hash::{Hash, Hasher},
-    mem,
-};
 use vector_wasm::{Role, WasmModuleConfig};
 
 pub mod defaults {
@@ -69,20 +64,8 @@ impl TransformConfig for WasmConfig {
             // To avoid creating directories and caches in runtime directory,
             // we create them in a tmp directory and manually check that we
             // can create directory/files in original directory.
-
-            // Change artifact_cache path to tmp directory
-            let mut tmp = env::temp_dir();
-            // We create a tmp directory whose name depends on artifact_cache path.
-            // This is to simulate group access dependency between multiple (vector,OS group)
-            // pairs. Without this, false dependecy between the pairs would be created because
-            // of which validate command could falsly fail.
-            let mut hasher = DefaultHasher::new();
-            config.artifact_cache.hash(&mut hasher);
-            tmp.push(format!("vector_validate_{}", hasher.finish()));
-            let cache_dir = mem::replace(&mut config.artifact_cache, tmp);
-
-            // Manually check that we have adequate access.
-            validate_dir(&cache_dir, "artifact_cache".to_owned())?;
+            config.artifact_cache =
+                validate_dir(&config.artifact_cache, "artifact_cache".to_owned())?;
         }
 
         Ok(Box::new(Wasm::new(config)?))

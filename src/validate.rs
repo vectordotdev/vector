@@ -183,9 +183,14 @@ pub use self::validate_dir::*;
 #[cfg(feature = "wasm")]
 pub mod validate_dir {
     use super::*;
-    use snafu::Snafu;
+    use snafu::*;
+    use std::collections::hash_map::DefaultHasher;
     use std::path::Path;
-    use std::{fs, io};
+    use std::{
+        env, fs,
+        hash::{Hash, Hasher},
+        io,
+    };
 
     #[derive(Debug, Snafu)]
     pub enum ValidateDirError {
@@ -206,30 +211,65 @@ pub mod validate_dir {
         NotDirectory { name: String, path: PathBuf },
         #[snafu(display("Root directory of {:?} path {:?} doesn't exist.", name, path))]
         NoRoot { name: String, path: PathBuf },
+        #[snafu(display(
+            "Failed to canonicalize {:?} path {:?}. Error: {:?}",
+            name,
+            path,
+            source
+        ))]
+        CanonicalizeError {
+            name: String,
+            path: PathBuf,
+            source: io::Error,
+        },
     }
 
     /// Validates that directory can be created and/or is writeable.
+    /// Returns a tmp path that can be used instead.
     ///
     /// Name of the field.
-    pub fn validate_dir(path: &Path, name: String) -> Result<(), ValidateDirError> {
+    pub fn validate_dir(path: &Path, name: String) -> Result<PathBuf, ValidateDirError> {
         if path.is_dir() {
-            for path in path.ancestors() {
-                match fs::metadata(path) {
+            for ancestor in path.ancestors() {
+                match fs::metadata(ancestor) {
                     Ok(metadata) if metadata.permissions().readonly() => {
                         return Err(ValidateDirError::ReadOnly {
                             name,
-                            path: path.to_path_buf(),
+                            path: ancestor.to_path_buf(),
                         });
                     }
                     // Found writeable directory.
-                    Ok(_) => return Ok(()),
+                    Ok(_) => {
+                        // We create a tmp directory whose name depends on artifact_cache path.
+                        // This is to simulate group access dependency between multiple (vector,OS group)
+                        // pairs. Without this, false dependecy between the pairs would be created because
+                        // of which validate command could falsly fail.
+                        let mut tmp = env::temp_dir();
+
+                        // Construct cannonical form of the path.
+                        let mut canonical = ancestor.canonicalize().context(CanonicalizeError {
+                            name,
+                            path: ancestor.to_path_buf(),
+                        })?;
+                        let suffix = path
+                            .strip_prefix(ancestor)
+                            .expect("Ancestor of path must be it's prefix.");
+                        canonical.push(suffix);
+
+                        // Construct directory name dependent on canonical path.
+                        let mut hasher = DefaultHasher::new();
+                        canonical.hash(&mut hasher);
+                        tmp.push(format!("vector_validate_{}", hasher.finish()));
+
+                        return Ok(tmp);
+                    }
 
                     // Continue with ancestor
                     Err(error) if error.kind() == io::ErrorKind::NotFound => (),
                     Err(error) => {
                         return Err(ValidateDirError::MetadataError {
                             name,
-                            path: path.to_path_buf(),
+                            path: ancestor.to_path_buf(),
                             error,
                         });
                     }
