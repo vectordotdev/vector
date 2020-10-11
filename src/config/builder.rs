@@ -82,7 +82,9 @@ impl ConfigBuilder {
         let mut errors = Vec::new();
 
         #[cfg(feature = "api")]
-        api::update_config(self, &with);
+        if let Err(error) = self.api.merge(with.api) {
+            errors.push(error);
+        }
 
         if self.global.data_dir.is_none() || self.global.data_dir == default_data_dir() {
             self.global.data_dir = with.global.data_dir;
