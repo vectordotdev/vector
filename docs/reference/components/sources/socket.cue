@@ -7,7 +7,7 @@ components: sources: socket: {
 
 	classes: {
 		commonly_used: true
-		deployment_roles: ["service", "sidecar"]
+		deployment_roles: ["aggregator", "sidecar"]
 		egress_method: "stream"
 		function:      "receive"
 	}
@@ -41,7 +41,8 @@ components: sources: socket: {
 		requirements: []
 		warnings: [
 			"""
-				This component exposes a configured port. You must ensure your network allows access to this port.
+				This component exposes a configured port. You must ensure your
+				network allows access to this port.
 				""",
 		]
 		notices: []

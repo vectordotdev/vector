@@ -18,8 +18,6 @@ components: transforms: regex_parser: {
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -70,9 +68,7 @@ components: transforms: regex_parser: {
 			description: "The Regular Expressions to apply. Do not include the leading or trailing `/` in any of the expressions."
 			required:    true
 			warnings: []
-			type: "[string]": {
-				examples: [["^(?P<timestamp>[\\\\w\\\\-:\\\\+]+) (?P<level>\\\\w+) (?P<message>.*)$"]]
-			}
+			type: array: items: type: string: examples: ["^(?P<timestamp>[\\\\w\\\\-:\\\\+]+) (?P<level>\\\\w+) (?P<message>.*)$"]
 		}
 		target_field: {
 			common:      false
@@ -85,6 +81,11 @@ components: transforms: regex_parser: {
 			}
 		}
 		types: components._types
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 
 	examples: log: [

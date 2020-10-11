@@ -18,8 +18,6 @@ components: transforms: lua: {
 	}
 
 	support: {
-		input_types: ["log", "metric"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -121,9 +119,9 @@ components: transforms: lua: {
 			groups: ["module"]
 			required: false
 			warnings: []
-			type: "[string]": {
+			type: array: {
 				default: null
-				examples: [["/etc/vector/lua"]]
+				items: type: string: examples: ["/etc/vector/lua"]
 			}
 		}
 		source: {
@@ -212,6 +210,18 @@ components: transforms: lua: {
 		}
 	}
 
+	input: {
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
+	}
+
 	examples: {
 		log: [
 			{
@@ -268,6 +278,7 @@ components: transforms: lua: {
 						"""#
 				}
 				input: {
+					name: "logins"
 					counter: {
 						value: 2.0
 					}
@@ -277,6 +288,7 @@ components: transforms: lua: {
 					}
 				}
 				output: {
+					name: "logins"
 					counter: {
 						value: 2.0
 					}
@@ -296,6 +308,7 @@ components: transforms: lua: {
 						"""#
 				}
 				input: {
+					name: "logins"
 					counter: {
 						value: 2.0
 					}

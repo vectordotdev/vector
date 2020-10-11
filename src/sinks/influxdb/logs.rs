@@ -207,7 +207,7 @@ impl InfluxDBLogsConfig {
 }
 
 impl Value {
-    pub fn to_field(&self) -> Field {
+    fn to_field(&self) -> Field {
         match self {
             Value::Integer(num) => Field::Int(*num),
             Value::Float(num) => Field::Float(*num),

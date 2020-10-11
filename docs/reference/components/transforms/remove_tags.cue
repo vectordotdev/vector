@@ -18,8 +18,6 @@ components: transforms: remove_tags: {
 	}
 
 	support: {
-		input_types: ["metric"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -39,9 +37,19 @@ components: transforms: remove_tags: {
 			description: "The tag names to drop."
 			required:    true
 			warnings: []
-			type: "[string]": {
-				examples: [["tag1", "tag2"]]
-			}
+			type: array: items: type: string: examples: ["tag1", "tag2"]
+		}
+	}
+
+	input: {
+		logs: false
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
 		}
 	}
 }

@@ -70,9 +70,9 @@ components: sources: journald: {
 			description: "The list of unit names to exclude from monitoring. Unit names lacking a `\".\"` will have `\".service\"` appended to make them a valid service unit name."
 			required:    false
 			warnings: []
-			type: "[string]": {
+			type: array: {
 				default: []
-				examples: [["badservice", "sysinit.target"]]
+				items: type: string: examples: ["badservice", "sysinit.target"]
 			}
 		}
 		include_units: {
@@ -80,9 +80,9 @@ components: sources: journald: {
 			description: "The list of unit names to monitor. If empty or not present, all units are accepted. Unit names lacking a `\".\"` will have `\".service\"` appended to make them a valid service unit name."
 			required:    false
 			warnings: []
-			type: "[string]": {
+			type: array: {
 				default: []
-				examples: [["ntpd", "sysinit.target"]]
+				items: type: string: examples: ["ntpd", "sysinit.target"]
 			}
 		}
 		journalctl_path: {

@@ -18,8 +18,6 @@ components: transforms: split: {
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -56,9 +54,7 @@ components: transforms: split: {
 			description: "The field names assigned to the resulting tokens, in order."
 			required:    true
 			warnings: []
-			type: "[string]": {
-				examples: [["timestamp", "level", "message", "parent.child"]]
-			}
+			type: array: items: type: string: examples: ["timestamp", "level", "message", "parent.child"]
 		}
 		separator: {
 			common:      true
@@ -71,6 +67,11 @@ components: transforms: split: {
 			}
 		}
 		types: components._types
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 
 	examples: log: [
