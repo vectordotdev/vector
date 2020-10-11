@@ -201,6 +201,8 @@ _values: {
 // * `stream` - one event at a time
 #EgressMethod: "batch" | "stream"
 
+#EncodingCodec: "json" | "ndjson" | "text"
+
 // `enum` restricts the value to a set of values.
 //
 //                enum: {
@@ -263,16 +265,16 @@ _values: {
 
 	if Args.kind == "sink" {
 		// `encoding` describes how the component encodes data.
-		encoding: close({
-			enabled: true
+		encoding: {
+			codec: {
+				enabled: bool
 
-			if enabled {
-				default: null
-				json:    null
-				ndjson:  null
-				text:    null
+				if enabled {
+					default: #EncodingCodec | null
+					enum:    [#EncodingCodec, ...] | null
+				}
 			}
-		})
+		}
 	}
 
 	if Args.kind == "sink" {

@@ -22,6 +22,7 @@ components: sinks: sematext_metrics: {
 		}
 		buffer: enabled:      true
 		compression: enabled: false
+		encoding: codec: enabled: false
 		healthcheck: enabled: true
 		request: enabled:     false
 		tls: enabled:         false

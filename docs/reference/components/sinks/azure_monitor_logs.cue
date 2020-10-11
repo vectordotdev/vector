@@ -22,13 +22,7 @@ components: sinks: azure_monitor_logs: {
 		}
 		buffer: enabled:      true
 		compression: enabled: false
-		encoding: {
-			enabled: true
-			default: null
-			json:    null
-			ndjson:  null
-			text:    null
-		}
+		encoding: codec: enabled: false
 		healthcheck: enabled: true
 		request: enabled:     false
 		tls: {
