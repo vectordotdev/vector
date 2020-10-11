@@ -15,11 +15,10 @@ components: sinks: console: {
 	features: {
 		buffer: enabled:      false
 		compression: enabled: false
-		encoding: {
+		encoding: codec: {
 			enabled: true
 			default: null
-			json:    null
-			text:    null
+			enum: ["json", "text"]
 		}
 		healthcheck: enabled: true
 		request: enabled:     false
