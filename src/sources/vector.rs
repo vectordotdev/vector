@@ -1,6 +1,6 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     event::proto,
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     shutdown::ShutdownSignal,
@@ -37,8 +37,10 @@ impl VectorConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<VectorConfig>("vector")
+    SourceDescription::new::<VectorConfig>("vector")
 }
+
+impl GenerateConfig for VectorConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "vector")]
