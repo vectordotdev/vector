@@ -1,17 +1,17 @@
 package metadata
 
 components: transforms: split: {
-	title: "Split"
+	title:             "Split"
 	short_description: "Accepts log events and allows you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
-	long_description: "Accepts log events and allows you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
+	long_description:  "Accepts log events and allows you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
 
 	classes: {
 		commonly_used: false
-		function: "parse"
+		egress_method: "stream"
+		function:      "parse"
 	}
 
-	features: {
-	}
+	features: {}
 
 	statuses: {
 		development: "stable"
@@ -21,76 +21,68 @@ components: transforms: split: {
 		input_types: ["log"]
 
 		platforms: {
-			"aarch64-unknown-linux-gnu": true
+			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin": true
-			"x86_64-pc-windows-msv": true
-			"x86_64-unknown-linux-gnu": true
-			"x86_64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {
 		drop_field: {
-			common: true
+			common:      true
 			description: "If `true` the `field` will be dropped after parsing."
-			required: false
+			required:    false
 			warnings: []
 			type: bool: default: true
 		}
 		field: {
-			common: true
+			common:      true
 			description: "The field to apply the split on."
-			required: false
+			required:    false
 			warnings: []
 			type: string: {
 				default: "message"
-				examples: ["message","parent.child"]
+				examples: ["message", "parent.child"]
 			}
 		}
 		field_names: {
 			description: "The field names assigned to the resulting tokens, in order."
-			required: true
+			required:    true
 			warnings: []
 			type: "[string]": {
-				examples: [["timestamp","level","message","parent.child"]]
+				examples: [["timestamp", "level", "message", "parent.child"]]
 			}
 		}
 		separator: {
-			common: true
+			common:      true
 			description: "The separator to split the field on. If no separator is given, it will split on all whitespace. 'Whitespace' is defined according to the terms of the [Unicode Derived Core Property `White_Space`][urls.unicode_whitespace]."
-			required: false
+			required:    false
 			warnings: []
 			type: string: {
 				default: "[whitespace]"
 				examples: [","]
 			}
 		}
-		types: {
-			common: true
-			description: "Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types."
-			required: false
-			warnings: []
-			type: object: {
-				examples: [{"status":"int"},{"duration":"float"},{"success":"bool"},{"timestamp":"timestamp|%F"},{"timestamp":"timestamp|%a %b %e %T %Y"},{"parent":{"child":"int"}}]
-				options: {}
-			}
-		}
+		types: components._types
 	}
 
 	examples: log: [
 		{
 			title: "Split log message"
 			configuration: {
-				field: "message"
+				field:     "message"
 				separator: ","
 				field_names: ["remote_addr", "user_id", "timestamp", "message", "status", "bytes"]
 				types: {
 					status: "int"
-					bytes: "int"
+					bytes:  "int"
 				}
 			}
 			input: {
@@ -98,12 +90,12 @@ components: transforms: split: {
 			}
 			output: {
 				remote_addr: "5.86.210.12"
-				user_id: "zieme4647"
-				timestamp: "19/06/2019:17:20:49 -0400"
-				message: "GET /embrace/supply-chains/dynamic/vertical"
-				status: 201
-				bytes: 20574
+				user_id:     "zieme4647"
+				timestamp:   "19/06/2019:17:20:49 -0400"
+				message:     "GET /embrace/supply-chains/dynamic/vertical"
+				status:      201
+				bytes:       20574
 			}
-		}
+		},
 	]
 }
