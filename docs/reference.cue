@@ -393,7 +393,7 @@ _values: {
 	buckets: [float, ...]
 	counts: [int, ...]
 	count: int
-	sum: float
+	sum:   float
 }
 
 #MetricEventSet: {
@@ -404,7 +404,7 @@ _values: {
 	quantiles: [float, ...]
 	values: [float, ...]
 	count: int
-	sum: float
+	sum:   float
 }
 
 #MetricOutput: [Name=string]: close({

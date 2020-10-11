@@ -16,13 +16,13 @@ components: sinks: influxdb_metrics: {
 		batch: {
 			enabled:      true
 			common:       false
-			max_bytes: null
+			max_bytes:    null
 			max_events:   20
 			timeout_secs: 1
 		}
 		buffer: enabled:      false
 		compression: enabled: false
-		encoding: codec: enabled:    false
+		encoding: codec: enabled: false
 		healthcheck: enabled: true
 		request: {
 			enabled:                    true
@@ -179,8 +179,8 @@ components: sinks: influxdb_metrics: {
 			output: "ns.total,metric_type=counter,host=\(_host) value=\(_value) 1542182950000000011"
 		},
 		{
-			_host:  _values.local_host
-			title:  "Distribution"
+			_host: _values.local_host
+			title: "Distribution"
 			configuration: {}
 			input: {
 				distribution: {
@@ -210,15 +210,15 @@ components: sinks: influxdb_metrics: {
 			output: "ns.meter,metric_type=gauge,host=\(_host) value=\(_value) 1542182950000000011"
 		},
 		{
-			_host:  _values.local_host
-			title:  "Histogram"
+			_host: _values.local_host
+			title: "Histogram"
 			configuration: {}
 			input: {
 				histogram: {
 					buckets: [1.0, 2.1, 3.0]
 					counts: [2, 5, 10]
 					count: 17
-					sum: 46.2
+					sum:   46.2
 				}
 				tags: {
 					host: _host
@@ -242,15 +242,15 @@ components: sinks: influxdb_metrics: {
 			output: "ns.users,metric_type=set,host=\(_host) value=3 154218295000000001"
 		},
 		{
-			_host:  _values.local_host
-			title:  "Summary"
+			_host: _values.local_host
+			title: "Summary"
 			configuration: {}
 			input: {
 				summary: {
 					quantiles: [0.01, 0.5, 0.99]
 					values: [1.5, 2.0, 3.0]
 					count: 6
-					sum: 12.1
+					sum:   12.1
 				}
 				tags: {
 					host: _host
