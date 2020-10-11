@@ -167,23 +167,23 @@ components: sinks: influxdb_logs: {
 	how_it_works: {
 		mapping: {
 			title: "Mapping Log Fields"
-			body:	#"""
-					InfluxDB uses [line protocol][urls.influxdb_line_protocol] to write data points. It is a text-based format that provides the measurement, tag set, field set, and timestamp of a data point.
+			body: #"""
+				InfluxDB uses [line protocol][urls.influxdb_line_protocol] to write data points. It is a text-based format that provides the measurement, tag set, field set, and timestamp of a data point.
 
-					A `Log Event` event contains an arbitrary set of fields (key/value pairs) that describe the event.
+				A `Log Event` event contains an arbitrary set of fields (key/value pairs) that describe the event.
 
-					The following matrix outlines how Log Event fields are mapped into InfluxDB Line Protocol:
+				The following matrix outlines how Log Event fields are mapped into InfluxDB Line Protocol:
 
-					| Field         | Line Protocol     |                                                                                                                                                 |
-					|---------------|-------------------|
-					| host          | tag               |
-					| message       | field             |
-					| source_type   | tag               |
-					| timestamp     | timestamp         |
-					| [custom-key]  | field             |
+				| Field         | Line Protocol     |                                                                                                                                                 |
+				|---------------|-------------------|
+				| host          | tag               |
+				| message       | field             |
+				| source_type   | tag               |
+				| timestamp     | timestamp         |
+				| [custom-key]  | field             |
 
-					The default behavior can be overridden by a `tags` configuration.
-					"""#
+				The default behavior can be overridden by a `tags` configuration.
+				"""#
 		}
 	}
 }
