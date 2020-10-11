@@ -6,6 +6,7 @@ on:
       - master
     paths:
       - ".github/workflows/master.yml"
+      - ".cargo/**"
       - "benches/**"
       - "lib/**"
       - "proto/**"
