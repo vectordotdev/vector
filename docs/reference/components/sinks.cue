@@ -10,7 +10,7 @@ components: sinks: [Name=string]: {
 
 				if enabled {
 					default: #EncodingCodec | null
-					enum: [#EncodingCodec, ...] | null
+					enum:    [#EncodingCodec, ...] | null
 				}
 			}
 		}
@@ -19,20 +19,20 @@ components: sinks: [Name=string]: {
 	configuration: {
 		encoding: {
 			description: "Configures the encoding specific sink behavior."
-			required: true
+			required:    true
 			type: object: options: {
 				if features.encoding.codec.enabled {
 					codec: {
 						description: "The encoding codec used to serialize the events before outputting."
-						required: true
+						required:    true
 						type: string: examples: features.encoding.codec.enum
 					}
 				}
 
 				except_fields: {
-					common: false
+					common:      false
 					description: "Prevent the sink from encoding the specified labels."
-					required: false
+					required:    false
 					type: array: {
 						default: null
 						items: type: string: examples: ["message", "parent.child"]
@@ -40,9 +40,9 @@ components: sinks: [Name=string]: {
 				}
 
 				only_fields: {
-					common: false
+					common:      false
 					description: "Prevent the sink from encoding the specified labels."
-					required: false
+					required:    false
 					type: array: {
 						default: null
 						items: type: string: examples: ["message", "parent.child"]
@@ -50,14 +50,14 @@ components: sinks: [Name=string]: {
 				}
 
 				timestamp_format: {
-					common: false
+					common:      false
 					description: "How to format event timestamps."
-					required: false
+					required:    false
 					type: string: {
 						default: "rfc3339"
 						enum: {
 							rfc3339: "Formats as a RFC3339 string"
-							unix: "Formats as a unix timestamp"
+							unix:    "Formats as a unix timestamp"
 						}
 					}
 				}

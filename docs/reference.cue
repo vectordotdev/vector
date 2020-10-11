@@ -271,7 +271,7 @@ _values: {
 
 				if enabled {
 					default: #EncodingCodec | null
-					enum: [#EncodingCodec, ...] | null
+					enum:    [#EncodingCodec, ...] | null
 				}
 			}
 		}
