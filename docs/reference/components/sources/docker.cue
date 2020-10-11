@@ -85,9 +85,9 @@ components: sources: docker: {
 				all containers will be included.
 				"""
 			required: false
-			type: "[string]": {
-				examples: [["serene_", "serene_leakey", "ad08cc418cf9"]]
+			type: array: {
 				default: null
+				items: type: string: examples: ["serene_", "serene_leakey", "ad08cc418cf9"]
 			}
 		}
 		include_labels: {
@@ -98,9 +98,9 @@ components: sources: docker: {
 				described label's synatx in [docker object labels docs][urls.docker_object_labels].
 				"""
 			required: false
-			type: "[string]": {
-				examples: [["com.example.vendor=Timber Inc.", "com.example.name=Vector"]]
+			type: array: {
 				default: null
+				items: type: string: examples: ["com.example.vendor=Timber Inc.", "com.example.name=Vector"]
 			}
 		}
 		include_images: {
@@ -110,9 +110,9 @@ components: sources: docker: {
 				images will be included.
 				"""
 			required: false
-			type: "[string]": {
-				examples: [["httpd", "redis"]]
+			type: array: {
 				default: null
+				items: type: string: examples: ["httpd", "redis"]
 			}
 		}
 		retry_backoff_secs: {

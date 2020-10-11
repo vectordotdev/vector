@@ -119,9 +119,9 @@ components: transforms: lua: {
 			groups: ["module"]
 			required: false
 			warnings: []
-			type: "[string]": {
+			type: array: {
 				default: null
-				examples: [["/etc/vector/lua"]]
+				items: type: string: examples: ["/etc/vector/lua"]
 			}
 		}
 		source: {

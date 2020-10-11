@@ -65,9 +65,9 @@ components: transforms: reduce: {
 			description: "An ordered list of fields by which to group events. Each group is combined independently, allowing you to keep independent events separate. When no fields are specified, all events will be combined in a single group. Events missing a specified field will be combined in their own group."
 			required:    false
 			warnings: []
-			type: "[string]": {
+			type: array: {
 				default: []
-				examples: [["request_id"], ["user_id", "transaction_id"]]
+				items: type: string: examples: ["request_id", "user_id", "transaction_id"]
 			}
 		}
 		merge_strategies: {
