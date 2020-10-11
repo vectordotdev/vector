@@ -86,6 +86,14 @@ components: sinks: influxdb_logs: {
 				examples: ["vector-database", "iot-store"]
 			}
 		}
+		endpoint: {
+			description: "The endpoint to send logs to."
+			groups: ["v1", "v2"]
+			required: true
+			type: string: {
+				examples: ["http://localhost:8086/", "https://us-west-2-1.aws.cloud1.influxdata.com", "https://us-west-2-1.aws.cloud2.influxdata.com"]
+			}
+		}
 		namespace: {
 			description: "A prefix that will be added to all metric names."
 			groups: ["v1", "v2"]
