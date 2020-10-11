@@ -107,6 +107,18 @@ components: sources: [Name=string]: {
 			type: "gauge"
 		}
 
+		_passthrough_set: {
+			description: data_model.schema.metric.type.object.options.set.description
+			tags: {
+				"*": {
+					description: "Any tags present on the metric."
+					examples: [_values.local_host]
+					required: false
+				}
+			}
+			type: "gauge"
+		}
+
 		_passthrough_summary: {
 			description: data_model.schema.metric.type.object.options.summary.description
 			tags: {
