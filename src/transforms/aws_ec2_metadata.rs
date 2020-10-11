@@ -108,8 +108,10 @@ struct Keys {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<Ec2Metadata>("aws_ec2_metadata")
+    TransformDescription::new::<Ec2Metadata>("aws_ec2_metadata")
 }
+
+impl_generate_config_from_default!(Ec2Metadata);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_ec2_metadata")]
@@ -138,7 +140,7 @@ impl TransformConfig for Ec2Metadata {
         let refresh_interval = self
             .refresh_interval_secs
             .map(Duration::from_secs)
-            .unwrap_or(Duration::from_secs(10));
+            .unwrap_or_else(|| Duration::from_secs(10));
         let fields = self
             .fields
             .clone()
@@ -499,6 +501,11 @@ mod integration_tests {
 
     lazy_static::lazy_static! {
         static ref HOST: String = "http://localhost:8111".to_string();
+    }
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<Ec2Metadata>();
     }
 
     #[tokio::test]
