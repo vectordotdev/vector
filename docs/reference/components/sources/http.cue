@@ -7,7 +7,7 @@ components: sources: http: {
 
 	classes: {
 		commonly_used: false
-		deployment_roles: ["service", "sidecar"]
+		deployment_roles: ["aggregator", "sidecar"]
 		egress_method: "batch"
 		function:      "receive"
 	}

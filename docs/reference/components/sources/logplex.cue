@@ -7,7 +7,7 @@ components: sources: logplex: {
 
 	classes: {
 		commonly_used: false
-		deployment_roles: ["service"]
+		deployment_roles: ["aggregator"]
 		egress_method: "batch"
 		function:      "receive"
 	}

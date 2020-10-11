@@ -7,7 +7,7 @@ components: sources: socket: {
 
 	classes: {
 		commonly_used: true
-		deployment_roles: ["service", "sidecar"]
+		deployment_roles: ["aggregator", "sidecar"]
 		egress_method: "stream"
 		function:      "receive"
 	}

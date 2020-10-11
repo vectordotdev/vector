@@ -7,7 +7,7 @@ components: sources: splunk_hec: {
 
 	classes: {
 		commonly_used: false
-		deployment_roles: ["service"]
+		deployment_roles: ["aggregator"]
 		egress_method: "batch"
 		function:      "receive"
 	}
