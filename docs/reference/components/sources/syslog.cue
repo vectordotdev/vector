@@ -88,7 +88,7 @@ components: sources: syslog: {
 		}
 	}
 
-	examples: log: [
+	examples: [
 		{
 			_app_name:     "non"
 			_event_id:     "1011"
@@ -106,7 +106,7 @@ components: sources: syslog: {
 				<13>1 \(_timestamp) \(_hostname) \(_app_name) \(_procid) \(_msgid) [exampleSDID@32473 iut="\(_iut)" eventSource="\(_event_source)" eventID="\(_event_id)"] \(_message)
 				```
 				"""
-			output: {
+			output: log: {
 				severity:    "notice"
 				facility:    "user"
 				timestamp:   _timestamp

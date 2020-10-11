@@ -222,105 +222,101 @@ components: transforms: lua: {
 		}
 	}
 
-	examples: {
-		log: [
-			{
-				title: "Add, rename, & remove fields"
-				configuration: {
-					hooks: process: #"""
-						function (event, emit)
-						  -- Add root level field
-						  event.log.field = "new value"
+	examples: [
+		{
+			title: "Add, rename, & remove fields"
+			configuration: {
+				hooks: process: #"""
+					function (event, emit)
+					  -- Add root level field
+					  event.log.field = "new value"
 
-						  -- Add nested field
-						  event.log.nested.field = "nested value"
+					  -- Add nested field
+					  event.log.nested.field = "nested value"
 
-						  -- Rename field
-						  event.log.renamed_field = event.log.field_to_rename
-						  event.log.field_to_rename = nil
+					  -- Rename field
+					  event.log.renamed_field = event.log.field_to_rename
+					  event.log.field_to_rename = nil
 
-						  -- Remove fields
-						  event.log.field_to_remove = nil
+					  -- Remove fields
+					  event.log.field_to_remove = nil
 
-						  emit(event)
-						end
-						"""#
-				}
-				input: {
-					field_to_rename: "old value"
-					field_to_remove: "remove me"
-				}
-				output: {
-					field: "new value"
-					nested: field: "nested value"
-					renamed_field: "old value"
-				}
-			},
-		]
-		metric: [
-			{
-				title: "Add, rename, remove metric tags"
-				configuration: {
-					hooks: process: #"""
-						function (event, emit)
-						  -- Add tag
-						  event.metric.tags.tag = "new value"
+					  emit(event)
+					end
+					"""#
+			}
+			input: log: {
+				field_to_rename: "old value"
+				field_to_remove: "remove me"
+			}
+			output: log: {
+				field: "new value"
+				nested: field: "nested value"
+				renamed_field: "old value"
+			}
+		},
+		{
+			title: "Add, rename, remove metric tags"
+			configuration: {
+				hooks: process: #"""
+					function (event, emit)
+					  -- Add tag
+					  event.metric.tags.tag = "new value"
 
-						  -- Rename tag
-						  event.metric.tags.renamed_tag = event.log.tag_to_rename
-						  event.metric.tags.tag_to_rename = nil
+					  -- Rename tag
+					  event.metric.tags.renamed_tag = event.log.tag_to_rename
+					  event.metric.tags.tag_to_rename = nil
 
-						  -- Remove tag
-						  event.metric.tags.tag_to_remove = nil
+					  -- Remove tag
+					  event.metric.tags.tag_to_remove = nil
 
-						  emit(event)
-						end
-						"""#
+					  emit(event)
+					end
+					"""#
+			}
+			input: metric: {
+				name: "logins"
+				counter: {
+					value: 2.0
 				}
-				input: {
-					name: "logins"
-					counter: {
-						value: 2.0
-					}
-					tags: {
-						tag_to_rename: "old value"
-						tag_to_remove: "remove me"
-					}
+				tags: {
+					tag_to_rename: "old value"
+					tag_to_remove: "remove me"
 				}
-				output: {
-					name: "logins"
-					counter: {
-						value: 2.0
-					}
-					tags: {
-						tag:         "new value"
-						renamed_tag: "old value"
-					}
+			}
+			output: metric: {
+				name: "logins"
+				counter: {
+					value: 2.0
 				}
-			},
-			{
-				title: "Drop metric event"
-				configuration: {
-					hooks: process: #"""
-						function (event, emit)
-						  -- Drop event entirely by not calling the `emit` function
-						end
-						"""#
+				tags: {
+					tag:         "new value"
+					renamed_tag: "old value"
 				}
-				input: {
-					name: "logins"
-					counter: {
-						value: 2.0
-					}
-					tags: {
-						tag_to_rename: "old value"
-						tag_to_remove: "remove me"
-					}
+			}
+		},
+		{
+			title: "Drop metric event"
+			configuration: {
+				hooks: process: #"""
+					function (event, emit)
+					  -- Drop event entirely by not calling the `emit` function
+					end
+					"""#
+			}
+			input: metric: {
+				name: "logins"
+				counter: {
+					value: 2.0
 				}
-				output: null
-			},
-		]
-	}
+				tags: {
+					tag_to_rename: "old value"
+					tag_to_remove: "remove me"
+				}
+			}
+			output: null
+		},
+	]
 
 	how_it_works: {
 		defining_timestamps: {
