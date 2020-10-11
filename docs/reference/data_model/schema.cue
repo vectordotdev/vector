@@ -144,10 +144,7 @@ data_model: schema: {
 								description: "The buckets contained within this histogram."
 								required:    true
 								warnings: []
-								type: array: items: type: uint: {
-									examples: [1, 2, 5, 10, 25]
-									unit: null
-								}
+								type: array: items: type: float: examples: [1.0, 2.0, 5.0, 10.0, 25.0]
 							}
 							count: {
 								description: "The total number of values contained within the histogram."
