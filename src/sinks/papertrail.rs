@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSink,
@@ -23,8 +23,10 @@ pub struct PapertrailConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<PapertrailConfig>("papertrail")
+    SinkDescription::new::<PapertrailConfig>("papertrail")
 }
+
+impl GenerateConfig for PapertrailConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "papertrail")]

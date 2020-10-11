@@ -7,19 +7,17 @@ components: transforms: merge: {
 
 	classes: {
 		commonly_used: false
+		egress_method: "stream"
 		function:      "aggregate"
 	}
 
-	features: {
-	}
+	features: {}
 
 	statuses: {
 		development: "beta"
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -46,9 +44,9 @@ components: transforms: merge: {
 				"""
 			required: false
 			warnings: []
-			type: "[string]": {
+			type: array: {
 				default: ["message"]
-				examples: [["message"], ["message", "parent.child"]]
+				items: type: string: examples: ["message", "parent.child"]
 			}
 		}
 		partial_event_marker_field: {
@@ -73,11 +71,16 @@ components: transforms: merge: {
 				"""
 			required: false
 			warnings: []
-			type: "[string]": {
+			type: array: {
 				default: []
-				examples: [["host"], ["host", "parent.child"]]
+				items: type: string: examples: ["host", "parent.child"]
 			}
 		}
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 
 	examples: log: [

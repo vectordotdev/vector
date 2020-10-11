@@ -1,5 +1,5 @@
 use crate::{
-    config::{Config, ConfigDiff},
+    config::{Config, ConfigDiff, GenerateConfig},
     topology::{self, RunningTopology},
     trace, Event,
 };
@@ -48,6 +48,28 @@ macro_rules! assert_downcast_matches {
             got => panic!("Assertion failed: got wrong error variant {:?}", got),
         }
     }};
+}
+
+#[macro_export]
+macro_rules! log_event {
+    ($($key:expr => $value:expr),*  $(,)?) => {
+        {
+            let mut event = Event::Log(LogEvent::default());
+            let log = event.as_mut_log();
+            $(
+                log.insert($key, $value);
+            )*
+            event
+        }
+    };
+}
+
+pub fn test_generate_config<T>()
+where
+    for<'de> T: GenerateConfig + serde::Deserialize<'de>,
+{
+    let cfg = T::generate_config().to_string();
+    toml::from_str::<T>(&cfg).expect("Invalid config generated");
 }
 
 pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {

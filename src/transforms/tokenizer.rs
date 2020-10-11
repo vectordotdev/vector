@@ -24,6 +24,8 @@ inventory::submit! {
     TransformDescription::new::<TokenizerConfig>("tokenizer")
 }
 
+impl_generate_config_from_default!(TokenizerConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "tokenizer")]
 impl TransformConfig for TokenizerConfig {
@@ -128,6 +130,11 @@ mod tests {
         Event,
     };
     use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<TokenizerConfig>();
+    }
 
     async fn parse_log(
         text: &str,
