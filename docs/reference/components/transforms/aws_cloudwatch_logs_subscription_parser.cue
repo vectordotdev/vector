@@ -83,8 +83,7 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 			subscription_filters: {
 				description: "The list of subscription filter names that the logs were sent by."
 				required:    true
-				type: "[string]": {examples: [["Destination"]]
-				}
+				type: array: items: type: string: examples: ["Destination"]
 			}
 		}
 	}

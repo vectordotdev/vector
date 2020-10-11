@@ -54,9 +54,7 @@ components: transforms: split: {
 			description: "The field names assigned to the resulting tokens, in order."
 			required:    true
 			warnings: []
-			type: "[string]": {
-				examples: [["timestamp", "level", "message", "parent.child"]]
-			}
+			type: array: items: type: string: examples: ["timestamp", "level", "message", "parent.child"]
 		}
 		separator: {
 			common:      true
