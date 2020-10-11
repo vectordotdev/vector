@@ -18,6 +18,7 @@ env:
 
 jobs:
   cancel-previous:
+    # Add a test comment
     name: Cancel redundant jobs
     runs-on: ubuntu-20.04
     timeout-minutes: 3
