@@ -31,6 +31,7 @@ components: transforms: remove_fields: {
 
     requirements: []
     warnings: []
+    notices: []
   }
 
   configuration: {
