@@ -33,8 +33,6 @@ components: sinks: sematext_metrics: {
 	}
 
 	support: {
-		input_types: ["metric"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -45,7 +43,14 @@ components: sinks: sematext_metrics: {
 		}
 
 		requirements: []
-		warnings: []
+		warnings: [
+			#"""
+				[Sematext monitoring][urls.sematext_monitoring] only accepts metrics which contain a single value.
+				Therefore, only `counter` and `gauge` metrics are supported. If you'd like to ingest other
+				metric types please consider using the [`metric_to_log` transform][docs.transforms.metric_to_log]
+				with the `sematext_logs` sink.
+				"""#,
+		]
 		notices: []
 	}
 
@@ -81,19 +86,23 @@ components: sinks: sematext_metrics: {
 			}
 		}
 	}
+
+	input: {
+		logs: false
+		metrics: {
+			counter:      true
+			distribution: false
+			gauge:        true
+			histogram:    false
+			set:          false
+			summary:      false
+		}
+	}
+
 	how_it_works: {
 		metric_types: {
-			title: "Metric Types"
+			title: "Metric Namespaces"
 			body: #"""
-				[Sematext monitoring](https://sematext.com/docs/monitoring/) accepts metrics which contain a single value.
-				These are the Counter and Gauge Vector metric types.
-
-				<Alert type="info">
-				Other metric types are not supported. The following metric types will not be sent to Sematext:
-
-				`aggregated_histogram`, `aggregated_summary`, `distribution`, `set`
-				</Alert>
-
 				All metrics are sent with a namespace. If no namespace is included with the metric, the metric name becomes
 				the namespace and the metric is named `value`.
 				"""#

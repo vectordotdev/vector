@@ -91,7 +91,14 @@ _values: {
 
 	configuration: #Schema
 
-	if kind == "source" || kind == "transform" {
+	if Kind == "transform" || Kind == "sink" {
+		input: {
+			logs:    bool
+			metrics: false | #MetricInput
+		}
+	}
+
+	if Kind == "source" || Kind == "transform" {
 		// `output` documents output of the component. This is very important
 		// as it communicate which events and fields are emitted.
 		output: {
@@ -112,11 +119,11 @@ _values: {
 					}
 				}
 
-				if kind == "source" {
+				if Kind == "source" {
 					input: string
 				}
 
-				if kind != "source" {
+				if Kind != "source" {
 					input: #LogEvent | [#LogEvent, ...]
 				}
 
@@ -341,6 +348,15 @@ _values: {
 	fields:      #Schema
 })
 
+#MetricInput: {
+	counter:      bool
+	distribution: bool
+	gauge:        bool
+	histogram:    bool
+	summary:      bool
+	set:          bool
+}
+
 #MetricEvent: {
 	tags: [Name=string]: string
 	close({counter: #MetricEventCounter}) |
@@ -443,11 +459,6 @@ _values: {
 
 #Support: {
 	_args: kind: string
-	let Args = _args
-
-	if Args.kind == "transform" || Args.kind == "sink" {
-		input_types: [#EventType, ...]
-	}
 
 	// `platforms` describes which platforms this component is available on.
 	//

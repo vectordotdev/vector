@@ -18,8 +18,6 @@ components: transforms: split: {
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -71,6 +69,11 @@ components: transforms: split: {
 			}
 		}
 		types: components._types
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 
 	examples: log: [

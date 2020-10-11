@@ -18,8 +18,6 @@ components: transforms: remove_fields: {
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -50,5 +48,10 @@ components: transforms: remove_fields: {
 				examples: [["field1", "field2", "parent.child"]]
 			}
 		}
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 }

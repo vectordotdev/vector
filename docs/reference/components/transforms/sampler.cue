@@ -18,8 +18,6 @@ components: transforms: sampler: {
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -64,5 +62,10 @@ components: transforms: sampler: {
 				unit: null
 			}
 		}
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 }
