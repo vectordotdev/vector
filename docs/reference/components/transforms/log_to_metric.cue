@@ -8,6 +8,7 @@ components: transforms: log_to_metric: {
 	classes: {
 		commonly_used: true
 		function:      "convert"
+		egress_method: "stream"
 	}
 
 	features: {
@@ -29,6 +30,7 @@ components: transforms: log_to_metric: {
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {
@@ -105,5 +107,10 @@ components: transforms: log_to_metric: {
 				}
 			}
 		}
+	}
+
+	input: {
+		logs:    true
+		metrics: true
 	}
 }
