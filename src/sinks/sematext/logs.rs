@@ -1,9 +1,11 @@
+use super::Region;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::elasticsearch::{ElasticSearchConfig, Encoding},
     sinks::util::{
         encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
     },
+    sinks::{Healthcheck, VectorSink},
     Event,
 };
 use futures01::{Future, Sink};
@@ -37,20 +39,10 @@ inventory::submit! {
 
 impl GenerateConfig for SematextLogsConfig {}
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Region {
-    Us,
-    Eu,
-}
-
 #[async_trait::async_trait]
 #[typetag::serde(name = "sematext_logs")]
 impl SinkConfig for SematextLogsConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = match (&self.endpoint, &self.region) {
             (Some(host), None) => host.clone(),
             (None, Some(Region::Us)) => "https://logsene-receiver.sematext.com".to_owned(),
@@ -76,7 +68,7 @@ impl SinkConfig for SematextLogsConfig {
 
         let sink = Box::new(sink.into_futures01sink().with(map_timestamp));
 
-        Ok((super::VectorSink::Futures01Sink(sink), healthcheck))
+        Ok((VectorSink::Futures01Sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

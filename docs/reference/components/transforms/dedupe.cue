@@ -19,8 +19,6 @@ components: transforms: dedupe: {
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -67,9 +65,9 @@ components: transforms: dedupe: {
 						description: "The field names to ignore when deciding if an Event is a duplicate. Incompatible with the `fields.match` option."
 						required:    false
 						warnings: []
-						type: "[string]": {
+						type: array: {
 							default: null
-							examples: [["field1", "parent.child_field"]]
+							items: type: string: examples: ["field1", "parent.child_field"]
 						}
 					}
 					match: {
@@ -77,14 +75,19 @@ components: transforms: dedupe: {
 						description: "The field names considered when deciding if an Event is a duplicate. This can also be globally set via the [global `log_schema` options][docs.reference.global-options#log_schema]. Incompatible with the `fields.ignore` option."
 						required:    false
 						warnings: []
-						type: "[string]": {
+						type: array: {
 							default: ["timestamp", "host", "message"]
-							examples: [["field1", "parent.child_field"], ["host", "message"]]
+							items: type: string: examples: ["field1", "parent.child_field", "host", "message"]
 						}
 					}
 				}
 			}
 		}
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 
 	how_it_works: {

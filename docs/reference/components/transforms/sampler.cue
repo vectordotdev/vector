@@ -18,8 +18,6 @@ components: transforms: sampler: {
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -50,9 +48,9 @@ components: transforms: sampler: {
 			description: "A list of regular expression patterns to exclude events from sampling. If an event's key field (see `key_field`) matches _any_ of these patterns it will _not_ be sampled."
 			required:    false
 			warnings: []
-			type: "[string]": {
+			type: array: {
 				default: null
-				examples: [["[error]", "field2"]]
+				items: type: string: examples: ["[error]", "field2"]
 			}
 		}
 		rate: {
@@ -64,5 +62,10 @@ components: transforms: sampler: {
 				unit: null
 			}
 		}
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 }

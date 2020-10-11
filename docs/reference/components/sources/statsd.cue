@@ -7,7 +7,7 @@ components: sources: statsd: {
 
 	classes: {
 		commonly_used: false
-		deployment_roles: ["service"]
+		deployment_roles: ["aggregator"]
 		egress_method: "stream"
 		function:      "receive"
 	}

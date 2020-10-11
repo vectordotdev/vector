@@ -91,7 +91,14 @@ _values: {
 
 	configuration: #Schema
 
-	if kind == "source" || kind == "transform" {
+	if Kind == "transform" || Kind == "sink" {
+		input: {
+			logs:    bool
+			metrics: false | #MetricInput
+		}
+	}
+
+	if Kind == "source" || Kind == "transform" {
 		// `output` documents output of the component. This is very important
 		// as it communicate which events and fields are emitted.
 		output: {
@@ -112,11 +119,11 @@ _values: {
 					}
 				}
 
-				if kind == "source" {
+				if Kind == "source" {
 					input: string
 				}
 
-				if kind != "source" {
+				if Kind != "source" {
 					input: #LogEvent | [#LogEvent, ...]
 				}
 
@@ -178,7 +185,7 @@ _values: {
 //   on the host.
 // * `service` - Vector receives data from one or more upstream
 //   sources, typically over a network protocol.
-#DeploymentRole: "daemon" | "service" | "sidecar"
+#DeploymentRole: "aggregator" | "daemon" | "sidecar"
 
 // `#DevelopmentStatus` documents the development status of the component.
 //
@@ -193,6 +200,8 @@ _values: {
 // * `batch` - one or more events at a time
 // * `stream` - one event at a time
 #EgressMethod: "batch" | "stream"
+
+#EncodingCodec: "json" | "ndjson" | "text"
 
 // `enum` restricts the value to a set of values.
 //
@@ -256,16 +265,16 @@ _values: {
 
 	if Args.kind == "sink" {
 		// `encoding` describes how the component encodes data.
-		encoding: close({
-			enabled: true
+		encoding: {
+			codec: {
+				enabled: bool
 
-			if enabled {
-				default: null
-				json:    null
-				ndjson:  null
-				text:    null
+				if enabled {
+					default: #EncodingCodec | null
+					enum:    [#EncodingCodec, ...] | null
+				}
 			}
-		})
+		}
 	}
 
 	if Args.kind == "sink" {
@@ -340,6 +349,15 @@ _values: {
 	name:        Name
 	fields:      #Schema
 })
+
+#MetricInput: {
+	counter:      bool
+	distribution: bool
+	gauge:        bool
+	histogram:    bool
+	summary:      bool
+	set:          bool
+}
 
 #MetricEvent: {
 	tags: [Name=string]: string
@@ -443,11 +461,6 @@ _values: {
 
 #Support: {
 	_args: kind: string
-	let Args = _args
-
-	if Args.kind == "transform" || Args.kind == "sink" {
-		input_types: [#EventType, ...]
-	}
 
 	// `platforms` describes which platforms this component is available on.
 	//
@@ -480,7 +493,25 @@ _values: {
 #Timestamp: =~"^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.\\d{6}Z"
 
 #Type: {
-	_args: required: bool
+	_args: {
+		arrays:   true
+		required: bool
+	}
+	let Args = _args
+
+	// `*` represents a wildcard type.
+	//
+	// For example, the `sinks.http.headers.*` option allows for arbitrary
+	// key/value pairs.
+	close({"array": #TypeArray & {_args: required: Args.required}}) |
+	#TypePrimitive
+}
+
+#TypePrimitive: {
+	_args: {
+		arrays:   true
+		required: bool
+	}
 	let Args = _args
 
 	// `*` represents a wildcard type.
@@ -488,9 +519,6 @@ _values: {
 	// For example, the `sinks.http.headers.*` option allows for arbitrary
 	// key/value pairs.
 	close({"*": close({})}) |
-	close({"[float]": #TypeArrayOfFloats & {_args: required: Args.required}}) |
-	close({"[string]": #TypeArrayOfStrings & {_args: required: Args.required}}) |
-	close({"[uint]": #TypeArrayOfUints & {_args: required: Args.required}}) |
 	close({"bool": #TypeBool & {_args: required: Args.required}}) |
 	close({"float": #TypeFloat & {_args: required: Args.required}}) |
 	close({"object": #TypeObject & {_args: required: Args.required}}) |
@@ -499,65 +527,18 @@ _values: {
 	close({"uint": #TypeUint & {_args: required: Args.required}})
 }
 
-#TypeArrayOfFloats: {
+#TypeArray: {
 	_args: required: bool
 	let Args = _args
 
 	if !Args.required {
 		// `default` sets the default value.
-		default: [...float] | null
+		default: [...] | null
 	}
 
-	// `examples` clarify values through examples. This should be used
-	// when examples cannot be derived from the `default` or `enum`
-	// options.
-	examples: [...[...float]]
-}
-
-#TypeArrayOfUints: {
-	_args: required: bool
-	let Args = _args
-
-	if !Args.required {
-		// `default` sets the default value.
-		default: [...uint] | null
-	}
-
-	// `examples` clarify values through examples. This should be used
-	// when examples cannot be derived from the `default` or `enum`
-	// options.
-	examples: [...[...uint]]
-}
-
-#TypeArrayOfStrings: {
-	_args: required: bool
-	let Args = _args
-
-	if !Args.required {
-		// `default` sets the default value.
-		default: [...string] | null
-	}
-
-	// `enum` restricts the value to a set of values.
-	//
-	//      enum: {
-	//       json: "Encodes the data via application/json"
-	//       text: "Encodes the data via text/plain"
-	//      }
-	enum?: #Enum
-
-	// `examples` clarify values through examples. This should be used
-	// when examples cannot be derived from the `default` or `enum`
-	// options.
-	examples: [...[...string]] | *[[
-			for k, v in enum {
-			k
-		},
-	]]
-
-	// `templateable` means that the option supports dynamic templated
-	// values.
-	templateable?: bool
+	// Set `required` to `true` to force disable defaults. Defaults should
+	// be specified on the array level and not the type level.
+	items: type: #TypePrimitive & {_args: required: true}
 }
 
 #TypeBool: {
