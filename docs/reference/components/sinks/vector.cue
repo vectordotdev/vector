@@ -48,8 +48,15 @@ components: sinks: vector: {
 	}
 
 	input: {
-		logs:    true
-		metrics: true
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			summary:      true
+			set:          true
+		}
 	}
 
 	configuration: {
