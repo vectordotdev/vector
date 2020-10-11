@@ -38,6 +38,7 @@ scopes:
   - deps # Anything related to Vector's dependencies
   - dev # Anything related to Vector's development environment
   - enriching # Anything related to enriching Vector's events with context data
+  - exceptions # Anything related to Vector's exception events.
   - extensions # Anything related to extending Vector (WASM, plugins, etc.)
   - external docs # Anything related to Vector's external, public documentation
   - filtering # Anything related to filtering within Vector
