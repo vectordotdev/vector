@@ -117,6 +117,16 @@ components: sinks: influxdb_metrics: {
 				examples: ["${INFLUXDB_PASSWORD}", "influxdb4ever"]
 			}
 		}
+		quantiles: {
+			common:      false
+			description: "Quantiles to use for aggregating [distribution][docs.data-model.metric#distribution] metrics into a summary."
+			required:    false
+			warnings: []
+			type: array: {
+				default: [0.5, 0.75, 0.9, 0.95, 0.99]
+				items: type: float: examples: [0.5, 0.75, 0.9, 0.95, 0.99]
+			}
+		}
 		retention_policy_name: {
 			common:      true
 			description: "Sets the target retention policy for the write into InfluxDB 1."
