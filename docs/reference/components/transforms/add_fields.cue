@@ -5,16 +5,13 @@ components: transforms: add_fields: {
 	short_description: "Accepts log events and allows you to add one or more log fields."
 	long_description:  "Accepts log events and allows you to add one or more log fields."
 
-	_features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
-
 	classes: {
 		commonly_used: false
+		egress_method: "stream"
 		function:      "schema"
 	}
+
+	features: {}
 
 	statuses: {
 		development: "stable"
@@ -78,7 +75,7 @@ components: transforms: add_fields: {
 	how_it_works: {
 		conflicts: {
 			title: "Conflicts"
-			body: ""
+			body:  ""
 			sub_sections: [
 				{
 					title: "Key Conflicts"

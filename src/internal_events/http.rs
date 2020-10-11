@@ -17,14 +17,8 @@ impl InternalEvent for HTTPEventsReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", self.events_count as u64,
-            "component_kind" => "source",
-            "component_type" => "http",
-        );
-        counter!("bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "http",
-        );
+        counter!("events_processed", self.events_count as u64);
+        counter!("bytes_processed", self.byte_size as u64);
     }
 }
 
@@ -45,10 +39,6 @@ impl<'a> InternalEvent for HTTPBadRequest<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "http_bad_requests", 1,
-            "component_kind" => "source",
-            "component_type" => "http",
-        );
+        counter!("http_bad_requests", 1);
     }
 }

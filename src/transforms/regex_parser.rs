@@ -39,6 +39,8 @@ inventory::submit! {
     TransformDescription::new::<RegexParserConfig>("regex_parser")
 }
 
+impl_generate_config_from_default!(RegexParserConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
@@ -138,8 +140,8 @@ impl RegexParser {
     pub fn build(config: &RegexParserConfig) -> crate::Result<Box<dyn Transform>> {
         let field = config
             .field
-            .as_ref()
-            .unwrap_or(&crate::config::log_schema().message_key());
+            .clone()
+            .unwrap_or_else(|| Atom::from(crate::config::log_schema().message_key()));
 
         let patterns = match (&config.regex, &config.patterns.len()) {
             (None, 0) => {
@@ -192,7 +194,7 @@ impl RegexParser {
         Ok(Box::new(RegexParser::new(
             regexset,
             patterns,
-            field.clone(),
+            field,
             config.drop_field,
             config.drop_failed,
             config.target_field.clone(),
@@ -305,6 +307,11 @@ mod tests {
         config::{TransformConfig, TransformContext},
         Event,
     };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<RegexParserConfig>();
+    }
 
     async fn do_transform(event: &str, patterns: &str, config: &str) -> Option<LogEvent> {
         let event = Event::from(event);

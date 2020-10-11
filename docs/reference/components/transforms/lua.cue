@@ -7,6 +7,7 @@ components: transforms: lua: {
 
 	classes: {
 		commonly_used: true
+		egress_method: "stream"
 		function:      "program"
 	}
 
@@ -176,6 +177,27 @@ components: transforms: lua: {
 			groups: ["inline", "module"]
 			required: false
 			warnings: []
+			type: object: {
+				options: {
+					handler: {
+						description: "Defines a handler function which is executed periodially at `interval_seconds`. It can produce new events using `emit` function."
+						required:    true
+						warnings: []
+						type: string: {
+							examples: ["timer_handler"]
+						}
+					}
+					interval_seconds: {
+						description: "Defines the interval at which the timer handler would be executed."
+						required:    true
+						warnings: []
+						type: uint: {
+							examples: [1, 10, 30]
+							unit: "seconds"
+						}
+					}
+				}
+			}
 		}
 		version: {
 			description: "Transform API version. Specifying this version ensures that Vector does not break backward compatibility."
@@ -247,7 +269,7 @@ components: transforms: lua: {
 				}
 				input: {
 					counter: {
-						value: 2
+						value: 2.0
 					}
 					tags: {
 						tag_to_rename: "old value"
@@ -256,7 +278,7 @@ components: transforms: lua: {
 				}
 				output: {
 					counter: {
-						value: 2
+						value: 2.0
 					}
 					tags: {
 						tag:         "new value"
@@ -275,7 +297,7 @@ components: transforms: lua: {
 				}
 				input: {
 					counter: {
-						value: 2
+						value: 2.0
 					}
 					tags: {
 						tag_to_rename: "old value"

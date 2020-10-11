@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     sinks::util::{
         http::{BatchedHttpSink, HttpClient, HttpSink},
@@ -11,6 +11,7 @@ use futures01::Sink;
 use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use string_cache::DefaultAtom as Atom;
 
 lazy_static::lazy_static! {
     static ref HOST: UriSerde = Uri::from_static("https://api.honeycomb.io/1/batch").into();
@@ -32,8 +33,10 @@ pub struct HoneycombConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<HoneycombConfig>("honeycomb")
+    SinkDescription::new::<HoneycombConfig>("honeycomb")
 }
+
+impl GenerateConfig for HoneycombConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "honeycomb")]
@@ -85,7 +88,8 @@ impl HttpSink for HoneycombConfig {
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let mut log = event.into_log();
 
-        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(log_schema().timestamp_key())
+        let timestamp = if let Some(Value::Timestamp(ts)) =
+            log.remove(&Atom::from(log_schema().timestamp_key()))
         {
             ts
         } else {

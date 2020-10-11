@@ -8,7 +8,8 @@ components: sources: apache_metrics: {
 	classes: {
 		commonly_used: false
 		deployment_roles: ["daemon", "sidecar"]
-		function: "collect"
+		egress_method: "batch"
+		function:      "collect"
 	}
 
 	features: {
@@ -78,7 +79,7 @@ components: sources: apache_metrics: {
 		_host: {
 			description: "The hostname of the Apache HTTP server"
 			required:    true
-			examples: ["localhost"]
+			examples: [_values.local_host]
 		}
 		apache_access_total: {
 			description:   "The total number of time the Apache server has been accessed."

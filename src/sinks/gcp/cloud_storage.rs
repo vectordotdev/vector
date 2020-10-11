@@ -1,6 +1,6 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     serde::to_string,
     sinks::{
@@ -31,6 +31,7 @@ use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::task::Poll;
+use string_cache::DefaultAtom as Atom;
 use tower::{Service, ServiceBuilder};
 use uuid::Uuid;
 
@@ -144,8 +145,10 @@ impl Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<GcsSinkConfig>(NAME)
+    SinkDescription::new::<GcsSinkConfig>(NAME)
 }
+
+impl GenerateConfig for GcsSinkConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
@@ -414,7 +417,7 @@ fn encode_event(
             .expect("Failed to encode event as json, this is a bug!"),
         Encoding::Text => {
             let mut bytes = log
-                .get(&crate::config::log_schema().message_key())
+                .get(&Atom::from(crate::config::log_schema().message_key()))
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             bytes.push(b'\n');
