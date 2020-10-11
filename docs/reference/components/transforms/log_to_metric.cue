@@ -51,7 +51,7 @@ components: transforms: log_to_metric: {
 					}
 					increment_by_value: {
 						description: """
-                If `true` the metric will be incremented by the `field` value. 
+                If `true` the metric will be incremented by the `field` value.
                 If `false` the metric will be incremented by 1 regardless of the `field` value.
                 """
 						required: false
@@ -86,7 +86,7 @@ components: transforms: log_to_metric: {
 							options: {
 								"*": {
 									description: """
-                      Key/value pairs representing [metric tags][docs.data-model.metric#tags]. 
+                      Key/value pairs representing [metric tags][docs.data-model.metric#tags].
                       Environment variables and field interpolation is allowed.
                       """
 									required: true
@@ -119,11 +119,6 @@ components: transforms: log_to_metric: {
 		logs:    true
 		metrics: false
 	}
-
-	// TODO: Something simmilar to this should be added
-	// output: {
-	//   metrics: #MetricOutput
-	//  }
 
 	how_it_works: {
 		multiple_metrics: {
