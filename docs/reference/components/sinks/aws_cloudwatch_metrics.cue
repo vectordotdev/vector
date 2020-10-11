@@ -16,7 +16,7 @@ components: sinks: aws_cloudwatch_metrics: {
 		batch: {
 			enabled:      true
 			common:       false
-			max_bytes: null
+			max_bytes:    null
 			max_events:   20
 			timeout_secs: 1
 		}
@@ -26,7 +26,7 @@ components: sinks: aws_cloudwatch_metrics: {
 			default: null
 			gzip:    true
 		}
-		encoding: codec: enabled:    false
+		encoding: codec: enabled: false
 		healthcheck: enabled: true
 		request: enabled:     false
 		tls: enabled:         false
@@ -50,15 +50,26 @@ components: sinks: aws_cloudwatch_metrics: {
 		requirements: []
 		warnings: [
 			#"""
-			Gauge values are persisted between flushes. On Vector start up each
-			gauge is assumed to have zero, 0.0, value, that can be updated
-			explicitly by the consequent absolute, not delta, gauge observation,
-			or by delta increments/decrements. Delta gauges are considered an
-			advanced feature useful in a distributed setting, however they
-			should be used with care.
-			"""#
+				Gauge values are persisted between flushes. On Vector start up each
+				gauge is assumed to have zero, 0.0, value, that can be updated
+				explicitly by the consequent absolute, not delta, gauge observation,
+				or by delta increments/decrements. Delta gauges are considered an
+				advanced feature useful in a distributed setting, however they
+				should be used with care.
+				"""#,
 		]
-		notices: []
+		notices: [
+			#"""
+				CloudWatch Metrics types are organized not by their semantics, but
+				by storage properties:
+
+				* Statistic Sets
+				* Data Points
+
+				In Vector only the latter is used to allow lossless statistics
+				calculations on CloudWatch side.
+				"""#,
+		]
 	}
 
 	configuration: {
