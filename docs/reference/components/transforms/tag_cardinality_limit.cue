@@ -18,8 +18,6 @@ components: transforms: tag_cardinality_limit: {
 	}
 
 	support: {
-		input_types: ["metric"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -78,6 +76,18 @@ components: transforms: tag_cardinality_limit: {
 				default: 500
 				unit:    null
 			}
+		}
+	}
+
+	input: {
+		logs: false
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
 		}
 	}
 
