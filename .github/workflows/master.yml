@@ -2,7 +2,23 @@ name: Master Test Suite
 
 on:
   push:
-    branches: master
+    branches: 
+      - master
+    paths:
+      - ".github/workflows/master.yml"
+      - "benches/**"
+      - "lib/**"
+      - "proto/**"
+      - "scripts/**"
+      - "skaffold/**"
+      - "src/**"
+      - "tests/**"
+      - "build.rs"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "docker-compose.yml"
+      - "Makefile"
+      - "rust-toolchain"
 
 env:
   AUTOINSTALL: true
