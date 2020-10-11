@@ -9,9 +9,13 @@ use crate::{
     wasm::WasmModule,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{hash_map::DefaultHasher, HashMap};
 use std::path::PathBuf;
-use std::{env, mem};
+use std::{
+    env,
+    hash::{Hash, Hasher},
+    mem,
+};
 use vector_wasm::{Role, WasmModuleConfig};
 
 pub mod defaults {
@@ -20,8 +24,6 @@ pub mod defaults {
         HEAP_MEMORY_SIZE
     }
 }
-
-pub(super) const TEMPORARY_DIRECTORY: &str = "validate_tmp_wasm_artifact_cache";
 
 /// Transform specific information needed to construct a [`WasmModuleConfig`].
 // Note: We have a separate type here for crate boundary purposes.
@@ -70,7 +72,13 @@ impl TransformConfig for WasmConfig {
 
             // Change artifact_cache path to tmp directory
             let mut tmp = env::temp_dir();
-            tmp.push(TEMPORARY_DIRECTORY);
+            // We create a tmp directory whose name depends on artifact_cache path.
+            // This is to simulate group access dependency between multiple (vector,OS group)
+            // pairs. Without this, false dependecy between the pairs would be created because
+            // of which validate command could falsly fail.
+            let mut hasher = DefaultHasher::new();
+            config.artifact_cache.hash(&mut hasher);
+            tmp.push(format!("vector_validate_{}", hasher.finish()));
             let cache_dir = mem::replace(&mut config.artifact_cache, tmp);
 
             // Manually check that we have adequate access.
