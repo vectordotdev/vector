@@ -7,8 +7,11 @@ components: transforms: swimlanes: {
 
 	classes: {
 		commonly_used: false
+		egress_method: "stream"
 		function:      "route"
 	}
+
+	features: {}
 
 	statuses: {
 		development: "beta"
@@ -28,6 +31,7 @@ components: transforms: swimlanes: {
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {
@@ -39,23 +43,23 @@ components: transforms: swimlanes: {
 		}
 	}
 
-  examples: log: [
-    {
-      title: "Split by log level"
-      configuration: {
-        lanes: {
-          debug: "level.eq": "debug"
-          info: "level.eq": "info"
-          warn: "level.eq": "warn"
-          error: "level.eq": "error"
-        }
-      }
-      input: {
-        level: "info"
-      }
-      output: {
-        level: "info"
-      }
-    }
-  ]
+	examples: log: [
+		{
+			title: "Split by log level"
+			configuration: {
+				lanes: {
+					debug: "level.eq": "debug"
+					info: "level.eq":  "info"
+					warn: "level.eq":  "warn"
+					error: "level.eq": "error"
+				}
+			}
+			input: {
+				level: "info"
+			}
+			output: {
+				level: "info"
+			}
+		},
+	]
 }
