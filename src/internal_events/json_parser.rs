@@ -12,10 +12,7 @@ impl InternalEvent for JsonParserEventProcessed {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "json_parser",
-        );
+        counter!("events_processed", 1);
     }
 }
 
@@ -39,8 +36,6 @@ impl<'a> InternalEvent for JsonParserFailedParse<'a> {
 
     fn emit_metrics(&self) {
         counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "json_parser",
             "error_type" => "failed_parse",
         );
     }
@@ -62,8 +57,6 @@ impl<'a> InternalEvent for JsonParserTargetExists<'a> {
 
     fn emit_metrics(&self) {
         counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "json_parser",
             "error_type" => "target_field_exists",
         );
     }
