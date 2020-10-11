@@ -41,7 +41,7 @@ export CURRENT_DIR = $(shell pwd)
 # Override this to automatically enter a container containing the correct, full, official build environment for Vector, ready for development
 export ENVIRONMENT ?= false
 # The upstream container we publish artifacts to on a successful master build.
-export ENVIRONMENT_UPSTREAM ?= docker.pkg.github.com/timberio/vector/environment
+export ENVIRONMENT_UPSTREAM ?= timberio/ci_image
 # Override to disable building the container, having it pull from the Github packages repo instead
 # TODO: Disable this by default. Blocked by `docker pull` from Github Packages requiring authenticated login
 export ENVIRONMENT_AUTOBUILD ?= true
@@ -184,12 +184,12 @@ build-aarch64-unknown-linux-gnu: target/aarch64-unknown-linux-gnu/release/vector
 	@echo "Output to ${<}"
 
 .PHONY: build-x86_64-unknown-linux-musl
-build-x86_64-unknown-linux-musl: ## Build static binary in release mode for the x86_64 architecture
-	$(RUN) build-x86_64-unknown-linux-musl
+build-x86_64-unknown-linux-musl: target/x86_64-unknown-linux-musl/release/vector ## Build a release binary for the aarch64-unknown-linux-gnu triple.
+	@echo "Output to ${<}"
 
 .PHONY: build-aarch64-unknown-linux-musl
-build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in release mode for the aarch64 architecture
-	$(RUN) build-aarch64-unknown-linux-musl
+build-aarch64-unknown-linux-musl: target/aarch64-unknown-linux-musl/release/vector ## Build a release binary for the aarch64-unknown-linux-gnu triple.
+	@echo "Output to ${<}"
 
 ##@ Cross Compiling
 .PHONY: cross-enable
@@ -208,6 +208,7 @@ cross-%: export TRIPLE ?=$(subst ${SPACE},-,$(wordlist 2,99,${PAIR}))
 cross-%: export PROFILE ?= release
 cross-%: export RUSTFLAGS += -C link-arg=-s
 cross-%: cargo-install-cross
+	$(MAKE) -k cross-image-${TRIPLE}
 	cross ${COMMAND} \
 		$(if $(findstring release,$(PROFILE)),--release,) \
 		--target ${TRIPLE} \
@@ -219,6 +220,7 @@ target/%/vector: export TRIPLE ?=$(word 1,${PAIR})
 target/%/vector: export PROFILE ?=$(word 2,${PAIR})
 target/%/vector: export RUSTFLAGS += -C link-arg=-s
 target/%/vector: cargo-install-cross CARGO_HANDLES_FRESHNESS
+	$(MAKE) -k cross-image-${TRIPLE}
 	cross build \
 		$(if $(findstring release,$(PROFILE)),--release,) \
 		--target ${TRIPLE} \
@@ -249,6 +251,14 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 		--directory target/scratch/ \
 		./vector-${TRIPLE}
 	rm -rf target/scratch/
+
+.PHONY: cross-image-%
+cross-image-%: export TRIPLE =$($(strip @):cross-image-%=%)
+cross-image-%:
+	$(CONTAINER_TOOL) build \
+		--tag vector-cross-env:${TRIPLE} \
+		--file scripts/cross/${TRIPLE}.dockerfile \
+		scripts/cross
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
@@ -792,8 +802,8 @@ check-internal-events: ## Check that internal events satisfy patterns set in htt
 ##@ Packaging
 
 # archives
-.PHONY: package
 target/artifacts/vector-%.tar.gz: export TRIPLE :=$(@:target/artifacts/vector-%.tar.gz=%)
+target/artifacts/vector-%.tar.gz: override PROFILE =release
 target/artifacts/vector-%.tar.gz: target/%/release/vector.tar.gz
 	@echo "Built to ${<}, relocating to ${@}"
 	@mkdir -p target/artifacts/
@@ -812,19 +822,19 @@ package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-d
 package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
 
 .PHONY: package-x86_64-unknown-linux-gnu
-package-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build an archive of the x86_64-unknown-linux-gnu triple.
+package-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-gnu` triple.
 	@echo "Output to ${<}."
 
 .PHONY: package-x86_64-unknown-linux-musl
-package-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## Build the x86_64 musl archive
-	$(RUN) package-x86_64-unknown-linux-musl
+package-x86_64-unknown-linux-musl: target/artifacts/vector-x86_64-unknown-linux-musl.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-musl` triple.
+	@echo "Output to ${<}."
 
 .PHONY: package-aarch64-unknown-linux-musl
-package-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## Build an archive of the aarch64-unknown-linux-gnu triple.
-	$(RUN) package-aarch64-unknown-linux-musl
+package-aarch64-unknown-linux-musl: target/artifacts/vector-aarch64-unknown-linux-musl.tar.gz ## Build an archive suitable for the `aarch64-unknown-linux-musl` triple.
+	@echo "Output to ${<}."
 
 .PHONY: package-aarch64-unknown-linux-gnu
-package-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build the aarch64 archive
+package-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `aarch64-unknown-linux-gnu` triple.
 	@echo "Output to ${<}."
 
 # debs
