@@ -165,10 +165,12 @@ components: sinks: influxdb_metrics: {
 	examples: metric: [
 		{
 			_host:  _values.local_host
+			_name:  "logins"
 			_value: 1.5
 			title:  "Counter"
 			configuration: {}
 			input: {
+				name: _name
 				counter: {
 					value: _value
 				}
@@ -176,13 +178,15 @@ components: sinks: influxdb_metrics: {
 					host: _host
 				}
 			}
-			output: "ns.total,metric_type=counter,host=\(_host) value=\(_value) 1542182950000000011"
+			output: "ns.\(_name),metric_type=counter,host=\(_host) value=\(_value) 1542182950000000011"
 		},
 		{
 			_host: _values.local_host
+			_name: "sparse_stats"
 			title: "Distribution"
 			configuration: {}
 			input: {
+				name: _name
 				distribution: {
 					values: [1.0, 5.0, 3.0]
 					sample_rates: [1.5, 2.0, 3.0]
@@ -192,14 +196,16 @@ components: sinks: influxdb_metrics: {
 					host: _host
 				}
 			}
-			output: "ns.sparse_stats,metric_type=distribution,host=\(_host) avg=3,count=3,max=5,median=3,min=1,quantile_0.95=4,sum=9 1542182950000000011"
+			output: "ns.\(_name),metric_type=distribution,host=\(_host) avg=3,count=3,max=5,median=3,min=1,quantile_0.95=4,sum=9 1542182950000000011"
 		},
 		{
 			_host:  _values.local_host
+			_name:  "memory_rss"
 			_value: 1.5
 			title:  "Gauge"
 			configuration: {}
 			input: {
+				name: _name
 				gauge: {
 					value: _value
 				}
@@ -207,13 +213,15 @@ components: sinks: influxdb_metrics: {
 					host: _host
 				}
 			}
-			output: "ns.meter,metric_type=gauge,host=\(_host) value=\(_value) 1542182950000000011"
+			output: "ns.\(_name),metric_type=gauge,host=\(_host) value=\(_value) 1542182950000000011"
 		},
 		{
 			_host: _values.local_host
+			_name: "requests"
 			title: "Histogram"
 			configuration: {}
 			input: {
+				name: _name
 				histogram: {
 					buckets: [1.0, 2.1, 3.0]
 					counts: [2, 5, 10]
@@ -224,14 +232,16 @@ components: sinks: influxdb_metrics: {
 					host: _host
 				}
 			}
-			output: "ns.requests,metric_type=histogram,host=\(_host) bucket_1=2i,bucket_2.1=5i,bucket_3=10i,count=17i,sum=46.2 1542182950000000011"
+			output: "ns.\(_name),metric_type=histogram,host=\(_host) bucket_1=2i,bucket_2.1=5i,bucket_3=10i,count=17i,sum=46.2 1542182950000000011"
 		},
 		{
 			_host:  _values.local_host
+			_name:  "users"
 			_value: 1.5
 			title:  "Set"
 			configuration: {}
 			input: {
+				name: _name
 				set: {
 					values: ["first", "another", "last"]
 				}
@@ -239,13 +249,15 @@ components: sinks: influxdb_metrics: {
 					host: _host
 				}
 			}
-			output: "ns.users,metric_type=set,host=\(_host) value=3 154218295000000001"
+			output: "ns.\(_name),metric_type=set,host=\(_host) value=3 154218295000000001"
 		},
 		{
 			_host: _values.local_host
+			_name: "requests"
 			title: "Summary"
 			configuration: {}
 			input: {
+				name: _name
 				summary: {
 					quantiles: [0.01, 0.5, 0.99]
 					values: [1.5, 2.0, 3.0]
@@ -256,7 +268,7 @@ components: sinks: influxdb_metrics: {
 					host: _host
 				}
 			}
-			output: "ns.requests,metric_type=summary,host=\(_host) count=6i,quantile_0.01=1.5,quantile_0.5=2,quantile_0.99=3,sum=12.1 1542182950000000011"
+			output: "ns.\(_name),metric_type=summary,host=\(_host) count=6i,quantile_0.01=1.5,quantile_0.5=2,quantile_0.99=3,sum=12.1 1542182950000000011"
 		},
 	]
 }

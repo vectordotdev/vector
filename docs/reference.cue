@@ -205,7 +205,7 @@ _values: {
 //
 // * `batch` - one or more events at a time
 // * `stream` - one event at a time
-#EgressMethod: "batch" | "stream"
+#EgressMethod: "aggregate" | "batch" | "stream"
 
 #EncodingCodec: "json" | "ndjson" | "text"
 
@@ -366,6 +366,7 @@ _values: {
 }
 
 #MetricEvent: {
+	name: string
 	tags: [Name=string]: string
 	close({counter: #MetricEventCounter}) |
 	close({distribution: #MetricEventDistribution}) |
