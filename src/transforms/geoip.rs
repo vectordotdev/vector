@@ -1,14 +1,11 @@
 use super::Transform;
-
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
 };
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
-
 use std::str::FromStr;
-use tracing::field;
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -30,12 +27,15 @@ fn default_geoip_target_field() -> String {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<GeoipConfig>("geoip")
+    TransformDescription::new::<GeoipConfig>("geoip")
 }
 
+impl GenerateConfig for GeoipConfig {}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "geoip")]
 impl TransformConfig for GeoipConfig {
-    fn build(&self, _cx: TransformContext) -> Result<Box<dyn Transform>, crate::Error> {
+    async fn build(&self, _cx: TransformContext) -> Result<Box<dyn Transform>, crate::Error> {
         let reader = maxminddb::Reader::open_readfile(self.database.clone())?;
         Ok(Box::new(Geoip::new(
             reader,
@@ -157,7 +157,7 @@ impl Transform for Geoip {
             } else {
                 debug!(
                     message = "IP Address not parsed correctly.",
-                    ipaddr = &field::display(&ipaddress),
+                    ipaddr = %ipaddress,
                 );
             }
         } else {

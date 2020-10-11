@@ -13,9 +13,11 @@ pub mod metric;
 pub mod util;
 
 mod log_event;
+mod lookup;
 mod value;
 
 pub use log_event::LogEvent;
+pub use lookup::Lookup;
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use std::convert::{TryFrom, TryInto};
 pub(crate) use util::log::PathComponent;
@@ -386,7 +388,7 @@ impl From<Bytes> for Event {
             .insert(log_schema().message_key(), message);
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key(), Utc::now());
+            .insert(Atom::from(log_schema().timestamp_key()), Utc::now());
 
         event
     }
@@ -432,7 +434,7 @@ mod test {
             "message": "raw log line",
             "foo": "bar",
             "bar": "baz",
-            "timestamp": event.as_log().get(&log_schema().timestamp_key()),
+            "timestamp": event.as_log().get(&Atom::from(log_schema().timestamp_key())),
         });
 
         let actual_all = serde_json::to_value(event.as_log().all_fields()).unwrap();

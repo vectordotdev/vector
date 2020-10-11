@@ -36,10 +36,16 @@ inventory::submit! {
     TransformDescription::new::<GrokParserConfig>("grok_parser")
 }
 
+impl_generate_config_from_default!(GrokParserConfig);
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "grok_parser")]
 impl TransformConfig for GrokParserConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        let field = self.field.as_ref().unwrap_or(&log_schema().message_key());
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+        let field = self
+            .field
+            .clone()
+            .unwrap_or_else(|| Atom::from(log_schema().message_key()));
 
         let mut grok = grok::Grok::with_patterns();
 
@@ -133,8 +139,14 @@ mod tests {
     };
     use pretty_assertions::assert_eq;
     use serde_json::json;
+    use string_cache::DefaultAtom as Atom;
 
-    fn parse_log(
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<GrokParserConfig>();
+    }
+
+    async fn parse_log(
         event: &str,
         pattern: &str,
         field: Option<&str>,
@@ -149,19 +161,20 @@ mod tests {
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
         .build(TransformContext::new_test())
+        .await
         .unwrap();
         parser.transform(event).unwrap().into_log()
     }
 
-    #[test]
-    fn grok_parser_adds_parsed_fields_to_event() {
+    #[tokio::test]
+    async fn grok_parser_adds_parsed_fields_to_event() {
         let event = parse_log(
             r#"109.184.11.34 - - [12/Dec/2015:18:32:56 +0100] "GET /administrator/ HTTP/1.1" 200 4263"#,
             "%{HTTPD_COMMONLOG}",
             None,
             true,
             &[],
-        );
+        ).await;
 
         let expected = json!({
             "clientip": "109.184.11.34",
@@ -179,35 +192,36 @@ mod tests {
         assert_eq!(expected, serde_json::to_value(&event.all_fields()).unwrap());
     }
 
-    #[test]
-    fn grok_parser_does_nothing_on_no_match() {
+    #[tokio::test]
+    async fn grok_parser_does_nothing_on_no_match() {
         let event = parse_log(
             r#"Help I'm stuck in an HTTP server"#,
             "%{HTTPD_COMMONLOG}",
             None,
             true,
             &[],
-        );
+        )
+        .await;
 
         assert_eq!(2, event.keys().count());
         assert_eq!(
             event::Value::from("Help I'm stuck in an HTTP server"),
-            event[&log_schema().message_key()]
+            event[&Atom::from(log_schema().message_key())]
         );
-        assert!(!event[&log_schema().timestamp_key()]
+        assert!(!event[&Atom::from(log_schema().timestamp_key())]
             .to_string_lossy()
             .is_empty());
     }
 
-    #[test]
-    fn grok_parser_can_not_drop_parsed_field() {
+    #[tokio::test]
+    async fn grok_parser_can_not_drop_parsed_field() {
         let event = parse_log(
             r#"109.184.11.34 - - [12/Dec/2015:18:32:56 +0100] "GET /administrator/ HTTP/1.1" 200 4263"#,
             "%{HTTPD_COMMONLOG}",
             None,
             false,
             &[],
-        );
+        ).await;
 
         let expected = json!({
             "clientip": "109.184.11.34",
@@ -226,35 +240,36 @@ mod tests {
         assert_eq!(expected, serde_json::to_value(&event.all_fields()).unwrap());
     }
 
-    #[test]
-    fn grok_parser_does_nothing_on_missing_field() {
+    #[tokio::test]
+    async fn grok_parser_does_nothing_on_missing_field() {
         let event = parse_log(
             "i am the only field",
             "^(?<foo>.*)",
             Some("bar"),
             false,
             &[],
-        );
+        )
+        .await;
 
         assert_eq!(2, event.keys().count());
         assert_eq!(
             event::Value::from("i am the only field"),
-            event[&log_schema().message_key()]
+            event[&Atom::from(log_schema().message_key())]
         );
-        assert!(!event[&log_schema().timestamp_key()]
+        assert!(!event[&Atom::from(log_schema().timestamp_key())]
             .to_string_lossy()
             .is_empty());
     }
 
-    #[test]
-    fn grok_parser_coerces_types() {
+    #[tokio::test]
+    async fn grok_parser_coerces_types() {
         let event = parse_log(
             r#"109.184.11.34 - - [12/Dec/2015:18:32:56 +0100] "GET /administrator/ HTTP/1.1" 200 4263"#,
             "%{HTTPD_COMMONLOG}",
             None,
             true,
             &[("response", "int"), ("bytes", "int")],
-        );
+        ).await;
 
         let expected = json!({
             "clientip": "109.184.11.34",
@@ -272,15 +287,16 @@ mod tests {
         assert_eq!(expected, serde_json::to_value(&event.all_fields()).unwrap());
     }
 
-    #[test]
-    fn grok_parser_does_not_drop_parsed_message_field() {
+    #[tokio::test]
+    async fn grok_parser_does_not_drop_parsed_message_field() {
         let event = parse_log(
             "12/Dec/2015:18:32:56 +0100 42",
             "%{HTTPDATE:timestamp} %{NUMBER:message}",
             None,
             true,
             &[],
-        );
+        )
+        .await;
 
         let expected = json!({
             "timestamp": "12/Dec/2015:18:32:56 +0100",

@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
 };
 use serde::{Deserialize, Serialize};
@@ -13,12 +13,15 @@ struct FilterConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<FilterConfig>("filter")
+    TransformDescription::new::<FilterConfig>("filter")
 }
 
+impl GenerateConfig for FilterConfig {}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Filter::new(self.condition.build()?)))
     }
 

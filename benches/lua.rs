@@ -1,9 +1,12 @@
 use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion};
 use indexmap::IndexMap;
+use std::str::FromStr;
 use transforms::lua::v2::LuaConfig;
 use vector::{
     config::{TransformConfig, TransformContext},
+    event::Lookup,
+    test_util::runtime,
     transforms::{self, Transform},
     Event,
 };
@@ -27,11 +30,8 @@ fn add_fields(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut map = IndexMap::new();
-                    map.insert(
-                        key.to_string().into(),
-                        toml::value::Value::String(value.to_string()),
-                    );
-                    transforms::add_fields::AddFields::new(map, true)
+                    map.insert(Lookup::from_str(key).unwrap(), String::from(value).into());
+                    transforms::add_fields::AddFields::new(map, true).unwrap()
                 },
                 |mut transform| {
                     for _ in 0..num_events {
@@ -92,14 +92,18 @@ fn field_filter(c: &mut Criterion) {
     c.bench(
         "lua_field_filter",
         Benchmark::new("native", move |b| {
+            let mut rt = runtime();
             b.iter_with_setup(
                 || {
-                    transforms::field_filter::FieldFilterConfig {
-                        field: "the_field".to_string(),
-                        value: "0".to_string(),
-                    }
-                    .build(TransformContext::new_test())
-                    .unwrap()
+                    rt.block_on(async move {
+                        transforms::field_filter::FieldFilterConfig {
+                            field: "the_field".to_string(),
+                            value: "0".to_string(),
+                        }
+                        .build(TransformContext::new_test())
+                        .await
+                        .unwrap()
+                    })
                 },
                 |mut transform| {
                     let num = (0..num_events)

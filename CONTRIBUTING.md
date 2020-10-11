@@ -18,12 +18,14 @@ expanding into more specifics.
    1. [Github Pull Requests](#github-pull-requests)
       1. [Title](#title)
       1. [Reviews & Approvals](#reviews--approvals)
+      1. [Bors review process](#bors-review-process)
       1. [Merge Style](#merge-style)
    1. [CI](#ci)
       1. [Releasing](#releasing)
       1. [Testing](#testing)
          1. [Skipping tests](#skipping-tests)
          1. [Daily tests](#daily-tests)
+      1. [Flakey tests](#flakey-tests)
          1. [Test harness](#test-harness)
 1. [Development](#development)
    1. [Setup](#setup)
@@ -38,6 +40,7 @@ expanding into more specifics.
    1. [Guidelines](#guidelines)
       1. [Sink Healthchecks](#sink-healthchecks)
       1. [Metric naming convention](#metric-naming-convention)
+      1. [Option naming](#option-naming)
    1. [Testing](#testing-1)
       1. [Unit Tests](#unit-tests)
       1. [Integration Tests](#integration-tests)
@@ -70,6 +73,7 @@ expanding into more specifics.
    1. [Why a DCO instead of a CLA?](#why-a-dco-instead-of-a-cla)
    1. [If I’m contributing while an employee, do I still need my employer to sign something?](#if-i%E2%80%99m-contributing-while-an-employee-do-i-still-need-my-employer-to-sign-something)
    1. [What if I forgot to sign my commits?](#what-if-i-forgot-to-sign-my-commits)
+1. [Contact](#contact)
 
 <!-- /MarkdownTOC -->
 
@@ -105,7 +109,7 @@ To merge a new source, sink, or transform, you need to:
 
 - [ ] Add tests, especially integration tests if your contribution connects to an external service.
 - [ ] Add instrumentation so folks using your integration can get insight into how it's working and performing. You can see some [example of instrumentation in existing integrations](https://github.com/timberio/vector/tree/master/src/internal_events).
-- [ ] Add internal documentation of options and fields. You can see [examples in the `.meta` directory](https://github.com/timberio/vector/blob/master/.meta/sources/kafka.toml.erb).
+- [ ] Add documentation. You can see [examples in the `docs` directory](https://github.com/timberio/vector/blob/master/docs).
 - [ ] Update [`.github/CODEOWNERS`](https://github.com/timberio/vector/blob/master/.github/CODEOWNERS) or talk to us about identifying someone on the team to help look after the new integration.
 
 ## Change Control
@@ -184,6 +188,32 @@ All pull requests should be reviewed by:
 
 If there are any CODEOWNERs automatically assigned, you should also wait for
 their review.
+
+#### Bors review process
+
+[![Bors enabled](https://bors.tech/images/badge_small.svg)](https://app.bors.tech/repositories/28346)
+
+Once you’ve reviewed the PR, instead of clicking the green “Merge Button”, leave a comment like this on the pull request:
+
+```text
+bors r+
+```
+
+Equivalently, you can comment the following:
+
+```text
+bors merge
+```
+
+The pull request, as well as any other pull requests that are reviewed around the same time, will be merged into a branch called `staging`. CI will run there and report the result back. If that result is “OK”, `master` gets fast-forwarded to reach it.
+
+There’s also:
+
+```text
+bors try
+```
+
+When this is run, your branch and master get merged into `trying`, and bors will report the results just like the `staging` branch would. Only reviewers can push to this.
 
 The review process is outlined in the [Review guide](REVIEWING.md).
 
@@ -507,6 +537,15 @@ host_cpu_seconds_total{cpu="0",mode="system"}
 host_cpu_seconds_total{cpu="0",mode="user"}
 host_cpu_seconds_total
 ```
+
+#### Option naming
+
+When naming options for sinks, sources, and transforms it's important to keep in mind these guidelines:
+
+- Suffix options with their unit. Ex: `_seconds`, `_bytes`, etc.
+- Don't repeat the name space in the option name, ex. `fingerprinting.fingerprint_bytes`.
+- Normalize around time units where relevant and possible, for example using seconds consistently rather than seconds and milliseconds.
+- Use nouns as category names, for example `fingerprint` instead of `fingerprinting`.
 
 ### Testing
 
@@ -857,17 +896,9 @@ your feature.
 
 ### Documentation
 
-Documentation is very important to the Vector project! In order to keep things
-simple for contributors, all reference documentation is derived from metadata
-in the [`/.meta` directory](/.meta). If you add a component, change options,
-or otherwise change anything user facing, you should update the relevant files
-in the `/.meta` directory.
-
-To ensure your change is valid, you can run `make check-meta`, which validates
-your changes against the local `/.meta/.schema.json` file.
-
-The actual website and documentation are generated on the
-[`vector-website`](https://github.com/timberio/vector-website) repo.
+Documentation is very important to the Vector project! All documentation is
+located in the `/docs` folder. To ensure your change is valid, you can run
+`make check-docs`, which validates your changes to the `/docs` directory.
 
 ### Changelog
 
@@ -901,14 +932,15 @@ Please see the [`SECURITY.md` file](/SECURITY.md).
 ## Legal
 
 To protect all users of Vector, the following legal requirements are made.
+If you have additional questions, please [contact us](#contact).
 
 ### DCO
 
 Vector requires all contributors to agree to the DCO. DCO stands for Developer
 Certificate of Origin and is maintained by the
 [Linux Foundation](https://www.linuxfoundation.org). It is an attestation
-attached to every commit made by every developer. It ensures that all committed
-code adheres to the [Vector license](LICENSE.md).
+attached to every commit made by every developer. All contributions are covered
+by, and fall under, the DCO.
 
 #### Trivial changes
 
@@ -916,10 +948,8 @@ Trivial changes, such as spelling fixes, do not need to be signed.
 
 ### Granted rights and copyright assignment
 
-It is important to note that the DCO is not a license. The license of the
-project is the license under which the contribution is made. However, the DCO
-in conjunction with the Vector License may be considered an alternate
-Contributor License Agreement (CLA).
+This is covered by the DCO. Contributions are covered by the DCO and do not
+require a CLA.
 
 ## FAQ
 
@@ -940,7 +970,7 @@ your accurate statement about your rights to submit a contribution.
 
 ### What if I forgot to sign my commits?
 
-No probs! We made this simple with the [`signoff` Makefile target](Makefile):
+No problem! We made this simple with the [`signoff` Makefile target](Makefile):
 
 ```bash
 make signoff
@@ -948,7 +978,14 @@ make signoff
 
 If you prefer to do this manually:
 
-https://stackoverflow.com/questions/13043357/git-sign-off-previous-commits
+```bash
+git commit --amend --signoff
+```
+
+## Contact
+
+If you have questions about this document or the project as a whole, please
+contact us at vector@timber.io.
 
 [urls.aws_announcements]: https://aws.amazon.com/new/?whats-new-content-all.sort-by=item.additionalFields.postDateTime&whats-new-content-all.sort-order=desc&wn-featured-announcements.sort-by=item.additionalFields.numericSort&wn-featured-announcements.sort-order=asc
 [urls.create_branch]: https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-and-deleting-branches-within-your-repository

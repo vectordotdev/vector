@@ -1,7 +1,7 @@
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::util::{encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding},
     tls::TlsConfig,
 };
@@ -25,8 +25,10 @@ pub enum Mode {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<SocketSinkConfig>("socket")
+    SinkDescription::new::<SocketSinkConfig>("socket")
 }
+
+impl GenerateConfig for SocketSinkConfig {}
 
 impl SocketSinkConfig {
     pub fn make_tcp_config(
@@ -63,9 +65,13 @@ impl From<UdpSinkConfig> for SocketSinkConfig {
     }
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "socket")]
 impl SinkConfig for SocketSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         match &self.mode {
             Mode::Tcp(config) => config.build(cx),
             Mode::Udp(config) => config.build(cx),
@@ -113,7 +119,7 @@ mod test {
             }),
         };
         let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).unwrap();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let event = Event::from("raw log line");
         sink.run(stream::once(future::ready(event))).await.unwrap();
@@ -159,7 +165,7 @@ mod test {
         };
 
         let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).unwrap();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let mut receiver = CountReceiver::receive_lines(addr);
 
@@ -227,7 +233,7 @@ mod test {
             }),
         };
         let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).unwrap();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
         let mut sink = sink.into_futures01sink().sink_compat();
 
         let msg_counter = Arc::new(AtomicUsize::new(0));
@@ -250,9 +256,9 @@ mod test {
         // Only accept two connections.
         let jh = tokio::spawn(async move {
             let tls = MaybeTlsSettings::from_config(&config, true).unwrap();
-            let mut listener = tls.bind(&addr).await.unwrap();
+            let listener = tls.bind(&addr).await.unwrap();
             listener
-                .incoming()
+                .accept_stream()
                 .take(2)
                 .for_each(|connection| {
                     let mut close_rx = close_rx.take();
@@ -335,7 +341,7 @@ mod test {
         };
 
         let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).unwrap();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let (_, events) = random_lines_with_stream(1000, 10000);
         let _ = tokio::spawn(sink.run(events));

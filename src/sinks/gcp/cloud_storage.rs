@@ -1,6 +1,6 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     serde::to_string,
     sinks::{
@@ -31,8 +31,8 @@ use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::task::Poll;
+use string_cache::DefaultAtom as Atom;
 use tower::{Service, ServiceBuilder};
-use tracing::field;
 use uuid::Uuid;
 
 const NAME: &str = "gcp_cloud_storage";
@@ -145,17 +145,15 @@ impl Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<GcsSinkConfig>(NAME)
+    SinkDescription::new::<GcsSinkConfig>(NAME)
 }
+
+impl GenerateConfig for GcsSinkConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
-    fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        unimplemented!()
-    }
-
-    async fn build_async(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = GcsSink::new(self, &cx).await?;
         let healthcheck = sink.clone().healthcheck().boxed();
         let service = sink.service(self, &cx)?;
@@ -316,11 +314,7 @@ impl RequestWrapper {
             settings.extension
         );
 
-        debug!(
-            message = "sending events.",
-            bytes = &field::debug(body.len()),
-            key = &field::debug(&key)
-        );
+        debug!(message = "sending events.", bytes = ?body.len(), ?key);
 
         Self {
             body,
@@ -423,7 +417,7 @@ fn encode_event(
             .expect("Failed to encode event as json, this is a bug!"),
         Encoding::Text => {
             let mut bytes = log
-                .get(&crate::config::log_schema().message_key())
+                .get(&Atom::from(crate::config::log_schema().message_key()))
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             bytes.push(b'\n');

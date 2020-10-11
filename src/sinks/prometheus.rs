@@ -1,13 +1,19 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::metric::{Metric, MetricKind, MetricValue},
-    sinks::util::{encode_namespace, MetricEntry},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
+    sinks::util::{
+        encode_namespace,
+        statistic::{validate_quantiles, DistributionStatistic},
+        MetricEntry, StreamSink,
+    },
     Event,
 };
+use async_trait::async_trait;
 use chrono::Utc;
-use futures::{compat::Future01CompatExt, future, FutureExt, TryFutureExt};
-use futures01::{Async, AsyncSink, Future, Sink};
+use futures::{
+    compat::Future01CompatExt, future, stream::BoxStream, FutureExt, StreamExt, TryFutureExt,
+};
 use hyper::{
     header::HeaderValue,
     service::{make_service_fn, service_fn},
@@ -18,11 +24,11 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
     collections::{BTreeMap, HashSet},
+    convert::Infallible,
     net::SocketAddr,
     sync::{Arc, RwLock},
 };
 use stream_cancel::{Trigger, Tripwire};
-use tracing::field;
 
 const MIN_FLUSH_PERIOD_SECS: u64 = 1;
 
@@ -40,6 +46,8 @@ pub struct PrometheusSinkConfig {
     pub address: SocketAddr,
     #[serde(default = "default_histogram_buckets")]
     pub buckets: Vec<f64>,
+    #[serde(default = "default_summary_quantiles")]
+    pub quantiles: Vec<f64>,
     #[serde(default = "default_flush_period_secs")]
     pub flush_period_secs: u64,
 }
@@ -48,6 +56,10 @@ pub fn default_histogram_buckets() -> Vec<f64> {
     vec![
         0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
     ]
+}
+
+pub fn default_summary_quantiles() -> Vec<f64> {
+    vec![0.5, 0.75, 0.9, 0.95, 0.99]
 }
 
 pub fn default_address() -> SocketAddr {
@@ -61,22 +73,40 @@ pub fn default_flush_period_secs() -> u64 {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<PrometheusSinkConfig>("prometheus")
+    SinkDescription::new::<PrometheusSinkConfig>("prometheus")
 }
 
+impl GenerateConfig for PrometheusSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(&Self {
+            namespace: None,
+            address: default_address(),
+            buckets: default_histogram_buckets(),
+            flush_period_secs: default_flush_period_secs(),
+        })
+        .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "prometheus")]
 impl SinkConfig for PrometheusSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         if self.flush_period_secs < MIN_FLUSH_PERIOD_SECS {
             return Err(Box::new(BuildError::FlushPeriodTooShort {
                 min: MIN_FLUSH_PERIOD_SECS,
             }));
         }
 
-        let sink = Box::new(PrometheusSink::new(self.clone(), cx.acker()));
+        validate_quantiles(&self.quantiles)?;
+
+        let sink = PrometheusSink::new(self.clone(), cx.acker());
         let healthcheck = future::ok(()).boxed();
 
-        Ok((super::VectorSink::Futures01Sink(sink), healthcheck))
+        Ok((super::VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -136,7 +166,14 @@ fn encode_metric_header(namespace: Option<&str>, metric: &Metric) -> String {
     let r#type = match &metric.value {
         MetricValue::Counter { .. } => "counter",
         MetricValue::Gauge { .. } => "gauge",
-        MetricValue::Distribution { statistic: _, .. } => "histogram",
+        MetricValue::Distribution {
+            statistic: StatisticKind::Histogram,
+            ..
+        } => "histogram",
+        MetricValue::Distribution {
+            statistic: StatisticKind::Summary,
+            ..
+        } => "summary",
         MetricValue::Set { .. } => "gauge",
         MetricValue::AggregatedHistogram { .. } => "histogram",
         MetricValue::AggregatedSummary { .. } => "summary",
@@ -150,6 +187,7 @@ fn encode_metric_header(namespace: Option<&str>, metric: &Metric) -> String {
 fn encode_metric_datum(
     namespace: Option<&str>,
     buckets: &[f64],
+    quantiles: &[f64],
     expired: bool,
     metric: &Metric,
 ) -> String {
@@ -174,7 +212,7 @@ fn encode_metric_datum(
             MetricValue::Distribution {
                 values,
                 sample_rates,
-                statistic: _,
+                statistic: StatisticKind::Histogram,
             } => {
                 // convert distributions into aggregated histograms
                 let mut counts = Vec::new();
@@ -213,6 +251,33 @@ fn encode_metric_datum(
                 let tags = encode_tags(tags);
                 s.push_str(&format!("{}_sum{} {}\n", fullname, tags, sum));
                 s.push_str(&format!("{}_count{} {}\n", fullname, tags, count));
+            }
+            MetricValue::Distribution {
+                values,
+                sample_rates,
+                statistic: StatisticKind::Summary,
+            } => {
+                if let Some(statistic) = DistributionStatistic::new(values, sample_rates, quantiles)
+                {
+                    for (q, v) in statistic.quantiles.iter() {
+                        s.push_str(&format!(
+                            "{}{} {}\n",
+                            fullname,
+                            encode_tags_with_extra(tags, "quantile".to_string(), q.to_string()),
+                            v
+                        ));
+                    }
+                    let tags = encode_tags(tags);
+                    s.push_str(&format!("{}_sum{} {}\n", fullname, tags, statistic.sum));
+                    s.push_str(&format!("{}_count{} {}\n", fullname, tags, statistic.count));
+                    s.push_str(&format!("{}_min{} {}\n", fullname, tags, statistic.min));
+                    s.push_str(&format!("{}_max{} {}\n", fullname, tags, statistic.max));
+                    s.push_str(&format!("{}_avg{} {}\n", fullname, tags, statistic.avg));
+                } else {
+                    let tags = encode_tags(tags);
+                    s.push_str(&format!("{}_sum{} {}\n", fullname, tags, 0.0));
+                    s.push_str(&format!("{}_count{} {}\n", fullname, tags, 0));
+                }
             }
             MetricValue::AggregatedHistogram {
                 buckets,
@@ -266,9 +331,10 @@ fn handle(
     req: Request<Body>,
     namespace: Option<&str>,
     buckets: &[f64],
+    quantiles: &[f64],
     expired: bool,
     metrics: &IndexSet<MetricEntry>,
-) -> Box<dyn Future<Item = Response<Body>, Error = hyper::Error> + Send> {
+) -> Response<Body> {
     let mut response = Response::new(Body::empty());
 
     match (req.method(), req.uri().path()) {
@@ -280,7 +346,7 @@ fn handle(
 
             for metric in metrics {
                 let name = &metric.0.name;
-                let frame = encode_metric_datum(namespace, &buckets, expired, &metric.0);
+                let frame = encode_metric_datum(namespace, &buckets, quantiles, expired, &metric.0);
 
                 if !processed_headers.contains(&name) {
                     let header = encode_metric_header(namespace, &metric.0);
@@ -305,9 +371,10 @@ fn handle(
 
     info!(
         message = "Request complete",
-        response_code = field::debug(response.status())
+        response_code = ?response.status()
     );
-    Box::new(futures01::future::ok(response))
+
+    response
 }
 
 impl PrometheusSink {
@@ -329,6 +396,7 @@ impl PrometheusSink {
         let metrics = Arc::clone(&self.metrics);
         let namespace = self.config.namespace.clone();
         let buckets = self.config.buckets.clone();
+        let quantiles = self.config.quantiles.clone();
         let last_flush_timestamp = Arc::clone(&self.last_flush_timestamp);
         let flush_period_secs = self.config.flush_period_secs;
 
@@ -336,22 +404,34 @@ impl PrometheusSink {
             let metrics = Arc::clone(&metrics);
             let namespace = namespace.clone();
             let buckets = buckets.clone();
+            let quantiles = quantiles.clone();
             let last_flush_timestamp = Arc::clone(&last_flush_timestamp);
             let flush_period_secs = flush_period_secs;
 
             async move {
-                Ok::<_, crate::Error>(service_fn(move |req| {
+                Ok::<_, Infallible>(service_fn(move |req| {
                     let metrics = metrics.read().unwrap();
                     let last_flush_timestamp = last_flush_timestamp.read().unwrap();
                     let interval = (Utc::now().timestamp() - *last_flush_timestamp) as u64;
                     let expired = interval > flush_period_secs;
-                    info_span!(
+
+                    let response = info_span!(
                         "prometheus_server",
-                        method = field::debug(req.method()),
-                        path = field::debug(req.uri().path()),
+                        method = ?req.method(),
+                        path = ?req.uri().path(),
                     )
-                    .in_scope(|| handle(req, namespace.as_deref(), &buckets, expired, &metrics))
-                    .compat()
+                    .in_scope(|| {
+                        handle(
+                            req,
+                            namespace.as_deref(),
+                            &buckets,
+                            &quantiles,
+                            expired,
+                            &metrics,
+                        )
+                    });
+
+                    future::ok::<_, Infallible>(response)
                 }))
             }
         });
@@ -368,54 +448,43 @@ impl PrometheusSink {
     }
 }
 
-impl Sink for PrometheusSink {
-    type SinkItem = Event;
-    type SinkError = ();
-
-    fn start_send(
-        &mut self,
-        event: Self::SinkItem,
-    ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
+#[async_trait]
+impl StreamSink for PrometheusSink {
+    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.start_server_if_needed();
+        while let Some(event) = input.next().await {
+            let item = event.into_metric();
+            let mut metrics = self.metrics.write().unwrap();
 
-        let item = event.into_metric();
-        let mut metrics = self.metrics.write().unwrap();
-
-        match item.kind {
-            MetricKind::Incremental => {
-                let new = MetricEntry(item.to_absolute());
-                if let Some(MetricEntry(mut existing)) = metrics.take(&new) {
-                    if item.value.is_set() {
-                        // sets need to be expired from time to time
-                        // because otherwise they could grow infinitelly
-                        let now = Utc::now().timestamp();
-                        let interval = now - *self.last_flush_timestamp.read().unwrap();
-                        if interval > self.config.flush_period_secs as i64 {
-                            *self.last_flush_timestamp.write().unwrap() = now;
-                            existing.reset();
+            match item.kind {
+                MetricKind::Incremental => {
+                    let new = MetricEntry(item.to_absolute());
+                    if let Some(MetricEntry(mut existing)) = metrics.take(&new) {
+                        if item.value.is_set() {
+                            // sets need to be expired from time to time
+                            // because otherwise they could grow infinitelly
+                            let now = Utc::now().timestamp();
+                            let interval = now - *self.last_flush_timestamp.read().unwrap();
+                            if interval > self.config.flush_period_secs as i64 {
+                                *self.last_flush_timestamp.write().unwrap() = now;
+                                existing.reset();
+                            }
                         }
-                    }
-                    existing.add(&item);
-                    metrics.insert(MetricEntry(existing));
-                } else {
-                    metrics.insert(new);
-                };
-            }
-            MetricKind::Absolute => {
-                let new = MetricEntry(item);
-                metrics.replace(new);
-            }
-        };
+                        existing.add(&item);
+                        metrics.insert(MetricEntry(existing));
+                    } else {
+                        metrics.insert(new);
+                    };
+                }
+                MetricKind::Absolute => {
+                    let new = MetricEntry(item);
+                    metrics.replace(new);
+                }
+            };
 
-        self.acker.ack(1);
-
-        Ok(AsyncSink::Ready)
-    }
-
-    fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
-        self.start_server_if_needed();
-
-        Ok(Async::Ready(()))
+            self.acker.ack(1);
+        }
+        Ok(())
     }
 }
 
@@ -424,6 +493,11 @@ mod tests {
     use super::*;
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<PrometheusSinkConfig>();
+    }
 
     fn tags() -> BTreeMap<String, String> {
         vec![("code".to_owned(), "200".to_owned())]
@@ -442,7 +516,7 @@ mod tests {
         };
 
         let header = encode_metric_header(Some("vector"), &metric);
-        let frame = encode_metric_datum(Some("vector"), &[], false, &metric);
+        let frame = encode_metric_datum(Some("vector"), &[], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -462,7 +536,7 @@ mod tests {
         };
 
         let header = encode_metric_header(Some("vector"), &metric);
-        let frame = encode_metric_datum(Some("vector"), &[], false, &metric);
+        let frame = encode_metric_datum(Some("vector"), &[], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -484,7 +558,7 @@ mod tests {
         };
 
         let header = encode_metric_header(None, &metric);
-        let frame = encode_metric_datum(None, &[], false, &metric);
+        let frame = encode_metric_datum(None, &[], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -506,7 +580,7 @@ mod tests {
         };
 
         let header = encode_metric_header(None, &metric);
-        let frame = encode_metric_datum(None, &[], true, &metric);
+        let frame = encode_metric_datum(None, &[], &[], true, &metric);
 
         assert_eq!(
             header,
@@ -530,7 +604,7 @@ mod tests {
         };
 
         let header = encode_metric_header(None, &metric);
-        let frame = encode_metric_datum(None, &[0.0, 2.5, 5.0], false, &metric);
+        let frame = encode_metric_datum(None, &[0.0, 2.5, 5.0], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -555,7 +629,7 @@ mod tests {
         };
 
         let header = encode_metric_header(None, &metric);
-        let frame = encode_metric_datum(None, &[], false, &metric);
+        let frame = encode_metric_datum(None, &[], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -580,12 +654,36 @@ mod tests {
         };
 
         let header = encode_metric_header(None, &metric);
-        let frame = encode_metric_datum(None, &[], false, &metric);
+        let frame = encode_metric_datum(None, &[], &[], false, &metric);
 
         assert_eq!(
             header,
             "# HELP requests requests\n# TYPE requests summary\n".to_owned()
         );
         assert_eq!(frame, "requests{code=\"200\",quantile=\"0.01\"} 1.5\nrequests{code=\"200\",quantile=\"0.5\"} 2\nrequests{code=\"200\",quantile=\"0.99\"} 3\nrequests_sum{code=\"200\"} 12\nrequests_count{code=\"200\"} 6\n".to_owned());
+    }
+
+    #[test]
+    fn test_encode_distribution_summary() {
+        let metric = Metric {
+            name: "requests".to_owned(),
+            timestamp: None,
+            tags: Some(tags()),
+            kind: MetricKind::Absolute,
+            value: MetricValue::Distribution {
+                values: vec![1.0, 2.0, 3.0],
+                sample_rates: vec![3, 3, 2],
+                statistic: StatisticKind::Summary,
+            },
+        };
+
+        let header = encode_metric_header(None, &metric);
+        let frame = encode_metric_datum(None, &[], &default_summary_quantiles(), false, &metric);
+
+        assert_eq!(
+            header,
+            "# HELP requests requests\n# TYPE requests summary\n".to_owned()
+        );
+        assert_eq!(frame, "requests{code=\"200\",quantile=\"0.5\"} 2\nrequests{code=\"200\",quantile=\"0.75\"} 2\nrequests{code=\"200\",quantile=\"0.9\"} 3\nrequests{code=\"200\",quantile=\"0.95\"} 3\nrequests{code=\"200\",quantile=\"0.99\"} 3\nrequests_sum{code=\"200\"} 15\nrequests_count{code=\"200\"} 8\nrequests_min{code=\"200\"} 1\nrequests_max{code=\"200\"} 3\nrequests_avg{code=\"200\"} 1.875\n".to_owned());
     }
 }
