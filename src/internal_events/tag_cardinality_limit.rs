@@ -9,10 +9,7 @@ impl InternalEvent for TagCardinalityLimitEventProcessed {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "tag_cardinality_limit",
-        );
+        counter!("events_processed", 1);
     }
 }
 
@@ -32,10 +29,7 @@ impl<'a> InternalEvent for TagCardinalityLimitRejectingEvent<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("tag_value_limit_exceeded", 1,
-            "component_kind" => "transform",
-            "component_type" => "tag_cardinality_limit",
-        );
+        counter!("tag_value_limit_exceeded", 1);
     }
 }
 
@@ -55,10 +49,7 @@ impl<'a> InternalEvent for TagCardinalityLimitRejectingTag<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("tag_value_limit_exceeded", 1,
-            "component_kind" => "transform",
-            "component_type" => "tag_cardinality_limit",
-        );
+        counter!("tag_value_limit_exceeded", 1);
     }
 }
 
@@ -75,9 +66,6 @@ impl<'a> InternalEvent for TagCardinalityValueLimitReached<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("value_limit_reached", 1,
-            "component_kind" => "transform",
-            "component_type" => "tag_cardinality_limit",
-        );
+        counter!("value_limit_reached", 1);
     }
 }

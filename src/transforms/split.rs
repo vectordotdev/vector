@@ -24,25 +24,29 @@ inventory::submit! {
     TransformDescription::new::<SplitConfig>("split")
 }
 
+impl_generate_config_from_default!(SplitConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "split")]
 impl TransformConfig for SplitConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        let field = self
-            .field
-            .as_ref()
-            .unwrap_or(&crate::config::log_schema().message_key());
+        let field = Atom::from(
+            self.field
+                .as_ref()
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| crate::config::log_schema().message_key().to_string()),
+        );
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)
             .map_err(|err| format!("{}", err))?;
 
         // don't drop the source field if it's getting overwritten by a parsed value
-        let drop_field = self.drop_field && !self.field_names.iter().any(|f| f == field);
+        let drop_field = self.drop_field && !self.field_names.iter().any(|f| **f == *field);
 
         Ok(Box::new(Split::new(
             self.field_names.clone(),
             self.separator.clone(),
-            field.clone(),
+            field,
             drop_field,
             types,
         )))
@@ -144,6 +148,11 @@ mod tests {
         Event,
     };
     use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SplitConfig>();
+    }
 
     #[test]
     fn split_whitespace() {

@@ -161,7 +161,7 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<Atom>> {
 fn render_timestamp(src: &str, event: &Event) -> String {
     let timestamp = match event {
         Event::Log(log) => log
-            .get(&log_schema().timestamp_key())
+            .get(&Atom::from(log_schema().timestamp_key()))
             .and_then(Value::as_timestamp),
         _ => None,
     };
@@ -334,9 +334,7 @@ mod tests {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts);
+        event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 
         let template = Template::try_from("abcd-%F").unwrap();
 
@@ -348,9 +346,7 @@ mod tests {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts);
+        event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 
         let template = Template::try_from("abcd-%F_%T").unwrap();
 
@@ -366,9 +362,7 @@ mod tests {
 
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("foo", "butts");
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts);
+        event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 
         let template = Template::try_from("{{ foo }}-%F_%T").unwrap();
 
@@ -384,9 +378,7 @@ mod tests {
 
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("format", "%F");
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts);
+        event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 
         let template = Template::try_from("nested {{ format }} %T").unwrap();
 
@@ -402,9 +394,7 @@ mod tests {
 
         let mut event = Event::from("hello world");
         event.as_mut_log().insert("%F", "foo");
-        event
-            .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts);
+        event.as_mut_log().insert(log_schema().timestamp_key(), ts);
 
         let template = Template::try_from("nested {{ %F }} %T").unwrap();
 
