@@ -44,9 +44,9 @@ components: transforms: merge: {
 				"""
 			required: false
 			warnings: []
-			type: "[string]": {
+			type: array: {
 				default: ["message"]
-				examples: [["message"], ["message", "parent.child"]]
+				items: type: string: examples: ["message", "parent.child"]
 			}
 		}
 		partial_event_marker_field: {
@@ -71,9 +71,9 @@ components: transforms: merge: {
 				"""
 			required: false
 			warnings: []
-			type: "[string]": {
+			type: array: {
 				default: []
-				examples: [["host"], ["host", "parent.child"]]
+				items: type: string: examples: ["host", "parent.child"]
 			}
 		}
 	}

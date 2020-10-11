@@ -84,17 +84,16 @@ data_model: schema: {
 								description: "The rate at which each individual value was sampled."
 								required:    true
 								warnings: []
-								type: "[uint]": {
-									examples: [[12, 43, 25]]
+								type: array: items: type: uint: {
+									examples: [12, 43, 25]
+									unit: null
 								}
 							}
 							values: {
 								description: "The list of values contained within the distribution."
 								required:    true
 								warnings: []
-								type: "[float]": {
-									examples: [[12.0, 43.3, 25.2]]
-								}
+								type: array: items: type: float: examples: [12.0, 43.3, 25.2]
 							}
 						}
 					}
@@ -145,8 +144,9 @@ data_model: schema: {
 								description: "The buckets contained within this histogram."
 								required:    true
 								warnings: []
-								type: "[uint]": {
-									examples: [[1, 2, 5, 10, 25]]
+								type: array: items: type: uint: {
+									examples: [1, 2, 5, 10, 25]
+									unit: null
 								}
 							}
 							count: {
@@ -162,8 +162,9 @@ data_model: schema: {
 								description: "The number of values contained within each bucket."
 								required:    true
 								warnings: []
-								type: "[uint]": {
-									examples: [[1, 10, 25, 100]]
+								type: array: items: type: uint: {
+									examples: [1, 10, 25, 100]
+									unit: null
 								}
 							}
 							sum: {
@@ -192,9 +193,7 @@ data_model: schema: {
 								description: "The list of unique values."
 								required:    true
 								warnings: []
-								type: "[string]": {
-									examples: [["value1", "value2"]]
-								}
+								type: array: items: type: string: examples: ["value1", "value2"]
 							}
 						}
 					}
@@ -229,8 +228,8 @@ data_model: schema: {
 								description: "The quantiles contained within the summary, where 0 ≤ quantile ≤ 1."
 								required:    true
 								warnings: []
-								type: "[float]": {
-									examples: [[0.1, 0.5, 0.75, 1.0]]
+								type: array: {
+									items: type: float: examples: [0.1, 0.5, 0.75, 1.0]
 								}
 							}
 							sum: {
@@ -245,8 +244,8 @@ data_model: schema: {
 								description: "The values contained within the summary that align with the `quantiles`."
 								required:    true
 								warnings: []
-								type: "[float]": {
-									examples: [[2.1, 4.68, 23.02, 120.1]]
+								type: array: {
+									items: type: float: examples: [2.1, 4.68, 23.02, 120.1]
 								}
 							}
 						}

@@ -60,7 +60,7 @@ components: sinks: sematext_metrics: {
 			required:      true
 			relevant_when: "`endpoint` is not set"
 			warnings: []
-			type: [string]: {
+			type: string: {
 				enum: {
 					us: "United States"
 					eu: "Europe"

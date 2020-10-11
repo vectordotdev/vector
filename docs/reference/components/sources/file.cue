@@ -43,9 +43,9 @@ components: sources: file: {
 			common:      false
 			description: "Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes precedence over the [`include` option](#include).*"
 			required:    false
-			type: "[string]": {
+			type: array: {
 				default: null
-				examples: [["/var/log/nginx/*.[0-9]*.log"]]
+				items: type: string: examples: ["/var/log/nginx/*.[0-9]*.log"]
 			}
 		}
 		file_key: {
@@ -125,7 +125,7 @@ components: sources: file: {
 		include: {
 			description: "Array of file patterns to include. [Globbing](#globbing) is supported."
 			required:    true
-			type: "[string]": examples: [["/var/log/nginx/*.log"]]
+			type: array: items: type: string: examples: ["/var/log/nginx/*.log"]
 		}
 		max_line_bytes: {
 			common:      false

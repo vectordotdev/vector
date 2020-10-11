@@ -73,9 +73,9 @@ components: sources: http: {
 			common:      false
 			description: "A list of HTTP headers to include in the log event. These will override any values included in the JSON payload with conflicting names. An empty string will be inserted into the log event if the corresponding HTTP header was missing."
 			required:    false
-			type: "[string]": {
+			type: array: {
 				default: null
-				examples: [["User-Agent", "X-My-Custom-Header"]]
+				items: type: string: examples: ["User-Agent", "X-My-Custom-Header"]
 			}
 		}
 	}
