@@ -11,8 +11,7 @@ components: transforms: remove_fields: {
 		function:      "schema"
 	}
 
-	features: {
-	}
+	features: {}
 
 	statuses: {
 		development: "stable"
