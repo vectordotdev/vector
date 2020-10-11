@@ -250,6 +250,7 @@ urls: {
 	rustup:                                                   "https://rustup.rs"
 	sematext:                                                 "https://sematext.com"
 	sematext_es:                                              "https://sematext.com/docs/logs/index-events-via-elasticsearch-api/"
+	sematext_monitoring:                                      "https://sematext.com/docs/monitoring/"
 	semver:                                                   "https://semver.org/"
 	snappy:                                                   "https://google.github.io/snappy/"
 	socket:                                                   "https://en.wikipedia.org/wiki/Network_socket"
