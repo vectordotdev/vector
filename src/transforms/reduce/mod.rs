@@ -48,6 +48,8 @@ inventory::submit! {
     TransformDescription::new::<ReduceConfig>("reduce")
 }
 
+impl_generate_config_from_default!(ReduceConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
@@ -296,6 +298,11 @@ mod test {
         Event,
     };
     use serde_json::json;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ReduceConfig>();
+    }
 
     #[tokio::test]
     async fn reduce_from_condition() {

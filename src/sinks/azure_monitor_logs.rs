@@ -23,6 +23,7 @@ use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -67,6 +68,8 @@ lazy_static! {
 inventory::submit! {
     SinkDescription::new::<AzureMonitorLogsConfig>("azure_monitor_logs")
 }
+
+impl_generate_config_from_default!(AzureMonitorLogsConfig);
 
 /// Max number of bytes in request body
 const MAX_BATCH_SIZE_MB: u64 = 30;
@@ -153,7 +156,7 @@ impl HttpSink for AzureMonitorLogsSink {
         let mut log = event.into_log();
         let timestamp_key = log_schema().timestamp_key();
 
-        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(timestamp_key) {
+        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(&Atom::from(timestamp_key)) {
             ts
         } else {
             chrono::Utc::now()
@@ -302,6 +305,11 @@ mod tests {
     use serde_json::value::RawValue;
     use std::iter::FromIterator;
 
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AzureMonitorLogsConfig>();
+    }
+
     fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
         let now = chrono::Utc::now();
 
@@ -401,10 +409,7 @@ mod tests {
 
         let time_generated_field = headers.get("time-generated-field").unwrap();
         let timestamp_key = log_schema().timestamp_key();
-        assert_eq!(
-            time_generated_field.to_str().unwrap(),
-            timestamp_key.as_ref()
-        );
+        assert_eq!(time_generated_field.to_str().unwrap(), timestamp_key);
 
         let azure_resource_id = headers.get("x-ms-azureresourceid").unwrap();
         assert_eq!(
