@@ -6,16 +6,16 @@ components: sinks: vector: {
 	long_description:  "Streams log and metric events to another downstream [`vector` source][docs.sources.vector]."
 
 	classes: {
+		egress_method: "stream"
 		commonly_used: false
 		function:      "transmit"
 		service_providers: []
 	}
 
 	features: {
-		batch: enabled:       false
 		buffer: enabled:      true
 		compression: enabled: false
-		encoding: enabled:    false
+		encoding: codec: enabled: false
 		healthcheck: enabled: true
 		request: enabled:     false
 		tls: {
@@ -33,8 +33,6 @@ components: sinks: vector: {
 	}
 
 	support: {
-		input_types: ["log", "metric"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -46,6 +44,12 @@ components: sinks: vector: {
 
 		requirements: []
 		warnings: []
+		notices: []
+	}
+
+	input: {
+		logs:    true
+		metrics: true
 	}
 
 	configuration: {
