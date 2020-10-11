@@ -18,7 +18,7 @@ pub struct SplitFieldMissing<'a> {
 
 impl<'a> InternalEvent for SplitFieldMissing<'a> {
     fn emit_logs(&self) {
-        debug!(
+        warn!(
             message = "Field does not exist.",
             field = %self.field,
             rate_limit_secs = 10
@@ -38,7 +38,7 @@ pub struct SplitConvertFailed<'a> {
 
 impl<'a> InternalEvent for SplitConvertFailed<'a> {
     fn emit_logs(&self) {
-        debug!(
+        warn!(
             message = "Could not convert types.",
             field = %self.field,
             error = %self.error,
