@@ -6,8 +6,8 @@ components: sinks: vector: {
 	long_description:  "Streams log and metric events to another downstream [`vector` source][docs.sources.vector]."
 
 	classes: {
-		egress_method: "stream"
 		commonly_used: false
+		egress_method: "stream"
 		function:      "transmit"
 		service_providers: []
 	}
@@ -69,4 +69,6 @@ components: sinks: vector: {
 			}
 		}
 	}
+
+	how_it_works: components.sources.vector.how_it_works
 }
