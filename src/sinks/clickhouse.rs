@@ -51,6 +51,8 @@ inventory::submit! {
     SinkDescription::new::<ClickhouseConfig>("clickhouse")
 }
 
+impl_generate_config_from_default!(ClickhouseConfig);
+
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
 #[derivative(Default)]
@@ -222,6 +224,11 @@ mod tests {
     use super::*;
 
     #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ClickhouseConfig>();
+    }
+
+    #[test]
     fn encode_valid() {
         let uri = encode_uri("http://localhost:80", "my_database", "my_table").unwrap();
         assert_eq!(uri, "http://localhost:80/?query=INSERT+INTO+%22my_database%22.%22my_table%22+FORMAT+JSONEachRow");
@@ -248,6 +255,7 @@ mod integration_tests {
     };
     use futures::{future, stream};
     use serde_json::Value;
+    use string_cache::DefaultAtom as Atom;
     use tokio::time::{timeout, Duration};
 
     #[tokio::test]
@@ -340,11 +348,11 @@ mod integration_tests {
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            log_schema().timestamp_key().clone(),
+            log_schema().timestamp_key(),
             format!(
                 "{}",
                 exp_event
-                    .get(&log_schema().timestamp_key())
+                    .get(&Atom::from(log_schema().timestamp_key()))
                     .unwrap()
                     .as_timestamp()
                     .unwrap()
@@ -400,11 +408,11 @@ timestamp_format = "unix""#,
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            log_schema().timestamp_key().clone(),
+            log_schema().timestamp_key(),
             format!(
                 "{}",
                 exp_event
-                    .get(&log_schema().timestamp_key())
+                    .get(&Atom::from(log_schema().timestamp_key()))
                     .unwrap()
                     .as_timestamp()
                     .unwrap()
