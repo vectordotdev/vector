@@ -53,6 +53,11 @@ components: transforms: logfmt_parser: {
 		types: components._types
 	}
 
+	input: {
+		logs:    true
+		metrics: false
+	}
+
 	how_it_works: {
 		key_value_parsing: {
 			title: "Key/Value Parsing"
