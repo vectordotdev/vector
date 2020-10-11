@@ -66,7 +66,7 @@ components: transforms: split: {
 				examples: [","]
 			}
 		}
-		types: components._types
+		types: configuration._types
 	}
 
 	input: {
@@ -74,7 +74,7 @@ components: transforms: split: {
 		metrics: false
 	}
 
-	examples: log: [
+	examples: [
 		{
 			title: "Split log message"
 			configuration: {
@@ -86,10 +86,10 @@ components: transforms: split: {
 					bytes:  "int"
 				}
 			}
-			input: {
+			input: log: {
 				message: "5.86.210.12,zieme4647,19/06/2019:17:20:49 -0400,GET /embrace/supply-chains/dynamic/vertical,201,20574"
 			}
-			output: {
+			output: log: {
 				remote_addr: "5.86.210.12"
 				user_id:     "zieme4647"
 				timestamp:   "19/06/2019:17:20:49 -0400"

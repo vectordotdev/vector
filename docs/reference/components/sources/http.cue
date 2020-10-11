@@ -108,7 +108,7 @@ components: sources: http: {
 		}
 	}
 
-	examples: log: [
+	examples: [
 		{
 			_line:       "Hello world"
 			_user_agent: "my-service/v2.1"
@@ -128,10 +128,12 @@ components: sources: http: {
              ```
              """
 			output: [{
-				host:         _values.local_host
-				message:      _line
-				timestamp:    _values.current_timestamp
-				"User-Agent": _user_agent
+				log: {
+					host:         _values.local_host
+					message:      _line
+					timestamp:    _values.current_timestamp
+					"User-Agent": _user_agent
+				}
 			}]
 		},
 		{
@@ -153,10 +155,12 @@ components: sources: http: {
              ```
              """
 			output: [{
-				host:         _values.local_host
-				key:          "val"
-				timestamp:    _values.current_timestamp
-				"User-Agent": _user_agent
+				log: {
+					host:         _values.local_host
+					key:          "val"
+					timestamp:    _values.current_timestamp
+					"User-Agent": _user_agent
+				}
 			}]
 		},
 	]

@@ -188,7 +188,7 @@ components: sources: file: {
 		}
 	}
 
-	examples: log: [
+	examples: [
 		{
 			_file: "/var/log/apache/access.log"
 			_line: "53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"
@@ -201,7 +201,7 @@ components: sources: file: {
 				\(_line)
 				```
 				"""
-			output: {
+			output: log: {
 				file:      _file
 				host:      _values.local_host
 				message:   _line

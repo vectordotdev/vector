@@ -186,14 +186,14 @@ components: sinks: influxdb_metrics: {
 		}
 	}
 
-	examples: metric: [
+	examples: [
 		{
 			_host:  _values.local_host
 			_name:  "logins"
 			_value: 1.5
 			title:  "Counter"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				counter: {
 					value: _value
@@ -209,7 +209,7 @@ components: sinks: influxdb_metrics: {
 			_name: "sparse_stats"
 			title: "Distribution"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				distribution: {
 					values: [1.0, 5.0, 3.0]
@@ -228,7 +228,7 @@ components: sinks: influxdb_metrics: {
 			_value: 1.5
 			title:  "Gauge"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				gauge: {
 					value: _value
@@ -244,7 +244,7 @@ components: sinks: influxdb_metrics: {
 			_name: "requests"
 			title: "Histogram"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				histogram: {
 					buckets: [1.0, 2.1, 3.0]
@@ -264,7 +264,7 @@ components: sinks: influxdb_metrics: {
 			_value: 1.5
 			title:  "Set"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				set: {
 					values: ["first", "another", "last"]
@@ -280,7 +280,7 @@ components: sinks: influxdb_metrics: {
 			_name: "requests"
 			title: "Summary"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				summary: {
 					quantiles: [0.01, 0.5, 0.99]

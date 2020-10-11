@@ -179,7 +179,7 @@ components: sources: docker: {
 		}
 	}
 
-	examples: log: [
+	examples: [
 		{
 			_container_name: "flog"
 			_image:          "mingrammer/flog"
@@ -197,7 +197,7 @@ components: sources: docker: {
 				 }
 				```
 				"""
-			output: {
+			output: log: {
 				container_created_at: "2020-10-03T16:11:29.443232Z"
 				container_id:         "fecc98177eca7fb75a2b2186c418bf9a0cd3a05a1169f2e2293bf8987a9d96ab"
 				container_name:       _container_name

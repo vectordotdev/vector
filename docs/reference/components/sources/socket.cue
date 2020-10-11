@@ -123,7 +123,7 @@ components: sources: socket: {
 		}
 	}
 
-	examples: log: [
+	examples: [
 		{
 			_line: #"""
 				2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
@@ -135,7 +135,7 @@ components: sources: socket: {
 				\( _line )
 				```
 				"""
-			output: {
+			output: log: {
 				timestamp: _values.current_timestamp
 				message:   _line
 				host:      _values.local_host

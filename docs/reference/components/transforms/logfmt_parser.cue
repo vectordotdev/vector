@@ -50,7 +50,7 @@ components: transforms: logfmt_parser: {
 				examples: ["message", "parent.child", "array[0]"]
 			}
 		}
-		types: components._types
+		types: configuration._types
 	}
 
 	input: {
@@ -121,7 +121,7 @@ components: transforms: logfmt_parser: {
 		}
 	}
 
-	examples: log: [
+	examples: [
 		{
 			title: "Heroku Router Log"
 			configuration: {
@@ -132,10 +132,10 @@ components: transforms: logfmt_parser: {
 					status: "int"
 				}
 			}
-			input: {
+			input: log: {
 				"message": #"at=info method=GET path=/ host=myapp.herokuapp.com request_id=8601b555-6a83-4c12-8269-97c8e32cdb22 fwd="204.204.204.204" dyno=web.1 connect=1ms service=18ms status=200 bytes=13 tls_version=tls1.1 protocol=http"#
 			}
-			output: {
+			output: log: {
 				"at":          "info"
 				"method":      "GET"
 				"path":        "/"
@@ -160,10 +160,10 @@ components: transforms: logfmt_parser: {
 					status: "int"
 				}
 			}
-			input: {
+			input: log: {
 				"message": #"info | Sent 200 in 54.2ms duration=54.2ms status=200"#
 			}
-			output: {
+			output: log: {
 				"message":  "info | Sent 200 in 54.2ms duration=54.2ms status=200"
 				"duration": "54.2ms"
 				"status":   200

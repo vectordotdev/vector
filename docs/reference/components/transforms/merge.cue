@@ -83,16 +83,16 @@ components: transforms: merge: {
 		metrics: false
 	}
 
-	examples: log: [
+	examples: [
 		{
 			title: "Default"
 			configuration: {}
 			input: [
-				{"message": "First", "_partial":            true, "custom_string_field":  "value1", "custom_int_field": 1},
-				{"message": "Second", "_partial":           true, "custom_string_field":  "value2", "custom_int_field": 2},
-				{"message": "Third", "custom_string_field": "value3", "custom_int_field": 3},
+				{log: {"message": "First", "_partial":            true, "custom_string_field":  "value1", "custom_int_field": 1}},
+				{log: {"message": "Second", "_partial":           true, "custom_string_field":  "value2", "custom_int_field": 2}},
+				{log: {"message": "Third", "custom_string_field": "value3", "custom_int_field": 3}},
 			]
-			output: {"message": "FirstSecondThird", "custom_string_field": "value1", "custom_int_field": 1}
+			output: log: {"message": "FirstSecondThird", "custom_string_field": "value1", "custom_int_field": 1}
 			notes: """
 				Notice that `custom_string_field` and `custom_int_field` were not overridden.
 				This is because they were not listed in the `fields` option.
@@ -104,11 +104,11 @@ components: transforms: merge: {
 				fields: ["message", "custom_string_field", "custom_int_field"]
 			}
 			input: [
-				{"message": "First", "_partial":            true, "custom_string_field":  "value1", "custom_int_field": 1},
-				{"message": "Second", "_partial":           true, "custom_string_field":  "value2", "custom_int_field": 2},
-				{"message": "Third", "custom_string_field": "value3", "custom_int_field": 3},
+				{log: {"message": "First", "_partial":            true, "custom_string_field":  "value1", "custom_int_field": 1}},
+				{log: {"message": "Second", "_partial":           true, "custom_string_field":  "value2", "custom_int_field": 2}},
+				{log: {"message": "Third", "custom_string_field": "value3", "custom_int_field": 3}},
 			]
-			output: {"message": "FirstSecondThird", "custom_string_field": "value1value2value3", "custom_int_field": 3}
+			output: log: {"message": "FirstSecondThird", "custom_string_field": "value1value2value3", "custom_int_field": 3}
 			notes: """
 				Notice that `custom_string_field` is concatenated and `custom_int_field`
 				overridden. This is because it was specified in the `fields` option.
