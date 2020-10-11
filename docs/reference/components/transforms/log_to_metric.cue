@@ -50,9 +50,12 @@ components: transforms: log_to_metric: {
 						}
 					}
 					increment_by_value: {
-						description: "If `true` the metric will be incremented by the `field` value. If `false` the metric will be incremented by 1 regardless of the `field` value."
-						required:    false
-						common:      false
+						description: """
+                If `true` the metric will be incremented by the `field` value. 
+                If `false` the metric will be incremented by 1 regardless of the `field` value.
+                """
+						required: false
+						common:   false
 						warnings: []
 						relevant_when: #"`type` = `"counter"`"#
 						type: bool: {
@@ -82,8 +85,11 @@ components: transforms: log_to_metric: {
 							]
 							options: {
 								"*": {
-									description: "Key/value pairs representing [metric tags][docs.data-model.metric#tags]. Environment variables and field interpolation is allowed."
-									required:    true
+									description: """
+                      Key/value pairs representing [metric tags][docs.data-model.metric#tags]. 
+                      Environment variables and field interpolation is allowed.
+                      """
+									required: true
 									warnings: []
 									type: "*": {}
 								}
@@ -118,4 +124,35 @@ components: transforms: log_to_metric: {
 	// output: {
 	//   metrics: #MetricOutput
 	//  }
+
+	how_it_works: {
+		multiple_metrics: {
+			title: "Multiple Metrics"
+			body: """
+				For clarification, when you convert a single `log` event into multiple `metric`
+				events, the `metric` events are not emitted as a single array. They are emitted
+				individually, and the downstream components treat them as individual events.
+				Downstream components are not aware they were derived from a single log event.
+				"""
+		}
+		reducing: {
+			title: "Reducing"
+			body: """
+				It's important to understand that this transform does not reduce multiple logs
+				to a single metric. Instead, this transform converts logs into granular
+				individual metrics that can then be reduced at the edge. Where the reduction
+				happens depends on your metrics storage. For example, the
+				[`prometheus` sink][docs.sinks.prometheus] will reduce logs in the sink itself
+				for the next scrape, while other metrics sinks will proceed to forward the
+				individual metrics for reduction in the metrics storage itself.
+				"""
+		}
+		null_fields: {
+			title: "Null Fields"
+			body: """
+				If the target log `field` contains a `null` value it will ignored, and a metric
+				will not be emitted.
+				"""
+		}
+	}
 }
