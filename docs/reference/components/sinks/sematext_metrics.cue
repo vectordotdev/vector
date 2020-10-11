@@ -56,6 +56,15 @@ components: sinks: sematext_metrics: {
 	}
 
 	configuration: {
+		endpoint: {
+			description:   "The endpoint to send metrics to."
+			required:      true
+			relevant_when: "`region` is not set"
+			warnings: []
+			type: string: {
+				examples: ["https://spm-receiver.sematext.com", "https://spm-receiver.eu.sematext.com"]
+			}
+		}
 		region: {
 			description:   "The region destination to send metrics to. This option is required if `endpoint` is not set."
 			required:      true
@@ -67,15 +76,6 @@ components: sinks: sematext_metrics: {
 					eu: "Europe"
 				}
 				examples: [ "us"]
-			}
-		}
-		endpoint: {
-			description:   "The endpoint to send metrics to."
-			required:      true
-			relevant_when: "`region` is not set"
-			warnings: []
-			type: string: {
-				examples: ["https://spm-receiver.sematext.com", "https://spm-receiver.eu.sematext.com"]
 			}
 		}
 		token: {
