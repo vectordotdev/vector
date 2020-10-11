@@ -178,7 +178,7 @@ _values: {
 //   on the host.
 // * `service` - Vector receives data from one or more upstream
 //   sources, typically over a network protocol.
-#DeploymentRole: "daemon" | "service" | "sidecar"
+#DeploymentRole: "aggregator" | "daemon" | "sidecar"
 
 // `#DevelopmentStatus` documents the development status of the component.
 //
