@@ -278,6 +278,7 @@ components: transforms: lua: {
 						"""#
 				}
 				input: {
+					name: "logins"
 					counter: {
 						value: 2.0
 					}
@@ -287,6 +288,7 @@ components: transforms: lua: {
 					}
 				}
 				output: {
+					name: "logins"
 					counter: {
 						value: 2.0
 					}
@@ -306,6 +308,7 @@ components: transforms: lua: {
 						"""#
 				}
 				input: {
+					name: "logins"
 					counter: {
 						value: 2.0
 					}

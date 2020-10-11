@@ -148,12 +148,18 @@ _values: {
 				}
 				input: #MetricEvent
 
-				if classes.egress_method == "batch" {
-					output: [#MetricEvent, ...] | null
+				if Kind != "sink" {
+					if classes.egress_method == "batch" {
+						output: [#MetricEvent, ...] | null
+					}
+
+					if classes.egress_method == "stream" {
+						output: #MetricEvent | null
+					}
 				}
 
-				if classes.egress_method == "stream" {
-					output: #MetricEvent | null
+				if Kind == "sink" {
+					output: string
 				}
 
 				notes?: string
@@ -199,7 +205,7 @@ _values: {
 //
 // * `batch` - one or more events at a time
 // * `stream` - one event at a time
-#EgressMethod: "batch" | "stream"
+#EgressMethod: "aggregate" | "batch" | "stream"
 
 #EncodingCodec: "json" | "ndjson" | "text"
 
@@ -360,17 +366,46 @@ _values: {
 }
 
 #MetricEvent: {
+	name: string
 	tags: [Name=string]: string
 	close({counter: #MetricEventCounter}) |
-	close({gauge: #MetricEventGauge})
+	close({distribution: #MetricEventDistribution}) |
+	close({gauge: #MetricEventGauge}) |
+	close({histogram: #MetricEventHistogram}) |
+	close({set: #MetricEventSet}) |
+	close({summary: #MetricEventSummary})
 }
 
 #MetricEventCounter: {
 	value: float
 }
 
+#MetricEventDistribution: {
+	values: [float, ...]
+	sample_rates: [float, ...]
+	statistic: "histogram" | "summary"
+}
+
 #MetricEventGauge: {
 	value: float
+}
+
+#MetricEventHistogram: {
+	buckets: [float, ...]
+	counts: [int, ...]
+	count: int
+	sum:   float
+}
+
+#MetricEventSet: {
+	values: [string, ...]
+}
+
+#MetricEventSummary: {
+	quantiles: [float, ...]
+	values: [float, ...]
+	count: int
+	sum:   float
 }
 
 #MetricOutput: [Name=string]: close({
