@@ -62,7 +62,7 @@ components: sinks: datadog_logs: {
 		}
 		endpoint: {
 			common:      false
-			description: "The endpoint to stream logs to."
+			description: "The endpoint to send logs to."
 			required:    false
 			type: string: {
 				default: "intake.logs.datadoghq.com:10516"

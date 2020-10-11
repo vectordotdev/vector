@@ -70,7 +70,7 @@ components: sinks: sematext_metrics: {
 			}
 		}
 		endpoint: {
-			description:   "The endpoint that will be used to send metrics to. This option is required if `region` is not set."
+			description:   "The endpoint to send metrics to."
 			required:      true
 			relevant_when: "`region` is not set"
 			warnings: []

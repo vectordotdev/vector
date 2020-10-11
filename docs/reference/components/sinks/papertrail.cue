@@ -53,7 +53,7 @@ components: sinks: papertrail: {
 
 	configuration: {
 		endpoint: {
-			description: "The endpoint to stream logs to."
+			description: "The endpoint to send logs to."
 			required:    true
 			type: string: {
 				examples: ["logs.papertrailapp.com:12345"]
