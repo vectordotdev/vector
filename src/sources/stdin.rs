@@ -40,6 +40,8 @@ inventory::submit! {
     SourceDescription::new::<StdinConfig>("stdin")
 }
 
+impl_generate_config_from_default!(StdinConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
@@ -130,6 +132,12 @@ mod tests {
     use futures::compat::Future01CompatExt;
     use futures01::{Async::*, Stream};
     use std::io::Cursor;
+    use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<StdinConfig>();
+    }
 
     #[test]
     fn stdin_create_event() {
@@ -141,8 +149,14 @@ mod tests {
         let log = event.into_log();
 
         assert_eq!(log[&"host".into()], "Some.Machine".into());
-        assert_eq!(log[&log_schema().message_key()], "hello world".into());
-        assert_eq!(log[log_schema().source_type_key()], "stdin".into());
+        assert_eq!(
+            log[&Atom::from(log_schema().message_key())],
+            "hello world".into()
+        );
+        assert_eq!(
+            log[&Atom::from(log_schema().source_type_key())],
+            "stdin".into()
+        );
     }
 
     #[tokio::test]
@@ -164,16 +178,18 @@ mod tests {
         assert!(event.is_ready());
         assert_eq!(
             Ready(Some("hello world".into())),
-            event.map(|event| event
-                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy()))
+            event.map(|event| event.map(|event| event.as_log()
+                [&Atom::from(log_schema().message_key())]
+                .to_string_lossy()))
         );
 
         let event = rx.poll().unwrap();
         assert!(event.is_ready());
         assert_eq!(
             Ready(Some("hello world again".into())),
-            event.map(|event| event
-                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy()))
+            event.map(|event| event.map(|event| event.as_log()
+                [&Atom::from(log_schema().message_key())]
+                .to_string_lossy()))
         );
 
         let event = rx.poll().unwrap();
