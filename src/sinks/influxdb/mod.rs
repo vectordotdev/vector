@@ -313,11 +313,13 @@ pub(in crate::sinks) fn encode_uri(
 pub mod test_util {
     use super::*;
     use chrono::offset::TimeZone;
+    use std::fs::File;
+    use std::io::Read;
 
     pub(crate) const ORG: &str = "my-org";
     pub(crate) const BUCKET: &str = "my-bucket";
     pub(crate) const TOKEN: &str = "my-token";
-    pub(crate) const DATABASE: &str = "my-database";
+    pub(crate) const DATABASE: &str = "testdb";
 
     pub(crate) fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
@@ -362,6 +364,47 @@ pub mod test_util {
         split = split[1].splitn(3, ' ').collect::<Vec<&str>>();
 
         (measurement, split[0], split[1].to_string(), split[2])
+    }
+
+    pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest::Response {
+        let mut test_ca = Vec::<u8>::new();
+        File::open("tests/data/Vector_CA.crt")
+            .unwrap()
+            .read_to_end(&mut test_ca)
+            .unwrap();
+        let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
+
+        let client = reqwest::Client::builder()
+            .add_root_certificate(test_ca)
+            .build()
+            .unwrap();
+
+        client
+            .get(&format!("{}/query", endpoint))
+            .query(&[("q", query)])
+            .send()
+            .await
+            .unwrap()
+    }
+
+    pub(crate) async fn onboarding_v1(endpoint: &str) {
+        let status = query_v1(endpoint, &format!("create database {}", DATABASE))
+            .await
+            .status();
+        assert!(
+            status == http::StatusCode::OK,
+            format!("UnexpectedStatus: {}", status)
+        );
+    }
+
+    pub(crate) async fn cleanup_v1(endpoint: &str) {
+        let status = query_v1(endpoint, &format!("drop database {}", DATABASE))
+            .await
+            .status();
+        assert!(
+            status == http::StatusCode::OK,
+            format!("UnexpectedStatus: {}", status)
+        );
     }
 
     pub(crate) async fn onboarding_v2() {
