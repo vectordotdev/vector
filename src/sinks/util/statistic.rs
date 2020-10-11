@@ -1,4 +1,11 @@
+use snafu::Snafu;
 use std::cmp::Ordering;
+
+#[derive(Debug, Snafu)]
+pub enum ValidationError {
+    #[snafu(display("Quantiles must be in range [0.0,1.0]"))]
+    QuantileOutOfRange,
+}
 
 pub struct DistributionStatistic {
     pub min: f64,
@@ -68,5 +75,16 @@ impl DistributionStatistic {
             count: samples.len() as u64,
             quantiles,
         })
+    }
+}
+
+pub fn validate_quantiles(quantiles: &[f64]) -> Result<(), ValidationError> {
+    if quantiles
+        .iter()
+        .all(|&quantile| 0.0 <= quantile && quantile <= 1.0)
+    {
+        Ok(())
+    } else {
+        Err(ValidationError::QuantileOutOfRange)
     }
 }

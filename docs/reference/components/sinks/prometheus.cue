@@ -96,6 +96,16 @@ components: sinks: prometheus: {
 				examples: ["service"]
 			}
 		}
+		quantiles: {
+			common:      false
+			description: "Quantiles to use for aggregating [distribution][docs.data-model.metric#distribution] metrics into a summary."
+			required:    false
+			warnings: []
+			type: array: {
+				default: [0.5, 0.75, 0.9, 0.95, 0.99]
+				items: type: float: examples: [0.5, 0.75, 0.9, 0.95, 0.99]
+			}
+		}
 	}
 
 	input: {
