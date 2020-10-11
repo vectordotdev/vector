@@ -7,6 +7,7 @@ components: transforms: lua: {
 
 	classes: {
 		commonly_used: true
+		egress_method: "stream"
 		function:      "program"
 	}
 
@@ -17,8 +18,6 @@ components: transforms: lua: {
 	}
 
 	support: {
-		input_types: ["log", "metric"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -120,9 +119,9 @@ components: transforms: lua: {
 			groups: ["module"]
 			required: false
 			warnings: []
-			type: "[string]": {
+			type: array: {
 				default: null
-				examples: [["/etc/vector/lua"]]
+				items: type: string: examples: ["/etc/vector/lua"]
 			}
 		}
 		source: {
@@ -176,6 +175,27 @@ components: transforms: lua: {
 			groups: ["inline", "module"]
 			required: false
 			warnings: []
+			type: object: {
+				options: {
+					handler: {
+						description: "Defines a handler function which is executed periodially at `interval_seconds`. It can produce new events using `emit` function."
+						required:    true
+						warnings: []
+						type: string: {
+							examples: ["timer_handler"]
+						}
+					}
+					interval_seconds: {
+						description: "Defines the interval at which the timer handler would be executed."
+						required:    true
+						warnings: []
+						type: uint: {
+							examples: [1, 10, 30]
+							unit: "seconds"
+						}
+					}
+				}
+			}
 		}
 		version: {
 			description: "Transform API version. Specifying this version ensures that Vector does not break backward compatibility."
@@ -187,6 +207,18 @@ components: transforms: lua: {
 					"2": "Lua transform API version 2"
 				}
 			}
+		}
+	}
+
+	input: {
+		logs: true
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
 		}
 	}
 
@@ -246,8 +278,9 @@ components: transforms: lua: {
 						"""#
 				}
 				input: {
+					name: "logins"
 					counter: {
-						value: 2
+						value: 2.0
 					}
 					tags: {
 						tag_to_rename: "old value"
@@ -255,8 +288,9 @@ components: transforms: lua: {
 					}
 				}
 				output: {
+					name: "logins"
 					counter: {
-						value: 2
+						value: 2.0
 					}
 					tags: {
 						tag:         "new value"
@@ -274,8 +308,9 @@ components: transforms: lua: {
 						"""#
 				}
 				input: {
+					name: "logins"
 					counter: {
-						value: 2
+						value: 2.0
 					}
 					tags: {
 						tag_to_rename: "old value"

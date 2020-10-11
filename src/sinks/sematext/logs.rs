@@ -1,13 +1,16 @@
+use super::Region;
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::elasticsearch::{ElasticSearchConfig, Encoding},
     sinks::util::{
         encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
     },
+    sinks::{Healthcheck, VectorSink},
     Event,
 };
 use futures01::{Future, Sink};
 use serde::{Deserialize, Serialize};
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SematextLogsConfig {
@@ -31,30 +34,20 @@ pub struct SematextLogsConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<SematextLogsConfig>("sematext")
+    SinkDescription::new::<SematextLogsConfig>("sematext_logs")
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Region {
-    Na,
-    Eu,
-}
+impl GenerateConfig for SematextLogsConfig {}
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "sematext")]
+#[typetag::serde(name = "sematext_logs")]
 impl SinkConfig for SematextLogsConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = match (&self.endpoint, &self.region) {
             (Some(host), None) => host.clone(),
-            (None, Some(Region::Na)) => "https://logsene-receiver.sematext.com".to_owned(),
+            (None, Some(Region::Us)) => "https://logsene-receiver.sematext.com".to_owned(),
             (None, Some(Region::Eu)) => "https://logsene-receiver.eu.sematext.com".to_owned(),
-            (None, None) => {
-                return Err("Either `region` or `host` must be set.".into());
-            }
+            (None, None) => "https://logsene-receiver.sematext.com".to_owned(),
             (Some(_), Some(_)) => {
                 return Err("Only one of `region` and `host` can be set.".into());
             }
@@ -75,7 +68,7 @@ impl SinkConfig for SematextLogsConfig {
 
         let sink = Box::new(sink.into_futures01sink().with(map_timestamp));
 
-        Ok((super::VectorSink::Futures01Sink(sink), healthcheck))
+        Ok((VectorSink::Futures01Sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -83,7 +76,7 @@ impl SinkConfig for SematextLogsConfig {
     }
 
     fn sink_type(&self) -> &'static str {
-        "sematext"
+        "sematext_logs"
     }
 }
 
@@ -91,11 +84,11 @@ impl SinkConfig for SematextLogsConfig {
 fn map_timestamp(mut event: Event) -> impl Future<Item = Event, Error = ()> {
     let log = event.as_mut_log();
 
-    if let Some(ts) = log.remove(&crate::config::log_schema().timestamp_key()) {
+    if let Some(ts) = log.remove(&Atom::from(crate::config::log_schema().timestamp_key())) {
         log.insert("@timestamp", ts);
     }
 
-    if let Some(host) = log.remove(&crate::config::log_schema().host_key()) {
+    if let Some(host) = log.remove(&Atom::from(crate::config::log_schema().host_key())) {
         log.insert("os.host", host);
     }
 
@@ -116,7 +109,7 @@ mod tests {
     async fn smoke() {
         let (mut config, cx) = load_sink::<SematextLogsConfig>(
             r#"
-            region = "na"
+            region = "us"
             token = "mylogtoken"
         "#,
         )
