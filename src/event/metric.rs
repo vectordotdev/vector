@@ -7,7 +7,9 @@ use std::fmt::{self, Display, Formatter};
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Metric {
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<BTreeMap<String, String>>,
     pub kind: MetricKind,
     #[serde(flatten)]
