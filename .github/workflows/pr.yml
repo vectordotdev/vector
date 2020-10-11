@@ -16,6 +16,16 @@ env:
   PROFILE: debug
 
 jobs:
+  cancel-previous:
+    name: Cancel redundant jobs
+    runs-on: ubuntu-20.04
+    timeout-minutes: 3
+    if: github.ref != 'refs/heads/master'
+    steps:
+      - uses: styfle/cancel-workflow-action@0.5.0
+        with:
+          access_token: ${{ secrets.GITHUB_TOKEN }}
+
   changes:
       runs-on: ubuntu-latest
       # Set job outputs to values from filter step
@@ -27,10 +37,6 @@ jobs:
         internal_events: ${{ steps.filter.outputs.internal_events }}
         helm: ${{ steps.filter.outputs.helm }}
       steps:
-      - uses: styfle/cancel-workflow-action@0.4.1
-        if: github.ref != 'refs/heads/master'
-        with:
-          access_token: ${{ secrets.GITHUB_TOKEN }}
       # For pull requests it's not necessary to checkout the code
       - uses: dorny/paths-filter@v2
         id: filter
