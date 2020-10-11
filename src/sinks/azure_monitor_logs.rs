@@ -25,6 +25,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use string_cache::DefaultAtom as Atom;
 
+fn default_endpoint() -> String {
+    "ods.opinsights.azure.com".into()
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct AzureMonitorLogsConfig {
@@ -32,7 +36,7 @@ pub struct AzureMonitorLogsConfig {
     pub shared_key: String,
     pub log_type: String,
     pub azure_resource_id: Option<String>,
-    #[serde(default = "ods.opinsights.azure.com")]
+    #[serde(default = "default_endpoint")]
     pub endpoint: String,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
@@ -451,7 +455,7 @@ mod tests {
         "#,
         )
         .expect("Config parsing failed without custom endpoint");
-        assert_eq!(config.endpoint, "ods.opinsights.azure.com");
+        assert_eq!(config_default.endpoint, default_endpoint());
 
         let config_cn = toml::from_str::<AzureMonitorLogsConfig>(
             r#"
