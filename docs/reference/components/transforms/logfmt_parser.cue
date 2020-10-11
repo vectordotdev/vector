@@ -68,53 +68,53 @@ components: transforms: logfmt_parser: {
 
 		quoting_values: {
 			title: "Quoting Values"
-			body:	#"""
-					Values can be quoted to capture spaces, and quotes can be escaped with `\`.
-					For example
+			body: #"""
+				Values can be quoted to capture spaces, and quotes can be escaped with `\`.
+				For example
 
-					```text
-					key1="value with spaces" key2="value with spaces and \""
-					```
+				```text
+				key1="value with spaces" key2="value with spaces and \""
+				```
 
-					Would result in the following `log` event:
+				Would result in the following `log` event:
 
-					```json title="log event"
-					{
-					  "key1": "value with spaces",
-					  "key2": "value with spaces and \""
-					}
-					```
-					"""#
+				```json title="log event"
+				{
+				  "key1": "value with spaces",
+				  "key2": "value with spaces and \""
+				}
+				```
+				"""#
 		}
 
 		format_specification: {
 			title: "Format Specification"
-			body:	#"""
-					[Logfmt][urls.logfmt] is, unfortunately, a very loosely defined format. There
-					is no official specification for the format and Vector makes a best effort to
-					parse key/value pairs delimited with a `=`. It works by splitting the `field`'s
-					value on non-quoted white-space and then splitting each token by a non-quoted
-					`=` character. This makes the parsing process somewhat flexible in that the
-					string does not need to be strictly formatted.
+			body: #"""
+				[Logfmt][urls.logfmt] is, unfortunately, a very loosely defined format. There
+				is no official specification for the format and Vector makes a best effort to
+				parse key/value pairs delimited with a `=`. It works by splitting the `field`'s
+				value on non-quoted white-space and then splitting each token by a non-quoted
+				`=` character. This makes the parsing process somewhat flexible in that the
+				string does not need to be strictly formatted.
 
-					For example, the following log line:
+				For example, the following log line:
 
-					```js title="log event"
-					{
-					  "message": "Hello world duration=2s user-agent=\"Firefox/47.3 Mozilla/5.0\""
-					}
-					```
+				```js title="log event"
+				{
+				  "message": "Hello world duration=2s user-agent=\"Firefox/47.3 Mozilla/5.0\""
+				}
+				```
 
-					Will be successfully parsed into:
+				Will be successfully parsed into:
 
-					```js title="log event"
-					{
-					  "message": "Hello world duration=2s user-agent=\"Firefox/47.3 Mozilla/5.0\"",
-					  "duration": "2s",
-					  "user-agent": "Firefox/47.3 Mozilla/5.0"
-					}
-					```
-					"""#
+				```js title="log event"
+				{
+				  "message": "Hello world duration=2s user-agent=\"Firefox/47.3 Mozilla/5.0\"",
+				  "duration": "2s",
+				  "user-agent": "Firefox/47.3 Mozilla/5.0"
+				}
+				```
+				"""#
 		}
 	}
 }
