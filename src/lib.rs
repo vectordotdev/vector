@@ -76,12 +76,18 @@ pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub fn get_version() -> String {
+pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
     let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
+
     #[cfg(not(feature = "nightly"))]
     let pkg_version = built_info::PKG_VERSION;
 
+    pkg_version
+}
+
+pub fn get_version() -> String {
+    let pkg_version = vector_version();
     let commit_hash = built_info::GIT_VERSION.and_then(|v| v.split('-').last());
     let built_date = chrono::DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC)
         .unwrap()
