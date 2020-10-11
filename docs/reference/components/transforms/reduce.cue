@@ -7,19 +7,17 @@ components: transforms: reduce: {
 
 	classes: {
 		commonly_used: false
+		egress_method: "stream"
 		function:      "aggregate"
 	}
 
-	features: {
-	}
+	features: {}
 
 	statuses: {
 		development: "beta"
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -67,9 +65,9 @@ components: transforms: reduce: {
 			description: "An ordered list of fields by which to group events. Each group is combined independently, allowing you to keep independent events separate. When no fields are specified, all events will be combined in a single group. Events missing a specified field will be combined in their own group."
 			required:    false
 			warnings: []
-			type: "[string]": {
+			type: array: {
 				default: []
-				examples: [["request_id"], ["user_id", "transaction_id"]]
+				items: type: string: examples: ["request_id", "user_id", "transaction_id"]
 			}
 		}
 		merge_strategies: {
@@ -118,6 +116,11 @@ components: transforms: reduce: {
 				}
 			}
 		}
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 
 	examples: log: [
