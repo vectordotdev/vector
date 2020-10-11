@@ -41,7 +41,8 @@ components: sources: socket: {
 		requirements: []
 		warnings: [
 			"""
-				This component exposes a configured port. You must ensure your network allows access to this port.
+				This component exposes a configured port. You must ensure your
+				network allows access to this port.
 				""",
 		]
 		notices: []
