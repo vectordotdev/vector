@@ -1,11 +1,15 @@
 use super::Transform;
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
+    },
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
+    event::LogEvent,
     event::Value,
     internal_events::{
-        LogToMetricEventProcessed, LogToMetricFieldNotFound, LogToMetricParseError,
-        LogToMetricRenderError, LogToMetricTemplateError,
+        LogToMetricEventProcessed, LogToMetricFieldNotFound, LogToMetricParseFloatError,
+        LogToMetricTemplateParseError, LogToMetricTemplateRenderError,
     },
     template::{Template, TemplateError},
     Event,
@@ -14,6 +18,7 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
+use std::num::ParseFloatError;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -83,8 +88,10 @@ pub struct LogToMetric {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<LogToMetricConfig>("log_to_metric")
+    TransformDescription::new::<LogToMetricConfig>("log_to_metric")
 }
+
+impl GenerateConfig for LogToMetricConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "log_to_metric")]
@@ -113,34 +120,41 @@ impl LogToMetric {
 }
 
 enum TransformError {
-    FieldNotFound,
-    TemplateError(TemplateError),
-    RenderError(String),
-    ParseError(&'static str),
+    FieldNotFound { field: Atom },
+    TemplateParseError(TemplateError),
+    TemplateRenderError { missing_keys: Vec<String> },
+    ParseFloatError { field: Atom, error: ParseFloatError },
 }
 
 fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
-    let template = Template::try_from(s).map_err(TransformError::TemplateError)?;
-    let name = template.render(&event).map_err(|e| {
-        TransformError::RenderError(format!(
-            "Keys ({:?}) do not exist on the event; dropping event.",
-            e
-        ))
-    })?;
-    Ok(String::from_utf8_lossy(&name.to_vec()).to_string())
+    let template = Template::try_from(s).map_err(TransformError::TemplateParseError)?;
+    template.render_string(&event).map_err(|missing_keys| {
+        // convert to String to avoid printing Atom in Debug format
+        let missing_keys = missing_keys
+            .into_iter()
+            .map(|k| k.to_string())
+            .collect::<Vec<String>>();
+        TransformError::TemplateRenderError { missing_keys }
+    })
 }
 
 fn render_tags(
     tags: &Option<IndexMap<Atom, String>>,
     event: &Event,
-) -> Option<BTreeMap<String, String>> {
-    match tags {
+) -> Result<Option<BTreeMap<String, String>>, TransformError> {
+    Ok(match tags {
         None => None,
         Some(tags) => {
             let mut map = BTreeMap::new();
             for (name, value) in tags {
-                if let Ok(tag) = render_template(value, event) {
-                    map.insert(name.to_string(), tag);
+                match render_template(value, event) {
+                    Ok(tag) => {
+                        map.insert(name.to_string(), tag);
+                    }
+                    Err(TransformError::TemplateRenderError { missing_keys }) => {
+                        emit!(LogToMetricTemplateRenderError { missing_keys });
+                    }
+                    Err(other) => return Err(other),
                 }
             }
             if !map.is_empty() {
@@ -149,14 +163,29 @@ fn render_tags(
                 None
             }
         }
-    }
+    })
+}
+
+fn parse_field(log: &LogEvent, field: &Atom) -> Result<f64, TransformError> {
+    let value = log
+        .get(field)
+        .ok_or_else(|| TransformError::FieldNotFound {
+            field: field.clone(),
+        })?;
+    value
+        .to_string_lossy()
+        .parse()
+        .map_err(|error| TransformError::ParseFloatError {
+            field: field.clone(),
+            error,
+        })
 }
 
 fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
     let log = event.as_log();
 
     let timestamp = log
-        .get(&log_schema().timestamp_key())
+        .get(&Atom::from(log_schema().timestamp_key()))
         .and_then(Value::as_timestamp)
         .cloned();
 
@@ -164,12 +193,16 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
         MetricConfig::Counter(counter) => {
             let value = log
                 .get(&counter.field)
-                .ok_or(TransformError::FieldNotFound)?;
+                .ok_or_else(|| TransformError::FieldNotFound {
+                    field: counter.field.clone(),
+                })?;
             let value = if counter.increment_by_value {
-                value
-                    .to_string_lossy()
-                    .parse()
-                    .map_err(|_| TransformError::ParseError("counter value"))?
+                value.to_string_lossy().parse().map_err(|error| {
+                    TransformError::ParseFloatError {
+                        field: counter.field.clone(),
+                        error,
+                    }
+                })?
             } else {
                 1.0
             };
@@ -177,7 +210,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = counter.name.as_ref().unwrap_or(&counter.field);
             let name = render_template(&name, &event)?;
 
-            let tags = render_tags(&counter.tags, &event);
+            let tags = render_tags(&counter.tags, &event)?;
 
             Ok(Metric {
                 name,
@@ -188,16 +221,12 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             })
         }
         MetricConfig::Histogram(hist) => {
-            let value = log.get(&hist.field).ok_or(TransformError::FieldNotFound)?;
-            let value = value
-                .to_string_lossy()
-                .parse()
-                .map_err(|_| TransformError::ParseError("histogram value"))?;
+            let value = parse_field(&log, &hist.field)?;
 
             let name = hist.name.as_ref().unwrap_or(&hist.field);
             let name = render_template(&name, &event)?;
 
-            let tags = render_tags(&hist.tags, &event);
+            let tags = render_tags(&hist.tags, &event)?;
 
             Ok(Metric {
                 name,
@@ -212,18 +241,12 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             })
         }
         MetricConfig::Summary(summary) => {
-            let value = log
-                .get(&summary.field)
-                .ok_or(TransformError::FieldNotFound)?;
-            let value = value
-                .to_string_lossy()
-                .parse()
-                .map_err(|_| TransformError::ParseError("summary value"))?;
+            let value = parse_field(&log, &summary.field)?;
 
             let name = summary.name.as_ref().unwrap_or(&summary.field);
             let name = render_template(&name, &event)?;
 
-            let tags = render_tags(&summary.tags, &event);
+            let tags = render_tags(&summary.tags, &event)?;
 
             Ok(Metric {
                 name,
@@ -238,16 +261,12 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             })
         }
         MetricConfig::Gauge(gauge) => {
-            let value = log.get(&gauge.field).ok_or(TransformError::FieldNotFound)?;
-            let value = value
-                .to_string_lossy()
-                .parse()
-                .map_err(|_| TransformError::ParseError("gauge value"))?;
+            let value = parse_field(&log, &gauge.field)?;
 
             let name = gauge.name.as_ref().unwrap_or(&gauge.field);
             let name = render_template(&name, &event)?;
 
-            let tags = render_tags(&gauge.tags, &event);
+            let tags = render_tags(&gauge.tags, &event)?;
 
             Ok(Metric {
                 name,
@@ -258,13 +277,17 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             })
         }
         MetricConfig::Set(set) => {
-            let value = log.get(&set.field).ok_or(TransformError::FieldNotFound)?;
+            let value = log
+                .get(&set.field)
+                .ok_or_else(|| TransformError::FieldNotFound {
+                    field: set.field.clone(),
+                })?;
             let value = value.to_string_lossy();
 
             let name = set.name.as_ref().unwrap_or(&set.field);
             let name = render_template(&name, &event)?;
 
-            let tags = render_tags(&set.tags, &event);
+            let tags = render_tags(&set.tags, &event)?;
 
             Ok(Metric {
                 name,
@@ -272,7 +295,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 tags,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Set {
-                    values: vec![value].into_iter().collect(),
+                    values: std::iter::once(value).collect(),
                 },
             })
         }
@@ -294,11 +317,17 @@ impl Transform for LogToMetric {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }
-                Err(TransformError::FieldNotFound) => emit!(LogToMetricFieldNotFound),
-                Err(TransformError::ParseError(error)) => emit!(LogToMetricParseError { error }),
-                Err(TransformError::RenderError(error)) => emit!(LogToMetricRenderError { error }),
-                Err(TransformError::TemplateError(error)) => {
-                    emit!(LogToMetricTemplateError { error })
+                Err(TransformError::FieldNotFound { field }) => {
+                    emit!(LogToMetricFieldNotFound { field })
+                }
+                Err(TransformError::ParseFloatError { field, error }) => {
+                    emit!(LogToMetricParseFloatError { field, error })
+                }
+                Err(TransformError::TemplateRenderError { missing_keys }) => {
+                    emit!(LogToMetricTemplateRenderError { missing_keys })
+                }
+                Err(TransformError::TemplateParseError(error)) => {
+                    emit!(LogToMetricTemplateParseError { error })
                 }
             }
         }
@@ -327,8 +356,7 @@ mod tests {
     fn create_event(key: &str, value: &str) -> Event {
         let mut log = Event::from("i am a log");
         log.as_mut_log().insert(key, value);
-        log.as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts());
+        log.as_mut_log().insert(log_schema().timestamp_key(), ts());
         log
     }
 
@@ -437,9 +465,8 @@ mod tests {
 
         let event = create_event("success", "42");
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform(event);
 
-        assert!(metric.is_none());
+        assert_eq!(transform.transform(event), None);
     }
 
     #[test]
@@ -512,7 +539,7 @@ mod tests {
         let event = create_event("status", "not a number");
         let mut transform = LogToMetric::new(config);
 
-        assert!(transform.transform(event).is_none());
+        assert_eq!(transform.transform(event), None);
     }
 
     #[test]
@@ -529,7 +556,7 @@ mod tests {
         let event = create_event("not foo", "not a number");
         let mut transform = LogToMetric::new(config);
 
-        assert!(transform.transform(event).is_none());
+        assert_eq!(transform.transform(event), None);
     }
 
     #[test]
@@ -550,7 +577,7 @@ mod tests {
         let mut event = Event::from("i am a log");
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts());
+            .insert(log_schema().timestamp_key(), ts());
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
 
@@ -600,7 +627,7 @@ mod tests {
         let mut event = Event::from("i am a log");
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key().clone(), ts());
+            .insert(log_schema().timestamp_key(), ts());
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
         event.as_mut_log().insert("host", "local");
