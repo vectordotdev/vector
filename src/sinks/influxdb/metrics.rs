@@ -825,6 +825,7 @@ mod integration_tests {
                 ca_file: Some("tests/data/Vector_CA.crt".into()),
                 ..Default::default()
             }),
+            quantiles: default_summary_quantiles(),
         };
 
         let events: Vec<_> = (0..10).map(create_event).collect();
