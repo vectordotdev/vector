@@ -71,30 +71,87 @@ components: sources: [Name=string]: {
 	}
 
 	output: {
+		_passthrough_counter: {
+			description: data_model.schema.metric.type.object.options.counter.description
+			tags: {
+				"*": {
+					description: "Any tags present on the metric."
+					examples: [_values.local_host]
+					required: false
+				}
+			}
+			type: "counter"
+		}
+
+		_passthrough_gauge: {
+			description: data_model.schema.metric.type.object.options.gauge.description
+			tags: {
+				"*": {
+					description: "Any tags present on the metric."
+					examples: [_values.local_host]
+					required: false
+				}
+			}
+			type: "gauge"
+		}
+
+		_passthrough_histogram: {
+			description: data_model.schema.metric.type.object.options.histogram.description
+			tags: {
+				"*": {
+					description: "Any tags present on the metric."
+					examples: [_values.local_host]
+					required: false
+				}
+			}
+			type: "gauge"
+		}
+
+		_passthrough_set: {
+			description: data_model.schema.metric.type.object.options.set.description
+			tags: {
+				"*": {
+					description: "Any tags present on the metric."
+					examples: [_values.local_host]
+					required: false
+				}
+			}
+			type: "gauge"
+		}
+
+		_passthrough_summary: {
+			description: data_model.schema.metric.type.object.options.summary.description
+			tags: {
+				"*": {
+					description: "Any tags present on the metric."
+					examples: [_values.local_host]
+					required: false
+				}
+			}
+			type: "gauge"
+		}
+
 		logs?: [Name=string]: {
 			fields: {
-				_host: {
-					description: "The local hostname, equivalent to the `gethostname` command."
-					required:    true
-					type: string: examples: ["host.mydomain.com"]
-				}
-
-				_timestamp: {
+				_current_timestamp: {
 					description: "The exact time the event was ingested into Vector."
 					required:    true
 					type: timestamp: {}
 				}
+
+				_local_host: {
+					description: "The local hostname, equivalent to the `gethostname` command."
+					required:    true
+					type: string: examples: [_values.local_host]
+				}
+
+				_raw_line: {
+					description: "The raw line, unparsed."
+					required:    true
+					type: string: examples: ["2019-02-13T19:48:34+00:00 [info] Started GET \"/\" for 127.0.0.1"]
+				}
 			}
 		}
-	}
-
-	// Example uses for the component.
-	examples: {
-		log: [
-			...{
-				input: string
-			},
-		]
 	}
 
 	how_it_works: {

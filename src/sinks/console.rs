@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     internal_events::ConsoleFieldNotFound,
     sinks::util::{
@@ -15,6 +15,7 @@ use futures::{
     FutureExt,
 };
 use serde::{Deserialize, Serialize};
+use string_cache::DefaultAtom as Atom;
 use tokio::io::{self, AsyncWriteExt};
 
 #[derive(Debug, Derivative, Deserialize, Serialize)]
@@ -42,8 +43,10 @@ pub enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<ConsoleSinkConfig>("console")
+    SinkDescription::new::<ConsoleSinkConfig>("console")
 }
+
+impl GenerateConfig for ConsoleSinkConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "console")]
@@ -91,11 +94,11 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
                 .ok(),
             Encoding::Text => {
                 let field = crate::config::log_schema().message_key();
-                match log.get(&field) {
+                match log.get(&Atom::from(field)) {
                     Some(v) => Some(v.to_string_lossy()),
                     None => {
                         emit!(ConsoleFieldNotFound {
-                            missing_field: field.to_string()
+                            missing_field: field,
                         });
                         None
                     }
@@ -202,7 +205,7 @@ mod test {
             },
         });
         assert_eq!(
-            r#"{"name":"users","timestamp":null,"tags":null,"kind":"incremental","set":{"values":["bob"]}}"#,
+            r#"{"name":"users","kind":"incremental","set":{"values":["bob"]}}"#,
             encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
         );
     }
@@ -221,7 +224,7 @@ mod test {
             },
         });
         assert_eq!(
-            r#"{"name":"glork","timestamp":null,"tags":null,"kind":"incremental","distribution":{"values":[10.0],"sample_rates":[1],"statistic":"histogram"}}"#,
+            r#"{"name":"glork","kind":"incremental","distribution":{"values":[10.0],"sample_rates":[1],"statistic":"histogram"}}"#,
             encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
         );
     }

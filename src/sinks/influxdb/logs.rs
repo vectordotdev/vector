@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     sinks::{
         influxdb::{
@@ -19,6 +19,7 @@ use http::{Request, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
+use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -68,8 +69,10 @@ pub enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<InfluxDBLogsConfig>("influxdb_logs")
+    SinkDescription::new::<InfluxDBLogsConfig>("influxdb_logs")
 }
+
+impl GenerateConfig for InfluxDBLogsConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_logs")]
@@ -148,10 +151,12 @@ impl HttpSink for InfluxDBLogsSink {
         let measurement = encode_namespace(Some(&self.namespace), '.', "vector");
 
         // Timestamp
-        let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
-            Some(Value::Timestamp(ts)) => Some(ts),
-            _ => None,
-        });
+        let timestamp = encode_timestamp(
+            match event.remove(&Atom::from(log_schema().timestamp_key())) {
+                Some(Value::Timestamp(ts)) => Some(ts),
+                _ => None,
+            },
+        );
 
         // Tags + Fields
         let mut tags: BTreeMap<String, String> = BTreeMap::new();
