@@ -2,7 +2,7 @@ name: Master Test Suite
 
 on:
   push:
-    branches: 
+    branches:
       - master
     paths:
       - ".github/workflows/master.yml"
