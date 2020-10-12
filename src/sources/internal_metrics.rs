@@ -16,11 +16,13 @@ use std::time::Duration;
 use tokio::{select, time::interval};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
-pub struct InternalMetricsConfig;
+pub struct InternalMetricsConfig {}
 
 inventory::submit! {
     SourceDescription::new::<InternalMetricsConfig>("internal_metrics")
 }
+
+impl_generate_config_from_default!(InternalMetricsConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "internal_metrics")]
@@ -80,6 +82,11 @@ mod tests {
     use crate::metrics::{capture_metrics, get_controller};
     use metrics::{counter, gauge, histogram};
     use std::collections::BTreeMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::InternalMetricsConfig>();
+    }
 
     #[test]
     fn captures_internal_metrics() {

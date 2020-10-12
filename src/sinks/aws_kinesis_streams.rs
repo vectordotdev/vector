@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::Event,
     internal_events::AwsKinesisStreamsEventSent,
@@ -72,8 +72,10 @@ pub enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<KinesisSinkConfig>("aws_kinesis_streams")
+    SinkDescription::new::<KinesisSinkConfig>("aws_kinesis_streams")
 }
+
+impl GenerateConfig for KinesisSinkConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_kinesis_streams")]
@@ -281,7 +283,7 @@ fn encode_event(
     let data = match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
         Encoding::Text => log
-            .get(&log_schema().message_key())
+            .get(&Atom::from(log_schema().message_key()))
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };
