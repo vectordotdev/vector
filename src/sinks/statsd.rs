@@ -1,7 +1,6 @@
 #[cfg(unix)]
 use crate::sinks::util::unix::{UnixService, UnixSinkConfig};
 use crate::{
-    buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::Event,
@@ -18,6 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use std::collections::BTreeMap;
 use std::fmt::Display;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::task::{Context, Poll};
 use tower::{Service, ServiceBuilder};
 
@@ -56,12 +56,18 @@ inventory::submit! {
     SinkDescription::new::<StatsdSinkConfig>("statsd")
 }
 
+fn default_address() -> SocketAddr {
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8125)
+}
+
 impl GenerateConfig for StatsdSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(&Self {
             namespace: None,
-            address: default_address(),
             batch: Default::default(),
+            mode: Mode::Udp(UdpSinkConfig {
+                address: default_address().to_string(),
+            }),
         })
         .unwrap()
     }
