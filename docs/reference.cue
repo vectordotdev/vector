@@ -419,7 +419,7 @@ _values: {
 		// For example, the `file` source requires that the target directory
 		// be mounted as a volume:
 		//
-		// 		- v /var/log
+		//   - v /var/log
 		flags: [...string]
 	}
 	triples: {

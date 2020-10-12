@@ -142,7 +142,7 @@ components: sources: file: {
 			}
 		}
 		max_read_bytes: {
-			category: "Reading"
+			category:    "Reading"
 			common:      false
 			description: "An approximate limit on the amount of data read from a single file at a given time."
 			required:    false
@@ -153,7 +153,7 @@ components: sources: file: {
 			}
 		}
 		oldest_first: {
-			category: "Reading"
+			category:    "Reading"
 			common:      false
 			description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files."
 			required:    false
