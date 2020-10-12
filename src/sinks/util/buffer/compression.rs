@@ -1,19 +1,22 @@
 use serde::{de, ser};
 use std::fmt;
 
-const GZIP_DEFAULT: usize = 6;
+pub const GZIP_NONE: usize = 0;
+pub const GZIP_FAST: usize = 1;
+pub const GZIP_DEFAULT: usize = 6;
+pub const GZIP_BEST: usize = 9;
 
 #[derive(Debug, Derivative, Copy, Clone, Eq, PartialEq)]
 #[derivative(Default)]
 pub enum Compression {
     #[derivative(Default)]
     None,
-    Gzip(usize),
+    Gzip(Option<usize>),
 }
 
 impl Compression {
-    pub const fn default_gzip() -> Compression {
-        Compression::Gzip(GZIP_DEFAULT)
+    pub const fn gzip_default() -> Compression {
+        Compression::Gzip(None)
     }
 
     pub fn content_encoding(&self) -> Option<&'static str> {
@@ -37,6 +40,7 @@ impl From<Compression> for rusoto_core::encoding::ContentEncoding {
         match compression {
             Compression::None => rusoto_core::encoding::ContentEncoding::Identity,
             Compression::Gzip(level) => {
+                let level = level.unwrap_or(GZIP_DEFAULT);
                 rusoto_core::encoding::ContentEncoding::Gzip(None, level as u32)
             }
         }
@@ -63,7 +67,7 @@ impl<'de> de::Deserialize<'de> for Compression {
             {
                 match s {
                     "none" => Ok(Compression::None),
-                    "gzip" => Ok(Compression::default_gzip()),
+                    "gzip" => Ok(Compression::gzip_default()),
                     _ => Err(de::Error::invalid_value(de::Unexpected::Str(s), &self)),
                 }
             }
@@ -99,27 +103,32 @@ impl<'de> de::Deserialize<'de> for Compression {
                 match algorithm.ok_or_else(|| de::Error::missing_field("algorithm"))? {
                     "none" => Ok(Compression::None),
                     "gzip" => Ok(Compression::Gzip(
-                        match level.unwrap_or_else(|| "default".to_owned()).as_str() {
-                            "none" => 0,
-                            "fast" => 1,
-                            "default" => GZIP_DEFAULT,
-                            "best" => 9,
-                            value => match value.parse::<usize>() {
-                                Ok(level) if level <= 9 => level,
-                                Ok(level) => {
-                                    return Err(de::Error::invalid_value(
-                                        de::Unexpected::Unsigned(level as u64),
-                                        &self,
-                                    ))
-                                }
-                                Err(_) => {
-                                    return Err(de::Error::invalid_value(
-                                        de::Unexpected::Str(value),
-                                        &self,
-                                    ))
-                                }
-                            },
-                        },
+                        match level {
+                            Some(level) => {
+                                Some(match level.as_str() {
+                                    "none" => GZIP_NONE,
+                                    "fast" => GZIP_FAST,
+                                    "default" => GZIP_DEFAULT,
+                                    "best" => GZIP_BEST,
+                                    value => match value.parse::<usize>() {
+                                        Ok(level) if level <= 9 => level,
+                                        Ok(level) => {
+                                            return Err(de::Error::invalid_value(
+                                                de::Unexpected::Unsigned(level as u64),
+                                                &self,
+                                            ))
+                                        }
+                                        Err(_) => {
+                                            return Err(de::Error::invalid_value(
+                                                de::Unexpected::Str(value),
+                                                &self,
+                                            ))
+                                        }
+                                    },
+                                })
+                            }
+                            None => None,
+                        }
                     )),
                     algorithm => Err(de::Error::unknown_variant(algorithm, &["none", "gzip"])),
                 }
@@ -142,12 +151,12 @@ impl ser::Serialize for Compression {
             Compression::None => map.serialize_entry("algorithm", "none")?,
             Compression::Gzip(level) => {
                 map.serialize_entry("algorithm", "gzip")?;
-                match level {
-                    0 => map.serialize_entry("level", "none")?,
-                    1 => map.serialize_entry("level", "fast")?,
-                    &GZIP_DEFAULT => map.serialize_entry("level", "default")?,
-                    9 => map.serialize_entry("level", "best")?,
-                    level => map.serialize_entry("level", level)?,
+                match level.unwrap_or(GZIP_DEFAULT) {
+                    GZIP_NONE => map.serialize_entry("level", "none")?,
+                    GZIP_FAST => map.serialize_entry("level", "fast")?,
+                    GZIP_DEFAULT => map.serialize_entry("level", "default")?,
+                    GZIP_BEST => map.serialize_entry("level", "best")?,
+                    level => map.serialize_entry("level", &level)?,
                 };
             }
         };

@@ -11,7 +11,7 @@ pub mod metrics;
 pub mod partition;
 pub mod vec;
 
-pub use compression::Compression;
+pub use compression::{Compression, GZIP_FAST};
 pub use partition::{Partition, PartitionBuffer, PartitionInnerBuffer};
 
 #[derive(Debug)]
@@ -34,10 +34,13 @@ impl Buffer {
         let buffer = Vec::with_capacity(settings.bytes);
         let inner = match compression {
             Compression::None => InnerBuffer::Plain(buffer),
-            Compression::Gzip(level) => InnerBuffer::Gzip(GzEncoder::new(
-                buffer,
-                flate2::Compression::new(level as u32),
-            )),
+            Compression::Gzip(level) => {
+                let level = level.unwrap_or(GZIP_FAST);
+                InnerBuffer::Gzip(GzEncoder::new(
+                    buffer,
+                    flate2::Compression::new(level as u32),
+                ))
+            }
         };
         Self {
             inner,
@@ -160,7 +163,7 @@ mod test {
 
         let buffered = BatchSink::new(
             svc,
-            Buffer::new(batch_size, Compression::default_gzip()),
+            Buffer::new(batch_size, Compression::gzip_default()),
             timeout,
             acker,
         );
