@@ -35,7 +35,7 @@ components: transforms: add_tags: {
 	configuration: {
 		overwrite: {
 			common:      true
-			description: "By default, fields will be overridden. Set this to `false` to avoid overwriting values.\n"
+			description: "By default, fields will be overridden. Set this to `false` to avoid overwriting values."
 			required:    false
 			warnings: []
 			type: bool: default: true
