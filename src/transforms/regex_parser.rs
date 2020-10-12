@@ -39,6 +39,8 @@ inventory::submit! {
     TransformDescription::new::<RegexParserConfig>("regex_parser")
 }
 
+impl_generate_config_from_default!(RegexParserConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
@@ -305,6 +307,11 @@ mod tests {
         config::{TransformConfig, TransformContext},
         Event,
     };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<RegexParserConfig>();
+    }
 
     async fn do_transform(event: &str, patterns: &str, config: &str) -> Option<LogEvent> {
         let event = Event::from(event);

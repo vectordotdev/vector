@@ -107,7 +107,7 @@ weak-table = { version = "0.3.0", optional = true }
 
 # External libs
 derivative = "1.0"
-chrono = { version = "0.4.6", features = ["serde"] }
+chrono = { version = "0.4.19", features = ["serde"] }
 rand = "0.5.5"
 regex = "1.3.9"
 bytes = { version = "0.5.6", features = ["serde"] }
@@ -119,7 +119,7 @@ openssl-probe = "0.1.2"
 string_cache = "0.7.3"
 flate2 = "1.0.6"
 async-compression = { version = "0.3.5", features = ["tokio-02", "gzip"] }
-structopt = "0.3.13"
+structopt = "0.3.19"
 indexmap = {version = "1.5.1", features = ["serde-1"]}
 http = "0.2"
 typetag = "0.1"
@@ -165,7 +165,7 @@ bloom = "0.3.2"
 pulsar = { version = "1.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
 task-compat = "0.1"
 cidr-utils = "0.4.2"
-pin-project = "0.4.23"
+pin-project = "0.4.26"
 k8s-openapi = { version = "0.9", features = ["v1_15"], optional = true }
 portpicker = "0.1.0"
 sha-1 = "0.9"
@@ -277,6 +277,7 @@ api_client = [
 # Sources
 sources = [
   "sources-apache_metrics",
+  "sources-aws_kinesis_firehose",
   "sources-docker",
   "sources-file",
   "sources-generator",
@@ -297,6 +298,7 @@ sources = [
   "sources-kubernetes-logs",
 ]
 sources-apache_metrics = []
+sources-aws_kinesis_firehose = ["base64", "sources-tls", "warp"]
 sources-docker = ["bollard"]
 sources-file = ["bytesize", "file-source"]
 sources-generator = []
@@ -321,6 +323,7 @@ transforms = [
   "transforms-add_fields",
   "transforms-add_tags",
   "transforms-ansi_stripper",
+  "transforms-aws_cloudwatch_logs_subscription_parser",
   "transforms-aws_ec2_metadata",
   "transforms-coercer",
   "transforms-concat",
@@ -350,6 +353,7 @@ transforms = [
 transforms-add_fields = []
 transforms-add_tags = []
 transforms-ansi_stripper = []
+transforms-aws_cloudwatch_logs_subscription_parser= []
 transforms-aws_ec2_metadata = ["evmap"]
 transforms-coercer = []
 transforms-concat = []
@@ -402,7 +406,7 @@ sinks = [
   "sinks-new_relic_logs",
   "sinks-papertrail",
   "sinks-prometheus",
-  "sinks-sematext_logs",
+  "sinks-sematext",
   "sinks-socket",
   "sinks-splunk_hec",
   "sinks-statsd",
@@ -431,7 +435,7 @@ sinks-logdna = ["bytesize"]
 sinks-loki = ["bytesize"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-prometheus = []
-sinks-sematext_logs = ["sinks-elasticsearch"]
+sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = []
 sinks-papertrail = []
 sinks-splunk_hec = ["bytesize"]

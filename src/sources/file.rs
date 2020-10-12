@@ -84,6 +84,8 @@ pub struct FileConfig {
 #[serde(tag = "strategy", rename_all = "snake_case")]
 pub enum FingerprintConfig {
     Checksum {
+        // Deprecated name
+        #[serde(alias = "fingerprint_bytes")]
         bytes: usize,
         ignored_header_bytes: usize,
     },
@@ -139,6 +141,8 @@ impl Default for FileConfig {
 inventory::submit! {
     SourceDescription::new::<FileConfig>("file")
 }
+
+impl_generate_config_from_default!(FileConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "file")]
@@ -333,6 +337,11 @@ mod tests {
     use string_cache::DefaultAtom as Atom;
     use tempfile::tempdir;
     use tokio::time::{delay_for, timeout, Duration};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<FileConfig>();
+    }
 
     fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {

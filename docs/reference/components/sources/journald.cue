@@ -8,7 +8,8 @@ components: sources: journald: {
 	classes: {
 		commonly_used: true
 		deployment_roles: ["daemon"]
-		function: "collect"
+		egress_method: "batch"
+		function:      "collect"
 	}
 
 	features: {
@@ -69,9 +70,9 @@ components: sources: journald: {
 			description: "The list of unit names to exclude from monitoring. Unit names lacking a `\".\"` will have `\".service\"` appended to make them a valid service unit name."
 			required:    false
 			warnings: []
-			type: "[string]": {
+			type: array: {
 				default: []
-				examples: [["badservice", "sysinit.target"]]
+				items: type: string: examples: ["badservice", "sysinit.target"]
 			}
 		}
 		include_units: {
@@ -79,9 +80,9 @@ components: sources: journald: {
 			description: "The list of unit names to monitor. If empty or not present, all units are accepted. Unit names lacking a `\".\"` will have `\".service\"` appended to make them a valid service unit name."
 			required:    false
 			warnings: []
-			type: "[string]": {
+			type: array: {
 				default: []
-				examples: [["ntpd", "sysinit.target"]]
+				items: type: string: examples: ["ntpd", "sysinit.target"]
 			}
 		}
 		journalctl_path: {
@@ -102,41 +103,46 @@ components: sources: journald: {
 			type: bool: default: false
 		}
 	}
-	examples: log: [
+
+	examples: [
 		{
 			title: "Sample Output"
-			configuration: {
-			}
-			input: {
-				"2019-07-26 20:30:27 reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s"
-			}
-			output: {
-				timestamp:                "2019-07-26T20:30:27.000443Z"
-				message:                  "reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s"
-				host:                     "lorien.example.com"
-				"__REALTIME_TIMESTAMP":   "1564173027000443"
-				"__MONOTONIC_TIMESTAMP":  "98694000446"
-				"_BOOT_ID":               "124c781146e841ae8d9b4590df8b9231"
-				"SYSLOG_FACILITY":        "3"
-				"_UID":                   "0"
-				"_GID":                   "0"
-				"_CAP_EFFECTIVE":         "3fffffffff"
-				"_MACHINE_ID":            "c36e9ea52800a19d214cb71b53263a28"
-				"PRIORITY":               "6"
-				"_TRANSPORT":             "stdout"
-				"_STREAM_ID":             "92c79f4b45c4457490ebdefece29995e"
-				"SYSLOG_IDENTIFIER":      "ntpd"
-				"_PID":                   "2156"
-				"_COMM":                  "ntpd"
-				"_EXE":                   "/usr/sbin/ntpd"
-				"_CMDLINE":               "ntpd: [priv]"
-				"_SYSTEMD_CGROUP":        "/system.slice/ntpd.service"
-				"_SYSTEMD_UNIT":          "ntpd.service"
-				"_SYSTEMD_SLICE":         "system.slice"
-				"_SYSTEMD_INVOCATION_ID": "496ad5cd046d48e29f37f559a6d176f8"
-			}
+			configuration: {}
+			input: #"""
+				```text
+				2019-07-26 20:30:27 reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s
+				```
+				"""#
+			output: [{
+				log: {
+					timestamp:                _values.current_timestamp
+					message:                  "reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s"
+					host:                     _values.local_host
+					"__REALTIME_TIMESTAMP":   "1564173027000443"
+					"__MONOTONIC_TIMESTAMP":  "98694000446"
+					"_BOOT_ID":               "124c781146e841ae8d9b4590df8b9231"
+					"SYSLOG_FACILITY":        "3"
+					"_UID":                   "0"
+					"_GID":                   "0"
+					"_CAP_EFFECTIVE":         "3fffffffff"
+					"_MACHINE_ID":            "c36e9ea52800a19d214cb71b53263a28"
+					"PRIORITY":               "6"
+					"_TRANSPORT":             "stdout"
+					"_STREAM_ID":             "92c79f4b45c4457490ebdefece29995e"
+					"SYSLOG_IDENTIFIER":      "ntpd"
+					"_PID":                   "2156"
+					"_COMM":                  "ntpd"
+					"_EXE":                   "/usr/sbin/ntpd"
+					"_CMDLINE":               "ntpd: [priv]"
+					"_SYSTEMD_CGROUP":        "/system.slice/ntpd.service"
+					"_SYSTEMD_UNIT":          "ntpd.service"
+					"_SYSTEMD_SLICE":         "system.slice"
+					"_SYSTEMD_INVOCATION_ID": "496ad5cd046d48e29f37f559a6d176f8"
+				}
+			}]
 		},
 	]
+
 	how_it_works: {
 		"communication-strategy": {
 			title: "Communication Strategy"

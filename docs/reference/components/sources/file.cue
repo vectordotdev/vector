@@ -8,7 +8,8 @@ components: sources: file: {
 	classes: {
 		commonly_used: true
 		deployment_roles: ["daemon", "sidecar"]
-		function: "collect"
+		egress_method: "stream"
+		function:      "collect"
 	}
 
 	features: {
@@ -42,9 +43,9 @@ components: sources: file: {
 			common:      false
 			description: "Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes precedence over the [`include` option](#include).*"
 			required:    false
-			type: "[string]": {
+			type: array: {
 				default: null
-				examples: [["/var/log/nginx/*.[0-9]*.log"]]
+				items: type: string: examples: ["/var/log/nginx/*.[0-9]*.log"]
 			}
 		}
 		file_key: {
@@ -56,7 +57,7 @@ components: sources: file: {
 				examples: ["file"]
 			}
 		}
-		fingerprinting: {
+		fingerprint: {
 			common:      false
 			description: "Configuration for how the file source should identify files."
 			required:    false
@@ -68,13 +69,13 @@ components: sources: file: {
 					type: string: {
 						default: "checksum"
 						enum: {
-							checksum:         "Read `fingerprint_bytes` bytes from the head of the file to uniquely identify files via a checksum."
+							checksum:         "Read `bytes` bytes from the head of the file to uniquely identify files via a checksum."
 							device_and_inode: "Uses the [device and inode][urls.inode] to unique identify files."
 						}
 						examples: ["checksum", "device_and_inode"]
 					}
 				}
-				fingerprint_bytes: {
+				bytes: {
 					common:        false
 					description:   "The number of bytes read off the head of the file to generate a unique fingerprint."
 					relevant_when: "`strategy` = \"checksum\""
@@ -124,7 +125,7 @@ components: sources: file: {
 		include: {
 			description: "Array of file patterns to include. [Globbing](#globbing) is supported."
 			required:    true
-			type: "[string]": examples: [["/var/log/nginx/*.log"]]
+			type: array: items: type: string: examples: ["/var/log/nginx/*.log"]
 		}
 		max_line_bytes: {
 			common:      false
@@ -177,31 +178,34 @@ components: sources: file: {
 				required:    true
 				type: string: examples: ["/var/log/apache/access.log"]
 			}
-			host: fields._host
+			host: fields._local_host
 			message: {
 				description: "The raw line from the file."
 				required:    true
 				type: string: examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
 			}
-			timestamp: fields._timestamp
+			timestamp: fields._current_timestamp
 		}
 	}
 
-	examples: log: [
+	examples: [
 		{
+			_file: "/var/log/apache/access.log"
+			_line: "53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"
 			title: "Apache Access Log"
 			configuration: {
 				include: ["/var/logs/**/*.log"]
 			}
 			input: """
-				```text filename="/var/log/apache/access.log"
-				53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"
+				```text filename="\(_file)"
+				\(_line)
 				```
 				"""
-			output: {
-				file:      "/var/log/apache/access.log"
-				message:   "53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"
-				timestamp: "2020-10-01T11:23:25.333432Z"
+			output: log: {
+				file:      _file
+				host:      _values.local_host
+				message:   _line
+				timestamp: _values.current_timestamp
 			}
 		},
 	]
@@ -313,8 +317,8 @@ components: sources: file: {
 				"""#
 		}
 
-		fingerprinting: {
-			title: "Fingerprinting"
+		fingerprint: {
+			title: "fingerprint"
 			body: #"""
 				By default, Vector identifies files by creating a
 				[cyclic redundancy check](urls.crc) (CRC) on the first 256 bytes of
@@ -361,9 +365,9 @@ components: sources: file: {
 
 						```text
 						foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)
-						  from foobar.rb:6:in `bar'
-						  from foobar.rb:2:in `foo'
-						  from foobar.rb:9:in `<main>'
+							from foobar.rb:6:in `bar'
+							from foobar.rb:2:in `foo'
+							from foobar.rb:9:in `<main>'
 						```
 
 						To consume these lines as a single event, use the following Vector
@@ -371,24 +375,24 @@ components: sources: file: {
 
 						```toml
 						[sources.my_file_source]
-						  type = "file"
-						  # ...
+							type = "file"
+							# ...
 
-						  [sources.my_file_source.multiline]
-						    start_pattern = "^[^\\s]"
-						    mode = "continue_through"
-						    condition_pattern = "^[\\s]+from"
-						    timeout_ms = 1000
+							[sources.my_file_source.multiline]
+								start_pattern = "^[^\\s]"
+								mode = "continue_through"
+								condition_pattern = "^[\\s]+from"
+								timeout_ms = 1000
 						```
 
 						* `start_pattern`, set to `^[^\\s]`, tells Vector that new
-						  multi-line events should _not_ start  with white-space.
+							multi-line events should _not_ start  with white-space.
 						* `mode`, set to `continue_through`, tells Vector continue
-						  aggregating lines until the `condition_pattern` is no longer
-						  valid (excluding the invalid line).
+							aggregating lines until the `condition_pattern` is no longer
+							valid (excluding the invalid line).
 						* `condition_pattern`, set to `^[\\s]+from`, tells Vector to
-						  continue aggregating lines if they start with white-space
-						  followed by `from`.
+							continue aggregating lines if they start with white-space
+							followed by `from`.
 						"""
 				},
 				{
@@ -408,23 +412,23 @@ components: sources: file: {
 
 						```toml
 						[sources.my_file_source]
-						  type = "file"
-						  # ...
+							type = "file"
+							# ...
 
-						  [sources.my_file_source.multiline]
-						    start_pattern = "\\$"
-						    mode = "continue_past"
-						    condition_pattern = "\\$"
-						    timeout_ms = 1000
+							[sources.my_file_source.multiline]
+								start_pattern = "\\$"
+								mode = "continue_past"
+								condition_pattern = "\\$"
+								timeout_ms = 1000
 						```
 
 						* `start_pattern`, set to `\\$`, tells Vector that new multi-line
-						  events start with lines that end in `\`.
+							events start with lines that end in `\`.
 						* `mode`, set to `continue_past`, tells Vector continue
-						  aggregating lines, plus one additional line, until
-						  `condition_pattern` is false.
+							aggregating lines, plus one additional line, until
+							`condition_pattern` is false.
 						* `condition_pattern`, set to `\\$`, tells Vector to continue
-						  aggregating lines if they _end_ with a `\` character.
+							aggregating lines if they _end_ with a `\` character.
 						"""#
 				},
 				{
@@ -444,25 +448,25 @@ components: sources: file: {
 
 						```toml
 						[sources.my_file_source]
-						  type = "file"
-						  # ...
+							type = "file"
+							# ...
 
-						  [sources.my_file_source.multiline]
-						    start_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
-						    mode = "halt_before"
-						    condition_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
-						    timeout_ms = 1000
+							[sources.my_file_source.multiline]
+								start_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
+								mode = "halt_before"
+								condition_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
+								timeout_ms = 1000
 						```
 
 						* `start_pattern`, set to `^\[[0-9]{4}-[0-9]{2}-[0-9]{2}`, tells
-						  Vector that new multi-line events start with a timestamp
-						  sequence.
+							Vector that new multi-line events start with a timestamp
+							sequence.
 						* `mode`, set to `halt_before`, tells Vector to continue
-						  aggregating lines as long as the `condition_pattern` does not
-						  match.
+							aggregating lines as long as the `condition_pattern` does not
+							match.
 						* `condition_pattern`, set to `^\[[0-9]{4}-[0-9]{2}-[0-9]{2}`,
-						  tells Vector to continue aggregating up until a line starts with
-						  a timestamp sequence.
+							tells Vector to continue aggregating up until a line starts with
+							a timestamp sequence.
 						"""##
 				},
 			]
