@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GlobalOptions, SourceConfig, SourceDescription},
+    config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     internal_events::{
         PrometheusErrorResponse, PrometheusEventReceived, PrometheusHttpError,
         PrometheusParseError, PrometheusRequestCompleted,
@@ -34,8 +34,10 @@ pub fn default_scrape_interval_secs() -> u64 {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<PrometheusConfig>("prometheus")
+    SourceDescription::new::<PrometheusConfig>("prometheus")
 }
+
+impl GenerateConfig for PrometheusConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus")]
@@ -227,6 +229,7 @@ mod test {
                 address: out_addr,
                 namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
+                quantiles: vec![],
                 flush_period_secs: 1,
             },
         );
