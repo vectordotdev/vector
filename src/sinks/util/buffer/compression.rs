@@ -1,6 +1,8 @@
 use serde::{de, ser};
 use std::fmt;
 
+const GZIP_DEFAULT: usize = 6;
+
 #[derive(Debug, Derivative, Copy, Clone, Eq, PartialEq)]
 #[derivative(Default)]
 pub enum Compression {
@@ -11,7 +13,7 @@ pub enum Compression {
 
 impl Compression {
     pub const fn default_gzip() -> Compression {
-        Compression::Gzip(6)
+        Compression::Gzip(GZIP_DEFAULT)
     }
 
     pub fn content_encoding(&self) -> Option<&'static str> {
@@ -100,7 +102,7 @@ impl<'de> de::Deserialize<'de> for Compression {
                         match level.unwrap_or_else(|| "default".to_owned()).as_str() {
                             "none" => 0,
                             "fast" => 1,
-                            "default" => 6,
+                            "default" => GZIP_DEFAULT,
                             "best" => 9,
                             value => match value.parse::<usize>() {
                                 Ok(level) if level <= 9 => level,
@@ -143,7 +145,7 @@ impl ser::Serialize for Compression {
                 match level {
                     0 => map.serialize_entry("level", "none")?,
                     1 => map.serialize_entry("level", "fast")?,
-                    6 => map.serialize_entry("level", "default")?,
+                    &GZIP_DEFAULT => map.serialize_entry("level", "default")?,
                     9 => map.serialize_entry("level", "best")?,
                     level => map.serialize_entry("level", level)?,
                 };
