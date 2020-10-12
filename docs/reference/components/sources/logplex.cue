@@ -48,15 +48,8 @@ components: sources: logplex: {
 	}
 
 	configuration: {
-		address: {
-			description: "The address to accept connections on. The address _must_ include a port."
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["0.0.0.0:80"]
-			}
-		}
-		auth: sources.http.configuration.auth
+		address: sources.http.configuration.address
+		auth:    sources.http.configuration.auth
 	}
 
 	output: logs: line: {

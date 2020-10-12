@@ -52,8 +52,9 @@ components: sources: http: {
 
 	configuration: {
 		address: {
-			description: "The address to listen for connections on"
+			description: "The address to accept connections on. The address _must_ include a port."
 			required:    true
+			warnings: []
 			type: string: examples: ["0.0.0.0:80", "localhost:80"]
 		}
 		encoding: {
