@@ -413,14 +413,8 @@ _values: {
 
 #Platforms: {
 	docker: {
-		// `flags` specifies any Docekr flags that must be passed in order for
-		// this soure to work.
-		//
-		// For example, the `file` source requires that the target directory
-		// be mounted as a volume:
-		//
-		//   - v /var/log
-		flags: [...string]
+		ports?: [uint16, ...]
+		volumes?: [string, ...]
 	}
 	triples: {
 		"aarch64-unknown-linux-gnu":  bool

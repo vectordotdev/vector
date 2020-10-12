@@ -1,6 +1,8 @@
 package metadata
 
 components: sources: http: {
+	_port: 80
+
 	title:             "HTTP"
 	long_description:  ""
 	short_description: "Receive logs through the HTTP protocol"
@@ -30,6 +32,7 @@ components: sources: http: {
 
 	support: {
 		platforms: {
+			docker: ports: [_port]
 			triples: {
 				"aarch64-unknown-linux-gnu":  true
 				"aarch64-unknown-linux-musl": true
@@ -56,7 +59,7 @@ components: sources: http: {
 		address: {
 			description: "The address to listen for connections on"
 			required:    true
-			type: string: examples: ["0.0.0.0:80", "localhost:80"]
+			type: string: examples: ["0.0.0.0:\(_port)", "localhost:\(_port)"]
 		}
 		encoding: {
 			common:      true
@@ -116,7 +119,7 @@ components: sources: http: {
 			_user_agent: "my-service/v2.1"
 			title:       "text/plain"
 			configuration: {
-				address:  "0.0.0.0:80"
+				address:  "0.0.0.0:\(_port)"
 				encoding: "text"
 				headers: ["User-Agent"]
 			}
@@ -143,7 +146,7 @@ components: sources: http: {
 			_user_agent: "my-service/v2.1"
 			title:       "application/json"
 			configuration: {
-				address:  "0.0.0.0:80"
+				address:  "0.0.0.0:\(_port)"
 				encoding: "json"
 				headers: ["User-Agent"]
 			}

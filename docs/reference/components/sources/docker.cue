@@ -37,6 +37,7 @@ components: sources: docker: {
 
 	support: {
 		platforms: {
+			docker: volumes: ["/var/run/docker.sock"]
 			triples: {
 				"aarch64-unknown-linux-gnu":  true
 				"aarch64-unknown-linux-musl": true

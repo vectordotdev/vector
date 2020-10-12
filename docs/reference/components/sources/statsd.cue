@@ -1,6 +1,8 @@
 package metadata
 
 components: sources: statsd: {
+	_port: 8126
+
 	title:             "StatsD"
 	short_description: "Ingests data through the [StatsD UDP protocol][urls.statsd_udp_protocol] and outputs metric events."
 	long_description:  "[StatsD][urls.statsd] is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy][urls.etsy] in Node."
@@ -25,6 +27,7 @@ components: sources: statsd: {
 
 	support: {
 		platforms: {
+			docker: ports: [_port]
 			triples: {
 				"aarch64-unknown-linux-gnu":  true
 				"aarch64-unknown-linux-musl": true
@@ -50,7 +53,7 @@ components: sources: statsd: {
 			required:    true
 			warnings: []
 			type: string: {
-				examples: ["127.0.0.1:8126"]
+				examples: ["127.0.0.1:\(_port)"]
 			}
 		}
 	}
