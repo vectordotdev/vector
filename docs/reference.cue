@@ -412,12 +412,24 @@ _values: {
 })
 
 #Platforms: {
-	"aarch64-unknown-linux-gnu":  bool
-	"aarch64-unknown-linux-musl": bool
-	"x86_64-apple-darwin":        bool
-	"x86_64-pc-windows-msv":      bool
-	"x86_64-unknown-linux-gnu":   bool
-	"x86_64-unknown-linux-musl":  bool
+	docker: {
+		// `flags` specifies any Docekr flags that must be passed in order for
+		// this soure to work.
+		//
+		// For example, the `file` source requires that the target directory
+		// be mounted as a volume:
+		//
+		//   - v /var/log
+		flags: [...string]
+	}
+	triples: {
+		"aarch64-unknown-linux-gnu":  bool
+		"aarch64-unknown-linux-musl": bool
+		"x86_64-apple-darwin":        bool
+		"x86_64-pc-windows-msv":      bool
+		"x86_64-unknown-linux-gnu":   bool
+		"x86_64-unknown-linux-musl":  bool
+	}
 }
 
 #Schema: [Name=string]: {
