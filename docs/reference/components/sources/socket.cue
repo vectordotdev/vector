@@ -50,7 +50,7 @@ components: sources: socket: {
 
 	configuration: {
 		address: {
-			description: "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port.\n"
+			description: "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
 			groups: ["tcp", "udp"]
 			required: true
 			warnings: []
@@ -123,7 +123,7 @@ components: sources: socket: {
 		}
 	}
 
-	examples: log: [
+	examples: [
 		{
 			_line: #"""
 				2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
@@ -135,7 +135,7 @@ components: sources: socket: {
 				\( _line )
 				```
 				"""
-			output: {
+			output: log: {
 				timestamp: _values.current_timestamp
 				message:   _line
 				host:      _values.local_host

@@ -23,7 +23,7 @@ components: sources: syslog: {
 			}
 			host: fields._local_host
 			hostname: {
-				description: "The hostname extracted from the Syslog line. (`host` is also this value if it exists in the log.)\n"
+				description: "The hostname extracted from the Syslog line. (`host` is also this value if it exists in the log.)"
 				required:    true
 				type: string: {
 					examples: ["my.host.com"]
@@ -65,7 +65,7 @@ components: sources: syslog: {
 				}
 			}
 			source_ip: {
-				description: "The upstream hostname. In the case where `mode` = `\"unix\"` the socket path will be used. (`host` is also this value if `hostname` does not exist in the log.)\n"
+				description: "The upstream hostname. In the case where `mode` = `\"unix\"` the socket path will be used. (`host` is also this value if `hostname` does not exist in the log.)"
 				required:    true
 				type: string: {
 					examples: ["127.0.0.1"]
@@ -81,14 +81,14 @@ components: sources: syslog: {
 				}
 			}
 			"*": {
-				description: "In addition to the defined fields, any Syslog 5424 structured fields are parsed and inserted as root level fields.\n"
+				description: "In addition to the defined fields, any Syslog 5424 structured fields are parsed and inserted as root level fields."
 				required:    true
 				type: "*": {}
 			}
 		}
 	}
 
-	examples: log: [
+	examples: [
 		{
 			_app_name:     "non"
 			_event_id:     "1011"
@@ -106,7 +106,7 @@ components: sources: syslog: {
 				<13>1 \(_timestamp) \(_hostname) \(_app_name) \(_procid) \(_msgid) [exampleSDID@32473 iut="\(_iut)" eventSource="\(_event_source)" eventID="\(_event_id)"] \(_message)
 				```
 				"""
-			output: {
+			output: log: {
 				severity:    "notice"
 				facility:    "user"
 				timestamp:   _timestamp

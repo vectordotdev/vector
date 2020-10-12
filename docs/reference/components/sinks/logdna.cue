@@ -85,6 +85,15 @@ components: sinks: logdna: {
 				examples: ["staging", "production"]
 			}
 		}
+		endpoint: {
+			common:      false
+			description: "The endpoint to send logs to."
+			required:    false
+			type: string: {
+				default: "https://logs.logdna.com/logs/ingest"
+				examples: ["http://127.0.0.1", "http://example.com"]
+			}
+		}
 		hostname: {
 			description: "The hostname that will be attached to each batch of events."
 			required:    true
