@@ -7,9 +7,15 @@ mod support;
 #[cfg(all(feature = "api", feature = "api_client"))]
 mod tests {
     use crate::support::{sink, source};
+    use api_client::{
+        client::{make_subscription_client, SubscriptionClient},
+        query::HealthQuery,
+        subscription::{
+            EventsProcessedMetricsSubscription, HeartbeatSubscription, UptimeMetricsSubscription,
+        },
+    };
     use chrono::Utc;
     use futures::StreamExt;
-    use graphql_client::*;
     use std::{
         net::SocketAddr,
         sync::Once,
@@ -20,47 +26,12 @@ mod tests {
     use vector::{
         self,
         api::{self, Server},
-        api_client::{make_subscription_client, SubscriptionClient},
         config::Config,
         internal_events::{emit, GeneratorEventProcessed, Heartbeat},
         test_util::{next_addr, retry_until},
     };
 
     static METRICS_INIT: Once = Once::new();
-
-    #[derive(GraphQLQuery)]
-    #[graphql(
-        schema_path = "graphql/schema.json",
-        query_path = "graphql/queries/health.graphql",
-        response_derives = "Debug"
-    )]
-    struct HealthQuery;
-
-    type DateTime = chrono::DateTime<chrono::Utc>;
-
-    #[derive(GraphQLQuery)]
-    #[graphql(
-        schema_path = "graphql/schema.json",
-        query_path = "graphql/subscriptions/heartbeat.graphql",
-        response_derives = "Debug"
-    )]
-    struct HeartbeatSubscription;
-
-    #[derive(GraphQLQuery)]
-    #[graphql(
-        schema_path = "graphql/schema.json",
-        query_path = "graphql/subscriptions/uptime_metrics.graphql",
-        response_derives = "Debug"
-    )]
-    struct UptimeMetricsSubscription;
-
-    #[derive(GraphQLQuery)]
-    #[graphql(
-        schema_path = "graphql/schema.json",
-        query_path = "graphql/subscriptions/events_processed_metrics.graphql",
-        response_derives = "Debug"
-    )]
-    struct EventsProcessedMetricsSubscription;
 
     // Initialize the metrics system. Idempotent.
     fn init_metrics() -> oneshot::Sender<()> {
