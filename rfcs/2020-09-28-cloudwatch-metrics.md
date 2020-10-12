@@ -66,6 +66,11 @@ We could alternatively model dimensions as another table:
   value = "i-05517fbc2e6124dfb"
 ```
 
+**NOTE** decided against this table representation since we have a few other
+examples of vector key/value config that use TOML maps: [`add_tags`
+transform](https://vector.dev/docs/reference/transforms/add_tags/) [`http`
+sink](https://vector.dev/docs/reference/sinks/http/).
+
 To support:
 
 * globbing metric names
@@ -176,6 +181,7 @@ would further advantage `GetMetricData`.
   querying for resources first (e.g. instances with a specific tag) and then
   fetching metrics for those instances.
 * Backfilling metrics if `vector` is restarted or offline for a period.
-* Config examples covering common use-cases
-* Warnings when configured dimensions do not match any metrics in `ListMetrics`
-* Caching `ListMetrics` output across vector restarts to speed up initial start
+* Additional config examples covering common use-cases; basic examples should be
+  included with the source documentation.
+* Warnings when configured dimensions do not match any metrics in `ListMetrics`.
+* Caching `ListMetrics` output across vector restarts to speed up initial start.
