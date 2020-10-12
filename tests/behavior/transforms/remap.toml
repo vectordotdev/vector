@@ -630,3 +630,23 @@
     extract_from = "remap_function_format_number"
     [[tests.outputs.conditions]]
       "a.equals" = "1.234,56"
+
+[transforms.remap_function_format_url]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .url = format_url(.a)
+  """
+[[tests]]
+  name = "remap_function_format_url"
+  [tests.input]
+    insert_at = "remap_function_format_url"
+    type = "log"
+    [tests.input.log_fields]
+      "a.scheme" = "https"
+      "a.host" = "duckduckgo.com"
+      "a.path" = "/"
+  [[tests.outputs]]
+    extract_from = "remap_function_format_url"
+    [[tests.outputs.conditions]]
+      "url.equals" = "https://duckduckgo.com/"

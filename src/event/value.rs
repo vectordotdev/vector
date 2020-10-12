@@ -227,6 +227,34 @@ impl Value {
         self.as_bytes()
     }
 
+    pub fn as_option(&self) -> Option<&Value> {
+        match self {
+            Value::Null => None,
+            value => Some(value),
+        }
+    }
+
+    pub fn as_i64(&self) -> Option<i64> {
+        match self {
+            Value::Integer(i) => Some(*i),
+            _ => None,
+        }
+    }
+
+    pub fn as_map(&self) -> Option<&BTreeMap<String, Value>> {
+        match self {
+            Value::Map(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn as_bytes2(&self) -> Option<Bytes> {
+        match self {
+            Value::Bytes(b) => Some(b.clone()), // cloning a Bytes is cheap
+            _ => None,
+        }
+    }
+
     pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
         match &self {
             Value::Timestamp(ts) => Some(ts),
