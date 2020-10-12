@@ -635,7 +635,7 @@ _values: {
 	// `examples` clarify values through examples. This should be used
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
-	examples?: [_values.current_timestamp]
+	examples: [_values.current_timestamp]
 }
 
 #TypeUint: {
