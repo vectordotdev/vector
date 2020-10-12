@@ -1,7 +1,7 @@
 package metadata
 
 components: sources: file: {
-	_directory: "-v /var/log"
+	_directory: "/var/log"
 
 	title:             "File"
 	long_description:  ""
