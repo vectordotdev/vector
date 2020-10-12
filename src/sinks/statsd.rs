@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::Event,
     internal_events::StatsdInvalidMetricReceived,
@@ -61,7 +61,18 @@ pub fn default_address() -> SocketAddr {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<StatsdSinkConfig>("statsd")
+    SinkDescription::new::<StatsdSinkConfig>("statsd")
+}
+
+impl GenerateConfig for StatsdSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(&Self {
+            namespace: None,
+            address: default_address(),
+            batch: Default::default(),
+        })
+        .unwrap()
+    }
 }
 
 #[async_trait::async_trait]
@@ -238,6 +249,11 @@ mod test {
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
     #[cfg(feature = "sources-statsd")]
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<StatsdSinkConfig>();
+    }
 
     fn tags() -> BTreeMap<String, String> {
         vec![

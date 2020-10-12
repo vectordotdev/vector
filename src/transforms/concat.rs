@@ -1,6 +1,6 @@
 use super::{BuildError, Transform};
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{ConcatEventProcessed, ConcatSubstringError, ConcatSubstringSourceMissing},
 };
@@ -19,8 +19,10 @@ pub struct ConcatConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<ConcatConfig>("concat")
+    TransformDescription::new::<ConcatConfig>("concat")
 }
+
+impl GenerateConfig for ConcatConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "concat")]

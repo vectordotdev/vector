@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     event::Lookup,
     internal_events::{
@@ -24,8 +24,10 @@ pub struct RenameFields {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<RenameFieldsConfig>("rename_fields")
+    TransformDescription::new::<RenameFieldsConfig>("rename_fields")
 }
+
+impl GenerateConfig for RenameFieldsConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "rename_fields")]
