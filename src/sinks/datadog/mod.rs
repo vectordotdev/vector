@@ -6,6 +6,6 @@ pub mod metrics;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Region {
-    Na,
+    Us,
     Eu,
 }

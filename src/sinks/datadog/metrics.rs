@@ -76,7 +76,7 @@ impl DatadogConfig {
             .as_deref()
             .unwrap_or_else(|| match self.region {
                 Some(super::Region::Eu) => "https://api.datadoghq.eu",
-                None | Some(super::Region::Na) => "https://api.datadoghq.com",
+                None | Some(super::Region::Us) => "https://api.datadoghq.com",
             })
     }
 }

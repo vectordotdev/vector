@@ -65,7 +65,7 @@ impl DatadogLogsConfig {
             .as_deref()
             .unwrap_or_else(|| match self.region {
                 Some(super::Region::Eu) => "https://http-intake.logs.datadoghq.eu",
-                None | Some(super::Region::Na) => "https://http-intake.logs.datadoghq.com",
+                None | Some(super::Region::Us) => "https://http-intake.logs.datadoghq.com",
             })
     }
 
