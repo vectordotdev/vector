@@ -13,30 +13,30 @@ const HOST: &str = "https://cloud.humio.com";
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct HumioLogsConfig {
-    pub token: String,
+    token: String,
     // Deprecated name
     #[serde(alias = "host")]
-    pub endpoint: Option<String>,
-    pub source: Option<Template>,
+    pub(in crate::sinks::humio) endpoint: Option<String>,
+    source: Option<Template>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    encoding: EncodingConfigWithDefault<Encoding>,
 
-    pub event_type: Option<Template>,
+    event_type: Option<Template>,
 
     #[serde(default = "default_host_key")]
-    pub host_key: String,
+    host_key: String,
 
     #[serde(default)]
-    pub compression: Compression,
+    compression: Compression,
 
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    request: TowerRequestConfig,
 
     #[serde(default)]
-    pub batch: BatchConfig,
+    batch: BatchConfig,
 }
 
 fn default_host_key() -> String {
@@ -70,10 +70,7 @@ impl From<Encoding> for splunk_hec::Encoding {
 #[async_trait::async_trait]
 #[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         self.build_hec_config().build(cx).await
     }
 
