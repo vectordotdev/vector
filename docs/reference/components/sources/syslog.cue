@@ -23,7 +23,7 @@ components: sources: syslog: {
 			}
 			host: fields._local_host
 			hostname: {
-				description: "The hostname extracted from the Syslog line. (`host` is also this value if it exists in the log.)\n"
+				description: "The hostname extracted from the Syslog line. (`host` is also this value if it exists in the log.)"
 				required:    true
 				type: string: {
 					examples: ["my.host.com"]
@@ -65,7 +65,7 @@ components: sources: syslog: {
 				}
 			}
 			source_ip: {
-				description: "The upstream hostname. In the case where `mode` = `\"unix\"` the socket path will be used. (`host` is also this value if `hostname` does not exist in the log.)\n"
+				description: "The upstream hostname. In the case where `mode` = `\"unix\"` the socket path will be used. (`host` is also this value if `hostname` does not exist in the log.)"
 				required:    true
 				type: string: {
 					examples: ["127.0.0.1"]
@@ -81,7 +81,7 @@ components: sources: syslog: {
 				}
 			}
 			"*": {
-				description: "In addition to the defined fields, any Syslog 5424 structured fields are parsed and inserted as root level fields.\n"
+				description: "In addition to the defined fields, any Syslog 5424 structured fields are parsed and inserted as root level fields."
 				required:    true
 				type: "*": {}
 			}
