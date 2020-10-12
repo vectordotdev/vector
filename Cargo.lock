@@ -2482,6 +2482,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "k8s-e2e-tests"
+version = "0.1.0"
+dependencies = [
+ "futures 0.3.5",
+ "k8s-openapi",
+ "k8s-test-framework",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "k8s-openapi"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6155,7 +6166,6 @@ dependencies = [
  "inventory",
  "jemallocator",
  "k8s-openapi",
- "k8s-test-framework",
  "lazy_static",
  "leveldb",
  "libc",
