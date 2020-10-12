@@ -1,6 +1,8 @@
 package metadata
 
 components: sources: file: {
+	_directory: "-v /var/log"
+
 	title:             "File"
 	long_description:  ""
 	short_description: "Collect logs by tailing one more files."
@@ -25,12 +27,15 @@ components: sources: file: {
 
 	support: {
 		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			docker: flags: ["-v \(_directory)"]
+			triples: {
+				"aarch64-unknown-linux-gnu":  true
+				"aarch64-unknown-linux-musl": true
+				"x86_64-apple-darwin":        true
+				"x86_64-pc-windows-msv":      true
+				"x86_64-unknown-linux-gnu":   true
+				"x86_64-unknown-linux-musl":  true
+			}
 		}
 
 		requirements: []
@@ -45,7 +50,7 @@ components: sources: file: {
 			required:    false
 			type: array: {
 				default: null
-				items: type: string: examples: ["/var/log/nginx/*.[0-9]*.log"]
+				items: type: string: examples: ["\(_directory)/apahce/*.[0-9]*.log"]
 			}
 		}
 		file_key: {
@@ -113,7 +118,7 @@ components: sources: file: {
 			type: string: default: "host"
 		}
 		ignore_older: {
-			common:      false
+			common:      true
 			description: "Ignore files with a data modification date that does not exceed this age."
 			required:    false
 			type: uint: {
@@ -125,7 +130,7 @@ components: sources: file: {
 		include: {
 			description: "Array of file patterns to include. [Globbing](#globbing) is supported."
 			required:    true
-			type: array: items: type: string: examples: ["/var/log/nginx/*.log"]
+			type: array: items: type: string: examples: ["\(_directory)/apahce/*.log"]
 		}
 		max_line_bytes: {
 			common:      false
@@ -137,7 +142,7 @@ components: sources: file: {
 			}
 		}
 		max_read_bytes: {
-			category: "Reading"
+			category:    "Reading"
 			common:      false
 			description: "An approximate limit on the amount of data read from a single file at a given time."
 			required:    false
@@ -148,7 +153,7 @@ components: sources: file: {
 			}
 		}
 		oldest_first: {
-			category: "Reading"
+			category:    "Reading"
 			common:      false
 			description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files."
 			required:    false
@@ -178,7 +183,7 @@ components: sources: file: {
 			file: {
 				description: "The absolute path of originating file."
 				required:    true
-				type: string: examples: ["/var/log/apache/access.log"]
+				type: string: examples: ["\(_directory)/apache/access.log"]
 			}
 			host: fields._local_host
 			message: {
@@ -192,11 +197,11 @@ components: sources: file: {
 
 	examples: [
 		{
-			_file: "/var/log/apache/access.log"
+			_file: "\(_directory)/apache/access.log"
 			_line: "53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"
 			title: "Apache Access Log"
 			configuration: {
-				include: ["/var/logs/**/*.log"]
+				include: ["\(_directory)/**/*.log"]
 			}
 			input: """
 				```text filename="\(_file)"
