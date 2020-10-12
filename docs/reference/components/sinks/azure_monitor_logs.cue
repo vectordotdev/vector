@@ -7,6 +7,7 @@ components: sinks: azure_monitor_logs: {
 
 	classes: {
 		commonly_used: false
+		egress_method: "batch"
 		function:      "transmit"
 		service_providers: ["Azure"]
 	}
@@ -21,13 +22,7 @@ components: sinks: azure_monitor_logs: {
 		}
 		buffer: enabled:      true
 		compression: enabled: false
-		encoding: {
-			enabled: true
-			default: null
-			json:    null
-			ndjson:  null
-			text:    null
-		}
+		encoding: codec: enabled: false
 		healthcheck: enabled: true
 		request: enabled:     false
 		tls: {
@@ -45,8 +40,6 @@ components: sinks: azure_monitor_logs: {
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -96,5 +89,10 @@ components: sinks: azure_monitor_logs: {
 				examples: ["${AZURE_MONITOR_SHARED_KEY_ENV_VAR}", "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="]
 			}
 		}
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 }

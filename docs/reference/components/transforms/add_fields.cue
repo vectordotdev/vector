@@ -5,24 +5,19 @@ components: transforms: add_fields: {
 	short_description: "Accepts log events and allows you to add one or more log fields."
 	long_description:  "Accepts log events and allows you to add one or more log fields."
 
-	_features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
-
 	classes: {
 		commonly_used: false
+		egress_method: "stream"
 		function:      "schema"
 	}
+
+	features: {}
 
 	statuses: {
 		development: "stable"
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -73,6 +68,11 @@ components: transforms: add_fields: {
 			warnings: []
 			type: bool: default: true
 		}
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 
 	how_it_works: {

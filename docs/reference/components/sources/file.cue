@@ -8,7 +8,8 @@ components: sources: file: {
 	classes: {
 		commonly_used: true
 		deployment_roles: ["daemon", "sidecar"]
-		function: "collect"
+		egress_method: "stream"
+		function:      "collect"
 	}
 
 	features: {
@@ -42,9 +43,9 @@ components: sources: file: {
 			common:      false
 			description: "Array of file patterns to exclude. [Globbing](#globbing) is supported.*Takes precedence over the [`include` option](#include).*"
 			required:    false
-			type: "[string]": {
+			type: array: {
 				default: null
-				examples: [["/var/log/nginx/*.[0-9]*.log"]]
+				items: type: string: examples: ["/var/log/nginx/*.[0-9]*.log"]
 			}
 		}
 		file_key: {
@@ -124,7 +125,7 @@ components: sources: file: {
 		include: {
 			description: "Array of file patterns to include. [Globbing](#globbing) is supported."
 			required:    true
-			type: "[string]": examples: [["/var/log/nginx/*.log"]]
+			type: array: items: type: string: examples: ["/var/log/nginx/*.log"]
 		}
 		max_line_bytes: {
 			common:      false
@@ -177,31 +178,34 @@ components: sources: file: {
 				required:    true
 				type: string: examples: ["/var/log/apache/access.log"]
 			}
-			host: fields._host
+			host: fields._local_host
 			message: {
 				description: "The raw line from the file."
 				required:    true
 				type: string: examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
 			}
-			timestamp: fields._timestamp
+			timestamp: fields._current_timestamp
 		}
 	}
 
-	examples: log: [
+	examples: [
 		{
+			_file: "/var/log/apache/access.log"
+			_line: "53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"
 			title: "Apache Access Log"
 			configuration: {
 				include: ["/var/logs/**/*.log"]
 			}
 			input: """
-				```text filename="/var/log/apache/access.log"
-				53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"
+				```text filename="\(_file)"
+				\(_line)
 				```
 				"""
-			output: {
-				file:      "/var/log/apache/access.log"
-				message:   "53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"
-				timestamp: "2020-10-01T11:23:25.333432Z"
+			output: log: {
+				file:      _file
+				host:      _values.local_host
+				message:   _line
+				timestamp: _values.current_timestamp
 			}
 		},
 	]

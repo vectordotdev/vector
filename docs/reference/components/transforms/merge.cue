@@ -7,19 +7,17 @@ components: transforms: merge: {
 
 	classes: {
 		commonly_used: false
+		egress_method: "stream"
 		function:      "aggregate"
 	}
 
-	features: {
-	}
+	features: {}
 
 	statuses: {
 		development: "beta"
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -46,9 +44,9 @@ components: transforms: merge: {
 				"""
 			required: false
 			warnings: []
-			type: "[string]": {
+			type: array: {
 				default: ["message"]
-				examples: [["message"], ["message", "parent.child"]]
+				items: type: string: examples: ["message", "parent.child"]
 			}
 		}
 		partial_event_marker_field: {
@@ -73,23 +71,28 @@ components: transforms: merge: {
 				"""
 			required: false
 			warnings: []
-			type: "[string]": {
+			type: array: {
 				default: []
-				examples: [["host"], ["host", "parent.child"]]
+				items: type: string: examples: ["host", "parent.child"]
 			}
 		}
 	}
 
-	examples: log: [
+	input: {
+		logs:    true
+		metrics: false
+	}
+
+	examples: [
 		{
 			title: "Default"
 			configuration: {}
 			input: [
-				{"message": "First", "_partial":            true, "custom_string_field":  "value1", "custom_int_field": 1},
-				{"message": "Second", "_partial":           true, "custom_string_field":  "value2", "custom_int_field": 2},
-				{"message": "Third", "custom_string_field": "value3", "custom_int_field": 3},
+				{log: {"message": "First", "_partial":            true, "custom_string_field":  "value1", "custom_int_field": 1}},
+				{log: {"message": "Second", "_partial":           true, "custom_string_field":  "value2", "custom_int_field": 2}},
+				{log: {"message": "Third", "custom_string_field": "value3", "custom_int_field": 3}},
 			]
-			output: {"message": "FirstSecondThird", "custom_string_field": "value1", "custom_int_field": 1}
+			output: log: {"message": "FirstSecondThird", "custom_string_field": "value1", "custom_int_field": 1}
 			notes: """
 				Notice that `custom_string_field` and `custom_int_field` were not overridden.
 				This is because they were not listed in the `fields` option.
@@ -101,11 +104,11 @@ components: transforms: merge: {
 				fields: ["message", "custom_string_field", "custom_int_field"]
 			}
 			input: [
-				{"message": "First", "_partial":            true, "custom_string_field":  "value1", "custom_int_field": 1},
-				{"message": "Second", "_partial":           true, "custom_string_field":  "value2", "custom_int_field": 2},
-				{"message": "Third", "custom_string_field": "value3", "custom_int_field": 3},
+				{log: {"message": "First", "_partial":            true, "custom_string_field":  "value1", "custom_int_field": 1}},
+				{log: {"message": "Second", "_partial":           true, "custom_string_field":  "value2", "custom_int_field": 2}},
+				{log: {"message": "Third", "custom_string_field": "value3", "custom_int_field": 3}},
 			]
-			output: {"message": "FirstSecondThird", "custom_string_field": "value1value2value3", "custom_int_field": 3}
+			output: log: {"message": "FirstSecondThird", "custom_string_field": "value1value2value3", "custom_int_field": 3}
 			notes: """
 				Notice that `custom_string_field` is concatenated and `custom_int_field`
 				overridden. This is because it was specified in the `fields` option.
