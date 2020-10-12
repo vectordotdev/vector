@@ -7,20 +7,18 @@ components: sinks: socket: {
 
 	classes: {
 		commonly_used: true
+		egress_method: "stream"
 		function:      "transmit"
 		service_providers: []
 	}
 
 	features: {
-		batch: enabled:       false
 		buffer: enabled:      true
 		compression: enabled: false
-		encoding: {
+		encoding: codec: {
 			enabled: true
 			default: null
-			json:    null
-			ndjson:  null
-			text:    null
+			enum: ["json", "text"]
 		}
 		healthcheck: enabled: true
 		request: enabled:     false
@@ -39,8 +37,6 @@ components: sinks: socket: {
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -52,6 +48,7 @@ components: sinks: socket: {
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {
@@ -86,5 +83,10 @@ components: sinks: socket: {
 				examples: ["/path/to/socket"]
 			}
 		}
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 }
