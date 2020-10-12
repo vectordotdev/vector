@@ -12,6 +12,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
+    tls::{MaybeTlsSettings, TlsConfig},
 };
 use bytes::Bytes;
 use flate2::write::GzEncoder;
@@ -30,6 +31,7 @@ pub struct DatadogLogsConfig {
     region: Option<super::Region>,
     api_key: String,
     encoding: EncodingConfig<Encoding>,
+    tls: Option<TlsConfig>,
 
     #[serde(default)]
     compression: Option<Compression>,
@@ -61,7 +63,10 @@ impl DatadogLogsConfig {
     fn get_endpoint(&self) -> &str {
         self.endpoint
             .as_deref()
-            .unwrap_or("https://http-intake.logs.datadoghq.eu/v1/input")
+            .unwrap_or_else(|| match self.region {
+                Some(super::Region::Eu) => "https://http-intake.logs.datadoghq.eu",
+                None | Some(super::Region::Na) => "https://http-intake.logs.datadoghq.com",
+            })
     }
 
     fn batch_settings<T: Batch>(&self) -> Result<BatchSettings<T>, BatchError> {
@@ -126,7 +131,7 @@ impl DatadogLogsConfig {
 
     /// Build the request, GZipping the contents if the config specifies.
     fn build_request(&self, body: Vec<u8>) -> crate::Result<http::Request<Vec<u8>>> {
-        let uri = self.get_endpoint();
+        let uri = format!("{}/v1/input", self.get_endpoint());
         let request = Request::post(uri)
             .header("Content-Type", "text/plain")
             .header("DD-API-KEY", self.api_key.clone());
@@ -467,103 +472,6 @@ mod tests {
         config.endpoint = Some(endpoint.clone());
 
         let (sink, _) = config.build(cx).await.unwrap();
-
-        let (rx, _trigger, server) = build_test_server(addr);
-        tokio::spawn(server);
-
-        let (expected, events) = random_lines_with_stream(100, 10);
-
-        let _ = sink.run(events).await.unwrap();
-
-        let output = rx.take(expected.len()).collect::<Vec<_>>().await;
-
-        for (i, val) in output.iter().enumerate() {
-            let mut json = serde_json::Deserializer::from_slice(&val.1[..])
-                .into_iter::<serde_json::Value>()
-                .map(|v| v.expect("decoding json"));
-
-            let json = json.next().unwrap();
-
-            // The json we send to Datadog is an array of events.
-            // As we have set batch.max_events to 1, each entry will be
-            // an array containing a single record.
-            let message = json
-                .get(0)
-                .unwrap()
-                .get("message")
-                .unwrap()
-                .as_str()
-                .unwrap();
-            assert_eq!(message, expected[i]);
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{
-        config::SinkConfig,
-        sinks::util::test::{build_test_server, load_sink},
-        test_util::{next_addr, random_lines_with_stream},
-    };
-    use futures::StreamExt;
-
-    #[tokio::test]
-    async fn smoke_text() {
-        let (mut config, cx) = load_sink::<DatadogLogsConfig>(
-            r#"
-            api_key = "atoken"
-            encoding = "text"
-            batch.max_events = 1
-            "#,
-        )
-        .unwrap();
-
-        let _ = config.build(cx.clone()).unwrap();
-
-        let addr = next_addr();
-        // Swap out the endpoint so we can force send it
-        // to our local server
-        let endpoint = format!("http://{}", addr);
-        config.endpoint = Some(endpoint.clone());
-
-        let (sink, _) = config.build(cx).unwrap();
-
-        let (rx, _trigger, server) = build_test_server(addr);
-        tokio::spawn(server);
-
-        let (expected, events) = random_lines_with_stream(100, 10);
-
-        let _ = sink.run(events).await.unwrap();
-
-        let output = rx.take(expected.len()).collect::<Vec<_>>().await;
-
-        for (i, val) in output.iter().enumerate() {
-            assert_eq!(val.1, format!("{}\n", expected[i]));
-        }
-    }
-
-    #[tokio::test]
-    async fn smoke_json() {
-        let (mut config, cx) = load_sink::<DatadogLogsConfig>(
-            r#"
-            api_key = "atoken"
-            encoding = "json"
-            batch.max_events = 1
-            "#,
-        )
-        .unwrap();
-
-        let _ = config.build(cx.clone()).unwrap();
-
-        let addr = next_addr();
-        // Swap out the endpoint so we can force send it
-        // to our local server
-        let endpoint = format!("http://{}", addr);
-        config.endpoint = Some(endpoint.clone());
-
-        let (sink, _) = config.build(cx).unwrap();
 
         let (rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);

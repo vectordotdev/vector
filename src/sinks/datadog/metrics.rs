@@ -71,14 +71,13 @@ struct DatadogRequest<T> {
 }
 
 impl DatadogConfig {
-    fn get_endpoint(&self) -> String {
-        match (&self.endpoint, &self.region) {
-            (Some(ref endpoint), _) => endpoint.clone(),
-            (None, Some(super::Region::Eu)) => String::from("https://api.datadoghq.eu"),
-            (None, Some(super::Region::Na)) | (None, None) => {
-                String::from("https://api.datadoghq.com")
-            }
-        }
+    fn get_endpoint(&self) -> &str {
+        self.endpoint
+            .as_deref()
+            .unwrap_or_else(|| match self.region {
+                Some(super::Region::Eu) => "https://api.datadoghq.eu",
+                None | Some(super::Region::Na) => "https://api.datadoghq.com",
+            })
     }
 }
 
