@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use string_cache::DefaultAtom as Atom;
 
-fn default_endpoint() -> String {
+fn default_host() -> String {
     "ods.opinsights.azure.com".into()
 }
 
@@ -36,8 +36,8 @@ pub struct AzureMonitorLogsConfig {
     pub shared_key: String,
     pub log_type: String,
     pub azure_resource_id: Option<String>,
-    #[serde(default = "default_endpoint")]
-    pub endpoint: String,
+    #[serde(default = "default_host")]
+    pub host: String,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -187,7 +187,7 @@ impl AzureMonitorLogsSink {
     fn new(config: &AzureMonitorLogsConfig) -> crate::Result<AzureMonitorLogsSink> {
         let url = format!(
             "https://{}.{}{}?api-version={}",
-            config.customer_id, config.endpoint, RESOURCE, API_VERSION
+            config.customer_id, config.host, RESOURCE, API_VERSION
         );
         let uri: Uri = url.parse()?;
 
@@ -446,7 +446,7 @@ mod tests {
     }
 
     #[test]
-    fn correct_endpoint() {
+    fn correct_host() {
         let config_default = toml::from_str::<AzureMonitorLogsConfig>(
             r#"
             customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
@@ -454,19 +454,19 @@ mod tests {
             log_type = "Vector"
         "#,
         )
-        .expect("Config parsing failed without custom endpoint");
-        assert_eq!(config_default.endpoint, default_endpoint());
+        .expect("Config parsing failed without custom host");
+        assert_eq!(config_default.host, default_host());
 
         let config_cn = toml::from_str::<AzureMonitorLogsConfig>(
             r#"
             customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
             shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
             log_type = "Vector"
-            endpoint = "ods.opinsights.azure.cn"
+            host = "ods.opinsights.azure.cn"
         "#,
         )
-        .expect("Config parsing failed with .cn custom endpoint");
-        assert_eq!(config_cn.endpoint, "ods.opinsights.azure.cn");
+        .expect("Config parsing failed with .cn custom host");
+        assert_eq!(config_cn.host, "ods.opinsights.azure.cn");
     }
 
     #[tokio::test]

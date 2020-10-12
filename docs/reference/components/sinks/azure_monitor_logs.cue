@@ -73,9 +73,9 @@ components: sinks: azure_monitor_logs: {
 				examples: ["5ce893d9-2c32-4b6c-91a9-b0887c2de2d6", "97ce69d9-b4be-4241-8dbd-d265edcf06c4"]
 			}
 		}
-		endpoint: {
+		host: {
 			common:      true
-			description: "[Alternative endpoint](https://docs.azure.cn/en-us/articles/guidance/developerdifferences#check-endpoints-in-azure) for dedicated Azure regions."
+			description: "[Alternative host](https://docs.azure.cn/en-us/articles/guidance/developerdifferences#check-endpoints-in-azure) for dedicated Azure regions."
 			required:    false
 			warnings: []
 			type: string: {
