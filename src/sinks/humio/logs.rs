@@ -4,6 +4,7 @@ use crate::{
     sinks::util::{
         encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
     },
+    sinks::{Healthcheck, VectorSink},
     template::Template,
 };
 use serde::{Deserialize, Serialize};
@@ -12,18 +13,18 @@ const HOST: &str = "https://cloud.humio.com";
 
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct HumioLogsConfig {
-    token: String,
+    pub token: String,
     // Deprecated name
     #[serde(alias = "host")]
-    endpoint: Option<String>,
-    source: Option<Template>,
+    pub endpoint: Option<String>,
+    pub source: Option<Template>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: EncodingConfigWithDefault<Encoding>,
 
-    event_type: Option<Template>,
+    pub event_type: Option<Template>,
 
     #[serde(default = "default_host_key")]
     pub host_key: String,
@@ -32,10 +33,10 @@ pub struct HumioLogsConfig {
     pub compression: Compression,
 
     #[serde(default)]
-    request: TowerRequestConfig,
+    pub request: TowerRequestConfig,
 
     #[serde(default)]
-    batch: BatchConfig,
+    pub batch: BatchConfig,
 }
 
 fn default_host_key() -> String {
@@ -72,7 +73,7 @@ impl SinkConfig for HumioLogsConfig {
     async fn build(
         &self,
         cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    ) -> crate::Result<(VectorSink, Healthcheck)> {
         self.build_hec_config().build(cx).await
     }
 
