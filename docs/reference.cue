@@ -5,6 +5,10 @@
 
 package metadata
 
+import (
+	"strings"
+)
+
 _values: {
 	current_timestamp: "2020-10-10T17:07:36.452332Z"
 	local_host:        "my-host.local"
@@ -417,6 +421,21 @@ _values: {
 }
 
 #Schema: [Name=string]: {
+	// `category` allows you to group options into categories.
+	//
+	// For example, all of the `*_key` options might be grouped under the
+	// "Context" category to make generated configuration examples easier to
+	// read.
+	category?: string
+
+	if strings.HasSuffix(name, "_key") {
+		category: "Mapping"
+	}
+
+	if type.object != _|_ {
+		category: strings.ToTitle(name)
+	}
+
 	// `desription` describes the option in a succinct fashion. Usually 1 to
 	// 2 sentences.
 	description: string
