@@ -42,7 +42,7 @@ pub(crate) struct GrokParserMissingField<'a> {
 
 impl InternalEvent for GrokParserMissingField<'_> {
     fn emit_logs(&self) {
-        debug!(message = "Field does not exist.", field = %self.field);
+        warn!(message = "Field does not exist.", field = %self.field);
     }
 
     fn emit_metrics(&self) {
@@ -60,7 +60,7 @@ pub(crate) struct GrokParserConversionFailed<'a> {
 
 impl<'a> InternalEvent for GrokParserConversionFailed<'a> {
     fn emit_logs(&self) {
-        debug!(
+        warn!(
             message = "Could not convert types.",
             name = %self.name,
             error = %self.error,

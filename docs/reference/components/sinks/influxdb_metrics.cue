@@ -33,7 +33,13 @@ components: sinks: influxdb_metrics: {
 			retry_max_duration_secs:    10
 			timeout_secs:               60
 		}
-		tls: enabled: false
+		tls: {
+			enabled:                true
+			can_enable:             true
+			can_verify_certificate: true
+			can_verify_hostname:    true
+			enabled_default:        true
+		}
 	}
 
 	statuses: {
@@ -84,6 +90,14 @@ components: sinks: influxdb_metrics: {
 			warnings: []
 			type: string: {
 				examples: ["vector-database", "iot-store"]
+			}
+		}
+		endpoint: {
+			description: "The endpoint to send metrics to."
+			groups: ["v1", "v2"]
+			required: true
+			type: string: {
+				examples: ["http://localhost:8086/", "https://us-west-2-1.aws.cloud1.influxdata.com", "https://us-west-2-1.aws.cloud2.influxdata.com"]
 			}
 		}
 		namespace: {
@@ -172,14 +186,14 @@ components: sinks: influxdb_metrics: {
 		}
 	}
 
-	examples: metric: [
+	examples: [
 		{
 			_host:  _values.local_host
 			_name:  "logins"
 			_value: 1.5
 			title:  "Counter"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				counter: {
 					value: _value
@@ -195,7 +209,7 @@ components: sinks: influxdb_metrics: {
 			_name: "sparse_stats"
 			title: "Distribution"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				distribution: {
 					values: [1.0, 5.0, 3.0]
@@ -214,7 +228,7 @@ components: sinks: influxdb_metrics: {
 			_value: 1.5
 			title:  "Gauge"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				gauge: {
 					value: _value
@@ -230,7 +244,7 @@ components: sinks: influxdb_metrics: {
 			_name: "requests"
 			title: "Histogram"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				histogram: {
 					buckets: [1.0, 2.1, 3.0]
@@ -250,7 +264,7 @@ components: sinks: influxdb_metrics: {
 			_value: 1.5
 			title:  "Set"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				set: {
 					values: ["first", "another", "last"]
@@ -266,7 +280,7 @@ components: sinks: influxdb_metrics: {
 			_name: "requests"
 			title: "Summary"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				summary: {
 					quantiles: [0.01, 0.5, 0.99]

@@ -2,7 +2,24 @@ name: Master Test Suite
 
 on:
   push:
-    branches: master
+    branches:
+      - master
+    paths:
+      - ".github/workflows/master.yml"
+      - ".cargo/**"
+      - "benches/**"
+      - "lib/**"
+      - "proto/**"
+      - "scripts/**"
+      - "skaffold/**"
+      - "src/**"
+      - "tests/**"
+      - "build.rs"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "docker-compose.yml"
+      - "Makefile"
+      - "rust-toolchain"
 
 env:
   AUTOINSTALL: true
@@ -23,7 +40,7 @@ jobs:
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
-      - uses: styfle/cancel-workflow-action@0.4.1
+      - uses: styfle/cancel-workflow-action@0.5.0
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
