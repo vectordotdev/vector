@@ -170,7 +170,7 @@ spec:
         - name: data-dir
           hostPath:
             path: /var/lib/vector/
-        # Vector config dir with a managed config map.
+        # Vector config dir.
         - name: config-dir
           projected:
             sources:
@@ -180,9 +180,9 @@ spec:
                   optional: true
               # Custom `ConfigMap`.
               - configMap:
-                  name: vector-config
+                  name: vector-agent-config
                   optional: true
               # Custom `Secret`.
               - secret:
-                  name: vector-config
+                  name: vector-agent-config
                   optional: true
