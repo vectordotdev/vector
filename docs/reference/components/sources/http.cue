@@ -88,7 +88,7 @@ components: sources: http: {
 				options: {
 					username: {
 						description: "The basic authentication user name."
-						required:    false
+						required:    true
 						warnings: []
 						type: string: {
 							examples: ["${HTTP_USERNAME}", "username"]
@@ -96,7 +96,7 @@ components: sources: http: {
 					}
 					password: {
 						description: "The basic authentication password."
-						required:    false
+						required:    true
 						warnings: []
 						type: string: {
 							examples: ["${HTTP_PASSWORD}", "password"]
