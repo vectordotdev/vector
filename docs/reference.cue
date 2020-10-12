@@ -91,14 +91,14 @@ _values: {
 
 	configuration: #Schema
 
-	if Kind == "transform" || Kind == "sink" {
+	if Kind != "source" {
 		input: {
 			logs:    bool
 			metrics: false | #MetricInput
 		}
 	}
 
-	if Kind == "source" || Kind == "transform" {
+	if Kind != "sink" {
 		// `output` documents output of the component. This is very important
 		// as it communicate which events and fields are emitted.
 		output: {
@@ -109,63 +109,40 @@ _values: {
 
 	// `examples` demonstrates various ways to use the component using an
 	// input, output, and example configuration.
-	examples: {
-		log: [
-			...close({
-				title: string
-				"configuration": {
-					for k, v in configuration {
-						"\( k )"?: _ | *null
-					}
+	examples: [
+		...close({
+			title: string
+			"configuration": {
+				for k, v in configuration {
+					"\( k )"?: _ | *null
 				}
+			}
 
-				if Kind == "source" {
-					input: string
-				}
+			if Kind == "source" {
+				input: string
+			}
 
-				if Kind != "source" {
-					input: #LogEvent | [#LogEvent, ...]
-				}
+			if Kind != "source" {
+				input: #Event | [#Event, ...]
+			}
 
+			if Kind == "sink" {
+				output: string
+			}
+
+			if Kind != "sink" {
 				if classes.egress_method == "batch" {
-					output: [#LogEvent, ...] | null
+					output: [#Event, ...] | null
 				}
 
 				if classes.egress_method == "stream" {
-					output: #LogEvent | null
+					output: #Event | null
 				}
+			}
 
-				notes?: string
-			}),
-		]
-		metric: [
-			...close({
-				title: string
-				"configuration": {
-					for k, v in configuration {
-						"\( k )"?: _ | *null
-					}
-				}
-				input: #MetricEvent
-
-				if Kind != "sink" {
-					if classes.egress_method == "batch" {
-						output: [#MetricEvent, ...] | null
-					}
-
-					if classes.egress_method == "stream" {
-						output: #MetricEvent | null
-					}
-				}
-
-				if Kind == "sink" {
-					output: string
-				}
-
-				notes?: string
-			}),
-		]
-	}
+			notes?: string
+		}),
+	]
 
 	// `how_it_works` contain sections that further describe the component's
 	// behavior. This is like a mini-manual for the component and should help
@@ -216,6 +193,11 @@ _values: {
 //                 text: "Encodes the data via text/plain"
 //                }
 #Enum: [Name=_]: string
+
+#Event: {
+	close({log: #LogEvent}) |
+	close({metric: #MetricEvent})
+}
 
 // `#EventType` represents one of Vector's supported event types.
 //

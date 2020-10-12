@@ -13,6 +13,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
+    tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
 use futures::future::{ready, BoxFuture};
@@ -43,6 +44,7 @@ pub struct InfluxDBConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>,
     #[serde(default = "default_summary_quantiles")]
     pub quantiles: Vec<f64>,
 }
@@ -74,7 +76,8 @@ impl_generate_config_from_default!(InfluxDBConfig);
 #[typetag::serde(name = "influxdb_metrics")]
 impl SinkConfig for InfluxDBConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = HttpClient::new(cx.resolver(), None)?;
+        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(cx.resolver(), tls_settings)?;
         let healthcheck = healthcheck(
             self.clone().endpoint,
             self.clone().influxdb1_settings,
@@ -780,40 +783,90 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use crate::{
-        config::SinkContext,
+        config::{SinkConfig, SinkContext},
         event::metric::{Metric, MetricKind, MetricValue},
         sinks::{
             influxdb::{
                 metrics::{default_summary_quantiles, InfluxDBConfig, InfluxDBSvc},
-                test_util::{onboarding_v2, BUCKET, ORG, TOKEN},
-                InfluxDB2Settings,
+                test_util::{
+                    cleanup_v1, onboarding_v1, onboarding_v2, query_v1, BUCKET, DATABASE, ORG,
+                    TOKEN,
+                },
+                InfluxDB1Settings, InfluxDB2Settings,
             },
             util::http::HttpClient,
         },
+        tls::TlsOptions,
         Event,
     };
     use chrono::Utc;
     use futures::stream;
 
-    //    fn onboarding_v1() {
-    //        let client = reqwest::Client::builder()
-    //            .danger_accept_invalid_certs(true)
-    //            .build()
-    //            .unwrap();
-    //
-    //        let res = client
-    //            .get("http://localhost:8086/query")
-    //            .query(&[("q", "CREATE DATABASE my-database")])
-    //            .send()
-    //            .unwrap();
-    //
-    //        let status = res.status();
-    //
-    //        assert!(
-    //            status == http::StatusCode::OK,
-    //            format!("UnexpectedStatus: {}", status)
-    //        );
-    //    }
+    #[tokio::test]
+    async fn insert_metrics_over_https() {
+        onboarding_v1("https://localhost:8087").await;
+
+        let cx = SinkContext::new_test();
+
+        let config = InfluxDBConfig {
+            namespace: Some("ns".to_string()),
+            endpoint: "https://localhost:8087".to_string(),
+            influxdb1_settings: Some(InfluxDB1Settings {
+                consistency: None,
+                database: DATABASE.to_string(),
+                retention_policy_name: Some("autogen".to_string()),
+                username: None,
+                password: None,
+            }),
+            influxdb2_settings: None,
+            batch: Default::default(),
+            request: Default::default(),
+            tls: Some(TlsOptions {
+                ca_file: Some("tests/data/Vector_CA.crt".into()),
+                ..Default::default()
+            }),
+            quantiles: default_summary_quantiles(),
+        };
+
+        let events: Vec<_> = (0..10).map(create_event).collect();
+        let (sink, _) = config.build(cx).await.expect("error when building config");
+        sink.run(stream::iter(events)).await.unwrap();
+
+        let res = query_v1(
+            "https://localhost:8087",
+            &format!("show series on {}", DATABASE),
+        )
+        .await;
+        let string = res.text().await.unwrap();
+        let res: serde_json::Value =
+            serde_json::from_str(&string).expect("error when parsing InfluxDB response JSON");
+
+        //
+        // {"results":[{"statement_id":0,"series":[{"columns":["key"],"values":
+        //  [
+        //    ["ns.counter-0,metric_type=counter,production=true,region=us-west-1"],
+        //    ["ns.counter-1,metric_type=counter,production=true,region=us-west-1"],
+        //    ["ns.counter-2,metric_type=counter,production=true,region=us-west-1"],
+        //    ["ns.counter-3,metric_type=counter,production=true,region=us-west-1"],
+        //    ["ns.counter-4,metric_type=counter,production=true,region=us-west-1"],
+        //    ["ns.counter-5,metric_type=counter,production=true,region=us-west-1"],
+        //    ["ns.counter-6,metric_type=counter,production=true,region=us-west-1"],
+        //    ["ns.counter-7,metric_type=counter,production=true,region=us-west-1"],
+        //    ["ns.counter-8,metric_type=counter,production=true,region=us-west-1"],
+        //    ["ns.counter-9,metric_type=counter,production=true,region=us-west-1"]
+        //  ]}]}]}\n
+        //
+
+        assert_eq!(
+            res["results"][0]["series"][0]["values"]
+                .as_array()
+                .unwrap()
+                .len(),
+            10
+        );
+
+        cleanup_v1("https://localhost:8087").await;
+    }
 
     #[tokio::test]
     async fn influxdb2_metrics_put_data() {
@@ -833,6 +886,7 @@ mod integration_tests {
             quantiles: default_summary_quantiles(),
             batch: Default::default(),
             request: Default::default(),
+            tls: None,
         };
 
         let metric = format!("counter-{}", Utc::now().timestamp_nanos());
@@ -918,5 +972,22 @@ mod integration_tests {
             record[header.iter().position(|&r| r.trim() == "_value").unwrap()].trim(),
             "45"
         );
+    }
+
+    fn create_event(i: i32) -> Event {
+        Event::Metric(Metric {
+            name: format!("counter-{}", i),
+            timestamp: None,
+            tags: Some(
+                vec![
+                    ("region".to_owned(), "us-west-1".to_owned()),
+                    ("production".to_owned(), "true".to_owned()),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+            kind: MetricKind::Incremental,
+            value: MetricValue::Counter { value: i as f64 },
+        })
     }
 }
