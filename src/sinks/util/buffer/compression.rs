@@ -102,34 +102,30 @@ impl<'de> de::Deserialize<'de> for Compression {
 
                 match algorithm.ok_or_else(|| de::Error::missing_field("algorithm"))? {
                     "none" => Ok(Compression::None),
-                    "gzip" => Ok(Compression::Gzip(
-                        match level {
-                            Some(level) => {
-                                Some(match level.as_str() {
-                                    "none" => GZIP_NONE,
-                                    "fast" => GZIP_FAST,
-                                    "default" => GZIP_DEFAULT,
-                                    "best" => GZIP_BEST,
-                                    value => match value.parse::<usize>() {
-                                        Ok(level) if level <= 9 => level,
-                                        Ok(level) => {
-                                            return Err(de::Error::invalid_value(
-                                                de::Unexpected::Unsigned(level as u64),
-                                                &self,
-                                            ))
-                                        }
-                                        Err(_) => {
-                                            return Err(de::Error::invalid_value(
-                                                de::Unexpected::Str(value),
-                                                &self,
-                                            ))
-                                        }
-                                    },
-                                })
-                            }
-                            None => None,
-                        }
-                    )),
+                    "gzip" => Ok(Compression::Gzip(match level {
+                        Some(level) => Some(match level.as_str() {
+                            "none" => GZIP_NONE,
+                            "fast" => GZIP_FAST,
+                            "default" => GZIP_DEFAULT,
+                            "best" => GZIP_BEST,
+                            value => match value.parse::<usize>() {
+                                Ok(level) if level <= 9 => level,
+                                Ok(level) => {
+                                    return Err(de::Error::invalid_value(
+                                        de::Unexpected::Unsigned(level as u64),
+                                        &self,
+                                    ))
+                                }
+                                Err(_) => {
+                                    return Err(de::Error::invalid_value(
+                                        de::Unexpected::Str(value),
+                                        &self,
+                                    ))
+                                }
+                            },
+                        }),
+                        None => None,
+                    })),
                     algorithm => Err(de::Error::unknown_variant(algorithm, &["none", "gzip"])),
                 }
             }
