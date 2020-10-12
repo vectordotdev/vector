@@ -11,7 +11,7 @@ use snafu::Snafu;
 use std::collections::{BTreeMap, HashMap};
 use tower::Service;
 
-pub enum Field {
+pub(in crate::sinks) enum Field {
     /// string
     String(String),
     /// float
@@ -25,7 +25,7 @@ pub enum Field {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum ProtocolVersion {
+pub(in crate::sinks) enum ProtocolVersion {
     V1,
     V2,
 }
@@ -168,7 +168,7 @@ fn healthcheck(
 }
 
 // https://v2.docs.influxdata.com/v2.0/reference/syntax/line-protocol/
-fn influx_line_protocol(
+pub(in crate::sinks) fn influx_line_protocol(
     protocol_version: ProtocolVersion,
     measurement: String,
     metric_type: &str,
@@ -274,7 +274,7 @@ fn encode_string(key: String, output: &mut String) {
     }
 }
 
-fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
+pub(in crate::sinks) fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     if let Some(ts) = timestamp {
         ts.timestamp_nanos()
     } else {
@@ -282,7 +282,11 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     }
 }
 
-fn encode_uri(endpoint: &str, path: &str, pairs: &[(&str, Option<String>)]) -> crate::Result<Uri> {
+pub(in crate::sinks) fn encode_uri(
+    endpoint: &str,
+    path: &str,
+    pairs: &[(&str, Option<String>)],
+) -> crate::Result<Uri> {
     let mut serializer = url::form_urlencoded::Serializer::new(String::new());
 
     for pair in pairs {
@@ -309,11 +313,13 @@ fn encode_uri(endpoint: &str, path: &str, pairs: &[(&str, Option<String>)]) -> c
 pub mod test_util {
     use super::*;
     use chrono::offset::TimeZone;
+    use std::fs::File;
+    use std::io::Read;
 
     pub(crate) const ORG: &str = "my-org";
     pub(crate) const BUCKET: &str = "my-bucket";
     pub(crate) const TOKEN: &str = "my-token";
-    pub(crate) const DATABASE: &str = "my-database";
+    pub(crate) const DATABASE: &str = "testdb";
 
     pub(crate) fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
@@ -358,6 +364,47 @@ pub mod test_util {
         split = split[1].splitn(3, ' ').collect::<Vec<&str>>();
 
         (measurement, split[0], split[1].to_string(), split[2])
+    }
+
+    pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest::Response {
+        let mut test_ca = Vec::<u8>::new();
+        File::open("tests/data/Vector_CA.crt")
+            .unwrap()
+            .read_to_end(&mut test_ca)
+            .unwrap();
+        let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
+
+        let client = reqwest::Client::builder()
+            .add_root_certificate(test_ca)
+            .build()
+            .unwrap();
+
+        client
+            .get(&format!("{}/query", endpoint))
+            .query(&[("q", query)])
+            .send()
+            .await
+            .unwrap()
+    }
+
+    pub(crate) async fn onboarding_v1(endpoint: &str) {
+        let status = query_v1(endpoint, &format!("create database {}", DATABASE))
+            .await
+            .status();
+        assert!(
+            status == http::StatusCode::OK,
+            format!("UnexpectedStatus: {}", status)
+        );
+    }
+
+    pub(crate) async fn cleanup_v1(endpoint: &str) {
+        let status = query_v1(endpoint, &format!("drop database {}", DATABASE))
+            .await
+            .status();
+        assert!(
+            status == http::StatusCode::OK,
+            format!("UnexpectedStatus: {}", status)
+        );
     }
 
     pub(crate) async fn onboarding_v2() {
