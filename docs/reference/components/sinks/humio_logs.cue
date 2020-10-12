@@ -7,6 +7,7 @@ components: sinks: humio_logs: {
 
 	classes: {
 		commonly_used: false
+		egress_method: "batch"
 		function:      "transmit"
 		service_providers: ["Humio"]
 	}
@@ -25,12 +26,10 @@ components: sinks: humio_logs: {
 			default: null
 			gzip:    true
 		}
-		encoding: {
+		encoding: codec: {
 			enabled: true
 			default: null
-			json:    null
-			ndjson:  null
-			text:    null
+			enum: ["json", "text"]
 		}
 		healthcheck: enabled: true
 		request: {
@@ -51,8 +50,6 @@ components: sinks: humio_logs: {
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -64,6 +61,7 @@ components: sinks: humio_logs: {
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {
@@ -105,5 +103,10 @@ components: sinks: humio_logs: {
 				examples: ["${HUMIO_TOKEN}", "A94A8FE5CCB19BA61C4C08"]
 			}
 		}
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 }
