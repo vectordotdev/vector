@@ -73,7 +73,7 @@ pub struct DatadogLogsConfig {
     tls: Option<TlsConfig>,
 
     #[serde(default)]
-    compression: Compression,
+    compression: Option<Compression>,
 
     #[serde(default)]
     compression_level: CompressionLevel,
@@ -162,8 +162,8 @@ impl DatadogLogsConfig {
             .header("DD-API-KEY", self.api_key.clone());
 
         let (request, body) = match self.compression {
-            Compression::None => (request, body),
-            Compression::Gzip => {
+            Some(Compression::None) => (request, body),
+            None | Some(Compression::Gzip) => {
                 let mut encoder = GzEncoder::new(Vec::new(), self.compression_level.get_level());
 
                 encoder.write_all(&body)?;
