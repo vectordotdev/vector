@@ -135,7 +135,7 @@ components: sources: docker: {
 				container_created_at: {
 					description: "A UTC timestamp representing when the container was created."
 					required:    true
-					type: timestamp: examples: ["2020-11-01T21:15:47.443232Z"]
+					type: timestamp: {}
 				}
 				container_id: {
 					description: "The Docker container ID that the log was collected from."
