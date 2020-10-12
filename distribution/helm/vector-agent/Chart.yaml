@@ -1,8 +1,8 @@
 apiVersion: v2
-name: vector
+name: vector-agent
 type: application
 icon: https://vector.dev/press/vector-icon.svg
-description: A Helm chart for Vector observability stack
+description: A Helm chart to collect Kubernetes logs with Vector
 version: "0.0.0" # overwritten via --version on publishing
 appVersion: "0.0.0" # overwritten via --app-version on publishing
 home: https://vector.dev/
@@ -12,6 +12,6 @@ maintainers:
   - name: Vector Contributors
     email: vector@timber.io
 dependencies:
-  - name: vector-agent
+  - name: vector-shared
     version: "*"
-    repository: file://../vector-agent
+    repository: file://../vector-shared

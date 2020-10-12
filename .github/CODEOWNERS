@@ -62,6 +62,7 @@
 /lib/file-source/src/paths_provider/mod.rs @MOZGIII
 /lib/file-source/src/paths_provider/glob.rs @MOZGIII
 /lib/k8s-test-framework/ @MOZGIII @JeanMertz
+/lib/k8s-e2e-tests/ @MOZGIII @JeanMertz
 /lib/prometheus-parser/ @juchiast
 /lib/vector-wasm/ @hoverbear @JeanMertz
 
@@ -163,7 +164,6 @@
 
 /tests/buffering.rs @MOZGIII
 /tests/data/wasm/ @hoverbear @JeanMertz
-/tests/kubernetes-e2e.rs @MOZGIII @JeanMertz
 /tests/shutdown.rs @ktff
 /tests/cli.rs @ktff
 
