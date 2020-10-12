@@ -9,7 +9,8 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::Sink;
-use serde::Serialize;
+use headers::{Authorization, HeaderMapExt};
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt;
 use std::net::SocketAddr;
@@ -49,6 +50,55 @@ impl fmt::Debug for RejectShuttingDown {
 }
 impl warp::reject::Reject for RejectShuttingDown {}
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct HttpSourceAuthConfig {
+    pub username: String,
+    pub password: String,
+}
+
+impl From<Option<&HttpSourceAuthConfig>> for HttpSourceAuth {
+    fn from(auth: Option<&HttpSourceAuthConfig>) -> Self {
+        let token = auth.map(|auth| {
+            let mut headers = HeaderMap::new();
+            headers.typed_insert(Authorization::basic(&auth.username, &auth.password));
+            headers
+                .get("authorization")
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_owned()
+        });
+        HttpSourceAuth { token }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct HttpSourceAuth {
+    pub token: Option<String>,
+}
+
+impl HttpSourceAuth {
+    pub fn is_valid(&self, header: Option<String>) -> Result<(), ErrorMessage> {
+        match (&self.token, &header) {
+            (Some(token1), Some(token2)) => {
+                if token1 == token2 {
+                    Ok(())
+                } else {
+                    Err(ErrorMessage::new(
+                        StatusCode::UNAUTHORIZED,
+                        "Invalid username/password".to_owned(),
+                    ))
+                }
+            }
+            (Some(_), None) => Err(ErrorMessage::new(
+                StatusCode::UNAUTHORIZED,
+                "No authorization header".to_owned(),
+            )),
+            (None, _) => Ok(()),
+        }
+    }
+}
+
 #[async_trait]
 pub trait HttpSource: Clone + Send + Sync + 'static {
     fn build_event(&self, body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage>;
@@ -58,6 +108,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         address: SocketAddr,
         path: &'static str,
         tls: &Option<TlsConfig>,
+        auth: &Option<HttpSourceAuthConfig>,
         out: Pipeline,
         shutdown: ShutdownSignal,
     ) -> crate::Result<crate::sources::Source> {
@@ -67,19 +118,25 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 filter = filter.and(warp::path(s)).boxed();
             }
         }
+        let auth: HttpSourceAuth = auth.as_ref().into();
         let svc = filter
             .and(warp::path::end())
+            .and(warp::header::optional::<String>("authorization"))
             .and(warp::header::headers_cloned())
             .and(warp::body::bytes())
-            .and_then(move |headers: HeaderMap, body: Bytes| {
+            .and_then(move |auth_header, headers: HeaderMap, body: Bytes| {
                 info!("Handling HTTP request: {:?}", headers);
 
-                let this = self.clone();
                 let out = out.clone();
 
+                let body_size = body.len();
+                let events = match auth.is_valid(auth_header) {
+                    Ok(()) => self.build_event(body, headers),
+                    Err(err) => Err(err),
+                };
+
                 async move {
-                    let body_size = body.len();
-                    match this.build_event(body, headers) {
+                    match events {
                         Ok(events) => {
                             emit!(HTTPEventsReceived {
                                 events_count: events.len(),

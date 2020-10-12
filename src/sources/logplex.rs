@@ -5,13 +5,12 @@ use crate::{
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     shutdown::ShutdownSignal,
-    sources::util::{ErrorMessage, HttpSource},
+    sources::util::{ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
     Pipeline,
 };
 use bytes::{buf::BufExt, Bytes};
 use chrono::{DateTime, Utc};
-use headers::{Authorization, HeaderMapExt};
 use serde::{Deserialize, Serialize};
 use std::{
     io::{BufRead, BufReader},
@@ -22,16 +21,10 @@ use string_cache::DefaultAtom as Atom;
 use warp::http::{HeaderMap, StatusCode};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct Auth {
-    username: String,
-    password: String,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LogplexConfig {
     address: SocketAddr,
     tls: Option<TlsConfig>,
-    auth: Option<Auth>,
+    auth: Option<HttpSourceAuthConfig>,
 }
 
 inventory::submit! {
@@ -41,24 +34,10 @@ inventory::submit! {
 impl GenerateConfig for LogplexConfig {}
 
 #[derive(Clone, Default)]
-struct LogplexSource {
-    auth: Option<String>,
-}
+struct LogplexSource;
 
 impl HttpSource for LogplexSource {
     fn build_event(&self, body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
-        if let Some(auth) = self.auth.as_ref() {
-            let header = get_header(&header_map, "authorization")?;
-            if auth != header {
-                let error_msg = format!("Invalid username/password");
-
-                if cfg!(test) {
-                    panic!(error_msg);
-                }
-                return Err(ErrorMessage::new(StatusCode::UNAUTHORIZED, error_msg));
-            }
-        }
-
         // Deal with headers
         let msg_count = match usize::from_str(get_header(&header_map, "Logplex-Msg-Count")?) {
             Ok(v) => v,
@@ -103,9 +82,8 @@ impl SourceConfig for LogplexConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let auth = self.auth.as_ref().map(|auth| auth.as_header());
-        let source = LogplexSource { auth };
-        source.run(self.address, "events", &self.tls, out, shutdown)
+        let source = LogplexSource {};
+        source.run(self.address, "events", &self.tls, &self.auth, out, shutdown)
     }
 
     fn output_type(&self) -> DataType {
@@ -114,19 +92,6 @@ impl SourceConfig for LogplexConfig {
 
     fn source_type(&self) -> &'static str {
         "logplex"
-    }
-}
-
-impl Auth {
-    fn as_header(&self) -> String {
-        let mut headers = HeaderMap::new();
-        headers.typed_insert(Authorization::basic(&self.username, &self.password));
-        headers
-            .get("authorization")
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_owned()
     }
 }
 
@@ -202,7 +167,7 @@ fn line_to_event(line: String) -> Event {
 
 #[cfg(test)]
 mod tests {
-    use super::{Auth, LogplexConfig};
+    use super::{HttpSourceAuthConfig, LogplexConfig};
     use crate::shutdown::ShutdownSignal;
     use crate::{
         config::{log_schema, GlobalOptions, SourceConfig},
@@ -217,7 +182,7 @@ mod tests {
     use std::net::SocketAddr;
     use string_cache::DefaultAtom as Atom;
 
-    async fn source(auth: Option<Auth>) -> (mpsc::Receiver<Event>, SocketAddr) {
+    async fn source(auth: Option<HttpSourceAuthConfig>) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
         tokio::spawn(async move {
@@ -242,7 +207,7 @@ mod tests {
         (recv, address)
     }
 
-    async fn send(address: SocketAddr, body: &str, auth: Option<Auth>) -> u16 {
+    async fn send(address: SocketAddr, body: &str, auth: Option<HttpSourceAuthConfig>) -> u16 {
         let len = body.lines().count();
         let mut req = reqwest::Client::new().post(&format!("http://{}/events", address));
         if let Some(auth) = auth {
@@ -265,7 +230,7 @@ mod tests {
 
         let body = r#"267 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#;
 
-        let auth = Auth {
+        let auth = HttpSourceAuthConfig {
             username: "vector_user".to_owned(),
             password: "vector_pass".to_owned(),
         };

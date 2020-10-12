@@ -78,6 +78,33 @@ components: sources: http: {
 				items: type: string: examples: ["User-Agent", "X-My-Custom-Header"]
 			}
 		}
+		auth: {
+			common:      false
+			description: "Options for HTTP Basic Authentication."
+			required:    false
+			warnings: []
+			type: object: {
+				examples: []
+				options: {
+					username: {
+						description: "The basic authentication user name."
+						required:    false
+						warnings: []
+						type: string: {
+							examples: ["${HTTP_USERNAME}", "username"]
+						}
+					}
+					password: {
+						description: "The basic authentication password."
+						required:    false
+						warnings: []
+						type: string: {
+							examples: ["${HTTP_PASSWORD}", "password"]
+						}
+					}
+				}
+			}
+		}
 	}
 
 	output: logs: {

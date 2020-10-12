@@ -7,7 +7,7 @@ mod tcp;
 mod unix;
 
 #[cfg(all(feature = "sources-tls", feature = "warp"))]
-pub use self::http::{ErrorMessage, HttpSource};
+pub use self::http::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
 pub use multiline_config::MultilineConfig;
 #[cfg(all(feature = "sources-tls", feature = "listenfd"))]
 pub use tcp::{SocketListenAddr, TcpSource};
