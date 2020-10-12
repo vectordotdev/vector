@@ -53,8 +53,8 @@ pub mod papertrail;
 pub mod prometheus;
 #[cfg(feature = "sinks-pulsar")]
 pub mod pulsar;
-#[cfg(feature = "sinks-sematext_logs")]
-pub mod sematext_logs;
+#[cfg(feature = "sinks-sematext")]
+pub mod sematext;
 #[cfg(feature = "sinks-socket")]
 pub mod socket;
 #[cfg(feature = "sinks-splunk_hec")]

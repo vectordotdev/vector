@@ -16,9 +16,7 @@ impl InternalEvent for TcpConnectionEstablished {
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_connections_established", 1,
-            "component_kind" => "sink",
-        );
+        counter!("tcp_connections_established", 1);
     }
 }
 
@@ -33,9 +31,7 @@ impl InternalEvent for TcpConnectionFailed {
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_connections_failed", 1,
-            "component_kind" => "sink",
-        );
+        counter!("tcp_connections_failed", 1);
     }
 }
 
@@ -50,9 +46,7 @@ impl InternalEvent for TcpConnectionDisconnected {
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_connections_disconnected", 1,
-            "component_kind" => "sink",
-        );
+        counter!("tcp_connections_disconnected", 1);
     }
 }
 
@@ -65,11 +59,7 @@ impl InternalEvent for TcpConnectionShutdown {
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_connection_shutdown", 1,
-            "component_kind" => "sink",
-            "component_type" => "socket",
-            "mode" => "tcp",
-        );
+        counter!("tcp_connection_shutdown", 1, "mode" => "tcp");
     }
 }
 
@@ -84,9 +74,7 @@ impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for TcpConnectionErro
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_connection_errors", 1,
-            "component_kind" => "source",
-        );
+        counter!("tcp_connection_errors", 1);
     }
 }
 
@@ -101,9 +89,7 @@ impl InternalEvent for TcpFlushError {
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_flush_errors", 1,
-            "component_kind" => "sink",
-        );
+        counter!("tcp_flush_errors", 1);
     }
 }
 
@@ -118,11 +104,7 @@ impl InternalEvent for TcpEventSent {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "sink",
-        );
-        counter!("bytes_processed", self.byte_size as u64,
-            "component_kind" => "sink",
-        );
+        counter!("events_processed", 1);
+        counter!("bytes_processed", self.byte_size as u64);
     }
 }
