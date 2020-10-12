@@ -8,7 +8,7 @@ use crate::{
         },
         util::{
             http::{HttpBatchService, HttpClient, HttpRetryLogic},
-            statistic::DistributionStatistic,
+            statistic::{validate_quantiles, DistributionStatistic},
             BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -43,6 +43,12 @@ pub struct InfluxDBConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    #[serde(default = "default_summary_quantiles")]
+    pub quantiles: Vec<f64>,
+}
+
+pub fn default_summary_quantiles() -> Vec<f64> {
+    vec![0.5, 0.75, 0.9, 0.95, 0.99]
 }
 
 lazy_static! {
@@ -75,6 +81,7 @@ impl SinkConfig for InfluxDBConfig {
             self.clone().influxdb2_settings,
             client.clone(),
         )?;
+        validate_quantiles(&self.quantiles)?;
         let sink = InfluxDBSvc::new(self.clone(), cx, client)?;
         Ok((sink, healthcheck))
     }
@@ -147,6 +154,7 @@ impl Service<Vec<Metric>> for InfluxDBSvc {
             self.protocol_version,
             items,
             self.config.namespace.as_deref(),
+            &self.config.quantiles,
         );
         let body: Vec<u8> = input.into_bytes();
 
@@ -175,6 +183,7 @@ fn encode_events(
     protocol_version: ProtocolVersion,
     events: Vec<Metric>,
     namespace: Option<&str>,
+    quantiles: &[f64],
 ) -> String {
     let mut output = String::new();
     for event in events.into_iter() {
@@ -276,7 +285,7 @@ fn encode_events(
             } => {
                 let quantiles = match statistic {
                     StatisticKind::Histogram => &[0.95] as &[_],
-                    StatisticKind::Summary => &[0.5, 0.75, 0.9, 0.95, 0.99] as &[_],
+                    StatisticKind::Summary => quantiles,
                 };
                 let fields = encode_distribution(&values, &sample_rates, quantiles);
 
@@ -363,7 +372,7 @@ mod tests {
             },
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), &[]);
         assert_eq!(
             line_protocols,
             "ns.total,metric_type=counter value=1.5 1542182950000000011\n\
@@ -381,7 +390,7 @@ mod tests {
             value: MetricValue::Gauge { value: -1.5 },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), &[]);
         assert_eq!(
             line_protocols,
             "ns.meter,metric_type=gauge,normal_tag=value,true_tag=true value=-1.5 1542182950000000011"
@@ -400,7 +409,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), &[]);
         assert_eq!(
             line_protocols,
             "ns.users,metric_type=set,normal_tag=value,true_tag=true value=2 1542182950000000011"
@@ -422,7 +431,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V1, events, Some("ns"));
+        let line_protocols = encode_events(ProtocolVersion::V1, events, Some("ns"), &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -461,7 +470,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -500,7 +509,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V1, events, Some("ns"));
+        let line_protocols = encode_events(ProtocolVersion::V1, events, Some("ns"), &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -539,7 +548,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -601,7 +610,7 @@ mod tests {
             },
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 3);
 
@@ -677,7 +686,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), &[]);
         assert_eq!(line_protocols.len(), 0);
     }
 
@@ -695,7 +704,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), &[]);
         assert_eq!(line_protocols.len(), 0);
     }
 
@@ -713,7 +722,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), &[]);
         assert_eq!(line_protocols.len(), 0);
     }
 
@@ -731,7 +740,12 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"));
+        let line_protocols = encode_events(
+            ProtocolVersion::V2,
+            events,
+            Some("ns"),
+            &default_summary_quantiles(),
+        );
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -770,7 +784,7 @@ mod integration_tests {
         event::metric::{Metric, MetricKind, MetricValue},
         sinks::{
             influxdb::{
-                metrics::{InfluxDBConfig, InfluxDBSvc},
+                metrics::{default_summary_quantiles, InfluxDBConfig, InfluxDBSvc},
                 test_util::{onboarding_v2, BUCKET, ORG, TOKEN},
                 InfluxDB2Settings,
             },
@@ -816,6 +830,7 @@ mod integration_tests {
                 bucket: BUCKET.to_string(),
                 token: TOKEN.to_string(),
             }),
+            quantiles: default_summary_quantiles(),
             batch: Default::default(),
             request: Default::default(),
         };

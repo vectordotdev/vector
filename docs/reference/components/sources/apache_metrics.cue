@@ -55,8 +55,8 @@ components: sources: apache_metrics: {
 		endpoints: {
 			description: "mod_status endpoints to scrape metrics from."
 			required:    true
-			type: "[string]": {
-				examples: [["http://localhost:8080/server-status/?auto"]]
+			type: array: {
+				items: type: string: examples: ["http://localhost:8080/server-status/?auto"]
 			}
 		}
 		interval_secs: {
@@ -79,7 +79,7 @@ components: sources: apache_metrics: {
 		_host: {
 			description: "The hostname of the Apache HTTP server"
 			required:    true
-			examples: ["localhost"]
+			examples: [_values.local_host]
 		}
 		apache_access_total: {
 			description:   "The total number of time the Apache server has been accessed."

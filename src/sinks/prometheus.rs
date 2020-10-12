@@ -2,7 +2,11 @@ use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-    sinks::util::{encode_namespace, statistic::DistributionStatistic, MetricEntry, StreamSink},
+    sinks::util::{
+        encode_namespace,
+        statistic::{validate_quantiles, DistributionStatistic},
+        MetricEntry, StreamSink,
+    },
     Event,
 };
 use async_trait::async_trait;
@@ -42,6 +46,8 @@ pub struct PrometheusSinkConfig {
     pub address: SocketAddr,
     #[serde(default = "default_histogram_buckets")]
     pub buckets: Vec<f64>,
+    #[serde(default = "default_summary_quantiles")]
+    pub quantiles: Vec<f64>,
     #[serde(default = "default_flush_period_secs")]
     pub flush_period_secs: u64,
 }
@@ -50,6 +56,10 @@ pub fn default_histogram_buckets() -> Vec<f64> {
     vec![
         0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
     ]
+}
+
+pub fn default_summary_quantiles() -> Vec<f64> {
+    vec![0.5, 0.75, 0.9, 0.95, 0.99]
 }
 
 pub fn default_address() -> SocketAddr {
@@ -90,6 +100,8 @@ impl SinkConfig for PrometheusSinkConfig {
                 min: MIN_FLUSH_PERIOD_SECS,
             }));
         }
+
+        validate_quantiles(&self.quantiles)?;
 
         let sink = PrometheusSink::new(self.clone(), cx.acker());
         let healthcheck = future::ok(()).boxed();
@@ -175,6 +187,7 @@ fn encode_metric_header(namespace: Option<&str>, metric: &Metric) -> String {
 fn encode_metric_datum(
     namespace: Option<&str>,
     buckets: &[f64],
+    quantiles: &[f64],
     expired: bool,
     metric: &Metric,
 ) -> String {
@@ -244,8 +257,7 @@ fn encode_metric_datum(
                 sample_rates,
                 statistic: StatisticKind::Summary,
             } => {
-                if let Some(statistic) =
-                    DistributionStatistic::new(values, sample_rates, &[0.5, 0.75, 0.9, 0.95, 0.99])
+                if let Some(statistic) = DistributionStatistic::new(values, sample_rates, quantiles)
                 {
                     for (q, v) in statistic.quantiles.iter() {
                         s.push_str(&format!(
@@ -319,6 +331,7 @@ fn handle(
     req: Request<Body>,
     namespace: Option<&str>,
     buckets: &[f64],
+    quantiles: &[f64],
     expired: bool,
     metrics: &IndexSet<MetricEntry>,
 ) -> Response<Body> {
@@ -333,7 +346,7 @@ fn handle(
 
             for metric in metrics {
                 let name = &metric.0.name;
-                let frame = encode_metric_datum(namespace, &buckets, expired, &metric.0);
+                let frame = encode_metric_datum(namespace, &buckets, quantiles, expired, &metric.0);
 
                 if !processed_headers.contains(&name) {
                     let header = encode_metric_header(namespace, &metric.0);
@@ -383,6 +396,7 @@ impl PrometheusSink {
         let metrics = Arc::clone(&self.metrics);
         let namespace = self.config.namespace.clone();
         let buckets = self.config.buckets.clone();
+        let quantiles = self.config.quantiles.clone();
         let last_flush_timestamp = Arc::clone(&self.last_flush_timestamp);
         let flush_period_secs = self.config.flush_period_secs;
 
@@ -390,6 +404,7 @@ impl PrometheusSink {
             let metrics = Arc::clone(&metrics);
             let namespace = namespace.clone();
             let buckets = buckets.clone();
+            let quantiles = quantiles.clone();
             let last_flush_timestamp = Arc::clone(&last_flush_timestamp);
             let flush_period_secs = flush_period_secs;
 
@@ -405,7 +420,16 @@ impl PrometheusSink {
                         method = ?req.method(),
                         path = ?req.uri().path(),
                     )
-                    .in_scope(|| handle(req, namespace.as_deref(), &buckets, expired, &metrics));
+                    .in_scope(|| {
+                        handle(
+                            req,
+                            namespace.as_deref(),
+                            &buckets,
+                            &quantiles,
+                            expired,
+                            &metrics,
+                        )
+                    });
 
                     future::ok::<_, Infallible>(response)
                 }))
@@ -492,7 +516,7 @@ mod tests {
         };
 
         let header = encode_metric_header(Some("vector"), &metric);
-        let frame = encode_metric_datum(Some("vector"), &[], false, &metric);
+        let frame = encode_metric_datum(Some("vector"), &[], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -512,7 +536,7 @@ mod tests {
         };
 
         let header = encode_metric_header(Some("vector"), &metric);
-        let frame = encode_metric_datum(Some("vector"), &[], false, &metric);
+        let frame = encode_metric_datum(Some("vector"), &[], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -534,7 +558,7 @@ mod tests {
         };
 
         let header = encode_metric_header(None, &metric);
-        let frame = encode_metric_datum(None, &[], false, &metric);
+        let frame = encode_metric_datum(None, &[], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -556,7 +580,7 @@ mod tests {
         };
 
         let header = encode_metric_header(None, &metric);
-        let frame = encode_metric_datum(None, &[], true, &metric);
+        let frame = encode_metric_datum(None, &[], &[], true, &metric);
 
         assert_eq!(
             header,
@@ -580,7 +604,7 @@ mod tests {
         };
 
         let header = encode_metric_header(None, &metric);
-        let frame = encode_metric_datum(None, &[0.0, 2.5, 5.0], false, &metric);
+        let frame = encode_metric_datum(None, &[0.0, 2.5, 5.0], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -605,7 +629,7 @@ mod tests {
         };
 
         let header = encode_metric_header(None, &metric);
-        let frame = encode_metric_datum(None, &[], false, &metric);
+        let frame = encode_metric_datum(None, &[], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -630,7 +654,7 @@ mod tests {
         };
 
         let header = encode_metric_header(None, &metric);
-        let frame = encode_metric_datum(None, &[], false, &metric);
+        let frame = encode_metric_datum(None, &[], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -654,7 +678,7 @@ mod tests {
         };
 
         let header = encode_metric_header(None, &metric);
-        let frame = encode_metric_datum(None, &[], false, &metric);
+        let frame = encode_metric_datum(None, &[], &default_summary_quantiles(), false, &metric);
 
         assert_eq!(
             header,

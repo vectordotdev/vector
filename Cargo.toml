@@ -103,7 +103,7 @@ async-graphql-warp = { version = "1.18.1", optional = true }
 
 # External libs
 derivative = "1.0"
-chrono = { version = "0.4.6", features = ["serde"] }
+chrono = { version = "0.4.19", features = ["serde"] }
 rand = "0.5.5"
 regex = "1.3.9"
 bytes = { version = "0.5.6", features = ["serde"] }
@@ -395,7 +395,7 @@ sinks = [
   "sinks-new_relic_logs",
   "sinks-papertrail",
   "sinks-prometheus",
-  "sinks-sematext_logs",
+  "sinks-sematext",
   "sinks-socket",
   "sinks-splunk_hec",
   "sinks-statsd",
@@ -424,7 +424,7 @@ sinks-logdna = ["bytesize"]
 sinks-loki = ["bytesize"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-prometheus = []
-sinks-sematext_logs = ["sinks-elasticsearch"]
+sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = []
 sinks-papertrail = []
 sinks-splunk_hec = ["bytesize"]

@@ -7,7 +7,7 @@ components: sources: aws_kinesis_firehose: {
 
 	classes: {
 		commonly_used: false
-		deployment_roles: ["service"]
+		deployment_roles: ["aggregator"]
 		egress_method: "batch"
 		function:      "receive"
 	}
@@ -81,7 +81,7 @@ components: sources: aws_kinesis_firehose: {
 		line: {
 			description: "One event will be published per incoming AWS Kinesis Firehose record."
 			fields: {
-				timestamp: fields._timestamp
+				timestamp: fields._current_timestamp
 				message: {
 					description: "The raw record from the incoming payload."
 					required:    true

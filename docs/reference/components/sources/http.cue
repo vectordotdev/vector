@@ -7,7 +7,7 @@ components: sources: http: {
 
 	classes: {
 		commonly_used: false
-		deployment_roles: ["service", "sidecar"]
+		deployment_roles: ["aggregator", "sidecar"]
 		egress_method: "batch"
 		function:      "receive"
 	}
@@ -73,9 +73,9 @@ components: sources: http: {
 			common:      false
 			description: "A list of HTTP headers to include in the log event. These will override any values included in the JSON payload with conflicting names. An empty string will be inserted into the log event if the corresponding HTTP header was missing."
 			required:    false
-			type: "[string]": {
+			type: array: {
 				default: null
-				examples: [["User-Agent", "X-My-Custom-Header"]]
+				items: type: string: examples: ["User-Agent", "X-My-Custom-Header"]
 			}
 		}
 	}
@@ -90,19 +90,20 @@ components: sources: http: {
 					required:      true
 					type: string: examples: ["Hello world"]
 				}
-				timestamp: fields._timestamp
+				timestamp: fields._current_timestamp
 			}
 		}
 		structured: {
 			description: "An individual line from a `application/json` request"
 			fields: {
 				"*": {
+					common:        false
 					description:   "Any field contained in your JSON payload"
 					relevant_when: "`encoding` != \"text\""
 					required:      false
 					type: "*": {}
 				}
-				timestamp: fields._timestamp
+				timestamp: fields._current_timestamp
 			}
 		}
 	}
@@ -110,7 +111,6 @@ components: sources: http: {
 	examples: log: [
 		{
 			_line:       "Hello world"
-			_host:       "123.456.789.111"
 			_user_agent: "my-service/v2.1"
 			title:       "text/plain"
 			configuration: {
@@ -122,21 +122,20 @@ components: sources: http: {
              ```http
              Content-Type: text/plain
              User-Agent: \( _user_agent )
-             X-Forwarded-For: \( _host )
+             X-Forwarded-For: \( _values.local_host )
 
              \( _line )
              ```
              """
 			output: [{
-				host:         _host
+				host:         _values.local_host
 				message:      _line
-				timestamp:    "2020-10-01T11:23:25.333432Z"
+				timestamp:    _values.current_timestamp
 				"User-Agent": _user_agent
 			}]
 		},
 		{
 			_line:       "{\"key\": \"val\"}"
-			_host:       "123.456.789.111"
 			_user_agent: "my-service/v2.1"
 			title:       "application/json"
 			configuration: {
@@ -148,15 +147,15 @@ components: sources: http: {
              ```http
              Content-Type: application/json
              User-Agent: \( _user_agent )
-             X-Forwarded-For: \( _host )
+             X-Forwarded-For: \( _values.local_host )
 
              \( _line )
              ```
              """
 			output: [{
-				host:         _host
+				host:         _values.local_host
 				key:          "val"
-				timestamp:    "2020-10-01T11:23:25.333432Z"
+				timestamp:    _values.current_timestamp
 				"User-Agent": _user_agent
 			}]
 		},

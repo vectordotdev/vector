@@ -18,8 +18,6 @@ components: transforms: regex_parser: {
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -70,9 +68,7 @@ components: transforms: regex_parser: {
 			description: "The Regular Expressions to apply. Do not include the leading or trailing `/` in any of the expressions."
 			required:    true
 			warnings: []
-			type: "[string]": {
-				examples: [["^(?P<timestamp>[\\\\w\\\\-:\\\\+]+) (?P<level>\\\\w+) (?P<message>.*)$"]]
-			}
+			type: array: items: type: string: examples: ["^(?P<timestamp>[\\\\w\\\\-:\\\\+]+) (?P<level>\\\\w+) (?P<message>.*)$"]
 		}
 		target_field: {
 			common:      false
@@ -84,16 +80,12 @@ components: transforms: regex_parser: {
 				examples: ["root_field", "parent.child"]
 			}
 		}
-		types: {
-			common:      true
-			description: "Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types."
-			required:    false
-			warnings: []
-			type: object: {
-				examples: [{"status": "int"}, {"duration": "float"}, {"success": "bool"}, {"timestamp": "timestamp|%F"}, {"timestamp": "timestamp|%a %b %e %T %Y"}, {"parent": {"child": "int"}}]
-				options: {}
-			}
-		}
+		types: components._types
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 
 	examples: log: [
