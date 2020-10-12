@@ -22,8 +22,8 @@ use http::{Request, StatusCode};
 use hyper::body::Body;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use string_cache::DefaultAtom as Atom;
 use std::{convert::TryFrom, io::Write, time::Duration};
+use string_cache::DefaultAtom as Atom;
 
 /// GZip compression level must be between 0 and 9.
 /// 0 is no compression, 9 is take as long as you like for maximum compression.
