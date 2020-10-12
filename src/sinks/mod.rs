@@ -1,5 +1,10 @@
 use crate::Event;
-use futures::{compat::Sink01CompatExt, future::BoxFuture, StreamExt};
+use futures::{
+    compat::{Compat, Future01CompatExt},
+    future::BoxFuture,
+    StreamExt, TryFutureExt,
+};
+use futures01::Stream;
 use snafu::Snafu;
 use std::fmt;
 
@@ -97,7 +102,12 @@ impl VectorSink {
         S: futures::Stream<Item = Event> + Send + 'static,
     {
         match self {
-            Self::Futures01Sink(sink) => input.map(Ok).forward(sink.sink_compat()).await,
+            Self::Futures01Sink(sink) => {
+                // Convert stream03 to stream01 instead of sink01 to sink03 to avoid close issues with Compat01as03Sink
+                // See https://github.com/timberio/vector/issues/4256
+                let inner = Compat::new(Box::pin(input.map(Ok)));
+                inner.forward(sink).compat().map_ok(|_| ()).await
+            }
             Self::Stream(ref mut s) => s.run(Box::pin(input)).await,
         }
     }

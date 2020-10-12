@@ -71,7 +71,7 @@ impl Fanout {
         }
     }
 
-    fn handle_sink_error(&mut self) -> Result<(), ()> {
+    fn handle_sink_error(&mut self, index: usize) -> Result<(), ()> {
         // If there's only one sink, propagate the error to the source ASAP
         // so it stops reading from its input. If there are multiple sinks,
         // keep pushing to the non-errored ones (while the errored sink
@@ -79,9 +79,33 @@ impl Fanout {
         if self.sinks.len() == 1 {
             Err(())
         } else {
-            self.sinks.remove(self.i);
+            self.sinks.remove(index);
             Ok(())
         }
+    }
+
+    fn poll_sinks(&mut self, close: bool) -> Poll<(), ()> {
+        self.process_control_messages();
+
+        let mut poll_result = Async::Ready(());
+
+        for i in 0..self.sinks.len() {
+            let (_name, sink) = &mut self.sinks[i];
+
+            let result = if close {
+                sink.close()
+            } else {
+                sink.poll_complete()
+            };
+
+            match result {
+                Ok(Async::Ready(())) => {}
+                Ok(Async::NotReady) => poll_result = Async::NotReady,
+                Err(()) => self.handle_sink_error(i)?,
+            }
+        }
+
+        Ok(poll_result)
     }
 }
 
@@ -101,7 +125,7 @@ impl Sink for Fanout {
             match sink.start_send(item.clone()) {
                 Ok(AsyncSink::NotReady(item)) => return Ok(AsyncSink::NotReady(item)),
                 Ok(AsyncSink::Ready) => self.i += 1,
-                Err(()) => self.handle_sink_error()?,
+                Err(()) => self.handle_sink_error(self.i)?,
             }
         }
 
@@ -109,7 +133,7 @@ impl Sink for Fanout {
         match sink.start_send(item) {
             Ok(AsyncSink::NotReady(item)) => return Ok(AsyncSink::NotReady(item)),
             Ok(AsyncSink::Ready) => self.i += 1,
-            Err(()) => self.handle_sink_error()?,
+            Err(()) => self.handle_sink_error(self.i)?,
         }
 
         self.i = 0;
@@ -118,26 +142,11 @@ impl Sink for Fanout {
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        self.process_control_messages();
+        self.poll_sinks(false)
+    }
 
-        let mut all_complete = true;
-
-        for i in 0..self.sinks.len() {
-            let (_name, sink) = &mut self.sinks[i];
-            match sink.poll_complete() {
-                Ok(Async::Ready(())) => {}
-                Ok(Async::NotReady) => {
-                    all_complete = false;
-                }
-                Err(()) => self.handle_sink_error()?,
-            }
-        }
-
-        if all_complete {
-            Ok(Async::Ready(()))
-        } else {
-            Ok(Async::NotReady)
-        }
+    fn close(&mut self) -> Poll<(), Self::SinkError> {
+        self.poll_sinks(true)
     }
 }
 
