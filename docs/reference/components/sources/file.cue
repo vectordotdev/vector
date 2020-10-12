@@ -27,7 +27,7 @@ components: sources: file: {
 
 	support: {
 		platforms: {
-			docker: flags: ["-v \(_directory)"]
+			docker: volumes: [_directory]
 			triples: {
 				"aarch64-unknown-linux-gnu":  true
 				"aarch64-unknown-linux-musl": true

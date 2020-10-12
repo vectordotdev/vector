@@ -1,6 +1,8 @@
 package metadata
 
 components: sources: splunk_hec: {
+	_port: 8080
+
 	title:             "Splunk HEC"
 	short_description: "Ingests data through the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol] and outputs log events."
 	long_description:  "The [Splunk HTTP Event Collector (HEC)][urls.splunk_hec] is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application."
@@ -30,6 +32,7 @@ components: sources: splunk_hec: {
 
 	support: {
 		platforms: {
+			docker: ports: [_port]
 			triples: {
 				"aarch64-unknown-linux-gnu":  true
 				"aarch64-unknown-linux-musl": true
@@ -56,7 +59,7 @@ components: sources: splunk_hec: {
 			required:    false
 			warnings: []
 			type: string: {
-				default: "0.0.0.0:8088"
+				default: "0.0.0.0:\(_port)"
 			}
 		}
 		token: {
