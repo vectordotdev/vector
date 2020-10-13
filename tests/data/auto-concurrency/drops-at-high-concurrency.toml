@@ -20,7 +20,7 @@ mean = [31, 32]
 [controller.in_flight]
 max = [13, 15]
 mean = [7.0, 8.0]
-mode = [3, 10]
+mode = [3, 11]
 
 [controller.concurrency_limit]
 max = [10, 15]
