@@ -61,6 +61,12 @@ struct LimitParams {
     #[serde(default)]
     scale: f64,
 
+    // The knee is the point above which a request's delay increases at
+    // an exponential scale rather than a linear scale.
+    knee_start: Option<usize>,
+
+    knee_exp: Option<f64>,
+
     // The limit is the level above which more requests will be denied.
     limit: Option<usize>,
 
@@ -73,6 +79,19 @@ impl LimitParams {
     fn action_at_level(&self, level: usize) -> Option<Action> {
         self.limit
             .and_then(|limit| (level > limit).and_some(self.action))
+    }
+
+    fn scale(&self, level: usize) -> f64 {
+        (level - 1) as f64 * self.scale
+            + self
+                .knee_start
+                .map(|knee| {
+                    self.knee_exp
+                        .unwrap_or_else(|| self.scale + 1.0)
+                        .powf(level.saturating_sub(knee) as f64)
+                        - 1.0
+                })
+                .unwrap_or(0.0)
     }
 }
 
@@ -181,6 +200,14 @@ impl TestSink {
             params: config.params,
         }
     }
+
+    fn delay_at(&self, in_flight: usize, rate: usize) -> f64 {
+        self.params.delay
+            * (1.0
+                + self.params.concurrency.scale(in_flight)
+                + self.params.rate.scale(rate)
+                + thread_rng().sample(Exp1) * self.params.jitter)
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -216,16 +243,11 @@ impl Service<Vec<Event>> for TestSink {
             .or(self.params.rate.action_at_level(rate));
         match action {
             None => {
-                let delay = self.params.delay
-                    * (1.0
-                        + (in_flight - 1) as f64 * self.params.concurrency.scale
-                        + rate as f64 * self.params.rate.scale
-                        + thread_rng().sample(Exp1) * self.params.jitter);
+                let delay = self.delay_at(in_flight, rate);
                 respond_after(Ok(Response::Ok), delay, Arc::clone(&self.stats))
             }
             Some(Action::Defer) => {
-                let delay =
-                    self.params.delay * (1.0 + thread_rng().sample(Exp1) * self.params.jitter);
+                let delay = self.delay_at(1, 1);
                 respond_after(Err(Error::Deferred), delay, Arc::clone(&self.stats))
             }
             Some(Action::Drop) => {
