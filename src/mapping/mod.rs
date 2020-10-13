@@ -4,8 +4,6 @@ use std::collections::BTreeMap;
 pub mod parser;
 pub mod query;
 
-
-
 pub type Result<T> = std::result::Result<T, String>;
 
 pub(self) trait Function: Send + core::fmt::Debug {

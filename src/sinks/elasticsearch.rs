@@ -498,7 +498,6 @@ mod tests {
     use http::{Response, StatusCode};
     use pretty_assertions::assert_eq;
     use serde_json::json;
-    
 
     #[test]
     fn generate_config() {
@@ -600,7 +599,6 @@ mod integration_tests {
     use serde_json::{json, Value};
     use std::fs::File;
     use std::io::Read;
-    
 
     #[test]
     fn ensure_pipeline_in_params() {

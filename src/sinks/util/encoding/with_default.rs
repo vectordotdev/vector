@@ -11,7 +11,6 @@ use std::{
     marker::PhantomData,
 };
 
-
 /// A structure to wrap sink encodings and enforce field privacy.
 ///
 /// This structure **does** assume that there is a default format. Consider

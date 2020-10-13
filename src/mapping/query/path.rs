@@ -4,7 +4,6 @@ use crate::{
     mapping::Result,
 };
 
-
 #[derive(Debug)]
 pub(in crate::mapping) struct Path {
     // TODO: Switch to String once Event API is cleaned up.
@@ -25,11 +24,7 @@ impl From<Vec<Vec<String>>> for Path {
             // TODO: Switch to String once Event API is cleaned up.
             path: path
                 .iter()
-                .map(|c| {
-                    c.iter()
-                        .map(|p| p.replace(".", "\\."))
-                        .collect()
-                })
+                .map(|c| c.iter().map(|p| p.replace(".", "\\.")).collect())
                 .collect(),
         }
     }
@@ -41,11 +36,7 @@ impl From<Vec<Vec<&str>>> for Path {
             // TODO: Switch to String once Event API is cleaned up.
             path: path
                 .iter()
-                .map(|c| {
-                    c.iter()
-                        .map(|p| p.replace(".", "\\."))
-                        .collect()
-                })
+                .map(|c| c.iter().map(|p| p.replace(".", "\\.")).collect())
                 .collect(),
         }
     }

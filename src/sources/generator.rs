@@ -119,7 +119,6 @@ mod tests {
     use futures::compat::Future01CompatExt;
     use futures01::{stream::Stream, sync::mpsc, Async::*};
     use std::time::{Duration, Instant};
-    
 
     #[test]
     fn generate_config() {

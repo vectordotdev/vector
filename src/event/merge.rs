@@ -1,7 +1,6 @@
 use crate::event::{LogEvent, Value};
 use bytes::BytesMut;
 
-
 /// Merges all fields specified at `fields` from `incoming` to `current`.
 pub fn merge_log_event(current: &mut LogEvent, mut incoming: LogEvent, fields: &[impl AsRef<str>]) {
     for field in fields {

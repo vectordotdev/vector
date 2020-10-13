@@ -4,7 +4,6 @@ use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use std::collections::{BTreeMap, HashMap};
 
-
 pub mod discriminant;
 pub mod merge;
 pub mod merge_state;

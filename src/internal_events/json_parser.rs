@@ -2,7 +2,6 @@ use super::InternalEvent;
 use metrics::counter;
 use serde_json::Error;
 
-
 #[derive(Debug)]
 pub(crate) struct JsonParserEventProcessed;
 

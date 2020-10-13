@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 
-
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct TokenizerConfig {
@@ -129,7 +128,6 @@ mod tests {
         config::{TransformConfig, TransformContext},
         Event,
     };
-    
 
     #[test]
     fn generate_config() {

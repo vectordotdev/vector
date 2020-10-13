@@ -2,7 +2,6 @@ use super::InternalEvent;
 use metrics::counter;
 use serde_json::Error;
 
-
 #[cfg(feature = "sources-splunk_hec")]
 pub(crate) use self::source::*;
 

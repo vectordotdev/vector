@@ -1,7 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
 
-
 #[derive(Debug)]
 pub struct ANSIStripperEventProcessed;
 

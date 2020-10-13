@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 use std::str::FromStr;
 
-
 #[derive(Deserialize, Serialize, Clone, Derivative)]
 #[serde(untagged)]
 #[derivative(Debug)]
@@ -74,14 +73,15 @@ impl CheckFieldsPredicate for EqualsPredicate {
                     _ => false,
                 },
             }),
-            Event::Metric(m) => m
-                .tags
-                .as_ref()
-                .and_then(|t| t.get(&self.target))
-                .map_or(false, |v| match &self.arg {
-                    CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.as_bytes(),
-                    _ => false,
-                }),
+            Event::Metric(m) => {
+                m.tags
+                    .as_ref()
+                    .and_then(|t| t.get(&self.target))
+                    .map_or(false, |v| match &self.arg {
+                        CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.as_bytes(),
+                        _ => false,
+                    })
+            }
         }
     }
 }
@@ -305,10 +305,7 @@ impl ExistsPredicate {
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         match arg {
-            CheckFieldsPredicateArg::Boolean(b) => Ok(Box::new(Self {
-                target,
-                arg: *b,
-            })),
+            CheckFieldsPredicateArg::Boolean(b) => Ok(Box::new(Self { target, arg: *b })),
             _ => Err("exists predicate requires a boolean argument".to_owned()),
         }
     }
@@ -414,10 +411,7 @@ impl LengthEqualsPredicate {
                     return Err("length_eq predicate integer cannot be negative".to_owned());
                 }
 
-                Ok(Box::new(Self {
-                    target,
-                    arg: *i,
-                }))
+                Ok(Box::new(Self { target, arg: *i }))
             }
             _ => Err("length_eq predicate requires an integer argument".to_owned()),
         }

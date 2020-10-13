@@ -694,28 +694,10 @@ fn benchmark_remap(c: &mut Criterion) {
 
         move || {
             let result = tform.transform(event.clone()).unwrap();
+            assert_eq!(result.as_log().get("foo").unwrap().to_string_lossy(), "bar");
+            assert_eq!(result.as_log().get("bar").unwrap().to_string_lossy(), "baz");
             assert_eq!(
-                result
-                    .as_log()
-                    .get("foo")
-                    .unwrap()
-                    .to_string_lossy(),
-                "bar"
-            );
-            assert_eq!(
-                result
-                    .as_log()
-                    .get("bar")
-                    .unwrap()
-                    .to_string_lossy(),
-                "baz"
-            );
-            assert_eq!(
-                result
-                    .as_log()
-                    .get("copy")
-                    .unwrap()
-                    .to_string_lossy(),
+                result.as_log().get("copy").unwrap().to_string_lossy(),
                 "buz"
             );
         }
@@ -756,19 +738,11 @@ fn benchmark_remap(c: &mut Criterion) {
         move || {
             let result = tform.transform(event.clone()).unwrap();
             assert_eq!(
-                result
-                    .as_log()
-                    .get("foo")
-                    .unwrap()
-                    .to_string_lossy(),
+                result.as_log().get("foo").unwrap().to_string_lossy(),
                 r#"{"key": "value"}"#
             );
             assert_eq!(
-                result
-                    .as_log()
-                    .get("bar")
-                    .unwrap()
-                    .to_string_lossy(),
+                result.as_log().get("bar").unwrap().to_string_lossy(),
                 r#"{"key":"value"}"#
             );
         }
@@ -816,10 +790,7 @@ fn benchmark_remap(c: &mut Criterion) {
                 result.as_log().get("number").unwrap(),
                 &Value::Integer(1234)
             );
-            assert_eq!(
-                result.as_log().get("bool").unwrap(),
-                &Value::Boolean(true)
-            );
+            assert_eq!(result.as_log().get("bool").unwrap(), &Value::Boolean(true));
             assert_eq!(
                 result.as_log().get("timestamp").unwrap(),
                 &Value::Timestamp(timestamp),

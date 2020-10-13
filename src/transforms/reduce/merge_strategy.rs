@@ -417,7 +417,6 @@ mod test {
     use super::*;
     use crate::Event;
     use serde_json::json;
-    
 
     #[test]
     fn initial_values() {

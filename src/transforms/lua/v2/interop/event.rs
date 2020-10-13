@@ -116,10 +116,7 @@ mod test {
             let event = ctx.load(lua_event).eval::<Event>().unwrap();
             let log = event.as_log();
             assert_eq!(log["field"], Value::Bytes("example".into()));
-            assert_eq!(
-                log["nested.field"],
-                Value::Bytes("another example".into())
-            );
+            assert_eq!(log["nested.field"], Value::Bytes("another example".into()));
         });
     }
 

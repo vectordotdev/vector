@@ -7,7 +7,6 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
@@ -137,7 +136,6 @@ mod test {
     use super::{JsonParser, JsonParserConfig};
     use crate::{config::log_schema, event::Event, transforms::Transform};
     use serde_json::json;
-    
 
     #[test]
     fn generate_config() {
@@ -152,10 +150,7 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert!(event
-            .as_log()
-            .get(log_schema().message_key())
-            .is_none());
+        assert!(event.as_log().get(log_schema().message_key()).is_none());
     }
 
     #[test]
@@ -169,10 +164,7 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert!(event
-            .as_log()
-            .get(log_schema().message_key())
-            .is_some());
+        assert!(event.as_log().get(log_schema().message_key()).is_some());
     }
 
     #[test]
@@ -290,10 +282,7 @@ mod test {
 
         let parsed_event = parser_outer.transform(event).unwrap();
 
-        assert_eq!(
-            parsed_event.as_log()["stream"],
-            "stdout".into()
-        );
+        assert_eq!(parsed_event.as_log()["stream"], "stdout".into());
 
         let parsed_inner_event = parser_inner.transform(parsed_event).unwrap();
         let log = parsed_inner_event.into_log();
@@ -317,10 +306,7 @@ mod test {
         let parsed = parser.transform(event.clone()).unwrap();
 
         assert_eq!(event, parsed);
-        assert_eq!(
-            event.as_log()[log_schema().message_key()],
-            invalid.into()
-        );
+        assert_eq!(event.as_log()[log_schema().message_key()], invalid.into());
 
         // Field
         let mut parser = JsonParser::from(JsonParserConfig {
@@ -429,10 +415,7 @@ mod test {
         let event = parser.transform(event).unwrap();
 
         assert_eq!(event.as_log()["string"], "this is text".into());
-        assert_eq!(
-            event.as_log()["null"],
-            crate::event::Value::Null
-        );
+        assert_eq!(event.as_log()["null"], crate::event::Value::Null);
         assert_eq!(event.as_log()["float"], 12.34.into());
         assert_eq!(event.as_log()["int"], 56.into());
         assert_eq!(event.as_log()["bool true"], true.into());
@@ -441,10 +424,7 @@ mod test {
         assert_eq!(event.as_log()["array[1]"], 7.into());
         assert_eq!(event.as_log()["object.nested"], "data".into());
         assert_eq!(event.as_log()["object.more"], "values".into());
-        assert_eq!(
-            event.as_log()["deep[0][0][0].a.b.c[0][0][0]"],
-            1234.into()
-        );
+        assert_eq!(event.as_log()["deep[0][0][0].a.b.c[0][0][0]"], 1234.into());
     }
 
     #[test]
@@ -478,10 +458,7 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert_eq!(
-            event.as_log()["message"],
-            "invalid json".into()
-        );
+        assert_eq!(event.as_log()["message"], "invalid json".into());
     }
 
     #[test]

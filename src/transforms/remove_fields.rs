@@ -8,7 +8,6 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
-
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RemoveFieldsConfig {
@@ -101,9 +100,6 @@ mod tests {
 
         assert!(new_event.as_log().get("to_remove").is_none());
         assert!(new_event.as_log().get("unknown").is_none());
-        assert_eq!(
-            new_event.as_log()["to_keep"],
-            "another value".into()
-        );
+        assert_eq!(new_event.as_log()["to_keep"], "another value".into());
     }
 }

@@ -17,7 +17,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
 use std::time::{Duration, Instant};
 
-
 mod merge_strategy;
 
 use merge_strategy::*;
@@ -158,11 +157,7 @@ impl Reduce {
             None
         };
 
-        let identifier_fields = config
-            .identifier_fields
-            .clone()
-            .into_iter()
-            .collect();
+        let identifier_fields = config.identifier_fields.clone().into_iter().collect();
 
         Ok(Reduce {
             expire_after: Duration::from_millis(config.expire_after_ms.unwrap_or(30000)),
@@ -346,10 +341,7 @@ identifier_fields = [ "request_id" ]
             outputs.first().unwrap().as_log()["message"],
             "test message 1".into()
         );
-        assert_eq!(
-            outputs.first().unwrap().as_log()["counter"],
-            Value::from(8)
-        );
+        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(8));
 
         outputs.clear();
 
@@ -369,10 +361,7 @@ identifier_fields = [ "request_id" ]
             outputs.first().unwrap().as_log()["extra_field"],
             "value1".into()
         );
-        assert_eq!(
-            outputs.first().unwrap().as_log()["counter"],
-            Value::from(7)
-        );
+        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(7));
     }
 
     #[tokio::test]
@@ -480,10 +469,7 @@ identifier_fields = [ "request_id" ]
             outputs.first().unwrap().as_log()["message"],
             "test message 1".into()
         );
-        assert_eq!(
-            outputs.first().unwrap().as_log()["counter"],
-            Value::from(8)
-        );
+        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(8));
 
         outputs.clear();
 
@@ -502,10 +488,7 @@ identifier_fields = [ "request_id" ]
             outputs.first().unwrap().as_log()["extra_field"],
             "value1".into()
         );
-        assert_eq!(
-            outputs.first().unwrap().as_log()["counter"],
-            Value::from(7)
-        );
+        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(7));
     }
 
     #[tokio::test]

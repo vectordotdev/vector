@@ -1,7 +1,6 @@
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
 
-
 pub fn default_true() -> bool {
     true
 }

@@ -229,10 +229,7 @@ fn create_event(record: Record) -> Event {
         }
     }
     // Add source type
-    log.try_insert(
-        log_schema().source_type_key(),
-        Bytes::from("journald"),
-    );
+    log.try_insert(log_schema().source_type_key(), Bytes::from("journald"));
 
     log.into()
 }

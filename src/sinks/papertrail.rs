@@ -76,10 +76,7 @@ impl SinkConfig for PapertrailConfig {
 }
 
 fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {
-    let host = if let Some(host) = event
-        .as_mut_log()
-        .remove(log_schema().host_key())
-    {
+    let host = if let Some(host) = event.as_mut_log().remove(log_schema().host_key()) {
         Some(host.to_string_lossy())
     } else {
         None
@@ -117,7 +114,6 @@ fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>)
 #[cfg(test)]
 mod tests {
     use super::*;
-    
 
     #[test]
     fn encode_event_apply_rules() {

@@ -21,7 +21,6 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 
-
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("{}: {}", source, name))]

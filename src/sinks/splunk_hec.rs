@@ -23,7 +23,6 @@ use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
 
-
 #[derive(Debug, Snafu)]
 pub enum BuildError {
     #[snafu(display("Host must include a scheme (https:// or http://)"))]

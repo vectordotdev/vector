@@ -607,10 +607,9 @@ fn raw_event(
     log.insert(log_schema().timestamp_key(), Utc::now());
 
     // Add source type
-    event.as_mut_log().try_insert(
-        log_schema().source_type_key(),
-        Bytes::from("splunk_hec"),
-    );
+    event
+        .as_mut_log()
+        .try_insert(log_schema().source_type_key(), Bytes::from("splunk_hec"));
 
     emit!(SplunkHECEventReceived);
 
@@ -764,7 +763,6 @@ mod tests {
     use futures::{compat::Future01CompatExt, future, stream, StreamExt};
     use futures01::sync::mpsc;
     use std::net::SocketAddr;
-    
 
     #[test]
     fn generate_config() {
@@ -875,14 +873,8 @@ mod tests {
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
-        assert_eq!(
-            event.as_log()[log_schema().message_key()],
-            message.into()
-        );
-        assert!(event
-            .as_log()
-            .get(log_schema().timestamp_key())
-            .is_some());
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
@@ -898,14 +890,8 @@ mod tests {
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
-        assert_eq!(
-            event.as_log()[log_schema().message_key()],
-            message.into()
-        );
-        assert!(event
-            .as_log()
-            .get(log_schema().timestamp_key())
-            .is_some());
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
@@ -925,14 +911,8 @@ mod tests {
         let events = channel_n(messages.clone(), sink, source).await;
 
         for (msg, event) in messages.into_iter().zip(events.into_iter()) {
-            assert_eq!(
-                event.as_log()[log_schema().message_key()],
-                msg.into()
-            );
-            assert!(event
-                .as_log()
-                .get(log_schema().timestamp_key())
-                .is_some());
+            assert_eq!(event.as_log()[log_schema().message_key()], msg.into());
+            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key()],
                 "splunk_hec".into()
@@ -949,14 +929,8 @@ mod tests {
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
-        assert_eq!(
-            event.as_log()[log_schema().message_key()],
-            message.into()
-        );
-        assert!(event
-            .as_log()
-            .get(log_schema().timestamp_key())
-            .is_some());
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
@@ -976,14 +950,8 @@ mod tests {
         let events = channel_n(messages.clone(), sink, source).await;
 
         for (msg, event) in messages.into_iter().zip(events.into_iter()) {
-            assert_eq!(
-                event.as_log()[log_schema().message_key()],
-                msg.into()
-            );
-            assert!(event
-                .as_log()
-                .get(log_schema().timestamp_key())
-                .is_some());
+            assert_eq!(event.as_log()[log_schema().message_key()], msg.into());
+            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key()],
                 "splunk_hec".into()
@@ -1005,10 +973,7 @@ mod tests {
         let event = collect_n(source, 1).await.unwrap().remove(0);
         assert_eq!(event.as_log()["greeting"], "hello".into());
         assert_eq!(event.as_log()["name"], "bob".into());
-        assert!(event
-            .as_log()
-            .get(log_schema().timestamp_key())
-            .is_some());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
@@ -1026,10 +991,7 @@ mod tests {
         sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
-        assert_eq!(
-            event.as_log()[log_schema().message_key()],
-            "hello".into()
-        );
+        assert_eq!(event.as_log()[log_schema().message_key()], "hello".into());
     }
 
     #[tokio::test]
@@ -1042,15 +1004,9 @@ mod tests {
         assert_eq!(200, post(address, "services/collector/raw", message).await);
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
-        assert_eq!(
-            event.as_log()[log_schema().message_key()],
-            message.into()
-        );
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
         assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
-        assert!(event
-            .as_log()
-            .get(log_schema().timestamp_key())
-            .is_some());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
@@ -1089,10 +1045,7 @@ mod tests {
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
-        assert_eq!(
-            event.as_log()[log_schema().message_key()],
-            message.into()
-        );
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
     }
 
     #[tokio::test]
@@ -1108,14 +1061,8 @@ mod tests {
         );
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
-        assert_eq!(
-            event.as_log()[log_schema().message_key()],
-            "first".into()
-        );
-        assert!(event
-            .as_log()
-            .get(log_schema().timestamp_key())
-            .is_some());
+        assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()

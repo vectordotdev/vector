@@ -15,7 +15,6 @@ use snafu::ResultExt;
 use std::collections::HashMap;
 use std::str;
 
-
 #[derive(Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
 #[serde(default, deny_unknown_fields)]
@@ -180,12 +179,7 @@ impl RegexParser {
 
         let names = &patterns
             .iter()
-            .map(|regex| {
-                regex
-                    .capture_names()
-                    .filter_map(|s| s)
-                    .collect::<Vec<_>>()
-            })
+            .map(|regex| regex.capture_names().filter_map(|s| s).collect::<Vec<_>>())
             .flatten()
             .collect::<Vec<_>>();
 

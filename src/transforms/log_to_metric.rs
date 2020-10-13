@@ -20,7 +20,6 @@ use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::num::ParseFloatError;
 
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct LogToMetricConfig {
@@ -120,19 +119,24 @@ impl LogToMetric {
 }
 
 enum TransformError {
-    FieldNotFound { field: String },
+    FieldNotFound {
+        field: String,
+    },
     TemplateParseError(TemplateError),
-    TemplateRenderError { missing_keys: Vec<String> },
-    ParseFloatError { field: String, error: ParseFloatError },
+    TemplateRenderError {
+        missing_keys: Vec<String>,
+    },
+    ParseFloatError {
+        field: String,
+        error: ParseFloatError,
+    },
 }
 
 fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
     let template = Template::try_from(s).map_err(TransformError::TemplateParseError)?;
     template.render_string(&event).map_err(|missing_keys| {
         // convert to String to avoid printing String in Debug format
-        let missing_keys = missing_keys
-            .into_iter()
-            .collect::<Vec<String>>();
+        let missing_keys = missing_keys.into_iter().collect::<Vec<String>>();
         TransformError::TemplateRenderError { missing_keys }
     })
 }
@@ -320,7 +324,10 @@ impl Transform for LogToMetric {
                     emit!(LogToMetricFieldNotFound { field })
                 }
                 Err(TransformError::ParseFloatError { field, error }) => {
-                    emit!(LogToMetricParseFloatError { field: field.as_ref(), error })
+                    emit!(LogToMetricParseFloatError {
+                        field: field.as_ref(),
+                        error
+                    })
                 }
                 Err(TransformError::TemplateRenderError { missing_keys }) => {
                     emit!(LogToMetricTemplateRenderError { missing_keys })

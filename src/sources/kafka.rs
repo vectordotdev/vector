@@ -284,7 +284,6 @@ mod integration_test {
         producer::{FutureProducer, FutureRecord},
         util::Timeout,
     };
-    
 
     const BOOTSTRAP_SERVER: &str = "localhost:9092";
 
@@ -349,17 +348,11 @@ mod integration_test {
             events[0].as_log()[log_schema().message_key()],
             "my message".into()
         );
-        assert_eq!(
-            events[0].as_log()["message_key"],
-            "my key".into()
-        );
+        assert_eq!(events[0].as_log()["message_key"], "my key".into());
         assert_eq!(
             events[0].as_log()[log_schema().source_type_key()],
             "kafka".into()
         );
-        assert_eq!(
-            events[0].as_log()[log_schema().timestamp_key()],
-            now.into()
-        );
+        assert_eq!(events[0].as_log()[log_schema().timestamp_key()], now.into());
     }
 }

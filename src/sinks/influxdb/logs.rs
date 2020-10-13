@@ -20,7 +20,6 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDBLogsConfig {
@@ -151,12 +150,10 @@ impl HttpSink for InfluxDBLogsSink {
         let measurement = encode_namespace(Some(&self.namespace), '.', "vector");
 
         // Timestamp
-        let timestamp = encode_timestamp(
-            match event.remove(log_schema().timestamp_key()) {
-                Some(Value::Timestamp(ts)) => Some(ts),
-                _ => None,
-            },
-        );
+        let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
+            Some(Value::Timestamp(ts)) => Some(ts),
+            _ => None,
+        });
 
         // Tags + Fields
         let mut tags: BTreeMap<String, String> = BTreeMap::new();
@@ -231,7 +228,6 @@ mod tests {
     };
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
-    
 
     #[test]
     fn test_config_without_tags() {

@@ -931,10 +931,7 @@ impl ContainerMetadata {
             .map(|map| {
                 map.iter()
                     .map(|(key, value)| {
-                        (
-                            ("label.".to_owned() + key),
-                            Value::from(value.to_owned()),
-                        )
+                        (("label.".to_owned() + key), Value::from(value.to_owned()))
                     })
                     .collect()
             })

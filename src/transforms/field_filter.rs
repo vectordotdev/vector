@@ -5,7 +5,6 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct FieldFilterConfig {
@@ -53,10 +52,7 @@ pub struct FieldFilter {
 
 impl FieldFilter {
     pub fn new(field_name: String, value: String) -> Self {
-        Self {
-            field_name,
-            value,
-        }
+        Self { field_name, value }
     }
 }
 

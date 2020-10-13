@@ -15,7 +15,6 @@ use std::error::Error;
 use std::fmt;
 use std::path::PathBuf;
 
-
 lazy_static! {
     static ref RE: Regex = Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap();
 }

@@ -201,10 +201,7 @@ impl rlua::UserData for LuaEvent {
                     let keys: rlua::Table = state.get("keys")?;
                     let next: rlua::Function = ctx.globals().get("next")?;
                     let key: Option<String> = next.call((keys, prev))?;
-                    match key
-                        .clone()
-                        .and_then(|k| event.inner.as_log().get(k))
-                    {
+                    match key.clone().and_then(|k| event.inner.as_log().get(k)) {
                         Some(value) => Ok((key, Some(ctx.create_string(&value.as_bytes())?))),
                         None => Ok((None, None)),
                     }

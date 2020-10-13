@@ -58,9 +58,7 @@ impl HttpSource for SimpleHttpSource {
                 // Add source type
                 let key = log_schema().source_type_key();
                 for event in events.iter_mut() {
-                    event
-                        .as_mut_log()
-                        .try_insert(key, Bytes::from("http"));
+                    event.as_mut_log().try_insert(key, Bytes::from("http"));
                 }
                 events
             })
@@ -222,7 +220,6 @@ mod tests {
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
-    
 
     async fn source(
         encoding: Encoding,
@@ -290,28 +287,16 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(
-                log[log_schema().message_key()],
-                "test body".into()
-            );
+            assert_eq!(log[log_schema().message_key()], "test body".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(
-                log[log_schema().source_type_key()],
-                "http".into()
-            );
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(
-                log[log_schema().message_key()],
-                "test body 2".into()
-            );
+            assert_eq!(log[log_schema().message_key()], "test body 2".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(
-                log[log_schema().source_type_key()],
-                "http".into()
-            );
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
         }
     }
 
@@ -330,28 +315,16 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(
-                log[log_schema().message_key()],
-                "test body".into()
-            );
+            assert_eq!(log[log_schema().message_key()], "test body".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(
-                log[log_schema().source_type_key()],
-                "http".into()
-            );
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(
-                log[log_schema().message_key()],
-                "test body 2".into()
-            );
+            assert_eq!(log[log_schema().message_key()], "test body 2".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(
-                log[log_schema().source_type_key()],
-                "http".into()
-            );
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
         }
     }
 
@@ -395,20 +368,14 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["key"], "value".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(
-                log[log_schema().source_type_key()],
-                "http".into()
-            );
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(
-                log[log_schema().source_type_key()],
-                "http".into()
-            );
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
         }
     }
 
@@ -431,20 +398,14 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(
-                log[log_schema().source_type_key()],
-                "http".into()
-            );
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log["key2"], "value2".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(
-                log[log_schema().source_type_key()],
-                "http".into()
-            );
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
         }
     }
 
@@ -477,16 +438,10 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["User-Agent"], "test_client".into());
-            assert_eq!(
-                log["Upgrade-Insecure-Requests"],
-                "false".into()
-            );
+            assert_eq!(log["Upgrade-Insecure-Requests"], "false".into());
             assert_eq!(log["AbsentHeader"], "".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
-            assert_eq!(
-                log[log_schema().source_type_key()],
-                "http".into()
-            );
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
         }
     }
 }

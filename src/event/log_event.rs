@@ -3,8 +3,8 @@ use serde::{Serialize, Serializer};
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
-    iter::FromIterator,
     fmt::{Debug, Display},
+    iter::FromIterator,
 };
 
 #[derive(PartialEq, Debug, Clone, Default)]
@@ -34,7 +34,11 @@ impl LogEvent {
     }
 
     #[instrument(skip(self, key), fields(key = %key.as_ref()))]
-    pub fn insert(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) -> Option<Value> {
+    pub fn insert(
+        &mut self,
+        key: impl AsRef<str>,
+        value: impl Into<Value> + Debug,
+    ) -> Option<Value> {
         util::log::insert(&mut self.fields, key.as_ref(), value.into())
     }
 

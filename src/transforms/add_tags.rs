@@ -8,7 +8,6 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{btree_map::Entry, BTreeMap};
 
-
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AddTagsConfig {
@@ -98,7 +97,6 @@ mod tests {
     };
     use indexmap::IndexMap;
     use std::collections::BTreeMap;
-    
 
     #[test]
     fn add_tags() {

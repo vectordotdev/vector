@@ -12,7 +12,6 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct MetricToLogConfig {
@@ -56,8 +55,8 @@ impl MetricToLog {
             timestamp_key: "timestamp".into(),
             host_tag: format!(
                 "tags.{}",
-                host_tag.unwrap_or_else(|| log_schema().host_key().to_string()
-            )),
+                host_tag.unwrap_or_else(|| log_schema().host_key().to_string())
+            ),
         }
     }
 }

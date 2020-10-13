@@ -11,7 +11,6 @@ use bytes::Bytes;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
 
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub enum FieldMatchConfig {
@@ -171,11 +170,7 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
 
             for (field_name, value) in event.as_log().all_fields() {
                 if !fields.contains(&field_name) {
-                    entry.push((
-                        field_name,
-                        type_id_for_value(&value),
-                        value.as_bytes(),
-                    ));
+                    entry.push((field_name, type_id_for_value(&value), value.as_bytes()));
                 }
             }
 
@@ -206,7 +201,6 @@ mod tests {
     use crate::transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig};
     use crate::{event::Event, event::Value, transforms::Transform};
     use std::collections::BTreeMap;
-    
 
     fn make_match_transform(num_events: usize, fields: Vec<String>) -> Dedupe {
         Dedupe::new(DedupeConfig {

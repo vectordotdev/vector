@@ -22,7 +22,6 @@ use serde_json::{json, map};
 use snafu::Snafu;
 use std::collections::HashMap;
 
-
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
     #[snafu(display("Resource not found"))]

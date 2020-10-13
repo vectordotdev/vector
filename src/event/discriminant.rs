@@ -4,7 +4,6 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-
 // TODO: if we had `Value` implement `Eq` and `Hash`, the implementation here
 // would be much easier. The issue is with `f64` type. We should consider using
 // a newtype for `f64` there that'd implement `Eq` and `Hash` is it's safe, for

@@ -160,10 +160,9 @@ fn line_to_event(line: String) -> Event {
     };
 
     // Add source type
-    event.as_mut_log().try_insert(
-        log_schema().source_type_key(),
-        Bytes::from("logplex"),
-    );
+    event
+        .as_mut_log()
+        .try_insert(log_schema().source_type_key(), Bytes::from("logplex"));
 
     event
 }
@@ -183,7 +182,6 @@ mod tests {
     use futures01::sync::mpsc;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
-    
 
     async fn source() -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
@@ -247,10 +245,7 @@ mod tests {
                 .into()
         );
         assert_eq!(log[&log_schema().host_key()], "host".into());
-        assert_eq!(
-            log[log_schema().source_type_key()],
-            "logplex".into()
-        );
+        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
     }
 
     #[test]
@@ -259,10 +254,7 @@ mod tests {
         let event = super::line_to_event(body.into());
         let log = event.as_log();
 
-        assert_eq!(
-            log[log_schema().message_key()],
-            "foo bar baz".into()
-        );
+        assert_eq!(log[log_schema().message_key()], "foo bar baz".into());
         assert_eq!(
             log[log_schema().timestamp_key()],
             "2020-01-08T22:33:57.353034+00:00"
@@ -271,10 +263,7 @@ mod tests {
                 .into()
         );
         assert_eq!(log[log_schema().host_key()], "host".into());
-        assert_eq!(
-            log[log_schema().source_type_key()],
-            "logplex".into()
-        );
+        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
     }
 
     #[test]
@@ -288,10 +277,7 @@ mod tests {
             "what am i doing here".into()
         );
         assert!(log.get(log_schema().timestamp_key()).is_some());
-        assert_eq!(
-            log[log_schema().source_type_key()],
-            "logplex".into()
-        );
+        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
     }
 
     #[test]
@@ -300,10 +286,7 @@ mod tests {
         let event = super::line_to_event(body.into());
         let log = event.as_log();
 
-        assert_eq!(
-            log[log_schema().message_key()],
-            "i'm not that long".into()
-        );
+        assert_eq!(log[log_schema().message_key()], "i'm not that long".into());
         assert_eq!(
             log[log_schema().timestamp_key()],
             "2020-01-08T22:33:57.353034+00:00"
@@ -312,9 +295,6 @@ mod tests {
                 .into()
         );
         assert_eq!(log[log_schema().host_key()], "host".into());
-        assert_eq!(
-            log[log_schema().source_type_key()],
-            "logplex".into()
-        );
+        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
     }
 }

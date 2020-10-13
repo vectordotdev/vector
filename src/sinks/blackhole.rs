@@ -10,7 +10,6 @@ use async_trait::async_trait;
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 
-
 pub struct BlackholeSink {
     total_events: usize,
     total_raw_bytes: usize,

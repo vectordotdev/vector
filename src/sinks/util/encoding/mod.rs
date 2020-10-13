@@ -41,7 +41,6 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::{collections::VecDeque, fmt::Debug};
 
-
 /// The behavior of a encoding configuration.
 pub trait EncodingConfiguration<E> {
     // Required Accessors

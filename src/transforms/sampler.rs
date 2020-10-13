@@ -11,7 +11,6 @@ use regex::RegexSet; // TODO: use regex::bytes
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
-
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SamplerConfig {
@@ -102,7 +101,6 @@ mod tests {
     use crate::transforms::Transform;
     use approx::assert_relative_eq;
     use regex::RegexSet;
-    
 
     #[test]
     fn samples_at_roughly_the_configured_rate() {

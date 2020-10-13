@@ -121,9 +121,6 @@ mod tests {
         assert_eq!(new_event.as_log()["moved"], "some value".into());
         assert!(new_event.as_log().get("not_present").is_none());
         assert!(new_event.as_log().get("should_not_exist").is_none());
-        assert_eq!(
-            new_event.as_log()["do_not_move"],
-            "not moved".into()
-        );
+        assert_eq!(new_event.as_log()["do_not_move"], "not moved".into());
     }
 }

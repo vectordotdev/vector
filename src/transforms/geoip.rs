@@ -6,7 +6,6 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct GeoipConfig {
@@ -190,7 +189,6 @@ mod tests {
         transforms::Transform,
     };
     use std::collections::HashMap;
-    
 
     #[test]
     fn geoip_city_lookup_success() {

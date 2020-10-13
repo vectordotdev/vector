@@ -7,7 +7,6 @@ use crate::{
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 
-
 use lazy_static::lazy_static;
 
 #[derive(Deserialize, Serialize, Debug)]

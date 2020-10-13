@@ -199,7 +199,7 @@ fn protobuf() -> Result<()> {
         collections::HashMap,
         io::{Read, Write},
     };
-    
+
     crate::test_util::trace_init();
 
     // Load in fixtures.

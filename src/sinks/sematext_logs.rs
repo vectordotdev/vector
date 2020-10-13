@@ -9,7 +9,6 @@ use crate::{
 use futures01::{Future, Sink};
 use serde::{Deserialize, Serialize};
 
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SematextLogsConfig {
     region: Option<Region>,

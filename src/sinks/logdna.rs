@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::SystemTime;
 
-
 lazy_static::lazy_static! {
     static ref HOST: UriSerde = Uri::from_static("https://logs.logdna.com").into();
 }

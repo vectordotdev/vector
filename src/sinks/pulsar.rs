@@ -16,7 +16,6 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{collections::HashSet, sync::Arc};
 
-
 type MetadataFuture<F, M> = future::Join<F, future::FutureResult<M, <F as Future>::Error>>;
 
 #[derive(Debug, Snafu)]
@@ -206,7 +205,6 @@ fn encode_event(mut item: Event, encoding: &EncodingConfig<Encoding>) -> crate::
 mod tests {
     use super::*;
     use std::collections::HashMap;
-    
 
     #[test]
     fn pulsar_event_json() {

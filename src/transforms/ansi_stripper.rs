@@ -10,7 +10,6 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AnsiStripperConfig {
@@ -83,7 +82,6 @@ mod tests {
         event::{Event, Value},
         transforms::Transform,
     };
-    
 
     macro_rules! assert_foo_bar {
         ($($in:expr),* $(,)?) => {

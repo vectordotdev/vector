@@ -334,7 +334,7 @@ mod tests {
         future::Future,
         io::{Seek, Write},
     };
-    
+
     use tempfile::tempdir;
     use tokio::time::{delay_for, timeout, Duration};
 
@@ -449,14 +449,8 @@ mod tests {
 
         assert_eq!(log["file"], "some_file.rs".into());
         assert_eq!(log["host"], "Some.Machine".into());
-        assert_eq!(
-            log[log_schema().message_key()],
-            "hello world".into()
-        );
-        assert_eq!(
-            log[log_schema().source_type_key()],
-            "file".into()
-        );
+        assert_eq!(log[log_schema().message_key()], "hello world".into());
+        assert_eq!(log[log_schema().source_type_key()], "file".into());
     }
 
     #[tokio::test]
@@ -854,9 +848,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| {
-                    event.as_log()[log_schema().message_key()].to_string_lossy()
-                })
+                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["zeroth line", "first line"]);
         }
@@ -877,9 +869,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| {
-                    event.as_log()[log_schema().message_key()].to_string_lossy()
-                })
+                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["second line"]);
         }
@@ -905,9 +895,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| {
-                    event.as_log()[log_schema().message_key()].to_string_lossy()
-                })
+                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(
                 lines,
@@ -944,9 +932,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| {
-                    event.as_log()[log_schema().message_key()].to_string_lossy()
-                })
+                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["first line"]);
         }
@@ -971,9 +957,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| {
-                    event.as_log()[log_schema().message_key()].to_string_lossy()
-                })
+                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["second line"]);
         }
@@ -1046,20 +1030,12 @@ mod tests {
         let received = wait_with_timeout(rx.collect().compat()).await;
         let before_lines = received
             .iter()
-            .filter(|event| {
-                event.as_log()["file"]
-                    .to_string_lossy()
-                    .ends_with("before")
-            })
+            .filter(|event| event.as_log()["file"].to_string_lossy().ends_with("before"))
             .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
             .collect::<Vec<_>>();
         let after_lines = received
             .iter()
-            .filter(|event| {
-                event.as_log()["file"]
-                    .to_string_lossy()
-                    .ends_with("after")
-            })
+            .filter(|event| event.as_log()["file"].to_string_lossy().ends_with("after"))
             .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(before_lines, vec!["second line"]);

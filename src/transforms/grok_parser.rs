@@ -14,7 +14,6 @@ use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::str;
 
-
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("Invalid grok pattern: {}", source))]
@@ -139,7 +138,6 @@ mod tests {
     };
     use pretty_assertions::assert_eq;
     use serde_json::json;
-    
 
     #[test]
     fn generate_config() {

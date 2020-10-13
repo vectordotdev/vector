@@ -507,28 +507,16 @@ mod integration_tests {
         let event = transform.transform(event).unwrap();
         let log = event.as_log();
 
-        assert_eq!(
-            log.get("availability-zone"),
-            Some(&"ww-region-1a".into())
-        );
+        assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
         assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
         assert_eq!(
             log.get("public-hostname"),
             Some(&"mock-public-hostname".into())
         );
         assert_eq!(log.get(&"local-ipv4"), Some(&"192.1.1.2".into()));
-        assert_eq!(
-            log.get("local-hostname"),
-            Some(&"mock-hostname".into())
-        );
-        assert_eq!(
-            log.get("instance-id"),
-            Some(&"i-096fba6d03d36d262".into())
-        );
-        assert_eq!(
-            log.get("ami-id"),
-            Some(&"ami-05f27d4d6770a43d2".into())
-        );
+        assert_eq!(log.get("local-hostname"), Some(&"mock-hostname".into()));
+        assert_eq!(log.get("instance-id"), Some(&"i-096fba6d03d36d262".into()));
+        assert_eq!(log.get("ami-id"), Some(&"ami-05f27d4d6770a43d2".into()));
         assert_eq!(log.get("instance-type"), Some(&"t2.micro".into()));
         assert_eq!(log.get("region"), Some(&"us-east-1".into()));
         assert_eq!(log.get("vpc-id"), Some(&"mock-vpc-id".into()));
@@ -606,10 +594,7 @@ mod integration_tests {
         let event = transform.transform(event).unwrap();
         let log = event.as_log();
 
-        assert_eq!(
-            log.get("availability-zone"),
-            Some(&"ww-region-1a".into())
-        );
+        assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
         assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
     }
 }
