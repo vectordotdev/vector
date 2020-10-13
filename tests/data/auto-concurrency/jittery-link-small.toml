@@ -11,7 +11,7 @@ max = [20, 35]
 mean = [8.0, 20.0]
 
 [stats.rate]
-max = [185, 350]
+max = [175, 350]
 mean = [70, 140]
 
 [controller.in_flight]
