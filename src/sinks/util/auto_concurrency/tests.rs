@@ -38,7 +38,7 @@ use std::{
     sync::{Arc, Mutex},
     task::Poll,
 };
-use tokio::time::{self, delay_until, Duration, Instant};
+use tokio::time::{self, delay_for, Duration, Instant};
 use tower::Service;
 
 #[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
@@ -241,9 +241,8 @@ fn respond_after(
     delay: f64,
     stats: Arc<Mutex<Statistics>>,
 ) -> BoxFuture<'static, Result<Response, Error>> {
-    let then = Instant::now() + Duration::from_secs_f64(delay);
     Box::pin(async move {
-        delay_until(then).await;
+        delay_for(Duration::from_secs_f64(delay)).await;
         let mut stats = stats.lock().expect("Poisoned stats lock");
         stats.end_request(Instant::now(), matches!(response, Ok(Response::Ok)));
         response
