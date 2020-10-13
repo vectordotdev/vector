@@ -87,6 +87,7 @@ name = "api_client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "futures 0.3.5",
  "graphql_client",

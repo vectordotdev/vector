@@ -1,3 +1,4 @@
+use anyhow;
 use futures::{SinkExt, Stream};
 use graphql_client::GraphQLQuery;
 use serde::{Deserialize, Serialize};
@@ -18,7 +19,7 @@ use tokio::{
 };
 use tokio_tungstenite::{
     connect_async,
-    tungstenite::{self, Error, Message},
+    tungstenite::{self, Message},
     WebSocketStream,
 };
 use url::Url;
@@ -68,6 +69,9 @@ pub trait Receiver<T: GraphQLQuery> {
         &self,
     ) -> Pin<Box<dyn Stream<Item = Option<graphql_client::Response<T::ResponseData>>>>>;
 }
+
+// Subscription result type
+pub type SubscriptionResult<T> = anyhow::Result<Box<Arc<dyn Receiver<T>>>>;
 
 #[derive(Debug)]
 pub struct Subscription {
@@ -189,7 +193,7 @@ impl SubscriptionClient {
     pub async fn start<T: GraphQLQuery>(
         &self,
         request_body: &graphql_client::QueryBody<T::Variables>,
-    ) -> Result<Box<Arc<dyn Receiver<T>>>, Error> {
+    ) -> SubscriptionResult<T> {
         // Generate a unique ID for the subscription. Subscriptions can be multiplexed
         // over a single connection, so we'll keep a copy of this against the client to
         // handling routing responses back to the relevant subscriber.
@@ -216,7 +220,7 @@ impl SubscriptionClient {
 
 /// Connect to a GraphQL subscription endpoint and return an active client. Can be used for
 /// multiple subscriptions
-pub async fn make_subscription_client(
+pub async fn connect_subscription_client(
     url: &Url,
 ) -> Result<SubscriptionClient, tungstenite::error::Error> {
     let (tx, _) = connect_async(url).await?;
