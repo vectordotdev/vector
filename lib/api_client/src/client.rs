@@ -26,12 +26,19 @@ impl Client {
             .post(self.url.clone())
             .json(request_body)
             .send()
-            .await?
+            .await
+            .with_context(|| {
+                format!(
+                    "Couldn't send '{}' query to {}",
+                    request_body.operation_name,
+                    &self.url.as_str()
+                )
+            })?
             .json()
             .await
             .with_context(|| {
                 format!(
-                    "Couldn't execute '{}' query: {:?}",
+                    "Couldn't serialize the response for '{}' query: {:?}",
                     request_body.operation_name, request_body.query
                 )
             })
