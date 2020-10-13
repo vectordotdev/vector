@@ -37,12 +37,15 @@ components: sources: docker: {
 
 	support: {
 		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
-			"x86_64-apple-darwin":        true
+			docker: volumes: ["/var/run/docker.sock"]
+			triples: {
+				"aarch64-unknown-linux-gnu":  true
+				"aarch64-unknown-linux-musl": true
+				"x86_64-pc-windows-msv":      true
+				"x86_64-unknown-linux-gnu":   true
+				"x86_64-unknown-linux-musl":  true
+				"x86_64-apple-darwin":        true
+			}
 		}
 
 		requirements: [
@@ -135,7 +138,7 @@ components: sources: docker: {
 				container_created_at: {
 					description: "A UTC timestamp representing when the container was created."
 					required:    true
-					type: timestamp: examples: ["2020-11-01T21:15:47.443232Z"]
+					type: timestamp: {}
 				}
 				container_id: {
 					description: "The Docker container ID that the log was collected from."

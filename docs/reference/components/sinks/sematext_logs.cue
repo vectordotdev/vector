@@ -43,12 +43,14 @@ components: sinks: sematext_logs: {
 
 	support: {
 		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			triples: {
+				"aarch64-unknown-linux-gnu":  true
+				"aarch64-unknown-linux-musl": true
+				"x86_64-apple-darwin":        true
+				"x86_64-pc-windows-msv":      true
+				"x86_64-unknown-linux-gnu":   true
+				"x86_64-unknown-linux-musl":  true
+			}
 		}
 
 		requirements: []
@@ -56,38 +58,7 @@ components: sinks: sematext_logs: {
 		notices: []
 	}
 
-	configuration: {
-		endpoint: {
-			common:      false
-			description: "The endpoint that will be used to send logs to. This option is required if `region` is not set."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["http://127.0.0.1", "http://example.com"]
-			}
-		}
-		region: {
-			description:   "The region destination to send metrics to. This option is required if `endpoint` is not set."
-			required:      true
-			relevant_when: "`endpoint` is not set"
-			warnings: []
-			type: string: {
-				enum: {
-					us: "United States"
-					eu: "Europe"
-				}
-				examples: [ "us"]
-			}
-		}
-		token: {
-			description: "The token that will be used to write to Sematext."
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["${SEMATEXT_TOKEN}", "some-sematext-token"]
-			}
-		}
-	}
+	configuration: sinks._sematext.configuration
 
 	input: {
 		logs:    true
