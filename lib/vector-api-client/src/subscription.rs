@@ -24,15 +24,15 @@ use url::Url;
 use uuid::Uuid;
 use weak_table::WeakValueHashMap;
 
-// Subscription GraphQL response, returned from an active stream
+/// Subscription GraphQL response, returned from an active stream
 pub type StreamResponse<T> = Pin<
     Box<dyn Stream<Item = Option<graphql_client::Response<<T as GraphQLQuery>::ResponseData>>>>,
 >;
 
-// Payload contains the raw data received back from a GraphQL subscription. At the point
-// of receiving data, the only known fields are { id, type }; what's contained inside the
-// `payload` field is unknown until we attempt to deserialize it against a generated
-// GraphQLQuery::ResponseData later
+/// Payload contains the raw data received back from a GraphQL subscription. At the point
+/// of receiving data, the only known fields are { id, type }; what's contained inside the
+/// `payload` field is unknown until we attempt to deserialize it against a generated
+/// GraphQLQuery::ResponseData later
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Payload {
     id: Uuid,
@@ -67,13 +67,21 @@ impl Payload {
             .ok()
     }
 }
+
+/// Receiver<T> has a single method, `stream`, that returns a `StreamResponse<T>` of
+/// `Payload`s received from the server
 pub trait Receiver<T: GraphQLQuery> {
+    /// Returns a stream of `Payload` responses, received from the GraphQL server
     fn stream(&self) -> StreamResponse<T>;
 }
 
-// Subscription result type
+/// SubscriptionResult<T> returns an `anyhow`-wrapped `Result`, containing a boxed `Receiver<T>`
 pub type SubscriptionResult<T> = anyhow::Result<Box<Arc<dyn Receiver<T>>>>;
 
+/// A Subscription is associated with a single GraphQL subscription query. Its methods
+/// allow transmitting `Payload`s upstream to the API server, via its `Receiver<T: GraphQLQuery`
+/// implementation, returning a stream of `Payload`, and preventing additional `Payload`
+/// messages from the server
 #[derive(Debug)]
 pub struct Subscription {
     id: Uuid,
@@ -82,6 +90,7 @@ pub struct Subscription {
 }
 
 impl Subscription {
+    /// Returns a new Subscription, that is associated with a particular GraphQL query
     pub fn new(id: Uuid, client_tx: broadcast::Sender<Payload>) -> Self {
         let (tx, _) = broadcast::channel(1);
         Self { id, tx, client_tx }
@@ -121,6 +130,11 @@ impl<T: GraphQLQuery> Receiver<T> for Subscription {
     }
 }
 
+/// SubscriptionClient is a GraphQL client specifically for long-lived `subscription`
+/// connections and queries, that return streaming responses. A client can be multiplexed
+/// via its `start` method to run multiple subscription queries in parallel, and pass
+/// many `Payload`s back to the `Receiver` that is returned when invoking `start()`.
+#[derive(Debug)]
 pub struct SubscriptionClient {
     tx: broadcast::Sender<Payload>,
     subscriptions: Arc<RwLock<WeakValueHashMap<Uuid, Weak<Subscription>>>>,
@@ -128,6 +142,9 @@ pub struct SubscriptionClient {
 }
 
 impl SubscriptionClient {
+    /// Takes a tokio_tungstenite WebSocketStream, and returns a new subscription client.
+    /// Typically the stream would be TcpStream, but any protocol that matches `TStream`
+    /// can be used, making this a flexible client for passing messages via WebSockets.
     pub fn new<TStream: tokio::io::AsyncRead + tokio::io::AsyncWrite + 'static + Send + Unpin>(
         ws: WebSocketStream<TStream>,
     ) -> Self {

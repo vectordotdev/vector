@@ -135,7 +135,7 @@ mod tests {
         num_results: usize,
         interval: i64,
     ) {
-        let subscription = client.heartbeat_susbcription(interval).await.unwrap();
+        let subscription = client.heartbeat_subscription(interval).await.unwrap();
 
         tokio::pin! {
             let heartbeats = subscription.stream().take(num_results);

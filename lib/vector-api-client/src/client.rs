@@ -2,14 +2,18 @@ use anyhow::Context;
 use graphql_client::GraphQLQuery;
 use url::Url;
 
+/// Wrapped `Result` type, that returns deserialized GraphQL response data
 pub type QueryResult<T> =
     anyhow::Result<graphql_client::Response<<T as GraphQLQuery>::ResponseData>>;
 
+/// GraphQL query client over HTTP
+#[derive(Debug)]
 pub struct Client {
     url: Url,
 }
 
 impl Client {
+    /// Returns a new GraphQL query client, bound to the provided URL
     pub fn new(url: Url) -> Self {
         Self { url }
     }
