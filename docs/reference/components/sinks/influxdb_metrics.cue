@@ -154,6 +154,7 @@ components: sinks: influxdb_metrics: {
 				examples: ["autogen", "one_day_only"]
 			}
 		}
+		tags: components.sinks.influxdb_logs.configuration.tags
 		token: {
 			description: "[Authentication token][urls.influxdb_authentication_token] for InfluxDB 2."
 			groups: ["v2"]
