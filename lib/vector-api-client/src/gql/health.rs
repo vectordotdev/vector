@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use chrono;
 use graphql_client::GraphQLQuery;
 use serde::{Deserialize, Serialize};
 

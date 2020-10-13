@@ -1,4 +1,3 @@
-use anyhow;
 use futures::{SinkExt, Stream};
 use graphql_client::GraphQLQuery;
 use serde::{Deserialize, Serialize};
@@ -25,6 +24,11 @@ use tokio_tungstenite::{
 use url::Url;
 use uuid::Uuid;
 use weak_table::WeakValueHashMap;
+
+// Subscription GraphQL response, returned from an active stream
+pub type StreamResponse<T> = Pin<
+    Box<dyn Stream<Item = Option<graphql_client::Response<<T as GraphQLQuery>::ResponseData>>>>,
+>;
 
 // Payload contains the raw data received back from a GraphQL subscription. At the point
 // of receiving data, the only known fields are { id, type }; what's contained inside the
@@ -65,9 +69,7 @@ impl Payload {
     }
 }
 pub trait Receiver<T: GraphQLQuery> {
-    fn stream(
-        &self,
-    ) -> Pin<Box<dyn Stream<Item = Option<graphql_client::Response<T::ResponseData>>>>>;
+    fn stream(&self) -> StreamResponse<T>;
 }
 
 // Subscription result type
@@ -108,9 +110,7 @@ impl Drop for Subscription {
 
 impl<T: GraphQLQuery> Receiver<T> for Subscription {
     /// Returns a stream of `Payload` responses, received from the GraphQL server
-    fn stream(
-        &self,
-    ) -> Pin<Box<dyn Stream<Item = Option<graphql_client::Response<T::ResponseData>>>>> {
+    fn stream(&self) -> StreamResponse<T> {
         Box::pin(
             self.tx
                 .subscribe()
