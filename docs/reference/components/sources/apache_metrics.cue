@@ -26,12 +26,9 @@ components: sources: apache_metrics: {
 				permissions: {}
 			}
 
-			setup:	{
+			configure:	{
 				_path: /server-status
 				internal: [
-					#"""
-					Ensure that Apache is running.
-					""",
 					#"""
 					Enable the [Apache Status module][urls.apache_mod_status]
 					in your Apache config:
@@ -52,9 +49,6 @@ components: sources: apache_metrics: {
 					ExtendedStatus On
 					```
 					""",
-					#"""
-					Reload Apache
-					""""
 				]
 				vector: {
 					endpoints: ["http://localhost:8080\(_path)/?auto"]
