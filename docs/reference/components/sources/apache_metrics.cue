@@ -14,41 +14,41 @@ components: sources: apache_metrics: {
 
 	dependencies: {
 		apache: {
-			title: "Apache HTTP Server (HTTPD)"
+			title:    "Apache HTTP Server (HTTPD)"
 			required: true
-			type: "external"
-			url: urls.apache
-			version: "any"
+			type:     "external"
+			url:      urls.apache
+			version:  "any"
 
 			interfaces: status_module: {
 				title: "Status Module"
-				url: urls.apache_mod_status
+				url:   urls.apache_mod_status
 				permissions: {}
 			}
 
-			configure:	{
-				_path: /server-status
+			configure: {
+				_path: "/server-status"
 				internal: [
 					#"""
-					Enable the [Apache Status module][urls.apache_mod_status]
-					in your Apache config:
+						Enable the [Apache Status module][urls.apache_mod_status]
+						in your Apache config:
 
-					``` file="/etc/apache2/httpd.conf"
-					<Location "\(_path)">
-					    SetHandler server-status
-					    Require host example.com
-					</Location>
-					```
-					"""#,
+						``` file="/etc/apache2/httpd.conf"
+						<Location "\(_path)">
+						    SetHandler server-status
+						    Require host example.com
+						</Location>
+						```
+						"""#,
 					#"""
-					Optionally enable [`ExtendedStatus` option][urls.apache_extended_status]
-					for more detailed metrics (see [Output](#output)). Note,
-					this defaults to `On` in Apache >= 2.3.6.
+						Optionally enable [`ExtendedStatus` option][urls.apache_extended_status]
+						for more detailed metrics (see [Output](#output)). Note,
+						this defaults to `On` in Apache >= 2.3.6.
 
-					``` file="/etc/apache2/httpd.conf"
-					ExtendedStatus On
-					```
-					""",
+						``` file="/etc/apache2/httpd.conf"
+						ExtendedStatus On
+						```
+						"""#,
 				]
 				vector: {
 					endpoints: ["http://localhost:8080\(_path)/?auto"]
@@ -222,26 +222,5 @@ components: sources: apache_metrics: {
 		}
 	}
 
-	how_it_works: {
-		mod_status: {
-			title: "Apache Status Module (mod_status)"
-			body: #"""
-				This source works by scraping the configured
-				[Apache Status module][urls.apache_mod_status] endpoint
-				which exposes basic metrics about Apache's runtime.
-				"""#
-			sub_sections: [
-				{
-					title: "Extended Status"
-					body: #"""
-						The Apache Status module offers an
-						[`ExtendedStatus` directive][urls.apache_extended_status]
-						that includes additional detailed runtime metrics with
-						your configured `mod_status` endpoint. Vector will
-						recognize these metrics and expose them accordingly.
-						"""#
-				},
-			]
-		}
-	}
+	how_it_works: {}
 }

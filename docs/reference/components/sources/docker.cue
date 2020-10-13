@@ -22,24 +22,24 @@ components: sources: docker: {
 
 	dependencies: {
 		docker_engine: {
-			title: "Docker Engine"
+			title:    "Docker Engine"
 			required: true
-			type: "external"
-			url: urls.docker_engine
-			version: ">= 1.24"
+			type:     "external"
+			url:      urls.docker_engine
+			version:  ">= 1.24"
 
 			interfaces: docker_engine_api: {
 				title: "Docker Engine API"
-				url: urls.docker_engine_api
+				url:   urls.docker_engine_api
 				permissions: {
 					docker_group: unix: commands: [
 						"sudo groupadd docker",
-				   		"sudo usermod -aG docker $USER"
+						"sudo usermod -aG docker $USER",
 					]
 				}
 			}
 
-			configuration:	{
+			configuration: {
 				internal: [
 					#"""
 					Ensure that the Docker Engine is exposing logs:
@@ -53,7 +53,7 @@ components: sources: docker: {
 				   Engine requires either the [`json-file`][urls.docker_logging_driver_json_file] (default)
 				   or [`journald`](docker_logging_driver_journald) Docker
 				   logging driver to be installed.
-				   """#
+				   """#,
 				]
 				vector: {}
 			}
@@ -87,13 +87,13 @@ components: sources: docker: {
 		requirements: []
 		warnings: [
 			#"""
-			Collecting logs directly from the Docker Engine is known to have
-			performance problems for very large setups. If you have a large
-			setup, please consider alternative collection methods, such as the
-			Docker [`syslog`][urls.docker_logging_driver_syslog] or
-			[Docker `journald` driver][urls.docker_logging_driver_journald]
-			drivers.
-			"""#
+				Collecting logs directly from the Docker Engine is known to have
+				performance problems for very large setups. If you have a large
+				setup, please consider alternative collection methods, such as the
+				Docker [`syslog`][urls.docker_logging_driver_syslog] or
+				[Docker `journald` driver][urls.docker_logging_driver_journald]
+				drivers.
+				"""#,
 		]
 		notices: []
 	}
