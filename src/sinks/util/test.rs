@@ -9,6 +9,7 @@ use hyper::{
     Body, Request, Response, Server,
 };
 use serde::Deserialize;
+use stream_cancel04::{Trigger, Tripwire};
 use tokio::sync::mpsc;
 
 pub fn load_sink<T>(config: &str) -> crate::Result<(T, SinkContext)>
@@ -25,7 +26,7 @@ pub fn build_test_server(
     addr: std::net::SocketAddr,
 ) -> (
     mpsc::Receiver<(http::request::Parts, Bytes)>,
-    stream_cancel::Trigger,
+    Trigger,
     impl std::future::Future<Output = Result<(), ()>>,
 ) {
     let (tx, rx) = mpsc::channel(100);
@@ -47,7 +48,7 @@ pub fn build_test_server(
         }
     });
 
-    let (trigger, tripwire) = stream_cancel::Tripwire::new();
+    let (trigger, tripwire) = Tripwire::new();
     let server = Server::bind(&addr)
         .serve(service)
         .with_graceful_shutdown(tripwire.compat().map(|_| ()))

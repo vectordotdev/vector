@@ -2,7 +2,7 @@ use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::{future, Async, Future};
 use std::collections::HashMap;
 use std::sync::Arc;
-use stream_cancel::{Trigger, Tripwire};
+use stream_cancel04::{Trigger, Tripwire};
 use tokio::time::{timeout_at, Instant};
 
 /// When this struct goes out of scope and its internal refcount goes to 0 it is a signal that its

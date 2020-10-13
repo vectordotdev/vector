@@ -824,7 +824,7 @@ mod transient_state_tests {
     use futures::compat::Future01CompatExt;
     use futures01::Future;
     use serde::{Deserialize, Serialize};
-    use stream_cancel::{Trigger, Tripwire};
+    use stream_cancel04::{Trigger, Tripwire};
 
     #[derive(Debug, Deserialize, Serialize)]
     pub struct MockSourceConfig {

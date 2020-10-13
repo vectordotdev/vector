@@ -28,7 +28,7 @@ use std::{
     net::SocketAddr,
     sync::{Arc, RwLock},
 };
-use stream_cancel::{Trigger, Tripwire};
+use stream_cancel04::{Trigger, Tripwire};
 
 const MIN_FLUSH_PERIOD_SECS: u64 = 1;
 
