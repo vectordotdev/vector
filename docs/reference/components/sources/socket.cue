@@ -1,6 +1,8 @@
 package metadata
 
 components: sources: socket: {
+	_port: 9000
+
 	title:             "Socket"
 	short_description: "Ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket and outputs log events."
 	long_description:  "Ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket and outputs log events."
@@ -30,12 +32,15 @@ components: sources: socket: {
 
 	support: {
 		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			docker: ports: [_port]
+			triples: {
+				"aarch64-unknown-linux-gnu":  true
+				"aarch64-unknown-linux-musl": true
+				"x86_64-apple-darwin":        true
+				"x86_64-pc-windows-msv":      true
+				"x86_64-unknown-linux-gnu":   true
+				"x86_64-unknown-linux-musl":  true
+			}
 		}
 
 		requirements: []
@@ -50,12 +55,12 @@ components: sources: socket: {
 
 	configuration: {
 		address: {
-			description: "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port.\n"
+			description: "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
 			groups: ["tcp", "udp"]
 			required: true
 			warnings: []
 			type: string: {
-				examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
+				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
 			}
 		}
 		host_key: {

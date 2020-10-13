@@ -5,6 +5,10 @@
 
 package metadata
 
+import (
+	"strings"
+)
+
 _values: {
 	current_timestamp: "2020-10-10T17:07:36.452332Z"
 	local_host:        "my-host.local"
@@ -408,15 +412,36 @@ _values: {
 })
 
 #Platforms: {
-	"aarch64-unknown-linux-gnu":  bool
-	"aarch64-unknown-linux-musl": bool
-	"x86_64-apple-darwin":        bool
-	"x86_64-pc-windows-msv":      bool
-	"x86_64-unknown-linux-gnu":   bool
-	"x86_64-unknown-linux-musl":  bool
+	docker: {
+		ports?: [uint16, ...]
+		volumes?: [string, ...]
+	}
+	triples: {
+		"aarch64-unknown-linux-gnu":  bool
+		"aarch64-unknown-linux-musl": bool
+		"x86_64-apple-darwin":        bool
+		"x86_64-pc-windows-msv":      bool
+		"x86_64-unknown-linux-gnu":   bool
+		"x86_64-unknown-linux-musl":  bool
+	}
 }
 
 #Schema: [Name=string]: {
+	// `category` allows you to group options into categories.
+	//
+	// For example, all of the `*_key` options might be grouped under the
+	// "Context" category to make generated configuration examples easier to
+	// read.
+	category?: string
+
+	if strings.HasSuffix(name, "_key") {
+		category: "Mapping"
+	}
+
+	if type.object != _|_ {
+		category: strings.ToTitle(name)
+	}
+
 	// `desription` describes the option in a succinct fashion. Usually 1 to
 	// 2 sentences.
 	description: string
@@ -635,7 +660,7 @@ _values: {
 	// `examples` clarify values through examples. This should be used
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
-	examples?: [...#Timestamp]
+	examples: [_values.current_timestamp]
 }
 
 #TypeUint: {

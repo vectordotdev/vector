@@ -1,6 +1,8 @@
 package metadata
 
 components: sources: vector: {
+	_port: 9000
+
 	title:             "Vector"
 	short_description: "Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs log and metric events."
 	long_description:  "Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs log and metric events."
@@ -30,12 +32,15 @@ components: sources: vector: {
 
 	support: {
 		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			docker: ports: [_port]
+			triples: {
+				"aarch64-unknown-linux-gnu":  true
+				"aarch64-unknown-linux-musl": true
+				"x86_64-apple-darwin":        true
+				"x86_64-pc-windows-msv":      true
+				"x86_64-unknown-linux-gnu":   true
+				"x86_64-unknown-linux-musl":  true
+			}
 		}
 
 		requirements: [
@@ -50,11 +55,11 @@ components: sources: vector: {
 
 	configuration: {
 		address: {
-			description: "The TCP address to listen for connections on, or `systemd#N to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port.\n"
+			description: "The TCP address to listen for connections on, or `systemd#N to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
 			required:    true
 			warnings: []
 			type: string: {
-				examples: ["0.0.0.0:9000", "systemd", "systemd#1"]
+				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#1"]
 			}
 		}
 		shutdown_timeout_secs: {

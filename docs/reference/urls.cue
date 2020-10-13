@@ -127,6 +127,7 @@ urls: {
 	homebrew_services:                                        "https://github.com/Homebrew/homebrew-services"
 	honeycomb:                                                "https://honeycomb.io"
 	honeycomb_batch:                                          "https://docs.honeycomb.io/api/events/#batched-events"
+	honeycomb_signup:                                         "https://ui.honeycomb.io/signup"
 	http:                                                     "https://www.w3.org/Protocols/"
 	humio:                                                    "https://humio.com"
 	humio_hec:                                                "https://docs.humio.com/integrations/data-shippers/hec/"
