@@ -14,11 +14,11 @@ impl InternalEvent for LogToMetricEventProcessed {
     }
 }
 
-pub(crate) struct LogToMetricFieldNotFound {
-    pub field: String,
+pub(crate) struct LogToMetricFieldNotFound<'a> {
+    pub field: &'a str,
 }
 
-impl InternalEvent for LogToMetricFieldNotFound {
+impl<'a> InternalEvent for LogToMetricFieldNotFound<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "Field not found.",

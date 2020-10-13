@@ -321,7 +321,7 @@ impl Transform for LogToMetric {
                     output.push(Event::Metric(metric));
                 }
                 Err(TransformError::FieldNotFound { field }) => {
-                    emit!(LogToMetricFieldNotFound { field })
+                    emit!(LogToMetricFieldNotFound { field: field.as_ref() })
                 }
                 Err(TransformError::ParseFloatError { field, error }) => {
                     emit!(LogToMetricParseFloatError {
