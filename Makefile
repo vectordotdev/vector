@@ -285,19 +285,19 @@ test-behavior: ## Runs behaviorial test
 test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-clickhouse test-integration-docker test-integration-elasticsearch
 test-integration: test-integration-gcp test-integration-influxdb test-integration-kafka test-integration-loki
-test-integration: test-integration-pulsar test-integration-splunk
+test-integration: test-integration-mongodb_metrics test-integration-pulsar test-integration-splunk
 
 .PHONY: start-test-integration
 start-test-integration: ## Starts all integration test infrastructure
 start-test-integration: start-integration-aws start-integration-clickhouse start-integration-elasticsearch
 start-test-integration: start-integration-gcp start-integration-influxdb start-integration-kafka start-integration-loki
-start-test-integration: start-integration-pulsar start-integration-splunk
+start-test-integration: start-integration-mongodb_metrics start-integration-pulsar start-integration-splunk
 
 .PHONY: stop-test-integration
 stop-test-integration: ## Stops all integration test infrastructure
 stop-test-integration: stop-integration-aws stop-integration-clickhouse stop-integration-elasticsearch
 stop-test-integration: stop-integration-gcp stop-integration-influxdb stop-integration-kafka stop-integration-loki
-stop-test-integration: stop-integration-pulsar stop-integration-splunk
+stop-test-integration: stop-integration-mongodb_metrics stop-integration-pulsar stop-integration-splunk
 
 .PHONY: start-integration-aws
 start-integration-aws:
@@ -619,6 +619,38 @@ endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features loki-integration-tests --lib ::loki:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-loki
+endif
+
+.PHONY: start-integration-mongodb_metrics
+start-integration-mongodb_metrics:
+ifeq ($(CONTAINER_TOOL),podman)
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-mongodb_metrics -p 27017:27017
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-mongodb_metrics --name vector_mongodb_metrics mongo
+else
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-mongodb_metrics
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-mongodb_metrics -p 27017:27017 --name vector_mongodb_metrics mongo
+endif
+
+.PHONY: stop-integration-mongodb_metrics
+stop-integration-mongodb_metrics:
+	$(CONTAINER_TOOL) rm --force vector_mongodb_metrics 2>/dev/null; true
+ifeq ($(CONTAINER_TOOL),podman)
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-mongodb_metrics 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-mongodb_metrics 2>/dev/null; true
+else
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-mongodb_metrics 2>/dev/null; true
+endif
+
+.PHONY: test-integration-mongodb_metrics
+test-integration-mongodb_metrics: ## Runs MongoDB Metrics integration tests
+ifeq ($(AUTOSPAWN), true)
+	-$(MAKE) -k stop-integration-mongodb_metrics
+	$(MAKE) start-integration-mongodb_metrics
+	sleep 10 # Many services are very slow... Give them a sec..
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features mongodb_metrics-integration-tests --lib ::mongodb_metrics:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	$(MAKE) -k stop-integration-mongodb_metrics
 endif
 
 .PHONY: start-integration-pulsar

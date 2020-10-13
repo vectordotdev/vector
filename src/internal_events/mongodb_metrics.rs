@@ -27,7 +27,7 @@ pub struct MongoDBMetricsBsonParseError<'a> {
 
 impl<'a> InternalEvent for MongoDBMetricsBsonParseError<'a> {
     fn emit_logs(&self) {
-        error!(message = "BSON document parse error.", endpoint = %self.endpoint, error = %self.error)
+        error!(message = "BSON document parse error.", endpoint = %self.endpoint, error = ?self.error)
     }
 
     fn emit_metrics(&self) {

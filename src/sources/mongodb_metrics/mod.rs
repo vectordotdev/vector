@@ -83,7 +83,8 @@ enum CollectError {
     Bson(bson::de::Error),
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
 struct MongoDBMetricsConfig {
     endpoint: String,
     #[serde(default = "default_scrape_interval_secs")]
@@ -109,8 +110,10 @@ pub fn default_namespace() -> String {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<MongoDBMetricsConfig>("mongodb_metrics")
+    SourceDescription::new::<MongoDBMetricsConfig>("mongodb_metrics")
 }
+
+impl_generate_config_from_default!(MongoDBMetricsConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "mongodb_metrics")]
@@ -634,12 +637,12 @@ impl MongoDBMetrics {
         // mongod_metrics_ttl_*
         metrics.push(self.create_metric(
             "mongod_metrics_ttl_deleted_documents_total",
-            counter!(status.metrics.repl.ttl.deleted_documents),
+            counter!(status.metrics.ttl.deleted_documents),
             tags!(self.tags),
         ));
         metrics.push(self.create_metric(
             "mongod_metrics_ttl_passes_total",
-            counter!(status.metrics.repl.ttl.passes),
+            counter!(status.metrics.ttl.passes),
             tags!(self.tags),
         ));
 
@@ -971,5 +974,81 @@ impl MongoDBMetrics {
         }
 
         Ok(metrics)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<MongoDBMetricsConfig>();
+    }
+}
+
+#[cfg(all(test, feature = "mongodb_metrics-integration-tests"))]
+mod integration_tests {
+    use super::*;
+    use crate::{test_util::trace_init, Pipeline};
+    use futures::compat::Stream01CompatExt;
+    use tokio::time::{timeout, Duration};
+
+    #[tokio::test]
+    async fn fetch_metrics() {
+        trace_init();
+
+        let endpoint = "mongodb://localhost:27017";
+        let host = "localhost";
+        let namespace = "vector_mongodb";
+
+        let (sender, recv) = Pipeline::new_test();
+        let mut recv = recv.compat();
+
+        tokio::spawn(async move {
+            MongoDBMetricsConfig {
+                endpoint: endpoint.to_owned(),
+                scrape_interval_secs: 15,
+                namespace: namespace.to_owned(),
+            }
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                sender,
+            )
+            .await
+            .unwrap()
+            .compat()
+            .await
+            .unwrap()
+        });
+
+        let event = timeout(Duration::from_secs(3), recv.next())
+            .await
+            .expect("fetch metrics timeout")
+            .expect("failed to get metrics from a stream");
+        let mut events = vec![event];
+        loop {
+            match timeout(Duration::from_millis(10), recv.next()).await {
+                Ok(Some(event)) => events.push(event),
+                Ok(None) => break,
+                Err(_) => break,
+            }
+        }
+
+        assert!(events.len() > 100);
+        for event in events {
+            let metric = event.expect("Valid Event").into_metric();
+            // validate namespace
+            assert!(metric.name.starts_with(&format!("{}_", namespace)));
+            // validate timestamp
+            let timestamp = metric.timestamp.expect("existed timestamp");
+            assert!((timestamp - Utc::now()).num_seconds() < 1);
+            // validate basic tags
+            let tags = metric.tags.expect("existed tags");
+            assert_eq!(tags.get("endpoint").map(String::as_ref), Some(endpoint));
+            assert_eq!(tags.get("host").map(String::as_ref), Some(host));
+        }
     }
 }

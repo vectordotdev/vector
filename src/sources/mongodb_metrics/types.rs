@@ -135,6 +135,7 @@ pub struct CommandServerStatusMetrics {
     pub query_executor: CommandServerStatusMetricsQueryExecutor,
     pub record: CommandServerStatusMetricsRecord,
     pub repl: CommandServerStatusMetricsRepl,
+    pub ttl: CommandServerStatusMetricsReplTtl,
 }
 
 #[derive(Debug, Deserialize)]
@@ -207,7 +208,6 @@ pub struct CommandServerStatusMetricsRepl {
     pub buffer: CommandServerStatusMetricsReplBuffer,
     pub executor: CommandServerStatusMetricsReplExecutor,
     pub network: CommandServerStatusMetricsReplNetwork,
-    pub ttl: CommandServerStatusMetricsReplTtl,
 }
 
 #[derive(Debug, Deserialize)]
@@ -327,7 +327,7 @@ pub struct CommandServerStatusWiredTigerCache {
     #[serde(rename = "bytes written from cache")]
     pub bytes_written_from: i32,
     #[serde(rename = "maximum bytes configured")]
-    pub max_bytes: i32,
+    pub max_bytes: f64,
     #[serde(rename = "modified pages evicted")]
     pub evicted_modified: i32,
     #[serde(rename = "pages currently held in the cache")]
