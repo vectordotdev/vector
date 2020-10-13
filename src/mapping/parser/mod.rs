@@ -323,10 +323,10 @@ fn regex_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
                     flags
                         .as_str()
                         .chars()
-                        .map(|flag| Value::from(flag.to_string()))
+                        .map(|c| Value::from(c.to_string()))
                         .collect()
                 })
-                .unwrap_or(vec![]);
+                .unwrap_or_else(Vec::new);
 
             let mut map = BTreeMap::new();
             map.insert(

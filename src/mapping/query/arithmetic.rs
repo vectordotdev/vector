@@ -1,5 +1,5 @@
-use super::Function;
 use super::query_value::QueryValue;
+use super::Function;
 use crate::{
     event::{Event, Value},
     mapping::Result,
@@ -210,7 +210,8 @@ impl Function for Arithmetic {
                 },
                 vl => return Err(format!("unable to OR left-hand field type {:?}", vl)),
             },
-        }.into())
+        }
+        .into())
     }
 }
 

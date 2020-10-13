@@ -1,10 +1,10 @@
-use crate::event::Value;
 use super::dynamic_regex::DynamicRegex;
+use crate::event::Value;
 
 #[derive(PartialEq, Debug, Clone)]
 pub(in crate::mapping) enum QueryValue {
     Value(Value),
-    
+
     #[allow(dead_code)]
     Regex(DynamicRegex),
 }

@@ -1,4 +1,4 @@
-use super::{Function, query_value::QueryValue};
+use super::{query_value::QueryValue, Function};
 use crate::{
     event::{util::log::get_value, Event, PathIter},
     mapping::Result,
@@ -93,8 +93,8 @@ impl Function for Path {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
     use crate::event::Value;
+    use serde_json::json;
 
     #[test]
     fn check_path_query() {
