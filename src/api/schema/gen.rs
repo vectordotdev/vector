@@ -104,7 +104,7 @@ fragment TypeRef on __Type {
 async fn main() {
     let schema = build_schema().finish();
     let res = schema.execute(INTROSPECTION_QUERY).await;
-    let json = serde_json::to_string_pretty(&async_graphql::http::GQLResponse(res)).unwrap();
+    let json = serde_json::to_string_pretty(&res).unwrap();
 
     fs::write("graphql/schema.json", format!("{}\n", json)).expect("Couldn't save schema file");
 }

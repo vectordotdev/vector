@@ -2,7 +2,7 @@
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
-  name: {{ include "vector.fullname" . }}
+  name: {{ include "libvector.fullname" . }}
 spec:
   privileged: false
   allowPrivilegeEscalation: false

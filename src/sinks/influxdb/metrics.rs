@@ -3,10 +3,11 @@ use crate::{
     event::metric::{Metric, MetricValue, StatisticKind},
     sinks::{
         influxdb::{
-            encode_namespace, encode_timestamp, healthcheck, influx_line_protocol,
-            influxdb_settings, Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
+            encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
+            InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
         },
         util::{
+            encode_namespace,
             http::{HttpBatchService, HttpClient, HttpRetryLogic},
             statistic::{validate_quantiles, DistributionStatistic},
             BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
@@ -20,7 +21,7 @@ use futures::future::{ready, BoxFuture};
 use futures01::Sink;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::task::Poll;
 use tower::Service;
 
@@ -44,6 +45,7 @@ pub struct InfluxDBConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub tags: Option<HashMap<String, String>>,
     pub tls: Option<TlsOptions>,
     #[serde(default = "default_summary_quantiles")]
     pub quantiles: Vec<f64>,
@@ -157,6 +159,7 @@ impl Service<Vec<Metric>> for InfluxDBSvc {
             self.protocol_version,
             items,
             self.config.namespace.as_deref(),
+            self.config.tags.as_ref(),
             &self.config.quantiles,
         );
         let body: Vec<u8> = input.into_bytes();
@@ -182,17 +185,39 @@ fn create_build_request(
     }
 }
 
+fn merge_tags(
+    event: &Metric,
+    tags: Option<&HashMap<String, String>>,
+) -> Option<BTreeMap<String, String>> {
+    match (&event.tags, tags) {
+        (Some(ref event_tags), Some(ref config_tags)) => {
+            let mut event_tags = event_tags.clone();
+            event_tags.extend(config_tags.iter().map(|(k, v)| (k.clone(), v.clone())));
+            Some(event_tags)
+        }
+        (Some(ref event_tags), None) => Some(event_tags.clone()),
+        (None, Some(config_tags)) => Some(
+            config_tags
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+        ),
+        (None, None) => None,
+    }
+}
+
 fn encode_events(
     protocol_version: ProtocolVersion,
     events: Vec<Metric>,
     namespace: Option<&str>,
+    tags: Option<&HashMap<String, String>>,
     quantiles: &[f64],
 ) -> String {
     let mut output = String::new();
     for event in events.into_iter() {
         let fullname = encode_namespace(namespace, '.', &event.name);
         let ts = encode_timestamp(event.timestamp);
-        let tags = event.tags.clone();
+        let tags = merge_tags(&event, tags);
         match event.value {
             MetricValue::Counter { value } => {
                 let fields = to_fields(value);
@@ -375,7 +400,7 @@ mod tests {
             },
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), None, &[]);
         assert_eq!(
             line_protocols,
             "ns.total,metric_type=counter value=1.5 1542182950000000011\n\
@@ -393,7 +418,7 @@ mod tests {
             value: MetricValue::Gauge { value: -1.5 },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), None, &[]);
         assert_eq!(
             line_protocols,
             "ns.meter,metric_type=gauge,normal_tag=value,true_tag=true value=-1.5 1542182950000000011"
@@ -412,7 +437,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), None, &[]);
         assert_eq!(
             line_protocols,
             "ns.users,metric_type=set,normal_tag=value,true_tag=true value=2 1542182950000000011"
@@ -434,7 +459,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V1, events, Some("ns"), &[]);
+        let line_protocols = encode_events(ProtocolVersion::V1, events, Some("ns"), None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -473,7 +498,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -512,7 +537,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V1, events, Some("ns"), &[]);
+        let line_protocols = encode_events(ProtocolVersion::V1, events, Some("ns"), None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -551,7 +576,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -613,7 +638,7 @@ mod tests {
             },
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 3);
 
@@ -689,7 +714,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), None, &[]);
         assert_eq!(line_protocols.len(), 0);
     }
 
@@ -707,7 +732,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), None, &[]);
         assert_eq!(line_protocols.len(), 0);
     }
 
@@ -725,7 +750,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), None, &[]);
         assert_eq!(line_protocols.len(), 0);
     }
 
@@ -747,6 +772,7 @@ mod tests {
             ProtocolVersion::V2,
             events,
             Some("ns"),
+            None,
             &default_summary_quantiles(),
         );
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
@@ -776,6 +802,50 @@ mod tests {
             .to_vec(),
         );
         assert_eq!("1542182950000000011", line_protocol.3);
+    }
+
+    #[test]
+    fn test_encode_with_some_tags() {
+        crate::test_util::trace_init();
+
+        let events = vec![
+            Metric {
+                name: "cpu".into(),
+                timestamp: Some(ts()),
+                tags: None,
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge { value: 2.5 },
+            },
+            Metric {
+                name: "mem".into(),
+                timestamp: Some(ts()),
+                tags: Some(tags()),
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge { value: 1000.0 },
+            },
+        ];
+
+        let mut tags = HashMap::new();
+        tags.insert("host".to_owned(), "local".to_owned());
+        tags.insert("datacenter".to_owned(), "us-east".to_owned());
+
+        let line_protocols = encode_events(
+            ProtocolVersion::V1,
+            events,
+            Some("vector"),
+            Some(tags).as_ref(),
+            &[],
+        );
+        let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
+        assert_eq!(line_protocols.len(), 2);
+        assert_eq!(
+            line_protocols[0],
+            "vector.cpu,datacenter=us-east,host=local,metric_type=gauge value=2.5 1542182950000000011"
+        );
+        assert_eq!(
+            line_protocols[1],
+            "vector.mem,datacenter=us-east,host=local,metric_type=gauge,normal_tag=value,true_tag=true value=1000 1542182950000000011"
+        );
     }
 }
 
@@ -886,6 +956,7 @@ mod integration_tests {
             quantiles: default_summary_quantiles(),
             batch: Default::default(),
             request: Default::default(),
+            tags: None,
             tls: None,
         };
 
