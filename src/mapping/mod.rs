@@ -36,7 +36,6 @@ impl Function for Assignment {
 
 #[derive(Debug)]
 pub(self) struct Deletion {
-    // TODO: Switch to String once Event API is cleaned up.
     paths: Vec<String>,
 }
 
