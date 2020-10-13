@@ -13,17 +13,57 @@ components: sources: docker: {
 		production.
 		"""
 
-	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  true
-		tls: enabled:        false
-	}
-
 	classes: {
 		commonly_used: false
 		deployment_roles: ["daemon"]
 		egress_method: "stream"
 		function:      "collect"
+	}
+
+	dependencies: {
+		docker_engine: {
+			title: "Docker Engine"
+			required: true
+			type: "external"
+			url: urls.docker_engine
+			version: ">= 1.24"
+
+			interfaces: docker_engine_api: {
+				title: "Docker Engine API"
+				url: urls.docker_engine_api
+				permissions: {
+					docker_group: unix: commands: [
+						"sudo groupadd docker",
+				   		"sudo usermod -aG docker $USER"
+					]
+				}
+			}
+
+			configuration:	{
+				internal: [
+					#"""
+					Ensure that the Docker Engine is exposing logs:
+
+				   ```bash
+				   docker logs $(docker ps | awk '{ print $1 }')
+				   ```
+
+				   If you receive an error it's likely that you do not have
+				   the proper Docker logging drivers installed. The Docker
+				   Engine requires either the [`json-file`][urls.docker_logging_driver_json_file] (default)
+				   or [`journald`](docker_logging_driver_journald) Docker
+				   logging driver to be installed.
+				   """#
+				]
+				vector: {}
+			}
+		}
+	}
+
+	features: {
+		checkpoint: enabled: false
+		multiline: enabled:  true
+		tls: enabled:        false
 	}
 
 	statuses: {
@@ -44,23 +84,16 @@ components: sources: docker: {
 			}
 		}
 
-		requirements: [
-			"""
-				Docker API >= 1.24 is required.
-				""",
-			"""
-				The [`json-file`][urls.docker_logging_driver_json_file] (default) or
-				[`journald`](docker_logging_driver_journald) Docker logging driver must
-				be enabled for this component to work. This is a constraint of the Docker
-				API.
-				""",
-		]
-
+		requirements: []
 		warnings: [
-			"""
-				Using Vector on Kubernetes? We highly recommend the
-				[`kubernetes_logs` source](kubernetes_logs) instead.
-				""",
+			#"""
+			Collecting logs directly from the Docker Engine is known to have
+			performance problems for very large setups. If you have a large
+			setup, please consider alternative collection methods, such as the
+			Docker [`syslog`][urls.docker_logging_driver_syslog] or
+			[Docker `journald` driver][urls.docker_logging_driver_journald]
+			drivers.
+			"""#
 		]
 		notices: []
 	}
@@ -208,102 +241,6 @@ components: sources: docker: {
 	]
 
 	how_it_works: {
-		alternatives: {
-			title: "Alternate Strategies"
-			body: #"""
-				If you'd prefer not to collect Docker logs through the Docker
-				API Vector offers alternative strategies. In some sets
-
-				First, it's worth mentioning that Vector strives to guide you towards the
-				optimal observability setup without presenting you with unnecessary details or
-				questions. Unfortunately, there are circumstances where trade-offs must be made
-				and you must determine which trade-offs are appropriate. Docker is one of these
-				circumstances.
-
-				Second, if you have a large container-based deployment you should consider using
-				a platform Kubernetes. These platforms provide alternate log collection means
-				that side-step the Docker logging problems. For supported platforms see Vector's
-				[Platforms installation section][docs.installation.platforms].
-
-				Finally, if you cannot use a container orchestrator then you can configure a
-				compatible [Docker logging driver][urls.docker_logging_drivers] with a matching
-				[Vector source][docs.sources]. For example:
-
-				1. The [Docker `syslog` driver][urls.docker_logging_driver_syslog] with the
-				   [Vector `syslog` source][docs.sources.syslog].
-				2. The [Docker `journald` driver][urls.docker_logging_driver_journald] with the
-				   [Vector `journald` source][docs.sources.journald].
-				3. The [Docker `splunk` driver][urls.docker_logging_driver_splunk] with the
-				   [Vector `splunk_hec` source][docs.sources.splunk_hec].
-
-				To our knowledge there is no discernible difference in performance or stability
-				between any of these. If we had to recommend one, we would recommend the
-				`syslog` combination.
-				"""#
-		}
-		docker_integration_strategy: {
-			title: "Docker Integration Strategy"
-			body: #"""
-				There are two primary ways through which you can integrate with Docker to
-				receive its logs:
-
-				1. Interact with the [Docker daemon][urls.docker_daemon] directly via the
-				   `docker logs` command. (simplest)
-				2. Configure a compatible [Docker logging driver][urls.docker_logging_drivers]
-				   with a matching [Vector source][docs.sources]. (advanced)
-
-				The Vector `docker` source implements option 1. This is the simplest option,
-				but it is prone to performance and stability issues with _large_ deployments. If
-				you experience this, please see the
-				[Alternate Strategies section](#alternate-strategies) below.
-				"""#
-			sub_sections: [
-				{
-					title: "Alternate Strategies"
-					body: #"""
-						First, it's worth mentioning that Vector strives to guide you towards the
-						optimal observability setup without presenting you with unnecessary details or
-						questions. Unfortunately, there are circumstances where trade-offs must be made
-						and you must determine which trade-offs are appropriate. Docker is one of these
-						circumstances.
-
-						Second, if you have a large container-based deployment you should consider using
-						a platform Kubernetes. These platforms provide alternate log collection means
-						that side-step the Docker logging problems. For supported platforms see Vector's
-						[Platforms installation section][docs.installation.platforms].
-
-						Finally, if you cannot use a container orchestrator then you can configure a
-						compatible [Docker logging driver][urls.docker_logging_drivers] with a matching
-						[Vector source][docs.sources]. For example:
-
-						1. The [Docker `syslog` driver][urls.docker_logging_driver_syslog] with the
-						   [Vector `syslog` source][docs.sources.syslog].
-						2. The [Docker `journald` driver][urls.docker_logging_driver_journald] with the
-						   [Vector `journald` source][docs.sources.journald].
-						3. The [Docker `splunk` driver][urls.docker_logging_driver_splunk] with the
-						   [Vector `splunk_hec` source][docs.sources.splunk_hec].
-
-						To our knowledge there is no discernible difference in performance or stability
-						between any of these. If we had to recommend one, we would recommend the
-						`syslog` combination.
-						"""#
-				},
-			]
-		}
-
-		docker_logging_drivers: {
-			title: "Docker Logging Drivers"
-			body: #"""
-				In order for the Vector `docker` source to work properly, you must configure
-				the [`json-file`][urls.docker_logging_driver_json_file] (default) or
-				[`journald`][urls.docker_logging_driver_journald] Docker logging drivers.
-				This is a requirement of the [Docker daemon][urls.docker_daemon], which Vector
-				uses to integrate. See the
-				[Docker Integration Strategy section](#docker-integration-strategy) for more
-				info.
-				"""#
-		}
-
 		message_merging: {
 			title: "Merging Split Messages"
 			body: #"""
@@ -314,44 +251,6 @@ components: sources: docker: {
 				off via the `auto_partial_merge` option. Furthermore, you can adjust the marker
 				that we use to determine if an event is partial via the
 				`partial_event_marker_field` option.
-				"""#
-		}
-
-		setup: {
-			title: "Setup"
-			body: #"""
-				1. Verify that the [Docker daemon][urls.docker_daemon] is
-				   running:
-
-				   ```bash
-				   docker ps
-				   ```
-
-				2. Verify that Docker is collecting logs:
-
-				   ```bash
-				   docker logs $(docker ps | awk '{ print $1 }')
-				   ```
-
-				   You must have the [`json-file`][urls.docker_logging_driver_json_file] (default)
-				   or [`journald`](docker_logging_driver_journald) Docker
-				   logging driver installed for this to work.
-
-				3. Ensure that Vector's operating system user has permission to
-				   access the Docker API:
-
-				   ```bash
-				   sudo groupadd docker
-				   sudo usermod -aG docker $USER
-				   ```
-
-				   [Detailed instructions][urls.docker_permissions] can be found
-				   in Docker docs.
-
-				That's it! Please note, Vector will respect Docker's
-				[environment variables][urls.docker_env_vars] which you can use
-				to customize how Vector communicates with the Docker API, such
-				as `DOCKER_HOST` or `DOCKER_VERIFY_TLS`.
 				"""#
 		}
 	}

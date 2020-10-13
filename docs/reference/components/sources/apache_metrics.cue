@@ -1,7 +1,7 @@
 package metadata
 
 components: sources: apache_metrics: {
-	title:             "Apache HTTPD Metrics"
+	title:             "Apache HTTP Server (HTTPD) Metrics"
 	long_description:  "fill me in"
 	short_description: "Collect metrics from an Apache HTTPD server."
 
@@ -14,14 +14,24 @@ components: sources: apache_metrics: {
 
 	dependencies: {
 		apache: {
-			name: "Apache HTTPD"
+			title: "Apache HTTP Server (HTTPD)"
 			required: true
 			type: "external"
 			url: urls.apache
 			version: "any"
-			configuration:	{
+
+			interfaces: status_module: {
+				title: "Status Module"
+				url: urls.apache_mod_status
+				permissions: {}
+			}
+
+			setup:	{
 				_path: /server-status
 				internal: [
+					#"""
+					Ensure that Apache is running.
+					""",
 					#"""
 					Enable the [Apache Status module][urls.apache_mod_status]
 					in your Apache config:
@@ -35,18 +45,21 @@ components: sources: apache_metrics: {
 					"""#,
 					#"""
 					Optionally enable [`ExtendedStatus` option][urls.apache_extended_status]
-					for more detailed metrics (see [Output](#output)):
+					for more detailed metrics (see [Output](#output)). Note,
+					this defaults to `On` in Apache >= 2.3.6.
 
 					``` file="/etc/apache2/httpd.conf"
 					ExtendedStatus On
 					```
 					""",
+					#"""
+					Reload Apache
+					""""
 				]
 				vector: {
 					endpoints: ["http://localhost:8080\(_path)/?auto"]
 				}
 			}
-			permissions: {}
 		}
 	}
 
