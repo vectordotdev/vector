@@ -17,7 +17,7 @@ pub(crate) struct TokenizerFieldMissing<'a> {
 
 impl<'a> InternalEvent for TokenizerFieldMissing<'a> {
     fn emit_logs(&self) {
-        debug!(
+        warn!(
             message = "Field does not exist.",
             field = %self.field,
             rate_limit_secs = 10
@@ -37,7 +37,7 @@ pub(crate) struct TokenizerConvertFailed<'a> {
 
 impl<'a> InternalEvent for TokenizerConvertFailed<'a> {
     fn emit_logs(&self) {
-        debug!(
+        warn!(
             message = "Could not convert types.",
             field = %self.field,
             error = %self.error,

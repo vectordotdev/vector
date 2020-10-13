@@ -8,6 +8,10 @@ mod apache_metrics;
 #[cfg(feature = "api")]
 mod api;
 mod auto_concurrency;
+#[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
+mod aws_cloudwatch_logs_subscription_parser;
+#[cfg(feature = "sources-aws_kinesis_firehose")]
+mod aws_kinesis_firehose;
 mod aws_kinesis_streams;
 mod blackhole;
 #[cfg(feature = "transforms-coercer")]
@@ -59,6 +63,8 @@ mod remove_tags;
 #[cfg(feature = "transforms-rename_fields")]
 mod rename_fields;
 mod sampler;
+#[cfg(feature = "sinks-sematext")]
+mod sematext_metrics;
 #[cfg(any(
     feature = "sources-socket",
     feature = "sources-syslog",
@@ -97,6 +103,10 @@ pub use self::apache_metrics::*;
 #[cfg(feature = "api")]
 pub use self::api::*;
 pub use self::auto_concurrency::*;
+#[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
+pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
+#[cfg(feature = "sources-aws_kinesis_firehose")]
+pub use self::aws_kinesis_firehose::*;
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
 #[cfg(feature = "transforms-coercer")]
@@ -150,6 +160,8 @@ pub use self::remove_tags::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub use self::rename_fields::*;
 pub use self::sampler::*;
+#[cfg(feature = "sinks-sematext")]
+pub use self::sematext_metrics::*;
 #[cfg(any(feature = "sources-socket", feature = "sources-syslog"))]
 pub(crate) use self::socket::*;
 pub use self::split::*;

@@ -13,6 +13,7 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
+    tls::{TlsOptions, TlsSettings},
 };
 use futures01::Sink;
 use http::{Request, Uri};
@@ -40,6 +41,7 @@ pub struct InfluxDBLogsConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>,
 }
 
 #[derive(Debug)]
@@ -82,7 +84,8 @@ impl SinkConfig for InfluxDBLogsConfig {
         tags.insert(log_schema().host_key().to_string());
         tags.insert(log_schema().source_type_key().to_string());
 
-        let client = HttpClient::new(cx.resolver(), None)?;
+        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(cx.resolver(), tls_settings)?;
         let healthcheck = self.healthcheck(client.clone())?;
 
         let batch = BatchSettings::default()
@@ -204,7 +207,7 @@ impl InfluxDBLogsConfig {
 }
 
 impl Value {
-    pub fn to_field(&self) -> Field {
+    fn to_field(&self) -> Field {
         match self {
             Value::Integer(num) => Field::Int(*num),
             Value::Float(num) => Field::Float(*num),
@@ -658,6 +661,7 @@ mod integration_tests {
             encoding: Default::default(),
             batch: Default::default(),
             request: Default::default(),
+            tls: None,
         };
 
         let (sink, _) = config.build(cx).await.unwrap();
