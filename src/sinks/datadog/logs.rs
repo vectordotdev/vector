@@ -264,7 +264,7 @@ impl HttpSink for DatadogLogsTextService {
     }
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
-        let body: Vec<u8> = events.iter().flat_map(|b| b.into_iter()).cloned().collect();
+        let body: Vec<u8> = events.into_iter().flat_map(Bytes::into_iter).collect();
         self.config.build_request(body)
     }
 }
