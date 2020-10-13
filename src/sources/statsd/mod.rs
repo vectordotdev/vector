@@ -38,7 +38,9 @@ impl SourceConfig for StatsdConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        Ok(statsd(self.address, shutdown, out))
+        Ok(Box::new(
+            statsd(self.address, shutdown, out).boxed().compat(),
+        ))
     }
 
     fn output_type(&self) -> crate::config::DataType {
@@ -50,60 +52,53 @@ impl SourceConfig for StatsdConfig {
     }
 }
 
-fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> super::Source {
+async fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> Result<(), ()> {
     let out = out.sink_map_err(|e| error!("Error sending metric: {:?}", e));
 
-    Box::new(
-        async move {
-            let socket = UdpSocket::bind(&addr)
-                .map_err(|error| emit!(StatsdSocketError::bind(error)))
-                .await?;
+    let socket = UdpSocket::bind(&addr)
+        .map_err(|error| emit!(StatsdSocketError::bind(error)))
+        .await?;
 
-            info!(
-                message = "Listening.",
-                addr = %addr,
-                r#type = "udp"
-            );
+    info!(
+        message = "Listening.",
+        addr = %addr,
+        r#type = "udp"
+    );
 
-            let _ = UdpFramed::new(socket, BytesCodec::new())
-                .take_until(shutdown.compat())
-                .filter_map(|frame| async move {
-                    match frame {
-                        Ok((bytes, _sock)) => {
-                            let packet = String::from_utf8_lossy(bytes.as_ref());
-                            let metrics = packet
-                                .lines()
-                                .filter_map(|line| match parse(line) {
-                                    Ok(metric) => {
-                                        emit!(StatsdEventReceived {
-                                            byte_size: line.len()
-                                        });
-                                        Some(Ok(Event::Metric(metric)))
-                                    }
-                                    Err(error) => {
-                                        emit!(StatsdInvalidRecord { error, text: line });
-                                        None
-                                    }
-                                })
-                                .collect::<Vec<_>>();
-                            Some(stream::iter(metrics))
-                        }
-                        Err(error) => {
-                            emit!(StatsdSocketError::read(error));
-                            None
-                        }
-                    }
-                })
-                .flatten()
-                .forward(out.sink_compat())
-                .await;
+    let _ = UdpFramed::new(socket, BytesCodec::new())
+        .take_until(shutdown.compat())
+        .filter_map(|frame| async move {
+            match frame {
+                Ok((bytes, _sock)) => {
+                    let packet = String::from_utf8_lossy(bytes.as_ref());
+                    let metrics = packet
+                        .lines()
+                        .filter_map(|line| match parse(line) {
+                            Ok(metric) => {
+                                emit!(StatsdEventReceived {
+                                    byte_size: line.len()
+                                });
+                                Some(Ok(Event::Metric(metric)))
+                            }
+                            Err(error) => {
+                                emit!(StatsdInvalidRecord { error, text: line });
+                                None
+                            }
+                        })
+                        .collect::<Vec<_>>();
+                    Some(stream::iter(metrics))
+                }
+                Err(error) => {
+                    emit!(StatsdSocketError::read(error));
+                    None
+                }
+            }
+        })
+        .flatten()
+        .forward(out.sink_compat())
+        .await;
 
-            info!("Finished sending");
-            Ok(())
-        }
-        .boxed()
-        .compat(),
-    )
+    Ok(())
 }
 
 #[cfg(feature = "sinks-prometheus")]
