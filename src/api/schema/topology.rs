@@ -10,7 +10,7 @@ use std::{
 const INVARIANT: &str =
     "It is an invariant for the API to be active but not have a TOPOLOGY. Please report this.";
 
-#[Enum]
+#[derive(Enum, Eq, PartialEq, Copy, Clone)]
 pub enum SourceOutputType {
     Any,
     Log,
@@ -161,11 +161,8 @@ impl Sink {
     }
 }
 
-#[Interface(
-    field(name = "name", type = "String"),
-    field(name = "events_processed", type = "Option<metrics::EventsProcessed>")
-)]
-#[derive(Clone)]
+#[derive(Clone, Interface)]
+#[graphql(field(name = "name", type = "String"), field(name = "events_processed", type = "Option<metrics::EventsProcessed>"))]
 pub enum Topology {
     Source(Source),
     Transform(Transform),

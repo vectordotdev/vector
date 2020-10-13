@@ -86,7 +86,8 @@ impl From<Metric> for BytesProcessed {
     }
 }
 
-#[Interface(field(name = "timestamp", type = "Option<DateTime<Utc>>"))]
+#[derive(Interface)]
+#[graphql(field(name = "timestamp", type = "Option<DateTime<Utc>>"))]
 pub enum MetricType {
     Uptime(Uptime),
     EventsProcessed(EventsProcessed),
@@ -101,7 +102,7 @@ impl MetricsSubscription {
     /// Metrics for how long the Vector instance has been running
     async fn uptime_metrics(
         &self,
-        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+        #[graphql(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Uptime> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
             "uptime_seconds" => Some(Uptime(m)),
@@ -123,7 +124,7 @@ impl MetricsSubscription {
     /// Bytes processed metrics
     async fn bytes_processed_metrics(
         &self,
-        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+        #[graphql(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = BytesProcessed> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
             "bytes_processed" => Some(BytesProcessed(m)),
@@ -134,7 +135,7 @@ impl MetricsSubscription {
     /// All metrics
     async fn metrics(
         &self,
-        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+        #[graphql(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = MetricType> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
             "uptime_seconds" => Some(MetricType::Uptime(m.into())),
