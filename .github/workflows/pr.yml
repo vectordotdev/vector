@@ -205,9 +205,12 @@ jobs:
         run: make check-version
       - name: Check scripts
         run: make check-scripts
-      - name: Check helm
+      - name: Check helm dependencies
         if: needs.changes.outputs.helm == 'true'
-        run: make check-helm
+        run: make check-helm-dependencies
+      - name: Check helm lint
+        if: needs.changes.outputs.helm == 'true'
+        run: make check-helm-lint
       - name: Check that generated Kubernetes YAML doesn't diverge from Helm
         if: needs.changes.outputs.helm == 'true'
         run: make check-kubernetes-yaml
