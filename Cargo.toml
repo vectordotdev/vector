@@ -30,6 +30,7 @@ assets = [
 ]
 license-file = ["target/debian-license.txt"]
 extended-description-file = "target/debian-extended-description.txt"
+depends = ""
 
 [workspace]
 members = [
