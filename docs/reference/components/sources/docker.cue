@@ -1,12 +1,8 @@
 package metadata
 
-import (
-	"strings"
-)
-
 components: sources: docker: {
 	title:             "Docker"
-	short_description: strings.ToTitle(classes.function) + " logs through the Docker API"
+	short_description: "Collects logs through the Docker API"
 	long_description: """
 		[Docker][urls.docker] is an open platform for developing, shipping, and running
 		applications and services. Docker enables you to separate your services from
@@ -212,17 +208,39 @@ components: sources: docker: {
 	]
 
 	how_it_works: {
-		connecting_to_docker: {
-			title: "Connecting To The Docker Daemon"
+		alternatives: {
+			title: "Alternate Strategies"
 			body: #"""
-				Vector will automatically attempt to connect to the docker daemon for you. If
-				the user that Vector is running under can run `docker ps` then Vector will be
-				able to connect. Vector will also respect if `DOCKER_HOST` and
-				`DOCKER_VERIFY_TLS` are set (as well as other Docker environment variables).
-				See the [Docker daemon docs][urls.docker_daemon_socket_option].
+				If you'd prefer not to collect Docker logs through the Docker
+				API Vector offers alternative strategies. In some sets
+
+				First, it's worth mentioning that Vector strives to guide you towards the
+				optimal observability setup without presenting you with unnecessary details or
+				questions. Unfortunately, there are circumstances where trade-offs must be made
+				and you must determine which trade-offs are appropriate. Docker is one of these
+				circumstances.
+
+				Second, if you have a large container-based deployment you should consider using
+				a platform Kubernetes. These platforms provide alternate log collection means
+				that side-step the Docker logging problems. For supported platforms see Vector's
+				[Platforms installation section][docs.installation.platforms].
+
+				Finally, if you cannot use a container orchestrator then you can configure a
+				compatible [Docker logging driver][urls.docker_logging_drivers] with a matching
+				[Vector source][docs.sources]. For example:
+
+				1. The [Docker `syslog` driver][urls.docker_logging_driver_syslog] with the
+				   [Vector `syslog` source][docs.sources.syslog].
+				2. The [Docker `journald` driver][urls.docker_logging_driver_journald] with the
+				   [Vector `journald` source][docs.sources.journald].
+				3. The [Docker `splunk` driver][urls.docker_logging_driver_splunk] with the
+				   [Vector `splunk_hec` source][docs.sources.splunk_hec].
+
+				To our knowledge there is no discernible difference in performance or stability
+				between any of these. If we had to recommend one, we would recommend the
+				`syslog` combination.
 				"""#
 		}
-
 		docker_integration_strategy: {
 			title: "Docker Integration Strategy"
 			body: #"""
@@ -296,6 +314,44 @@ components: sources: docker: {
 				off via the `auto_partial_merge` option. Furthermore, you can adjust the marker
 				that we use to determine if an event is partial via the
 				`partial_event_marker_field` option.
+				"""#
+		}
+
+		setup: {
+			title: "Setup"
+			body: #"""
+				1. Verify that the [Docker daemon][urls.docker_daemon] is
+				   running:
+
+				   ```bash
+				   docker ps
+				   ```
+
+				2. Verify that Docker is collecting logs:
+
+				   ```bash
+				   docker logs $(docker ps | awk '{ print $1 }')
+				   ```
+
+				   You must have the [`json-file`][urls.docker_logging_driver_json_file] (default)
+				   or [`journald`](docker_logging_driver_journald) Docker
+				   logging driver installed for this to work.
+
+				3. Ensure that Vector's operating system user has permission to
+				   access the Docker API:
+
+				   ```bash
+				   sudo groupadd docker
+				   sudo usermod -aG docker $USER
+				   ```
+
+				   [Detailed instructions][urls.docker_permissions] can be found
+				   in Docker docs.
+
+				That's it! Please note, Vector will respect Docker's
+				[environment variables][urls.docker_env_vars] which you can use
+				to customize how Vector communicates with the Docker API, such
+				as `DOCKER_HOST` or `DOCKER_VERIFY_TLS`.
 				"""#
 		}
 	}

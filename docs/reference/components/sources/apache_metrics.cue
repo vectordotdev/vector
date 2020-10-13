@@ -12,6 +12,44 @@ components: sources: apache_metrics: {
 		function:      "collect"
 	}
 
+	dependencies: {
+		apache: {
+			name: "Apache HTTPD"
+			required: true
+			type: "external"
+			url: urls.apache
+			version: "any"
+			configuration:	{
+				_path: /server-status
+				internal: [
+					#"""
+					Enable the [Apache Status module][urls.apache_mod_status]
+					in your Apache config:
+
+					``` file="/etc/apache2/httpd.conf"
+					<Location "\(_path)">
+					    SetHandler server-status
+					    Require host example.com
+					</Location>
+					```
+					"""#,
+					#"""
+					Optionally enable [`ExtendedStatus` option][urls.apache_extended_status]
+					for more detailed metrics (see [Output](#output)):
+
+					``` file="/etc/apache2/httpd.conf"
+					ExtendedStatus On
+					```
+					""",
+				]
+				vector: {
+					endpoints: ["http://localhost:8080\(_path)/?auto"]
+				}
+			}
+			permissions: {}
+		}
+	}
+
 	features: {
 		checkpoint: enabled: false
 		multiline: enabled:  false
@@ -35,21 +73,8 @@ components: sources: apache_metrics: {
 			}
 		}
 
-		requirements: [
-			#"""
-				The Apache [Status module (`mod_status`)][urls.apache_mod_status] must
-				be enabled and configured for this source to work.
-				"""#,
-		]
-
-		warnings: [
-			"""
-				The [`ExtendedStatus` option][urls.apache_extended_status] has been
-				known to cause performance problems. If enabled, please monitor
-				performance carefully.
-				""",
-		]
-
+		requirements: []
+		warnings: []
 		notices: []
 	}
 
