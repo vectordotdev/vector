@@ -8,7 +8,6 @@ use std::{
     sync::{Arc, RwLock, Weak},
 };
 use tokio::{
-    net::TcpStream,
     select,
     stream::StreamExt,
     sync::{
@@ -129,7 +128,9 @@ pub struct SubscriptionClient {
 }
 
 impl SubscriptionClient {
-    pub fn new(ws: WebSocketStream<TcpStream>) -> Self {
+    pub fn new<TStream: tokio::io::AsyncRead + tokio::io::AsyncWrite + 'static + Send + Unpin>(
+        ws: WebSocketStream<TStream>,
+    ) -> Self {
         // Oneshot channel for cancelling the listener if SubscriptionClient is dropped
         let (_shutdown_tx, mut shutdown_rx) = oneshot::channel::<()>();
 
