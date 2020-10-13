@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use tokio::stream::{Stream, StreamExt};
 use tokio::time::Duration;
 
-#[SimpleObject]
+#[derive(SimpleObject)]
 pub struct Heartbeat {
     utc: DateTime<Utc>,
 }
@@ -33,7 +33,7 @@ impl HealthSubscription {
     /// Heartbeat, containing the UTC timestamp of the last server-sent payload
     async fn heartbeat(
         &self,
-        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+        #[graphql(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Heartbeat> {
         tokio::time::interval(Duration::from_millis(interval as u64)).map(|_| Heartbeat::new())
     }

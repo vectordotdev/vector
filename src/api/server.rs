@@ -2,9 +2,9 @@ use super::{handler, schema};
 use crate::config;
 use async_graphql::{
     http::{playground_source, GraphQLPlaygroundConfig},
-    QueryBuilder,
+    Request, Schema,
 };
-use async_graphql_warp::{graphql_subscription, GQLResponse};
+use async_graphql_warp::{graphql_subscription, Response as GQLResponse};
 use std::{convert::Infallible, net::SocketAddr};
 use tokio::sync::oneshot;
 use warp::filters::BoxedFilter;
@@ -66,9 +66,8 @@ fn make_routes(playground: bool) -> BoxedFilter<(impl Reply,)> {
     // GraphQL query and subscription handler
     let graphql_handler = warp::path("graphql").and(graphql_subscription(schema.clone()).or(
         async_graphql_warp::graphql(schema).and_then(
-            |(schema, builder): (_, QueryBuilder)| async move {
-                let resp = builder.execute(&schema).await;
-                Ok::<_, Infallible>(GQLResponse::from(resp))
+            |(schema, request): (Schema<_, _, _>, Request)| async move {
+                Ok::<_, Infallible>(GQLResponse::from(schema.execute(request).await))
             },
         ),
     ));

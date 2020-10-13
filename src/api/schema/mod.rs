@@ -2,12 +2,12 @@ mod health;
 mod metrics;
 pub mod topology;
 
-use async_graphql::{EmptyMutation, GQLMergedObject, GQLMergedSubscription, Schema, SchemaBuilder};
+use async_graphql::{EmptyMutation, MergedObject, MergedSubscription, Schema, SchemaBuilder};
 
-#[derive(GQLMergedObject, Default)]
+#[derive(MergedObject, Default)]
 pub struct Query(health::HealthQuery, topology::TopologyQuery);
 
-#[derive(GQLMergedSubscription, Default)]
+#[derive(MergedSubscription, Default)]
 pub struct Subscription(health::HealthSubscription, metrics::MetricsSubscription);
 
 /// Build a new GraphQL schema, comprised of Query, Mutation and Subscription types
