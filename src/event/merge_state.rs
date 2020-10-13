@@ -27,7 +27,11 @@ impl LogEventMergeState {
 
     /// Merge the final (non-partial) event in and return the resulting (merged)
     /// event.
-    pub fn merge_in_final_event(mut self, incoming: LogEvent, fields: &[impl AsRef<str>]) -> LogEvent {
+    pub fn merge_in_final_event(
+        mut self,
+        incoming: LogEvent,
+        fields: &[impl AsRef<str>],
+    ) -> LogEvent {
         self.merge_in_next_event(incoming, fields);
         self.intermediate_merged_event
     }

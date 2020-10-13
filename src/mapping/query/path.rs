@@ -21,7 +21,6 @@ impl From<&str> for Path {
 impl From<Vec<Vec<String>>> for Path {
     fn from(path: Vec<Vec<String>>) -> Self {
         Self {
-            // TODO: Switch to String once Event API is cleaned up.
             path: path
                 .iter()
                 .map(|c| c.iter().map(|p| p.replace(".", "\\.")).collect())

@@ -134,11 +134,9 @@ enum TransformError {
 
 fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
     let template = Template::try_from(s).map_err(TransformError::TemplateParseError)?;
-    template.render_string(&event).map_err(|missing_keys| {
-        // convert to String to avoid printing String in Debug format
-        let missing_keys = missing_keys.into_iter().collect::<Vec<String>>();
-        TransformError::TemplateRenderError { missing_keys }
-    })
+    template
+        .render_string(&event)
+        .map_err(|missing_keys| TransformError::TemplateRenderError { missing_keys })
 }
 
 fn render_tags(
@@ -320,9 +318,9 @@ impl Transform for LogToMetric {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }
-                Err(TransformError::FieldNotFound { field }) => {
-                    emit!(LogToMetricFieldNotFound { field: field.as_ref() })
-                }
+                Err(TransformError::FieldNotFound { field }) => emit!(LogToMetricFieldNotFound {
+                    field: field.as_ref()
+                }),
                 Err(TransformError::ParseFloatError { field, error }) => {
                     emit!(LogToMetricParseFloatError {
                         field: field.as_ref(),
