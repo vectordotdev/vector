@@ -155,6 +155,12 @@ _values: {
 	how_it_works: #HowItWorks
 }
 
+// `#CompressionAlgorithm` specified data compression algorithm.
+//
+// * `none` - compression is not applied
+// * `gzip` - gzip compression applied
+#CompressionAlgorithm: "none" | "gzip"
+
 // `#DeliveryStatus` documents the delivery guarantee.
 //
 // * `at_least_once` - The event will be delivered at least once and
@@ -249,8 +255,9 @@ _values: {
 			enabled: bool
 
 			if enabled == true {
-				default: "gzip" | null
-				gzip:    bool
+				default: #CompressionAlgorithm
+				algorithm: ["none", "gzip"]
+				level: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 			}
 		}
 	}

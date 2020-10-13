@@ -24,7 +24,6 @@ components: sinks: clickhouse: {
 		compression: {
 			enabled: true
 			default: "gzip"
-			gzip:    true
 		}
 		encoding: codec: enabled: false
 		healthcheck: enabled: true

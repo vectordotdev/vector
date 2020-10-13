@@ -23,8 +23,7 @@ components: sinks: aws_cloudwatch_metrics: {
 		buffer: enabled: false
 		compression: {
 			enabled: true
-			default: null
-			gzip:    true
+			default: "none"
 		}
 		encoding: codec: enabled: false
 		healthcheck: enabled: true

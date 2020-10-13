@@ -23,8 +23,7 @@ components: sinks: aws_kinesis_streams: {
 		buffer: enabled: true
 		compression: {
 			enabled: true
-			default: null
-			gzip:    true
+			default: "none"
 		}
 		encoding: codec: {
 			enabled: true
