@@ -448,7 +448,7 @@ mod test {
         let messages = collect_n(rx, 1).await.unwrap();
         assert_eq!(
             messages[0],
-            Bytes::from("vector.counter:1.5|c|#empty_tag:,normal_tag:value,true_tag\nvector.histogram:2|h|@0.01"),
+            Bytes::from("vector.counter:1.5|c|#empty_tag:,normal_tag:value,true_tag\nvector.histogram:2|h|@0.01\n"),
         );
     }
 }
