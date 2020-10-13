@@ -428,9 +428,9 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Process channel field
         if let Some(JsonValue::String(guid)) = json.get_mut("channel").map(JsonValue::take) {
-            log.insert(CHANNEL.clone(), guid);
+            log.insert(CHANNEL, guid);
         } else if let Some(guid) = self.channel.as_ref() {
-            log.insert(CHANNEL.clone(), guid.clone());
+            log.insert(CHANNEL, guid.clone());
         }
 
         // Process fields field
@@ -596,7 +596,7 @@ fn raw_event(
     log.insert(log_schema().message_key(), message);
 
     // Add channel
-    log.insert(CHANNEL.clone(), channel);
+    log.insert(CHANNEL, channel);
 
     // Add host
     if let Some(host) = host {

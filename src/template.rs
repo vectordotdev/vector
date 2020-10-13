@@ -154,7 +154,7 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<String>> {
     if missing_fields.is_empty() {
         Ok(out)
     } else {
-        Err(missing_fields.into())
+        Err(missing_fields)
     }
 }
 

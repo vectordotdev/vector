@@ -132,7 +132,6 @@ fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
         // convert to String to avoid printing String in Debug format
         let missing_keys = missing_keys
             .into_iter()
-            .map(|k| k.to_string())
             .collect::<Vec<String>>();
         TransformError::TemplateRenderError { missing_keys }
     })
@@ -166,17 +165,17 @@ fn render_tags(
     })
 }
 
-fn parse_field(log: &LogEvent, field: &String) -> Result<f64, TransformError> {
+fn parse_field(log: &LogEvent, field: &str) -> Result<f64, TransformError> {
     let value = log
         .get(field)
         .ok_or_else(|| TransformError::FieldNotFound {
-            field: field.clone(),
+            field: field.to_string(),
         })?;
     value
         .to_string_lossy()
         .parse()
         .map_err(|error| TransformError::ParseFloatError {
-            field: field.clone(),
+            field: field.to_string(),
             error,
         })
 }

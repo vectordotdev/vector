@@ -419,7 +419,7 @@ impl MetadataClient {
 
                 for (i, role_name) in role_names.lines().enumerate() {
                     self.state.update(
-                        format!("{}[{}]", self.keys.role_name_key, i).into(),
+                        format!("{}[{}]", self.keys.role_name_key, i),
                         role_name.to_string().into(),
                     );
                 }
@@ -438,20 +438,18 @@ impl Keys {
     pub fn new(namespace: &Option<String>) -> Self {
         if let Some(namespace) = &namespace {
             Keys {
-                ami_id_key: format!("{}.{}", namespace, AMI_ID_KEY.clone()).into(),
-                availability_zone_key: format!("{}.{}", namespace, AVAILABILITY_ZONE_KEY.clone())
-                    .into(),
-                instance_id_key: format!("{}.{}", namespace, INSTANCE_ID_KEY.clone()).into(),
-                instance_type_key: format!("{}.{}", namespace, INSTANCE_TYPE_KEY.clone()).into(),
-                local_hostname_key: format!("{}.{}", namespace, LOCAL_HOSTNAME_KEY.clone()).into(),
-                local_ipv4_key: format!("{}.{}", namespace, LOCAL_IPV4_KEY.clone()).into(),
-                public_hostname_key: format!("{}.{}", namespace, PUBLIC_HOSTNAME_KEY.clone())
-                    .into(),
-                public_ipv4_key: format!("{}.{}", namespace, PUBLIC_IPV4_KEY.clone()).into(),
-                region_key: format!("{}.{}", namespace, REGION_KEY.clone()).into(),
-                subnet_id_key: format!("{}.{}", namespace, SUBNET_ID_KEY.clone()).into(),
-                vpc_id_key: format!("{}.{}", namespace, VPC_ID_KEY.clone()).into(),
-                role_name_key: format!("{}.{}", namespace, VPC_ID_KEY.clone()).into(),
+                ami_id_key: format!("{}.{}", namespace, AMI_ID_KEY),
+                availability_zone_key: format!("{}.{}", namespace, AVAILABILITY_ZONE_KEY),
+                instance_id_key: format!("{}.{}", namespace, INSTANCE_ID_KEY),
+                instance_type_key: format!("{}.{}", namespace, INSTANCE_TYPE_KEY),
+                local_hostname_key: format!("{}.{}", namespace, LOCAL_HOSTNAME_KEY),
+                local_ipv4_key: format!("{}.{}", namespace, LOCAL_IPV4_KEY),
+                public_hostname_key: format!("{}.{}", namespace, PUBLIC_HOSTNAME_KEY),
+                public_ipv4_key: format!("{}.{}", namespace, PUBLIC_IPV4_KEY),
+                region_key: format!("{}.{}", namespace, REGION_KEY),
+                subnet_id_key: format!("{}.{}", namespace, SUBNET_ID_KEY),
+                vpc_id_key: format!("{}.{}", namespace, VPC_ID_KEY),
+                role_name_key: format!("{}.{}", namespace, VPC_ID_KEY),
             }
         } else {
             Keys {

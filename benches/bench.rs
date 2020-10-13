@@ -785,7 +785,7 @@ fn benchmark_remap(c: &mut Criterion) {
 
     c.bench_function("remap: parse JSON with json_parser", |b| {
         let tform = JsonParser::from(JsonParserConfig {
-            field: Some("foo"),
+            field: Some("foo".to_string()),
             target_field: Some("bar".to_owned()),
             drop_field: false,
             drop_invalid: false,

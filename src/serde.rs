@@ -38,10 +38,10 @@ impl<V: 'static> Fields<V> {
             .map(|(k, v)| -> Box<dyn Iterator<Item = (String, V)>> {
                 match v {
                     // boxing is used as a way to avoid incompatible types of the match arms
-                    FieldsOrValue::Value(v) => Box::new(std::iter::once((k.into(), v))),
+                    FieldsOrValue::Value(v) => Box::new(std::iter::once((k, v))),
                     FieldsOrValue::Fields(f) => Box::new(
                         f.all_fields()
-                            .map(move |(nested_k, v)| (format!("{}.{}", k, nested_k).into(), v)),
+                            .map(move |(nested_k, v)| (format!("{}.{}", k, nested_k), v)),
                     ),
                 }
             })

@@ -72,12 +72,12 @@ impl FromStr for Conversion {
 /// Helper function to parse a conversion map and check against a list of names
 pub fn parse_check_conversion_map(
     types: &HashMap<String, String>,
-    names: &Vec<String>,
+    names: &[impl AsRef<str>],
 ) -> Result<HashMap<String, Conversion>, ConversionError> {
     // Check if any named type references a nonexistent field
-    let names: HashSet<String> = names.iter().map(String::from).collect();
-    for &name in types.keys() {
-        if !names.contains(&name) {
+    let names = names.iter().map(|s| s.as_ref()).collect::<HashSet<_>>();
+    for name in types.keys() {
+        if !names.contains(name.as_str()) {
             warn!(
                 message = "Field was specified in the types but is not a valid field name.",
                 field = &name[..]

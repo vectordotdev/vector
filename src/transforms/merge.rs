@@ -112,7 +112,7 @@ impl Transform for Merge {
                     entry.insert(LogEventMergeState::new(event));
                 }
                 hash_map::Entry::Occupied(mut entry) => {
-                    entry.get_mut().merge_in_next_event(event, self.fields);
+                    entry.get_mut().merge_in_next_event(event, &self.fields);
                 }
             }
 
@@ -132,7 +132,7 @@ impl Transform for Merge {
 
         // Merge in the final non-partial event and consume the merge state in
         // exchange for the merged event.
-        let merged_event = log_event_merge_state.merge_in_final_event(event, self.fields);
+        let merged_event = log_event_merge_state.merge_in_final_event(event, &self.fields);
 
         // Return the merged event.
         Some(Event::Log(merged_event))
@@ -151,7 +151,7 @@ mod test {
     }
 
     fn make_partial(mut event: Event) -> Event {
-        event.as_mut_log().insert(event::PARTIAL.clone(), true);
+        event.as_mut_log().insert(event::PARTIAL, true);
         event
     }
 

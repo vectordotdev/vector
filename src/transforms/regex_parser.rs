@@ -87,7 +87,8 @@ impl CompiledRegex {
             .filter_map(|(idx, cn)| {
                 cn.map(|cn| {
                     let conv = types.get(cn).unwrap_or(&Conversion::Bytes);
-                    (idx, cn, conv.clone())
+                    let name = cn.to_string();
+                    (idx, name, conv.clone())
                 })
             })
             .collect::<Vec<_>>();
@@ -182,7 +183,7 @@ impl RegexParser {
             .map(|regex| {
                 regex
                     .capture_names()
-                    .filter_map(|s| s.map(Into::into))
+                    .filter_map(|s| s)
                     .collect::<Vec<_>>()
             })
             .flatten()

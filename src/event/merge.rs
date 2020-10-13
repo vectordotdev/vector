@@ -3,13 +3,13 @@ use bytes::BytesMut;
 
 
 /// Merges all fields specified at `fields` from `incoming` to `current`.
-pub fn merge_log_event<'a>(current: &mut LogEvent, mut incoming: LogEvent, fields: Vec<String>) {
+pub fn merge_log_event(current: &mut LogEvent, mut incoming: LogEvent, fields: &[impl AsRef<str>]) {
     for field in fields {
         let incoming_val = match incoming.remove(field) {
             None => continue,
             Some(val) => val,
         };
-        match current.get_mut(field) {
+        match current.get_mut(&field) {
             None => {
                 current.insert(field, incoming_val);
             }
@@ -108,7 +108,7 @@ mod test {
         };
 
         let mut merged = current;
-        merge_log_event(&mut merged, incoming, fields_to_merge);
+        merge_log_event(&mut merged, incoming, &fields_to_merge);
 
         let expected = {
             let mut log = LogEvent::default();

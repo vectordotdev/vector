@@ -22,13 +22,13 @@ impl LogEventMergeState {
     }
 
     /// Merge the incoming (partial) event in.
-    pub fn merge_in_next_event<'a>(&mut self, incoming: LogEvent, fields: Vec<String>) {
-        merge_log_event(&mut self.intermediate_merged_event, incoming, fields);
+    pub fn merge_in_next_event(&mut self, incoming: LogEvent, fields: &[impl AsRef<str>]) {
+        merge_log_event(&mut self.intermediate_merged_event, incoming,  fields);
     }
 
     /// Merge the final (non-partial) event in and return the resulting (merged)
     /// event.
-    pub fn merge_in_final_event<'a>(mut self, incoming: LogEvent, fields: Vec<String>) -> LogEvent {
+    pub fn merge_in_final_event(mut self, incoming: LogEvent, fields: &[String]) -> LogEvent {
         self.merge_in_next_event(incoming, fields);
         self.intermediate_merged_event
     }
@@ -49,8 +49,8 @@ mod test {
         let fields = vec!["message".to_string()];
 
         let mut state = LogEventMergeState::new(log_event_with_message("hel"));
-        state.merge_in_next_event(log_event_with_message("lo "), fields);
-        let merged_event = state.merge_in_final_event(log_event_with_message("world"), fields);
+        state.merge_in_next_event(log_event_with_message("lo "), &fields);
+        let merged_event = state.merge_in_final_event(log_event_with_message("world"), &fields);
 
         assert_eq!(
             merged_event

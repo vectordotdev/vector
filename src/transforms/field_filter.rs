@@ -54,7 +54,7 @@ pub struct FieldFilter {
 impl FieldFilter {
     pub fn new(field_name: String, value: String) -> Self {
         Self {
-            field_name: field_name.into(),
+            field_name,
             value,
         }
     }

@@ -45,7 +45,7 @@ impl EqualsPredicate {
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         Ok(Box::new(Self {
-            target: target.into(),
+            target,
             arg: arg.clone(),
         }))
     }
@@ -101,11 +101,11 @@ impl ContainsPredicate {
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         match arg {
             CheckFieldsPredicateArg::String(s) => Ok(Box::new(Self {
-                target: target.into(),
+                target,
                 arg: vec![s.clone()],
             })),
             CheckFieldsPredicateArg::VecString(ss) => Ok(Box::new(Self {
-                target: target.into(),
+                target,
                 arg: ss.clone(),
             })),
             _ => Err("contains predicate requires a string or list of string argument".to_owned()),
@@ -140,11 +140,11 @@ impl StartsWithPredicate {
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         match arg {
             CheckFieldsPredicateArg::String(s) => Ok(Box::new(Self {
-                target: target.into(),
+                target,
                 arg: vec![s.clone()],
             })),
             CheckFieldsPredicateArg::VecString(ss) => Ok(Box::new(Self {
-                target: target.into(),
+                target,
                 arg: ss.clone(),
             })),
             _ => {
@@ -181,11 +181,11 @@ impl EndsWithPredicate {
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         match arg {
             CheckFieldsPredicateArg::String(s) => Ok(Box::new(Self {
-                target: target.into(),
+                target,
                 arg: vec![s.clone()],
             })),
             CheckFieldsPredicateArg::VecString(ss) => Ok(Box::new(Self {
-                target: target.into(),
+                target,
                 arg: ss.clone(),
             })),
             _ => Err("ends_with predicate requires a string argument".to_owned()),
@@ -219,7 +219,7 @@ impl NotEqualsPredicate {
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         Ok(Box::new(Self {
-            target: target.into(),
+            target,
             arg: match arg {
                 CheckFieldsPredicateArg::String(s) => vec![s.clone()],
                 CheckFieldsPredicateArg::VecString(ss) => ss.clone(),
@@ -271,7 +271,6 @@ impl RegexPredicate {
         };
         let regex = Regex::new(&pattern)
             .map_err(|error| format!("Invalid regex \"{}\": {}", pattern, error))?;
-        let target = target.into();
         Ok(Box::new(Self { target, regex }))
     }
 }
@@ -307,7 +306,7 @@ impl ExistsPredicate {
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         match arg {
             CheckFieldsPredicateArg::Boolean(b) => Ok(Box::new(Self {
-                target: target.into(),
+                target,
                 arg: *b,
             })),
             _ => Err("exists predicate requires a boolean argument".to_owned()),
@@ -354,7 +353,6 @@ impl IpCidrPredicate {
             Ok(v) => v,
             Err(e) => return Err(format!("Invalid IP CIDR: {}", e)),
         };
-        let target = target.into();
         Ok(Box::new(Self { target, cidrs }))
     }
 }
@@ -417,7 +415,7 @@ impl LengthEqualsPredicate {
                 }
 
                 Ok(Box::new(Self {
-                    target: target.into(),
+                    target,
                     arg: *i,
                 }))
             }

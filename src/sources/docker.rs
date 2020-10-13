@@ -824,7 +824,7 @@ impl ContainerLogInfo {
             log_event.insert(log_schema().message_key(), bytes_message);
 
             // Stream we got the message from.
-            log_event.insert(STREAM.clone(), stream);
+            log_event.insert(*STREAM, stream);
 
             // Timestamp of the event.
             if let Some(timestamp) = timestamp {
@@ -832,7 +832,7 @@ impl ContainerLogInfo {
             }
 
             // Container ID.
-            log_event.insert(CONTAINER.clone(), self.id.0.clone());
+            log_event.insert(*CONTAINER, self.id.0.clone());
 
             // Labels.
             for (key, value) in self.metadata.labels.iter() {
@@ -840,13 +840,13 @@ impl ContainerLogInfo {
             }
 
             // Container name.
-            log_event.insert(NAME.clone(), self.metadata.name.clone());
+            log_event.insert(*NAME, self.metadata.name.clone());
 
             // Container image.
-            log_event.insert(IMAGE.clone(), self.metadata.image.clone());
+            log_event.insert(*IMAGE, self.metadata.image.clone());
 
             // Timestamp of the container creation.
-            log_event.insert(CREATED_AT.clone(), self.metadata.created_at);
+            log_event.insert(*CREATED_AT, self.metadata.created_at);
 
             // Return the resulting log event.
             log_event
@@ -867,7 +867,7 @@ impl ContainerLogInfo {
                 // current message being the initial one.
                 if let Some(partial_event_merge_state) = partial_event_merge_state {
                     partial_event_merge_state
-                        .merge_in_next_event(log_event, vec![log_schema().message_key().to_string()]);
+                        .merge_in_next_event(log_event, &[log_schema().message_key().to_string()]);
                 } else {
                     *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
                 };
@@ -880,7 +880,7 @@ impl ContainerLogInfo {
             // Otherwise it's just a regular event that we return as-is.
             match partial_event_merge_state.take() {
                 Some(partial_event_merge_state) => partial_event_merge_state
-                    .merge_in_final_event(log_event, vec![log_schema().message_key().to_string()]),
+                    .merge_in_final_event(log_event, &[log_schema().message_key().to_string()]),
                 None => log_event,
             }
         } else {
@@ -932,7 +932,7 @@ impl ContainerMetadata {
                 map.iter()
                     .map(|(key, value)| {
                         (
-                            ("label.".to_owned() + key).into(),
+                            ("label.".to_owned() + key),
                             Value::from(value.to_owned()),
                         )
                     })
