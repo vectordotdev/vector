@@ -15,18 +15,25 @@ set -euo pipefail
 #
 #   Deploy:
 #
-#   $ CONTAINER_IMAGE=timberio/vector:alpine-latest scripts/deploy-kubernetes-test.sh up vector-test-qwerty
+#   $ CONTAINER_IMAGE=timberio/vector:alpine-latest scripts/deploy-kubernetes-test.sh up vector-test-qwerty vector
 #
 #   Teardown:
 #
-#   $ scripts/deploy-kubernetes-test.sh down vector-test-qwerty
+#   $ scripts/deploy-kubernetes-test.sh down vector-test-qwerty vector
 #
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 # Command to perform.
 COMMAND="${1:?"Specify the command (up/down) as the first argument"}"
 
 # A Kubernetes namespace to deploy to.
 NAMESPACE="${2:?"Specify the namespace as the second argument"}"
+
+if [[ "$COMMAND" == "up" ]]; then
+  # The helm chart to deploy.
+  HELM_CHART="${3:?"Specify the helm chart name as the third argument"}"
+fi
 
 # Allow overriding kubectl with something like `minikube kubectl --`.
 VECTOR_TEST_KUBECTL="${VECTOR_TEST_KUBECTL:-"kubectl"}"
@@ -72,8 +79,8 @@ up() {
 
   split-container-image "$CONTAINER_IMAGE"
   HELM_VALUES+=(
-    --set "image.repository=$CONTAINER_IMAGE_REPOSITORY"
-    --set "image.tag=$CONTAINER_IMAGE_TAG"
+    --set "global.vector.image.repository=$CONTAINER_IMAGE_REPOSITORY"
+    --set "global.vector.image.tag=$CONTAINER_IMAGE_TAG"
   )
 
   set -x
@@ -82,7 +89,7 @@ up() {
     --namespace "$NAMESPACE" \
     "${HELM_VALUES[@]}" \
     "vector" \
-    "./distribution/helm/vector"
+    "./distribution/helm/$HELM_CHART"
   { set +x; } &>/dev/null
 }
 
@@ -91,7 +98,9 @@ down() {
     $VECTOR_TEST_KUBECTL delete --namespace "$NAMESPACE" -f "$CUSTOM_RESOURCE_CONFIGS_FILE"
   fi
 
-  $VECTOR_TEST_HELM delete --namespace "$NAMESPACE" "vector"
+  if $VECTOR_TEST_HELM status --namespace "$NAMESPACE" "vector" &>/dev/null; then
+    $VECTOR_TEST_HELM delete --namespace "$NAMESPACE" "vector"
+  fi
 
   $VECTOR_TEST_KUBECTL delete namespace "$NAMESPACE"
 }
