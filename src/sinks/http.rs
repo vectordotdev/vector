@@ -163,25 +163,7 @@ impl HttpSink for HttpSinkConfig {
         self.encoding.apply_rules(&mut event);
         let body = match &self.encoding.codec() {
             Encoding::Text => {
-<<<<<<< HEAD
-                if let EventOrLog::Log(event) = event {
-                    if let Some(v) = event.get(&Atom::from(crate::config::log_schema().message_key()) {
-                        let mut b = v.to_string_lossy().into_bytes();
-                        b.push(b'\n');
-                        b
-                    } else {
-                        warn!(
-                            message = "Event missing the message key; dropping event.",
-                            rate_limit_secs = 30,
-                        );
-                        return None;
-                    }
-                } else {
-                    panic!("HTTP sink: Text encoding is not compatible with metrics_plus_mode");
-                }
-=======
                compile_error!("A text format for combining metrics and logs has not been defined."); 
->>>>>>> 372c677e... Remove metrics_plus_mode
             }
             Encoding::Ndjson => {
                 let mut b = serde_json::to_vec(&event)
