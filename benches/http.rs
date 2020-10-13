@@ -43,7 +43,6 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
                         encoding: sinks::http::Encoding::Text.into(),
                         request: Default::default(),
                         tls: Default::default(),
-                        metrics_plus_mode: false,
                     },
                 );
 
@@ -102,7 +101,6 @@ fn benchmark_http_gzip(c: &mut Criterion) {
                         encoding: sinks::http::Encoding::Text.into(),
                         request: Default::default(),
                         tls: Default::default(),
-                        metrics_plus_mode: false,
                     },
                 );
 

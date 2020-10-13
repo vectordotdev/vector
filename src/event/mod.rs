@@ -93,10 +93,6 @@ fn timestamp_to_string(timestamp: &DateTime<Utc>) -> String {
     timestamp.to_rfc3339_opts(SecondsFormat::AutoSi, true)
 }
 
-fn string_to_timestamp(string: &str) -> Result<DateTime<Utc>, ParseError> {
-    DateTime::<FixedOffset>::parse_from_rfc3339(string).map(|d| d.into())
-}
-
 fn decode_map(fields: BTreeMap<String, proto::Value>) -> Option<Value> {
     let mut accum: BTreeMap<String, Value> = BTreeMap::new();
     for (key, value) in fields {

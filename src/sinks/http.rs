@@ -52,8 +52,6 @@ pub struct HttpSinkConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
-    #[serde(default)]
-    pub metrics_plus_mode: bool,
 }
 
 #[cfg(test)]
@@ -69,7 +67,6 @@ fn default_config(e: Encoding) -> HttpSinkConfig {
         encoding: e.into(),
         request: Default::default(),
         tls: Default::default(),
-        metrics_plus_mode: Default::default(),
     }
 }
 
@@ -156,12 +153,6 @@ impl SinkConfig for HttpSinkConfig {
     }
 }
 
-#[derive(Serialize)]
-#[serde(untagged)]
-enum EventOrLog {
-    Event(Event),
-    Log(LogEvent),
-}
 
 #[async_trait::async_trait]
 impl HttpSink for HttpSinkConfig {
@@ -170,18 +161,9 @@ impl HttpSink for HttpSinkConfig {
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
-        let event = if self.metrics_plus_mode {
-            EventOrLog::Event(event)
-        } else {
-            match event {
-                Event::Log(event) => EventOrLog::Log(event),
-                Event::Metric(_) => panic!(
-                    "metrics_plus_mode must be set to true to send metrics through the HTTP sink."
-                ),
-            }
-        };
         let body = match &self.encoding.codec() {
             Encoding::Text => {
+<<<<<<< HEAD
                 if let EventOrLog::Log(event) = event {
                     if let Some(v) = event.get(&Atom::from(crate::config::log_schema().message_key()) {
                         let mut b = v.to_string_lossy().into_bytes();
@@ -197,8 +179,10 @@ impl HttpSink for HttpSinkConfig {
                 } else {
                     panic!("HTTP sink: Text encoding is not compatible with metrics_plus_mode");
                 }
+=======
+               compile_error!("A text format for combining metrics and logs has not been defined."); 
+>>>>>>> 372c677e... Remove metrics_plus_mode
             }
-
             Encoding::Ndjson => {
                 let mut b = serde_json::to_vec(&event)
                     .map_err(|e| panic!("Unable to encode into JSON: {}", e))
@@ -329,7 +313,6 @@ mod tests {
     use futures::{stream, StreamExt};
     use headers::{Authorization, HeaderMapExt};
     use hyper::Method;
-    use serde::Deserialize;
     use std::io::{BufRead, BufReader};
 
     #[test]
@@ -351,28 +334,6 @@ mod tests {
 
         let mut config = default_config(Encoding::Json);
         config.encoding = encoding;
-        let bytes = config.encode_event(event).unwrap();
-
-        #[derive(Deserialize, Debug)]
-        #[serde(deny_unknown_fields)]
-        struct ExpectedEvent {
-            message: String,
-            timestamp: chrono::DateTime<chrono::Utc>,
-        }
-
-        let output = serde_json::from_slice::<ExpectedEvent>(&bytes[..]).unwrap();
-
-        assert_eq!(output.message, "hello world".to_string());
-    }
-
-    #[test]
-    fn http_encode_event_json_metrics_plus_mode() {
-        let encoding = EncodingConfig::from(Encoding::Ndjson);
-        let event = Event::from("hello world");
-
-        let mut config = default_config(Encoding::Json);
-        config.encoding = encoding;
-        config.metrics_plus_mode = true;
         let bytes = config.encode_event(event.clone()).unwrap();
 
         let output = serde_json::from_slice::<Event>(&bytes[..]).unwrap();

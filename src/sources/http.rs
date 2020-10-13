@@ -26,8 +26,6 @@ pub struct SimpleHttpConfig {
     #[serde(default)]
     headers: Vec<String>,
     tls: Option<TlsConfig>,
-    #[serde(default)]
-    metrics_plus_mode: bool,
 }
 
 inventory::submit! {
@@ -39,7 +37,6 @@ impl GenerateConfig for SimpleHttpConfig {}
 #[derive(Clone)]
 struct SimpleHttpSource {
     encoding: Encoding,
-    metrics_plus_mode: bool,
     headers: Vec<String>,
 }
 
@@ -55,7 +52,7 @@ pub enum Encoding {
 
 impl HttpSource for SimpleHttpSource {
     fn build_event(&self, body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
-        decode_body(body, self.encoding, self.metrics_plus_mode)
+        decode_body(body, self.encoding)
             .map(|events| add_headers(events, &self.headers, header_map))
             .map(|mut events| {
                 // Add source type
@@ -81,13 +78,8 @@ impl SourceConfig for SimpleHttpConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        // Fail fast
-        if self.metrics_plus_mode && self.encoding == Encoding::Text {
-            panic!("HTTP Source: Metrics plus mode does not support text encoding")
-        }
         let source = SimpleHttpSource {
             encoding: self.encoding,
-            metrics_plus_mode: self.metrics_plus_mode,
             headers: self.headers.clone(),
         };
         source.run(self.address, "", &self.tls, out, shutdown)
@@ -148,7 +140,6 @@ fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>
 fn decode_body(
     body: Bytes,
     enc: Encoding,
-    metrics_plus_mode: bool,
 ) -> Result<Vec<Event>, ErrorMessage> {
     match enc {
         Encoding::Text => body_to_lines(body)
@@ -158,57 +149,37 @@ fn decode_body(
             .map(|j| {
                 let parsed_json = serde_json::from_slice(&j?)
                     .map_err(|e| json_error(format!("Error parsing Ndjson: {:?}", e)))?;
-                json_parse_object(parsed_json, metrics_plus_mode)
+                json_parse_object(parsed_json)
             })
             .collect::<Result<_, _>>(),
         Encoding::Json => {
             let parsed_json = serde_json::from_slice(&body)
                 .map_err(|e| json_error(format!("Error parsing Json: {:?}", e)))?;
-            json_parse_array_of_object(parsed_json, metrics_plus_mode)
+            json_parse_array_of_object(parsed_json)
         }
     }
 }
 
-fn json_parse_object(value: JsonValue, metrics_plus_mode: bool) -> Result<Event, ErrorMessage> {
-    if metrics_plus_mode {
-        let mut event = serde_json::from_value::<Event>(value);
-        if let Ok(Event::Log(event)) = event.as_mut() {
-            event.insert(log_schema().timestamp_key().clone(), Utc::now()); // Add timestamp
-        }
-        event.map_err(|e| json_error(format!("Unable to parse JSON as Event, {:?}", e)))
-    } else {
-        let mut event = Event::new_empty_log();
-        let log = event.as_mut_log();
-        log.insert(log_schema().timestamp_key().clone(), Utc::now()); // Add timestamp
-        match value {
-            JsonValue::Object(map) => {
-                for (k, v) in map {
-                    log.insert(k, v);
-                }
-                Ok(event)
-            }
-            _ => Err(json_error(format!(
-                "Expected Object, got {}, the sending HTTP sink, if another vector instance, may have their metrics_plus_mode set to true, and mine is false.",
-                json_value_to_type_string(&value)
-            ))),
-        }
+fn json_parse_object(value: JsonValue) -> Result<Event, ErrorMessage> {
+    let mut event = serde_json::from_value::<Event>(value);
+    if let Ok(Event::Log(event)) = event.as_mut() {
+        event.insert(log_schema().timestamp_key().clone(), Utc::now()); // Add timestamp
     }
+    event.map_err(|e| json_error(format!("Unable to parse JSON as Event, {:?}", e)))
 }
 
 fn json_parse_array_of_object(
     value: JsonValue,
-    metrics_plus_mode: bool,
 ) -> Result<Vec<Event>, ErrorMessage> {
     match value {
         JsonValue::Array(v) => v
             .into_iter()
-            .map(|v| json_parse_object(v, metrics_plus_mode))
+            .map(|v| json_parse_object(v))
             .collect::<Result<_, _>>(),
         JsonValue::Object(map) => {
             //treat like an array of one object
             Ok(vec![json_parse_object(
                 JsonValue::Object(map),
-                metrics_plus_mode,
             )?])
         }
         _ => Err(json_error(format!(
@@ -255,14 +226,6 @@ mod tests {
         encoding: Encoding,
         headers: Vec<String>,
     ) -> (mpsc::Receiver<Event>, SocketAddr) {
-        source_metrics_plus(encoding, headers, false).await
-    }
-
-    async fn source_metrics_plus(
-        encoding: Encoding,
-        headers: Vec<String>,
-        metrics_plus_mode: bool,
-    ) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
         tokio::spawn(async move {
@@ -271,7 +234,6 @@ mod tests {
                 encoding,
                 headers,
                 tls: None,
-                metrics_plus_mode,
             }
             .build(
                 "default",
@@ -402,32 +364,6 @@ mod tests {
         assert_eq!(400, send(addr, "{").await); //malformed
         assert_eq!(400, send(addr, r#"{"key"}"#).await); //key without value
 
-        assert_eq!(200, send(addr, "{}").await); //can be one object or array of objects
-        assert_eq!(200, send(addr, "[{},{},{}]").await);
-
-        let mut events = collect_n(rx, 2).await.unwrap();
-        assert!(events
-            .remove(1)
-            .as_log()
-            .get(&Atom::from(log_schema().timestamp_key()))
-            .is_some());
-        assert!(events
-            .remove(0)
-            .as_log()
-            .get(&Atom::from(log_schema().timestamp_key()))
-            .is_some());
-    }
-
-    #[tokio::test]
-    async fn http_json_parsing_metrics_plus_mode() {
-        trace_init();
-
-        let (rx, addr) = source_metrics_plus(Encoding::Json, vec![], true).await;
-
-        assert_eq!(400, send(addr, "{").await); //malformed
-        assert_eq!(400, send(addr, r#"{"key"}"#).await); //key without value
-        assert_eq!(400, send(addr, r#"{}"#).await); //empty object should not be accepted in metrics_plus_mode
-
         assert_eq!(200, send(addr, "{\"Log\": {}}").await); //can be one object or array of objects
         assert_eq!(
             200,
@@ -438,12 +374,12 @@ mod tests {
         assert!(events
             .remove(1)
             .as_log()
-            .get(&log_schema().timestamp_key())
+            .get(&Atom::from(log_schema().timestamp_key()))
             .is_some());
         assert!(events
             .remove(0)
             .as_log()
-            .get(&log_schema().timestamp_key())
+            .get(&Atom::from(log_schema().timestamp_key()))
             .is_some());
     }
 
@@ -453,38 +389,6 @@ mod tests {
 
         let (rx, addr) = source(Encoding::Json, vec![]).await;
 
-        assert_eq!(200, send(addr, r#"[{"key":"value"}]"#).await);
-        assert_eq!(200, send(addr, r#"{"key2":"value2"}"#).await);
-
-        let mut events = collect_n(rx, 2).await.unwrap();
-        {
-            let event = events.remove(0);
-            let log = event.as_log();
-            assert_eq!(log[&Atom::from("key")], "value".into());
-            assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
-            assert_eq!(
-                log[&Atom::from(log_schema().source_type_key())],
-                "http".into()
-            );
-        }
-        {
-            let event = events.remove(0);
-            let log = event.as_log();
-            assert_eq!(log[&Atom::from("key2")], "value2".into());
-            assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
-            assert_eq!(
-                log[&Atom::from(log_schema().source_type_key())],
-                "http".into()
-            );
-        }
-    }
-
-    #[tokio::test]
-    async fn http_json_values_metrics_plus_mode() {
-        trace_init();
-
-        let (rx, addr) = source_metrics_plus(Encoding::Json, vec![], true).await;
-
         assert_eq!(200, send(addr, r#"[{"Log":{"key":"value"}}]"#).await);
         assert_eq!(200, send(addr, r#"{"Log":{"key2":"value2"}}"#).await);
 
@@ -493,15 +397,21 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key")], "value".into());
-            assert!(log.get(&log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
+            assert_eq!(
+                log[&Atom::from(log_schema().source_type_key())],
+                "http".into()
+            );
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key2")], "value2".into());
-            assert!(log.get(&log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
+            assert_eq!(
+                log[&Atom::from(log_schema().source_type_key())],
+                "http".into()
+            );
         }
     }
 
@@ -511,41 +421,6 @@ mod tests {
 
         let (rx, addr) = source(Encoding::Ndjson, vec![]).await;
 
-        assert_eq!(400, send(addr, r#"[{"key":"value"}]"#).await); //one object per line
-
-        assert_eq!(
-            200,
-            send(addr, "{\"key1\":\"value1\"}\n\n{\"key2\":\"value2\"}").await
-        );
-
-        let mut events = collect_n(rx, 2).await.unwrap();
-        {
-            let event = events.remove(0);
-            let log = event.as_log();
-            assert_eq!(log[&Atom::from("key1")], "value1".into());
-            assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
-            assert_eq!(
-                log[&Atom::from(log_schema().source_type_key())],
-                "http".into()
-            );
-        }
-        {
-            let event = events.remove(0);
-            let log = event.as_log();
-            assert_eq!(log[&Atom::from("key2")], "value2".into());
-            assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
-            assert_eq!(
-                log[&Atom::from(log_schema().source_type_key())],
-                "http".into()
-            );
-        }
-    }
-
-    #[tokio::test]
-    async fn http_ndjson_metrics_plus_mode() {
-        trace_init();
-
-        let (rx, addr) = source_metrics_plus(Encoding::Ndjson, vec![], true).await;
 
         assert_eq!(400, send(addr, r#"[{"Log":{"key":"value"}}]"#).await); //one object per line
 
@@ -563,15 +438,21 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key1")], "value1".into());
-            assert!(log.get(&log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
+            assert_eq!(
+                log[&Atom::from(log_schema().source_type_key())],
+                "http".into()
+            );
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[&Atom::from("key2")], "value2".into());
-            assert!(log.get(&log_schema().timestamp_key()).is_some());
-            assert_eq!(log[log_schema().source_type_key()], "http".into());
+            assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
+            assert_eq!(
+                log[&Atom::from(log_schema().source_type_key())],
+                "http".into()
+            );
         }
     }
 

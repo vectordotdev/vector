@@ -19,79 +19,9 @@ pub enum Value {
     Boolean(bool),
     Map(BTreeMap<String, Value>),
     Array(Vec<Value>),
-    #[serde(
-        serialize_with = "serialize_as_string_timestamp",
-        deserialize_with = "deserialize_as_string_timestamp"
-    )]
     Timestamp(DateTime<Utc>),
-    #[serde(
-        serialize_with = "serialize_as_string_bytes",
-        deserialize_with = "deserialize_as_string_bytes"
-    )]
     Bytes(Bytes),
-    #[serde(
-        serialize_with = "serialize_as_none",
-        deserialize_with = "deserialize_as_none"
-    )]
     Null,
-}
-
-fn serialize_as_string_bytes<S: Serializer>(
-    input: &Bytes,
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
-    serializer.serialize_str(&String::from_utf8_lossy(input))
-}
-
-fn serialize_as_string_timestamp<S: Serializer>(
-    input: &DateTime<Utc>,
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
-    serializer.serialize_str(&timestamp_to_string(input))
-}
-
-fn deserialize_as_string_bytes<'de, D: Deserializer<'de>>(
-    deserializer: D,
-) -> Result<Bytes, D::Error> {
-    match String::deserialize(deserializer) {
-        Ok(s) => Ok(Bytes::copy_from_slice(s.as_bytes())),
-        Err(e) => Err(e),
-    }
-}
-
-fn deserialize_as_string_timestamp<'de, D: Deserializer<'de>>(
-    deserializer: D,
-) -> Result<DateTime<Utc>, D::Error> {
-    match String::deserialize(deserializer) {
-        Ok(s) => string_to_timestamp(&s).map_err(|_| {
-            <D::Error as de::Error>::invalid_type(de::Unexpected::Str(&s), &"timestamp")
-        }),
-        Err(e) => Err(e),
-    }
-}
-
-fn serialize_as_none<S: Serializer>(serializer: S) -> Result<S::Ok, S::Error> {
-    serializer.serialize_none()
-}
-
-fn deserialize_as_none<'de, D: Deserializer<'de>>(deserializer: D) -> Result<(), D::Error> {
-    match Option::<()>::deserialize(deserializer) {
-        Ok(Some(_)) => Err(<D::Error as de::Error>::unknown_variant(
-            "???",
-            &[
-                "timestamp",
-                "bytes",
-                "integer",
-                "float",
-                "boolean",
-                "map",
-                "array",
-                "null",
-            ],
-        )),
-        Ok(None) => Ok(()),
-        Err(e) => Err(e),
-    }
 }
 
 impl From<Bytes> for Value {
@@ -368,23 +298,5 @@ mod test {
             },
             _ => panic!("This test should never read Err'ing type folders."),
         })
-    }
-
-    #[test]
-    fn serialize_and_deserialize_custom_functions() {
-        let timestamp = Value::Timestamp(Utc::now());
-        assert_eq!(
-            serde_json::from_str::<Value>(&serde_json::to_string(&timestamp).unwrap()).unwrap(),
-            timestamp
-        );
-        let bytes = Value::Bytes(Bytes::from("hello world!"));
-        assert_eq!(
-            serde_json::from_str::<Value>(&serde_json::to_string(&bytes).unwrap()).unwrap(),
-            bytes
-        );
-        assert_eq!(
-            serde_json::from_str::<Value>(&serde_json::to_string(&Value::Null).unwrap()).unwrap(),
-            Value::Null
-        );
     }
 }

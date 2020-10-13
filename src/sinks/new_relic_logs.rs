@@ -143,7 +143,6 @@ impl NewRelicLogsConfig {
             request,
 
             tls: None,
-            metrics_plus_mode: false,
         })
     }
 }
