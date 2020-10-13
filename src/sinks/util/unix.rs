@@ -256,9 +256,12 @@ impl tower::Service<Bytes> for UnixService {
         use futures::SinkExt;
         let connector = self.connector.clone();
         async move {
-            let mut connection = connector.connect().await?;
-            connection.send(msg).await.context(SendError)?;
-            Ok(())
+            connector
+                .connect()
+                .await?
+                .send(msg)
+                .await
+                .context(SendError)
         }
         .boxed()
     }
