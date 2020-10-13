@@ -138,7 +138,7 @@ impl HttpSink for HecSinkConfig {
             sourcetype
                 .render_string(&event)
                 .map_err(|missing_keys| {
-                    emit!(SplunkSourceTypeMissingKeys { keys: missing_keys });
+                    emit!(SplunkSourceTypeMissingKeys { keys: &missing_keys });
                 })
                 .ok()
         });
@@ -147,7 +147,7 @@ impl HttpSink for HecSinkConfig {
             source
                 .render_string(&event)
                 .map_err(|missing_keys| {
-                    emit!(SplunkSourceMissingKeys { keys: missing_keys });
+                    emit!(SplunkSourceMissingKeys { keys: &missing_keys });
                 })
                 .ok()
         });
