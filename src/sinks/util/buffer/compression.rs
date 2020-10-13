@@ -101,7 +101,10 @@ impl<'de> de::Deserialize<'de> for Compression {
                 }
 
                 match algorithm.ok_or_else(|| de::Error::missing_field("algorithm"))? {
-                    "none" => Ok(Compression::None),
+                    "none" => match level {
+                        Some(_) => Err(de::Error::unknown_field("level", &["algorithm"])),
+                        None => Ok(Compression::None),
+                    },
                     "gzip" => Ok(Compression::Gzip(match level {
                         Some(level) => Some(match level.as_str() {
                             "none" => GZIP_NONE,
