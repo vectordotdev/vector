@@ -234,10 +234,7 @@ impl Service<Vec<u8>> for StatsdSvc {
         }
     }
 
-    fn call(&mut self, mut frame: Vec<u8>) -> Self::Future {
-        if let Some(b'\n') = frame.last() {
-            frame.pop();
-        }
+    fn call(&mut self, frame: Vec<u8>) -> Self::Future {
         match &mut self.client {
             Client::Tcp(service) => service.call(frame.into()).err_into().boxed(),
             Client::Udp(service) => service.call(frame.into()).err_into().boxed(),
