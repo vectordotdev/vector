@@ -3,10 +3,10 @@ package metadata
 components: sinks: _sematext: {
 	configuration: {
 		endpoint: {
-			common:      false
-			description: "The endpoint to send data to."
+			common:        false
+			description:   "The endpoint to send data to."
 			relevant_when: "`region` is not set"
-			required:    false
+			required:      false
 			type: string: {
 				default: null
 				examples: ["http://127.0.0.1", "http://example.com"]

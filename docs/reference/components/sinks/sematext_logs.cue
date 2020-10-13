@@ -60,8 +60,8 @@ components: sinks: sematext_logs: {
 
 	configuration: {
 		endpoint: sinks._sematext.configuration.endpoint
-		region: sinks._sematext.configuration.region
-		token: sinks._sematext.configuration.token
+		region:   sinks._sematext.configuration.region
+		token:    sinks._sematext.configuration.token
 	}
 
 	input: {
