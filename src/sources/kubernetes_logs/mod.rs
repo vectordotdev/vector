@@ -393,8 +393,72 @@ fn prepare_label_selector(config: &Config) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::Config;
+
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<super::Config>();
+        crate::test_util::test_generate_config::<Config>();
+    }
+
+    #[test]
+    fn prepare_field_selector() {
+        let cases = vec![
+            // We're not testing `Config::default()` or empty `self_node_name`
+            // as passing env vars in the concurrent tests is diffucult.
+            (
+                Config {
+                    self_node_name: "qwe".to_owned(),
+                    ..Default::default()
+                },
+                "spec.nodeName=qwe",
+            ),
+            (
+                Config {
+                    self_node_name: "qwe".to_owned(),
+                    extra_field_selector: "".to_owned(),
+                    ..Default::default()
+                },
+                "spec.nodeName=qwe",
+            ),
+            (
+                Config {
+                    self_node_name: "qwe".to_owned(),
+                    extra_field_selector: "foo=bar".to_owned(),
+                    ..Default::default()
+                },
+                "spec.nodeName=qwe,foo=bar",
+            ),
+        ];
+
+        for (input, expected) in cases {
+            let output = super::prepare_field_selector(&input).unwrap();
+            assert_eq!(expected, output, "expected left, actual right");
+        }
+    }
+
+    #[test]
+    fn prepare_label_selector() {
+        let cases = vec![
+            (Config::default(), "vector.dev/exclude!=true"),
+            (
+                Config {
+                    extra_label_selector: "".to_owned(),
+                    ..Default::default()
+                },
+                "vector.dev/exclude!=true",
+            ),
+            (
+                Config {
+                    extra_label_selector: "qwe".to_owned(),
+                    ..Default::default()
+                },
+                "vector.dev/exclude!=true,qwe",
+            ),
+        ];
+
+        for (input, expected) in cases {
+            let output = super::prepare_label_selector(&input);
+            assert_eq!(expected, output, "expected left, actual right");
+        }
     }
 }
