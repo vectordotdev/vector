@@ -16,6 +16,16 @@ env:
   PROFILE: debug
 
 jobs:
+  cancel-previous:
+    name: Cancel redundant jobs
+    runs-on: ubuntu-20.04
+    timeout-minutes: 3
+    if: github.ref != 'refs/heads/master'
+    steps:
+      - uses: styfle/cancel-workflow-action@0.5.0
+        with:
+          access_token: ${{ secrets.GITHUB_TOKEN }}
+
   changes:
       runs-on: ubuntu-latest
       # Set job outputs to values from filter step
@@ -27,17 +37,13 @@ jobs:
         internal_events: ${{ steps.filter.outputs.internal_events }}
         helm: ${{ steps.filter.outputs.helm }}
       steps:
-      - uses: styfle/cancel-workflow-action@0.4.1
-        if: github.ref != 'refs/heads/master'
-        with:
-          access_token: ${{ secrets.GITHUB_TOKEN }}
       # For pull requests it's not necessary to checkout the code
       - uses: dorny/paths-filter@v2
         id: filter
         with:
           filters: |
             source:
-              - ".github/workflows/prs.yml"
+              - ".github/workflows/pr.yml"
               - ".cargo/**"
               - "benches/**"
               - "lib/**"
@@ -60,7 +66,7 @@ jobs:
               - 'Cargo.toml'
               - 'Cargo.lock'
               - 'rust-toolchain'
-              - '.github/workflows/prs.yml'
+              - '.github/workflows/pr.yml'
               - 'Makefile'
               - 'scripts/cross/**'
             internal_events:
@@ -199,9 +205,12 @@ jobs:
         run: make check-version
       - name: Check scripts
         run: make check-scripts
-      - name: Check helm
+      - name: Check helm dependencies
         if: needs.changes.outputs.helm == 'true'
-        run: make check-helm
+        run: make check-helm-dependencies
+      - name: Check helm lint
+        if: needs.changes.outputs.helm == 'true'
+        run: make check-helm-lint
       - name: Check that generated Kubernetes YAML doesn't diverge from Helm
         if: needs.changes.outputs.helm == 'true'
         run: make check-kubernetes-yaml

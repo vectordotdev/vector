@@ -7,26 +7,26 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 
 	classes: {
 		commonly_used: false
+		egress_method: "batch"
 		function:      "parse"
 	}
 
-	features: {
-	}
+	features: {}
 
 	statuses: {
 		development: "beta"
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			triples: {
+				"aarch64-unknown-linux-gnu":  true
+				"aarch64-unknown-linux-musl": true
+				"x86_64-apple-darwin":        true
+				"x86_64-pc-windows-msv":      true
+				"x86_64-unknown-linux-gnu":   true
+				"x86_64-unknown-linux-musl":  true
+			}
 		}
 
 		requirements: []
@@ -42,6 +42,11 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 			warnings: []
 			type: string: default: "message"
 		}
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 
 	output: logs: line: {
@@ -80,19 +85,18 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 			subscription_filters: {
 				description: "The list of subscription filter names that the logs were sent by."
 				required:    true
-				type: "[string]": {examples: [["Destination"]]
-				}
+				type: array: items: type: string: examples: ["Destination"]
 			}
 		}
 	}
 
-	examples: log: [
+	examples: [
 		{
 			title: "Default"
 			configuration: {
 				field: "message"
 			}
-			input: {
+			input: log: {
 				message: """
 						{
 						  "messageType": "DATA_MESSAGE",
@@ -119,13 +123,15 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 			}
 			output: [
 				{
-					id:         "35683658089614582423604394983260738922885519999578275840"
-					log_group:  "test"
-					log_stream: "test"
-					message:    "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-latform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}"
-					owner:      "111111111111"
-					timestamp:  "2020-09-14T19:09:29.039Z"
-					subscription_filters: [ "Destination"]
+					log: {
+						id:         "35683658089614582423604394983260738922885519999578275840"
+						log_group:  "test"
+						log_stream: "test"
+						message:    "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-latform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}"
+						owner:      "111111111111"
+						timestamp:  "2020-09-14T19:09:29.039Z"
+						subscription_filters: [ "Destination"]
+					}
 				},
 				{
 					id:         "35683658089659183914001456229543810359430816722590236673"
