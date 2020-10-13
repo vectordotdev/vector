@@ -11,6 +11,9 @@ publish = false
 serde = { version = "1.0.116", features = ["derive"] }
 serde_json = { version = "1.0.33", features = ["raw_value"] }
 
+# Error handling
+anyhow = "1.0.28"
+
 # Tokio / Futures
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
 tokio = { version = "0.2.13", features = ["blocking", "fs", "signal", "io-std", "macros", "rt-core", "rt-threaded", "uds", "sync"] }
@@ -19,7 +22,7 @@ tokio = { version = "0.2.13", features = ["blocking", "fs", "signal", "io-std", 
 graphql_client = "0.9.0"
 
 # HTTP / WebSockets
-reqwest = "0.10.6"
+reqwest = { version = "0.10.6", features = ["json"] }
 tokio-tungstenite = "0.11.0"
 
 # External libs
@@ -27,6 +30,3 @@ weak-table = "0.3.0"
 url = "2.1.1"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 chrono = { version = "0.4.6", features = ["serde"] }
-
-[dev-dependencies]
-vector = { version = "0.11.0", path = "../..", default-features = false, features = ["no-api-client"] }

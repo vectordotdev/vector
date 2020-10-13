@@ -106,5 +106,6 @@ async fn main() {
     let res = schema.execute(INTROSPECTION_QUERY).await;
     let json = serde_json::to_string_pretty(&async_graphql::http::GQLResponse(res)).unwrap();
 
-    fs::write("graphql/schema.json", format!("{}\n", json)).expect("Couldn't save schema file");
+    fs::write("lib/api_client/graphql/schema.json", format!("{}\n", json))
+        .expect("Couldn't save schema file");
 }

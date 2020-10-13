@@ -7,13 +7,7 @@ mod support;
 #[cfg(all(feature = "api", feature = "api_client"))]
 mod tests {
     use crate::support::{sink, source};
-    use api_client::{
-        client::{make_subscription_client, SubscriptionClient},
-        query::HealthQuery,
-        subscription::{
-            EventsProcessedMetricsSubscription, HeartbeatSubscription, UptimeMetricsSubscription,
-        },
-    };
+    use api_client::{client, gql, make_subscription_client, SubscriptionClient};
     use chrono::Utc;
     use futures::StreamExt;
     use std::{
@@ -94,27 +88,6 @@ mod tests {
         .await
     }
 
-    async fn query<T: GraphQLQuery>(
-        request_body: &graphql_client::QueryBody<T::Variables>,
-    ) -> graphql_client::Response<T::ResponseData> {
-        let config = api_enabled_config();
-        let addr = config.api.bind.unwrap();
-        let url = format!("http://{}:{}/graphql", addr.ip(), addr.port());
-
-        let _server = api::Server::start(&config);
-        let client = reqwest::Client::new();
-
-        retry_until(
-            || client.post(&url).json(&request_body).send(),
-            Duration::from_millis(100),
-            Duration::from_secs(10),
-        )
-        .await
-        .json()
-        .await
-        .unwrap()
-    }
-
     // Creates and returns a new subscription client. Connection is re-attempted until
     // the specified timeout
     async fn new_subscription_client(addr: SocketAddr) -> SubscriptionClient {
@@ -153,10 +126,12 @@ mod tests {
         interval: i64,
     ) {
         let request_body =
-            HeartbeatSubscription::build_query(heartbeat_subscription::Variables { interval });
+            gql::HeartbeatSubscription::build_query(gql::heartbeat_subscription::Variables {
+                interval,
+            });
 
         let subscription = client
-            .start::<HeartbeatSubscription>(&request_body)
+            .start::<gql::HeartbeatSubscription>(&request_body)
             .await
             .unwrap();
 
@@ -188,11 +163,12 @@ mod tests {
     }
 
     async fn new_uptime_subscription(client: &SubscriptionClient) {
-        let request_body =
-            UptimeMetricsSubscription::build_query(uptime_metrics_subscription::Variables);
+        let request_body = gql::UptimeMetricsSubscription::build_query(
+            gql::uptime_metrics_subscription::Variables,
+        );
 
         let subscription = client
-            .start::<UptimeMetricsSubscription>(&request_body)
+            .start::<gql::UptimeMetricsSubscription>(&request_body)
             .await
             .unwrap();
 
@@ -226,12 +202,12 @@ mod tests {
 
         // Defaults to a 1 second interval, which we'll leave as-is since uptimeMetrics.seconds
         // isn't any more granular
-        let request_body = EventsProcessedMetricsSubscription::build_query(
-            events_processed_metrics_subscription::Variables { interval },
+        let request_body = gql::EventsProcessedMetricsSubscription::build_query(
+            gql::events_processed_metrics_subscription::Variables { interval },
         );
 
         let subscription = client
-            .start::<EventsProcessedMetricsSubscription>(&request_body)
+            .start::<gql::EventsProcessedMetricsSubscription>(&request_body)
             .await
             .unwrap();
 
@@ -294,13 +270,13 @@ mod tests {
     #[tokio::test]
     /// Tests the health query
     async fn api_graphql_health() {
-        let request_body = HealthQuery::build_query(health_query::Variables);
-        let res = query::<HealthQuery>(&request_body).await;
+        let request_body = gql::HealthQuery::build_query(gql::health_query::Variables);
+        let res = query::<gql::HealthQuery>(&request_body).await;
 
         assert_matches!(
             res,
             graphql_client::Response {
-                data: Some(health_query::ResponseData { health: true }),
+                data: Some(gql::health_query::ResponseData { health: true }),
                 errors: None,
             }
         );
