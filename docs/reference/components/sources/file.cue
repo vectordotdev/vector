@@ -50,7 +50,7 @@ components: sources: file: {
 			required:    false
 			type: array: {
 				default: null
-				items: type: string: examples: ["\(_directory)/apahce/*.[0-9]*.log"]
+				items: type: string: examples: ["\(_directory)/apache/*.[0-9]*.log"]
 			}
 		}
 		file_key: {
@@ -130,7 +130,7 @@ components: sources: file: {
 		include: {
 			description: "Array of file patterns to include. [Globbing](#globbing) is supported."
 			required:    true
-			type: array: items: type: string: examples: ["\(_directory)/apahce/*.log"]
+			type: array: items: type: string: examples: ["\(_directory)/apache/*.log"]
 		}
 		max_line_bytes: {
 			common:      false
@@ -163,6 +163,7 @@ components: sources: file: {
 			common:      false
 			description: "Timeout from reaching `eof` after which file will be removed from filesystem, unless new data is written in the meantime. If not specified, files will not be removed."
 			required:    false
+			warnings: ["Vector's process must have permission to delete files."]
 			type: uint: {
 				default: null
 				examples: [0, 5, 60]
