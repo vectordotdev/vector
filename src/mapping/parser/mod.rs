@@ -19,7 +19,7 @@ use pest::{
     iterators::{Pair, Pairs},
     Parser,
 };
-use std::str::FromStr;
+use std::{collections::BTreeMap, str::FromStr};
 
 // If this macro triggers, it means the parser syntax file (grammar.pest) was
 // updated in unexpected, and unsupported ways.
@@ -286,13 +286,14 @@ fn positional_item_from_pair(
     index: usize,
     signature: &FunctionSignature,
 ) -> Result<()> {
-    let resolver = query_arithmetic_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?;
-
     let parameter = signature.parameters().get(index).cloned().ok_or(format!(
         "unknown positional argument '{}' for function: '{}'",
         index,
         signature.as_str()
     ))?;
+
+    // let resolver = query_arithmetic_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?;
+    let resolver = argument_item_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?;
 
     let keyword = parameter.keyword.to_owned();
     let argument = Argument::new(resolver, parameter);
@@ -300,6 +301,44 @@ fn positional_item_from_pair(
     list.push(argument, Some(keyword));
 
     Ok(())
+}
+
+fn argument_item_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
+    let inner = pair.into_inner().next().ok_or(TOKEN_ERR)?;
+    match inner.as_rule() {
+        Rule::query_arithmetic_boolean => query_arithmetic_from_pair(inner),
+        Rule::regex => regex_from_pair(inner),
+        _ => unexpected_parser_sytax!(inner),
+    }
+}
+
+fn regex_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
+    match pair.as_rule() {
+        Rule::regex => {
+            let mut inner = pair.into_inner();
+            let regex = inner.next().ok_or(TOKEN_ERR)?;
+            let flags = inner
+                .next()
+                .map(|flags| {
+                    flags
+                        .as_str()
+                        .chars()
+                        .map(|flag| Value::from(flag.to_string()))
+                        .collect()
+                })
+                .unwrap_or(vec![]);
+
+            let mut map = BTreeMap::new();
+            map.insert(
+                "pattern".to_string(),
+                Value::from(regex.as_str().to_owned()),
+            );
+            map.insert("flags".to_string(), Value::from(flags));
+
+            Ok(Box::new(Literal::from(Value::from(map))))
+        }
+        _ => unexpected_parser_sytax!(pair),
+    }
 }
 
 fn keyword_item_from_pair(
@@ -507,7 +546,7 @@ mod tests {
     use super::*;
     use crate::mapping::query::function::{
         ContainsFn, DowncaseFn, FormatTimestampFn, Md5Fn, NowFn, ParseDurationFn, ParseJsonFn,
-        ParseTimestampFn, Sha1Fn, Sha2Fn, Sha3Fn, SliceFn, StripAnsiEscapeCodesFn,
+        ParseTimestampFn, Sha1Fn, Sha2Fn, Sha3Fn, SliceFn, SplitFn, StripAnsiEscapeCodesFn,
         StripWhitespaceFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn,
         TokenizeFn, TruncateFn, UpcaseFn, UuidV4Fn,
     };
@@ -1215,6 +1254,22 @@ mod tests {
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ParseDurationFn::new(Box::new(QueryPath::from("foo")), "s")),
+                ))]),
+            ),
+            (
+                r#".foo = split(.bar, /a/i, 2)"#,
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(SplitFn::new(
+                        Box::new(QueryPath::from("bar")),
+                        Box::new(Literal::from(Value::from({
+                            let mut map = BTreeMap::new();
+                            map.insert("pattern".to_string(), Value::from("a"));
+                            map.insert("flags".to_string(), Value::from(vec![Value::from("i")]));
+                            map
+                        }))),
+                        Some(Box::new(Literal::from(Value::from(2)))),
+                    )),
                 ))]),
             ),
         ];
