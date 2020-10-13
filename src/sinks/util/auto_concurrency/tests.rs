@@ -229,7 +229,7 @@ impl Service<Vec<Event>> for TestSink {
                 respond_after(Err(Error::Deferred), delay, Arc::clone(&self.stats))
             }
             Some(Action::Drop) => {
-                stats.end_request(now);
+                stats.end_request(now, false);
                 Box::pin(pending())
             }
         }
@@ -245,7 +245,7 @@ fn respond_after(
     Box::pin(async move {
         delay_until(then).await;
         let mut stats = stats.lock().expect("Poisoned stats lock");
-        stats.end_request(Instant::now());
+        stats.end_request(Instant::now(), matches!(response, Ok(Response::Ok)));
         response
     })
 }
@@ -275,6 +275,7 @@ impl RetryLogic for TestRetryLogic {
 
 #[derive(Default)]
 struct Statistics {
+    completed: usize,
     in_flight: LevelTimeHistogram,
     rate: TimeHistogram,
     requests: VecDeque<Instant>,
@@ -283,6 +284,7 @@ struct Statistics {
 impl fmt::Debug for Statistics {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         fmt.debug_struct("Statistics")
+            .field("completed", &self.completed)
             .field("in_flight", &self.in_flight)
             .field("rate", &self.rate.stats())
             .field("requests", &self.requests.len())
@@ -298,10 +300,11 @@ impl Statistics {
         self.in_flight.adjust(1, now.into());
     }
 
-    fn end_request(&mut self, now: Instant) {
+    fn end_request(&mut self, now: Instant, completed: bool) {
         self.drop_old_requests(now);
         self.rate.add(self.requests.len(), now.into());
         self.in_flight.adjust(-1, now.into());
+        self.completed += completed as usize;
     }
 
     fn drop_old_requests(&mut self, now: Instant) {
@@ -348,13 +351,9 @@ async fn run_test(params: TestParams) -> TestResults {
 
     let controller = get_controller().unwrap();
 
-    // Give time for the generator to start and queue all its data, and
-    // all the requests to resolve to a response.
-    let delay = params.interval.unwrap_or(0.0) * (params.requests as f64) + 1.0;
     // This is crude and dumb, but it works, and the tests run fast and
     // the results are highly repeatable.
-    let msecs = (delay * 1000.0) as usize;
-    for _ in 0..msecs {
+    while stats.lock().expect("Poisoned stats lock").completed < params.requests {
         time::advance(Duration::from_millis(1)).await;
     }
     topology.stop().compat().await.unwrap();
