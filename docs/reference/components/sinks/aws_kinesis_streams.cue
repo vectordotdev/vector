@@ -67,15 +67,6 @@ components: sinks: aws_kinesis_streams: {
 	}
 
 	configuration: {
-		endpoint: {
-			common:      false
-			description: "Custom endpoint for use with AWS-compatible services. Providing a value for this option will make `region` moot."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["127.0.0.0:5000/path/to/service"]
-			}
-		}
 		partition_key_field: {
 			common:      true
 			description: "The log field used as the Kinesis record's partition key value."
