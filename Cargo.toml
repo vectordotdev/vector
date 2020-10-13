@@ -40,6 +40,7 @@ members = [
   "lib/k8s-test-framework",
   "lib/k8s-e2e-tests",
   "lib/prometheus-parser",
+  "lib/vector-api-client"
 ]
 
 [dependencies]
@@ -48,6 +49,7 @@ codec = { path = "lib/codec" }
 file-source = { path = "lib/file-source", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 prometheus-parser = { path = "lib/prometheus-parser", optional = true }
+vector-api-client = { path = "lib/vector-api-client", optional = true }
 
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
@@ -99,12 +101,6 @@ smpl_jwt = { version = "0.5.0", optional = true }
 # API
 async-graphql = { version = "2.0.0", optional = true }
 async-graphql-warp = { version = "2.0.0", optional = true }
-
-# API client
-graphql_client = { version = "0.9.0", optional = true }
-reqwest = { version = "0.10.6", features = ["json"], optional = true }
-tokio-tungstenite = {version = "0.11.0", optional = true }
-weak-table = { version = "0.3.0", optional = true }
 
 # External libs
 derivative = "1.0"
@@ -223,13 +219,13 @@ reqwest = { version = "0.10.6", features = ["json"] }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api_client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
-default-musl = ["api", "api_client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
+default = ["api", "vector-api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+default-musl = ["api", "vector-api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api_client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
+default-cmake = ["api", "vector-api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api_client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
+default-msvc = ["api", "vector-api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
 
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
@@ -264,14 +260,6 @@ kubernetes = ["k8s-openapi", "evmap"]
 api = [
   "async-graphql",
   "async-graphql-warp",
-]
-
-# API client
-api_client = [
-  "graphql_client",
-  "reqwest",
-  "tokio-tungstenite",
-  "weak-table",
 ]
 
 # Sources

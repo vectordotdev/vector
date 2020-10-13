@@ -6196,7 +6196,6 @@ dependencies = [
  "getset",
  "glob 0.3.0",
  "goauth",
- "graphql_client",
  "grok",
  "headers",
  "heim",
@@ -6280,7 +6279,6 @@ dependencies = [
  "tokio-openssl",
  "tokio-retry",
  "tokio-test",
- "tokio-tungstenite",
  "tokio-util",
  "tokio01-test",
  "toml 0.4.10",
@@ -6296,11 +6294,30 @@ dependencies = [
  "uom 0.29.0",
  "url",
  "uuid 0.8.1",
+ "vector-api-client",
  "vector-wasm",
  "walkdir",
  "warp",
- "weak-table",
  "windows-service",
+]
+
+[[package]]
+name = "vector-api-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "futures 0.3.5",
+ "graphql_client",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
+ "url",
+ "uuid 0.8.1",
+ "weak-table",
 ]
 
 [[package]]
