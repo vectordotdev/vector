@@ -596,6 +596,12 @@ async fn all_tests() {
 
     time::pause();
 
+    // The first delay takes just slightly longer than all the rest,
+    // which causes the first test to run differently than all the
+    // others. Throw in a dummy delay to take up this delay "slack".
+    let _ = tokio::spawn(async move { delay_for(Duration::from_millis(1)) }).await;
+    time::advance(Duration::from_millis(1)).await;
+
     // Then run all the tests
     for (file_path, input) in entries {
         run_compare(file_path, input).await;
