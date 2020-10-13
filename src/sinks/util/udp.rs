@@ -19,21 +19,15 @@ use tokio_retry::strategy::ExponentialBackoff;
 #[derive(Debug, Snafu)]
 pub enum UdpError {
     #[snafu(display("Failed to create UDP listener socket, error = {:?}.", source))]
-    BindError {
-        source: std::io::Error,
-    },
-    SendError {
-        source: std::io::Error,
-    },
-    ConnectError {
-        source: std::io::Error,
-    },
+    BindError { source: std::io::Error },
+    #[snafu(display("Send error: {}", source))]
+    SendError { source: std::io::Error },
+    #[snafu(display("Connect error: {}", source))]
+    ConnectError { source: std::io::Error },
     #[snafu(display("No addresses returned."))]
     NoAddresses,
     #[snafu(display("Unable to resolve DNS: {}", source))]
-    DnsError {
-        source: crate::dns::DnsError,
-    },
+    DnsError { source: crate::dns::DnsError },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -98,12 +98,9 @@ impl Into<UnixService> for UnixConnector {
 #[derive(Debug, Snafu)]
 pub enum UnixSocketError {
     #[snafu(display("Connect error: {}", source))]
-    ConnectError {
-        source: tokio::io::Error,
-    },
-    SendError {
-        source: tokio::io::Error,
-    },
+    ConnectError { source: tokio::io::Error },
+    #[snafu(display("Send error: {}", source))]
+    SendError { source: tokio::io::Error },
 }
 
 pub struct UnixSink {

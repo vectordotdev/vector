@@ -53,18 +53,13 @@ struct TcpConnector {
 #[derive(Debug, Snafu)]
 pub enum TcpError {
     #[snafu(display("Connect error: {}", source))]
-    ConnectError {
-        source: TlsError,
-    },
+    ConnectError { source: TlsError },
     #[snafu(display("Unable to resolve DNS: {}", source))]
-    DnsError {
-        source: crate::dns::DnsError,
-    },
+    DnsError { source: crate::dns::DnsError },
     #[snafu(display("No addresses returned."))]
     NoAddresses,
-    SendError {
-        source: tokio::io::Error,
-    },
+    #[snafu(display("Send error: {}", source))]
+    SendError { source: tokio::io::Error },
 }
 
 impl TcpSinkConfig {
