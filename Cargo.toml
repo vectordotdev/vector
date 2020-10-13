@@ -226,7 +226,6 @@ default-cmake = ["api", "api_client", "sources", "transforms", "sinks", "vendor-
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
 default-msvc = ["api", "api_client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
-no-api-client = ["api", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
 
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
