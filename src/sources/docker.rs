@@ -38,15 +38,15 @@ use tokio::sync::mpsc;
 
 /// The beginning of image names of vector docker images packaged by vector.
 const VECTOR_IMAGE_NAME: &str = "timberio/vector";
+const IMAGE: &str = "image";
+const CREATED_AT: &str = "container_created_at";
+const NAME: &str = "container_name";
+const STREAM: &str = "stream";
+const CONTAINER: &str = "container_id";
 
 lazy_static! {
     static ref STDERR: Bytes = "stderr".into();
     static ref STDOUT: Bytes = "stdout".into();
-    static ref IMAGE: &'static str = "image";
-    static ref CREATED_AT: &'static str = "container_created_at";
-    static ref NAME: &'static str = "container_name";
-    static ref STREAM: &'static str = "stream";
-    static ref CONTAINER: &'static str = "container_id";
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -824,7 +824,7 @@ impl ContainerLogInfo {
             log_event.insert(log_schema().message_key(), bytes_message);
 
             // Stream we got the message from.
-            log_event.insert(*STREAM, stream);
+            log_event.insert(STREAM, stream);
 
             // Timestamp of the event.
             if let Some(timestamp) = timestamp {
@@ -832,7 +832,7 @@ impl ContainerLogInfo {
             }
 
             // Container ID.
-            log_event.insert(*CONTAINER, self.id.0.clone());
+            log_event.insert(CONTAINER, self.id.0.clone());
 
             // Labels.
             for (key, value) in self.metadata.labels.iter() {
@@ -840,13 +840,13 @@ impl ContainerLogInfo {
             }
 
             // Container name.
-            log_event.insert(*NAME, self.metadata.name.clone());
+            log_event.insert(NAME, self.metadata.name.clone());
 
             // Container image.
-            log_event.insert(*IMAGE, self.metadata.image.clone());
+            log_event.insert(IMAGE, self.metadata.image.clone());
 
             // Timestamp of the container creation.
-            log_event.insert(*CREATED_AT, self.metadata.created_at);
+            log_event.insert(CREATED_AT, self.metadata.created_at);
 
             // Return the resulting log event.
             log_event
