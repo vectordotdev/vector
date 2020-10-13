@@ -2,8 +2,12 @@ use crate::{
     config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
+    sources::util::TcpSource,
+    tls::TlsConfig,
     Event, Pipeline,
 };
+use bytes::Bytes;
+use codec::BytesDelimitedCodec;
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
     future, stream, FutureExt, StreamExt, TryFutureExt,
@@ -17,9 +21,22 @@ use tokio_util::{codec::BytesCodec, udp::UdpFramed};
 
 pub mod parser;
 
-#[derive(Deserialize, Serialize, Debug)]
-struct StatsdConfig {
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+enum StatsdConfig {
+    Tcp(TcpConfig),
+    Udp(UdpConfig),
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+struct UdpConfig {
     address: SocketAddr,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+struct TcpConfig {
+    address: SocketAddr,
+    tls: Option<TlsConfig>,
 }
 
 inventory::submit! {
@@ -38,9 +55,14 @@ impl SourceConfig for StatsdConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        Ok(Box::new(
-            statsd(self.address, shutdown, out).boxed().compat(),
-        ))
+        match self {
+            StatsdConfig::Udp(config) => Ok(Box::new(
+                statsd_udp(config.address.clone(), shutdown, out)
+                    .boxed()
+                    .compat(),
+            )),
+            _ => unreachable!(),
+        }
     }
 
     fn output_type(&self) -> crate::config::DataType {
@@ -52,7 +74,7 @@ impl SourceConfig for StatsdConfig {
     }
 }
 
-async fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> Result<(), ()> {
+async fn statsd_udp(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> Result<(), ()> {
     let out = out.sink_map_err(|e| error!("Error sending metric: {:?}", e));
 
     let socket = UdpSocket::bind(&addr)
@@ -101,10 +123,38 @@ async fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> Re
     Ok(())
 }
 
+#[derive(Clone)]
+struct StatsdTcpSource;
+
+impl TcpSource for StatsdTcpSource {
+    type Error = std::io::Error;
+    type Decoder = BytesDelimitedCodec;
+
+    fn decoder(&self) -> Self::Decoder {
+        BytesDelimitedCodec::new(b'\n')
+    }
+
+    fn build_event(&self, line: Bytes, _host: Bytes) -> Option<Event> {
+        let line = String::from_utf8_lossy(line.as_ref());
+        match parse(&line) {
+            Ok(metric) => {
+                emit!(StatsdEventReceived {
+                    byte_size: line.len()
+                });
+                Some(Event::Metric(metric))
+            }
+            Err(error) => {
+                emit!(StatsdInvalidRecord { error, text: &line });
+                None
+            }
+        }
+    }
+}
+
 #[cfg(feature = "sinks-prometheus")]
 #[cfg(test)]
 mod test {
-    use super::StatsdConfig;
+    use super::{StatsdConfig, UdpConfig};
     use crate::{
         config,
         sinks::prometheus::PrometheusSinkConfig,
@@ -130,7 +180,7 @@ mod test {
         let out_addr = next_addr();
 
         let mut config = config::Config::builder();
-        config.add_source("in", StatsdConfig { address: in_addr });
+        config.add_source("in", StatsdConfig::Udp(UdpConfig { address: in_addr }));
         config.add_sink(
             "out",
             &["in"],
