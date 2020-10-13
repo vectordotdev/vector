@@ -185,7 +185,7 @@ impl HttpSink for ElasticSearchCommon {
             .index
             .render_string(&event)
             .map_err(|missing_keys| {
-                emit!(ElasticSearchMissingKeys { keys: missing_keys });
+                emit!(ElasticSearchMissingKeys { keys: &missing_keys });
             })
             .ok()?;
 
