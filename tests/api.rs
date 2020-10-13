@@ -4,14 +4,9 @@ extern crate matches;
 
 mod support;
 
-#[cfg(all(feature = "api", feature = "api_client"))]
+#[cfg(all(feature = "api", feature = "vector-api-client"))]
 mod tests {
     use crate::support::{sink, source};
-    use api_client::{
-        connect_subscription_client,
-        gql::{HealthQueryExt, HealthSubscriptionExt, MetricsSubscriptionExt},
-        Client, SubscriptionClient,
-    };
     use chrono::Utc;
     use futures::StreamExt;
     use std::{
@@ -27,6 +22,11 @@ mod tests {
         config::Config,
         internal_events::{emit, GeneratorEventProcessed, Heartbeat},
         test_util::{next_addr, retry_until},
+    };
+    use vector_api_client::{
+        connect_subscription_client,
+        gql::{HealthQueryExt, HealthSubscriptionExt, MetricsSubscriptionExt},
+        Client, SubscriptionClient,
     };
 
     static METRICS_INIT: Once = Once::new();

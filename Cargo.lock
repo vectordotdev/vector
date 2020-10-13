@@ -83,25 +83,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b602bfe940d21c130f3895acd65221e8a61270debe89d628b9cb4e3ccb8569b"
 
 [[package]]
-name = "api_client"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "futures 0.3.5",
- "graphql_client",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tokio-tungstenite",
- "url",
- "uuid 0.8.1",
- "weak-table",
-]
-
-[[package]]
 name = "approx"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6181,7 +6162,6 @@ name = "vector"
 version = "0.11.0"
 dependencies = [
  "anyhow",
- "api_client",
  "approx",
  "assert_cmd",
  "async-compression",
@@ -6314,10 +6294,30 @@ dependencies = [
  "uom 0.29.0",
  "url",
  "uuid 0.8.1",
+ "vector-api-client",
  "vector-wasm",
  "walkdir",
  "warp",
  "windows-service",
+]
+
+[[package]]
+name = "vector-api-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "futures 0.3.5",
+ "graphql_client",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
+ "url",
+ "uuid 0.8.1",
+ "weak-table",
 ]
 
 [[package]]
