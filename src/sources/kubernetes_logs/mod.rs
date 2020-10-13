@@ -392,7 +392,7 @@ fn prepare_label_selector(config: &Config) -> String {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::Config>();
