@@ -1,6 +1,9 @@
 use super::Transform;
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
+        TransformDescription,
+    },
     event::{Event, Value},
     internal_events::{DedupeEventDiscarded, DedupeEventProcessed},
 };
@@ -71,12 +74,15 @@ pub struct Dedupe {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<DedupeConfig>("dedupe")
+    TransformDescription::new::<DedupeConfig>("dedupe")
 }
 
+impl GenerateConfig for DedupeConfig {}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Dedupe::new(self.fill_default())))
     }
 

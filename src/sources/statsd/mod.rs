@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GlobalOptions, SourceConfig, SourceDescription},
+    config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     Event, Pipeline,
@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tokio::net::UdpSocket;
 use tokio_util::{codec::BytesCodec, udp::UdpFramed};
-use tracing::field;
 
 pub mod parser;
 
@@ -24,12 +23,15 @@ struct StatsdConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<StatsdConfig>("statsd")
+    SourceDescription::new::<StatsdConfig>("statsd")
 }
 
+impl GenerateConfig for StatsdConfig {}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "statsd")]
 impl SourceConfig for StatsdConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -59,7 +61,7 @@ fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> super::S
 
             info!(
                 message = "Listening.",
-                addr = &field::display(addr),
+                addr = %addr,
                 r#type = "udp"
             );
 
@@ -141,6 +143,7 @@ mod test {
                 address: out_addr,
                 namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
+                quantiles: vec![],
                 flush_period_secs: 1,
             },
         );

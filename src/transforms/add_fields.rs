@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::serde::Fields;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Lookup,
     event::{Event, Value},
     internal_events::{
@@ -48,12 +48,15 @@ pub struct AddFields {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<AddFieldsConfig>("add_fields")
+    TransformDescription::new::<AddFieldsConfig>("add_fields")
 }
 
+impl GenerateConfig for AddFieldsConfig {}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "add_fields")]
 impl TransformConfig for AddFieldsConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let all_fields = self.fields.clone().all_fields().collect::<IndexMap<_, _>>();
         let mut fields = IndexMap::with_capacity(all_fields.len());
         for (key, value) in all_fields {

@@ -50,7 +50,7 @@ pub async fn start_validated(
     let mut running_topology = RunningTopology {
         inputs: HashMap::new(),
         outputs: HashMap::new(),
-        config: Config::default(),
+        config,
         shutdown_coordinator: SourceShutdownCoordinator::default(),
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
@@ -65,7 +65,6 @@ pub async fn start_validated(
     }
     running_topology.connect_diff(&diff, &mut pieces);
     running_topology.spawn_diff(&diff, pieces);
-    running_topology.config = config;
 
     Some((running_topology, abort_rx))
 }
@@ -446,8 +445,9 @@ impl RunningTopology {
         let task = new_pieces.tasks.remove(name).unwrap();
         let span = error_span!(
             "sink",
-            topology_component_name = %task.name(),
-            topology_component_type = %task.typetag(),
+            component_kind = "sink",
+            component_name = %task.name(),
+            component_type = %task.typetag(),
         );
         let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task.compat());
@@ -460,8 +460,9 @@ impl RunningTopology {
         let task = new_pieces.tasks.remove(name).unwrap();
         let span = error_span!(
             "transform",
-            topology_component_name = %task.name(),
-            topology_component_type = %task.typetag(),
+            component_kind = "transform",
+            component_name = %task.name(),
+            component_type = %task.typetag(),
         );
         let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task.compat());
@@ -474,8 +475,9 @@ impl RunningTopology {
         let task = new_pieces.tasks.remove(name).unwrap();
         let span = error_span!(
             "source",
-            topology_component_name = %task.name(),
-            topology_component_type = %task.typetag(),
+            component_kind = "source",
+            component_name = %task.name(),
+            component_type = %task.typetag(),
         );
         let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span.clone());
         let spawned = tokio::spawn(task.compat());
@@ -594,6 +596,11 @@ impl RunningTopology {
         }
 
         self.inputs.insert(name.to_string(), tx);
+    }
+
+    /// Borrows the Config
+    pub fn config(&self) -> &Config {
+        &self.config
     }
 }
 
@@ -837,9 +844,10 @@ mod transient_state_tests {
         }
     }
 
+    #[async_trait::async_trait]
     #[typetag::serde(name = "mock")]
     impl SourceConfig for MockSourceConfig {
-        fn build(
+        async fn build(
             &self,
             _name: &str,
             _globals: &GlobalOptions,

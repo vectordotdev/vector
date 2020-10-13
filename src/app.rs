@@ -116,7 +116,7 @@ impl Application {
                     let code = match s {
                         SubCommand::Validate(v) => validate::validate(&v, color).await,
                         SubCommand::List(l) => list::cmd(&l),
-                        SubCommand::Test(t) => unit_test::cmd(&t),
+                        SubCommand::Test(t) => unit_test::cmd(&t).await,
                         SubCommand::Generate(g) => generate::cmd(&g),
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
@@ -129,9 +129,9 @@ impl Application {
 
                 if watch_config {
                     // Start listening for config changes immediately.
-                    config::watcher::spawn_thread(&config_paths, None).or_else(|error| {
+                    config::watcher::spawn_thread(&config_paths, None).map_err(|error| {
                         error!(message = "Unable to start config watcher.", %error);
-                        Err(exitcode::CONFIG)
+                        exitcode::CONFIG
                     })?;
                 }
 
@@ -183,24 +183,27 @@ impl Application {
 
         let mut config_paths = self.config.config_paths;
 
-        #[cfg(feature = "api")]
-        // assigned to prevent the API terminating when falling out of scope
-        let _api = if self.config.api.enabled {
-            emit!(ApiStarted {
-                addr: self.config.api.bind.unwrap(),
-                playground: self.config.api.playground
-            });
-
-            Some(api::Server::start(self.config.api))
-        } else {
-            None
-        };
-
         let opts = self.opts;
+
+        #[cfg(feature = "api")]
+        let api_config = self.config.api;
 
         rt.block_on(async move {
             emit!(VectorStarted);
             tokio::spawn(heartbeat::heartbeat());
+
+            #[cfg(feature = "api")]
+            // assigned to prevent the API terminating when falling out of scope
+            let api_server = if api_config.enabled {
+                emit!(ApiStarted {
+                    addr: api_config.bind.unwrap(),
+                    playground: api_config.playground
+                });
+
+                Some(api::Server::start(topology.config()))
+            } else {
+                None
+            };
 
             let signals = signal::signals();
             tokio::pin!(signals);
@@ -221,7 +224,14 @@ impl Application {
                                 .reload_config_and_respawn(new_config, opts.require_healthy)
                                 .await
                             {
-                                Ok(true) =>  emit!(VectorReloaded { config_paths: &config_paths }),
+                                Ok(true) => {
+                                    #[cfg(feature="api")]
+                                    if let Some(ref api_server) = api_server {
+                                        api_server.update_config(topology.config())
+                                    }
+
+                                    emit!(VectorReloaded { config_paths: &config_paths })
+                                },
                                 Ok(false) => emit!(VectorReloadFailed),
                                 // Trigger graceful shutdown for what remains of the topology
                                 Err(()) => {

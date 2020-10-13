@@ -4,20 +4,23 @@ extern crate matches;
 
 mod support;
 
-#[cfg(feature = "api")]
+#[cfg(all(feature = "api", feature = "api_client"))]
 mod tests {
     use crate::support::{sink, source};
     use chrono::Utc;
     use futures::StreamExt;
     use graphql_client::*;
     use std::{
+        net::SocketAddr,
         sync::Once,
         time::{Duration, Instant},
     };
     use tokio::{select, sync::oneshot};
+    use url::Url;
     use vector::{
         self,
-        api::{self, client::subscription::SubscriptionClient},
+        api::{self, Server},
+        api_client::{make_subscription_client, SubscriptionClient},
         config::Config,
         internal_events::{emit, GeneratorEventProcessed, Heartbeat},
         test_util::{next_addr, retry_until},
@@ -95,13 +98,19 @@ mod tests {
         config.build().unwrap()
     }
 
+    // Starts and returns the server
+    fn start_server() -> Server {
+        let config = api_enabled_config();
+        api::Server::start(&config)
+    }
+
     // Returns the result of a URL test against the API. Wraps the test in retry_until
     // to guard against the race condition of the TCP listener not being ready
     async fn url_test(config: Config, url: &'static str) -> reqwest::Response {
         let addr = config.api.bind.unwrap();
         let url = format!("http://{}:{}/{}", addr.ip(), addr.port(), url);
 
-        let _server = api::Server::start(config.api);
+        let _server = api::Server::start(&config);
 
         // Build the request
         let client = reqwest::Client::new();
@@ -121,7 +130,7 @@ mod tests {
         let addr = config.api.bind.unwrap();
         let url = format!("http://{}:{}/graphql", addr.ip(), addr.port());
 
-        let _server = api::Server::start(config.api);
+        let _server = api::Server::start(&config);
         let client = reqwest::Client::new();
 
         retry_until(
@@ -137,9 +146,11 @@ mod tests {
 
     // Creates and returns a new subscription client. Connection is re-attempted until
     // the specified timeout
-    async fn new_subscription_client(bind: std::net::SocketAddr) -> SubscriptionClient {
+    async fn new_subscription_client(addr: SocketAddr) -> SubscriptionClient {
+        let url = Url::parse(&*format!("ws://{}/graphql", addr)).unwrap();
+
         retry_until(
-            || api::make_subscription_client(bind),
+            || make_subscription_client(&url),
             Duration::from_millis(50),
             Duration::from_secs(10),
         )
@@ -198,7 +209,7 @@ mod tests {
                 .utc
                 - now;
 
-            assert!(diff.num_milliseconds() > mul as i64 * interval);
+            assert!(diff.num_milliseconds() >= mul as i64 * interval);
         }
 
         // Stream should have stopped after `num_results`
@@ -327,10 +338,8 @@ mod tests {
     #[tokio::test]
     /// Tests that the heartbeat subscription returns a UTC payload every 1/2 second
     async fn api_graphql_heartbeat() {
-        let config = api_enabled_config();
-        let _server = api::Server::start(config.api);
-        let bind = config.api.bind.unwrap();
-        let client = new_subscription_client(bind).await;
+        let server = start_server();
+        let client = new_subscription_client(server.addr()).await;
 
         new_heartbeat_subscription(&client, 3, 500).await;
     }
@@ -338,10 +347,8 @@ mod tests {
     #[tokio::test]
     /// Tests for Vector instance uptime in seconds
     async fn api_graphql_uptime_metrics() {
-        let config = api_enabled_config();
-        let _server = api::Server::start(config.api);
-        let bind = config.api.bind.unwrap();
-        let client = new_subscription_client(bind).await;
+        let server = start_server();
+        let client = new_subscription_client(server.addr()).await;
 
         let _metrics = init_metrics();
 
@@ -351,10 +358,8 @@ mod tests {
     #[tokio::test]
     /// Tests for events processed metrics, using fake generator events
     async fn api_graphql_event_processed_metrics() {
-        let config = api_enabled_config();
-        let _server = api::Server::start(config.api);
-        let bind = config.api.bind.unwrap();
-        let client = new_subscription_client(bind).await;
+        let server = start_server();
+        let client = new_subscription_client(server.addr()).await;
 
         let _metrics = init_metrics();
 
@@ -364,10 +369,8 @@ mod tests {
     #[tokio::test]
     /// Tests whether 2 disparate subscriptions can run against a single client
     async fn api_graphql_combined_heartbeat_uptime() {
-        let config = api_enabled_config();
-        let _server = api::Server::start(config.api);
-        let bind = config.api.bind.unwrap();
-        let client = new_subscription_client(bind).await;
+        let server = start_server();
+        let client = new_subscription_client(server.addr()).await;
 
         let _metrics = init_metrics();
 

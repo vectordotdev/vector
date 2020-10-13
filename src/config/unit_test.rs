@@ -10,7 +10,7 @@ use crate::{
 use indexmap::IndexMap;
 use std::{collections::HashMap, path::PathBuf};
 
-pub fn build_unit_tests_main(path: PathBuf) -> Result<Vec<UnitTest>, Vec<String>> {
+pub async fn build_unit_tests_main(path: PathBuf) -> Result<Vec<UnitTest>, Vec<String>> {
     let config = super::loading::load_builder_from_paths(&[path])?;
 
     // Ignore failures on calls other than the first
@@ -18,10 +18,10 @@ pub fn build_unit_tests_main(path: PathBuf) -> Result<Vec<UnitTest>, Vec<String>
         .set(config.global.log_schema.clone())
         .ok();
 
-    build_unit_tests(config)
+    build_unit_tests(config).await
 }
 
-fn build_unit_tests(builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>> {
+async fn build_unit_tests(builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>> {
     let mut tests = vec![];
     let mut errors = vec![];
 
@@ -39,10 +39,8 @@ fn build_unit_tests(builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>
 
     super::compiler::expand_macros(&mut config)?;
 
-    config
-        .tests
-        .iter()
-        .for_each(|test| match build_unit_test(test, &config) {
+    for test in &config.tests {
+        match build_unit_test(test, &config).await {
             Ok(t) => tests.push(t),
             Err(errs) => {
                 let mut test_err = errs.join("\n");
@@ -51,7 +49,8 @@ fn build_unit_tests(builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<String>
                 test_err.insert_str(0, &format!("Failed to build test '{}':\n  ", test.name));
                 errors.push(test_err);
             }
-        });
+        }
+    }
 
     if errors.is_empty() {
         Ok(tests)
@@ -350,7 +349,10 @@ fn build_inputs(
     }
 }
 
-fn build_unit_test(definition: &TestDefinition, config: &Config) -> Result<UnitTest, Vec<String>> {
+async fn build_unit_test(
+    definition: &TestDefinition,
+    config: &Config,
+) -> Result<UnitTest, Vec<String>> {
     let mut errors = vec![];
 
     let inputs = match build_inputs(config, definition) {
@@ -416,7 +418,11 @@ fn build_unit_test(definition: &TestDefinition, config: &Config) -> Result<UnitT
     let mut transforms: IndexMap<String, UnitTestTransform> = IndexMap::new();
     for (name, transform_config) in &config.transforms {
         if let Some(outputs) = transform_outputs.remove(name) {
-            match transform_config.inner.build(TransformContext::new_test()) {
+            match transform_config
+                .inner
+                .build(TransformContext::new_test())
+                .await
+            {
                 Ok(transform) => {
                     transforms.insert(
                         name.clone(),
@@ -533,8 +539,8 @@ mod tests {
     use super::*;
     use crate::config::ConfigBuilder;
 
-    #[test]
-    fn parse_no_input() {
+    #[tokio::test]
+    async fn parse_no_input() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.bar]
@@ -558,7 +564,7 @@ mod tests {
         )
         .unwrap();
 
-        let errs = build_unit_tests(config).err().unwrap();
+        let errs = build_unit_tests(config).await.err().unwrap();
         assert_eq!(
             errs,
             vec![r#"Failed to build test 'broken test':
@@ -593,7 +599,7 @@ mod tests {
         )
         .unwrap();
 
-        let errs = build_unit_tests(config).err().unwrap();
+        let errs = build_unit_tests(config).await.err().unwrap();
         assert_eq!(
             errs,
             vec![r#"Failed to build test 'broken test':
@@ -602,8 +608,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn parse_no_test_input() {
+    #[tokio::test]
+    async fn parse_no_test_input() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.bar]
@@ -623,7 +629,7 @@ mod tests {
         )
         .unwrap();
 
-        let errs = build_unit_tests(config).err().unwrap();
+        let errs = build_unit_tests(config).await.err().unwrap();
         assert_eq!(
             errs,
             vec![r#"Failed to build test 'broken test':
@@ -632,8 +638,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn parse_no_outputs() {
+    #[tokio::test]
+    async fn parse_no_outputs() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.foo]
@@ -652,7 +658,7 @@ mod tests {
         )
         .unwrap();
 
-        let errs = build_unit_tests(config).err().unwrap();
+        let errs = build_unit_tests(config).await.err().unwrap();
         assert_eq!(
             errs,
             vec![r#"Failed to build test 'broken test':
@@ -661,8 +667,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn parse_broken_topology() {
+    #[tokio::test]
+    async fn parse_broken_topology() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.foo]
@@ -747,7 +753,7 @@ mod tests {
         )
         .unwrap();
 
-        let errs = build_unit_tests(config).err().unwrap();
+        let errs = build_unit_tests(config).await.err().unwrap();
         assert_eq!(
             errs,
             vec![
@@ -766,8 +772,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn parse_bad_input_event() {
+    #[tokio::test]
+    async fn parse_bad_input_event() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.foo]
@@ -792,7 +798,7 @@ mod tests {
         )
         .unwrap();
 
-        let errs = build_unit_tests(config).err().unwrap();
+        let errs = build_unit_tests(config).await.err().unwrap();
         assert_eq!(
             errs,
             vec![r#"Failed to build test 'broken test':
@@ -801,8 +807,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_success_multi_inputs() {
+    #[tokio::test]
+    async fn test_success_multi_inputs() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.foo]
@@ -885,12 +891,12 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(config).unwrap();
+        let mut tests = build_unit_tests(config).await.unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
-    #[test]
-    fn test_success() {
+    #[tokio::test]
+    async fn test_success() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.foo]
@@ -945,12 +951,12 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(config).unwrap();
+        let mut tests = build_unit_tests(config).await.unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
-    #[test]
-    fn test_swimlanes() {
+    #[tokio::test]
+    async fn test_swimlanes() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.foo]
@@ -1005,12 +1011,12 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(config).unwrap();
+        let mut tests = build_unit_tests(config).await.unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
-    #[test]
-    fn test_fail_no_outputs() {
+    #[tokio::test]
+    async fn test_fail_no_outputs() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.foo]
@@ -1035,12 +1041,12 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(config).unwrap();
+        let mut tests = build_unit_tests(config).await.unwrap();
         assert_ne!(tests[0].run().1, Vec::<String>::new());
     }
 
-    #[test]
-    fn test_fail_two_output_events() {
+    #[tokio::test]
+    async fn test_fail_two_output_events() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.foo]
@@ -1105,13 +1111,13 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(config).unwrap();
+        let mut tests = build_unit_tests(config).await.unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
         assert_ne!(tests[1].run().1, Vec::<String>::new());
     }
 
-    #[test]
-    fn test_no_outputs_from() {
+    #[tokio::test]
+    async fn test_no_outputs_from() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.foo]
@@ -1141,13 +1147,13 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(config).unwrap();
+        let mut tests = build_unit_tests(config).await.unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
         assert_ne!(tests[1].run().1, Vec::<String>::new());
     }
 
-    #[test]
-    fn test_no_outputs_from_chained() {
+    #[tokio::test]
+    async fn test_no_outputs_from_chained() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.foo]
@@ -1183,13 +1189,13 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(config).unwrap();
+        let mut tests = build_unit_tests(config).await.unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
         assert_ne!(tests[1].run().1, Vec::<String>::new());
     }
 
-    #[test]
-    fn test_log_input() {
+    #[tokio::test]
+    async fn test_log_input() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.foo]
@@ -1221,12 +1227,12 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(config).unwrap();
+        let mut tests = build_unit_tests(config).await.unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
-    #[test]
-    fn test_metric_input() {
+    #[tokio::test]
+    async fn test_metric_input() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.foo]
@@ -1259,12 +1265,12 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(config).unwrap();
+        let mut tests = build_unit_tests(config).await.unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
-    #[test]
-    fn test_success_over_gap() {
+    #[tokio::test]
+    async fn test_success_over_gap() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.foo]
@@ -1304,12 +1310,12 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(config).unwrap();
+        let mut tests = build_unit_tests(config).await.unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
-    #[test]
-    fn test_success_tree() {
+    #[tokio::test]
+    async fn test_success_tree() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.ignored]
@@ -1362,12 +1368,12 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(config).unwrap();
+        let mut tests = build_unit_tests(config).await.unwrap();
         assert_eq!(tests[0].run().1, Vec::<String>::new());
     }
 
-    #[test]
-    fn test_fails() {
+    #[tokio::test]
+    async fn test_fails() {
         let config: ConfigBuilder = toml::from_str(
             r#"
 [transforms.foo]
@@ -1433,7 +1439,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut tests = build_unit_tests(config).unwrap();
+        let mut tests = build_unit_tests(config).await.unwrap();
         assert_ne!(tests[0].run().1, Vec::<String>::new());
         assert_ne!(tests[1].run().1, Vec::<String>::new());
         // TODO: The json representations are randomly ordered so these checks
