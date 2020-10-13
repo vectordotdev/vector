@@ -1,8 +1,13 @@
 #!/bin/sh
 set -e
 
-usermod -aG systemd-journal vector || true
+# Add Vector to adm group to read /var/logs
+usermod --append --gid adm vector || true
 
+# Add Vector to systemd-journal to read journald logs
+usermod --append --gid systemd-journal vector || true
+
+# Reload the daemon to reflect new group membership
 if command -v systemctl >/dev/null 2>&1
 then
   systemctl daemon-reload
