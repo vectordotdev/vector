@@ -6,7 +6,7 @@ use crate::{
 };
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
-    stream, FutureExt, StreamExt, TryFutureExt,
+    future, stream, FutureExt, StreamExt, TryFutureExt,
 };
 use futures01::Sink;
 use parser::parse;
@@ -67,8 +67,8 @@ async fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> Re
 
     let _ = UdpFramed::new(socket, BytesCodec::new())
         .take_until(shutdown.compat())
-        .filter_map(|frame| async move {
-            match frame {
+        .filter_map(|frame| {
+            future::ready(match frame {
                 Ok((bytes, _sock)) => {
                     let packet = String::from_utf8_lossy(bytes.as_ref());
                     let metrics = packet
@@ -92,7 +92,7 @@ async fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> Re
                     emit!(StatsdSocketError::read(error));
                     None
                 }
-            }
+            })
         })
         .flatten()
         .forward(out.sink_compat())
