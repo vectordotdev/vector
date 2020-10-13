@@ -138,7 +138,7 @@ impl TcpConnector {
     }
 
     fn healthcheck(&self) -> BoxFuture<'static, crate::Result<()>> {
-        self.connect().map_ok(|_| ()).map_err(|e| e.into()).boxed()
+        self.connect().map_ok(|_| ()).map_err(Into::into).boxed()
     }
 }
 
