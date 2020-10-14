@@ -16,16 +16,8 @@ impl InternalEvent for PrometheusEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "events_processed", self.count as u64,
-            "component_kind" => "source",
-            "component_type" => "prometheus",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "prometheus",
-        );
+        counter!("events_processed", self.count as u64);
+        counter!("bytes_processed", self.byte_size as u64);
     }
 }
 
@@ -41,21 +33,15 @@ impl InternalEvent for PrometheusRequestCompleted {
     }
 
     fn emit_metrics(&self) {
-        counter!("requests_completed", 1,
-            "component_kind" => "source",
-            "component_type" => "prometheus",
-        );
-        histogram!("request_duration_nanoseconds", self.end - self.start,
-            "component_kind" => "source",
-            "component_type" => "prometheus",
-        );
+        counter!("requests_completed", 1);
+        histogram!("request_duration_nanoseconds", self.end - self.start);
     }
 }
 
 #[derive(Debug)]
 pub struct PrometheusParseError<'a> {
     pub error: ParserError,
-    pub url: String,
+    pub url: http::Uri,
     pub body: Cow<'a, str>,
 }
 
@@ -70,17 +56,14 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("parse_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "prometheus",
-        );
+        counter!("parse_errors", 1);
     }
 }
 
 #[derive(Debug)]
 pub struct PrometheusErrorResponse {
     pub code: hyper::StatusCode,
-    pub url: String,
+    pub url: http::Uri,
 }
 
 impl InternalEvent for PrometheusErrorResponse {
@@ -89,17 +72,14 @@ impl InternalEvent for PrometheusErrorResponse {
     }
 
     fn emit_metrics(&self) {
-        counter!("http_error_response", 1,
-            "component_kind" => "source",
-            "component_type" => "prometheus",
-        );
+        counter!("http_error_response", 1);
     }
 }
 
 #[derive(Debug)]
 pub struct PrometheusHttpError {
     pub error: hyper::Error,
-    pub url: String,
+    pub url: http::Uri,
 }
 
 impl InternalEvent for PrometheusHttpError {
@@ -108,9 +88,6 @@ impl InternalEvent for PrometheusHttpError {
     }
 
     fn emit_metrics(&self) {
-        counter!("http_request_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "prometheus",
-        );
+        counter!("http_request_errors", 1);
     }
 }

@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::Event,
     internal_events::AwsKinesisStreamsEventSent,
@@ -30,7 +30,7 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
-use string_cache::DefaultAtom as Atom;
+
 use tower::Service;
 use tracing_futures::Instrument;
 
@@ -44,7 +44,7 @@ pub struct KinesisService {
 #[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
     pub stream_name: String,
-    pub partition_key_field: Option<Atom>,
+    pub partition_key_field: Option<String>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
@@ -72,8 +72,10 @@ pub enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<KinesisSinkConfig>("aws_kinesis_streams")
+    SinkDescription::new::<KinesisSinkConfig>("aws_kinesis_streams")
 }
+
+impl GenerateConfig for KinesisSinkConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_kinesis_streams")]
@@ -251,7 +253,7 @@ enum HealthcheckError {
 
 fn encode_event(
     mut event: Event,
-    partition_key_field: &Option<Atom>,
+    partition_key_field: &Option<String>,
     encoding: &EncodingConfig<Encoding>,
 ) -> Option<PutRecordsRequestEntry> {
     let partition_key = if let Some(partition_key_field) = partition_key_field {
@@ -281,7 +283,7 @@ fn encode_event(
     let data = match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&log).expect("Error encoding event as json."),
         Encoding::Text => log
-            .get(&log_schema().message_key())
+            .get(log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };
@@ -360,7 +362,7 @@ mod tests {
         event.as_mut_log().insert("key", "some_key");
 
         let mut encoding: EncodingConfig<_> = Encoding::Json.into();
-        encoding.except_fields = Some(vec![Atom::from("key")]);
+        encoding.except_fields = Some(vec!["key".into()]);
 
         let event = encode_event(event, &Some("key".into()), &encoding).unwrap();
         let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();

@@ -12,7 +12,6 @@ use std::{
     fmt::{self, Debug},
     marker::PhantomData,
 };
-use string_cache::DefaultAtom as Atom;
 
 /// A structure to wrap sink encodings and enforce field privacy.
 ///
@@ -26,7 +25,7 @@ pub struct EncodingConfig<E> {
     #[serde(default)]
     pub(crate) only_fields: Option<Vec<Vec<PathComponent>>>,
     #[serde(default)]
-    pub(crate) except_fields: Option<Vec<Atom>>,
+    pub(crate) except_fields: Option<Vec<String>>,
     #[serde(default)]
     pub(crate) timestamp_format: Option<TimestampFormat>,
 }
@@ -39,7 +38,7 @@ impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
     fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>> {
         &self.only_fields
     }
-    fn except_fields(&self) -> &Option<Vec<Atom>> {
+    fn except_fields(&self) -> &Option<Vec<String>> {
         &self.except_fields
     }
     fn timestamp_format(&self) -> &Option<TimestampFormat> {
@@ -149,7 +148,7 @@ pub struct Inner<E> {
     #[serde(default)]
     only_fields: Option<Vec<String>>,
     #[serde(default)]
-    except_fields: Option<Vec<Atom>>,
+    except_fields: Option<Vec<String>>,
     #[serde(default)]
     timestamp_format: Option<TimestampFormat>,
 }
