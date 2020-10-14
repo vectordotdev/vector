@@ -10,7 +10,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 set -x
 
-CHANNEL="${CHANNEL:-"$(scripts/util/release-channel.sh)"}"
+CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
 VERSION="${VERSION:-"$(scripts/version.sh)"}"
 
 if [[ "$CHANNEL" == "nightly" ]]; then
