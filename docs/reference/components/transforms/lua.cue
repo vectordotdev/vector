@@ -179,23 +179,26 @@ components: transforms: lua: {
 			groups: ["inline", "module"]
 			required: false
 			warnings: []
-			type: object: {
-				options: {
-					handler: {
-						description: "Defines a handler function which is executed periodially at `interval_seconds`. It can produce new events using `emit` function."
-						required:    true
-						warnings: []
-						type: string: {
-							examples: ["timer_handler"]
+			type: array: {
+				default: null
+				items: type: object: {
+					options: {
+						handler: {
+							description: "Defines a handler function which is executed periodially at `interval_seconds`. It can produce new events using `emit` function."
+							required:    true
+							warnings: []
+							type: string: {
+								examples: ["timer_handler"]
+							}
 						}
-					}
-					interval_seconds: {
-						description: "Defines the interval at which the timer handler would be executed."
-						required:    true
-						warnings: []
-						type: uint: {
-							examples: [1, 10, 30]
-							unit: "seconds"
+						interval_seconds: {
+							description: "Defines the interval at which the timer handler would be executed."
+							required:    true
+							warnings: []
+							type: uint: {
+								examples: [1, 10, 30]
+								unit: "seconds"
+							}
 						}
 					}
 				}
