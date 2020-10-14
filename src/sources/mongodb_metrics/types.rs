@@ -17,7 +17,7 @@ pub enum NodeType {
 pub struct CommandIsMaster {
     pub msg: Option<String>,
     pub set_name: Option<String>,
-    pub hosts: Option<String>,
+    pub hosts: Option<Vec<String>>,
 }
 
 /// https://docs.mongodb.com/manual/reference/command/buildInfo/

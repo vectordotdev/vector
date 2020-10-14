@@ -172,10 +172,6 @@ impl MongoDBMetrics {
         tags.insert("endpoint".into(), endpoint.clone());
 
         let node_type = Self::get_node_type(&client).await?;
-        if node_type != NodeType::Mongod {
-            return Err(BuildError::UnsupportedNodeType { node_type });
-        }
-
         let build_info = Self::get_build_info(&client).await?;
         debug!(
             "Connected to: {:?} (node type: {:?}, server version: {})",
@@ -215,7 +211,7 @@ impl MongoDBMetrics {
             .context(CommandIsMasterMongoError)?;
         let msg: CommandIsMaster = from_document(doc).context(CommandIsMasterParseError)?;
 
-        Ok(if msg.set_name.is_some() && msg.hosts.is_some() {
+        Ok(if msg.set_name.is_some() || msg.hosts.is_some() {
             NodeType::Replset
         } else if msg.msg.map(|msg| msg == "isdbgrid").unwrap_or(false) {
             // Contains the value isdbgrid when isMaster returns from a mongos instance.
@@ -994,11 +990,7 @@ mod integration_tests {
     use futures::compat::Stream01CompatExt;
     use tokio::time::{timeout, Duration};
 
-    #[tokio::test]
-    async fn fetch_metrics() {
-        trace_init();
-
-        let endpoint = "mongodb://localhost:27017";
+    async fn test_instance(endpoint: &'static str) {
         let host = "localhost";
         let namespace = "vector_mongodb";
 
@@ -1050,5 +1042,24 @@ mod integration_tests {
             assert_eq!(tags.get("endpoint").map(String::as_ref), Some(endpoint));
             assert_eq!(tags.get("host").map(String::as_ref), Some(host));
         }
+    }
+
+    #[tokio::test]
+    async fn fetch_metrics_mongod() {
+        trace_init();
+        test_instance("mongodb://localhost:27017").await;
+    }
+
+    // TODO
+    // #[tokio::test]
+    // async fn fetch_metrics_mongos() {
+    //     trace_init();
+    //     test_instance("mongodb://localhost:27018").await;
+    // }
+
+    #[tokio::test]
+    async fn fetch_metrics_replset() {
+        trace_init();
+        test_instance("mongodb://localhost:27019").await;
     }
 }

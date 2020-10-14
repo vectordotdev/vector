@@ -621,19 +621,29 @@ ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-loki
 endif
 
+# https://docs.mongodb.com/manual/tutorial/deploy-shard-cluster/
 .PHONY: start-integration-mongodb_metrics
 start-integration-mongodb_metrics:
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-mongodb_metrics -p 27017:27017
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-mongodb_metrics --name vector_mongodb_metrics mongo
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-mongodb_metrics -p 27017:27017 -p 27018:27018 -p 27019:27019
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-mongodb_metrics --name vector_mongodb_metrics1 mongo:4.2.10 mongod --configsvr --replSet vector
+	sleep 1
+	$(CONTAINER_TOOL) exec vector_mongodb_metrics1 mongo --port 27019 --eval 'rs.initiate({_id:"vector",configsvr:true,members:[{_id:0,host:"127.0.0.1:27019"}]})'
+	$(CONTAINER_TOOL) exec -d vector_mongodb_metrics1 mongos --port 27018 --configdb vector/127.0.0.1:27019
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-mongodb_metrics --name vector_mongodb_metrics2 mongo:4.2.10 mongod
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-mongodb_metrics
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-mongodb_metrics -p 27017:27017 --name vector_mongodb_metrics mongo
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-mongodb_metrics -p 27018:27018 -p 27019:27019 --name vector_mongodb_metrics1 mongo:4.2.10 mongod --configsvr --replSet vector
+	sleep 1
+	$(CONTAINER_TOOL) exec vector_mongodb_metrics1 mongo --port 27019 --eval 'rs.initiate({_id:"vector",configsvr:true,members:[{_id:0,host:"127.0.0.1:27019"}]})'
+	$(CONTAINER_TOOL) exec -d vector_mongodb_metrics1 mongos --port 27018 --configdb vector/127.0.0.1:27019
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-mongodb_metrics -p 27017:27017 --name vector_mongodb_metrics2 mongo:4.2.10 mongod
 endif
 
 .PHONY: stop-integration-mongodb_metrics
 stop-integration-mongodb_metrics:
-	$(CONTAINER_TOOL) rm --force vector_mongodb_metrics 2>/dev/null; true
+	$(CONTAINER_TOOL) rm --force vector_mongodb_metrics1 2>/dev/null; true
+	$(CONTAINER_TOOL) rm --force vector_mongodb_metrics2 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-mongodb_metrics 2>/dev/null; true
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-mongodb_metrics 2>/dev/null; true
