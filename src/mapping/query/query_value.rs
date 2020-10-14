@@ -9,6 +9,12 @@ pub(in crate::mapping) enum QueryValue {
     Regex(DynamicRegex),
 }
 
+impl QueryValue {
+    pub(in crate::mapping) fn from_value<T: Into<Value>>(value: T) -> Self {
+        From::from(value.into())
+    }
+}
+
 impl From<Value> for QueryValue {
     fn from(value: Value) -> Self {
         Self::Value(value)
