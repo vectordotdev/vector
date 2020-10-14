@@ -43,8 +43,7 @@ components: transforms: lua: {
 	configuration: {
 		hooks: {
 			description: "Configures hooks handlers."
-			groups: ["simple", "inline", "module"]
-			required: true
+			required:    true
 			warnings: []
 			type: object: {
 				examples: []
@@ -52,8 +51,7 @@ components: transforms: lua: {
 					init: {
 						common:      false
 						description: "A function which is called when the first event comes, before calling `hooks.process`"
-						groups: ["inline", "module"]
-						required: false
+						required:    false
 						warnings: []
 						type: string: {
 							default: null
@@ -69,8 +67,7 @@ components: transforms: lua: {
 					}
 					process: {
 						description: "A function which is called for each incoming event. It can produce new events using `emit` function."
-						groups: ["simple", "inline", "module"]
-						required: true
+						required:    true
 						warnings: []
 						type: string: {
 							examples: [
@@ -90,8 +87,7 @@ components: transforms: lua: {
 					shutdown: {
 						common:      false
 						description: "A function which is called when Vector is stopped. It can produce new events using `emit` function."
-						groups: ["inline", "module"]
-						required: false
+						required:    false
 						warnings: []
 						type: string: {
 							default: null
@@ -111,8 +107,7 @@ components: transforms: lua: {
 		search_dirs: {
 			common:      false
 			description: "A list of directories to search when loading a Lua file via the `require` function. If not specified, the modules are looked up in the directories of Vector's configs."
-			groups: ["module"]
-			required: false
+			required:    false
 			warnings: []
 			type: array: {
 				default: null
@@ -122,8 +117,7 @@ components: transforms: lua: {
 		source: {
 			common:      false
 			description: "The source which is evaluated when the transform is created."
-			groups: ["inline", "module"]
-			required: false
+			required:    false
 			warnings: []
 			type: string: {
 				default: null
@@ -167,8 +161,7 @@ components: transforms: lua: {
 		timers: {
 			common:      false
 			description: "Configures timers which are executed periodically at given interval."
-			groups: ["inline", "module"]
-			required: false
+			required:    false
 			warnings: []
 			type: array: {
 				default: null
@@ -197,8 +190,7 @@ components: transforms: lua: {
 		}
 		version: {
 			description: "Transform API version. Specifying this version ensures that Vector does not break backward compatibility."
-			groups: ["simple", "inline", "module"]
-			required: true
+			required:    true
 			warnings: []
 			type: string: {
 				enum: {
