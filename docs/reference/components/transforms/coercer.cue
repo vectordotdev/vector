@@ -8,18 +8,14 @@ components: transforms: coercer: {
 	classes: {
 		commonly_used: false
 		function:      "schema"
+		development:   "stable"
+		egress_method: "stream"
 	}
 
 	features: {
 	}
 
-	statuses: {
-		development: "stable"
-	}
-
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -31,6 +27,12 @@ components: transforms: coercer: {
 
 		requirements: []
 		warnings: []
+		notices: []
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 
 	configuration: {
