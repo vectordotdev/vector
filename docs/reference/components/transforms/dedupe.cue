@@ -7,16 +7,12 @@ components: transforms: dedupe: {
 
 	classes: {
 		commonly_used: false
+		development:   "stable"
 		egress_method: "stream"
 		function:      "filter"
 	}
 
-	features: {
-	}
-
-	statuses: {
-		development: "stable"
-	}
+	features: {}
 
 	support: {
 		platforms: {

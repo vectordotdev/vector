@@ -7,15 +7,12 @@ components: transforms: swimlanes: {
 
 	classes: {
 		commonly_used: false
+		development:   "beta"
 		egress_method: "stream"
 		function:      "route"
 	}
 
 	features: {}
-
-	statuses: {
-		development: "beta"
-	}
 
 	support: {
 		platforms: {

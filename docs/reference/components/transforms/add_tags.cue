@@ -7,15 +7,13 @@ components: transforms: add_tags: {
 
 	classes: {
 		commonly_used: false
+		development:   "stable"
+		development:   "stable"
 		egress_method: "stream"
 		function:      "schema"
 	}
 
 	features: {}
-
-	statuses: {
-		development: "stable"
-	}
 
 	support: {
 		platforms: {

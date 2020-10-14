@@ -7,7 +7,9 @@ components: sources: journald: {
 
 	classes: {
 		commonly_used: true
+		delivery:      "at_least_once"
 		deployment_roles: ["daemon"]
+		development:   "beta"
 		egress_method: "batch"
 		function:      "collect"
 	}
@@ -16,11 +18,6 @@ components: sources: journald: {
 		checkpoint: enabled: true
 		multiline: enabled:  false
 		tls: enabled:        false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
 	}
 
 	support: {

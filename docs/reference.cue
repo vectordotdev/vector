@@ -28,11 +28,16 @@ _values: {
 	// less commonly used, components.
 	commonly_used: bool
 
+	if Args.kind == "source" || Args.kind == "sink" {
+		delivery: #DeliveryStatus
+	}
+
 	if Args.kind == "source" {
 		// `deployment_roles` clarify when the component should be used under
 		// different deployment contexts.
 		deployment_roles: [#DeploymentRole, ...]
 	}
+	development: #DevelopmentStatus
 
 	// `egress_method` documents how the component outputs events.
 	egress_method: #EgressMethod
@@ -141,9 +146,6 @@ _values: {
 		// as it communicate which events and fields are emitted.
 		output: #Output
 	}
-
-	// `statuses` communicates the various statuses of the component.
-	statuses: #Statuses & {_args: kind: Kind}
 
 	// `support` communicates the varying levels of support of the component.
 	support: #Support & {_args: kind: Kind}
@@ -544,17 +546,6 @@ _values: {
 	// `types` sets the option's value type. External tagging is used since
 	// each type has its own set of fields.
 	type: #Type & {_args: "required": required}
-}
-
-#Statuses: {
-	_args: kind: string
-	let Args = _args
-
-	if Args.kind == "source" || Args.kind == "sink" {
-		delivery: #DeliveryStatus
-	}
-
-	development: #DevelopmentStatus
 }
 
 #Support: {

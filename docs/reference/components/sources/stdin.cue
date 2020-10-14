@@ -7,7 +7,9 @@ components: sources: stdin: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["sidecar"]
+		development:   "stable"
 		egress_method: "stream"
 		function:      "receive"
 	}
@@ -16,11 +18,6 @@ components: sources: stdin: {
 		checkpoint: enabled: false
 		multiline: enabled:  false
 		tls: enabled:        false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "stable"
 	}
 
 	support: {

@@ -9,7 +9,9 @@ components: sources: logplex: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["aggregator"]
+		development:   "beta"
 		egress_method: "batch"
 		function:      "receive"
 	}
@@ -23,11 +25,6 @@ components: sources: logplex: {
 			can_verify_certificate: true
 			enabled_default:        false
 		}
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
 	}
 
 	support: {

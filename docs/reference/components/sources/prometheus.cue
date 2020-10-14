@@ -7,7 +7,9 @@ components: sources: prometheus: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
+		development:   "beta"
 		egress_method: "batch"
 		function:      "collect"
 	}
@@ -16,11 +18,6 @@ components: sources: prometheus: {
 		checkpoint: enabled: false
 		multiline: enabled:  false
 		tls: enabled:        false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
 	}
 
 	support: {

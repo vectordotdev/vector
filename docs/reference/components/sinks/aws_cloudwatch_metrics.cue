@@ -7,6 +7,8 @@ components: sinks: aws_cloudwatch_metrics: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "batch"
 		function:      "transmit"
 		service_providers: ["AWS"]
@@ -30,11 +32,6 @@ components: sinks: aws_cloudwatch_metrics: {
 		healthcheck: enabled: true
 		request: enabled:     false
 		tls: enabled:         false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
 	}
 
 	support: {

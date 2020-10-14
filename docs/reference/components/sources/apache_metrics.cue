@@ -10,7 +10,9 @@ components: sources: apache_metrics: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
+		development:   "beta"
 		egress_method: "batch"
 		function:      "collect"
 	}
@@ -19,11 +21,6 @@ components: sources: apache_metrics: {
 		checkpoint: enabled: false
 		multiline: enabled:  false
 		tls: enabled:        false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
 	}
 
 	support: {

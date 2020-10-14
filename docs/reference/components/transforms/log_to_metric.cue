@@ -6,17 +6,13 @@ components: transforms: log_to_metric: {
 	long_description:  "Accepts log events and allows you to convert logs into one or more metrics."
 
 	classes: {
-		commonly_used: true
+		commonly_used: false
+		development:   "stable"
 		function:      "convert"
 		egress_method: "batch"
 	}
 
-	features: {
-	}
-
-	statuses: {
-		development: "stable"
-	}
+	features: {}
 
 	support: {
 		platforms: {

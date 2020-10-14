@@ -7,6 +7,8 @@ components: sinks: influxdb_logs: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "batch"
 		function:      "transmit"
 		service_providers: ["InfluxData"]
@@ -34,11 +36,6 @@ components: sinks: influxdb_logs: {
 			timeout_secs:               60
 		}
 		tls: enabled: false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
 	}
 
 	support: {

@@ -7,15 +7,12 @@ components: transforms: split: {
 
 	classes: {
 		commonly_used: false
+		development:   "stable"
 		egress_method: "stream"
 		function:      "parse"
 	}
 
 	features: {}
-
-	statuses: {
-		development: "stable"
-	}
 
 	support: {
 		platforms: {

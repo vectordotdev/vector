@@ -15,7 +15,9 @@ components: sources: docker: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "best_effort"
 		deployment_roles: ["daemon"]
+		development:   "beta"
 		egress_method: "stream"
 		function:      "collect"
 	}
@@ -24,11 +26,6 @@ components: sources: docker: {
 		checkpoint: enabled: false
 		multiline: enabled:  true
 		tls: enabled:        false
-	}
-
-	statuses: {
-		delivery:    "best_effort"
-		development: "beta"
 	}
 
 	support: {

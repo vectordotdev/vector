@@ -9,7 +9,9 @@ components: sources: file: {
 
 	classes: {
 		commonly_used: true
+		delivery:      "best_effort"
 		deployment_roles: ["daemon", "sidecar"]
+		development:   "stable"
 		egress_method: "stream"
 		function:      "collect"
 	}
@@ -18,11 +20,6 @@ components: sources: file: {
 		checkpoint: enabled: true
 		multiline: enabled:  true
 		tls: enabled:        false
-	}
-
-	statuses: {
-		delivery:    "best_effort"
-		development: "stable"
 	}
 
 	support: {

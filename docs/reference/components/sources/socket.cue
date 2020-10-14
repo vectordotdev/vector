@@ -9,7 +9,9 @@ components: sources: socket: {
 
 	classes: {
 		commonly_used: true
+		delivery:      "best_effort"
 		deployment_roles: ["aggregator", "sidecar"]
+		development:   "stable"
 		egress_method: "stream"
 		function:      "receive"
 	}
@@ -23,11 +25,6 @@ components: sources: socket: {
 			can_verify_certificate: true
 			enabled_default:        false
 		}
-	}
-
-	statuses: {
-		delivery:    "best_effort"
-		development: "stable"
 	}
 
 	support: {

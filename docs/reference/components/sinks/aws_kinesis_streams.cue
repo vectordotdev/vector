@@ -7,6 +7,8 @@ components: sinks: aws_kinesis_streams: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "stable"
 		egress_method: "batch"
 		function:      "transmit"
 		service_providers: ["AWS"]
@@ -42,11 +44,6 @@ components: sinks: aws_kinesis_streams: {
 			timeout_secs:               30
 		}
 		tls: enabled: false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "stable"
 	}
 
 	support: {

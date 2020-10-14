@@ -7,6 +7,8 @@ components: sinks: sematext_metrics: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		function:      "transmit"
 		service_providers: ["Sematext"]
 		egress_method: "batch"
@@ -26,11 +28,6 @@ components: sinks: sematext_metrics: {
 		healthcheck: enabled: true
 		request: enabled:     false
 		tls: enabled:         false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
 	}
 
 	support: {

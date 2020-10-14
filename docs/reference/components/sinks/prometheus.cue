@@ -7,6 +7,8 @@ components: sinks: prometheus: {
 
 	classes: {
 		commonly_used: true
+		delivery:      "best_effort"
+		development:   "beta"
 		egress_method: "aggregate"
 		function:      "transmit"
 		service_providers: []
@@ -19,11 +21,6 @@ components: sinks: prometheus: {
 		healthcheck: enabled: false
 		request: enabled:     false
 		tls: enabled:         false
-	}
-
-	statuses: {
-		delivery:    "best_effort"
-		development: "beta"
 	}
 
 	support: {

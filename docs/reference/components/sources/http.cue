@@ -9,7 +9,9 @@ components: sources: http: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["aggregator", "sidecar"]
+		development:   "beta"
 		egress_method: "batch"
 		function:      "receive"
 	}
@@ -23,11 +25,6 @@ components: sources: http: {
 			can_verify_certificate: true
 			enabled_default:        false
 		}
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
 	}
 
 	support: {

@@ -7,6 +7,8 @@ components: sinks: influxdb_metrics: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "batch"
 		function:      "transmit"
 		service_providers: ["InfluxData"]
@@ -40,11 +42,6 @@ components: sinks: influxdb_metrics: {
 			can_verify_hostname:    true
 			enabled_default:        true
 		}
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
 	}
 
 	support: {

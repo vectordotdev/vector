@@ -9,7 +9,9 @@ components: sources: vector: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "best_effort"
 		deployment_roles: ["aggregator"]
+		development:   "beta"
 		egress_method: "stream"
 		function:      "receive"
 	}
@@ -23,11 +25,6 @@ components: sources: vector: {
 			can_verify_certificate: true
 			enabled_default:        false
 		}
-	}
-
-	statuses: {
-		delivery:    "best_effort"
-		development: "beta"
 	}
 
 	support: {

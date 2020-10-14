@@ -7,6 +7,8 @@ components: sinks: azure_monitor_logs: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "batch"
 		function:      "transmit"
 		service_providers: ["Azure"]
@@ -32,11 +34,6 @@ components: sinks: azure_monitor_logs: {
 			can_verify_hostname:    true
 			enabled_default:        true
 		}
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
 	}
 
 	support: {

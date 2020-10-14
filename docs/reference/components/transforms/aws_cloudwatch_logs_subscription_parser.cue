@@ -7,15 +7,12 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 
 	classes: {
 		commonly_used: false
+		development:   "beta"
 		egress_method: "batch"
 		function:      "parse"
 	}
 
 	features: {}
-
-	statuses: {
-		development: "beta"
-	}
 
 	support: {
 		platforms: {

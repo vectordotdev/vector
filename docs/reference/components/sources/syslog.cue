@@ -9,7 +9,6 @@ components: sources: syslog: {
 
 	classes:  sources.socket.classes
 	features: sources.socket.features
-	statuses: sources.socket.statuses
 
 	support: {
 		dependencies: {

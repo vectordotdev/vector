@@ -6,16 +6,13 @@ components: transforms: lua: {
 	long_description:  "Accepts log and metric events and allows you to transform events with a full embedded [Lua][urls.lua] engine."
 
 	classes: {
-		commonly_used: true
+		commonly_used: false
+		development:   "beta"
 		egress_method: "stream"
 		function:      "program"
 	}
 
 	features: {}
-
-	statuses: {
-		development: "beta"
-	}
 
 	support: {
 		dependencies: {

@@ -7,6 +7,8 @@ components: sinks: papertrail: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "stream"
 		function:      "transmit"
 		service_providers: ["Papertrail"]
@@ -29,11 +31,6 @@ components: sinks: papertrail: {
 			can_verify_hostname:    true
 			enabled_default:        true
 		}
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
 	}
 
 	support: {

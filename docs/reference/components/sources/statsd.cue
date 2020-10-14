@@ -9,7 +9,9 @@ components: sources: statsd: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "best_effort"
 		deployment_roles: ["aggregator"]
+		development:   "stable"
 		egress_method: "stream"
 		function:      "receive"
 	}
@@ -18,11 +20,6 @@ components: sources: statsd: {
 		checkpoint: enabled: false
 		multiline: enabled:  false
 		tls: enabled:        false
-	}
-
-	statuses: {
-		delivery:    "best_effort"
-		development: "stable"
 	}
 
 	support: {
