@@ -15,7 +15,7 @@ use futures::{
 use futures01::Sink;
 use parser::parse;
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use tokio::net::UdpSocket;
 use tokio_util::{codec::BytesCodec, udp::UdpFramed};
 
@@ -50,7 +50,14 @@ inventory::submit! {
     SourceDescription::new::<StatsdConfig>("statsd")
 }
 
-impl GenerateConfig for StatsdConfig {}
+impl GenerateConfig for StatsdConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self::Udp(UdpConfig {
+            address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 8125)),
+        }))
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "statsd")]
@@ -177,6 +184,11 @@ mod test {
     use futures::{compat::Future01CompatExt, TryStreamExt};
     use futures01::Stream;
     use tokio::time::{delay_for, Duration};
+
+    #[test]
+    fn test_generate_config() {
+        crate::test_util::test_generate_config::<StatsdConfig>();
+    }
 
     fn parse_count(lines: &[&str], prefix: &str) -> usize {
         lines
