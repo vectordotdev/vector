@@ -72,7 +72,7 @@ complexity we need to add before being able to reap the value.
 
 ## Plan of Attack
 
-- [ ] Implement `TransformFn` from Arch RFC, switch parsers to it
+- [ ] Implement `TransformFn` from [Arch RFC](https://github.com/timberio/vector/blob/master/rfcs/2020-06-18-2625-architecture-revisit.md), switch parsers to it
 - [ ] Add `Vec<dyn TransformFn>` field to `Pipeline`
 - [ ] Implement composed sources as facade that prepends relevant `TransformFn`
     to `Pipeline` passed to `SourceConfig::build`
