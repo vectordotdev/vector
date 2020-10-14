@@ -119,7 +119,6 @@ mod tests {
     use futures::compat::Future01CompatExt;
     use futures01::{stream::Stream, sync::mpsc, Async::*};
     use std::time::{Duration, Instant};
-    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn generate_config() {
@@ -139,7 +138,7 @@ mod tests {
 
     #[tokio::test]
     async fn copies_lines() {
-        let message_key = Atom::from(log_schema().message_key());
+        let message_key = log_schema().message_key();
         let mut rx = runit(
             r#"lines = ["one", "two"]
                count = 1"#,
@@ -178,7 +177,7 @@ mod tests {
 
     #[tokio::test]
     async fn adds_sequence() {
-        let message_key = Atom::from(log_schema().message_key());
+        let message_key = log_schema().message_key();
         let mut rx = runit(
             r#"lines = ["one", "two"]
                count = 2

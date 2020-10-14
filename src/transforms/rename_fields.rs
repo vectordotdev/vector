@@ -117,13 +117,10 @@ mod tests {
 
         let new_event = transform.transform(event).unwrap();
 
-        assert!(new_event.as_log().get(&"to_move".into()).is_none());
-        assert_eq!(new_event.as_log()[&"moved".into()], "some value".into());
-        assert!(new_event.as_log().get(&"not_present".into()).is_none());
-        assert!(new_event.as_log().get(&"should_not_exist".into()).is_none());
-        assert_eq!(
-            new_event.as_log()[&"do_not_move".into()],
-            "not moved".into()
-        );
+        assert!(new_event.as_log().get("to_move").is_none());
+        assert_eq!(new_event.as_log()["moved"], "some value".into());
+        assert!(new_event.as_log().get("not_present").is_none());
+        assert!(new_event.as_log().get("should_not_exist").is_none());
+        assert_eq!(new_event.as_log()["do_not_move"], "not moved".into());
     }
 }

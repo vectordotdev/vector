@@ -6,14 +6,13 @@ use crate::{
         GrokParserConversionFailed, GrokParserEventProcessed, GrokParserFailedMatch,
         GrokParserMissingField,
     },
-    types::{parse_conversion_map_no_atoms, Conversion},
+    types::{parse_conversion_map, Conversion},
 };
 use grok::Pattern;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::str;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -26,7 +25,7 @@ enum BuildError {
 #[derivative(Default)]
 pub struct GrokParserConfig {
     pub pattern: String,
-    pub field: Option<Atom>,
+    pub field: Option<String>,
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
     pub types: HashMap<String, String>,
@@ -45,11 +44,11 @@ impl TransformConfig for GrokParserConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| Atom::from(log_schema().message_key()));
+            .unwrap_or_else(|| log_schema().message_key().into());
 
         let mut grok = grok::Grok::with_patterns();
 
-        let types = parse_conversion_map_no_atoms(&self.types)?;
+        let types = parse_conversion_map(&self.types)?;
 
         Ok(grok
             .compile(&self.pattern, true)
@@ -80,7 +79,7 @@ impl TransformConfig for GrokParserConfig {
 
 pub struct GrokParser {
     pattern: Pattern,
-    field: Atom,
+    field: String,
     drop_field: bool,
     types: HashMap<String, Conversion>,
     paths: HashMap<String, Vec<PathComponent>>,
@@ -139,7 +138,6 @@ mod tests {
     };
     use pretty_assertions::assert_eq;
     use serde_json::json;
-    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn generate_config() {
@@ -206,9 +204,9 @@ mod tests {
         assert_eq!(2, event.keys().count());
         assert_eq!(
             event::Value::from("Help I'm stuck in an HTTP server"),
-            event[&Atom::from(log_schema().message_key())]
+            event[log_schema().message_key()]
         );
-        assert!(!event[&Atom::from(log_schema().timestamp_key())]
+        assert!(!event[log_schema().timestamp_key()]
             .to_string_lossy()
             .is_empty());
     }
@@ -254,9 +252,9 @@ mod tests {
         assert_eq!(2, event.keys().count());
         assert_eq!(
             event::Value::from("i am the only field"),
-            event[&Atom::from(log_schema().message_key())]
+            event[log_schema().message_key()]
         );
-        assert!(!event[&Atom::from(log_schema().timestamp_key())]
+        assert!(!event[log_schema().timestamp_key()]
             .to_string_lossy()
             .is_empty());
     }

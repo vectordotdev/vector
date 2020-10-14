@@ -411,7 +411,7 @@ fn merge_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
         Some(pair) => Some(query_arithmetic_from_pair(pair)?),
     };
 
-    Ok(Box::new(MergeFn::new(to_path.into(), query2, deep)))
+    Ok(Box::new(MergeFn::new(to_path, query2, deep)))
 }
 
 fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {

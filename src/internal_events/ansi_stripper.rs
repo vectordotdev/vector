@@ -1,6 +1,5 @@
 use super::InternalEvent;
 use metrics::counter;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug)]
 pub struct ANSIStripperEventProcessed;
@@ -13,7 +12,7 @@ impl InternalEvent for ANSIStripperEventProcessed {
 
 #[derive(Debug)]
 pub struct ANSIStripperFieldMissing<'a> {
-    pub field: &'a Atom,
+    pub field: &'a str,
 }
 
 impl InternalEvent for ANSIStripperFieldMissing<'_> {
@@ -32,7 +31,7 @@ impl InternalEvent for ANSIStripperFieldMissing<'_> {
 
 #[derive(Debug)]
 pub struct ANSIStripperFieldInvalid<'a> {
-    pub field: &'a Atom,
+    pub field: &'a str,
 }
 
 impl InternalEvent for ANSIStripperFieldInvalid<'_> {
@@ -51,7 +50,7 @@ impl InternalEvent for ANSIStripperFieldInvalid<'_> {
 
 #[derive(Debug)]
 pub struct ANSIStripperFailed<'a> {
-    pub field: &'a Atom,
+    pub field: &'a str,
     pub error: std::io::Error,
 }
 

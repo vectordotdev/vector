@@ -13,13 +13,12 @@ use crate::{
 use chrono::{serde::ts_milliseconds, DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::iter;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct AwsCloudwatchLogsSubscriptionParserConfig {
-    pub field: Option<Atom>,
+    pub field: Option<String>,
 }
 
 inventory::submit! {
@@ -52,7 +51,7 @@ impl GenerateConfig for AwsCloudwatchLogsSubscriptionParserConfig {}
 
 #[derive(Debug)]
 pub struct AwsCloudwatchLogsSubscriptionParser {
-    field: Atom,
+    field: String,
 }
 
 impl From<AwsCloudwatchLogsSubscriptionParserConfig> for AwsCloudwatchLogsSubscriptionParser {
@@ -62,7 +61,7 @@ impl From<AwsCloudwatchLogsSubscriptionParserConfig> for AwsCloudwatchLogsSubscr
         AwsCloudwatchLogsSubscriptionParser {
             field: config
                 .field
-                .unwrap_or_else(|| Atom::from(log_schema().message_key())),
+                .unwrap_or_else(|| log_schema().message_key().to_string()),
         }
     }
 }

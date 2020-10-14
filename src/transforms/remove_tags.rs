@@ -5,16 +5,15 @@ use crate::{
     Event,
 };
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RemoveTagsConfig {
-    pub tags: Vec<Atom>,
+    pub tags: Vec<String>,
 }
 
 pub struct RemoveTags {
-    tags: Vec<Atom>,
+    tags: Vec<String>,
 }
 
 inventory::submit! {
@@ -44,7 +43,7 @@ impl TransformConfig for RemoveTagsConfig {
 }
 
 impl RemoveTags {
-    pub fn new(tags: Vec<Atom>) -> Self {
+    pub fn new(tags: Vec<String>) -> Self {
         RemoveTags { tags }
     }
 }
@@ -57,7 +56,7 @@ impl Transform for RemoveTags {
 
         if let Some(map) = tags {
             for tag in &self.tags {
-                map.remove(tag.as_ref());
+                map.remove(tag);
 
                 if map.is_empty() {
                     *tags = None;

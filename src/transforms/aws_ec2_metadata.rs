@@ -9,69 +9,55 @@ use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map::RandomState, HashSet};
-use string_cache::DefaultAtom as Atom;
+
 use tokio::time::{delay_for, Duration, Instant};
 use tracing_futures::Instrument;
 
-type WriteHandle = evmap::WriteHandle<Atom, Bytes, (), RandomState>;
-type ReadHandle = evmap::ReadHandle<Atom, Bytes, (), RandomState>;
+type WriteHandle = evmap::WriteHandle<String, Bytes, (), RandomState>;
+type ReadHandle = evmap::ReadHandle<String, Bytes, (), RandomState>;
+
+const AMI_ID_KEY: &str = "ami-id";
+const AVAILABILITY_ZONE_KEY: &str = "availability-zone";
+const INSTANCE_ID_KEY: &str = "instance-id";
+const INSTANCE_TYPE_KEY: &str = "instance-type";
+const LOCAL_HOSTNAME_KEY: &str = "local-hostname";
+const LOCAL_IPV4_KEY: &str = "local-ipv4";
+const PUBLIC_HOSTNAME_KEY: &str = "public-hostname";
+const PUBLIC_IPV4_KEY: &str = "public-ipv4";
+const REGION_KEY: &str = "region";
+const SUBNET_ID_KEY: &str = "subnet-id";
+const VPC_ID_KEY: &str = "vpc-id";
+const ROLE_NAME_KEY: &str = "role-name";
 
 lazy_static::lazy_static! {
     static ref AMI_ID: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/ami-id");
-    static ref AMI_ID_KEY: Atom = Atom::from("ami-id");
-
     static ref AVAILABILITY_ZONE: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/placement/availability-zone");
-    static ref AVAILABILITY_ZONE_KEY: Atom = Atom::from("availability-zone");
-
     static ref INSTANCE_ID: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/instance-id");
-    static ref INSTANCE_ID_KEY: Atom = Atom::from("instance-id");
-
     static ref INSTANCE_TYPE: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/instance-type");
-    static ref INSTANCE_TYPE_KEY: Atom = Atom::from("instance-type");
-
     static ref LOCAL_HOSTNAME: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/local-hostname");
-    static ref LOCAL_HOSTNAME_KEY: Atom = Atom::from("local-hostname");
-
     static ref LOCAL_IPV4: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/local-ipv4");
-    static ref LOCAL_IPV4_KEY: Atom = Atom::from("local-ipv4");
-
     static ref PUBLIC_HOSTNAME: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/public-hostname");
-    static ref PUBLIC_HOSTNAME_KEY: Atom = Atom::from("public-hostname");
-
     static ref PUBLIC_IPV4: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/public-ipv4");
-    static ref PUBLIC_IPV4_KEY: Atom = Atom::from("public-ipv4");
-
     static ref REGION: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/region");
-    static ref REGION_KEY: Atom = Atom::from("region");
-
     static ref SUBNET_ID: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/network/interfaces/macs/mac/subnet-id");
-    static ref SUBNET_ID_KEY: Atom = Atom::from("subnet-id");
-
     static ref VPC_ID: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/network/interfaces/macs/mac/vpc-id");
-    static ref VPC_ID_KEY: Atom = Atom::from("vpc-id");
-
     static ref ROLE_NAME: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/iam/security-credentials/");
-    static ref ROLE_NAME_KEY: Atom = Atom::from("role-name");
-
     static ref MAC: PathAndQuery = PathAndQuery::from_static("/latest/meta-data/mac");
-
     static ref DYNAMIC_DOCUMENT: PathAndQuery = PathAndQuery::from_static("/latest/dynamic/instance-identity/document");
-
-    static ref DEFAULT_FIELD_WHITELIST: Vec<Atom> = vec![
-        AMI_ID_KEY.clone(),
-        AVAILABILITY_ZONE_KEY.clone(),
-        INSTANCE_ID_KEY.clone(),
-        INSTANCE_TYPE_KEY.clone(),
-        LOCAL_HOSTNAME_KEY.clone(),
-        LOCAL_IPV4_KEY.clone(),
-        PUBLIC_HOSTNAME_KEY.clone(),
-        PUBLIC_IPV4_KEY.clone(),
-        REGION_KEY.clone(),
-        SUBNET_ID_KEY.clone(),
-        VPC_ID_KEY.clone(),
-        ROLE_NAME_KEY.clone(),
+    static ref DEFAULT_FIELD_WHITELIST: Vec<String> = vec![
+        AMI_ID_KEY.to_string(),
+        AVAILABILITY_ZONE_KEY.to_string(),
+        INSTANCE_ID_KEY.to_string(),
+        INSTANCE_TYPE_KEY.to_string(),
+        LOCAL_HOSTNAME_KEY.to_string(),
+        LOCAL_IPV4_KEY.to_string(),
+        PUBLIC_HOSTNAME_KEY.to_string(),
+        PUBLIC_IPV4_KEY.to_string(),
+        REGION_KEY.to_string(),
+        SUBNET_ID_KEY.to_string(),
+        VPC_ID_KEY.to_string(),
+        ROLE_NAME_KEY.to_string(),
     ];
-
     static ref API_TOKEN: PathAndQuery = PathAndQuery::from_static("/latest/api/token");
     static ref TOKEN_HEADER: Bytes = Bytes::from("X-aws-ec2-metadata-token");
     static ref HOST: Uri = Uri::from_static("http://169.254.169.254");
@@ -93,18 +79,18 @@ pub struct Ec2MetadataTransform {
 
 #[derive(Debug, Clone)]
 struct Keys {
-    ami_id_key: Atom,
-    availability_zone_key: Atom,
-    instance_id_key: Atom,
-    instance_type_key: Atom,
-    local_hostname_key: Atom,
-    local_ipv4_key: Atom,
-    public_hostname_key: Atom,
-    public_ipv4_key: Atom,
-    region_key: Atom,
-    subnet_id_key: Atom,
-    vpc_id_key: Atom,
-    role_name_key: Atom,
+    ami_id_key: String,
+    availability_zone_key: String,
+    instance_id_key: String,
+    instance_type_key: String,
+    local_hostname_key: String,
+    local_ipv4_key: String,
+    public_hostname_key: String,
+    public_ipv4_key: String,
+    region_key: String,
+    subnet_id_key: String,
+    vpc_id_key: String,
+    role_name_key: String,
 }
 
 inventory::submit! {
@@ -144,7 +130,6 @@ impl TransformConfig for Ec2Metadata {
         let fields = self
             .fields
             .clone()
-            .map(|v| v.into_iter().map(Atom::from).collect())
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
 
         let http_client = HttpClient::new(cx.resolver(), None)?;
@@ -201,7 +186,7 @@ struct MetadataClient {
     keys: Keys,
     state: WriteHandle,
     refresh_interval: Duration,
-    fields: HashSet<Atom>,
+    fields: HashSet<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -224,7 +209,7 @@ impl MetadataClient {
         keys: Keys,
         state: WriteHandle,
         refresh_interval: Duration,
-        fields: Vec<Atom>,
+        fields: Vec<String>,
     ) -> Self {
         Self {
             client,
@@ -341,67 +326,67 @@ impl MetadataClient {
         let identity_document = self.get_document().await?;
 
         if let Some(document) = identity_document {
-            if self.fields.contains(&AMI_ID_KEY) {
+            if self.fields.contains(&*AMI_ID_KEY) {
                 self.state
                     .update(self.keys.ami_id_key.clone(), document.image_id.into());
             }
 
-            if self.fields.contains(&INSTANCE_ID_KEY) {
+            if self.fields.contains(&*INSTANCE_ID_KEY) {
                 self.state.update(
                     self.keys.instance_id_key.clone(),
                     document.instance_id.into(),
                 );
             }
 
-            if self.fields.contains(&INSTANCE_TYPE_KEY) {
+            if self.fields.contains(&*INSTANCE_TYPE_KEY) {
                 self.state.update(
                     self.keys.instance_type_key.clone(),
                     document.instance_type.into(),
                 );
             }
 
-            if self.fields.contains(&REGION_KEY) {
+            if self.fields.contains(&*REGION_KEY) {
                 self.state
                     .update(self.keys.region_key.clone(), document.region.into());
             }
         }
 
-        if self.fields.contains(&AVAILABILITY_ZONE_KEY) {
+        if self.fields.contains(&*AVAILABILITY_ZONE_KEY) {
             if let Some(availability_zone) = self.get_metadata(&AVAILABILITY_ZONE).await? {
                 self.state
                     .update(self.keys.availability_zone_key.clone(), availability_zone);
             }
         }
 
-        if self.fields.contains(&LOCAL_HOSTNAME_KEY) {
+        if self.fields.contains(&*LOCAL_HOSTNAME_KEY) {
             if let Some(local_hostname) = self.get_metadata(&LOCAL_HOSTNAME).await? {
                 self.state
                     .update(self.keys.local_hostname_key.clone(), local_hostname);
             }
         }
 
-        if self.fields.contains(&LOCAL_IPV4_KEY) {
+        if self.fields.contains(&*LOCAL_IPV4_KEY) {
             if let Some(local_ipv4) = self.get_metadata(&LOCAL_IPV4).await? {
                 self.state
                     .update(self.keys.local_ipv4_key.clone(), local_ipv4);
             }
         }
 
-        if self.fields.contains(&PUBLIC_HOSTNAME_KEY) {
+        if self.fields.contains(&*PUBLIC_HOSTNAME_KEY) {
             if let Some(public_hostname) = self.get_metadata(&PUBLIC_HOSTNAME).await? {
                 self.state
                     .update(self.keys.public_hostname_key.clone(), public_hostname);
             }
         }
 
-        if self.fields.contains(&PUBLIC_IPV4_KEY) {
+        if self.fields.contains(&*PUBLIC_IPV4_KEY) {
             if let Some(public_ipv4) = self.get_metadata(&PUBLIC_IPV4).await? {
                 self.state
                     .update(self.keys.public_ipv4_key.clone(), public_ipv4);
             }
         }
 
-        if self.fields.contains(&SUBNET_ID_KEY) || self.fields.contains(&VPC_ID_KEY) {
+        if self.fields.contains(&*SUBNET_ID_KEY) || self.fields.contains(VPC_ID_KEY) {
             if let Some(mac) = self.get_metadata(&MAC).await? {
                 let mac = String::from_utf8_lossy(&mac[..]);
 
@@ -413,14 +398,14 @@ impl MetadataClient {
                 let vpc_path =
                     format!("/latest/meta-data/network/interfaces/macs/{}/vpc-id", mac).parse()?;
 
-                if self.fields.contains(&SUBNET_ID_KEY) {
+                if self.fields.contains(&*SUBNET_ID_KEY) {
                     if let Some(subnet_id) = self.get_metadata(&subnet_path).await? {
                         self.state
                             .update(self.keys.subnet_id_key.clone(), subnet_id);
                     }
                 }
 
-                if self.fields.contains(&VPC_ID_KEY) {
+                if self.fields.contains(&*VPC_ID_KEY) {
                     if let Some(vpc_id) = self.get_metadata(&vpc_path).await? {
                         self.state.update(self.keys.vpc_id_key.clone(), vpc_id);
                     }
@@ -428,13 +413,13 @@ impl MetadataClient {
             }
         }
 
-        if self.fields.contains(&ROLE_NAME_KEY) {
+        if self.fields.contains(&*ROLE_NAME_KEY) {
             if let Some(role_names) = self.get_metadata(&ROLE_NAME).await? {
                 let role_names = String::from_utf8_lossy(&role_names[..]);
 
                 for (i, role_name) in role_names.lines().enumerate() {
                     self.state.update(
-                        format!("{}[{}]", self.keys.role_name_key, i).into(),
+                        format!("{}[{}]", self.keys.role_name_key, i),
                         role_name.to_string().into(),
                     );
                 }
@@ -453,35 +438,33 @@ impl Keys {
     pub fn new(namespace: &Option<String>) -> Self {
         if let Some(namespace) = &namespace {
             Keys {
-                ami_id_key: format!("{}.{}", namespace, AMI_ID_KEY.clone()).into(),
-                availability_zone_key: format!("{}.{}", namespace, AVAILABILITY_ZONE_KEY.clone())
-                    .into(),
-                instance_id_key: format!("{}.{}", namespace, INSTANCE_ID_KEY.clone()).into(),
-                instance_type_key: format!("{}.{}", namespace, INSTANCE_TYPE_KEY.clone()).into(),
-                local_hostname_key: format!("{}.{}", namespace, LOCAL_HOSTNAME_KEY.clone()).into(),
-                local_ipv4_key: format!("{}.{}", namespace, LOCAL_IPV4_KEY.clone()).into(),
-                public_hostname_key: format!("{}.{}", namespace, PUBLIC_HOSTNAME_KEY.clone())
-                    .into(),
-                public_ipv4_key: format!("{}.{}", namespace, PUBLIC_IPV4_KEY.clone()).into(),
-                region_key: format!("{}.{}", namespace, REGION_KEY.clone()).into(),
-                subnet_id_key: format!("{}.{}", namespace, SUBNET_ID_KEY.clone()).into(),
-                vpc_id_key: format!("{}.{}", namespace, VPC_ID_KEY.clone()).into(),
-                role_name_key: format!("{}.{}", namespace, VPC_ID_KEY.clone()).into(),
+                ami_id_key: format!("{}.{}", namespace, AMI_ID_KEY),
+                availability_zone_key: format!("{}.{}", namespace, AVAILABILITY_ZONE_KEY),
+                instance_id_key: format!("{}.{}", namespace, INSTANCE_ID_KEY),
+                instance_type_key: format!("{}.{}", namespace, INSTANCE_TYPE_KEY),
+                local_hostname_key: format!("{}.{}", namespace, LOCAL_HOSTNAME_KEY),
+                local_ipv4_key: format!("{}.{}", namespace, LOCAL_IPV4_KEY),
+                public_hostname_key: format!("{}.{}", namespace, PUBLIC_HOSTNAME_KEY),
+                public_ipv4_key: format!("{}.{}", namespace, PUBLIC_IPV4_KEY),
+                region_key: format!("{}.{}", namespace, REGION_KEY),
+                subnet_id_key: format!("{}.{}", namespace, SUBNET_ID_KEY),
+                vpc_id_key: format!("{}.{}", namespace, VPC_ID_KEY),
+                role_name_key: format!("{}.{}", namespace, VPC_ID_KEY),
             }
         } else {
             Keys {
-                ami_id_key: AMI_ID_KEY.clone(),
-                availability_zone_key: AVAILABILITY_ZONE_KEY.clone(),
-                instance_id_key: INSTANCE_ID_KEY.clone(),
-                instance_type_key: INSTANCE_TYPE_KEY.clone(),
-                local_hostname_key: LOCAL_HOSTNAME_KEY.clone(),
-                local_ipv4_key: LOCAL_IPV4_KEY.clone(),
-                public_hostname_key: PUBLIC_HOSTNAME_KEY.clone(),
-                public_ipv4_key: PUBLIC_IPV4_KEY.clone(),
-                region_key: REGION_KEY.clone(),
-                subnet_id_key: SUBNET_ID_KEY.clone(),
-                vpc_id_key: VPC_ID_KEY.clone(),
-                role_name_key: ROLE_NAME_KEY.clone(),
+                ami_id_key: AMI_ID_KEY.into(),
+                availability_zone_key: AVAILABILITY_ZONE_KEY.into(),
+                instance_id_key: INSTANCE_ID_KEY.into(),
+                instance_type_key: INSTANCE_TYPE_KEY.into(),
+                local_hostname_key: LOCAL_HOSTNAME_KEY.into(),
+                local_ipv4_key: LOCAL_IPV4_KEY.into(),
+                public_hostname_key: PUBLIC_HOSTNAME_KEY.into(),
+                public_ipv4_key: PUBLIC_IPV4_KEY.into(),
+                region_key: REGION_KEY.into(),
+                subnet_id_key: SUBNET_ID_KEY.into(),
+                vpc_id_key: VPC_ID_KEY.into(),
+                role_name_key: ROLE_NAME_KEY.into(),
             }
         }
     }
@@ -499,9 +482,7 @@ mod integration_tests {
     use super::*;
     use crate::{event::Event, test_util::trace_init};
 
-    lazy_static::lazy_static! {
-        static ref HOST: String = "http://localhost:8111".to_string();
-    }
+    const HOST: &str = "http://localhost:8111";
 
     #[test]
     fn generate_config() {
@@ -513,7 +494,7 @@ mod integration_tests {
         trace_init();
 
         let config = Ec2Metadata {
-            endpoint: Some(HOST.clone()),
+            endpoint: Some(HOST.to_string()),
             ..Default::default()
         };
         let mut transform = config.build(TransformContext::new_test()).await.unwrap();
@@ -526,39 +507,27 @@ mod integration_tests {
         let event = transform.transform(event).unwrap();
         let log = event.as_log();
 
+        assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
+        assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
         assert_eq!(
-            log.get(&"availability-zone".into()),
-            Some(&"ww-region-1a".into())
-        );
-        assert_eq!(log.get(&"public-ipv4".into()), Some(&"192.1.1.1".into()));
-        assert_eq!(
-            log.get(&"public-hostname".into()),
+            log.get("public-hostname"),
             Some(&"mock-public-hostname".into())
         );
-        assert_eq!(log.get(&"local-ipv4".into()), Some(&"192.1.1.2".into()));
-        assert_eq!(
-            log.get(&"local-hostname".into()),
-            Some(&"mock-hostname".into())
-        );
-        assert_eq!(
-            log.get(&"instance-id".into()),
-            Some(&"i-096fba6d03d36d262".into())
-        );
-        assert_eq!(
-            log.get(&"ami-id".into()),
-            Some(&"ami-05f27d4d6770a43d2".into())
-        );
-        assert_eq!(log.get(&"instance-type".into()), Some(&"t2.micro".into()));
-        assert_eq!(log.get(&"region".into()), Some(&"us-east-1".into()));
-        assert_eq!(log.get(&"vpc-id".into()), Some(&"mock-vpc-id".into()));
-        assert_eq!(log.get(&"subnet-id".into()), Some(&"mock-subnet-id".into()));
-        assert_eq!(log.get(&"role-name[0]".into()), Some(&"mock-user".into()));
+        assert_eq!(log.get(&"local-ipv4"), Some(&"192.1.1.2".into()));
+        assert_eq!(log.get("local-hostname"), Some(&"mock-hostname".into()));
+        assert_eq!(log.get("instance-id"), Some(&"i-096fba6d03d36d262".into()));
+        assert_eq!(log.get("ami-id"), Some(&"ami-05f27d4d6770a43d2".into()));
+        assert_eq!(log.get("instance-type"), Some(&"t2.micro".into()));
+        assert_eq!(log.get("region"), Some(&"us-east-1".into()));
+        assert_eq!(log.get("vpc-id"), Some(&"mock-vpc-id".into()));
+        assert_eq!(log.get("subnet-id"), Some(&"mock-subnet-id".into()));
+        assert_eq!(log.get("role-name[0]"), Some(&"mock-user".into()));
     }
 
     #[tokio::test]
     async fn fields() {
         let config = Ec2Metadata {
-            endpoint: Some(HOST.clone()),
+            endpoint: Some(HOST.to_string()),
             fields: Some(vec!["public-ipv4".into(), "region".into()]),
             ..Default::default()
         };
@@ -572,21 +541,21 @@ mod integration_tests {
         let event = transform.transform(event).unwrap();
         let log = event.as_log();
 
-        assert_eq!(log.get(&"availability-zone".into()), None);
-        assert_eq!(log.get(&"public-ipv4".into()), Some(&"192.1.1.1".into()));
-        assert_eq!(log.get(&"public-hostname".into()), None);
-        assert_eq!(log.get(&"local-ipv4".into()), None);
-        assert_eq!(log.get(&"local-hostname".into()), None);
-        assert_eq!(log.get(&"instance-id".into()), None,);
-        assert_eq!(log.get(&"instance-type".into()), None,);
-        assert_eq!(log.get(&"ami-id".into()), None);
-        assert_eq!(log.get(&"region".into()), Some(&"us-east-1".into()));
+        assert_eq!(log.get("availability-zone"), None);
+        assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
+        assert_eq!(log.get("public-hostname"), None);
+        assert_eq!(log.get("local-ipv4"), None);
+        assert_eq!(log.get("local-hostname"), None);
+        assert_eq!(log.get("instance-id"), None,);
+        assert_eq!(log.get("instance-type"), None,);
+        assert_eq!(log.get("ami-id"), None);
+        assert_eq!(log.get("region"), Some(&"us-east-1".into()));
     }
 
     #[tokio::test]
     async fn namespace() {
         let config = Ec2Metadata {
-            endpoint: Some(HOST.clone()),
+            endpoint: Some(HOST.to_string()),
             namespace: Some("ec2.metadata".into()),
             ..Default::default()
         };
@@ -601,17 +570,17 @@ mod integration_tests {
         let log = event.as_log();
 
         assert_eq!(
-            log.get(&"ec2.metadata.availability-zone".into()),
+            log.get("ec2.metadata.availability-zone"),
             Some(&"ww-region-1a".into())
         );
         assert_eq!(
-            log.get(&"ec2.metadata.public-ipv4".into()),
+            log.get("ec2.metadata.public-ipv4"),
             Some(&"192.1.1.1".into())
         );
 
         // Set an empty namespace to ensure we don't prepend one.
         let config = Ec2Metadata {
-            endpoint: Some(HOST.clone()),
+            endpoint: Some(HOST.to_string()),
             namespace: Some("".into()),
             ..Default::default()
         };
@@ -625,10 +594,7 @@ mod integration_tests {
         let event = transform.transform(event).unwrap();
         let log = event.as_log();
 
-        assert_eq!(
-            log.get(&"availability-zone".into()),
-            Some(&"ww-region-1a".into())
-        );
-        assert_eq!(log.get(&"public-ipv4".into()), Some(&"192.1.1.1".into()));
+        assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
+        assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
     }
 }

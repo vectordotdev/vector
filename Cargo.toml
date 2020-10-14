@@ -114,7 +114,6 @@ hyper = "0.13"
 hyper-openssl = "0.8"
 openssl = "0.10.26"
 openssl-probe = "0.1.2"
-string_cache = "0.7.3"
 flate2 = "1.0.6"
 async-compression = { version = "0.3.5", features = ["tokio-02", "gzip"] }
 structopt = "0.3.19"

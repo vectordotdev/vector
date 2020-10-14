@@ -9,12 +9,11 @@ use crate::{
     Event,
 };
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AnsiStripperConfig {
-    field: Option<Atom>,
+    field: Option<String>,
 }
 
 inventory::submit! {
@@ -30,7 +29,7 @@ impl TransformConfig for AnsiStripperConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| Atom::from(crate::config::log_schema().message_key()));
+            .unwrap_or_else(|| crate::config::log_schema().message_key().into());
 
         Ok(Box::new(AnsiStripper { field }))
     }
@@ -49,7 +48,7 @@ impl TransformConfig for AnsiStripperConfig {
 }
 
 pub struct AnsiStripper {
-    field: Atom,
+    field: String,
 }
 
 impl Transform for AnsiStripper {
@@ -83,7 +82,6 @@ mod tests {
         event::{Event, Value},
         transforms::Transform,
     };
-    use string_cache::DefaultAtom as Atom;
 
     macro_rules! assert_foo_bar {
         ($($in:expr),* $(,)?) => {
@@ -96,7 +94,7 @@ mod tests {
                 let event = transform.transform(event).unwrap();
 
                 assert_eq!(
-                    event.into_log().remove(&Atom::from(crate::config::log_schema().message_key())).unwrap(),
+                    event.into_log().remove(crate::config::log_schema().message_key()).unwrap(),
                     Value::from("foo bar")
                 );
             )+

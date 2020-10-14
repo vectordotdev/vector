@@ -79,15 +79,15 @@ mod test {
         Lua::new().context(move |ctx| {
             let event: LogEvent = ctx.load(lua_event).eval().unwrap();
 
-            assert_eq!(event[&"a".into()], Value::Integer(1));
-            assert_eq!(event[&"nested.field".into()], Value::Bytes("2".into()));
+            assert_eq!(event["a"], Value::Integer(1));
+            assert_eq!(event["nested.field"], Value::Bytes("2".into()));
             assert_eq!(
-                event[&"nested.array[0]".into()],
+                event["nested.array[0]"],
                 Value::Bytes("example value".into())
             );
-            assert_eq!(event[&"nested.array[1]".into()], Value::Bytes("".into()));
+            assert_eq!(event["nested.array[1]"], Value::Bytes("".into()));
             assert_eq!(
-                event[&"nested.array[2]".into()],
+                event["nested.array[2]"],
                 Value::Bytes("another value".into())
             );
         });

@@ -29,7 +29,6 @@ use futures::FutureExt;
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -141,18 +140,13 @@ impl HttpSink for LokiConfig {
             }
         }
 
-        let timestamp = match event
-            .as_log()
-            .get(&Atom::from(log_schema().timestamp_key()))
-        {
+        let timestamp = match event.as_log().get(log_schema().timestamp_key()) {
             Some(event::Value::Timestamp(ts)) => ts.timestamp_nanos(),
             _ => chrono::Utc::now().timestamp_nanos(),
         };
 
         if self.remove_timestamp {
-            event
-                .as_mut_log()
-                .remove(&Atom::from(log_schema().timestamp_key()));
+            event.as_mut_log().remove(log_schema().timestamp_key());
         }
 
         self.encoding.apply_rules(&mut event);
@@ -162,7 +156,7 @@ impl HttpSink for LokiConfig {
 
             Encoding::Text => event
                 .as_log()
-                .get(&Atom::from(log_schema().message_key()))
+                .get(log_schema().message_key())
                 .map(Value::to_string_lossy)
                 .unwrap_or_default(),
         };

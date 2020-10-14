@@ -10,7 +10,6 @@ use std::{
     fmt::{self, Debug},
     marker::PhantomData,
 };
-use string_cache::DefaultAtom as Atom;
 
 /// A structure to wrap sink encodings and enforce field privacy.
 ///
@@ -37,7 +36,7 @@ pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub(crate) except_fields: Option<Vec<Atom>>,
+    pub(crate) except_fields: Option<Vec<String>>,
     /// Format for outgoing timestamps.
     #[serde(
         default,
@@ -54,7 +53,7 @@ impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefa
     fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>> {
         &self.only_fields
     }
-    fn except_fields(&self) -> &Option<Vec<Atom>> {
+    fn except_fields(&self) -> &Option<Vec<String>> {
         &self.except_fields
     }
     fn timestamp_format(&self) -> &Option<TimestampFormat> {
@@ -203,7 +202,7 @@ pub struct InnerWithDefault<E: Default> {
     #[serde(default)]
     only_fields: Option<Vec<String>>,
     #[serde(default)]
-    except_fields: Option<Vec<Atom>>,
+    except_fields: Option<Vec<String>>,
     #[serde(default)]
     timestamp_format: Option<TimestampFormat>,
 }

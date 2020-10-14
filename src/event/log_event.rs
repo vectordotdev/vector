@@ -3,9 +3,9 @@ use serde::{Serialize, Serializer};
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
+    fmt::{Debug, Display},
     iter::FromIterator,
 };
-use string_cache::DefaultAtom;
 
 #[derive(PartialEq, Debug, Clone, Default)]
 pub struct LogEvent {
@@ -13,70 +13,81 @@ pub struct LogEvent {
 }
 
 impl LogEvent {
-    pub fn get(&self, key: &DefaultAtom) -> Option<&Value> {
-        util::log::get(&self.fields, key)
+    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
+    pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
+        util::log::get(&self.fields, key.as_ref())
     }
 
+    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
         self.fields.get(key.as_ref())
     }
 
-    pub fn get_mut(&mut self, key: &DefaultAtom) -> Option<&mut Value> {
-        util::log::get_mut(&mut self.fields, key)
+    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
+    pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
+        util::log::get_mut(&mut self.fields, key.as_ref())
     }
 
+    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
     pub fn contains(&self, key: impl AsRef<str>) -> bool {
         util::log::contains(&self.fields, key.as_ref())
     }
 
-    pub fn insert<K, V>(&mut self, key: K, value: V) -> Option<Value>
-    where
-        K: AsRef<str>,
-        V: Into<Value>,
-    {
+    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
+    pub fn insert(
+        &mut self,
+        key: impl AsRef<str>,
+        value: impl Into<Value> + Debug,
+    ) -> Option<Value> {
         util::log::insert(&mut self.fields, key.as_ref(), value.into())
     }
 
+    #[instrument(skip(self, key), fields(key = ?key))]
     pub fn insert_path<V>(&mut self, key: Vec<PathComponent>, value: V) -> Option<Value>
     where
-        V: Into<Value>,
+        V: Into<Value> + Debug,
     {
         util::log::insert_path(&mut self.fields, key, value.into())
     }
 
+    #[instrument(skip(self, key), fields(key = %key))]
     pub fn insert_flat<K, V>(&mut self, key: K, value: V)
     where
-        K: Into<String>,
-        V: Into<Value>,
+        K: Into<String> + Display,
+        V: Into<Value> + Debug,
     {
         self.fields.insert(key.into(), value.into());
     }
 
-    pub fn try_insert<V>(&mut self, key: &DefaultAtom, value: V)
-    where
-        V: Into<Value>,
-    {
+    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
+    pub fn try_insert(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
+        let key = key.as_ref();
         if !self.contains(key) {
-            self.insert(key.clone(), value);
+            self.insert(key, value);
         }
     }
 
-    pub fn remove(&mut self, key: &DefaultAtom) -> Option<Value> {
-        util::log::remove(&mut self.fields, &key, false)
+    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
+    pub fn remove(&mut self, key: impl AsRef<str>) -> Option<Value> {
+        util::log::remove(&mut self.fields, key.as_ref(), false)
     }
 
+    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
     pub fn remove_prune(&mut self, key: impl AsRef<str>, prune: bool) -> Option<Value> {
         util::log::remove(&mut self.fields, key.as_ref(), prune)
     }
 
+    #[instrument(skip(self))]
     pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
         util::log::keys(&self.fields)
     }
 
+    #[instrument(skip(self))]
     pub fn all_fields(&self) -> impl Iterator<Item = (String, &Value)> + Serialize {
         util::log::all_fields(&self.fields)
     }
 
+    #[instrument(skip(self))]
     pub fn is_empty(&self) -> bool {
         self.fields.is_empty()
     }
@@ -175,25 +186,32 @@ impl TryInto<serde_json::Value> for LogEvent {
     }
 }
 
-impl std::ops::Index<&DefaultAtom> for LogEvent {
+impl<T> std::ops::Index<T> for LogEvent
+where
+    T: AsRef<str>,
+{
     type Output = Value;
 
-    fn index(&self, key: &DefaultAtom) -> &Value {
-        self.get(key)
-            .expect(&*format!("Key is not found: {:?}", key))
+    fn index(&self, key: T) -> &Value {
+        self.get(key.as_ref())
+            .expect(&*format!("Key is not found: {:?}", key.as_ref()))
     }
 }
 
-impl<K: Into<DefaultAtom>, V: Into<Value>> Extend<(K, V)> for LogEvent {
+impl<K, V> Extend<(K, V)> for LogEvent
+where
+    K: AsRef<str>,
+    V: Into<Value>,
+{
     fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
         for (k, v) in iter {
-            self.insert(k.into(), v.into());
+            self.insert(k.as_ref(), v.into());
         }
     }
 }
 
 // Allow converting any kind of appropriate key/value iterator directly into a LogEvent.
-impl<K: Into<DefaultAtom>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
+impl<K: AsRef<str>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
         let mut log_event = LogEvent::default();
         log_event.extend(iter);

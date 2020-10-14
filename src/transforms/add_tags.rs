@@ -7,18 +7,17 @@ use crate::{
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{btree_map::Entry, BTreeMap};
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AddTagsConfig {
-    pub tags: IndexMap<Atom, String>,
+    pub tags: IndexMap<String, String>,
     #[serde(default = "crate::serde::default_true")]
     pub overwrite: bool,
 }
 
 pub struct AddTags {
-    tags: IndexMap<Atom, String>,
+    tags: IndexMap<String, String>,
     overwrite: bool,
 }
 
@@ -49,7 +48,7 @@ impl TransformConfig for AddTagsConfig {
 }
 
 impl AddTags {
-    pub fn new(tags: IndexMap<Atom, String>, overwrite: bool) -> Self {
+    pub fn new(tags: IndexMap<String, String>, overwrite: bool) -> Self {
         AddTags { tags, overwrite }
     }
 }
@@ -98,7 +97,6 @@ mod tests {
     };
     use indexmap::IndexMap;
     use std::collections::BTreeMap;
-    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn add_tags() {
@@ -110,9 +108,9 @@ mod tests {
             value: MetricValue::Gauge { value: 10.0 },
         });
 
-        let map: IndexMap<Atom, String> = vec![
-            (Atom::from("region"), "us-east-1".into()),
-            (Atom::from("host"), "localhost".into()),
+        let map: IndexMap<String, String> = vec![
+            ("region".into(), "us-east-1".into()),
+            ("host".into(), "localhost".into()),
         ]
         .into_iter()
         .collect();
@@ -138,7 +136,7 @@ mod tests {
             value: MetricValue::Gauge { value: 10.0 },
         });
 
-        let map: IndexMap<Atom, String> = vec![(Atom::from("region"), "overridden".into())]
+        let map: IndexMap<String, String> = vec![("region".to_string(), "overridden".to_string())]
             .into_iter()
             .collect();
 

@@ -417,7 +417,6 @@ mod test {
     use super::*;
     use crate::Event;
     use serde_json::json;
-    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn initial_values() {
@@ -558,6 +557,6 @@ mod test {
         let mut output = Event::new_empty_log();
         let mut output = output.as_mut_log();
         merger.insert_into("out".into(), &mut output)?;
-        Ok(output.remove(&Atom::from("out")).unwrap())
+        Ok(output.remove("out").unwrap())
     }
 }

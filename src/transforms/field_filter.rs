@@ -4,7 +4,6 @@ use crate::{
     event::Event,
 };
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -47,16 +46,13 @@ impl TransformConfig for FieldFilterConfig {
 }
 
 pub struct FieldFilter {
-    field_name: Atom,
+    field_name: String,
     value: String,
 }
 
 impl FieldFilter {
     pub fn new(field_name: String, value: String) -> Self {
-        Self {
-            field_name: field_name.into(),
-            value,
-        }
+        Self { field_name, value }
     }
 }
 

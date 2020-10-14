@@ -7,7 +7,6 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -15,7 +14,7 @@ pub struct MergeConfig {
     /// The field that indicates that the event is partial. A consequent stream
     /// of partial events along with the first non-partial event will be merged
     /// together.
-    pub partial_event_marker_field: Atom,
+    pub partial_event_marker_field: String,
     /// Fields to merge. The values of these fields will be merged into the
     /// first partial event. Fields not specified here will be ignored.
     /// Merging process takes the first partial event and the base, then it
@@ -24,12 +23,12 @@ pub struct MergeConfig {
     /// merged in, producing the resulting merged event.
     // Deprecated name is merge_fields
     #[serde(alias = "merge_fields")]
-    pub fields: Vec<Atom>,
+    pub fields: Vec<String>,
     /// An ordered list of fields to distinguish streams by. Each stream has a
     /// separate partial event merging state. Should be used to prevent events
     /// from unrelated sources from mixing together, as this affects partial
     /// event processing.
-    pub stream_discriminant_fields: Vec<Atom>,
+    pub stream_discriminant_fields: Vec<String>,
 }
 
 inventory::submit! {
@@ -41,8 +40,8 @@ impl_generate_config_from_default!(MergeConfig);
 impl Default for MergeConfig {
     fn default() -> Self {
         Self {
-            partial_event_marker_field: event::PARTIAL.clone(),
-            fields: vec![Atom::from(crate::config::log_schema().message_key())],
+            partial_event_marker_field: event::PARTIAL.to_string(),
+            fields: vec![crate::config::log_schema().message_key().to_string()],
             stream_discriminant_fields: vec![],
         }
     }
@@ -70,9 +69,9 @@ impl TransformConfig for MergeConfig {
 
 #[derive(Debug)]
 pub struct Merge {
-    partial_event_marker_field: Atom,
-    fields: Vec<Atom>,
-    stream_discriminant_fields: Vec<Atom>,
+    partial_event_marker_field: String,
+    fields: Vec<String>,
+    stream_discriminant_fields: Vec<String>,
     log_event_merge_states: HashMap<Discriminant, LogEventMergeState>,
 }
 
@@ -145,7 +144,6 @@ mod test {
     use super::{Merge, MergeConfig};
     use crate::event::{self, Event};
     use crate::transforms::Transform;
-    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn generate_config() {
@@ -153,7 +151,7 @@ mod test {
     }
 
     fn make_partial(mut event: Event) -> Event {
-        event.as_mut_log().insert(event::PARTIAL.clone(), true);
+        event.as_mut_log().insert(event::PARTIAL, true);
         event
     }
 
@@ -186,7 +184,7 @@ mod test {
         assert_eq!(
             merged_event
                 .as_log()
-                .get(&Atom::from("message"))
+                .get("message")
                 .unwrap()
                 .as_bytes()
                 .as_ref(),
@@ -199,7 +197,7 @@ mod test {
 
     #[test]
     fn merge_merges_partial_events_from_separate_streams() {
-        let stream_discriminant_field = Atom::from("stream_name");
+        let stream_discriminant_field = "stream_name".to_string();
 
         let mut merge = Merge::from(MergeConfig {
             stream_discriminant_fields: vec![stream_discriminant_field.clone()],
@@ -233,7 +231,7 @@ mod test {
         assert_eq!(
             s1_merged_event
                 .as_log()
-                .get(&Atom::from("message"))
+                .get("message")
                 .unwrap()
                 .as_bytes()
                 .as_ref(),
@@ -243,7 +241,7 @@ mod test {
         assert_eq!(
             s2_merged_event
                 .as_log()
-                .get(&Atom::from("message"))
+                .get("message")
                 .unwrap()
                 .as_bytes()
                 .as_ref(),

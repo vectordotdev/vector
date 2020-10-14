@@ -1,6 +1,5 @@
 use super::InternalEvent;
 use metrics::counter;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug)]
 pub(crate) struct RegexParserEventProcessed;
@@ -36,7 +35,7 @@ impl InternalEvent for RegexParserFailedMatch<'_> {
 
 #[derive(Debug)]
 pub(crate) struct RegexParserMissingField<'a> {
-    pub field: &'a Atom,
+    pub field: &'a str,
 }
 
 impl InternalEvent for RegexParserMissingField<'_> {
@@ -51,7 +50,7 @@ impl InternalEvent for RegexParserMissingField<'_> {
 
 #[derive(Debug)]
 pub(crate) struct RegexParserTargetExists<'a> {
-    pub target_field: &'a Atom,
+    pub target_field: &'a str,
 }
 
 impl<'a> InternalEvent for RegexParserTargetExists<'a> {
@@ -70,7 +69,7 @@ impl<'a> InternalEvent for RegexParserTargetExists<'a> {
 
 #[derive(Debug)]
 pub(crate) struct RegexParserConversionFailed<'a> {
-    pub name: &'a Atom,
+    pub name: &'a str,
     pub error: crate::types::Error,
 }
 

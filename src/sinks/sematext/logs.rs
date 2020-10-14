@@ -10,7 +10,6 @@ use crate::{
 };
 use futures01::{Future, Sink};
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SematextLogsConfig {
@@ -84,11 +83,11 @@ impl SinkConfig for SematextLogsConfig {
 fn map_timestamp(mut event: Event) -> impl Future<Item = Event, Error = ()> {
     let log = event.as_mut_log();
 
-    if let Some(ts) = log.remove(&Atom::from(crate::config::log_schema().timestamp_key())) {
+    if let Some(ts) = log.remove(crate::config::log_schema().timestamp_key()) {
         log.insert("@timestamp", ts);
     }
 
-    if let Some(host) = log.remove(&Atom::from(crate::config::log_schema().host_key())) {
+    if let Some(host) = log.remove(crate::config::log_schema().host_key()) {
         log.insert("os.host", host);
     }
 
