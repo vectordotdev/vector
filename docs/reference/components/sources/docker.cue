@@ -20,35 +20,6 @@ components: sources: docker: {
 		function:      "collect"
 	}
 
-	dependencies: {
-		docker_engine: {
-			required: true
-			title:    "Docker Engine"
-			type:     "external"
-			url:      urls.docker_engine
-			version:  ">= 1.24"
-
-			setup: [
-				#"""
-					Ensure that [Docker is setup][urls.docker_setup] and running.
-					"""#,
-				#"""
-					Ensure that the Docker Engine is properly exposing logs:
-
-					```bash
-					docker logs $(docker ps | awk '{ print $1 }')
-					```
-
-					If you receive an error it's likely that you do not have
-					the proper Docker logging drivers installed. The Docker
-					Engine requires either the [`json-file`][urls.docker_logging_driver_json_file] (default)
-					or [`journald`](docker_logging_driver_journald) Docker
-					logging driver to be installed.
-					"""#,
-			]
-		}
-	}
-
 	features: {
 		checkpoint: enabled: false
 		multiline: enabled:  true
@@ -61,6 +32,47 @@ components: sources: docker: {
 	}
 
 	support: {
+		dependencies: {
+			docker_engine: {
+				required: true
+				title:    "Docker Engine"
+				type:     "external"
+				url:      urls.docker_engine
+				versions: ">= 1.24"
+
+				interface: socket: {
+					api: {
+						title: "Docker Engine API"
+						url:   urls.docker_engine_api
+					}
+					direction: "outgoing"
+					permissions: unix: group: "docker"
+					protocols: ["http"]
+					socket: "/var/run/docker.sock"
+					ssl:    "disabled"
+				}
+
+				setup: [
+					#"""
+						Ensure that [Docker is setup][urls.docker_setup] and running.
+						"""#,
+					#"""
+						Ensure that the Docker Engine is properly exposing logs:
+
+						```bash
+						docker logs $(docker ps | awk '{ print $1 }')
+						```
+
+						If you receive an error it's likely that you do not have
+						the proper Docker logging drivers installed. The Docker
+						Engine requires either the [`json-file`][urls.docker_logging_driver_json_file] (default)
+						or [`journald`](docker_logging_driver_journald) Docker
+						logging driver to be installed.
+						"""#,
+				]
+			}
+		}
+
 		platforms: {
 			docker: volumes: ["/var/run/docker.sock"]
 			triples: {
@@ -147,15 +159,6 @@ components: sources: docker: {
 				default: 1
 			}
 		}
-	}
-
-	input: collect: http: {
-		api: {
-			docs_url: urls.docker_engine_api
-			title:    "Docker Engine API"
-		}
-		permissions: unix: group: "docker"
-		socket: "/var/run/docker.sock"
 	}
 
 	output: logs: {

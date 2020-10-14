@@ -64,8 +64,6 @@ _values: {
 
 	configuration: #Schema
 
-	dependencies: #Dependencies
-
 	// `long_description` describes the components with a single paragraph.
 	// It is used for SEO purposes and should be full of relevant keywords.
 	long_description: string
@@ -134,18 +132,14 @@ _values: {
 	// to these sections for deeper explanations of behavior.
 	how_it_works: #HowItWorks
 
-	if Kind == "source" {
-		input?: #ExternalInput
-	}
-
 	if Kind != "source" {
-		input: #InternalInput
+		input: #Input
 	}
 
 	if Kind != "sink" {
 		// `output` documents output of the component. This is very important
 		// as it communicate which events and fields are emitted.
-		output: #InternalOutput
+		output: #Output
 	}
 
 	// `statuses` communicates the various statuses of the component.
@@ -168,7 +162,9 @@ _values: {
 	required: bool
 	type:     "external" | "internal"
 	url:      string
-	version:  string
+	versions: string | null
+
+	interface: #Interface
 
 	setup: [...string]
 })
@@ -219,46 +215,41 @@ _values: {
 // * `metric` - metric event
 #EventType: "log" | "metric"
 
-#ExternalInput: {
-	close({collect: #ExternalInputCollect}) |
-	close({receive: #ExternalInputReceive})
+#Interface: {
+	close({binary: #InterfaceBinary}) |
+	close({file_system: #InterfaceFileSystem}) |
+	close({socket: #InterfaceSocket}) |
+	close({stdin: close({})})
 }
 
-#ExternalInputCollect: {
-	close({binary: #ExternalInputCollectBinary}) |
-	close({file_system: #ExternalInputCollectFileSystem}) |
-	close({http: #ExternalInputCollectHTTP})
-}
-
-#ExternalInputCollectBinary: {
+#InterfaceBinary: {
 	name:         string
 	permissions?: #Permissions
 }
 
-#ExternalInputCollectFileSystem: {
+#InterfaceFileSystem: {
 	directory: string
 }
 
-#ExternalInputCollectHTTP: {
-	api: {
-		docs_url: string
-		title:    string
-	}
-	permissions?: #Permissions
-	socket?:      string
-}
-
-#ExternalInputReceive: {
-	close({http: #ExternalInputReceiveHTTP})
-}
-
-#ExternalInputReceiveHTTP: {
+#InterfaceSocket: {
 	api?: {
-		docs_url: string
-		title:    string
+		title: string
+		url:   string
 	}
-	port: uint16
-	ssl:  "required" | "optional"
+	direction: "incoming" | "outgoing"
+
+	if direction == "outgoing" {
+		network_hops?: uint8
+		permissions?:  #Permissions
+	}
+
+	if direction == "incoming" {
+		port: uint16
+	}
+
+	protocols: [#Protocol, ...]
+	socket?: string
+	ssl:     "disabled" | "required" | "optional"
 }
 
 #Features: {
@@ -381,14 +372,9 @@ _values: {
 	}]
 })
 
-#InternalInput: {
+#Input: {
 	logs:    bool
 	metrics: false | #MetricInput
-}
-
-#InternalOutput: {
-	logs?:    #LogOutput
-	metrics?: #MetricOutput
 }
 
 #LogEvent: {
@@ -473,6 +459,11 @@ _values: {
 
 #MetricType: "counter" | "gauge" | "histogram" | "summary"
 
+#Output: {
+	logs?:    #LogOutput
+	metrics?: #MetricOutput
+}
+
 #Permissions: {
 	unix: {
 		group: string
@@ -493,6 +484,8 @@ _values: {
 		"x86_64-unknown-linux-musl":  bool
 	}
 }
+
+#Protocol: "http" | "tcp" | "udp" | "unix"
 
 #Schema: [Name=string]: {
 	// `category` allows you to group options into categories.
@@ -571,6 +564,8 @@ _values: {
 
 #Support: {
 	_args: kind: string
+
+	dependencies: #Dependencies
 
 	// `platforms` describes which platforms this component is available on.
 	//

@@ -31,6 +31,22 @@ components: sources: vector: {
 	}
 
 	support: {
+		dependencies: {
+			vector_client: {
+				required: true
+				title:    "Vector Client"
+				type:     "external"
+				url:      urls.vector_sink
+				versions: null
+
+				interface: socket: {
+					port: _port
+					protocols: ["tcp"]
+					ssl: "optional"
+				}
+			}
+		}
+
 		platforms: {
 			docker: ports: [_port]
 			triples: {
@@ -43,13 +59,8 @@ components: sources: vector: {
 			}
 		}
 
-		requirements: [
-		]
-		warnings: [
-			"""
-				This component exposes a configured port. You must ensure your network allows access to this port.
-				""",
-		]
+		requirements: []
+		warnings: []
 		notices: []
 	}
 

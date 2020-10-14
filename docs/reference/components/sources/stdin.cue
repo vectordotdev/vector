@@ -24,6 +24,18 @@ components: sources: stdin: {
 	}
 
 	support: {
+		dependencies: {
+			stdin_client: {
+				required: true
+				title:    "STDIN Client"
+				type:     "external"
+				url:      urls.stdin
+				versions: null
+
+				interface: stdin: {}
+			}
+		}
+
 		platforms: {
 			triples: {
 				"aarch64-unknown-linux-gnu":  true

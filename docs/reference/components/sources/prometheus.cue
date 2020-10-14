@@ -24,6 +24,26 @@ components: sources: prometheus: {
 	}
 
 	support: {
+		dependencies: {
+			prometheus_client: {
+				required: true
+				title:    "Prometheus Client"
+				type:     "external"
+				url:      urls.prometheus_client
+				versions: null
+
+				interface: socket: {
+					api: {
+						title: "Prometheus"
+						url:   urls.prometheus_text_based_exposition_format
+					}
+					direction: "outgoing"
+					protocols: ["http"]
+					ssl: "optional"
+				}
+			}
+		}
+
 		platforms: {
 			triples: {
 				"aarch64-unknown-linux-gnu":  true

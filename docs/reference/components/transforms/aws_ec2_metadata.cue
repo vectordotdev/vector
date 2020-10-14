@@ -18,6 +18,22 @@ components: transforms: aws_ec2_metadata: {
 	}
 
 	support: {
+		dependencies: {
+			aws_imds_v2: {
+				required: true
+				title:    "AWS IMDS v2"
+				type:     "external"
+				url:      urls.apache
+				versions: ">= 2"
+
+				interface: socket: {
+					direction:    "outgoing"
+					network_hops: 2
+					protocols: ["http"]
+					ssl: "disabled"
+				}
+			}
+		}
 
 		platforms: {
 			triples: {
@@ -30,22 +46,7 @@ components: transforms: aws_ec2_metadata: {
 			}
 		}
 
-		requirements: [
-			#"""
-				[AWS IMDS v2][urls.aws_ec2_instance_metadata] is required for
-				security reasons. This is available by default on all EC2
-				instances.
-				"""#,
-			#"""
-				Running this transform within Docker on EC2 requires 2 network
-				hops. Users must raise this limit by running the following
-				command:
-
-				```bash
-				aws ec2 modify-instance-metadata-options --instance-id <ID> --http-endpoint enabled --http-put-response-hop-limit 2
-				```
-				"""#,
-		]
+		requirements: []
 		warnings: []
 		notices: []
 	}

@@ -31,6 +31,23 @@ components: sources: socket: {
 	}
 
 	support: {
+		dependencies: {
+			socket_client: {
+				required: true
+				title:    "Socket Client"
+				type:     "external"
+				url:      urls.prometheus_client
+				versions: null
+
+				interface: socket: {
+					direction: "incoming"
+					port:      _port
+					protocols: ["tcp", "unix", "udp"]
+					ssl: "optional"
+				}
+			}
+		}
+
 		platforms: {
 			docker: ports: [_port]
 			triples: {

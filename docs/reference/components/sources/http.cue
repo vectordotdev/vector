@@ -31,6 +31,25 @@ components: sources: http: {
 	}
 
 	support: {
+		dependencies: {
+			http_client: {
+				required: true
+				title:    "HTTP Client"
+				type:     "external"
+				url:      urls.http_client
+				versions: null
+
+				interface: {
+					socket: {
+						direction: "incoming"
+						port:      _port
+						protocols: ["http"]
+						ssl: "optional"
+					}
+				}
+			}
+		}
+
 		platforms: {
 			docker: ports: [_port]
 			triples: {
@@ -83,11 +102,6 @@ components: sources: http: {
 				items: type: string: examples: ["User-Agent", "X-My-Custom-Header"]
 			}
 		}
-	}
-
-	input: receive: http: {
-		port: _port
-		ssl:  "required"
 	}
 
 	output: logs: {

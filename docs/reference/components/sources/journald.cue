@@ -24,6 +24,20 @@ components: sources: journald: {
 	}
 
 	support: {
+		dependencies: {
+			journald: {
+				required: true
+				title:    "JournalD"
+				type:     "external"
+				url:      urls.journald
+				versions: null
+
+				interface: binary: {
+					name: "journalctl"
+					permissions: unix: group: "systemd-journal"
+				}
+			}
+		}
 
 		platforms: {
 			triples: {
@@ -106,11 +120,6 @@ components: sources: journald: {
 		}
 	}
 
-	input: collect: binary: {
-		name: "journalctl"
-		permissions: unix: group: "systemd-journal"
-	}
-
 	examples: [
 		{
 			title: "Sample Output"
@@ -149,19 +158,4 @@ components: sources: journald: {
 			}]
 		},
 	]
-
-	how_it_works: {
-		"communication-strategy": {
-			title: "Communication Strategy"
-			body: #"""
-				Vector's journald source uses the `journalctl` utility program to read data from the journald log files. This program reads the journald binary log files and outputs structured records that Vector reads and converts into events. Vector must have permissions to execute this program and read the files in the journald log spool directories.
-				"""#
-		}
-		"user-permissions": {
-			title: "User Permissions"
-			body: #"""
-				Journald stores the log spool in files that are only accessible to members of the `systemd-journal` group. In order for Vector to read these files, it must either be run with the `systemd-journal` group privileges or the permissions on the journal directory on files must be modified to allow Vector access.
-				"""#
-		}
-	}
 }

@@ -27,6 +27,57 @@ components: sources: apache_metrics: {
 	}
 
 	support: {
+		dependencies: {
+			apache_http: {
+				required: true
+				title:    "Apache HTTP Server (HTTPD)"
+				type:     "external"
+				url:      urls.apache
+				versions: null
+
+				interface: {
+					socket: {
+						api: {
+							title: "Apache HTTP Server Status Module"
+							url:   urls.apache_mod_status
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "disabled"
+					}
+				}
+
+				setup: [
+					#"""
+						[Install the Apache HTTP server][urls.apache_install].
+						"""#,
+					#"""
+						Enable the [Apache Status module][urls.apache_mod_status]
+						in your Apache config:
+
+						```text file="\(_config_path)"
+						<Location "\(_path)">
+						    SetHandler server-status
+						    Require host example.com
+						</Location>
+						```
+						"""#,
+					#"""
+						Optionally enable [`ExtendedStatus` option][urls.apache_extended_status]
+						for more detailed metrics (see [Output](#output)). Note,
+						this defaults to `On` in Apache >= 2.3.6.
+
+						```text file="\(_config_path)"
+						ExtendedStatus On
+						```
+						"""#,
+					#"""
+						Start or reload Apache to apply the config changes.
+						"""#,
+				]
+			}
+		}
+
 		platforms: {
 			triples: {
 				"aarch64-unknown-linux-gnu":  true
@@ -41,45 +92,6 @@ components: sources: apache_metrics: {
 		requirements: []
 		warnings: []
 		notices: []
-	}
-
-	dependencies: {
-		apache: {
-			required: true
-			title:    "Apache HTTP Server (HTTPD)"
-			type:     "external"
-			url:      urls.apache
-			version:  "any"
-
-			setup: [
-				#"""
-					[Install the Apache HTTP server][urls.apache_install].
-					"""#,
-				#"""
-					Enable the [Apache Status module][urls.apache_mod_status]
-					in your Apache config:
-
-					```text file="\(_config_path)"
-					<Location "\(_path)">
-					    SetHandler server-status
-					    Require host example.com
-					</Location>
-					```
-					"""#,
-				#"""
-					Optionally enable [`ExtendedStatus` option][urls.apache_extended_status]
-					for more detailed metrics (see [Output](#output)). Note,
-					this defaults to `On` in Apache >= 2.3.6.
-
-					```text file="\(_config_path)"
-					ExtendedStatus On
-					```
-					"""#,
-				#"""
-					Start or reload Apache to apply the config changes.
-					"""#,
-			]
-		}
 	}
 
 	configuration: {
@@ -99,11 +111,6 @@ components: sources: apache_metrics: {
 				unit:    "seconds"
 			}
 		}
-	}
-
-	input: collect: http: api: {
-		title:    "Apache HTTP Served Status Module"
-		docs_url: urls.apache_mod_status
 	}
 
 	output: metrics: {

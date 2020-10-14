@@ -26,6 +26,26 @@ components: sources: statsd: {
 	}
 
 	support: {
+		dependencies: {
+			statsd_client: {
+				required: true
+				title:    "StatsD Client"
+				type:     "external"
+				url:      urls.statsd
+				versions: null
+
+				interface: socket: {
+					api: {
+						title: "StatsD"
+						url:   urls.statsd_udp_protocol
+					}
+					port: _port
+					protocols: ["udp"]
+					ssl: "optional"
+				}
+			}
+		}
+
 		platforms: {
 			docker: ports: [_port]
 			triples: {
@@ -69,12 +89,13 @@ components: sources: statsd: {
 		timestamps: {
 			title: "Timestamps"
 			body: #"""
-				StatsD protocol does not provide support for sending metric timestamps. You'll
-				notice that each parsed metric is assigned a `null` timestamp, which is a
-				special value which means "a real time metric", i.e. not a historical one. Normally such
-				`null` timestamps will be substituted by current time by downstream sinks or
-				3rd party services during sending/ingestion. See the [metric][docs.data-model.metric]
-				data model page for more info.
+				StatsD protocol does not provide support for sending metric
+				timestamps. You'll notice that each parsed metric is assigned a
+				`null` timestamp, which is a special value which means "a real
+				time metric", i.e. not a historical one. Normally such `null`
+				timestamps will be substituted by current time by downstream
+				sinks or 3rd party services during sending/ingestion. See the
+				[metric][docs.data-model.metric] data model page for more info.
 				"""#
 		}
 	}

@@ -31,6 +31,37 @@ components: sources: logplex: {
 	}
 
 	support: {
+		dependencies: {
+			logpex: {
+				required: true
+				title:    "Heroku"
+				type:     "external"
+				url:      urls.logplex
+				versions: null
+
+				interface: socket: {
+					api: {
+						title: "Syslog 6587"
+						url:   urls.syslog_6587
+					}
+					port: _port
+					protocols: ["http"]
+					ssl: "optional"
+				}
+
+				setup: [
+					#"""
+						Create a [Heroku log drain][urls.heroku_http_log_drain] that
+						points to your Vector instance's address:
+
+						```bash
+						heroku drains:add https://<user>:<pass>@<address> -a <app>
+						```
+						"""#,
+				]
+			}
+		}
+
 		platforms: {
 			docker: ports: [_port]
 			triples: {
@@ -61,15 +92,6 @@ components: sources: logplex: {
 				examples: ["0.0.0.0:\(_port)"]
 			}
 		}
-	}
-
-	input: receive: http: {
-		api: {
-			docs_url: urls.logplex_protocol
-			title:    "Logplex Destination"
-		}
-		port: _port
-		ssl:  "optional"
 	}
 
 	output: logs: line: {
