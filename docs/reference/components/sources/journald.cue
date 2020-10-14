@@ -40,25 +40,15 @@ components: sources: journald: {
 		}
 
 		platforms: {
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        false
-				"x86_64-pc-windows-msv":      false
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
-			}
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        false
+			"x86_64-pc-windows-msv":      false
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: [
-			#"""
-				The `journalctl` binary is required, this is the interface Vector uses to retrieve JournalD logs. See the ["Communication Strategy" section][docs.sources.journald#communication-strategy] for more info.
-				"""#,
-			#"""
-				The Vector user must be part of the `systemd-journal` group in order to execute the `journalctl` binary. See the ["User Permissions" section][docs.sources.journald#user-permissions] for more info.
-				"""#,
-		]
-
+		requirements: []
 		warnings: []
 		notices: []
 	}

@@ -51,25 +51,15 @@ components: sources: http: {
 		}
 
 		platforms: {
-			docker: ports: [_port]
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
-			}
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: [
-			#"""
-				This component exposes a configured port. You must ensure your network
-				allows inbound access to this port if you want to accept requests from
-				remote sources.
-				"""#,
-		]
-
+		requirements: []
 		warnings: []
 		notices: []
 	}

@@ -472,18 +472,12 @@ _values: {
 }
 
 #Platforms: {
-	docker: {
-		ports?: [uint16, ...]
-		volumes?: [string, ...]
-	}
-	triples: {
-		"aarch64-unknown-linux-gnu":  bool
-		"aarch64-unknown-linux-musl": bool
-		"x86_64-apple-darwin":        bool
-		"x86_64-pc-windows-msv":      bool
-		"x86_64-unknown-linux-gnu":   bool
-		"x86_64-unknown-linux-musl":  bool
-	}
+	"aarch64-unknown-linux-gnu":  bool
+	"aarch64-unknown-linux-musl": bool
+	"x86_64-apple-darwin":        bool
+	"x86_64-pc-windows-msv":      bool
+	"x86_64-unknown-linux-gnu":   bool
+	"x86_64-unknown-linux-musl":  bool
 }
 
 #Protocol: "http" | "tcp" | "udp" | "unix"
