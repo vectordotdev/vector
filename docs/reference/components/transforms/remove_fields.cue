@@ -3,7 +3,6 @@ package metadata
 components: transforms: remove_fields: {
 	title:             "Remove Fields"
 	short_description: "Accepts log events and allows you to remove one or more log fields."
-	long_description:  "Accepts log events and allows you to remove one or more log fields."
 
 	classes: {
 		commonly_used: false

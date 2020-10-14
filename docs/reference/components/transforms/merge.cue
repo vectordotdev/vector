@@ -3,7 +3,6 @@ package metadata
 components: transforms: merge: {
 	title:             "Merge"
 	short_description: "Accepts log events and allows you to merge partial log events into a single event."
-	long_description:  "Accepts log events and allows you to merge partial log events into a single event."
 
 	classes: {
 		commonly_used: false

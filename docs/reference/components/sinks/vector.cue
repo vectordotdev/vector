@@ -3,7 +3,6 @@ package metadata
 components: sinks: vector: {
 	title:             "Vector"
 	short_description: "Streams log and metric events to another downstream [`vector` source][docs.sources.vector]."
-	long_description:  "Streams log and metric events to another downstream [`vector` source][docs.sources.vector]."
 
 	classes: {
 		commonly_used: false

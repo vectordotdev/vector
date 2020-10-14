@@ -3,7 +3,6 @@ package metadata
 components: transforms: json_parser: {
 	title:             "JSON Parser"
 	short_description: "Accepts log events and allows you to parse a log field value as JSON."
-	long_description:  "Accepts log events and allows you to parse a log field value as JSON."
 
 	classes: {
 		commonly_used: false

@@ -3,7 +3,6 @@ package metadata
 components: transforms: lua: {
 	title:             "Lua"
 	short_description: "Accepts log and metric events and allows you to transform events with a full embedded [Lua][urls.lua] engine."
-	long_description:  "Accepts log and metric events and allows you to transform events with a full embedded [Lua][urls.lua] engine."
 
 	classes: {
 		commonly_used: false

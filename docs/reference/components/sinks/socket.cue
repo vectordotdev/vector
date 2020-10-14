@@ -3,7 +3,6 @@ package metadata
 components: sinks: socket: {
 	title:             "Socket"
 	short_description: "Streams log events to a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket."
-	long_description:  "Streams log events to a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket."
 
 	classes: {
 		commonly_used: true

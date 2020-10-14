@@ -3,7 +3,6 @@ package metadata
 components: sources: stdin: {
 	title:             "STDIN"
 	short_description: "Ingests data through [standard input (STDIN)][urls.stdin] and outputs log events."
-	long_description:  "Ingests data through [standard input (STDIN)][urls.stdin] and outputs log events."
 
 	classes: {
 		commonly_used: false

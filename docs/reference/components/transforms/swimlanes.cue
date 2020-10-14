@@ -3,7 +3,6 @@ package metadata
 components: transforms: swimlanes: {
 	title:             "Swimlanes"
 	short_description: "Accepts log events and allows you to route events across parallel streams using logical filters."
-	long_description:  "Accepts log events and allows you to route events across parallel streams using logical filters."
 
 	classes: {
 		commonly_used: false
