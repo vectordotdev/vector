@@ -888,7 +888,6 @@ mod integration_tests {
                 username: None,
                 password: None,
             }),
-            tags: None,
             influxdb2_settings: None,
             batch: Default::default(),
             request: Default::default(),

@@ -124,11 +124,11 @@ impl HttpSink for LogdnaConfig {
         map.insert("line".to_string(), json!(line));
         map.insert("timestamp".to_string(), json!(timestamp));
 
-        if let Some(env) = log.remove(&"env") {
+        if let Some(env) = log.remove("env") {
             map.insert("env".to_string(), json!(env));
         }
 
-        if let Some(app) = log.remove(&"app") {
+        if let Some(app) = log.remove("app") {
             map.insert("app".to_string(), json!(app));
         }
 

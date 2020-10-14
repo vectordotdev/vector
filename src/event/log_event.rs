@@ -186,16 +186,17 @@ impl TryInto<serde_json::Value> for LogEvent {
     }
 }
 
-impl std::ops::Index<&str> for LogEvent {
+impl<T> std::ops::Index<T> for LogEvent where T: AsRef<str> {
     type Output = Value;
 
-    fn index(&self, key: &str) -> &Value {
-        self.get(key)
-            .expect(&*format!("Key is not found: {:?}", key))
+    fn index(&self, key: T) -> &Value {
+        self.get(key.as_ref())
+            .expect(&*format!("Key is not found: {:?}", key.as_ref()))
     }
 }
 
-impl<K: AsRef<str>, V: Into<Value>> Extend<(K, V)> for LogEvent {
+impl<K, V> Extend<(K, V)> for LogEvent
+where K: AsRef<str>, V: Into<Value> {
     fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
         for (k, v) in iter {
             self.insert(k.as_ref(), v.into());
