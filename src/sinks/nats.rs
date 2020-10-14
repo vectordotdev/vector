@@ -7,7 +7,6 @@ use crate::{
 };
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
-use nats;
 use serde::{Deserialize, Serialize};
 
 /**
@@ -66,8 +65,8 @@ impl NatsSink {
         let nc = options.connect(&config.url).unwrap();
 
         Self {
-            nc: nc,
-            subject: config.subject.clone(),
+            nc,
+            subject: config.subject,
         }
     }
 }
@@ -85,17 +84,10 @@ impl StreamSink for NatsSink {
 
                     let message_len = body.len();
 
-                    match self.nc.publish(&self.subject, body) {
-                        Ok(_) => {
-                            emit!(NatsEventSent {
-                                byte_size: message_len,
-                            });
-                        }
-                        _ => {
-                            // DEV: Code path for handling unsuccessful
-                            //      publications. Future work to buffer unsent
-                            //      messages might go here.
-                        }
+                    if self.nc.publish(&self.subject, body).is_ok() {
+                        emit!(NatsEventSent {
+                            byte_size: message_len,
+                        });
                     }
                 }
                 Event::Metric(_metric) => {}
