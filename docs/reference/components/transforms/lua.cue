@@ -228,7 +228,7 @@ components: transforms: lua: {
 
 	examples: [
 		{
-			title: "Add, rename, & remove fields"
+			title: "Add, rename, & remove log fields"
 			configuration: {
 				hooks: process: #"""
 					function (event, emit)
@@ -300,7 +300,7 @@ components: transforms: lua: {
 			}
 		},
 		{
-			title: "Drop metric event"
+			title: "Drop an event"
 			configuration: {
 				hooks: process: #"""
 					function (event, emit)
@@ -308,21 +308,163 @@ components: transforms: lua: {
 					end
 					"""#
 			}
-			input: metric: {
-				name: "logins"
+			input: log: {
+				field_to_rename: "old value"
+				field_to_remove: "remove me"
+			}
+			output: null
+		},
+		{
+			title: "Iterate over log fields"
+			configuration: {
+				hooks: process: #"""
+					function (event, emit)
+					  -- Remove all fields where the value is "-"
+					  for f, v in pairs(event) do
+					    if v == "-" then
+					      event[f] = nil
+					    end
+					  end
+
+					  emit(event)
+					end
+					"""#
+			}
+			input: log: {
+				value_to_remove: "-"
+				value_to_keep:   "keep"
+			}
+			output: log: {
+				value_to_keep: "keep"
+			}
+		},
+		{
+			title: "Parse timestamps"
+			configuration: {
+				hooks: {
+					init: #"""
+						-- Parse timestamps like `2020-04-07 06:26:02.643`
+						timestamp_pattern = "(%d%d%d%d)[-](%d%d)[-](%d%d) (%d%d):(%d%d):(%d%d).?(%d*)"
+
+						function parse_timestamp(str)
+						  local year, month, day, hour, min, sec, millis = string.match(str, timestamp_pattern)
+						  local ms = 0
+						  if millis and millis ~= "" then
+						    ms = tonumber(millis)
+						  end
+						  return {
+						    year    = tonumber(year),
+						    month   = tonumber(month),
+						    day     = tonumber(day),
+						    hour    = tonumber(hour),
+						    min     = tonumber(min),
+						    sec     = tonumber(sec),
+						    nanosec = ms * 1000000
+						  }
+						end
+						"""#
+					process: #"""
+						function (event, emit)
+							event.log.timestamp = parse_timestamp(event.log.timestamp_string)
+							emit(event)
+						end
+						"""#
+				}
+			}
+			input: log: {
+				timestamp_string: "2020-04-07 06:26:02.643"
+			}
+			output: log: {
+				timestamp_string: "2020-04-07 06:26:02.643"
+				timestamp:        "2020-04-07 06:26:02.643"
+			}
+		},
+		{
+			title: "Count the number of logs"
+			configuration: {
+				hooks: {
+					init:     "init"
+					process:  "process"
+					shutdown: "shutdown"
+				}
+				timers: [
+					{interval_seconds: 5, handler: "timer_handler"},
+				]
+				source: #"""
+					function init()
+					  count = 0
+					end
+
+					function process()
+					  count = count + 1
+					end
+
+					function timer_handler(emit)
+					  emit(make_counter(count))
+					  count = 0
+					end
+
+					function shutdown(emit)
+					  emit(make_counter(count))
+					end
+
+					function make_counter(value)
+					  return metric = {
+					    name = "event_counter",
+					    kind = "incremental",
+					    timestamp = os.date("!*t"),
+					    counter = {
+					      value = value
+					    }
+					  }
+					end
+					"""#
+			}
+			input: log: {}
+			output: metric: {
+				name: "event_counter"
 				counter: {
 					value: 2.0
 				}
 				tags: {
-					tag_to_rename: "old value"
-					tag_to_remove: "remove me"
+					tag:         "new value"
+					renamed_tag: "old value"
 				}
 			}
-			output: null
 		},
 	]
 
 	how_it_works: {
+		event_data_model: {
+			title: "Event Data Model"
+			body: #"""
+				The `process` hook takes an `event` as its first argument.
+				Events are represented as [tables][urls.lua_table] in Lua
+				and follow Vector's data model exactly. Please refer to
+				Vector's [data model reference][docs.data-model] for the event
+				schema. How Vector's types map to Lua's type are covered below.
+				"""#
+			sub_sections: [
+				{
+					title: "Type Mappings"
+					body: #"""
+						The correspondence between Vector's [data types][docs.about.data-model.log#types] and Lua data type is summarized
+						by the following table:
+
+						| Vector Type                                         | Lua Type                        | Comment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+						|:----------------------------------------------------|:--------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+						| [`String`][docs.about.data-model.log#strings]       | [`string`][urls.lua_string]     |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+						| [`Integer`][docs.about.data-model.log#ints]         | [`integer`][urls.lua_integer]   |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+						| [`Float`][docs.about.data-model.log#floats]         | [`number`][urls.lua_number]     |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+						| [`Boolean`][docs.about.data-model.log#booleans]     | [`boolean`][urls.lua_boolean]   |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+						| [`Timestamp`][docs.about.data-model.log#timestamps] | [`table`][urls.lua_table]       | There is no dedicated timestamp type in Lua. Timestamps are represented as tables using the convention defined by [`os.date`][urls.lua_os_date] and [`os.time`][urls.lua_os_time]. The table representation of a timestamp contains the fields `year`, `month`, `day`, `hour`, `min`, `sec`, `nanosec`, `yday`, `wday`, and `isdst`. If such a table is passed from Lua to Vector, the fields  `yday`, `wday`, and `isdst` can be omitted. In addition to the `os.time` representation, Vector supports sub-second resolution with a `nanosec` field in the table. |
+						| [`Null`][docs.about.data-model.log#null-values]     | empty string                    | In Lua setting the value of a table field to `nil` means deletion of this field. In addition, the length operator `#` does not work in the expected way with sequences containing nulls. Because of that `Null` values are encoded as empty strings.                                                                                                                                                                                                                                                                                                               |
+						| [`Map`][docs.about.data-model.log#maps]             | [`table`][urls.lua_table]       |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+						| [`Array`][docs.about.data-model.log#arrays]         | [`sequence`][urls.lua_sequence] | Sequences are a special case of tables. Indexes start from 1, following the Lua convention.                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+						"""#
+				},
+			]
+		}
 		defining_timestamps: {
 			title: "Defining Timestamps"
 			body: #"""
