@@ -25,7 +25,6 @@ use std::{
     convert::Infallible,
     net::SocketAddr,
     sync::{Arc, RwLock},
-    task::Poll,
 };
 use stream_cancel::{Trigger, Tripwire};
 
@@ -440,15 +439,7 @@ impl PrometheusSink {
 
         let server = Server::bind(&self.config.address)
             .serve(new_service)
-            .with_graceful_shutdown(tripwire.then(|closed| {
-                future::poll_fn(move |_| {
-                    if closed {
-                        Poll::Ready(())
-                    } else {
-                        Poll::Pending
-                    }
-                })
-            }))
+            .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
             .map_err(|e| eprintln!("server error: {}", e));
 
         tokio::spawn(server);

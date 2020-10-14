@@ -3,13 +3,12 @@ use crate::{
     Error,
 };
 use bytes::Bytes;
-use futures::{future, FutureExt, TryFutureExt};
+use futures::{FutureExt, TryFutureExt};
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server,
 };
 use serde::Deserialize;
-use std::task::Poll;
 use stream_cancel::{Trigger, Tripwire};
 use tokio::sync::mpsc;
 
@@ -52,15 +51,7 @@ pub fn build_test_server(
     let (trigger, tripwire) = Tripwire::new();
     let server = Server::bind(&addr)
         .serve(service)
-        .with_graceful_shutdown(tripwire.then(|closed| {
-            future::poll_fn(move |_| {
-                if closed {
-                    Poll::Ready(())
-                } else {
-                    Poll::Pending
-                }
-            })
-        }))
+        .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
         .map_err(|e| panic!("Server error: {}", e));
 
     (rx, trigger, server)

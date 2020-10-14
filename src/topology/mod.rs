@@ -821,10 +821,9 @@ mod transient_state_tests {
         transforms::json_parser::JsonParserConfig,
         Error, Pipeline,
     };
-    use futures::{compat::Future01CompatExt, future, FutureExt, TryFutureExt};
+    use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
     use futures01::Future;
     use serde::{Deserialize, Serialize};
-    use std::task::Poll;
     use stream_cancel::{Trigger, Tripwire};
 
     #[derive(Debug, Deserialize, Serialize)]
@@ -857,22 +856,15 @@ mod transient_state_tests {
         ) -> Result<Source, Error> {
             let source = shutdown
                 .map(|_| ())
-                .select(
+                .select(Box::new(
                     self.tripwire
                         .clone()
                         .unwrap()
-                        .then(|closed| {
-                            future::poll_fn(move |_| {
-                                if closed {
-                                    Poll::Ready(())
-                                } else {
-                                    Poll::Pending
-                                }
-                            })
-                        })
+                        .then(crate::stream::tripwire_handler)
                         .unit_error()
+                        .boxed()
                         .compat(),
-                )
+                ))
                 .map(|_| std::mem::drop(out))
                 .map_err(|_| ());
             Ok(Box::new(source))
