@@ -21,16 +21,24 @@ use tokio_util::{codec::BytesCodec, udp::UdpFramed};
 
 pub mod parser;
 
+#[cfg(unix)]
+mod unix;
+
+#[cfg(unix)]
+use unix::{statsd_unix, UnixConfig};
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 enum StatsdConfig {
     Tcp(TcpConfig),
     Udp(UdpConfig),
+    #[cfg(unix)]
+    Unix(UnixConfig),
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-struct UdpConfig {
-    address: SocketAddr,
+pub struct UdpConfig {
+    pub address: SocketAddr,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -83,6 +91,8 @@ impl SourceConfig for StatsdConfig {
                     out,
                 )
             }
+            #[cfg(unix)]
+            StatsdConfig::Unix(config) => Ok(statsd_unix(config.clone(), shutdown, out)),
         }
     }
 
@@ -175,7 +185,7 @@ impl TcpSource for StatsdTcpSource {
 #[cfg(feature = "sinks-prometheus")]
 #[cfg(test)]
 mod test {
-    use super::{StatsdConfig, TcpConfig, UdpConfig};
+    use super::*;
     use crate::{
         config,
         sinks::prometheus::PrometheusSinkConfig,
@@ -236,6 +246,32 @@ mod test {
                 while let Some(bytes) = receiver.recv().await {
                     use tokio::io::AsyncWriteExt;
                     tokio::net::TcpStream::connect(addr)
+                        .await
+                        .unwrap()
+                        .write_all(bytes)
+                        .await
+                        .unwrap();
+                }
+            });
+            sender
+        };
+        test_statsd(config, sender).await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_statsd_unix() {
+        let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
+        let config = StatsdConfig::Unix(UnixConfig {
+            path: in_path.clone(),
+        });
+        let sender = {
+            let (sender, mut receiver) = mpsc::channel(200);
+            let path = in_path;
+            tokio::spawn(async move {
+                while let Some(bytes) = receiver.recv().await {
+                    use tokio::io::AsyncWriteExt;
+                    tokio::net::UnixStream::connect(&path)
                         .await
                         .unwrap()
                         .write_all(bytes)
