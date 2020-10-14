@@ -3,7 +3,6 @@ package metadata
 components: transforms: reduce: {
 	title:             "Reduce"
 	short_description: "Accepts log events and allows you to combine multiple events into a single event based on a set of identifiers."
-	long_description:  "Accepts log events and allows you to combine multiple events into a single event based on a set of identifiers."
 
 	classes: {
 		commonly_used: false

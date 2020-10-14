@@ -4,7 +4,6 @@ components: sources: file: {
 	_directory: "/var/log"
 
 	title:             "File"
-	long_description:  ""
 	short_description: "Collect logs by tailing one more files."
 
 	classes: {

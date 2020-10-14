@@ -5,7 +5,6 @@ components: sources: vector: {
 
 	title:             "Vector"
 	short_description: "Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs log and metric events."
-	long_description:  "Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs log and metric events."
 
 	classes: {
 		commonly_used: false

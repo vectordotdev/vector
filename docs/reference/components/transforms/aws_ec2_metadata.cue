@@ -3,7 +3,6 @@ package metadata
 components: transforms: aws_ec2_metadata: {
 	title:             "AWS EC2 Metadata"
 	short_description: "Accepts log events and allows you to enrich logs with AWS EC2 instance metadata."
-	long_description:  "Accepts log events and allows you to enrich logs with AWS EC2 instance metadata."
 
 	classes: {
 		commonly_used: false

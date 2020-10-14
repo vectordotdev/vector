@@ -71,7 +71,7 @@ _values: {
 
 	// `long_description` describes the components with a single paragraph.
 	// It is used for SEO purposes and should be full of relevant keywords.
-	long_description: string
+	long_description?: string
 
 	// `short_description` describes the component in one sentence.
 	short_description: string

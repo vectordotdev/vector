@@ -6,7 +6,6 @@ components: sources: apache_metrics: {
 
 	title:             "Apache HTTP Server (HTTPD) Metrics"
 	short_description: "Collect metrics from an Apache HTTPD server."
-	long_description:  "TODO: fill me in"
 
 	classes: {
 		commonly_used: false

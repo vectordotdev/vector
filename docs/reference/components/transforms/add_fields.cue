@@ -1,9 +1,8 @@
 package metadata
 
 components: transforms: add_fields: {
-	title:             "#{component.title}"
+	title:             "Add Fields"
 	short_description: "Accepts log events and allows you to add one or more log fields."
-	long_description:  "Accepts log events and allows you to add one or more log fields."
 
 	classes: {
 		commonly_used: false

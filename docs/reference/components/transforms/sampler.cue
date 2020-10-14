@@ -3,7 +3,6 @@ package metadata
 components: transforms: sampler: {
 	title:             "Sampler"
 	short_description: "Accepts log events and allows you to sample events with a configurable rate."
-	long_description:  "Accepts log events and allows you to sample events with a configurable rate."
 
 	classes: {
 		commonly_used: false

@@ -5,7 +5,6 @@ components: sources: socket: {
 
 	title:             "Socket"
 	short_description: "Ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket and outputs log events."
-	long_description:  "Ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket and outputs log events."
 
 	classes: {
 		commonly_used: true
