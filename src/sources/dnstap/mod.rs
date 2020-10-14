@@ -20,17 +20,19 @@ mod dns_message_parser;
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct DnstapConfig {
-    #[serde(default = "default_max_length")]
-    pub max_length: usize,
+    #[serde(default = "default_max_frame_length")]
+    pub max_frame_length: usize,
     pub host_key: Option<String>,
     pub socket_path: PathBuf,
     pub raw_data_only: Option<bool>,
     pub multithreaded: Option<bool>,
     pub max_frame_handling_tasks: Option<i32>,
     pub socket_file_mode: Option<u32>,
+    pub socket_receive_buffer_size: Option<usize>,
+    pub socket_send_buffer_size: Option<usize>
 }
 
-fn default_max_length() -> usize {
+fn default_max_frame_length() -> usize {
     bytesize::kib(100u64) as usize
 }
 
@@ -52,12 +54,14 @@ impl Default for DnstapConfig {
     fn default() -> Self {
         Self {
             host_key: Some("host".to_string()),
-            max_length: default_max_length(),
+            max_frame_length: default_max_frame_length(),
             socket_path: PathBuf::from("/run/bind/dnstap.sock"),
             raw_data_only: None,
             multithreaded: None,
             max_frame_handling_tasks: None,
             socket_file_mode: None,
+            socket_receive_buffer_size: None,
+            socket_send_buffer_size: None,
         }
     }
 }
@@ -81,7 +85,7 @@ impl SourceConfig for DnstapConfig {
             .unwrap_or_else(|| log_schema().host_key().to_string());
 
         let frame_handler = DnstapFrameHandler::new(
-            self.max_length,
+            self.max_frame_length,
             host_key,
             self.socket_path.clone(),
             self.content_type(),
@@ -100,12 +104,9 @@ impl SourceConfig for DnstapConfig {
             } else {
                 1000
             },
-            self.socket_file_mode
-            // if let Some(v) = self.socket_file_mode {
-            //     v
-            // } else {
-            //     0o755
-            // },
+            self.socket_file_mode,
+            self.socket_receive_buffer_size,
+            self.socket_send_buffer_size
         );
         Ok(build_framestream_unix_source(frame_handler, shutdown, out))
     }
@@ -121,7 +122,7 @@ impl SourceConfig for DnstapConfig {
 
 #[derive(Clone)]
 pub struct DnstapFrameHandler {
-    max_length: usize,
+    max_frame_length: usize,
     host_key: String,
     socket_path: PathBuf,
     content_type: String,
@@ -130,11 +131,13 @@ pub struct DnstapFrameHandler {
     multithreaded: bool,
     max_frame_handling_tasks: i32,
     socket_file_mode: Option<u32>,
+    socket_receive_buffer_size: Option<usize>,
+    socket_send_buffer_size: Option<usize>,
 }
 
 impl DnstapFrameHandler {
     pub fn new(
-        max_length: usize,
+        max_frame_length: usize,
         host_key: String,
         socket_path: PathBuf,
         content_type: String,
@@ -142,9 +145,11 @@ impl DnstapFrameHandler {
         multithreaded: bool,
         max_frame_handling_tasks: i32,
         socket_file_mode: Option<u32>,
+        socket_receive_buffer_size: Option<usize>,
+        socket_send_buffer_size: Option<usize>,
     ) -> Self {
         Self {
-            max_length,
+            max_frame_length,
             host_key,
             socket_path,
             content_type,
@@ -153,6 +158,8 @@ impl DnstapFrameHandler {
             multithreaded,
             max_frame_handling_tasks,
             socket_file_mode,
+            socket_receive_buffer_size,
+            socket_send_buffer_size,
         }
     }
 }
@@ -162,8 +169,8 @@ impl FrameHandler for DnstapFrameHandler {
         self.content_type.clone()
     }
 
-    fn max_length(&self) -> usize {
-        self.max_length
+    fn max_frame_length(&self) -> usize {
+        self.max_frame_length
     }
 
     fn host_key(&self) -> String {
@@ -214,5 +221,13 @@ impl FrameHandler for DnstapFrameHandler {
 
     fn socket_file_mode(&self) -> Option<u32> {
         self.socket_file_mode
+    }
+
+    fn socket_receive_buffer_size(&self) -> Option<usize> {
+        self.socket_receive_buffer_size
+    }
+
+    fn socket_send_buffer_size(&self) -> Option<usize> {
+        self.socket_send_buffer_size
     }
 }

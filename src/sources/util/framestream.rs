@@ -18,6 +18,8 @@ use futures01::Sink as Sink01;
 use std::convert::TryInto;
 use std::fs;
 use std::marker::{Send, Sync};
+#[cfg(unix)]
+use std::os::unix::io::AsRawFd;
 use std::os::unix::fs::PermissionsExt;
 use std::{
     path::PathBuf,
@@ -343,13 +345,15 @@ impl FrameStreamReader {
 
 pub trait FrameHandler {
     fn content_type(&self) -> String;
-    fn max_length(&self) -> usize;
+    fn max_frame_length(&self) -> usize;
     fn host_key(&self) -> String;
     fn handle_event(&self, received_from: Option<Bytes>, frame: Bytes) -> Option<Event>;
     fn socket_path(&self) -> PathBuf;
     fn multithreaded(&self) -> bool;
     fn max_frame_handling_tasks(&self) -> i32;
     fn socket_file_mode(&self) -> Option<u32>;
+    fn socket_receive_buffer_size(&self) -> Option<usize>;
+    fn socket_send_buffer_size(&self) -> Option<usize>;
 }
 
 /**
@@ -370,15 +374,39 @@ pub fn build_framestream_unix_source(
     match fs::metadata(&path) {
         Ok(_) => {
             //exists, so try to delete it
-            info!(message = "deleting file", ?path);
-            fs::remove_file(&path).expect("failed to delete existing socket");
+            info!(message = "Deleting file", ?path);
+            fs::remove_file(&path).expect("Failed to delete existing socket");
         }
         Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {} //doesn't exist, do nothing
-        Err(e) => error!("failed to bind to listener socket; error = {:?}", e),
+        Err(e) => error!("Failed to bind to listener socket; error = {:?}", e),
     };
 
     let fut = async move {
-        let mut listener = UnixListener::bind(&path).expect("failed to bind to listener socket");
+        let mut listener = UnixListener::bind(&path).expect("Failed to bind to listener socket");
+
+        // system's 'net.core.rmem_max' might have to be changed if socket receive buffer is not updated properly
+        if let Some(socket_receive_buffer_size) = frame_handler.socket_receive_buffer_size() {
+            let _ = nix::sys::socket::setsockopt(
+                listener.as_raw_fd(),
+                nix::sys::socket::sockopt::RcvBuf,
+                &(socket_receive_buffer_size),
+            );
+            let rcv_buf_size =
+                nix::sys::socket::getsockopt(listener.as_raw_fd(), nix::sys::socket::sockopt::RcvBuf);
+            info!("Unix socket receive buffer size modified to {}", rcv_buf_size.unwrap());
+        }
+
+        // system's 'net.core.wmem_max' might have to be changed if socket send buffer is not updated properly
+        if let Some(socket_send_buffer_size) = frame_handler.socket_send_buffer_size() {
+            let _ = nix::sys::socket::setsockopt(
+                listener.as_raw_fd(),
+                nix::sys::socket::sockopt::SndBuf,
+                &(socket_send_buffer_size),
+            );
+            let snd_buf_size =
+                nix::sys::socket::getsockopt(listener.as_raw_fd(), nix::sys::socket::sockopt::SndBuf);
+            info!("Unix socket buffer send size modified to {}", snd_buf_size.unwrap());
+        }
 
         // the permissions to unix socket are restricted from 0o700 to 0o777, which are 448 and 511 in decimal
         if let Some(socket_permission) = frame_handler.socket_file_mode() {
@@ -387,10 +415,10 @@ pub fn build_framestream_unix_source(
             }
             match fs::set_permissions(&path, fs::Permissions::from_mode(socket_permission)) {
                 Ok(_) => {
-                    info!("socket permissions updated to {:o}", socket_permission);
+                    info!("Socket permissions updated to {:o}", socket_permission);
                 }
                 Err(e) => error!(
-                    "failed to update listener socket permissions; error = {:?}",
+                    "Failed to update listener socket permissions; error = {:?}",
                     e
                 ),
             };
@@ -398,13 +426,13 @@ pub fn build_framestream_unix_source(
 
         let parsing_task_counter = Arc::new(AtomicI32::new(0));
 
-        info!(message = "listening...", ?path, r#type = "unix");
+        info!(message = "Listening...", ?path, r#type = "unix");
 
         let mut stream = listener.incoming().take_until(shutdown.clone().compat());
         while let Some(socket) = stream.next().await {
             let socket = match socket {
                 Err(e) => {
-                    error!("failed to accept socket; error = {:?}", e);
+                    error!("Failed to accept socket; error = {:?}", e);
                     continue;
                 }
                 Ok(s) => s,
@@ -432,7 +460,7 @@ pub fn build_framestream_unix_source(
             let (sock_sink, sock_stream) = Framed::new(
                 socket,
                 length_delimited::Builder::new()
-                    .max_frame_length(frame_handler.max_length())
+                    .max_frame_length(frame_handler.max_frame_length())
                     .new_codec(),
             )
             .split();
@@ -572,24 +600,28 @@ mod test {
     #[derive(Clone)]
     struct MockFrameHandler {
         content_type: String,
-        max_length: usize,
+        max_frame_length: usize,
         host_key: String,
         socket_path: PathBuf,
         multithreaded: bool,
         max_frame_handling_tasks: i32,
         socket_file_mode: Option<u32>,
+        socket_receive_buffer_size: Option<usize>,
+        socket_send_buffer_size: Option<usize>,
     }
 
     impl MockFrameHandler {
         pub fn new(content_type: String) -> Self {
             Self {
                 content_type,
-                max_length: bytesize::kib(100u64) as usize,
+                max_frame_length: bytesize::kib(100u64) as usize,
                 host_key: "test_framestream".to_string(),
                 socket_path: tempfile::tempdir().unwrap().into_path().join("unix_test"),
                 multithreaded: false,
                 max_frame_handling_tasks: 0,
                 socket_file_mode: None,
+                socket_receive_buffer_size: None,
+                socket_send_buffer_size: None,
             }
         }
     }
@@ -598,8 +630,8 @@ mod test {
         fn content_type(&self) -> String {
             self.content_type.clone()
         }
-        fn max_length(&self) -> usize {
-            self.max_length
+        fn max_frame_length(&self) -> usize {
+            self.max_frame_length
         }
         fn host_key(&self) -> String {
             self.host_key.clone()
@@ -628,6 +660,14 @@ mod test {
 
         fn socket_file_mode(&self) -> Option<u32> {
             self.socket_file_mode
+        }
+
+        fn socket_receive_buffer_size(&self) -> Option<usize> {
+            self.socket_receive_buffer_size
+        }
+
+        fn socket_send_buffer_size(&self) -> Option<usize> {
+            self.socket_send_buffer_size
         }
     }
 
