@@ -7,15 +7,12 @@ components: transforms: swimlanes: {
 
 	classes: {
 		commonly_used: false
+		development:   "beta"
 		egress_method: "stream"
 		function:      "route"
 	}
 
 	features: {}
-
-	statuses: {
-		development: "beta"
-	}
 
 	support: {
 		platforms: {
@@ -37,7 +34,7 @@ components: transforms: swimlanes: {
 			description: "A table of swimlane identifiers to logical conditions representing the filter of the swimlane. Each swimlane can then be referenced as an input by other components with the name `<transform_name>.<swimlane_id>`."
 			required:    true
 			warnings: []
-			type: object: components._conditions
+			type: object: configuration._conditions
 		}
 	}
 
@@ -46,7 +43,7 @@ components: transforms: swimlanes: {
 		metrics: false
 	}
 
-	examples: log: [
+	examples: [
 		{
 			title: "Split by log level"
 			configuration: {
@@ -57,10 +54,10 @@ components: transforms: swimlanes: {
 					error: "level.eq": "error"
 				}
 			}
-			input: {
+			input: log: {
 				level: "info"
 			}
-			output: {
+			output: log: {
 				level: "info"
 			}
 		},

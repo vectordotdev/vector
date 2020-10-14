@@ -7,6 +7,8 @@ components: sinks: logdna: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "batch"
 		function:      "transmit"
 		service_providers: ["LogDNA"]
@@ -34,11 +36,6 @@ components: sinks: logdna: {
 			timeout_secs:               60
 		}
 		tls: enabled: false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
 	}
 
 	support: {

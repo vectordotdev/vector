@@ -7,15 +7,13 @@ components: transforms: add_fields: {
 
 	classes: {
 		commonly_used: false
+		development:   "stable"
+		development:   "stable"
 		egress_method: "stream"
 		function:      "schema"
 	}
 
 	features: {}
-
-	statuses: {
-		development: "stable"
-	}
 
 	support: {
 		platforms: {
@@ -63,7 +61,7 @@ components: transforms: add_fields: {
 		}
 		overwrite: {
 			common:      true
-			description: "By default, fields will be overridden. Set this to `false` to avoid overwriting values.\n"
+			description: "By default, fields will be overridden. Set this to `false` to avoid overwriting values."
 			required:    false
 			warnings: []
 			type: bool: default: true

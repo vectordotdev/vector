@@ -7,6 +7,8 @@ components: sinks: console: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "stable"
 		egress_method: "stream"
 		function:      "test"
 		service_providers: []
@@ -23,11 +25,6 @@ components: sinks: console: {
 		healthcheck: enabled: true
 		request: enabled:     false
 		tls: enabled:         false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "stable"
 	}
 
 	support: {

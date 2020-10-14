@@ -7,15 +7,12 @@ components: transforms: remove_fields: {
 
 	classes: {
 		commonly_used: false
+		development:   "stable"
 		egress_method: "stream"
 		function:      "schema"
 	}
 
 	features: {}
-
-	statuses: {
-		development: "stable"
-	}
 
 	support: {
 		platforms: {

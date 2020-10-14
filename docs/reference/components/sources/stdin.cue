@@ -7,7 +7,9 @@ components: sources: stdin: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["sidecar"]
+		development:   "stable"
 		egress_method: "stream"
 		function:      "receive"
 	}
@@ -18,12 +20,19 @@ components: sources: stdin: {
 		tls: enabled:        false
 	}
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "stable"
-	}
-
 	support: {
+		dependencies: {
+			stdin_client: {
+				required: true
+				title:    "STDIN Client"
+				type:     "external"
+				url:      urls.stdin
+				versions: null
+
+				interface: stdin: {}
+			}
+		}
+
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -67,7 +76,7 @@ components: sources: stdin: {
 		}
 	}
 
-	examples: log: [
+	examples: [
 		{
 			_line: #"""
 				2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
@@ -79,7 +88,7 @@ components: sources: stdin: {
 				\( _line )
 				```
 				"""
-			output: {
+			output: log: {
 				timestamp: _values.current_timestamp
 				message:   _line
 				host:      _values.local_host

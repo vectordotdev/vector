@@ -6,16 +6,13 @@ components: transforms: sampler: {
 	long_description:  "Accepts log events and allows you to sample events with a configurable rate."
 
 	classes: {
-		commonly_used: true
+		commonly_used: false
+		development:   "beta"
 		egress_method: "stream"
 		function:      "filter"
 	}
 
 	features: {}
-
-	statuses: {
-		development: "beta"
-	}
 
 	support: {
 		platforms: {

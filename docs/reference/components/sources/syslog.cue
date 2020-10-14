@@ -1,14 +1,44 @@
 package metadata
 
 components: sources: syslog: {
+	_port: 514
+
 	title:             "Syslog"
 	short_description: "Ingests data through the [Syslog protocol][urls.syslog_5424] and outputs log events."
 	long_description:  "[Syslog][urls.syslog] stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is used to collect various device logs from different machines and send them to a central location for monitoring and review."
 
-	classes:       sources.socket.classes
-	features:      sources.socket.features
-	statuses:      sources.socket.statuses
-	support:       sources.socket.support
+	classes:  sources.socket.classes
+	features: sources.socket.features
+
+	support: {
+		dependencies: {
+			syslog_client: {
+				required: true
+				title:    "Syslog Client"
+				type:     "external"
+				url:      urls.syslog
+				versions: null
+
+				interface: socket: {
+					api: {
+						title: "Syslog"
+						url:   urls.syslog
+					}
+					direction: "incoming"
+					port:      _port
+					protocols: ["tcp", "unix", "udp"]
+					ssl: "optional"
+				}
+			}
+		}
+
+		platforms: sources.socket.support.platforms
+
+		requirements: []
+		warnings: []
+		notices: []
+	}
+
 	configuration: sources.socket.configuration
 
 	output: logs: line: {
@@ -23,7 +53,7 @@ components: sources: syslog: {
 			}
 			host: fields._local_host
 			hostname: {
-				description: "The hostname extracted from the Syslog line. (`host` is also this value if it exists in the log.)\n"
+				description: "The hostname extracted from the Syslog line. (`host` is also this value if it exists in the log.)"
 				required:    true
 				type: string: {
 					examples: ["my.host.com"]
@@ -65,7 +95,7 @@ components: sources: syslog: {
 				}
 			}
 			source_ip: {
-				description: "The upstream hostname. In the case where `mode` = `\"unix\"` the socket path will be used. (`host` is also this value if `hostname` does not exist in the log.)\n"
+				description: "The upstream hostname. In the case where `mode` = `\"unix\"` the socket path will be used. (`host` is also this value if `hostname` does not exist in the log.)"
 				required:    true
 				type: string: {
 					examples: ["127.0.0.1"]
@@ -81,14 +111,14 @@ components: sources: syslog: {
 				}
 			}
 			"*": {
-				description: "In addition to the defined fields, any Syslog 5424 structured fields are parsed and inserted as root level fields.\n"
+				description: "In addition to the defined fields, any Syslog 5424 structured fields are parsed and inserted as root level fields."
 				required:    true
 				type: "*": {}
 			}
 		}
 	}
 
-	examples: log: [
+	examples: [
 		{
 			_app_name:     "non"
 			_event_id:     "1011"
@@ -106,7 +136,7 @@ components: sources: syslog: {
 				<13>1 \(_timestamp) \(_hostname) \(_app_name) \(_procid) \(_msgid) [exampleSDID@32473 iut="\(_iut)" eventSource="\(_event_source)" eventID="\(_event_id)"] \(_message)
 				```
 				"""
-			output: {
+			output: log: {
 				severity:    "notice"
 				facility:    "user"
 				timestamp:   _timestamp

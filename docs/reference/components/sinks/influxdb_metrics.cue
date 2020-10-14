@@ -7,6 +7,8 @@ components: sinks: influxdb_metrics: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "batch"
 		function:      "transmit"
 		service_providers: ["InfluxData"]
@@ -33,12 +35,13 @@ components: sinks: influxdb_metrics: {
 			retry_max_duration_secs:    10
 			timeout_secs:               60
 		}
-		tls: enabled: false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
+		tls: {
+			enabled:                true
+			can_enable:             true
+			can_verify_certificate: true
+			can_verify_hostname:    true
+			enabled_default:        true
+		}
 	}
 
 	support: {
@@ -56,117 +59,7 @@ components: sinks: influxdb_metrics: {
 		notices: []
 	}
 
-	configuration: {
-		bucket: {
-			description: "The destination bucket for writes into InfluxDB 2."
-			groups: ["v2"]
-			required: true
-			warnings: []
-			type: string: {
-				examples: ["vector-bucket", "4d2225e4d3d49f75"]
-			}
-		}
-		consistency: {
-			common:      true
-			description: "Sets the write consistency for the point for InfluxDB 1."
-			groups: ["v1"]
-			required: false
-			warnings: []
-			type: string: {
-				default: null
-				examples: ["any", "one", "quorum", "all"]
-			}
-		}
-		database: {
-			description: "Sets the target database for the write into InfluxDB 1."
-			groups: ["v1"]
-			required: true
-			warnings: []
-			type: string: {
-				examples: ["vector-database", "iot-store"]
-			}
-		}
-		endpoint: {
-			description: "The endpoint to send metrics to."
-			groups: ["v1", "v2"]
-			required: true
-			type: string: {
-				examples: ["http://localhost:8086/", "https://us-west-2-1.aws.cloud1.influxdata.com", "https://us-west-2-1.aws.cloud2.influxdata.com"]
-			}
-		}
-		namespace: {
-			common:      true
-			description: "A prefix that will be added to all metric names."
-			groups: ["v1", "v2"]
-			required: false
-			warnings: []
-			type: string: {
-				default: null
-				examples: ["service"]
-			}
-		}
-		org: {
-			description: "Specifies the destination organization for writes into InfluxDB 2."
-			groups: ["v2"]
-			required: true
-			warnings: []
-			type: string: {
-				examples: ["my-org", "33f2cff0a28e5b63"]
-			}
-		}
-		password: {
-			common:      true
-			description: "Sets the password for authentication if you’ve enabled authentication for the write into InfluxDB 1."
-			groups: ["v1"]
-			required: false
-			warnings: []
-			type: string: {
-				default: null
-				examples: ["${INFLUXDB_PASSWORD}", "influxdb4ever"]
-			}
-		}
-		quantiles: {
-			common:      false
-			description: "Quantiles to use for aggregating [distribution][docs.data-model.metric#distribution] metrics into a summary."
-			required:    false
-			warnings: []
-			type: array: {
-				default: [0.5, 0.75, 0.9, 0.95, 0.99]
-				items: type: float: examples: [0.5, 0.75, 0.9, 0.95, 0.99]
-			}
-		}
-		retention_policy_name: {
-			common:      true
-			description: "Sets the target retention policy for the write into InfluxDB 1."
-			groups: ["v1"]
-			required: false
-			warnings: []
-			type: string: {
-				default: null
-				examples: ["autogen", "one_day_only"]
-			}
-		}
-		token: {
-			description: "[Authentication token][urls.influxdb_authentication_token] for InfluxDB 2."
-			groups: ["v2"]
-			required: true
-			warnings: []
-			type: string: {
-				examples: ["${INFLUXDB_TOKEN}", "ef8d5de700e7989468166c40fc8a0ccd"]
-			}
-		}
-		username: {
-			common:      true
-			description: "Sets the username for authentication if you’ve enabled authentication for the write into InfluxDB 1."
-			groups: ["v1"]
-			required: false
-			warnings: []
-			type: string: {
-				default: null
-				examples: ["todd", "vector-source"]
-			}
-		}
-	}
+	configuration: sinks._influxdb.configuration
 
 	input: {
 		logs: false
@@ -180,14 +73,14 @@ components: sinks: influxdb_metrics: {
 		}
 	}
 
-	examples: metric: [
+	examples: [
 		{
 			_host:  _values.local_host
 			_name:  "logins"
 			_value: 1.5
 			title:  "Counter"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				counter: {
 					value: _value
@@ -203,7 +96,7 @@ components: sinks: influxdb_metrics: {
 			_name: "sparse_stats"
 			title: "Distribution"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				distribution: {
 					values: [1.0, 5.0, 3.0]
@@ -222,7 +115,7 @@ components: sinks: influxdb_metrics: {
 			_value: 1.5
 			title:  "Gauge"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				gauge: {
 					value: _value
@@ -238,7 +131,7 @@ components: sinks: influxdb_metrics: {
 			_name: "requests"
 			title: "Histogram"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				histogram: {
 					buckets: [1.0, 2.1, 3.0]
@@ -258,7 +151,7 @@ components: sinks: influxdb_metrics: {
 			_value: 1.5
 			title:  "Set"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				set: {
 					values: ["first", "another", "last"]
@@ -274,7 +167,7 @@ components: sinks: influxdb_metrics: {
 			_name: "requests"
 			title: "Summary"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				summary: {
 					quantiles: [0.01, 0.5, 0.99]

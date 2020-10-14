@@ -7,6 +7,8 @@ components: sinks: prometheus: {
 
 	classes: {
 		commonly_used: true
+		delivery:      "best_effort"
+		development:   "beta"
 		egress_method: "aggregate"
 		function:      "transmit"
 		service_providers: []
@@ -19,11 +21,6 @@ components: sinks: prometheus: {
 		healthcheck: enabled: false
 		request: enabled:     false
 		tls: enabled:         false
-	}
-
-	statuses: {
-		delivery:    "best_effort"
-		development: "beta"
 	}
 
 	support: {
@@ -120,14 +117,14 @@ components: sinks: prometheus: {
 		}
 	}
 
-	examples: metric: [
+	examples: [
 		{
 			_host:  _values.local_host
 			_name:  "logins"
 			_value: 1.5
 			title:  "Counter"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				counter: {
 					value: _value
@@ -148,7 +145,7 @@ components: sinks: prometheus: {
 			_value: 1.5
 			title:  "Gauge"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				gauge: {
 					value: _value
@@ -168,7 +165,7 @@ components: sinks: prometheus: {
 			_name: "response_time_s"
 			title: "Histogram"
 			configuration: {}
-			input: {
+			input: metric: {
 				name: _name
 				histogram: {
 					buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]

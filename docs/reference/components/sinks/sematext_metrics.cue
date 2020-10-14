@@ -7,6 +7,8 @@ components: sinks: sematext_metrics: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		function:      "transmit"
 		service_providers: ["Sematext"]
 		egress_method: "batch"
@@ -26,11 +28,6 @@ components: sinks: sematext_metrics: {
 		healthcheck: enabled: true
 		request: enabled:     false
 		tls: enabled:         false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
 	}
 
 	support: {
@@ -55,38 +52,7 @@ components: sinks: sematext_metrics: {
 		notices: []
 	}
 
-	configuration: {
-		region: {
-			description:   "The region destination to send metrics to. This option is required if `endpoint` is not set."
-			required:      true
-			relevant_when: "`endpoint` is not set"
-			warnings: []
-			type: string: {
-				enum: {
-					us: "United States"
-					eu: "Europe"
-				}
-				examples: [ "us"]
-			}
-		}
-		endpoint: {
-			description:   "The endpoint to send metrics to."
-			required:      true
-			relevant_when: "`region` is not set"
-			warnings: []
-			type: string: {
-				examples: ["https://spm-receiver.sematext.com", "https://spm-receiver.eu.sematext.com"]
-			}
-		}
-		token: {
-			required:    true
-			description: "The api token for the app in Sematext to send the metrics to."
-			warnings: []
-			type: string: {
-				examples: ["${SEMATEXT_TOKEN}", "some-sematext-token"]
-			}
-		}
-	}
+	configuration: sinks._sematext.configuration
 
 	input: {
 		logs: false
