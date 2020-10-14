@@ -162,7 +162,10 @@ impl Sink {
 }
 
 #[derive(Clone, Interface)]
-#[graphql(field(name = "name", type = "String"), field(name = "events_processed", type = "Option<metrics::EventsProcessed>"))]
+#[graphql(
+    field(name = "name", type = "String"),
+    field(name = "events_processed", type = "Option<metrics::EventsProcessed>")
+)]
 pub enum Topology {
     Source(Source),
     Transform(Transform),
