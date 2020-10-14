@@ -197,7 +197,10 @@ impl JournaldConfig {
             .instrument(info_span!("journald-server"))
             .boxed()
             .compat()
-            .select(shutdown.map(move |_| close()))
+            // .select(shutdown.map(move |_| close()))
+            .select(Box::new(
+                shutdown.map(move |_| close()).unit_error().boxed().compat(),
+            ))
             .map(|_| ())
             .map_err(|_| ()),
         ))
@@ -346,7 +349,7 @@ where
             for _ in 0..self.batch_size {
                 let text = match self.journal.next().await {
                     None => {
-                        let _ = self.shutdown.compat().await;
+                        let _ = self.shutdown.await;
                         return;
                     }
                     Some(Ok(text)) => text,

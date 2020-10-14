@@ -5201,15 +5201,6 @@ checksum = "213701ba3370744dcd1a12960caa4843b3d68b4d1c0a5d575e0d65b2ee9d16c0"
 
 [[package]]
 name = "stream-cancel"
-version = "0.4.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d62fea0968935ec8eedcf671b2738bf49c58e133db968097c301d32e32eaedf"
-dependencies = [
- "futures 0.1.29",
-]
-
-[[package]]
-name = "stream-cancel"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fcbeca004dfaec7b6fd818d8ae6359eaea21770d134f137c4cb8fb5fa92b5a33"
@@ -6279,8 +6270,7 @@ dependencies = [
  "sha3",
  "smpl_jwt",
  "snafu",
- "stream-cancel 0.4.4",
- "stream-cancel 0.6.2",
+ "stream-cancel",
  "string_cache",
  "strip-ansi-escapes",
  "structopt",

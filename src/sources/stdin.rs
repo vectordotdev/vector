@@ -7,8 +7,7 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
-    executor, FutureExt, StreamExt, TryFutureExt, TryStreamExt,
+    compat::Sink01CompatExt, executor, FutureExt, StreamExt, TryFutureExt, TryStreamExt,
 };
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
@@ -93,7 +92,7 @@ where
     });
 
     let fut = receiver
-        .take_until(shutdown.compat())
+        .take_until(shutdown)
         .map_err(|error| emit!(StdinReadFailed { error }))
         .map_ok(move |line| {
             emit!(StdinEventReceived {
