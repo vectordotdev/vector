@@ -20,7 +20,6 @@ use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -164,7 +163,7 @@ impl HttpSink for HttpSinkConfig {
 
         let body = match &self.encoding.codec() {
             Encoding::Text => {
-                if let Some(v) = event.get(&Atom::from(crate::config::log_schema().message_key())) {
+                if let Some(v) = event.get(crate::config::log_schema().message_key()) {
                     let mut b = v.to_string_lossy().into_bytes();
                     b.push(b'\n');
                     b

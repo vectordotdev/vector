@@ -217,15 +217,6 @@ impl From<&str> for Lookup {
     }
 }
 
-impl From<string_cache::DefaultAtom> for Lookup {
-    fn from(input: string_cache::DefaultAtom) -> Self {
-        Self {
-            segments: vec![Segment::field(input.to_string())],
-        }
-        // We know this must be at least one segment.
-    }
-}
-
 impl Index<usize> for Lookup {
     type Output = Segment;
 

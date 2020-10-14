@@ -6,13 +6,12 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct JsonParserConfig {
-    pub field: Option<Atom>,
+    pub field: Option<String>,
     pub drop_invalid: bool,
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
@@ -48,10 +47,10 @@ impl TransformConfig for JsonParserConfig {
 
 #[derive(Debug)]
 pub struct JsonParser {
-    field: Atom,
+    field: String,
     drop_invalid: bool,
     drop_field: bool,
-    target_field: Option<Atom>,
+    target_field: Option<String>,
     overwrite_target: bool,
 }
 
@@ -59,13 +58,13 @@ impl From<JsonParserConfig> for JsonParser {
     fn from(config: JsonParserConfig) -> JsonParser {
         let field = config
             .field
-            .unwrap_or_else(|| Atom::from(log_schema().message_key()));
+            .unwrap_or_else(|| log_schema().message_key().to_string());
 
         JsonParser {
             field,
             drop_invalid: config.drop_invalid,
             drop_field: config.drop_field,
-            target_field: config.target_field.map(Atom::from),
+            target_field: config.target_field,
             overwrite_target: config.overwrite_target.unwrap_or(false),
         }
     }
@@ -137,7 +136,6 @@ mod test {
     use super::{JsonParser, JsonParserConfig};
     use crate::{config::log_schema, event::Event, transforms::Transform};
     use serde_json::json;
-    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn generate_config() {
@@ -152,10 +150,7 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert!(event
-            .as_log()
-            .get(&Atom::from(log_schema().message_key()))
-            .is_none());
+        assert!(event.as_log().get(log_schema().message_key()).is_none());
     }
 
     #[test]
@@ -169,10 +164,7 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert!(event
-            .as_log()
-            .get(&Atom::from(log_schema().message_key()))
-            .is_some());
+        assert!(event.as_log().get(log_schema().message_key()).is_some());
     }
 
     #[test]
@@ -186,10 +178,10 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert_eq!(event.as_log()[&Atom::from("greeting")], "hello".into());
-        assert_eq!(event.as_log()[&Atom::from("name")], "bob".into());
+        assert_eq!(event.as_log()["greeting"], "hello".into());
+        assert_eq!(event.as_log()["name"], "bob".into());
         assert_eq!(
-            event.as_log()[&Atom::from(log_schema().message_key())],
+            event.as_log()[log_schema().message_key()],
             r#"{"greeting": "hello", "name": "bob"}"#.into()
         );
     }
@@ -213,11 +205,11 @@ mod test {
         let event = parser.transform(event).unwrap();
 
         assert_eq!(
-            event.as_log().get_flat(&Atom::from("field.with.dots")),
+            event.as_log().get_flat("field.with.dots"),
             Some(&crate::event::Value::from("hello")),
         );
         assert_eq!(
-            event.as_log().get_flat(&Atom::from("sub.field")),
+            event.as_log().get_flat("sub.field"),
             Some(&crate::event::Value::from(json!({ "another.one": "bob", }))),
         );
     }
@@ -233,10 +225,10 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert_eq!(event.as_log()[&Atom::from("greeting")], "hello".into());
-        assert_eq!(event.as_log()[&Atom::from("name")], "bob".into());
+        assert_eq!(event.as_log()["greeting"], "hello".into());
+        assert_eq!(event.as_log()["name"], "bob".into());
         assert_eq!(
-            event.as_log()[&Atom::from(log_schema().message_key())],
+            event.as_log()[log_schema().message_key()],
             r#" {"greeting": "hello", "name": "bob"}    "#.into()
         );
     }
@@ -258,10 +250,10 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert_eq!(event.as_log()[&Atom::from("greeting")], "hello".into(),);
-        assert_eq!(event.as_log()[&Atom::from("name")], "bob".into());
+        assert_eq!(event.as_log()["greeting"], "hello".into(),);
+        assert_eq!(event.as_log()["name"], "bob".into());
         assert_eq!(
-            event.as_log()[&Atom::from("data")],
+            event.as_log()["data"],
             r#"{"greeting": "hello", "name": "bob"}"#.into()
         );
 
@@ -290,16 +282,13 @@ mod test {
 
         let parsed_event = parser_outer.transform(event).unwrap();
 
-        assert_eq!(
-            parsed_event.as_log()[&Atom::from("stream")],
-            "stdout".into()
-        );
+        assert_eq!(parsed_event.as_log()["stream"], "stdout".into());
 
         let parsed_inner_event = parser_inner.transform(parsed_event).unwrap();
         let log = parsed_inner_event.into_log();
 
-        assert_eq!(log[&Atom::from("type")], "response".into());
-        assert_eq!(log[&Atom::from("statusCode")], 200.into());
+        assert_eq!(log["type"], "response".into());
+        assert_eq!(log["statusCode"], 200.into());
     }
 
     #[test]
@@ -317,10 +306,7 @@ mod test {
         let parsed = parser.transform(event.clone()).unwrap();
 
         assert_eq!(event, parsed);
-        assert_eq!(
-            event.as_log()[&Atom::from(log_schema().message_key())],
-            invalid.into()
-        );
+        assert_eq!(event.as_log()[log_schema().message_key()], invalid.into());
 
         // Field
         let mut parser = JsonParser::from(JsonParserConfig {
@@ -334,8 +320,8 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert_eq!(event.as_log()[&Atom::from("data")], invalid.into());
-        assert!(event.as_log().get(&Atom::from("greeting")).is_none());
+        assert_eq!(event.as_log()["data"], invalid.into());
+        assert!(event.as_log().get("greeting").is_none());
     }
 
     #[test]
@@ -399,10 +385,10 @@ mod test {
         let event = parser1.transform(event).unwrap();
         let event = parser2.transform(event).unwrap();
 
-        assert_eq!(event.as_log()[&Atom::from("greeting")], "hello".into());
-        assert_eq!(event.as_log()[&Atom::from("name")], "bob".into());
+        assert_eq!(event.as_log()["greeting"], "hello".into());
+        assert_eq!(event.as_log()["name"], "bob".into());
         assert_eq!(
-            event.as_log()[&Atom::from("message")],
+            event.as_log()["message"],
             "help i'm trapped under many layers of json".into()
         );
     }
@@ -428,23 +414,17 @@ mod test {
         );
         let event = parser.transform(event).unwrap();
 
-        assert_eq!(event.as_log()[&Atom::from("string")], "this is text".into());
-        assert_eq!(
-            event.as_log()[&Atom::from("null")],
-            crate::event::Value::Null
-        );
-        assert_eq!(event.as_log()[&Atom::from("float")], 12.34.into());
-        assert_eq!(event.as_log()[&Atom::from("int")], 56.into());
-        assert_eq!(event.as_log()[&Atom::from("bool true")], true.into());
-        assert_eq!(event.as_log()[&Atom::from("bool false")], false.into());
-        assert_eq!(event.as_log()[&Atom::from("array[0]")], "z".into());
-        assert_eq!(event.as_log()[&Atom::from("array[1]")], 7.into());
-        assert_eq!(event.as_log()[&Atom::from("object.nested")], "data".into());
-        assert_eq!(event.as_log()[&Atom::from("object.more")], "values".into());
-        assert_eq!(
-            event.as_log()[&Atom::from("deep[0][0][0].a.b.c[0][0][0]")],
-            1234.into()
-        );
+        assert_eq!(event.as_log()["string"], "this is text".into());
+        assert_eq!(event.as_log()["null"], crate::event::Value::Null);
+        assert_eq!(event.as_log()["float"], 12.34.into());
+        assert_eq!(event.as_log()["int"], 56.into());
+        assert_eq!(event.as_log()["bool true"], true.into());
+        assert_eq!(event.as_log()["bool false"], false.into());
+        assert_eq!(event.as_log()["array[0]"], "z".into());
+        assert_eq!(event.as_log()["array[1]"], 7.into());
+        assert_eq!(event.as_log()["object.nested"], "data".into());
+        assert_eq!(event.as_log()["object.more"], "values".into());
+        assert_eq!(event.as_log()["deep[0][0][0].a.b.c[0][0][0]"], 1234.into());
     }
 
     #[test]
@@ -463,8 +443,8 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert_eq!(event.as_log()[&Atom::from("key")], "data".into());
-        assert_eq!(event.as_log()[&Atom::from("message")], "inner".into());
+        assert_eq!(event.as_log()["key"], "data".into());
+        assert_eq!(event.as_log()["message"], "inner".into());
     }
 
     #[test]
@@ -478,10 +458,7 @@ mod test {
 
         let event = parser.transform(event).unwrap();
 
-        assert_eq!(
-            event.as_log()[&Atom::from("message")],
-            "invalid json".into()
-        );
+        assert_eq!(event.as_log()["message"], "invalid json".into());
     }
 
     #[test]
@@ -496,8 +473,8 @@ mod test {
         let event = parser.transform(event).unwrap();
         let event = event.as_log();
 
-        assert_eq!(event[&Atom::from("that.greeting")], "hello".into());
-        assert_eq!(event[&Atom::from("that.name")], "bob".into());
+        assert_eq!(event["that.greeting"], "hello".into());
+        assert_eq!(event["that.name"], "bob".into());
     }
 
     #[test]
@@ -513,9 +490,9 @@ mod test {
         let event = parser.transform(event).unwrap();
         let event = event.as_log();
 
-        assert_eq!(event[&"message".into()], message.into());
-        assert_eq!(event.get(&"message.greeting".into()), None);
-        assert_eq!(event.get(&"message.name".into()), None);
+        assert_eq!(event["message"], message.into());
+        assert_eq!(event.get("message.greeting"), None);
+        assert_eq!(event.get("message.name"), None);
     }
 
     #[test]
@@ -532,11 +509,11 @@ mod test {
         let event = parser.transform(event).unwrap();
         let event = event.as_log();
 
-        match event.get(&"message".into()) {
+        match event.get("message") {
             Some(crate::event::Value::Map(_)) => (),
             _ => panic!("\"message\" is not a map"),
         }
-        assert_eq!(event[&Atom::from("message.greeting")], "hello".into());
-        assert_eq!(event[&Atom::from("message.name")], "bob".into());
+        assert_eq!(event["message.greeting"], "hello".into());
+        assert_eq!(event["message.name"], "bob".into());
     }
 }

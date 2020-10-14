@@ -7,7 +7,9 @@ components: sources: host_metrics: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["daemon"]
+		development:   "beta"
 		egress_method: "batch"
 		function:      "collect"
 	}
@@ -16,11 +18,6 @@ components: sources: host_metrics: {
 		checkpoint: enabled: false
 		multiline: enabled:  false
 		tls: enabled:        false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
 	}
 
 	support: {
@@ -45,9 +42,9 @@ components: sources: host_metrics: {
 			description: "The list of host metric collector services to use. Defaults to all collectors."
 			common:      true
 			required:    false
-			type: "[string]": {
+			type: array: {
 				default: ["cpu", "disk", "filesystem", "load", "memory", "network"]
-				enum: {
+				items: type: string: enum: {
 					cpu:        "Metrics related to CPU utilization."
 					disk:       "Metrics related to disk I/O utilization."
 					filesystem: "Metrics related to filesystem space utilization."
@@ -90,9 +87,9 @@ components: sources: host_metrics: {
 								Defaults to including all devices.
 								The patterns are matched using [globbing](#globbing).
 								"""#
-							type: "[string]": {
+							type: array: {
 								default: ["*"]
-								examples: [["sda"], ["dm-*"]]
+								items: type: string: examples: ["sda", "dm-*"]
 							}
 						}
 						excludes: {
@@ -103,9 +100,9 @@ components: sources: host_metrics: {
 								Defaults to excluding no devices.
 								The patterns are matched using [globbing](#globbing).
 								"""#
-							type: "[string]": {
+							type: array: {
 								default: []
-								examples: [["sda"], ["dm-*"]]
+								items: type: string: examples: ["sda", "dm-*"]
 							}
 						}
 					}
@@ -130,9 +127,9 @@ components: sources: host_metrics: {
 								Defaults to including all devices.
 								The patterns are matched using [globbing](#globbing).
 								"""#
-							type: "[string]": {
+							type: array: {
 								default: ["*"]
-								examples: [["sda"], ["dm-*"]]
+								items: type: string: examples: ["sda", "dm-*"]
 							}
 						}
 						excludes: {
@@ -143,9 +140,9 @@ components: sources: host_metrics: {
 								Defaults to excluding no devices.
 								The patterns are matched using [globbing](#globbing).
 								"""#
-							type: "[string]": {
+							type: array: {
 								default: []
-								examples: [["sda"], ["dm-*"]]
+								items: type: string: examples: ["sda", "dm-*"]
 							}
 						}
 					}
@@ -163,9 +160,9 @@ components: sources: host_metrics: {
 								Defaults to including all filesystems.
 								The patterns are matched using [globbing](#globbing).
 								"""#
-							type: "[string]": {
+							type: array: {
 								default: ["*"]
-								examples: [["ntfs"], ["ext*"]]
+								items: type: string: examples: ["ntfs", "ext*"]
 							}
 						}
 						excludes: {
@@ -176,9 +173,9 @@ components: sources: host_metrics: {
 								Defaults to excluding no filesystems.
 								The patterns are matched using [globbing](#globbing).
 								"""#
-							type: "[string]": {
+							type: array: {
 								default: []
-								examples: [["ntfs"], ["ext*"]]
+								items: type: string: examples: ["ntfs", "ext*"]
 							}
 						}
 					}
@@ -196,9 +193,9 @@ components: sources: host_metrics: {
 								Defaults to including all mount points.
 								The patterns are matched using [globbing](#globbing).
 								"""#
-							type: "[string]": {
+							type: array: {
 								default: ["*"]
-								examples: [["/home"], ["/raid*"]]
+								items: type: string: examples: ["/home", "/raid*"]
 							}
 						}
 						excludes: {
@@ -209,9 +206,9 @@ components: sources: host_metrics: {
 								Defaults to excluding no mount points.
 								The patterns are matched using [globbing](#globbing).
 								"""#
-							type: "[string]": {
+							type: array: {
 								default: []
-								examples: [["/home"], ["/raid*"]]
+								items: type: string: examples: ["/home", "/raid*"]
 							}
 						}
 					}
@@ -236,9 +233,9 @@ components: sources: host_metrics: {
 								Defaults to including all devices.
 								The patterns are matched using [globbing](#globbing).
 								"""#
-							type: "[string]": {
+							type: array: {
 								default: ["*"]
-								examples: [["sda"], ["dm-*"]]
+								items: type: string: examples: ["sda", "dm-*"]
 							}
 						}
 						excludes: {
@@ -249,9 +246,9 @@ components: sources: host_metrics: {
 								Defaults to excluding no devices.
 								The patterns are matched using [globbing](#globbing).
 								"""#
-							type: "[string]": {
+							type: array: {
 								default: []
-								examples: [["sda"], ["dm-*"]]
+								items: type: string: examples: ["sda", "dm-*"]
 							}
 						}
 					}

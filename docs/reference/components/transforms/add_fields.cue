@@ -1,21 +1,18 @@
 package metadata
 
 components: transforms: add_fields: {
-	title:             "#{component.title}"
+	title:             "Add Fields"
 	short_description: "Accepts log events and allows you to add one or more log fields."
-	long_description:  "Accepts log events and allows you to add one or more log fields."
 
 	classes: {
 		commonly_used: false
+		development:   "stable"
+		development:   "stable"
 		egress_method: "stream"
 		function:      "schema"
 	}
 
 	features: {}
-
-	statuses: {
-		development: "stable"
-	}
 
 	support: {
 		platforms: {
@@ -63,7 +60,7 @@ components: transforms: add_fields: {
 		}
 		overwrite: {
 			common:      true
-			description: "By default, fields will be overridden. Set this to `false` to avoid overwriting values.\n"
+			description: "By default, fields will be overridden. Set this to `false` to avoid overwriting values."
 			required:    false
 			warnings: []
 			type: bool: default: true

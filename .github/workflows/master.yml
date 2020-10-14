@@ -2,7 +2,23 @@ name: Master Test Suite
 
 on:
   push:
-    branches: master
+    branches:
+      - master
+    paths:
+      - ".github/workflows/master.yml"
+      - ".cargo/**"
+      - "benches/**"
+      - "lib/**"
+      - "proto/**"
+      - "scripts/**"
+      - "skaffold/**"
+      - "src/**"
+      - "tests/**"
+      - "build.rs"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "Makefile"
+      - "rust-toolchain"
 
 env:
   AUTOINSTALL: true
@@ -23,7 +39,7 @@ jobs:
     timeout-minutes: 3
     if: github.ref != 'refs/heads/master'
     steps:
-      - uses: styfle/cancel-workflow-action@0.4.1
+      - uses: styfle/cancel-workflow-action@0.5.0
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -467,3 +483,37 @@ jobs:
       - run: make slim-builds
       - run: echo "home/runner/.local/bin" >> "$GITHUB_PATH"
       - run: make check-component-features
+
+  master-failure:
+    name: master-failure
+    if: failure()
+    needs:
+      - cancel-previous
+      - cross-linux
+      - test-linux
+      - test-mac
+      - test-windows
+      - test-misc
+      - test-integration-aws
+      - test-integration-clickhouse
+      - test-integration-docker
+      - test-integration-elasticsearch
+      - test-integration-gcp
+      - test-integration-humio
+      - test-integration-influxdb
+      - test-integration-kafka
+      - test-integration-loki
+      - test-integration-pulsar
+      - test-integration-splunk
+      - build-x86_64-unknown-linux-gnu
+      - compute-k8s-test-plan
+      - test-e2e-kubernetes
+      - check-component-features
+    runs-on: ubuntu-latest
+    steps:
+    - name: Discord notification
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      uses: Ilshidur/action-discord@0.3.0
+      with:
+        args: "Master failed and is red: https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}"

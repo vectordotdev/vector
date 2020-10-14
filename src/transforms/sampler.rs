@@ -10,13 +10,12 @@ use crate::{
 use regex::RegexSet; // TODO: use regex::bytes
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct SamplerConfig {
     pub rate: u64,
-    pub key_field: Option<Atom>,
+    pub key_field: Option<String>,
     #[serde(default)]
     pub pass_list: Vec<String>,
 }
@@ -53,13 +52,13 @@ impl TransformConfig for SamplerConfig {
 
 pub struct Sampler {
     rate: u64,
-    key_field: Atom,
+    key_field: String,
     pass_list: RegexSet,
 }
 
 impl Sampler {
-    pub fn new(rate: u64, key_field: Option<Atom>, pass_list: RegexSet) -> Self {
-        let key_field = key_field.unwrap_or_else(|| Atom::from(log_schema().message_key()));
+    pub fn new(rate: u64, key_field: Option<String>, pass_list: RegexSet) -> Self {
+        let key_field = key_field.unwrap_or_else(|| log_schema().message_key().to_string());
         Self {
             rate,
             key_field,
@@ -85,7 +84,7 @@ impl Transform for Sampler {
         if seahash::hash(message.as_bytes()) % self.rate == 0 {
             event
                 .as_mut_log()
-                .insert(Atom::from("sample_rate"), self.rate.to_string());
+                .insert("sample_rate", self.rate.to_string());
 
             Some(event)
         } else {
@@ -102,7 +101,6 @@ mod tests {
     use crate::transforms::Transform;
     use approx::assert_relative_eq;
     use regex::RegexSet;
-    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn samples_at_roughly_the_configured_rate() {
@@ -176,32 +174,32 @@ mod tests {
         let passing = events
             .into_iter()
             .filter(|s| {
-                !s.as_log()[&Atom::from(log_schema().message_key())]
+                !s.as_log()[log_schema().message_key()]
                     .to_string_lossy()
                     .contains("na")
             })
             .find_map(|event| sampler.transform(event))
             .unwrap();
-        assert_eq!(passing.as_log()[&Atom::from("sample_rate")], "10".into());
+        assert_eq!(passing.as_log()["sample_rate"], "10".into());
 
         let events = random_events(10000);
         let mut sampler = Sampler::new(25, None, RegexSet::new(&["na"]).unwrap());
         let passing = events
             .into_iter()
             .filter(|s| {
-                !s.as_log()[&Atom::from(log_schema().message_key())]
+                !s.as_log()[log_schema().message_key()]
                     .to_string_lossy()
                     .contains("na")
             })
             .find_map(|event| sampler.transform(event))
             .unwrap();
-        assert_eq!(passing.as_log()[&Atom::from("sample_rate")], "25".into());
+        assert_eq!(passing.as_log()["sample_rate"], "25".into());
 
         // If the event passed the regex check, don't include the sampling rate
         let mut sampler = Sampler::new(25, None, RegexSet::new(&["na"]).unwrap());
         let event = Event::from("nananana");
         let passing = sampler.transform(event).unwrap();
-        assert!(passing.as_log().get(&Atom::from("sample_rate")).is_none());
+        assert!(passing.as_log().get("sample_rate").is_none());
     }
 
     fn random_events(n: usize) -> Vec<Event> {

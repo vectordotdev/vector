@@ -3,19 +3,15 @@ package metadata
 components: transforms: remove_fields: {
 	title:             "Remove Fields"
 	short_description: "Accepts log events and allows you to remove one or more log fields."
-	long_description:  "Accepts log events and allows you to remove one or more log fields."
 
 	classes: {
 		commonly_used: false
+		development:   "stable"
 		egress_method: "stream"
 		function:      "schema"
 	}
 
 	features: {}
-
-	statuses: {
-		development: "stable"
-	}
 
 	support: {
 		platforms: {
@@ -44,9 +40,7 @@ components: transforms: remove_fields: {
 			description: "The log field names to drop."
 			required:    true
 			warnings: []
-			type: "[string]": {
-				examples: [["field1", "field2", "parent.child"]]
-			}
+			type: array: items: type: string: examples: ["field1", "field2", "parent.child"]
 		}
 	}
 

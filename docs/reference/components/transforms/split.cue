@@ -3,19 +3,15 @@ package metadata
 components: transforms: split: {
 	title:             "Split"
 	short_description: "Accepts log events and allows you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
-	long_description:  "Accepts log events and allows you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
 
 	classes: {
 		commonly_used: false
+		development:   "stable"
 		egress_method: "stream"
 		function:      "parse"
 	}
 
 	features: {}
-
-	statuses: {
-		development: "stable"
-	}
 
 	support: {
 		platforms: {
@@ -54,9 +50,7 @@ components: transforms: split: {
 			description: "The field names assigned to the resulting tokens, in order."
 			required:    true
 			warnings: []
-			type: "[string]": {
-				examples: [["timestamp", "level", "message", "parent.child"]]
-			}
+			type: array: items: type: string: examples: ["timestamp", "level", "message", "parent.child"]
 		}
 		separator: {
 			common:      true
@@ -68,7 +62,7 @@ components: transforms: split: {
 				examples: [","]
 			}
 		}
-		types: components._types
+		types: configuration._types
 	}
 
 	input: {
@@ -76,7 +70,7 @@ components: transforms: split: {
 		metrics: false
 	}
 
-	examples: log: [
+	examples: [
 		{
 			title: "Split log message"
 			configuration: {
@@ -88,10 +82,10 @@ components: transforms: split: {
 					bytes:  "int"
 				}
 			}
-			input: {
+			input: log: {
 				message: "5.86.210.12,zieme4647,19/06/2019:17:20:49 -0400,GET /embrace/supply-chains/dynamic/vertical,201,20574"
 			}
-			output: {
+			output: log: {
 				remote_addr: "5.86.210.12"
 				user_id:     "zieme4647"
 				timestamp:   "19/06/2019:17:20:49 -0400"

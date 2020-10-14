@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::collections::HashMap;
 use std::str;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
@@ -25,14 +24,14 @@ pub struct RegexParserConfig {
     /// TODO: Remove at a future point in time.
     pub regex: Option<String>,
     pub patterns: Vec<String>,
-    pub field: Option<Atom>,
+    pub field: Option<String>,
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
     pub drop_failed: bool,
-    pub target_field: Option<Atom>,
+    pub target_field: Option<String>,
     #[derivative(Default(value = "true"))]
     pub overwrite_target: bool,
-    pub types: HashMap<Atom, String>,
+    pub types: HashMap<String, String>,
 }
 
 inventory::submit! {
@@ -64,21 +63,21 @@ impl TransformConfig for RegexParserConfig {
 pub struct RegexParser {
     regexset: RegexSet,
     patterns: Vec<CompiledRegex>, // indexes correspend to RegexSet
-    field: Atom,
+    field: String,
     drop_field: bool,
     drop_failed: bool,
-    target_field: Option<Atom>,
+    target_field: Option<String>,
     overwrite_target: bool,
 }
 
 struct CompiledRegex {
     regex: Regex,
-    capture_names: Vec<(usize, Atom, Conversion)>,
+    capture_names: Vec<(usize, String, Conversion)>,
     capture_locs: CaptureLocations,
 }
 
 impl CompiledRegex {
-    fn new(regex: Regex, types: &HashMap<Atom, Conversion>) -> CompiledRegex {
+    fn new(regex: Regex, types: &HashMap<String, Conversion>) -> CompiledRegex {
         // Calculate the location (index into the capture locations) of
         // each named capture, and the required type coercion.
         let capture_names = regex
@@ -86,9 +85,9 @@ impl CompiledRegex {
             .enumerate()
             .filter_map(|(idx, cn)| {
                 cn.map(|cn| {
-                    let cn = Atom::from(cn);
-                    let conv = types.get(&cn).unwrap_or(&Conversion::Bytes);
-                    (idx, cn, conv.clone())
+                    let conv = types.get(cn).unwrap_or(&Conversion::Bytes);
+                    let name = cn.to_string();
+                    (idx, name, conv.clone())
                 })
             })
             .collect::<Vec<_>>();
@@ -105,7 +104,7 @@ impl CompiledRegex {
     fn captures<'a>(
         &'a mut self,
         value: &'a [u8],
-    ) -> Option<impl Iterator<Item = (Atom, Value)> + 'a> {
+    ) -> Option<impl Iterator<Item = (String, Value)> + 'a> {
         match self.regex.captures_read(&mut self.capture_locs, value) {
             Some(_) => {
                 let capture_locs = &self.capture_locs;
@@ -141,7 +140,7 @@ impl RegexParser {
         let field = config
             .field
             .clone()
-            .unwrap_or_else(|| Atom::from(crate::config::log_schema().message_key()));
+            .unwrap_or_else(|| crate::config::log_schema().message_key().to_string());
 
         let patterns = match (&config.regex, &config.patterns.len()) {
             (None, 0) => {
@@ -180,12 +179,7 @@ impl RegexParser {
 
         let names = &patterns
             .iter()
-            .map(|regex| {
-                regex
-                    .capture_names()
-                    .filter_map(|s| s.map(Into::into))
-                    .collect::<Vec<_>>()
-            })
+            .map(|regex| regex.capture_names().filter_map(|s| s).collect::<Vec<_>>())
             .flatten()
             .collect::<Vec<_>>();
 
@@ -206,12 +200,12 @@ impl RegexParser {
     pub fn new(
         regexset: RegexSet,
         patterns: Vec<Regex>,
-        field: Atom,
+        field: String,
         mut drop_field: bool,
         drop_failed: bool,
-        target_field: Option<Atom>,
+        target_field: Option<String>,
         overwrite_target: bool,
-        types: HashMap<Atom, Conversion>,
+        types: HashMap<String, Conversion>,
     ) -> Self {
         // Build a buffer of the regex capture locations and names to avoid
         // repeated allocations.
@@ -278,7 +272,7 @@ impl Transform for RegexParser {
 
                 log.extend(captures.map(|(name, value)| {
                     let name = target_field
-                        .map(|target| Atom::from(format!("{}.{}", target, name)))
+                        .map(|target| format!("{}.{}", target, name))
                         .unwrap_or_else(|| name.clone());
                     (name, value)
                 }));
@@ -340,9 +334,9 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log[&"status".into()], "1234".into());
-        assert_eq!(log[&"time".into()], "5678".into());
-        assert!(log.get(&"message".into()).is_some());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["time"], "5678".into());
+        assert!(log.get("message").is_some());
     }
 
     #[tokio::test]
@@ -355,8 +349,8 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log.get(&"status".into()), None);
-        assert!(log.get(&"message".into()).is_some());
+        assert_eq!(log.get("status"), None);
+        assert!(log.get("message").is_some());
     }
 
     #[tokio::test]
@@ -369,9 +363,9 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log[&"status".into()], "1234".into());
-        assert_eq!(log[&"time".into()], "5678".into());
-        assert!(log.get(&"message".into()).is_none());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["time"], "5678".into());
+        assert!(log.get("message").is_none());
     }
 
     #[tokio::test]
@@ -384,8 +378,8 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log[&"status".into()], "1234".into());
-        assert_eq!(log[&"message".into()], "yes".into());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["message"], "yes".into());
     }
 
     #[tokio::test]
@@ -398,7 +392,7 @@ mod tests {
         .await
         .unwrap();
 
-        assert!(log.get(&"message".into()).is_some());
+        assert!(log.get(&"message").is_some());
     }
 
     #[tokio::test]
@@ -415,7 +409,7 @@ mod tests {
         .unwrap();
 
         // timestamp is unpredictable, don't compare it
-        log.remove(&"timestamp".into());
+        log.remove("timestamp");
         let log = serde_json::to_value(log.all_fields()).unwrap();
         assert_eq!(
             log,
@@ -441,9 +435,9 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log[&"message".into()], message.into());
-        assert_eq!(log.get(&"message.status".into()), None);
-        assert_eq!(log.get(&"message.time".into()), None);
+        assert_eq!(log["message"], message.into());
+        assert_eq!(log.get("message.status"), None);
+        assert_eq!(log.get("message.time"), None);
     }
 
     #[tokio::test]
@@ -460,7 +454,7 @@ mod tests {
         .unwrap();
 
         // timestamp is unpredictable, don't compare it
-        log.remove(&"timestamp".into());
+        log.remove("timestamp");
         let log = serde_json::to_value(log.all_fields()).unwrap();
         assert_eq!(
             log,
@@ -488,7 +482,7 @@ mod tests {
         let log = do_transform("1234", r#"['(?P<status>\d+)?']"#, "")
             .await
             .unwrap();
-        assert_eq!(log[&"status".into()], "1234".into());
+        assert_eq!(log["status"], "1234".into());
     }
 
     #[tokio::test]
@@ -496,7 +490,7 @@ mod tests {
         let log = do_transform("none", r#"['(?P<status>\d+)?']"#, "")
             .await
             .unwrap();
-        assert!(log.get(&"status".into()).is_none());
+        assert!(log.get("status").is_none());
     }
 
     #[tokio::test]
@@ -513,9 +507,9 @@ mod tests {
         )
         .await
         .expect("Failed to parse log");
-        assert_eq!(log[&"check".into()], Value::Boolean(false));
-        assert_eq!(log[&"status".into()], Value::Integer(1234));
-        assert_eq!(log[&"time".into()], Value::Float(6789.01));
+        assert_eq!(log["check"], Value::Boolean(false));
+        assert_eq!(log["status"], Value::Integer(1234));
+        assert_eq!(log["time"], Value::Float(6789.01));
     }
 
     #[tokio::test]
@@ -538,11 +532,11 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log[&"id1".into()], Value::Integer(1234));
-        assert_eq!(log.get(&"id2".into()), None);
-        assert_eq!(log.get(&"time".into()), None);
-        assert_eq!(log.get(&"check".into()), None);
-        assert!(log.get(&"message".into()).is_some());
+        assert_eq!(log["id1"], Value::Integer(1234));
+        assert_eq!(log.get("id2"), None);
+        assert_eq!(log.get("time"), None);
+        assert_eq!(log.get("check"), None);
+        assert!(log.get("message").is_some());
     }
 
     #[tokio::test]
@@ -566,10 +560,10 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(log.get(&"id1".into()), None);
-        assert_eq!(log[&"id2".into()], Value::Integer(1234));
-        assert_eq!(log[&"time".into()], Value::Float(235.42));
-        assert_eq!(log[&"check".into()], Value::Boolean(true));
-        assert!(log.get(&"message".into()).is_some());
+        assert_eq!(log.get("id1"), None);
+        assert_eq!(log["id2"], Value::Integer(1234));
+        assert_eq!(log["time"], Value::Float(235.42));
+        assert_eq!(log["check"], Value::Boolean(true));
+        assert!(log.get("message").is_some());
     }
 }

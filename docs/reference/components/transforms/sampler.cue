@@ -3,19 +3,15 @@ package metadata
 components: transforms: sampler: {
 	title:             "Sampler"
 	short_description: "Accepts log events and allows you to sample events with a configurable rate."
-	long_description:  "Accepts log events and allows you to sample events with a configurable rate."
 
 	classes: {
-		commonly_used: true
+		commonly_used: false
+		development:   "beta"
 		egress_method: "stream"
 		function:      "filter"
 	}
 
 	features: {}
-
-	statuses: {
-		development: "beta"
-	}
 
 	support: {
 		platforms: {
@@ -48,9 +44,9 @@ components: transforms: sampler: {
 			description: "A list of regular expression patterns to exclude events from sampling. If an event's key field (see `key_field`) matches _any_ of these patterns it will _not_ be sampled."
 			required:    false
 			warnings: []
-			type: "[string]": {
+			type: array: {
 				default: null
-				examples: [["[error]", "field2"]]
+				items: type: string: examples: ["[error]", "field2"]
 			}
 		}
 		rate: {

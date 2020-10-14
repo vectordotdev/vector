@@ -7,7 +7,9 @@ components: sources: prometheus: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
+		development:   "beta"
 		egress_method: "batch"
 		function:      "collect"
 	}
@@ -18,12 +20,27 @@ components: sources: prometheus: {
 		tls: enabled:        false
 	}
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
-	}
-
 	support: {
+		dependencies: {
+			prometheus_client: {
+				required: true
+				title:    "Prometheus Client"
+				type:     "external"
+				url:      urls.prometheus_client
+				versions: null
+
+				interface: socket: {
+					api: {
+						title: "Prometheus"
+						url:   urls.prometheus_text_based_exposition_format
+					}
+					direction: "outgoing"
+					protocols: ["http"]
+					ssl: "optional"
+				}
+			}
+		}
+
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -43,8 +60,8 @@ components: sources: prometheus: {
 			description: "Endpoints to scrape metrics from."
 			required:    true
 			warnings: ["You must explicitly add the path to your endpoints. Vector will _not_ automatically add `/metics`."]
-			type: "[string]": {
-				examples: [["http://localhost:9090/metrics"]]
+			type: array: {
+				items: type: string: examples: ["http://localhost:9090/metrics"]
 			}
 		}
 		scrape_interval_secs: {
