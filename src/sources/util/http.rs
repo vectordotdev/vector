@@ -11,9 +11,7 @@ use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::Sink;
 use headers::{Authorization, HeaderMapExt};
 use serde::{Deserialize, Serialize};
-use std::error::Error;
-use std::fmt;
-use std::net::SocketAddr;
+use std::{convert::TryFrom, error::Error, fmt, net::SocketAddr};
 use warp::{
     filters::BoxedFilter,
     http::{HeaderMap, StatusCode},
@@ -56,19 +54,27 @@ pub struct HttpSourceAuthConfig {
     pub password: String,
 }
 
-impl From<Option<&HttpSourceAuthConfig>> for HttpSourceAuth {
-    fn from(auth: Option<&HttpSourceAuthConfig>) -> Self {
-        let token = auth.map(|auth| {
-            let mut headers = HeaderMap::new();
-            headers.typed_insert(Authorization::basic(&auth.username, &auth.password));
-            headers
-                .get("authorization")
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_owned()
-        });
-        HttpSourceAuth { token }
+impl TryFrom<Option<&HttpSourceAuthConfig>> for HttpSourceAuth {
+    type Error = String;
+
+    fn try_from(auth: Option<&HttpSourceAuthConfig>) -> Result<Self, Self::Error> {
+        match auth {
+            Some(auth) => {
+                let mut headers = HeaderMap::new();
+                headers.typed_insert(Authorization::basic(&auth.username, &auth.password));
+                match headers.get("authorization") {
+                    Some(value) => {
+                        let token = value
+                            .to_str()
+                            .map_err(|err| format!("Failed stringify HeaderValue: {:?}", err))?
+                            .to_owned();
+                        Ok(HttpSourceAuth { token: Some(token) })
+                    }
+                    None => Err("Authorization headers wasn't generated".to_owned()),
+                }
+            }
+            None => Ok(HttpSourceAuth { token: None }),
+        }
     }
 }
 
@@ -118,7 +124,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 filter = filter.and(warp::path(s)).boxed();
             }
         }
-        let auth: HttpSourceAuth = auth.as_ref().into();
+        let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         let svc = filter
             .and(warp::path::end())
             .and(warp::header::optional::<String>("authorization"))
