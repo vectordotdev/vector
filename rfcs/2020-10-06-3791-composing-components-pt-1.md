@@ -10,9 +10,15 @@ it easy to create pre-built "chunks" of config that users could configure as
 normal components. These would be bundles of lower-level components wired
 together with adjusted default values for the specific use case.
 
+## Scope
+
+This RFC focuses on enabling rapid development of "composed" sources (e.g. NGINX
+logs) within our existing architecture. A more complete solution for composing
+arbitrary components is deferred to a later RFC.
+
 ## Motivation
 
-We need a way to rapidly assemble Vector components that address specific use
+We need a way to quickly assemble Vector components that address specific use
 cases. This will allow us to improve ease of use without spending significant
 development time on each individual use case. It will allow us to focus
 development time on reuseable components without forcing users to do the work of
@@ -68,20 +74,28 @@ transform (regex or grok parser) and provide NGINX-specific default values for
 each. Focusing on these simpler cases will dramatically decrease how much
 complexity we need to add before being able to reap the value.
 
-...
+## Rationale
+
+This set of changes unblocks the most user-facing value with the least required
+investment, and it does so without compromising future plans for deeper
+architectural changes.
 
 ## Plan of Attack
 
-- [ ] Implement `TransformFn` from [Arch RFC](https://github.com/timberio/vector/blob/master/rfcs/2020-06-18-2625-architecture-revisit.md), switch parsers to it
+- [ ] Implement `TransformFn` from the [Architecture
+    RFC](https://github.com/timberio/vector/blob/master/rfcs/2020-06-18-2625-architecture-revisit.md),
+    switch non-task transforms to it
 - [ ] Add `Vec<dyn TransformFn>` field to `Pipeline`
-- [ ] Implement composed sources as facade that prepends relevant `TransformFn`
-    to `Pipeline` passed to `SourceConfig::build`
+- [ ] Implement composed sources as facades that prepend the relevant `TransformFn`
+    to the `Pipeline` passed to `SourceConfig::build`
 - [ ] Move `event_processed` internal events to topology wrappers instead of
-    components themselves to avoid double counting or incorrect tagging (will
-    expand on this)
+    components themselves to avoid double counting or incorrect tagging (likely
+    within `impl Transform for TransformFn` for now)
 
 Then later we can choose to push towards level (3) as needed:
 
 - [ ] Make `TransformConfig::expand` into first-class stage, splitting the
     existing config `build` methods
 - [ ] Allow new expansion stage to work for all components, not just transforms
+- [ ] Consider introducing more fine-grained internal component types designed
+    to be composed into user-facing sources, transforms, and sinks
