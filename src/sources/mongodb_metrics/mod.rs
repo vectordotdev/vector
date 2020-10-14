@@ -250,7 +250,7 @@ impl MongoDBMetrics {
             timestamp: Some(Utc::now()),
             tags: Some(tags),
             kind: MetricKind::Absolute,
-            value: value,
+            value,
         }
     }
 
