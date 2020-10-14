@@ -410,7 +410,7 @@ components: transforms: lua: {
 			output: metric: {
 				name: "event_counter"
 				counter: {
-					value: 2.0
+					value: 1.0
 				}
 				tags: {
 					tag:         "new value"
