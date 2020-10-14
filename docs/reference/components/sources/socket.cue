@@ -9,7 +9,9 @@ components: sources: socket: {
 
 	classes: {
 		commonly_used: true
+		delivery:      "best_effort"
 		deployment_roles: ["aggregator", "sidecar"]
+		development:   "stable"
 		egress_method: "stream"
 		function:      "receive"
 	}
@@ -25,31 +27,35 @@ components: sources: socket: {
 		}
 	}
 
-	statuses: {
-		delivery:    "best_effort"
-		development: "stable"
-	}
-
 	support: {
-		platforms: {
-			docker: ports: [_port]
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
+		dependencies: {
+			socket_client: {
+				required: true
+				title:    "Socket Client"
+				type:     "external"
+				url:      urls.prometheus_client
+				versions: null
+
+				interface: socket: {
+					direction: "incoming"
+					port:      _port
+					protocols: ["tcp", "unix", "udp"]
+					ssl: "optional"
+				}
 			}
 		}
 
+		platforms: {
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
+		}
+
 		requirements: []
-		warnings: [
-			"""
-				This component exposes a configured port. You must ensure your
-				network allows access to this port.
-				""",
-		]
+		warnings: []
 		notices: []
 	}
 

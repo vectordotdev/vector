@@ -9,7 +9,9 @@ components: sources: http: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["aggregator", "sidecar"]
+		development:   "beta"
 		egress_method: "batch"
 		function:      "receive"
 	}
@@ -25,32 +27,36 @@ components: sources: http: {
 		}
 	}
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
-	}
-
 	support: {
-		platforms: {
-			docker: ports: [_port]
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
+		dependencies: {
+			http_client: {
+				required: true
+				title:    "HTTP Client"
+				type:     "external"
+				url:      urls.http_client
+				versions: null
+
+				interface: {
+					socket: {
+						direction: "incoming"
+						port:      _port
+						protocols: ["http"]
+						ssl: "optional"
+					}
+				}
 			}
 		}
 
-		requirements: [
-			#"""
-				This component exposes a configured port. You must ensure your network
-				allows inbound access to this port if you want to accept requests from
-				remote sources.
-				"""#,
-		]
+		platforms: {
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
+		}
 
+		requirements: []
 		warnings: []
 		notices: []
 	}

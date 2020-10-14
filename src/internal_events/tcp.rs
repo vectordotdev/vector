@@ -21,11 +21,11 @@ impl InternalEvent for TcpConnectionEstablished {
 }
 
 #[derive(Debug)]
-pub struct TcpConnectionFailed {
-    pub error: crate::tls::TlsError,
+pub struct TcpConnectionFailed<E> {
+    pub error: E,
 }
 
-impl InternalEvent for TcpConnectionFailed {
+impl<E: std::error::Error> InternalEvent for TcpConnectionFailed<E> {
     fn emit_logs(&self) {
         error!(message = "Unable to connect.", error = %self.error);
     }

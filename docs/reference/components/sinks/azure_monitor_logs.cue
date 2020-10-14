@@ -7,6 +7,8 @@ components: sinks: azure_monitor_logs: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "batch"
 		function:      "transmit"
 		service_providers: ["Azure"]
@@ -34,21 +36,14 @@ components: sinks: azure_monitor_logs: {
 		}
 	}
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
-	}
-
 	support: {
 		platforms: {
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
-			}
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
 		requirements: []
@@ -73,6 +68,16 @@ components: sinks: azure_monitor_logs: {
 			warnings: []
 			type: string: {
 				examples: ["5ce893d9-2c32-4b6c-91a9-b0887c2de2d6", "97ce69d9-b4be-4241-8dbd-d265edcf06c4"]
+			}
+		}
+		host: {
+			common:      true
+			description: "[Alternative host](https://docs.azure.cn/en-us/articles/guidance/developerdifferences#check-endpoints-in-azure) for dedicated Azure regions."
+			required:    false
+			warnings: []
+			type: string: {
+				default: "ods.opinsights.azure.com"
+				examples: ["ods.opinsights.azure.us", "ods.opinsights.azure.cn"]
 			}
 		}
 		log_type: {
