@@ -1,13 +1,10 @@
-use crate::{
-    api_client::{make_subscription_client, query},
-    config,
-};
-use graphql_client::GraphQLQuery;
+use crate::config;
 use human_format;
 use prettytable::{format, Table};
-use reqwest;
 use structopt::StructOpt;
 use url::Url;
+use vector_api_client::gql::TopologyQueryExt;
+use vector_api_client::{connect_subscription_client, gql::HealthQueryExt, Client};
 
 trait StatsWriter {
     fn kb(&mut self, n: f64) -> String;
@@ -73,60 +70,8 @@ pub struct Opts {
     humanize: bool,
 }
 
-#[derive(GraphQLQuery)]
-#[graphql(
-    schema_path = "graphql/schema.json",
-    query_path = "graphql/queries/health.graphql",
-    response_derives = "Debug"
-)]
-struct HealthQuery;
-
-#[derive(GraphQLQuery)]
-#[graphql(
-    schema_path = "graphql/schema.json",
-    query_path = "graphql/queries/topology.graphql",
-    response_derives = "Debug"
-)]
-struct TopologyQuery;
-
-#[derive(GraphQLQuery)]
-#[graphql(
-    schema_path = "graphql/schema.json",
-    query_path = "graphql/subscriptions/uptime_metrics.graphql",
-    response_derives = "Debug"
-)]
-struct UptimeMetricsSubscription;
-
-fn topology_type(topology_on: topology_query::TopologyQueryTopologyOn) -> &'static str {
-    match topology_on {
-        topology_query::TopologyQueryTopologyOn::Source => "source",
-        topology_query::TopologyQueryTopologyOn::Transform => "transform",
-        topology_query::TopologyQueryTopologyOn::Sink => "sink",
-    }
-}
-
-async fn healthcheck(url: &Url) -> Result<bool, ()> {
-    let request_body = HealthQuery::build_query(health_query::Variables);
-    let res = query::<HealthQuery>(url, &request_body)
-        .await
-        .map_err(|_| ())?;
-
-    // Health (currently) always returns `true`, so there should be no instance where
-    // a server is both accessible and also returns `false`. However, this may change in the
-    // future, where the health is a more inclusive indicator of overall topological health,
-    // so I think this is worth leaving in.
-    match res.data.ok_or(())?.health {
-        true => Ok(true),
-        false => Err(()),
-    }
-}
-
-async fn print_topology(
-    url: &Url,
-    mut formatter: Box<dyn StatsWriter>,
-) -> Result<(), reqwest::Error> {
-    let request_body = TopologyQuery::build_query(topology_query::Variables);
-    let res = query::<TopologyQuery>(url, &request_body).await?;
+async fn print_topology(client: &Client, mut formatter: Box<dyn StatsWriter>) -> Result<(), ()> {
+    let res = client.topology_query().await.map_err(|_| ())?;
 
     let mut table = Table::new();
     table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
@@ -135,7 +80,7 @@ async fn print_topology(
     for data in res.data.unwrap().topology {
         table.add_row(row!(
             data.name,
-            topology_type(data.on),
+            data.on.to_string(),
             r->formatter.kb(data
                 .events_processed
                 .map(|ep| ep.events_processed)
@@ -171,16 +116,18 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
         Url::parse(&*format!("http://{}/graphql", addr)).unwrap()
     });
 
+    let client = Client::new(url);
+
     // Check that the GraphQL server is reachable
-    match healthcheck(&url).await {
-        Ok(t) if t => (),
+    match client.health_query().await {
+        Ok(_) => (),
         _ => {
             eprintln!("Vector API server not reachable");
             return exitcode::UNAVAILABLE;
         }
     }
 
-    if print_topology(&url, new_formatter(opts.humanize))
+    if print_topology(&client, new_formatter(opts.humanize))
         .await
         .is_err()
     {

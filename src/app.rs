@@ -13,8 +13,10 @@ use futures::{
 };
 use futures01::sync::mpsc;
 
+#[cfg(feature = "api-client")]
+use crate::top;
 #[cfg(feature = "api")]
-use crate::{api, internal_events::ApiStarted, top};
+use crate::{api, internal_events::ApiStarted};
 
 #[cfg(windows)]
 use crate::service;
@@ -116,7 +118,7 @@ impl Application {
                         SubCommand::List(l) => list::cmd(&l),
                         SubCommand::Test(t) => unit_test::cmd(&t).await,
                         SubCommand::Generate(g) => generate::cmd(&g),
-                        #[cfg(feature = "api")]
+                        #[cfg(feature = "api-client")]
                         SubCommand::Top(t) => top::cmd(&t).await,
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),

@@ -1,4 +1,4 @@
-#[cfg(feature = "api")]
+#[cfg(feature = "api-client")]
 use crate::top;
 use crate::{generate, get_version, list, unit_test, validate};
 use std::path::PathBuf;
@@ -116,7 +116,7 @@ pub enum SubCommand {
 
     /// Display topology in the console. This is available when the `api` feature is enabled, since
     /// observing topology requires an active/running API server.
-    #[cfg(feature = "api")]
+    #[cfg(feature = "api-client")]
     Top(top::Opts),
 
     /// Manage the vector service.

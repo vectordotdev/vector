@@ -17,7 +17,7 @@ extern crate derivative;
 #[macro_use]
 extern crate pest_derive;
 
-#[cfg(feature = "api")]
+#[cfg(feature = "api-client")]
 #[macro_use]
 extern crate prettytable;
 
@@ -62,8 +62,8 @@ pub mod stream;
 pub mod template;
 pub mod test_util;
 pub mod tls;
-#[cfg(feature = "api_client")]
-mod top;
+#[cfg(feature = "api-client")]
+pub mod top;
 pub mod topology;
 pub mod trace;
 pub mod transforms;
