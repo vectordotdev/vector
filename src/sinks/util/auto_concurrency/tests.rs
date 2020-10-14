@@ -240,7 +240,7 @@ impl Service<Vec<Event>> for TestSink {
             .params
             .concurrency
             .action_at_level(in_flight)
-            .or(self.params.rate.action_at_level(rate));
+            .or_else(|| self.params.rate.action_at_level(rate));
         match action {
             None => {
                 let delay = self.delay_at(in_flight, rate);
