@@ -14,7 +14,6 @@ use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt;
 use std::path::PathBuf;
-use string_cache::DefaultAtom as Atom;
 
 lazy_static! {
     static ref RE: Regex = Regex::new(r"\{\{(?P<key>[^\}]+)\}\}").unwrap();
@@ -94,7 +93,7 @@ fn is_dynamic(item: &Item) -> bool {
 }
 
 impl Template {
-    pub fn render(&self, event: &Event) -> Result<Bytes, Vec<Atom>> {
+    pub fn render(&self, event: &Event) -> Result<Bytes, Vec<String>> {
         match (self.has_fields, self.has_ts) {
             (false, false) => Ok(self.src_bytes.clone()),
             (true, false) => render_fields(&self.src, event).map(Bytes::from),
@@ -106,17 +105,17 @@ impl Template {
         }
     }
 
-    pub fn render_string(&self, event: &Event) -> Result<String, Vec<Atom>> {
+    pub fn render_string(&self, event: &Event) -> Result<String, Vec<String>> {
         self.render(event)
             .map(|bytes| String::from_utf8(Vec::from(bytes.as_ref())).expect("this is a bug"))
     }
 
-    pub fn get_fields(&self) -> Option<Vec<Atom>> {
+    pub fn get_fields(&self) -> Option<Vec<String>> {
         if self.has_fields {
             RE.captures_iter(&self.src)
                 .map(|c| {
                     c.get(1)
-                        .map(|s| Atom::from(s.as_str().trim()))
+                        .map(|s| s.as_str().trim().to_string())
                         .expect("src should match regex")
                 })
                 .collect::<Vec<_>>()
@@ -135,18 +134,18 @@ impl Template {
     }
 }
 
-fn render_fields(src: &str, event: &Event) -> Result<String, Vec<Atom>> {
+fn render_fields(src: &str, event: &Event) -> Result<String, Vec<String>> {
     let mut missing_fields = Vec::new();
     let out = RE
         .replace_all(src, |caps: &Captures<'_>| {
             let key = caps
                 .get(1)
-                .map(|s| Atom::from(s.as_str().trim()))
+                .map(|s| s.as_str().trim())
                 .expect("src should match regex");
             if let Some(val) = event.as_log().get(&key) {
                 val.to_string_lossy()
             } else {
-                missing_fields.push(key.clone());
+                missing_fields.push(key.to_owned());
                 String::new()
             }
         })
@@ -161,7 +160,7 @@ fn render_fields(src: &str, event: &Event) -> Result<String, Vec<Atom>> {
 fn render_timestamp(src: &str, event: &Event) -> String {
     let timestamp = match event {
         Event::Log(log) => log
-            .get(&Atom::from(log_schema().timestamp_key()))
+            .get(log_schema().timestamp_key())
             .and_then(Value::as_timestamp),
         _ => None,
     };
@@ -227,8 +226,8 @@ mod tests {
         let f3 = Template::try_from("nofield").unwrap().get_fields();
         let f4 = Template::try_from("%F").unwrap().get_fields();
 
-        assert_eq!(f1, vec![Atom::from("foo")]);
-        assert_eq!(f2, vec![Atom::from("foo"), Atom::from("bar")]);
+        assert_eq!(f1, vec!["foo"]);
+        assert_eq!(f2, vec!["foo", "bar"]);
         assert_eq!(f3, None);
         assert_eq!(f4, None);
     }
@@ -298,7 +297,7 @@ mod tests {
         let template = Template::try_from("{{log_stream}}-{{foo}}").unwrap();
 
         assert_eq!(
-            Err(vec![Atom::from("log_stream"), Atom::from("foo")]),
+            Err(vec!["log_stream".to_string(), "foo".to_string()]),
             template.render(&event)
         );
     }

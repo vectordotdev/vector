@@ -7,6 +7,9 @@ components: sinks: azure_monitor_logs: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
+		egress_method: "batch"
 		function:      "transmit"
 		service_providers: ["Azure"]
 	}
@@ -21,13 +24,7 @@ components: sinks: azure_monitor_logs: {
 		}
 		buffer: enabled:      true
 		compression: enabled: false
-		encoding: {
-			enabled: true
-			default: null
-			json:    null
-			ndjson:  null
-			text:    null
-		}
+		encoding: codec: enabled: false
 		healthcheck: enabled: true
 		request: enabled:     false
 		tls: {
@@ -39,14 +36,7 @@ components: sinks: azure_monitor_logs: {
 		}
 	}
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
-	}
-
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -80,6 +70,16 @@ components: sinks: azure_monitor_logs: {
 				examples: ["5ce893d9-2c32-4b6c-91a9-b0887c2de2d6", "97ce69d9-b4be-4241-8dbd-d265edcf06c4"]
 			}
 		}
+		host: {
+			common:      true
+			description: "[Alternative host](https://docs.azure.cn/en-us/articles/guidance/developerdifferences#check-endpoints-in-azure) for dedicated Azure regions."
+			required:    false
+			warnings: []
+			type: string: {
+				default: "ods.opinsights.azure.com"
+				examples: ["ods.opinsights.azure.us", "ods.opinsights.azure.cn"]
+			}
+		}
 		log_type: {
 			description: "The [record type of the data that is being submitted](https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-headers). Can only contain letters, numbers, and underscore (_), and may not exceed 100 characters."
 			required:    true
@@ -96,5 +96,10 @@ components: sinks: azure_monitor_logs: {
 				examples: ["${AZURE_MONITOR_SHARED_KEY_ENV_VAR}", "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="]
 			}
 		}
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 }

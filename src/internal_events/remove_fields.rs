@@ -17,6 +17,6 @@ pub struct RemoveFieldsFieldMissing<'a> {
 
 impl<'a> InternalEvent for RemoveFieldsFieldMissing<'a> {
     fn emit_logs(&self) {
-        error!(message = "Field did not exist.", %self.field, rate_limit_secs = 30);
+        debug!(message = "Field did not exist.", %self.field, rate_limit_secs = 30);
     }
 }

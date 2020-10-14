@@ -1,7 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
 use std::num::ParseFloatError;
-use string_cache::DefaultAtom;
 
 pub(crate) struct LogToMetricEventProcessed;
 
@@ -15,11 +14,11 @@ impl InternalEvent for LogToMetricEventProcessed {
     }
 }
 
-pub(crate) struct LogToMetricFieldNotFound {
-    pub field: DefaultAtom,
+pub(crate) struct LogToMetricFieldNotFound<'a> {
+    pub field: &'a str,
 }
 
-impl InternalEvent for LogToMetricFieldNotFound {
+impl<'a> InternalEvent for LogToMetricFieldNotFound<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "Field not found.",
@@ -35,12 +34,12 @@ impl InternalEvent for LogToMetricFieldNotFound {
     }
 }
 
-pub(crate) struct LogToMetricParseFloatError {
-    pub field: DefaultAtom,
+pub(crate) struct LogToMetricParseFloatError<'a> {
+    pub field: &'a str,
     pub error: ParseFloatError,
 }
 
-impl InternalEvent for LogToMetricParseFloatError {
+impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "Failed to parse field as float.",
