@@ -2,7 +2,7 @@ package metadata
 
 components: sources: docker: {
 	title:             "Docker"
-	short_description: "Collects logs through the Docker API"
+	short_description: "Collects logs through the Docker API."
 	long_description: """
 		[Docker][urls.docker] is an open platform for developing, shipping, and running
 		applications and services. Docker enables you to separate your services from
