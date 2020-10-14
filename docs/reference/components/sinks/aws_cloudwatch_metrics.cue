@@ -75,15 +75,6 @@ components: sinks: aws_cloudwatch_metrics: {
 	}
 
 	configuration: {
-		endpoint: {
-			common:      false
-			description: "Custom endpoint for use with AWS-compatible services. Providing a value for this option will make `region` moot."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["127.0.0.0:5000/path/to/service"]
-			}
-		}
 		namespace: {
 			description: "A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other."
 			required:    true
