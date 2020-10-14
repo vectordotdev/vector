@@ -92,24 +92,6 @@ async fn print_topology(client: &Client, mut formatter: Box<dyn StatsWriter>) ->
     Ok(())
 }
 
-// async fn metrics(url: &Url) -> Result<(), ()> {
-//     let client = make_subscription_client(&url).await.map_err(|_| ())?;
-//
-//     let request_body =
-//         UptimeMetricsSubscription::build_query(uptime_metrics_subscription::Variables);
-//
-//     let subscription = client
-//         .start::<UptimeMetricsSubscription>(&request_body)
-//         .await
-//         .map_err(|_| ())?;
-//
-//     for data in subscription.stream().iter() {
-//         println!("{:?}", data)
-//     }
-//
-//     Ok(())
-// }
-
 pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let url = opts.url.clone().unwrap_or_else(|| {
         let addr = config::api::default_bind().unwrap();
@@ -127,6 +109,8 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
         }
     }
 
+    // Print initial topology
+    // TODO - make this auto-update!
     if print_topology(&client, new_formatter(opts.humanize))
         .await
         .is_err()
