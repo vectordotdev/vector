@@ -7,6 +7,8 @@ components: sinks: socket: {
 
 	classes: {
 		commonly_used: true
+		delivery:      "best_effort"
+		development:   "stable"
 		egress_method: "stream"
 		function:      "transmit"
 		service_providers: []
@@ -29,11 +31,6 @@ components: sinks: socket: {
 			can_verify_hostname:    true
 			enabled_default:        false
 		}
-	}
-
-	statuses: {
-		delivery:    "best_effort"
-		development: "stable"
 	}
 
 	support: {
