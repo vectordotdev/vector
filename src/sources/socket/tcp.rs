@@ -7,7 +7,6 @@ use crate::{
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -17,7 +16,7 @@ pub struct TcpConfig {
     pub max_length: usize,
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
-    pub host_key: Option<Atom>,
+    pub host_key: Option<String>,
     pub tls: Option<TlsConfig>,
 }
 
@@ -63,10 +62,10 @@ impl TcpSource for RawTcpSource {
             Bytes::from("socket"),
         );
 
-        let host_key =
-            (self.config.host_key.as_ref()).unwrap_or(&crate::config::log_schema().host_key());
+        let host_key = (self.config.host_key.clone())
+            .unwrap_or_else(|| crate::config::log_schema().host_key().to_string());
 
-        event.as_mut_log().insert(host_key.clone(), host);
+        event.as_mut_log().insert(host_key, host);
 
         emit!(SocketEventReceived {
             byte_size,

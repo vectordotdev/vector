@@ -27,7 +27,7 @@ use std::{
     str::FromStr,
     task::{Context, Poll},
 };
-use string_cache::DefaultAtom as Atom;
+
 use tokio::{
     fs::{File, OpenOptions},
     io::{self, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
@@ -38,14 +38,14 @@ use tracing_futures::Instrument;
 const DEFAULT_BATCH_SIZE: usize = 16;
 
 const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
+const CURSOR: &str = "__CURSOR";
+const HOSTNAME: &str = "_HOSTNAME";
+const MESSAGE: &str = "MESSAGE";
+const SYSTEMD_UNIT: &str = "_SYSTEMD_UNIT";
+const SOURCE_TIMESTAMP: &str = "_SOURCE_REALTIME_TIMESTAMP";
+const RECEIVED_TIMESTAMP: &str = "__REALTIME_TIMESTAMP";
 
 lazy_static! {
-    static ref CURSOR: Atom = Atom::from("__CURSOR");
-    static ref HOSTNAME: Atom = Atom::from("_HOSTNAME");
-    static ref MESSAGE: Atom = Atom::from("MESSAGE");
-    static ref SYSTEMD_UNIT: Atom = Atom::from("_SYSTEMD_UNIT");
-    static ref SOURCE_TIMESTAMP: Atom = Atom::from("_SOURCE_REALTIME_TIMESTAMP");
-    static ref RECEIVED_TIMESTAMP: Atom = Atom::from("__REALTIME_TIMESTAMP");
     static ref JOURNALCTL: PathBuf = "journalctl".into();
 }
 
@@ -80,7 +80,9 @@ inventory::submit! {
     SourceDescription::new::<JournaldConfig>("journald")
 }
 
-type Record = HashMap<Atom, String>;
+impl_generate_config_from_default!(JournaldConfig);
+
+type Record = HashMap<String, String>;
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "journald")]
@@ -205,16 +207,16 @@ impl JournaldConfig {
 fn create_event(record: Record) -> Event {
     let mut log = LogEvent::from_iter(record);
     // Convert some journald-specific field names into Vector standard ones.
-    if let Some(message) = log.remove(&MESSAGE) {
-        log.insert(log_schema().message_key().clone(), message);
+    if let Some(message) = log.remove(MESSAGE) {
+        log.insert(log_schema().message_key(), message);
     }
-    if let Some(host) = log.remove(&HOSTNAME) {
-        log.insert(log_schema().host_key().clone(), host);
+    if let Some(host) = log.remove(HOSTNAME) {
+        log.insert(log_schema().host_key(), host);
     }
     // Translate the timestamp, and so leave both old and new names.
     if let Some(timestamp) = log
-        .get(&SOURCE_TIMESTAMP)
-        .or_else(|| log.get(&RECEIVED_TIMESTAMP))
+        .get(&*SOURCE_TIMESTAMP)
+        .or_else(|| log.get(RECEIVED_TIMESTAMP))
     {
         if let Value::Bytes(timestamp) = timestamp {
             if let Ok(timestamp) = String::from_utf8_lossy(timestamp).parse::<u64>() {
@@ -222,10 +224,7 @@ fn create_event(record: Record) -> Event {
                     (timestamp / 1_000_000) as i64,
                     (timestamp % 1_000_000) as u32 * 1_000,
                 );
-                log.insert(
-                    log_schema().timestamp_key().clone(),
-                    Value::Timestamp(timestamp),
-                );
+                log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
             }
         }
     }
@@ -364,13 +363,13 @@ where
                         continue;
                     }
                 };
-                if let Some(tmp) = record.remove(&CURSOR) {
+                if let Some(tmp) = record.remove(&*CURSOR) {
                     cursor = Some(tmp);
                 }
 
                 saw_record = true;
 
-                let unit = record.get(&SYSTEMD_UNIT);
+                let unit = record.get(&*SYSTEMD_UNIT);
                 if filter_unit(unit, &self.include_units, &self.exclude_units) {
                     continue;
                 }
@@ -510,6 +509,11 @@ mod checkpointer_tests {
     use super::*;
     use tempfile::tempdir;
     use tokio::fs::read_to_string;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<JournaldConfig>();
+    }
 
     #[tokio::test]
     async fn journald_checkpointer_works() {
@@ -747,11 +751,11 @@ mod tests {
     }
 
     fn message(event: &Event) -> Value {
-        event.as_log()[&log_schema().message_key()].clone()
+        event.as_log()[log_schema().message_key()].clone()
     }
 
     fn timestamp(event: &Event) -> Value {
-        event.as_log()[&log_schema().timestamp_key()].clone()
+        event.as_log()[log_schema().timestamp_key()].clone()
     }
 
     fn value_ts(secs: i64, usecs: u32) -> Value {
@@ -759,6 +763,6 @@ mod tests {
     }
 
     fn priority(event: &Event) -> Value {
-        event.as_log()[&"PRIORITY".into()].clone()
+        event.as_log()["PRIORITY"].clone()
     }
 }
