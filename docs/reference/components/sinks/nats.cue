@@ -17,11 +17,7 @@ components: sinks: nats: {
 	features: {
 		buffer: enabled:      false
 		compression: enabled: false
-		encoding: codec: {
-			enabled: true
-			default: null
-			enum: ["json", "text"]
-		}
+		encoding: codec: enabled: false
 		healthcheck: enabled: true
 		request: enabled:     false
 		tls: enabled:         false
@@ -57,7 +53,6 @@ components: sinks: nats: {
 			required:    true
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["foo", "time.us.east", "time.*.east", "time.>", ">"]
 			}
 		}
