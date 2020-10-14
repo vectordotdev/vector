@@ -207,7 +207,7 @@ mod test {
         let config = StatsdConfig::Udp(UdpConfig { address: in_addr });
         let sender = {
             let (sender, mut receiver) = mpsc::channel(200);
-            let addr = in_addr.clone();
+            let addr = in_addr;
             tokio::spawn(async move {
                 let bind_addr = next_addr();
                 let mut socket = tokio::net::UdpSocket::bind(bind_addr).await.unwrap();
@@ -231,7 +231,7 @@ mod test {
         });
         let sender = {
             let (sender, mut receiver) = mpsc::channel(200);
-            let addr = in_addr.clone();
+            let addr = in_addr;
             tokio::spawn(async move {
                 while let Some(bytes) = receiver.recv().await {
                     use tokio::io::AsyncWriteExt;
