@@ -4,6 +4,12 @@ set -e -o verbose
 export DEBIAN_FRONTEND=noninteractive
 
 apt update --yes
+
+apt install --yes \
+  software-properties-common \
+  apt-utils \
+  apt-transport-https
+
 apt upgrade --yes
 
 # Deps
@@ -15,9 +21,7 @@ apt install --yes \
     python3-pip \
     jq \
     shellcheck \
-    software-properties-common \
     locales \
-    apt-transport-https \
     ca-certificates \
     curl \
     gnupg-agent \
@@ -29,7 +33,10 @@ apt install --yes \
     wget \
     gawk \
     yarn \
-    sudo
+    sudo \
+    cmark-gfm \
+    rename \
+    rpm
 
 # Cue
 TEMP=$(mktemp -d)

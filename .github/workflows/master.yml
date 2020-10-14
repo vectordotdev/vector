@@ -17,7 +17,6 @@ on:
       - "build.rs"
       - "Cargo.lock"
       - "Cargo.toml"
-      - "docker-compose.yml"
       - "Makefile"
       - "rust-toolchain"
 

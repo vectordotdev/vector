@@ -70,7 +70,8 @@ cat LICENSE NOTICE > "$PROJECT_ROOT/target/debian-license.txt"
 #
 #   --no-build
 #     because this stop should follow a build
-cargo deb --target "$TARGET" --deb-version "$PACKAGE_VERSION" --no-build
+
+cargo deb --target "$TARGET" --deb-version "$PACKAGE_VERSION" --no-build --no-strip
 
 # Rename the resulting .deb file to use - instead of _ since this
 # is consistent with our package naming scheme.

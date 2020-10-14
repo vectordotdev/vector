@@ -6,6 +6,7 @@ rustup default "$(cat rust-toolchain)"
 rustup component add rustfmt
 rustup component add clippy
 rustup target add wasm32-wasi
+rustup run stable cargo install cargo-deb --version '^1.28.0'
 
 cd scripts
 bundle update --bundler
