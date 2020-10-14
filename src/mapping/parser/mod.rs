@@ -337,7 +337,8 @@ fn regex_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
             );
             map.insert("flags".to_string(), Value::from(flags));
 
-            let regex = DynamicRegex::try_from(Value::from(map))?;
+            let mut regex = DynamicRegex::try_from(Value::from(map))?;
+            regex.compile()?;
 
             Ok(Box::new(Literal::from(QueryValue::from(regex))))
         }
@@ -1266,12 +1267,11 @@ mod tests {
                     "foo".to_string(),
                     Box::new(SplitFn::new(
                         Box::new(QueryPath::from("bar")),
-                        Box::new(Literal::from(QueryValue::from(DynamicRegex::new(
-                            "a".to_string(),
-                            false,
-                            true,
-                            false,
-                        )))),
+                        Box::new(Literal::from(QueryValue::from({
+                            let mut regex = DynamicRegex::new("a".to_string(), false, true, false);
+                            regex.compile().unwrap();
+                            regex
+                        }))),
                         Some(Box::new(Literal::from(Value::from(2)))),
                     )),
                 ))]),

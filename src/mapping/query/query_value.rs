@@ -40,7 +40,7 @@ impl From<QueryValue> for Value {
 
         match value {
             Value(v) => v,
-            Regex(_r) => unimplemented!(), // r.into(),
+            Regex(r) => r.into(),
         }
     }
 }

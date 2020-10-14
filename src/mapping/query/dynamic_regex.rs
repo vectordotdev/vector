@@ -106,6 +106,28 @@ impl TryFrom<Value> for DynamicRegex {
     }
 }
 
+impl From<DynamicRegex> for Value {
+    fn from(regex: DynamicRegex) -> Self {
+        let mut map = BTreeMap::new();
+        map.insert("pattern".to_string(), Value::from(regex.pattern));
+
+        let mut flags = Vec::new();
+        if regex.insensitive {
+            flags.push(Value::from(Bytes::from_static(b"i")));
+        }
+        if regex.multiline {
+            flags.push(Value::from(Bytes::from_static(b"m")));
+        }
+        if regex.global {
+            flags.push(Value::from(Bytes::from_static(b"g")));
+        }
+
+        map.insert("flags".to_string(), Value::from(flags));
+
+        Value::from(map)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
