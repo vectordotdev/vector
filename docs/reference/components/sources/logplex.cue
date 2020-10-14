@@ -9,7 +9,9 @@ components: sources: logplex: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["aggregator"]
+		development:   "beta"
 		egress_method: "batch"
 		function:      "receive"
 	}
@@ -25,29 +27,48 @@ components: sources: logplex: {
 		}
 	}
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
-	}
-
 	support: {
-		platforms: {
-			docker: ports: [_port]
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
+		dependencies: {
+			logpex: {
+				required: true
+				title:    "Heroku"
+				type:     "external"
+				url:      urls.logplex
+				versions: null
+
+				interface: socket: {
+					api: {
+						title: "Syslog 6587"
+						url:   urls.syslog_6587
+					}
+					port: _port
+					protocols: ["http"]
+					ssl: "optional"
+				}
+
+				setup: [
+					#"""
+						Create a [Heroku log drain][urls.heroku_http_log_drain] that
+						points to your Vector instance's address:
+
+						```bash
+						heroku drains:add https://<user>:<pass>@<address> -a <app>
+						```
+						"""#,
+				]
 			}
 		}
 
-		requirements: [
-			"""
-				This component exposes a configured port. You must ensure your network allows access to this port.
-				""",
-		]
+		platforms: {
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
+		}
+
+		requirements: []
 		warnings: []
 		notices: []
 	}

@@ -1,13 +1,17 @@
 package metadata
 
 components: sources: aws_kinesis_firehose: {
+	_port: 443
+
 	title:             "AWS Kinesis Firehose"
 	long_description:  "[AWS Kinesis Firehose][urls.aws_kinesis_firehose] is an AWS service that simplifies dealing with streaming data. It allows for ingestion, transformation, and forwarding of events. In addition to publishing events directly to Kinesis Firehose, the service has direct integrations with many AWS services which allow them to directly publish events to a delivery stream."
 	short_description: "Ingests events from AWS Kinesis Firehose via the [AWS Kinesis Firehose HTTP protocol][urls.aws_kinesis_firehose_http_protocol]."
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["aggregator"]
+		development:   "beta"
 		egress_method: "batch"
 		function:      "receive"
 	}
@@ -23,36 +27,46 @@ components: sources: aws_kinesis_firehose: {
 		}
 	}
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
-	}
-
 	support: {
-		platforms: {
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
+		dependencies: {
+			aws_kinesis_firehose: {
+				required: true
+				title:    "AWS Kinesis Firehose"
+				type:     "external"
+				url:      urls.aws_kinesis_firehose
+				versions: null
+
+				interface: socket: {
+					api: {
+						title: "AWS Kinesis Firehose HTTP Destination"
+						url:   urls.aws_firehose_http_request_spec
+					}
+					direction: "incoming"
+					port:      _port
+					protocols: ["http"]
+					ssl: "required"
+				}
+
+				setup: [
+					#"""
+						[Setup a Kinesis Firehose delivery stream][urls.aws_kinesis_firehose_setup]
+						in your preferred AWS region. Point the endpoint to your
+						Vector instance's address.
+						"""#,
+				]
 			}
 		}
 
-		requirements: [
-			#"""
-					This component exposes a configured port. You must ensure your
-					network allows inbound access to this port if you want to accept
-					requests from remote sources.
-				"""#,
-			#"""
-					AWS Kinesis Firehose requires that the endpoint being serving
-					TLS. You should either configure the `tls` options for this
-					source or use a load balancer that can handle TLS termination.
-				"""#,
-		]
+		platforms: {
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
+		}
 
+		requirements: []
 		warnings: []
 		notices: []
 	}

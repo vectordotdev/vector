@@ -9,7 +9,9 @@ components: sources: vector: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "best_effort"
 		deployment_roles: ["aggregator"]
+		development:   "beta"
 		egress_method: "stream"
 		function:      "receive"
 	}
@@ -25,31 +27,34 @@ components: sources: vector: {
 		}
 	}
 
-	statuses: {
-		delivery:    "best_effort"
-		development: "beta"
-	}
-
 	support: {
-		platforms: {
-			docker: ports: [_port]
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
+		dependencies: {
+			vector_client: {
+				required: true
+				title:    "Vector Client"
+				type:     "external"
+				url:      urls.vector_sink
+				versions: null
+
+				interface: socket: {
+					port: _port
+					protocols: ["tcp"]
+					ssl: "optional"
+				}
 			}
 		}
 
-		requirements: [
-		]
-		warnings: [
-			"""
-				This component exposes a configured port. You must ensure your network allows access to this port.
-				""",
-		]
+		platforms: {
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
+		}
+
+		requirements: []
+		warnings: []
 		notices: []
 	}
 

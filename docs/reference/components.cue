@@ -300,25 +300,13 @@ components: {
 		}
 
 		how_it_works: {
-			environment_variables: {
-				title: "Environment Variables"
-				body: #"""
-					Environment variables are supported through all of Vector's
-					configuration. Simply add ${MY_ENV_VAR} in your Vector
-					configuration file and the variable will be replaced before being
-					evaluated.
-
-					Learn more in the [configuration manual](/docs/manual/setup/configuration).
-					"""#
-			}
-
 			if (Kind == "source" || Kind == "sink") {
 				if features.tls.enabled {
 					tls: {
 						title: "Transport Layer Security (TLS)"
 						body: #"""
                   Vector uses [Openssl][urls.openssl] for TLS protocols. You can
-                  enable and adjust TLS behavior via the `tls.*` options.
+                  adjust TLS behavior via the `tls.*` options.
                   """#
 					}
 				}
