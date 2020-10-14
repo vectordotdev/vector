@@ -403,7 +403,7 @@ mod tests {
             let log = event.as_log();
             let mut map = BTreeMap::new();
             map.insert("dotted.key2".to_string(), Value::from("value2"));
-            assert_eq!(log[&Atom::from("nested")], map.into());
+            assert_eq!(log["nested"], map.into());
         }
     }
 
