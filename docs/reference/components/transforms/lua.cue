@@ -18,6 +18,18 @@ components: transforms: lua: {
 	}
 
 	support: {
+		dependencies: {
+			lua: {
+				required: true
+				title:    "AWS IMDS v2"
+				type:     "internal"
+				url:      urls.lua
+				versions: "5.3"
+
+				interface: ffi: {}
+			}
+		}
+
 		platforms: {
 			triples: {
 				"aarch64-unknown-linux-gnu":  true
@@ -31,11 +43,7 @@ components: transforms: lua: {
 
 		requirements: []
 		warnings: []
-		notices: [
-			#"""
-				Vector embeds Lua `5.3`.
-				"""#,
-		]
+		notices: []
 	}
 
 	configuration: {

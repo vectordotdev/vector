@@ -217,6 +217,7 @@ _values: {
 
 #Interface: {
 	close({binary: #InterfaceBinary}) |
+	close({ffi: close({})}) |
 	close({file_system: #InterfaceFileSystem}) |
 	close({socket: #InterfaceSocket}) |
 	close({stdin: close({})})
