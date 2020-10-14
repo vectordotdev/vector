@@ -114,8 +114,7 @@ pub enum SubCommand {
     /// For guidance on how to write unit tests check out: https://vector.dev/docs/setup/guides/unit-testing/
     Test(unit_test::Opts),
 
-    /// Display topology in the console. This is available when the `api` feature is enabled, since
-    /// observing topology requires an active/running API server.
+    /// Display topology and metrics in the console, for a local or remote Vector instance
     #[cfg(feature = "api-client")]
     Top(top::Opts),
 
