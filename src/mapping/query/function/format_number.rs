@@ -34,7 +34,7 @@ impl FormatNumberFn {
 }
 
 impl Function for FormatNumberFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let value = required!(ctx, self.query,
             Value::Integer(v) => Decimal::from_i64(v),
             Value::Float(v) => Decimal::from_f64(v),
@@ -97,29 +97,32 @@ impl Function for FormatNumberFn {
         // Join results, using configured decimal separator.
         Ok(Value::from(
             parts.join(&String::from_utf8_lossy(&decimal_separator[..])),
-        ))
+        ).into())
     }
 
     fn parameters() -> &'static [Parameter] {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Integer(_) | Value::Float(_)),
+                accepts: |v| {
+                    matches!(v, QueryValue::Value(Value::Integer(_))
+                                      | QueryValue::Value(Value::Float(_)))
+                },
                 required: true,
             },
             Parameter {
                 keyword: "scale",
-                accepts: |v| matches!(v, Value::Integer(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Integer(_))),
                 required: false,
             },
             Parameter {
                 keyword: "decimal_separator",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
                 required: false,
             },
             Parameter {
                 keyword: "grouping_separator",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
                 required: false,
             },
         ]
@@ -250,7 +253,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event).map(Into::into), exp);
         }
     }
 }
