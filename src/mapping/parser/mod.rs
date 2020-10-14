@@ -294,7 +294,6 @@ fn positional_item_from_pair(
         signature.as_str()
     ))?;
 
-    // let resolver = query_arithmetic_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?;
     let resolver = argument_item_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?;
 
     let keyword = parameter.keyword.to_owned();
