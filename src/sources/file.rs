@@ -14,11 +14,11 @@ use file_source::{
     FileServer, Fingerprinter,
 };
 use futures::{
-    compat::{Compat, Compat01As03, Compat01As03Sink, Future01CompatExt},
+    compat::{Compat, Future01CompatExt},
     future::{FutureExt, TryFutureExt},
-    stream::StreamExt,
+    stream::{Stream, StreamExt},
 };
-use futures01::{future, Future, Sink, Stream};
+use futures01::{Future, Sink};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -225,25 +225,15 @@ pub fn file_source(
     let multiline_config = config.multiline.clone();
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
-    Box::new(future::lazy(move || {
-        info!(message = "Starting file server.", ?include, ?exclude);
+
+    Box::new(futures01::future::lazy(move || {
+        info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
         // sizing here is just a guess
-        let (tx, rx) = futures01::sync::mpsc::channel(100);
+        let (tx, rx) = futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
+        let rx = rx.map(futures::stream::iter).flatten();
 
-        // This closure is overcomplicated because of the compatibility layer.
-        let wrap_with_line_agg = |rx, config| {
-            let rx = StreamExt::filter_map(Compat01As03::new(rx), |val| {
-                futures::future::ready(val.ok())
-            });
-            let logic = line_agg::Logic::new(config);
-            Box::new(Compat::new(
-                LineAgg::new(rx.map(|(line, src)| (src, line, ())), logic)
-                    .map(|(src, line, _context)| (line, src))
-                    .map(Ok),
-            ))
-        };
-        let messages: Box<dyn Stream<Item = (Bytes, String), Error = ()> + Send> =
+        let messages: Box<dyn Stream<Item = (Bytes, String)> + Send + std::marker::Unpin> =
             if let Some(ref multiline_config) = multiline_config {
                 wrap_with_line_agg(
                     rx,
@@ -265,13 +255,15 @@ pub fn file_source(
         // logs in the queue.
         let span = current_span();
         let span2 = span.clone();
+        let messages01 = Compat::new(StreamExt::map(
+            messages,
+            move |(msg, file): (Bytes, String)| {
+                let _enter = span2.enter();
+                Ok::<_, ()>(create_event(msg, file, &host_key, &hostname, &file_key))
+            },
+        ));
         tokio::spawn(
-            messages
-                .map(move |(msg, file): (Bytes, String)| {
-                    let _enter = span2.enter();
-                    create_event(msg, file, &host_key, &hostname, &file_key)
-                })
-                .forward(out.sink_map_err(|e| error!(%e)))
+            futures01::Stream::forward(messages01, out.sink_map_err(|e| error!(%e)))
                 .map(|_| ())
                 .compat()
                 .instrument(span),
@@ -280,7 +272,7 @@ pub fn file_source(
         let span = info_span!("file_server");
         spawn_blocking(move || {
             let _enter = span.enter();
-            let result = file_server.run(Compat01As03Sink::new(tx), shutdown.compat());
+            let result = file_server.run(tx, shutdown);
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
@@ -288,8 +280,19 @@ pub fn file_source(
         })
         .boxed()
         .compat()
-        .map_err(|error| error!(message="file server unexpectedly stopped.",%error))
+        .map_err(|error| error!(message="File server unexpectedly stopped.", %error))
     }))
+}
+
+fn wrap_with_line_agg(
+    rx: impl Stream<Item = (Bytes, String)> + Send + std::marker::Unpin + 'static,
+    config: line_agg::Config,
+) -> Box<dyn Stream<Item = (Bytes, String)> + Send + std::marker::Unpin + 'static> {
+    let logic = line_agg::Logic::new(config);
+    Box::new(
+        LineAgg::new(rx.map(|(line, src)| (src, line, ())), logic)
+            .map(|(src, line, _context)| (line, src)),
+    )
 }
 
 fn create_event(
@@ -724,7 +727,7 @@ mod tests {
             sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            shutdown_done.compat().await.unwrap();
+            shutdown_done.await;
 
             let received = wait_with_timeout(rx.into_future().compat())
                 .await
@@ -761,7 +764,7 @@ mod tests {
             sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            shutdown_done.compat().await.unwrap();
+            shutdown_done.await;
 
             let received = wait_with_timeout(rx.into_future().compat())
                 .await
@@ -798,7 +801,7 @@ mod tests {
             sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            shutdown_done.compat().await.unwrap();
+            shutdown_done.await;
 
             let received = wait_with_timeout(rx.into_future().compat())
                 .await
@@ -1475,5 +1478,57 @@ mod tests {
                 "hooray".into(),
             ]
         );
+    }
+
+    // TODO: Renable test for Mac after https://github.com/timberio/vector/issues/4196 has been resolved
+    // TODO: and check if the original issue has been resolved https://github.com/timberio/vector/issues/3780.
+    #[cfg(not(target_os = "macos"))]
+    #[tokio::test]
+    async fn remove_file() {
+        let n = 5;
+        let remove_after = 1;
+
+        let (tx, rx) = Pipeline::new_test();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            remove_after: Some(remove_after),
+            glob_minimum_cooldown: 100,
+            ..test_default_file_config(&dir)
+        };
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        tokio::spawn(source.compat());
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+
+        for i in 0..n {
+            writeln!(&mut file, "{}", i).unwrap();
+        }
+        std::mem::drop(file);
+
+        for _ in 0..10 {
+            // Wait for remove grace period to end.
+            delay_for(Duration::from_secs(remove_after + 1)).await;
+
+            if File::open(&path).is_err() {
+                break;
+            }
+        }
+
+        drop(trigger_shutdown);
+
+        let received = wait_with_timeout(rx.collect().compat()).await;
+        assert_eq!(received.len(), n);
+
+        match File::open(&path) {
+            Ok(_) => panic!("File wasn't removed"),
+            Err(error) => assert_eq!(error.kind(), std::io::ErrorKind::NotFound),
+        }
     }
 }

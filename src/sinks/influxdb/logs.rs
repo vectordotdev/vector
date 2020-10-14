@@ -1,14 +1,16 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
+    http::HttpClient,
     sinks::{
         influxdb::{
-            encode_namespace, encode_timestamp, healthcheck, influx_line_protocol,
-            influxdb_settings, Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
+            encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
+            InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
         },
         util::{
+            encode_namespace,
             encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpClient, HttpSink},
+            http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -73,7 +75,19 @@ inventory::submit! {
     SinkDescription::new::<InfluxDBLogsConfig>("influxdb_logs")
 }
 
-impl GenerateConfig for InfluxDBLogsConfig {}
+impl GenerateConfig for InfluxDBLogsConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"endpoint = "http://localhost:8086/"
+            namespace = "my-namespace"
+            tags = []
+            org = "my-org"
+            bucket = "my-bucket"
+            token = "${INFLUXDB_TOKEN}""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_logs")]
@@ -85,7 +99,7 @@ impl SinkConfig for InfluxDBLogsConfig {
         tags.insert(log_schema().source_type_key().to_string());
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let client = HttpClient::new(tls_settings)?;
         let healthcheck = self.healthcheck(client.clone())?;
 
         let batch = BatchSettings::default()
@@ -124,7 +138,7 @@ impl SinkConfig for InfluxDBLogsConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal influxdb_logs sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal influxdb_logs sink error.", %error));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
@@ -150,7 +164,12 @@ impl HttpSink for InfluxDBLogsSink {
         let mut event = event.into_log();
 
         // Measurement
-        let measurement = encode_namespace(Some(&self.namespace), '.', "vector");
+        let name = "vector";
+        let measurement = encode_namespace(
+            Some(self.namespace.as_str()).filter(|namespace| !namespace.is_empty()),
+            '.',
+            name,
+        );
 
         // Timestamp
         let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
@@ -231,6 +250,11 @@ mod tests {
     };
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<InfluxDBLogsConfig>();
+    }
 
     #[test]
     fn test_config_without_tags() {

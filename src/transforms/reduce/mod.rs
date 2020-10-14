@@ -1,17 +1,16 @@
-use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::discriminant::Discriminant,
     event::{Event, LogEvent},
     internal_events::{ReduceEventProcessed, ReduceStaleEventFlushed},
+    transforms::{TaskTransform, Transform},
 };
 use async_stream::stream;
 use futures::{
     compat::{Compat, Compat01As03},
     stream, StreamExt,
 };
-use futures01::Stream as Stream01;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
@@ -23,7 +22,7 @@ use merge_strategy::*;
 
 //------------------------------------------------------------------------------
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct ReduceConfig {
     pub expire_after_ms: Option<u64>,
@@ -33,7 +32,7 @@ pub struct ReduceConfig {
     /// An ordered list of fields to distinguish reduces by. Each
     /// reduce has a separate event merging state.
     #[serde(default)]
-    pub identifier_fields: Vec<String>,
+    pub group_by: Vec<String>,
 
     #[serde(default)]
     pub merge_strategies: IndexMap<String, MergeStrategy>,
@@ -41,6 +40,7 @@ pub struct ReduceConfig {
     /// An optional condition that determines when an event is the end of a
     /// reduce.
     pub ends_when: Option<AnyCondition>,
+    pub starts_when: Option<AnyCondition>,
 }
 
 inventory::submit! {
@@ -52,9 +52,8 @@ impl_generate_config_from_default!(ReduceConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        let t = Reduce::new(self)?;
-        Ok(Box::new(t))
+    async fn build(&self) -> crate::Result<Transform> {
+        Reduce::new(self).map(Transform::task)
     }
 
     fn input_type(&self) -> DataType {
@@ -86,8 +85,8 @@ impl ReduceState {
                     if let Some(strat) = strategies.get(&k) {
                         match get_value_merger(v, strat) {
                             Ok(m) => Some((k, m)),
-                            Err(err) => {
-                                warn!("failed to create merger for field '{}': {}", k, err);
+                            Err(error) => {
+                                warn!(message = "Failed to create merger.", field = ?k, %error);
                                 None
                             }
                         }
@@ -109,8 +108,8 @@ impl ReduceState {
                             Ok(m) => {
                                 entry.insert(m);
                             }
-                            Err(err) => {
-                                warn!("failed to merge value: {}", err);
+                            Err(error) => {
+                                warn!(message = "Failed to merge value.", %error);
                             }
                         }
                     } else {
@@ -118,8 +117,8 @@ impl ReduceState {
                     }
                 }
                 hash_map::Entry::Occupied(mut entry) => {
-                    if let Err(err) = entry.get_mut().add(v.clone()) {
-                        warn!("failed to merge value: {}", err);
+                    if let Err(error) = entry.get_mut().add(v.clone()) {
+                        warn!(message = "Failed to merge value.", %error);
                     }
                 }
             }
@@ -130,8 +129,8 @@ impl ReduceState {
     fn flush(mut self) -> LogEvent {
         let mut event = Event::new_empty_log().into_log();
         for (k, v) in self.fields.drain() {
-            if let Err(err) = v.insert_into(k, &mut event) {
-                warn!("failed to merge values for field: {}", err);
+            if let Err(error) = v.insert_into(k, &mut event) {
+                warn!(message = "Failed to merge values for field.", %error);
             }
         }
         event
@@ -143,29 +142,31 @@ impl ReduceState {
 pub struct Reduce {
     expire_after: Duration,
     flush_period: Duration,
-    identifier_fields: Vec<String>,
+    group_by: Vec<String>,
     merge_strategies: IndexMap<String, MergeStrategy>,
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
     ends_when: Option<Box<dyn Condition>>,
+    starts_when: Option<Box<dyn Condition>>,
 }
 
 impl Reduce {
     fn new(config: &ReduceConfig) -> crate::Result<Self> {
-        let ends_when = if let Some(ends_conf) = &config.ends_when {
-            Some(ends_conf.build()?)
-        } else {
-            None
-        };
+        if config.ends_when.is_some() && config.starts_when.is_some() {
+            return Err("only one of `ends_when` and `starts_when` can be provided".into());
+        }
 
-        let identifier_fields = config.identifier_fields.clone().into_iter().collect();
+        let ends_when = config.ends_when.as_ref().map(|c| c.build()).transpose()?;
+        let starts_when = config.starts_when.as_ref().map(|c| c.build()).transpose()?;
+        let group_by = config.group_by.clone().into_iter().collect();
 
         Ok(Reduce {
             expire_after: Duration::from_millis(config.expire_after_ms.unwrap_or(30000)),
             flush_period: Duration::from_millis(config.flush_period_ms.unwrap_or(1000)),
-            identifier_fields,
+            group_by,
             merge_strategies: config.merge_strategies.clone(),
             reduce_merge_states: HashMap::new(),
             ends_when,
+            starts_when,
         })
     }
 
@@ -189,17 +190,24 @@ impl Reduce {
             .drain()
             .for_each(|(_, s)| output.push(Event::from(s.flush())));
     }
-}
 
-impl Transform for Reduce {
-    // Only used in tests
-    fn transform(&mut self, event: Event) -> Option<Event> {
-        let mut output = Vec::new();
-        self.transform_into(&mut output, event);
-        output.pop()
+    fn push_or_new_reduce_state(&mut self, event: LogEvent, discriminant: Discriminant) {
+        match self.reduce_merge_states.entry(discriminant) {
+            hash_map::Entry::Vacant(entry) => {
+                entry.insert(ReduceState::new(event, &self.merge_strategies));
+            }
+            hash_map::Entry::Occupied(mut entry) => {
+                entry.get_mut().add_event(event, &self.merge_strategies);
+            }
+        }
     }
 
-    fn transform_into(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform_one(&mut self, output: &mut Vec<Event>, event: Event) {
+        let starts_here = self
+            .starts_when
+            .as_ref()
+            .map(|c| c.check(&event))
+            .unwrap_or(false);
         let ends_here = self
             .ends_when
             .as_ref()
@@ -207,37 +215,39 @@ impl Transform for Reduce {
             .unwrap_or(false);
 
         let event = event.into_log();
-        let discriminant = Discriminant::from_log_event(&event, &self.identifier_fields);
+        let discriminant = Discriminant::from_log_event(&event, &self.group_by);
 
-        if ends_here {
-            output.push(Event::from(
-                if let Some(mut state) = self.reduce_merge_states.remove(&discriminant) {
-                    state.add_event(event, &self.merge_strategies);
-                    state.flush()
-                } else {
-                    ReduceState::new(event, &self.merge_strategies).flush()
-                },
-            ));
-        } else {
-            match self.reduce_merge_states.entry(discriminant) {
-                hash_map::Entry::Vacant(entry) => {
-                    entry.insert(ReduceState::new(event, &self.merge_strategies));
-                }
-                hash_map::Entry::Occupied(mut entry) => {
-                    entry.get_mut().add_event(event, &self.merge_strategies);
-                }
+        if starts_here {
+            if let Some(state) = self.reduce_merge_states.remove(&discriminant) {
+                output.push(state.flush().into());
             }
+
+            self.push_or_new_reduce_state(event, discriminant)
+        } else if ends_here {
+            output.push(match self.reduce_merge_states.remove(&discriminant) {
+                Some(mut state) => {
+                    state.add_event(event, &self.merge_strategies);
+                    state.flush().into()
+                }
+                None => ReduceState::new(event, &self.merge_strategies)
+                    .flush()
+                    .into(),
+            })
+        } else {
+            self.push_or_new_reduce_state(event, discriminant)
         }
 
         emit!(ReduceEventProcessed);
 
         self.flush_into(output);
     }
+}
 
-    fn transform_stream(
+impl TaskTransform for Reduce {
+    fn transform(
         self: Box<Self>,
-        input_rx: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
-    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+        input_rx: Box<dyn futures01::Stream<Item = Event, Error = ()> + Send>,
+    ) -> Box<dyn futures01::Stream<Item = Event, Error = ()> + Send>
     where
         Self: 'static,
     {
@@ -263,7 +273,7 @@ impl Transform for Reduce {
                       true
                     }
                     Some(Ok(event)) => {
-                      me.transform_into(&mut output, event);
+                      me.transform_one(&mut output, event);
                       false
                     }
                     Some(Err(())) => panic!("Unexpected error reading channel"),
@@ -285,12 +295,9 @@ impl Transform for Reduce {
 
 #[cfg(test)]
 mod test {
-    use super::ReduceConfig;
-    use crate::{
-        config::{TransformConfig, TransformContext},
-        event::Value,
-        Event,
-    };
+    use super::*;
+    use crate::{config::TransformConfig, event::Value, Event};
+    use futures::compat::Stream01CompatExt;
     use serde_json::json;
 
     #[test]
@@ -300,75 +307,62 @@ mod test {
 
     #[tokio::test]
     async fn reduce_from_condition() {
-        let mut reduce = toml::from_str::<ReduceConfig>(
+        let reduce = toml::from_str::<ReduceConfig>(
             r#"
-identifier_fields = [ "request_id" ]
+group_by = [ "request_id" ]
 
 [ends_when]
   "test_end.exists" = true
 "#,
         )
         .unwrap()
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
+        let reduce = reduce.into_task();
 
-        let mut outputs = Vec::new();
+        let mut e_1 = Event::from("test message 1");
+        e_1.as_mut_log().insert("counter", 1);
+        e_1.as_mut_log().insert("request_id", "1");
 
-        let mut e = Event::from("test message 1");
-        e.as_mut_log().insert("counter", 1);
-        e.as_mut_log().insert("request_id", "1");
-        reduce.transform_into(&mut outputs, e);
+        let mut e_2 = Event::from("test message 2");
+        e_2.as_mut_log().insert("counter", 2);
+        e_2.as_mut_log().insert("request_id", "2");
 
-        let mut e = Event::from("test message 2");
-        e.as_mut_log().insert("counter", 2);
-        e.as_mut_log().insert("request_id", "2");
-        reduce.transform_into(&mut outputs, e);
+        let mut e_3 = Event::from("test message 3");
+        e_3.as_mut_log().insert("counter", 3);
+        e_3.as_mut_log().insert("request_id", "1");
 
-        let mut e = Event::from("test message 3");
-        e.as_mut_log().insert("counter", 3);
-        e.as_mut_log().insert("request_id", "1");
-        reduce.transform_into(&mut outputs, e);
+        let mut e_4 = Event::from("test message 4");
+        e_4.as_mut_log().insert("counter", 4);
+        e_4.as_mut_log().insert("request_id", "1");
+        e_4.as_mut_log().insert("test_end", "yep");
 
-        let mut e = Event::from("test message 4");
-        e.as_mut_log().insert("counter", 4);
-        e.as_mut_log().insert("request_id", "1");
-        e.as_mut_log().insert("test_end", "yep");
-        reduce.transform_into(&mut outputs, e);
+        let mut e_5 = Event::from("test message 5");
+        e_5.as_mut_log().insert("counter", 5);
+        e_5.as_mut_log().insert("request_id", "2");
+        e_5.as_mut_log().insert("extra_field", "value1");
+        e_5.as_mut_log().insert("test_end", "yep");
 
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(
-            outputs.first().unwrap().as_log()["message"],
-            "test message 1".into()
-        );
-        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(8));
+        let inputs = vec![e_1, e_2, e_3, e_4, e_5];
+        let in_stream = futures01::stream::iter_ok(inputs);
+        let mut out_stream = reduce.transform(Box::new(in_stream)).compat();
 
-        outputs.clear();
+        let output_1 = out_stream.next().await.unwrap().unwrap();
+        assert_eq!(output_1.as_log()["message"], "test message 1".into());
+        assert_eq!(output_1.as_log()["counter"], Value::from(8));
 
-        let mut e = Event::from("test message 5");
-        e.as_mut_log().insert("counter", 5);
-        e.as_mut_log().insert("request_id", "2");
-        e.as_mut_log().insert("extra_field", "value1");
-        e.as_mut_log().insert("test_end", "yep");
-        reduce.transform_into(&mut outputs, e);
-
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(
-            outputs.first().unwrap().as_log()["message"],
-            "test message 2".into()
-        );
-        assert_eq!(
-            outputs.first().unwrap().as_log()["extra_field"],
-            "value1".into()
-        );
-        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(7));
+        let output_2 = out_stream.next().await.unwrap().unwrap();
+        assert_eq!(output_2.as_log()["message"], "test message 2".into());
+        assert_eq!(output_2.as_log()["extra_field"], "value1".into());
+        assert_eq!(output_2.as_log()["counter"], Value::from(7));
     }
 
     #[tokio::test]
     async fn reduce_merge_strategies() {
-        let mut reduce = toml::from_str::<ReduceConfig>(
+        let reduce = toml::from_str::<ReduceConfig>(
             r#"
-identifier_fields = [ "request_id" ]
+group_by = [ "request_id" ]
 
 merge_strategies.foo = "concat"
 merge_strategies.bar = "array"
@@ -379,123 +373,102 @@ merge_strategies.baz = "max"
 "#,
         )
         .unwrap()
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
+        let reduce = reduce.into_task();
 
-        let mut outputs = Vec::new();
+        let mut e_1 = Event::from("test message 1");
+        e_1.as_mut_log().insert("foo", "first foo");
+        e_1.as_mut_log().insert("bar", "first bar");
+        e_1.as_mut_log().insert("baz", 2);
+        e_1.as_mut_log().insert("request_id", "1");
 
-        let mut e = Event::from("test message 1");
-        e.as_mut_log().insert("foo", "first foo");
-        e.as_mut_log().insert("bar", "first bar");
-        e.as_mut_log().insert("baz", 2);
-        e.as_mut_log().insert("request_id", "1");
+        let mut e_2 = Event::from("test message 2");
+        e_2.as_mut_log().insert("foo", "second foo");
+        e_2.as_mut_log().insert("bar", 2);
+        e_2.as_mut_log().insert("baz", "not number");
+        e_2.as_mut_log().insert("request_id", "1");
 
-        reduce.transform_into(&mut outputs, e);
+        let mut e_3 = Event::from("test message 3");
+        e_3.as_mut_log().insert("foo", 10);
+        e_3.as_mut_log().insert("bar", "third bar");
+        e_3.as_mut_log().insert("baz", 3);
+        e_3.as_mut_log().insert("request_id", "1");
+        e_3.as_mut_log().insert("test_end", "yep");
 
-        let mut e = Event::from("test message 2");
-        e.as_mut_log().insert("foo", "second foo");
-        e.as_mut_log().insert("bar", 2);
-        e.as_mut_log().insert("baz", "not number");
-        e.as_mut_log().insert("request_id", "1");
+        let inputs = vec![e_1, e_2, e_3];
+        let in_stream = futures01::stream::iter_ok(inputs);
+        let mut out_stream = reduce.transform(Box::new(in_stream)).compat();
 
-        reduce.transform_into(&mut outputs, e);
-
-        let mut e = Event::from("test message 3");
-        e.as_mut_log().insert("foo", 10);
-        e.as_mut_log().insert("bar", "third bar");
-        e.as_mut_log().insert("baz", 3);
-        e.as_mut_log().insert("request_id", "1");
-        e.as_mut_log().insert("test_end", "yep");
-
-        reduce.transform_into(&mut outputs, e);
-
-        assert_eq!(outputs.len(), 1);
+        let output_1 = out_stream.next().await.unwrap().unwrap();
+        assert_eq!(output_1.as_log()["message"], "test message 1".into());
+        assert_eq!(output_1.as_log()["foo"], "first foo second foo".into());
         assert_eq!(
-            outputs.first().unwrap().as_log()["message"],
-            "test message 1".into()
-        );
-        assert_eq!(
-            outputs.first().unwrap().as_log()["foo"],
-            "first foo second foo".into()
-        );
-        assert_eq!(
-            outputs.first().unwrap().as_log()["bar"],
+            output_1.as_log()["bar"],
             Value::Array(vec!["first bar".into(), 2.into(), "third bar".into()]),
         );
-        assert_eq!(outputs.first().unwrap().as_log()["baz"], 3.into(),);
+        assert_eq!(output_1.as_log()["baz"], 3.into(),);
     }
 
     #[tokio::test]
-    async fn missing_identifier() {
-        let mut reduce = toml::from_str::<ReduceConfig>(
+    async fn missing_group_by() {
+        let reduce = toml::from_str::<ReduceConfig>(
             r#"
-identifier_fields = [ "request_id" ]
+group_by = [ "request_id" ]
 
 [ends_when]
   "test_end.exists" = true
 "#,
         )
         .unwrap()
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
+        let reduce = reduce.into_task();
 
-        let mut outputs = Vec::new();
+        let mut e_1 = Event::from("test message 1");
+        e_1.as_mut_log().insert("counter", 1);
+        e_1.as_mut_log().insert("request_id", "1");
 
-        let mut e = Event::from("test message 1");
-        e.as_mut_log().insert("counter", 1);
-        e.as_mut_log().insert("request_id", "1");
-        reduce.transform_into(&mut outputs, e);
+        let mut e_2 = Event::from("test message 2");
+        e_2.as_mut_log().insert("counter", 2);
 
-        let mut e = Event::from("test message 2");
-        e.as_mut_log().insert("counter", 2);
-        // e.as_mut_log().insert("request_id", "");
-        reduce.transform_into(&mut outputs, e);
+        let mut e_3 = Event::from("test message 3");
+        e_3.as_mut_log().insert("counter", 3);
+        e_3.as_mut_log().insert("request_id", "1");
 
-        let mut e = Event::from("test message 3");
-        e.as_mut_log().insert("counter", 3);
-        e.as_mut_log().insert("request_id", "1");
-        reduce.transform_into(&mut outputs, e);
+        let mut e_4 = Event::from("test message 4");
+        e_4.as_mut_log().insert("counter", 4);
+        e_4.as_mut_log().insert("request_id", "1");
+        e_4.as_mut_log().insert("test_end", "yep");
 
-        let mut e = Event::from("test message 4");
-        e.as_mut_log().insert("counter", 4);
-        e.as_mut_log().insert("request_id", "1");
-        e.as_mut_log().insert("test_end", "yep");
-        reduce.transform_into(&mut outputs, e);
+        let mut e_5 = Event::from("test message 5");
+        e_5.as_mut_log().insert("counter", 5);
+        e_5.as_mut_log().insert("extra_field", "value1");
+        e_5.as_mut_log().insert("test_end", "yep");
 
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(
-            outputs.first().unwrap().as_log()["message"],
-            "test message 1".into()
-        );
-        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(8));
+        let inputs = vec![e_1, e_2, e_3, e_4, e_5];
+        let in_stream = Box::new(futures01::stream::iter_ok(inputs));
+        let mut out_stream = reduce.transform(in_stream).compat();
 
-        outputs.clear();
+        let output_1 = out_stream.next().await.unwrap().unwrap();
+        let output_1 = output_1.as_log();
+        assert_eq!(output_1["message"], "test message 1".into());
+        assert_eq!(output_1["counter"], Value::from(8));
 
-        let mut e = Event::from("test message 5");
-        e.as_mut_log().insert("counter", 5);
-        e.as_mut_log().insert("extra_field", "value1");
-        e.as_mut_log().insert("test_end", "yep");
-        reduce.transform_into(&mut outputs, e);
-
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(
-            outputs.first().unwrap().as_log()["message"],
-            "test message 2".into()
-        );
-        assert_eq!(
-            outputs.first().unwrap().as_log()["extra_field"],
-            "value1".into()
-        );
-        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(7));
+        let output_2 = out_stream.next().await.unwrap().unwrap();
+        let output_2 = output_2.as_log();
+        assert_eq!(output_2["message"], "test message 2".into());
+        assert_eq!(output_2["extra_field"], "value1".into());
+        assert_eq!(output_2["counter"], Value::from(7));
     }
 
     #[tokio::test]
     async fn arrays() {
-        let mut reduce = toml::from_str::<ReduceConfig>(
+        let reduce = toml::from_str::<ReduceConfig>(
             r#"
-identifier_fields = [ "request_id" ]
+group_by = [ "request_id" ]
 
 merge_strategies.foo = "array"
 merge_strategies.bar = "concat"
@@ -505,72 +478,56 @@ merge_strategies.bar = "concat"
 "#,
         )
         .unwrap()
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
+        let reduce = reduce.into_task();
 
-        let mut outputs = Vec::new();
+        let mut e_1 = Event::from("test message 1");
+        e_1.as_mut_log().insert("foo", json!([1, 3]));
+        e_1.as_mut_log().insert("bar", json!([1, 3]));
+        e_1.as_mut_log().insert("request_id", "1");
 
-        let mut e = Event::from("test message 1");
-        e.as_mut_log().insert("foo", json!([1, 3]));
-        e.as_mut_log().insert("bar", json!([1, 3]));
-        e.as_mut_log().insert("request_id", "1");
-        reduce.transform_into(&mut outputs, e);
+        let mut e_2 = Event::from("test message 2");
+        e_2.as_mut_log().insert("foo", json!([2, 4]));
+        e_2.as_mut_log().insert("bar", json!([2, 4]));
+        e_2.as_mut_log().insert("request_id", "2");
 
-        let mut e = Event::from("test message 2");
-        e.as_mut_log().insert("foo", json!([2, 4]));
-        e.as_mut_log().insert("bar", json!([2, 4]));
-        e.as_mut_log().insert("request_id", "2");
-        reduce.transform_into(&mut outputs, e);
+        let mut e_3 = Event::from("test message 3");
+        e_3.as_mut_log().insert("foo", json!([5, 7]));
+        e_3.as_mut_log().insert("bar", json!([5, 7]));
+        e_3.as_mut_log().insert("request_id", "1");
 
-        let mut e = Event::from("test message 3");
-        e.as_mut_log().insert("foo", json!([5, 7]));
-        e.as_mut_log().insert("bar", json!([5, 7]));
-        e.as_mut_log().insert("request_id", "1");
-        reduce.transform_into(&mut outputs, e);
+        let mut e_4 = Event::from("test message 4");
+        e_4.as_mut_log().insert("foo", json!("done"));
+        e_4.as_mut_log().insert("bar", json!("done"));
+        e_4.as_mut_log().insert("request_id", "1");
+        e_4.as_mut_log().insert("test_end", "yep");
 
-        let mut e = Event::from("test message 4");
-        e.as_mut_log().insert("foo", json!("done"));
-        e.as_mut_log().insert("bar", json!("done"));
-        e.as_mut_log().insert("request_id", "1");
-        e.as_mut_log().insert("test_end", "yep");
-        reduce.transform_into(&mut outputs, e);
+        let mut e_5 = Event::from("test message 5");
+        e_5.as_mut_log().insert("foo", json!([6, 8]));
+        e_5.as_mut_log().insert("bar", json!([6, 8]));
+        e_5.as_mut_log().insert("request_id", "2");
 
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(
-            outputs.first().unwrap().as_log()["foo"],
-            json!([[1, 3], [5, 7], "done"]).into()
-        );
+        let mut e_6 = Event::from("test message 6");
+        e_6.as_mut_log().insert("foo", json!("done"));
+        e_6.as_mut_log().insert("bar", json!("done"));
+        e_6.as_mut_log().insert("request_id", "2");
+        e_6.as_mut_log().insert("test_end", "yep");
 
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(
-            outputs.first().unwrap().as_log()["bar"],
-            json!([1, 3, 5, 7, "done"]).into()
-        );
+        let inputs = vec![e_1, e_2, e_3, e_4, e_5, e_6];
+        let in_stream = Box::new(futures01::stream::iter_ok(inputs));
+        let mut out_stream = reduce.transform(in_stream).compat();
 
-        outputs.clear();
+        let output_1 = out_stream.next().await.unwrap().unwrap();
+        let output_1 = output_1.as_log();
+        assert_eq!(output_1["foo"], json!([[1, 3], [5, 7], "done"]).into());
 
-        let mut e = Event::from("test message 5");
-        e.as_mut_log().insert("foo", json!([6, 8]));
-        e.as_mut_log().insert("bar", json!([6, 8]));
-        e.as_mut_log().insert("request_id", "2");
-        reduce.transform_into(&mut outputs, e);
+        assert_eq!(output_1["bar"], json!([1, 3, 5, 7, "done"]).into());
 
-        let mut e = Event::from("test message 6");
-        e.as_mut_log().insert("foo", json!("done"));
-        e.as_mut_log().insert("bar", json!("done"));
-        e.as_mut_log().insert("request_id", "2");
-        e.as_mut_log().insert("test_end", "yep");
-        reduce.transform_into(&mut outputs, e);
-
-        assert_eq!(outputs.len(), 1);
-        assert_eq!(
-            outputs.first().unwrap().as_log()["foo"],
-            json!([[2, 4], [6, 8], "done"]).into()
-        );
-        assert_eq!(
-            outputs.first().unwrap().as_log()["bar"],
-            json!([2, 4, 6, 8, "done"]).into()
-        );
+        let output_1 = out_stream.next().await.unwrap().unwrap();
+        let output_1 = output_1.as_log();
+        assert_eq!(output_1["foo"], json!([[2, 4], [6, 8], "done"]).into());
+        assert_eq!(output_1["bar"], json!([2, 4, 6, 8, "done"]).into());
     }
 }

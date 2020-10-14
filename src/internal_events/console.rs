@@ -2,6 +2,18 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
+pub struct ConsoleEventProcessed {
+    pub byte_size: usize,
+}
+
+impl InternalEvent for ConsoleEventProcessed {
+    fn emit_metrics(&self) {
+        counter!("events_processed_total", 1);
+        counter!("processed_bytes_total", self.byte_size as u64);
+    }
+}
+
+#[derive(Debug)]
 pub struct ConsoleFieldNotFound<'a> {
     pub missing_field: &'a str,
 }
@@ -16,6 +28,6 @@ impl<'a> InternalEvent for ConsoleFieldNotFound<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1, "error_type" => "field_not_found");
+        counter!("processing_errors_total", 1, "error_type" => "field_not_found");
     }
 }

@@ -2,10 +2,11 @@ use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
+    http::HttpClient,
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpClient, HttpSink},
+            http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, UriParseError, VectorSink,
@@ -81,7 +82,7 @@ impl SinkConfig for PubsubConfig {
             .parse_config(self.batch)?;
         let request_settings = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let client = HttpClient::new(tls_settings)?;
 
         let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.creds.clone()).boxed();
 
@@ -93,7 +94,7 @@ impl SinkConfig for PubsubConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal gcp pubsub sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal gcp_pubsub sink error.", %error));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }

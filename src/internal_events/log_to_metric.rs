@@ -10,7 +10,7 @@ impl InternalEvent for LogToMetricEventProcessed {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
+        counter!("events_processed_total", 1);
     }
 }
 
@@ -28,7 +28,7 @@ impl<'a> InternalEvent for LogToMetricFieldNotFound<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
+        counter!("processing_errors_total", 1,
                  "error_type" => "field_not_found",
         );
     }
@@ -44,13 +44,13 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
         warn!(
             message = "Failed to parse field as float.",
             field = %self.field,
-            error = %self.error,
+            error = ?self.error,
             rate_limit_secs = 30
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
+        counter!("processing_errors_total", 1,
                  "error_type" => "parse_error",
         );
     }
@@ -65,13 +65,13 @@ impl InternalEvent for LogToMetricTemplateRenderError {
         let error = format!("Keys {:?} do not exist on the event.", self.missing_keys);
         warn!(
             message = "Failed to render template.",
-            error = %error,
+            %error,
             rate_limit_secs = 30
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
+        counter!("processing_errors_total", 1,
                  "error_type" => "render_error",
         );
     }
@@ -83,11 +83,11 @@ pub(crate) struct LogToMetricTemplateParseError {
 
 impl InternalEvent for LogToMetricTemplateParseError {
     fn emit_logs(&self) {
-        warn!(message = "Failed to parse template.", error = %self.error, rate_limit_secs = 30);
+        warn!(message = "Failed to parse template.", error = ?self.error, rate_limit_secs = 30);
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
+        counter!("processing_errors_total", 1,
                  "error_type" => "template_error",
         );
     }

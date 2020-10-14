@@ -36,7 +36,15 @@ inventory::submit! {
     SinkDescription::new::<SematextLogsConfig>("sematext_logs")
 }
 
-impl GenerateConfig for SematextLogsConfig {}
+impl GenerateConfig for SematextLogsConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"region = "us"
+            token = "${SEMATEXT_TOKEN}""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "sematext_logs")]
@@ -103,6 +111,11 @@ mod tests {
         test_util::{next_addr, random_lines_with_stream},
     };
     use futures::StreamExt;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SematextLogsConfig>();
+    }
 
     #[tokio::test]
     async fn smoke() {

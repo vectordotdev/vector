@@ -17,16 +17,28 @@ pub struct BlackholeSink {
     acker: Acker,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, default)]
+#[derivative(Default)]
 pub struct BlackholeConfig {
+    #[derivative(Default(value = "1000"))]
+    #[serde(default = "default_print_amount")]
     pub print_amount: usize,
+}
+
+fn default_print_amount() -> usize {
+    1000
 }
 
 inventory::submit! {
     SinkDescription::new::<BlackholeConfig>("blackhole")
 }
 
-impl GenerateConfig for BlackholeConfig {}
+impl GenerateConfig for BlackholeConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(&Self::default()).unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "blackhole")]
@@ -66,14 +78,11 @@ impl StreamSink for BlackholeSink {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
             let message_len = match event {
-                Event::Log(log) => log
-                    .get(crate::config::log_schema().message_key())
-                    .map(|v| v.as_bytes().len())
-                    .unwrap_or(0),
-                Event::Metric(metric) => {
-                    serde_json::to_string(&metric).map(|v| v.len()).unwrap_or(0)
-                }
-            };
+                Event::Log(log) => serde_json::to_string(&log),
+                Event::Metric(metric) => serde_json::to_string(&metric),
+            }
+            .map(|v| v.len())
+            .unwrap_or(0);
 
             self.total_events += 1;
             self.total_raw_bytes += message_len;
@@ -99,6 +108,11 @@ impl StreamSink for BlackholeSink {
 mod tests {
     use super::*;
     use crate::test_util::random_events_with_stream;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<BlackholeConfig>();
+    }
 
     #[tokio::test]
     async fn blackhole() {

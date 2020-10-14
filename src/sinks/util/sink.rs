@@ -58,81 +58,6 @@ use tokio::time::{delay_for, Duration};
 use tower::Service;
 use tracing_futures::Instrument;
 
-// === StreamSinkOld ===
-
-const STREAM_SINK_MAX: usize = 10_000;
-
-/// Simple stream based sink adapter.
-///
-/// This will wrap any inner sink acking all events
-/// as soon as poll_complete returns ready. `start_send`
-/// will also attempt to fully flush if the amount of
-/// in flight acks is larger than `STREAM_SINK_MAX`.
-#[derive(Debug)]
-pub struct StreamSinkOld<T> {
-    inner: T,
-    acker: Acker,
-    pending: usize,
-    closing_inner: bool,
-}
-
-impl<T> StreamSinkOld<T> {
-    pub fn new(inner: T, acker: Acker) -> Self {
-        Self {
-            inner,
-            acker,
-            pending: 0,
-            closing_inner: false,
-        }
-    }
-}
-
-impl<T: Sink> Sink for StreamSinkOld<T> {
-    type SinkItem = T::SinkItem;
-    type SinkError = T::SinkError;
-
-    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        trace!("Sending item.");
-        match self.inner.start_send(item)? {
-            AsyncSink::Ready => {
-                self.pending += 1;
-                trace!(message = "Submit successful.", pending_acks = self.pending);
-
-                if self.pending >= STREAM_SINK_MAX {
-                    self.poll_complete()?;
-                }
-
-                Ok(AsyncSink::Ready)
-            }
-
-            AsyncSink::NotReady(item) => {
-                trace!("Inner sink applying back pressure.");
-                Ok(AsyncSink::NotReady(item))
-            }
-        }
-    }
-
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        try_ready!(self.inner.poll_complete());
-
-        trace!(message = "Acking events.", acking_num = self.pending);
-        self.acker.ack(self.pending);
-        self.pending = 0;
-
-        Ok(().into())
-    }
-
-    fn close(&mut self) -> Poll<(), Self::SinkError> {
-        if !self.closing_inner {
-            if let Async::NotReady = self.poll_complete()? {
-                return Ok(Async::NotReady);
-            }
-            self.closing_inner = true;
-        }
-        self.inner.close()
-    }
-}
-
 // === StreamSink ===
 
 #[async_trait]
@@ -508,7 +433,7 @@ where
         // is apply back pressure.
         if self.sending.len() > 5 {
             trace!(
-                message = "too many sending batches.",
+                message = "Too many sending batches.",
                 amount = self.sending.len()
             );
             self.poll_complete()?;
@@ -715,7 +640,7 @@ where
         self.next_request_id = request_id.wrapping_add(1);
 
         trace!(
-            message = "submitting service request.",
+            message = "Submitting service request.",
             in_flight_requests = self.in_flight.len()
         );
         let response = Compat::new(Box::pin(self.service.call(req)))
@@ -723,16 +648,13 @@ where
             .then(move |result| {
                 match result {
                     Ok(response) if response.is_successful() => {
-                        trace!(message = "Response successful.", ?response);
+                        trace!(message = "Response successful.", response = ?response);
                     }
                     Ok(response) => {
-                        error!(message = "Response wasn't successful.", ?response);
+                        error!(message = "Response wasn't successful.", response = ?response);
                     }
                     Err(error) => {
-                        error!(
-                            message = "Request failed.",
-                            %error,
-                        );
+                        error!(message = "Request failed.", %error,);
                     }
                 }
 
@@ -761,10 +683,10 @@ where
                         num_to_ack += ack_size;
                         self.seq_tail += 1
                     }
-                    trace!(message = "acking events.", acking_num = num_to_ack);
+                    trace!(message = "Acking events.", acking_num = num_to_ack);
                     self.acker.ack(num_to_ack);
                 }
-                Err(_) => panic!("ServiceSink service sender dropped"),
+                Err(_) => panic!("ServiceSink service sender dropped."),
             }
         }
     }

@@ -10,8 +10,11 @@ mod api;
 mod auto_concurrency;
 #[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
 mod aws_cloudwatch_logs_subscription_parser;
+#[cfg(feature = "transforms-aws_ec2_metadata")]
+mod aws_ec2_metadata;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 mod aws_kinesis_firehose;
+#[cfg(feature = "sinks-aws_kinesis_streams")]
 mod aws_kinesis_streams;
 mod blackhole;
 #[cfg(feature = "transforms-coercer")]
@@ -43,11 +46,17 @@ mod kafka;
 mod kubernetes_logs;
 #[cfg(feature = "transforms-log_to_metric")]
 mod log_to_metric;
+#[cfg(feature = "transforms-logfmt_parser")]
+mod logfmt_parser;
 mod logplex;
 #[cfg(feature = "transforms-lua")]
 mod lua;
 #[cfg(feature = "transforms-metric_to_log")]
 mod metric_to_log;
+#[cfg(feature = "sources-mongodb_metrics")]
+mod mongodb_metrics;
+mod open;
+#[cfg(feature = "sinks-nats")]
 mod nats;
 mod process;
 #[cfg(feature = "sources-prometheus")]
@@ -66,11 +75,6 @@ mod rename_fields;
 mod sampler;
 #[cfg(feature = "sinks-sematext")]
 mod sematext_metrics;
-#[cfg(any(
-    feature = "sources-socket",
-    feature = "sources-syslog",
-    feature = "sources-vector"
-))]
 mod socket;
 mod split;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
@@ -106,8 +110,11 @@ pub use self::api::*;
 pub use self::auto_concurrency::*;
 #[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
 pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
+#[cfg(feature = "transforms-aws_ec2_metadata")]
+pub use self::aws_ec2_metadata::*;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub use self::aws_kinesis_firehose::*;
+#[cfg(feature = "sinks-aws_kinesis_streams")]
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
 #[cfg(feature = "transforms-coercer")]
@@ -141,12 +148,16 @@ pub use self::kafka::*;
 pub use self::kubernetes_logs::*;
 #[cfg(feature = "transforms-log_to_metric")]
 pub(crate) use self::log_to_metric::*;
+#[cfg(feature = "transforms-logfmt_parser")]
+pub use self::logfmt_parser::*;
 pub use self::logplex::*;
 #[cfg(feature = "transforms-lua")]
 pub use self::lua::*;
 #[cfg(feature = "transforms-metric_to_log")]
 pub(crate) use self::metric_to_log::*;
+#[cfg(feature = "sinks-nats")]
 pub use self::nats::*;
+pub use self::open::*;
 pub use self::process::*;
 #[cfg(feature = "sources-prometheus")]
 pub use self::prometheus::*;
@@ -164,7 +175,6 @@ pub use self::rename_fields::*;
 pub use self::sampler::*;
 #[cfg(feature = "sinks-sematext")]
 pub use self::sematext_metrics::*;
-#[cfg(any(feature = "sources-socket", feature = "sources-syslog"))]
 pub(crate) use self::socket::*;
 pub use self::split::*;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
@@ -189,6 +199,8 @@ pub use self::vector::*;
 pub use self::wasm::*;
 #[cfg(windows)]
 pub use self::windows::*;
+#[cfg(feature = "sources-mongodb_metrics")]
+pub use mongodb_metrics::*;
 
 pub trait InternalEvent {
     fn emit_logs(&self) {}
@@ -230,7 +242,7 @@ pub fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
 mod test {
     #[test]
     fn truncate_utf8() {
-        let message = "hello 😁 this is test";
-        assert_eq!("hello [...]", super::truncate_string_at(&message, 13));
+        let message = "Hello 😁 this is test.";
+        assert_eq!("Hello [...]", super::truncate_string_at(&message, 13));
     }
 }

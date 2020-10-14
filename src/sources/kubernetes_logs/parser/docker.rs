@@ -2,7 +2,7 @@ use crate::{
     config::log_schema,
     event::{self, Event, LogEvent, Value},
     internal_events::KubernetesLogsDockerFormatParseFailed,
-    transforms::Transform,
+    transforms::FunctionTransform,
 };
 use chrono::{DateTime, Utc};
 use serde_json::Value as JsonValue;
@@ -17,15 +17,15 @@ pub const LOG: &str = "log";
 /// contents specific to the implementation of the Docker `json` log driver.
 ///
 /// Normalizes parsed data for consistency.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Docker;
 
-impl Transform for Docker {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for Docker {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
-        parse_json(log)?;
-        normalize_event(log).ok()?;
-        Some(event)
+        parse_json(log);
+        normalize_event(log).ok();
+        output.push(event);
     }
 }
 
@@ -104,6 +104,7 @@ enum NormalizationError {
 #[cfg(test)]
 pub mod tests {
     use super::{super::test_util, *};
+    use crate::transforms::Transform;
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()
@@ -167,6 +168,6 @@ pub mod tests {
 
     #[test]
     fn test_parsing() {
-        test_util::test_parser(|| Docker, cases());
+        test_util::test_parser(|| Transform::function(Docker), cases());
     }
 }

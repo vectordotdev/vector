@@ -13,10 +13,11 @@ spec:
     type: {{ .Values.updateStrategy }}
   template:
     metadata:
-    {{- with .Values.podAnnotations }}
       annotations:
-        {{- toYaml . | nindent 8 }}
-    {{- end }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
       labels:
         {{- with .Values.podLabels }}
           {{- toYaml . | nindent 8 }}
@@ -55,6 +56,10 @@ spec:
                   fieldPath: metadata.namespace
             {{- include "libvector.globalEnv" . | nindent 12 }}
             {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            {{- with .Values.extraContainersPorts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
           resources:

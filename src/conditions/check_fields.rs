@@ -26,9 +26,11 @@ pub enum CheckFieldsPredicateArg {
     Boolean(bool),
 }
 
-pub trait CheckFieldsPredicate: std::fmt::Debug + Send + Sync {
+pub trait CheckFieldsPredicate: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
     fn check(&self, e: &Event) -> bool;
 }
+
+dyn_clone::clone_trait_object!(CheckFieldsPredicate);
 
 //------------------------------------------------------------------------------
 
@@ -348,7 +350,7 @@ impl IpCidrPredicate {
         };
         let cidrs = match cidr_strings.iter().map(IpCidr::from_str).collect() {
             Ok(v) => v,
-            Err(e) => return Err(format!("Invalid IP CIDR: {}", e)),
+            Err(error) => return Err(format!("Invalid IP CIDR: {}", error)),
         };
         Ok(Box::new(Self { target, cidrs }))
     }
@@ -370,7 +372,7 @@ impl CheckFieldsPredicate for IpCidrPredicate {
 
 //------------------------------------------------------------------------------
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct NegatePredicate {
     subpred: Box<dyn CheckFieldsPredicate>,
 }
@@ -423,7 +425,10 @@ impl CheckFieldsPredicate for LengthEqualsPredicate {
         match event {
             Event::Log(l) => l.get(&self.target).map_or(false, |v| {
                 let len = match v {
+                    Value::Bytes(value) => value.len(),
                     Value::Array(value) => value.len(),
+                    Value::Map(value) => value.len(),
+                    Value::Null => 0,
                     value => value.to_string_lossy().len(),
                 };
 
@@ -447,7 +452,7 @@ fn build_predicate(
         "contains" => ContainsPredicate::new(target, arg),
         "prefix" => {
             warn!(
-                message = "The \"prefix\" comparison predicate is deprecated, use \"starts_with\" instead",
+                message = "The `prefix` comparison predicate is deprecated, use `starts_with` instead.",
                 %target,
             );
             StartsWithPredicate::new(target, arg)
@@ -537,6 +542,7 @@ impl ConditionConfig for CheckFieldsConfig {
 
 //------------------------------------------------------------------------------
 
+#[derive(Clone)]
 pub struct CheckFields {
     predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>>,
 }

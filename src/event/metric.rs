@@ -8,6 +8,8 @@ use std::fmt::{self, Display, Formatter};
 pub struct Metric {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub namespace: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<BTreeMap<String, String>>,
@@ -83,6 +85,7 @@ impl Metric {
     pub fn to_absolute(&self) -> Self {
         Self {
             name: self.name.clone(),
+            namespace: self.namespace.clone(),
             timestamp: self.timestamp,
             tags: self.tags.clone(),
             kind: MetricKind::Absolute,
@@ -230,6 +233,7 @@ impl Metric {
 
         Self {
             name: key.name().to_string(),
+            namespace: Some("vector".to_string()),
             timestamp: Some(Utc::now()),
             tags: if labels.is_empty() {
                 None
@@ -240,12 +244,20 @@ impl Metric {
             value,
         }
     }
+
+    /// Returns `true` if `name` tag is present, and matches the provided `value`
+    pub fn tag_matches(&self, name: &str, value: &str) -> bool {
+        self.tags
+            .as_ref()
+            .filter(|t| t.get(name).filter(|v| *v == value).is_some())
+            .is_some()
+    }
 }
 
 impl Display for Metric {
     /// Display a metric using something like Prometheus' text format:
     ///
-    /// TIMESTAMP NAME{TAGS} KIND DATA
+    /// TIMESTAMP NAMESPACE_NAME{TAGS} KIND DATA
     ///
     /// TIMESTAMP is in ISO 8601 format with UTC time zone.
     ///
@@ -260,11 +272,15 @@ impl Display for Metric {
     ///
     /// example:
     /// ```text
-    /// 2020-08-12T20:23:37.248661343Z bytes_processed{component_kind="sink",component_type="blackhole"} = 6391
+    /// 2020-08-12T20:23:37.248661343Z vector_processed_bytes_total{component_kind="sink",component_type="blackhole"} = 6391
     /// ```
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         if let Some(timestamp) = &self.timestamp {
             write!(fmt, "{:?} ", timestamp)?;
+        }
+        if let Some(namespace) = &self.namespace {
+            write_word(fmt, namespace)?;
+            write!(fmt, "_")?;
         }
         write_word(fmt, &self.name)?;
         write!(fmt, "{{")?;
@@ -389,6 +405,7 @@ mod test {
     fn merge_counters() {
         let mut counter = Metric {
             name: "counter".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -397,6 +414,7 @@ mod test {
 
         let delta = Metric {
             name: "counter".into(),
+            namespace: Some("vector".to_string()),
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Incremental,
@@ -408,6 +426,7 @@ mod test {
             counter,
             Metric {
                 name: "counter".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -420,6 +439,7 @@ mod test {
     fn merge_gauges() {
         let mut gauge = Metric {
             name: "gauge".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -428,6 +448,7 @@ mod test {
 
         let delta = Metric {
             name: "gauge".into(),
+            namespace: Some("vector".to_string()),
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Incremental,
@@ -439,6 +460,7 @@ mod test {
             gauge,
             Metric {
                 name: "gauge".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -451,6 +473,7 @@ mod test {
     fn merge_sets() {
         let mut set = Metric {
             name: "set".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -461,6 +484,7 @@ mod test {
 
         let delta = Metric {
             name: "set".into(),
+            namespace: Some("vector".to_string()),
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Incremental,
@@ -474,6 +498,7 @@ mod test {
             set,
             Metric {
                 name: "set".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -488,6 +513,7 @@ mod test {
     fn merge_histograms() {
         let mut dist = Metric {
             name: "hist".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -500,6 +526,7 @@ mod test {
 
         let delta = Metric {
             name: "hist".into(),
+            namespace: Some("vector".to_string()),
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Incremental,
@@ -515,6 +542,7 @@ mod test {
             dist,
             Metric {
                 name: "hist".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -534,6 +562,7 @@ mod test {
                 "{}",
                 Metric {
                     name: "one".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tags()),
                     kind: MetricKind::Absolute,
@@ -548,6 +577,7 @@ mod test {
                 "{}",
                 Metric {
                     name: "two word".into(),
+                    namespace: None,
                     timestamp: Some(ts()),
                     tags: None,
                     kind: MetricKind::Incremental,
@@ -555,6 +585,36 @@ mod test {
                 }
             ),
             r#"2018-11-14T08:09:10.000000011Z "two word"{} + 2"#
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                Metric {
+                    name: "namespace".into(),
+                    namespace: Some("vector".to_string()),
+                    timestamp: None,
+                    tags: None,
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 1.23 },
+                }
+            ),
+            r#"vector_namespace{} = 1.23"#
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                Metric {
+                    name: "namespace".into(),
+                    namespace: Some("vector host".to_string()),
+                    timestamp: None,
+                    tags: None,
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 1.23 },
+                }
+            ),
+            r#""vector host"_namespace{} = 1.23"#
         );
 
         let mut values = BTreeSet::<String>::new();
@@ -567,6 +627,7 @@ mod test {
                 "{}",
                 Metric {
                     name: "three".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -581,6 +642,7 @@ mod test {
                 "{}",
                 Metric {
                     name: "four".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -599,6 +661,7 @@ mod test {
                 "{}",
                 Metric {
                     name: "five".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -618,6 +681,7 @@ mod test {
                 "{}",
                 Metric {
                     name: "six".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: None,
                     kind: MetricKind::Absolute,

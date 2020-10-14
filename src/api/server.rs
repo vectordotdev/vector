@@ -29,8 +29,8 @@ impl Server {
             },
         );
 
-        // Update topology schema with the config before starting the server
-        schema::topology::update_config(config);
+        // Update component schema with the config before starting the server
+        schema::components::update_config(config);
 
         // Spawn the server in the background
         tokio::spawn(server);
@@ -47,7 +47,7 @@ impl Server {
     /// directly involve `self`, it provides a neater API to expose an internal implementation
     /// detail than exposing the function of the sub-mod directly
     pub fn update_config(&self, config: &config::Config) {
-        schema::topology::update_config(config)
+        schema::components::update_config(config)
     }
 }
 

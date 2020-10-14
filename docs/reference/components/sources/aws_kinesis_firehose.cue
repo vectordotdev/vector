@@ -3,9 +3,8 @@ package metadata
 components: sources: aws_kinesis_firehose: {
 	_port: 443
 
-	title:             "AWS Kinesis Firehose"
-	long_description:  "[AWS Kinesis Firehose][urls.aws_kinesis_firehose] is an AWS service that simplifies dealing with streaming data. It allows for ingestion, transformation, and forwarding of events. In addition to publishing events directly to Kinesis Firehose, the service has direct integrations with many AWS services which allow them to directly publish events to a delivery stream."
-	short_description: "Ingests events from AWS Kinesis Firehose via the [AWS Kinesis Firehose HTTP protocol][urls.aws_kinesis_firehose_http_protocol]."
+	title:       "AWS Kinesis Firehose"
+	description: "[AWS Kinesis Firehose](\(urls.aws_kinesis_firehose)) is an AWS service that simplifies dealing with streaming data. It allows for ingestion, transformation, and forwarding of events. In addition to publishing events directly to Kinesis Firehose, the service has direct integrations with many AWS services which allow them to directly publish events to a delivery stream."
 
 	classes: {
 		commonly_used: false
@@ -13,26 +12,14 @@ components: sources: aws_kinesis_firehose: {
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "batch"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: {
-			enabled:                true
-			can_enable:             true
-			can_verify_certificate: true
-			enabled_default:        false
-		}
-	}
-
-	support: {
-		dependencies: {
-			aws_kinesis_firehose: {
-				required: true
-				title:    "AWS Kinesis Firehose"
-				type:     "external"
+		multiline: enabled: false
+		receive: {
+			from: {
+				name:     "AWS Kinesis Firehose"
+				thing:    "a \(name) stream"
 				url:      urls.aws_kinesis_firehose
 				versions: null
 
@@ -48,15 +35,23 @@ components: sources: aws_kinesis_firehose: {
 				}
 
 				setup: [
-					#"""
-						[Setup a Kinesis Firehose delivery stream][urls.aws_kinesis_firehose_setup]
+					"""
+						[Setup a Kinesis Firehose delivery stream](\(urls.aws_kinesis_firehose_setup))
 						in your preferred AWS region. Point the endpoint to your
 						Vector instance's address.
-						"""#,
+						""",
 				]
 			}
-		}
 
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				enabled_default:        false
+			}}
+	}
+
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -79,12 +74,12 @@ components: sources: aws_kinesis_firehose: {
 		}
 		access_key: {
 			common: true
-			description: #"""
+			description: """
 					AWS Kinesis Firehose can be configured to pass along an access
 					key to authenticate requests. If configured, `access_key` should
 					be set to the same value. If not specified, vector will treat
 					all requests as authenticated.
-				"""#
+				"""
 			required: false
 			type: "string": {
 				default: null

@@ -1,17 +1,17 @@
 package metadata
 
 components: transforms: reduce: {
-	title:             "Reduce"
-	short_description: "Accepts log events and allows you to combine multiple events into a single event based on a set of identifiers."
+	title: "Reduce"
 
 	classes: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
-		function:      "aggregate"
 	}
 
-	features: {}
+	features: {
+		reduce: {}
+	}
 
 	support: {
 		platforms: {
@@ -56,7 +56,7 @@ components: transforms: reduce: {
 				unit:    "milliseconds"
 			}
 		}
-		identifier_fields: {
+		group_by: {
 			common:      true
 			description: "An ordered list of fields by which to group events. Each group is combined independently, allowing you to keep independent events separate. When no fields are specified, all events will be combined in a single group. Events missing a specified field will be combined in their own group."
 			required:    false
@@ -68,7 +68,7 @@ components: transforms: reduce: {
 		}
 		merge_strategies: {
 			common: false
-			description: #"""
+			description: """
 				A map of field names to custom merge strategies. For each
 				field specified this strategy will be used for combining
 				events rather than the default behavior.
@@ -81,7 +81,7 @@ components: transforms: reduce: {
 				   `[field-name]_end` is added with the last received
 				   timestamp value.
 				3. Numeric values are summed.
-				"""#
+				"""
 			required: false
 			warnings: []
 			type: object: {
@@ -100,12 +100,13 @@ components: transforms: reduce: {
 						warnings: []
 						type: string: {
 							enum: {
-								array:   "Each value is appended to an array."
-								concat:  "Concatenate each string value (delimited with a space)."
-								discard: "Discard all but the first value found."
-								sum:     "Sum all numeric values."
-								max:     "The maximum of all numeric values."
-								min:     "The minimum of all numeric values."
+								array:          "Each value is appended to an array."
+								concat:         "Concatenate each string value (delimited with a space)."
+								concat_newline: "Concatenate each string value (delimited with a newline)."
+								discard:        "Discard all but the first value found."
+								sum:            "Sum all numeric values."
+								max:            "The maximum of all numeric values."
+								min:            "The minimum of all numeric values."
 							}
 						}
 					}
@@ -116,7 +117,7 @@ components: transforms: reduce: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	examples: [

@@ -24,9 +24,8 @@ fn batching(
             move || {
                 let input = random_lines(event_len)
                     .take(num_events)
-                    .map(|s| s.into_bytes())
-                    .collect::<Vec<_>>();
-                futures01::stream::iter_ok::<_, ()>(input.into_iter())
+                    .map(|s| s.into_bytes());
+                futures01::stream::iter_ok::<_, ()>(input)
             },
             |input| {
                 let mut rt = runtime();
@@ -41,7 +40,7 @@ fn batching(
                     Duration::from_secs(1),
                     acker,
                 )
-                .sink_map_err(|e| panic!(e));
+                .sink_map_err(|error| panic!(error));
 
                 let _ = rt.block_on(input.forward(batch_sink).compat()).unwrap();
             },
@@ -62,16 +61,14 @@ fn partitioned_batching(
     Benchmark::new(bench_name, move |b| {
         b.iter_with_setup(
             move || {
-                let key = Bytes::from("key");
                 let input = random_lines(event_len)
                     .take(num_events)
                     .map(|s| s.into_bytes())
                     .map(|b| InnerBuffer {
                         inner: b,
-                        key: key.clone(),
-                    })
-                    .collect::<Vec<_>>();
-                futures01::stream::iter_ok::<_, ()>(input.into_iter())
+                        key: Bytes::from("key"),
+                    });
+                futures01::stream::iter_ok::<_, ()>(input)
             },
             |input| {
                 let mut rt = runtime();
@@ -86,7 +83,7 @@ fn partitioned_batching(
                     Duration::from_secs(1),
                     acker,
                 )
-                .sink_map_err(|e| panic!(e));
+                .sink_map_err(|error| panic!(error));
 
                 let _ = rt.block_on(input.forward(batch_sink).compat()).unwrap();
             },
@@ -112,7 +109,7 @@ fn benchmark_batching(c: &mut Criterion) {
         "batch",
         batching(
             "gzip 10mb with 2mb batches",
-            Compression::Gzip,
+            Compression::gzip_default(),
             2_000_000,
             100_000,
             100,
@@ -122,7 +119,7 @@ fn benchmark_batching(c: &mut Criterion) {
         "batch",
         batching(
             "gzip 10mb with 500kb batches",
-            Compression::Gzip,
+            Compression::gzip_default(),
             500_000,
             100_000,
             100,
@@ -143,7 +140,7 @@ fn benchmark_batching(c: &mut Criterion) {
         "partitioned_batch",
         partitioned_batching(
             "gzip 10mb with 2mb batches",
-            Compression::Gzip,
+            Compression::gzip_default(),
             2_000_000,
             100_000,
             100,

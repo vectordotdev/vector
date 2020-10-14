@@ -1,8 +1,7 @@
 package metadata
 
 components: sources: stdin: {
-	title:             "STDIN"
-	short_description: "Ingests data through [standard input (STDIN)][urls.stdin] and outputs log events."
+	title: "STDIN"
 
 	classes: {
 		commonly_used: false
@@ -10,28 +9,25 @@ components: sources: stdin: {
 		deployment_roles: ["sidecar"]
 		development:   "stable"
 		egress_method: "stream"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
-
-	support: {
-		dependencies: {
-			stdin_client: {
-				required: true
-				title:    "STDIN Client"
-				type:     "external"
+		multiline: enabled: false
+		receive: {
+			from: {
+				name:     "STDIN"
+				thing:    "the \(name) stream"
 				url:      urls.stdin
 				versions: null
 
 				interface: stdin: {}
 			}
-		}
 
+			tls: enabled: false
+		}
+	}
+
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -48,6 +44,7 @@ components: sources: stdin: {
 
 	configuration: {
 		host_key: {
+			category:    "Context"
 			common:      false
 			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.global-options#host_key]."
 			required:    false
@@ -77,9 +74,9 @@ components: sources: stdin: {
 
 	examples: [
 		{
-			_line: #"""
+			_line: """
 				2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
-				"""#
+				"""
 			title: "STDIN line"
 			configuration: {}
 			input: """
@@ -92,5 +89,15 @@ components: sources: stdin: {
 				message:   _line
 				host:      _values.local_host
 			}
-		}]
+		},
+	]
+
+	how_it_works: {
+		line_delimiters: {
+			title: "Line Delimiters"
+			body: """
+				Each line is read until a new line delimiter, the `0xA` byte, is found.
+				"""
+		}
+	}
 }

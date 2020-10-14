@@ -1,25 +1,25 @@
-use super::Transform;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
-    event::Lookup,
     internal_events::{
         RenameFieldsEventProcessed, RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten,
     },
     serde::Fields,
+    transforms::{FunctionTransform, Transform},
 };
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct RenameFieldsConfig {
-    pub fields: Fields<Lookup>,
+    pub fields: Fields<String>,
     drop_empty: Option<bool>,
 }
 
+#[derive(Debug, Clone)]
 pub struct RenameFields {
-    fields: IndexMap<Lookup, Lookup>,
+    fields: IndexMap<String, String>,
     drop_empty: bool,
 }
 
@@ -27,20 +27,21 @@ inventory::submit! {
     TransformDescription::new::<RenameFieldsConfig>("rename_fields")
 }
 
-impl GenerateConfig for RenameFieldsConfig {}
+impl GenerateConfig for RenameFieldsConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(r#"fields.old_field_name = "new_field_name""#).unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "rename_fields")]
 impl TransformConfig for RenameFieldsConfig {
-    async fn build(&self, _exec: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         let mut fields = IndexMap::default();
         for (key, value) in self.fields.clone().all_fields() {
-            fields.insert(
-                key.to_string().parse::<Lookup>()?,
-                value.to_string().parse::<Lookup>()?,
-            );
+            fields.insert(key.to_string(), value.to_string());
         }
-        Ok(Box::new(RenameFields::new(
+        Ok(Transform::function(RenameFields::new(
             fields,
             self.drop_empty.unwrap_or(false),
         )?))
@@ -60,43 +61,41 @@ impl TransformConfig for RenameFieldsConfig {
 }
 
 impl RenameFields {
-    pub fn new(fields: IndexMap<Lookup, Lookup>, drop_empty: bool) -> crate::Result<Self> {
+    pub fn new(fields: IndexMap<String, String>, drop_empty: bool) -> crate::Result<Self> {
         Ok(RenameFields { fields, drop_empty })
     }
 }
 
-impl Transform for RenameFields {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for RenameFields {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(RenameFieldsEventProcessed);
 
         for (old_key, new_key) in &self.fields {
-            let old_key_string = old_key.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
-            let new_key_string = new_key.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
             let log = event.as_mut_log();
-            match log.remove_prune(&old_key_string, self.drop_empty) {
+            match log.remove_prune(&old_key, self.drop_empty) {
                 Some(v) => {
-                    if event.as_mut_log().insert(&new_key_string, v).is_some() {
-                        emit!(RenameFieldsFieldOverwritten {
-                            field: &old_key_string
-                        });
+                    if event.as_mut_log().insert(&new_key, v).is_some() {
+                        emit!(RenameFieldsFieldOverwritten { field: old_key });
                     }
                 }
                 None => {
-                    emit!(RenameFieldsFieldDoesNotExist {
-                        field: &old_key_string
-                    });
+                    emit!(RenameFieldsFieldDoesNotExist { field: old_key });
                 }
             }
         }
 
-        Some(event)
+        output.push(event);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::convert::TryFrom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<RenameFieldsConfig>();
+    }
 
     #[test]
     fn rename_fields() {
@@ -104,18 +103,15 @@ mod tests {
         event.as_mut_log().insert("to_move", "some value");
         event.as_mut_log().insert("do_not_move", "not moved");
         let mut fields = IndexMap::new();
+        fields.insert(String::from("to_move"), String::from("moved"));
         fields.insert(
-            Lookup::try_from("to_move").unwrap(),
-            Lookup::try_from("moved").unwrap(),
-        );
-        fields.insert(
-            Lookup::try_from("not_present").unwrap(),
-            Lookup::try_from("should_not_exist").unwrap(),
+            String::from("not_present"),
+            String::from("should_not_exist"),
         );
 
         let mut transform = RenameFields::new(fields, false).unwrap();
 
-        let new_event = transform.transform(event).unwrap();
+        let new_event = transform.transform_one(event).unwrap();
 
         assert!(new_event.as_log().get("to_move").is_none());
         assert_eq!(new_event.as_log()["moved"], "some value".into());

@@ -1,9 +1,8 @@
 package metadata
 
 components: sources: prometheus: {
-	title:             "Prometheus"
-	short_description: "Ingests data through the [Prometheus text exposition format][urls.prometheus_text_based_exposition_format] and outputs metric events."
-	long_description:  "[Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
+	title:       "Prometheus"
+	description: "[Prometheus](\(urls.prometheus)) is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
 
 	classes: {
 		commonly_used: false
@@ -11,21 +10,14 @@ components: sources: prometheus: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
-		function:      "collect"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
-
-	support: {
-		dependencies: {
-			prometheus_client: {
-				required: true
-				title:    "Prometheus Client"
-				type:     "external"
+		collect: {
+			checkpoint: enabled: false
+			from: {
+				name:     "Prometheus"
+				thing:    "one or more \(name) endpoints"
 				url:      urls.prometheus_client
 				versions: null
 
@@ -39,8 +31,18 @@ components: sources: prometheus: {
 					ssl: "optional"
 				}
 			}
+			tls: {
+				enabled:                true
+				can_enable:             false
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
 		}
+		multiline: enabled: false
+	}
 
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -72,6 +74,52 @@ components: sources: prometheus: {
 			type: uint: {
 				default: 15
 				unit:    "seconds"
+			}
+		}
+		auth: {
+			common:      false
+			description: "Options for the authentication strategy."
+			required:    false
+			warnings: []
+			type: object: {
+				examples: []
+				options: {
+					password: {
+						description: "The basic authentication password."
+						required:    true
+						warnings: []
+						type: string: {
+							examples: ["${PROMETHEUS_PASSWORD}", "password"]
+						}
+					}
+					strategy: {
+						description: "The authentication strategy to use."
+						required:    true
+						warnings: []
+						type: string: {
+							enum: {
+								basic:  "The [basic authentication strategy](\(urls.basic_auth))."
+								bearer: "The bearer token authentication strategy."
+							}
+						}
+					}
+					token: {
+						description: "The token to use for bearer authentication"
+						required:    true
+						warnings: []
+						type: string: {
+							examples: ["${API_TOKEN}", "xyz123"]
+						}
+					}
+					user: {
+						description: "The basic authentication user name."
+						required:    true
+						warnings: []
+						type: string: {
+							examples: ["${PROMETHEUS_USERNAME}", "username"]
+						}
+					}
+				}
 			}
 		}
 	}

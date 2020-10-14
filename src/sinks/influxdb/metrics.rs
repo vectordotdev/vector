@@ -1,6 +1,7 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricValue, StatisticKind},
+    http::HttpClient,
     sinks::{
         influxdb::{
             encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
@@ -8,7 +9,7 @@ use crate::{
         },
         util::{
             encode_namespace,
-            http::{HttpBatchService, HttpClient, HttpRetryLogic},
+            http::{HttpBatchService, HttpRetryLogic},
             statistic::{validate_quantiles, DistributionStatistic},
             BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
         },
@@ -35,7 +36,7 @@ struct InfluxDBSvc {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDBConfig {
-    pub namespace: Option<String>,
+    pub default_namespace: Option<String>,
     pub endpoint: String,
     #[serde(flatten)]
     pub influxdb1_settings: Option<InfluxDB1Settings>,
@@ -79,7 +80,7 @@ impl_generate_config_from_default!(InfluxDBConfig);
 impl SinkConfig for InfluxDBConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let client = HttpClient::new(tls_settings)?;
         let healthcheck = healthcheck(
             self.clone().endpoint,
             self.clone().influxdb1_settings,
@@ -139,7 +140,7 @@ impl InfluxDBSvc {
                 batch.timeout,
                 cx.acker(),
             )
-            .sink_map_err(|e| error!("Fatal influxdb sink error: {}", e));
+            .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));
 
         Ok(VectorSink::Futures01Sink(Box::new(sink)))
     }
@@ -158,7 +159,7 @@ impl Service<Vec<Metric>> for InfluxDBSvc {
         let input = encode_events(
             self.protocol_version,
             items,
-            self.config.namespace.as_deref(),
+            self.config.default_namespace.as_deref(),
             self.config.tags.as_ref(),
             &self.config.quantiles,
         );
@@ -209,13 +210,17 @@ fn merge_tags(
 fn encode_events(
     protocol_version: ProtocolVersion,
     events: Vec<Metric>,
-    namespace: Option<&str>,
+    default_namespace: Option<&str>,
     tags: Option<&HashMap<String, String>>,
     quantiles: &[f64],
 ) -> String {
     let mut output = String::new();
     for event in events.into_iter() {
-        let fullname = encode_namespace(namespace, '.', &event.name);
+        let fullname = encode_namespace(
+            event.namespace.as_deref().or(default_namespace),
+            '.',
+            &event.name,
+        );
         let ts = encode_timestamp(event.timestamp);
         let tags = merge_tags(&event, tags);
         match event.value {
@@ -386,6 +391,7 @@ mod tests {
         let events = vec![
             Metric {
                 name: "total".into(),
+                namespace: Some("ns".into()),
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -393,6 +399,7 @@ mod tests {
             },
             Metric {
                 name: "check".into(),
+                namespace: Some("ns".into()),
                 timestamp: Some(ts()),
                 tags: Some(tags()),
                 kind: MetricKind::Incremental,
@@ -400,7 +407,7 @@ mod tests {
             },
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("vector"), None, &[]);
         assert_eq!(
             line_protocols,
             "ns.total,metric_type=counter value=1.5 1542182950000000011\n\
@@ -412,13 +419,14 @@ mod tests {
     fn test_encode_gauge() {
         let events = vec![Metric {
             name: "meter".to_owned(),
+            namespace: Some("ns".into()),
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Incremental,
             value: MetricValue::Gauge { value: -1.5 },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         assert_eq!(
             line_protocols,
             "ns.meter,metric_type=gauge,normal_tag=value,true_tag=true value=-1.5 1542182950000000011"
@@ -429,6 +437,7 @@ mod tests {
     fn test_encode_set() {
         let events = vec![Metric {
             name: "users".into(),
+            namespace: Some("ns".into()),
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Incremental,
@@ -437,7 +446,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         assert_eq!(
             line_protocols,
             "ns.users,metric_type=set,normal_tag=value,true_tag=true value=2 1542182950000000011"
@@ -448,6 +457,7 @@ mod tests {
     fn test_encode_histogram_v1() {
         let events = vec![Metric {
             name: "requests".to_owned(),
+            namespace: Some("ns".into()),
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Absolute,
@@ -459,7 +469,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V1, events, Some("ns"), None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V1, events, None, None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -487,6 +497,7 @@ mod tests {
     fn test_encode_histogram() {
         let events = vec![Metric {
             name: "requests".to_owned(),
+            namespace: Some("ns".into()),
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Absolute,
@@ -498,7 +509,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -526,6 +537,7 @@ mod tests {
     fn test_encode_summary_v1() {
         let events = vec![Metric {
             name: "requests_sum".to_owned(),
+            namespace: Some("ns".into()),
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Absolute,
@@ -537,7 +549,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V1, events, Some("ns"), None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V1, events, None, None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -565,6 +577,7 @@ mod tests {
     fn test_encode_summary() {
         let events = vec![Metric {
             name: "requests_sum".to_owned(),
+            namespace: Some("ns".into()),
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Absolute,
@@ -576,7 +589,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -605,6 +618,7 @@ mod tests {
         let events = vec![
             Metric {
                 name: "requests".into(),
+                namespace: Some("ns".into()),
                 timestamp: Some(ts()),
                 tags: Some(tags()),
                 kind: MetricKind::Incremental,
@@ -616,6 +630,7 @@ mod tests {
             },
             Metric {
                 name: "dense_stats".into(),
+                namespace: Some("ns".into()),
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -627,6 +642,7 @@ mod tests {
             },
             Metric {
                 name: "sparse_stats".into(),
+                namespace: Some("ns".into()),
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -638,7 +654,7 @@ mod tests {
             },
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 3);
 
@@ -704,6 +720,7 @@ mod tests {
     fn test_encode_distribution_empty_stats() {
         let events = vec![Metric {
             name: "requests".into(),
+            namespace: Some("ns".into()),
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Incremental,
@@ -714,7 +731,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         assert_eq!(line_protocols.len(), 0);
     }
 
@@ -722,6 +739,7 @@ mod tests {
     fn test_encode_distribution_zero_counts_stats() {
         let events = vec![Metric {
             name: "requests".into(),
+            namespace: Some("ns".into()),
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Incremental,
@@ -732,7 +750,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         assert_eq!(line_protocols.len(), 0);
     }
 
@@ -740,6 +758,7 @@ mod tests {
     fn test_encode_distribution_unequal_stats() {
         let events = vec![Metric {
             name: "requests".into(),
+            namespace: Some("ns".into()),
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Incremental,
@@ -750,7 +769,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("ns"), None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         assert_eq!(line_protocols.len(), 0);
     }
 
@@ -758,6 +777,7 @@ mod tests {
     fn test_encode_distribution_summary() {
         let events = vec![Metric {
             name: "requests".into(),
+            namespace: Some("ns".into()),
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Incremental,
@@ -771,7 +791,7 @@ mod tests {
         let line_protocols = encode_events(
             ProtocolVersion::V2,
             events,
-            Some("ns"),
+            None,
             None,
             &default_summary_quantiles(),
         );
@@ -811,6 +831,7 @@ mod tests {
         let events = vec![
             Metric {
                 name: "cpu".into(),
+                namespace: Some("vector".into()),
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Absolute,
@@ -818,6 +839,7 @@ mod tests {
             },
             Metric {
                 name: "mem".into(),
+                namespace: Some("vector".into()),
                 timestamp: Some(ts()),
                 tags: Some(tags()),
                 kind: MetricKind::Absolute,
@@ -832,7 +854,7 @@ mod tests {
         let line_protocols = encode_events(
             ProtocolVersion::V1,
             events,
-            Some("vector"),
+            Some("ns"),
             Some(tags).as_ref(),
             &[],
         );
@@ -855,16 +877,13 @@ mod integration_tests {
     use crate::{
         config::{SinkConfig, SinkContext},
         event::metric::{Metric, MetricKind, MetricValue},
-        sinks::{
-            influxdb::{
-                metrics::{default_summary_quantiles, InfluxDBConfig, InfluxDBSvc},
-                test_util::{
-                    cleanup_v1, onboarding_v1, onboarding_v2, query_v1, BUCKET, DATABASE, ORG,
-                    TOKEN,
-                },
-                InfluxDB1Settings, InfluxDB2Settings,
+        http::HttpClient,
+        sinks::influxdb::{
+            metrics::{default_summary_quantiles, InfluxDBConfig, InfluxDBSvc},
+            test_util::{
+                cleanup_v1, onboarding_v1, onboarding_v2, query_v1, BUCKET, DATABASE, ORG, TOKEN,
             },
-            util::http::HttpClient,
+            InfluxDB1Settings, InfluxDB2Settings,
         },
         tls::TlsOptions,
         Event,
@@ -879,7 +898,6 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let config = InfluxDBConfig {
-            namespace: Some("ns".to_string()),
             endpoint: "https://localhost:8087".to_string(),
             influxdb1_settings: Some(InfluxDB1Settings {
                 consistency: None,
@@ -897,6 +915,7 @@ mod integration_tests {
             }),
             quantiles: default_summary_quantiles(),
             tags: None,
+            default_namespace: None,
         };
 
         let events: Vec<_> = (0..10).map(create_event).collect();
@@ -946,7 +965,6 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let config = InfluxDBConfig {
-            namespace: Some("ns".to_string()),
             endpoint: "http://localhost:9999".to_string(),
             influxdb1_settings: None,
             influxdb2_settings: Some(InfluxDB2Settings {
@@ -959,6 +977,7 @@ mod integration_tests {
             request: Default::default(),
             tags: None,
             tls: None,
+            default_namespace: None,
         };
 
         let metric = format!("counter-{}", Utc::now().timestamp_nanos());
@@ -966,6 +985,7 @@ mod integration_tests {
         for i in 0..10 {
             let event = Event::Metric(Metric {
                 name: metric.to_string(),
+                namespace: Some("ns".to_string()),
                 timestamp: None,
                 tags: Some(
                     vec![
@@ -981,7 +1001,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let client = HttpClient::new(cx.resolver(), None).unwrap();
+        let client = HttpClient::new(None).unwrap();
         let sink = InfluxDBSvc::new(config, cx, client).unwrap();
         sink.run(stream::iter(events)).await.unwrap();
 
@@ -1049,6 +1069,7 @@ mod integration_tests {
     fn create_event(i: i32) -> Event {
         Event::Metric(Metric {
             name: format!("counter-{}", i),
+            namespace: Some("ns".to_string()),
             timestamp: None,
             tags: Some(
                 vec![

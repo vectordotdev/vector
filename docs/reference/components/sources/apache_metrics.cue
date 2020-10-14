@@ -4,8 +4,7 @@ components: sources: apache_metrics: {
 	_config_path: "/etc/apache2/httpd.conf"
 	_path:        "/server-status"
 
-	title:             "Apache HTTP Server (HTTPD) Metrics"
-	short_description: "Collect metrics from an Apache HTTPD server."
+	title: "Apache HTTP Server (HTTPD) Metrics"
 
 	classes: {
 		commonly_used: false
@@ -13,21 +12,15 @@ components: sources: apache_metrics: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
-		function:      "collect"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
-
-	support: {
-		dependencies: {
-			apache_http: {
-				required: true
-				title:    "Apache HTTP Server (HTTPD)"
-				type:     "external"
+		multiline: enabled: false
+		collect: {
+			checkpoint: enabled: false
+			from: {
+				name:     "Apache HTTP server (HTTPD)"
+				thing:    "an \(name)"
 				url:      urls.apache
 				versions: null
 
@@ -44,11 +37,11 @@ components: sources: apache_metrics: {
 				}
 
 				setup: [
-					#"""
-						[Install the Apache HTTP server][urls.apache_install].
-						"""#,
-					#"""
-						Enable the [Apache Status module][urls.apache_mod_status]
+					"""
+						[Install the Apache HTTP server](\(urls.apache_install)).
+						""",
+					"""
+						Enable the [Apache Status module](\(urls.apache_mod_status))
 						in your Apache config:
 
 						```text file="\(_config_path)"
@@ -57,23 +50,25 @@ components: sources: apache_metrics: {
 						    Require host example.com
 						</Location>
 						```
-						"""#,
-					#"""
-						Optionally enable [`ExtendedStatus` option][urls.apache_extended_status]
+						""",
+					"""
+						Optionally enable [`ExtendedStatus` option](\(urls.apache_extended_status))
 						for more detailed metrics (see [Output](#output)). Note,
 						this defaults to `On` in Apache >= 2.3.6.
 
 						```text file="\(_config_path)"
 						ExtendedStatus On
 						```
-						"""#,
-					#"""
+						""",
+					"""
 						Start or reload Apache to apply the config changes.
-						"""#,
+						""",
 				]
 			}
 		}
+	}
 
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -105,6 +100,15 @@ components: sources: apache_metrics: {
 				unit:    "seconds"
 			}
 		}
+		namespace: {
+			description: "The namespace of the metric. Disabled if empty."
+			required:    false
+			common:      false
+			warnings: []
+			type: string: {
+				default: "apache"
+			}
+		}
 	}
 
 	output: metrics: {
@@ -118,7 +122,7 @@ components: sources: apache_metrics: {
 			required:    true
 			examples: [_values.local_host]
 		}
-		apache_access_total: {
+		access_total: {
 			description:   "The total number of time the Apache server has been accessed."
 			relevant_when: "`ExtendedStatus On`"
 			type:          "counter"
@@ -127,7 +131,7 @@ components: sources: apache_metrics: {
 				host:     _host
 			}
 		}
-		apache_connections: {
+		connections: {
 			description: "The total number of time the Apache server has been accessed."
 			type:        "gauge"
 			tags: {
@@ -140,7 +144,7 @@ components: sources: apache_metrics: {
 				}
 			}
 		}
-		apache_cpu_load: {
+		cpu_load: {
 			description:   "The current CPU of the Apache server."
 			relevant_when: "`ExtendedStatus On`"
 			type:          "gauge"
@@ -149,7 +153,7 @@ components: sources: apache_metrics: {
 				host:     _host
 			}
 		}
-		apache_cpu_seconds_total: {
+		cpu_seconds_total: {
 			description:   "The CPU time of various Apache processes."
 			relevant_when: "`ExtendedStatus On`"
 			type:          "counter"
@@ -163,7 +167,7 @@ components: sources: apache_metrics: {
 				}
 			}
 		}
-		apache_duration_seconds_total: {
+		duration_seconds_total: {
 			description:   "The amount of time the Apache server has been running."
 			relevant_when: "`ExtendedStatus On`"
 			type:          "counter"
@@ -172,7 +176,7 @@ components: sources: apache_metrics: {
 				host:     _host
 			}
 		}
-		apache_scoreboard: {
+		scoreboard: {
 			description: "The amount of times various Apache server tasks have been run."
 			type:        "gauge"
 			tags: {
@@ -185,7 +189,7 @@ components: sources: apache_metrics: {
 				}
 			}
 		}
-		apache_sent_bytes_total: {
+		sent_bytes_total: {
 			description:   "The amount of bytes sent by the Apache server."
 			relevant_when: "`ExtendedStatus On`"
 			type:          "counter"
@@ -194,7 +198,7 @@ components: sources: apache_metrics: {
 				host:     _host
 			}
 		}
-		apache_uptime_seconds_total: {
+		uptime_seconds_total: {
 			description: "The amount of time the Apache server has been running."
 			type:        "counter"
 			tags: {
@@ -202,7 +206,7 @@ components: sources: apache_metrics: {
 				host:     _host
 			}
 		}
-		apache_workers: {
+		workers: {
 			description: "Apache worker statuses."
 			type:        "gauge"
 			tags: {
@@ -215,7 +219,7 @@ components: sources: apache_metrics: {
 				}
 			}
 		}
-		apache_up: {
+		up: {
 			description: "If the Apache server is up or not."
 			type:        "gauge"
 			tags: {

@@ -1,9 +1,5 @@
-use super::Transform;
 use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::LogEvent,
     event::Value,
@@ -12,6 +8,7 @@ use crate::{
         LogToMetricTemplateParseError, LogToMetricTemplateRenderError,
     },
     template::{Template, TemplateError},
+    transforms::{FunctionTransform, Transform},
     Event,
 };
 use indexmap::IndexMap;
@@ -27,44 +24,44 @@ pub struct LogToMetricConfig {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(tag = "type", rename_all = "snake_case")]
 pub struct CounterConfig {
     field: String,
     name: Option<String>,
+    namespace: Option<String>,
     #[serde(default = "default_increment_by_value")]
     increment_by_value: bool,
     tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(tag = "type", rename_all = "snake_case")]
 pub struct GaugeConfig {
-    field: String,
-    name: Option<String>,
-    tags: Option<IndexMap<String, String>>,
+    pub field: String,
+    pub name: Option<String>,
+    pub namespace: Option<String>,
+    pub tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(tag = "type", rename_all = "snake_case")]
 pub struct SetConfig {
     field: String,
     name: Option<String>,
+    namespace: Option<String>,
     tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(tag = "type", rename_all = "snake_case")]
 pub struct HistogramConfig {
     field: String,
     name: Option<String>,
+    namespace: Option<String>,
     tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(tag = "type", rename_all = "snake_case")]
 pub struct SummaryConfig {
     field: String,
     name: Option<String>,
+    namespace: Option<String>,
     tags: Option<IndexMap<String, String>>,
 }
 
@@ -82,6 +79,7 @@ fn default_increment_by_value() -> bool {
     false
 }
 
+#[derive(Debug, Clone)]
 pub struct LogToMetric {
     config: LogToMetricConfig,
 }
@@ -90,13 +88,26 @@ inventory::submit! {
     TransformDescription::new::<LogToMetricConfig>("log_to_metric")
 }
 
-impl GenerateConfig for LogToMetricConfig {}
+impl GenerateConfig for LogToMetricConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            metrics: vec![MetricConfig::Counter(CounterConfig {
+                field: "field_name".to_string(),
+                name: None,
+                namespace: None,
+                increment_by_value: false,
+                tags: None,
+            })],
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(LogToMetric::new(self.clone())))
+    async fn build(&self) -> crate::Result<Transform> {
+        Ok(Transform::function(LogToMetric::new(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -211,10 +222,16 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = counter.name.as_ref().unwrap_or(&counter.field);
             let name = render_template(&name, &event)?;
 
+            let namespace = counter.namespace.as_ref();
+            let namespace = namespace
+                .map(|namespace| render_template(namespace, &event))
+                .transpose()?;
+
             let tags = render_tags(&counter.tags, &event)?;
 
             Ok(Metric {
                 name,
+                namespace,
                 timestamp,
                 tags,
                 kind: MetricKind::Incremental,
@@ -227,10 +244,16 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = hist.name.as_ref().unwrap_or(&hist.field);
             let name = render_template(&name, &event)?;
 
+            let namespace = hist.namespace.as_ref();
+            let namespace = namespace
+                .map(|namespace| render_template(namespace, &event))
+                .transpose()?;
+
             let tags = render_tags(&hist.tags, &event)?;
 
             Ok(Metric {
                 name,
+                namespace,
                 timestamp,
                 tags,
                 kind: MetricKind::Incremental,
@@ -247,10 +270,16 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = summary.name.as_ref().unwrap_or(&summary.field);
             let name = render_template(&name, &event)?;
 
+            let namespace = summary.namespace.as_ref();
+            let namespace = namespace
+                .map(|namespace| render_template(namespace, &event))
+                .transpose()?;
+
             let tags = render_tags(&summary.tags, &event)?;
 
             Ok(Metric {
                 name,
+                namespace,
                 timestamp,
                 tags,
                 kind: MetricKind::Incremental,
@@ -267,10 +296,16 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = gauge.name.as_ref().unwrap_or(&gauge.field);
             let name = render_template(&name, &event)?;
 
+            let namespace = gauge.namespace.as_ref();
+            let namespace = namespace
+                .map(|namespace| render_template(namespace, &event))
+                .transpose()?;
+
             let tags = render_tags(&gauge.tags, &event)?;
 
             Ok(Metric {
                 name,
+                namespace,
                 timestamp,
                 tags,
                 kind: MetricKind::Absolute,
@@ -288,10 +323,16 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = set.name.as_ref().unwrap_or(&set.field);
             let name = render_template(&name, &event)?;
 
+            let namespace = set.namespace.as_ref();
+            let namespace = namespace
+                .map(|namespace| render_template(namespace, &event))
+                .transpose()?;
+
             let tags = render_tags(&set.tags, &event)?;
 
             Ok(Metric {
                 name,
+                namespace,
                 timestamp,
                 tags,
                 kind: MetricKind::Incremental,
@@ -303,19 +344,12 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
     }
 }
 
-impl Transform for LogToMetric {
-    // Only used in tests
-    fn transform(&mut self, event: Event) -> Option<Event> {
-        emit!(LogToMetricEventProcessed);
-        let mut output = Vec::new();
-        self.transform_into(&mut output, event);
-        output.pop()
-    }
-
-    fn transform_into(&mut self, output: &mut Vec<Event>, event: Event) {
+impl FunctionTransform for LogToMetric {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         for config in self.config.metrics.iter() {
             match to_metric(&config, &event) {
                 Ok(metric) => {
+                    emit!(LogToMetricEventProcessed);
                     output.push(Event::Metric(metric));
                 }
                 Err(TransformError::FieldNotFound { field }) => emit!(LogToMetricFieldNotFound {
@@ -340,14 +374,18 @@ impl Transform for LogToMetric {
 
 #[cfg(test)]
 mod tests {
-    use super::{LogToMetric, LogToMetricConfig};
+    use super::*;
     use crate::{
         config::log_schema,
         event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
         event::Event,
-        transforms::Transform,
     };
     use chrono::{offset::TimeZone, DateTime, Utc};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<LogToMetricConfig>();
+    }
 
     fn parse_config(s: &str) -> LogToMetricConfig {
         toml::from_str(s).unwrap()
@@ -376,12 +414,13 @@ mod tests {
 
         let event = create_event("status", "42");
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform(event).unwrap();
+        let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
             Metric {
                 name: "status".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -398,6 +437,7 @@ mod tests {
             type = "counter"
             field = "message"
             name = "http_requests_total"
+            namespace = "app"
             tags = {method = "{{method}}", code = "{{code}}", missing_tag = "{{unknown}}", host = "localhost"}
             "#,
         );
@@ -407,12 +447,13 @@ mod tests {
         event.as_mut_log().insert("code", "200");
 
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform(event).unwrap();
+        let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
             Metric {
                 name: "http_requests_total".into(),
+                namespace: Some("app".into()),
                 timestamp: Some(ts()),
                 tags: Some(
                     vec![
@@ -442,12 +483,13 @@ mod tests {
 
         let event = create_event("backtrace", "message");
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform(event).unwrap();
+        let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
             Metric {
                 name: "exception_total".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -470,7 +512,7 @@ mod tests {
         let event = create_event("success", "42");
         let mut transform = LogToMetric::new(config);
 
-        assert_eq!(transform.transform(event), None);
+        assert_eq!(transform.transform_one(event), None);
     }
 
     #[test]
@@ -487,12 +529,13 @@ mod tests {
 
         let event = create_event("amount", "33.99");
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform(event).unwrap();
+        let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
             Metric {
                 name: "amount_total".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -514,12 +557,13 @@ mod tests {
 
         let event = create_event("memory_rss", "123");
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform(event).unwrap();
+        let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
             Metric {
                 name: "memory_rss_bytes".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Absolute,
@@ -543,7 +587,7 @@ mod tests {
         let event = create_event("status", "not a number");
         let mut transform = LogToMetric::new(config);
 
-        assert_eq!(transform.transform(event), None);
+        assert_eq!(transform.transform_one(event), None);
     }
 
     #[test]
@@ -560,7 +604,7 @@ mod tests {
         let event = create_event("not foo", "not a number");
         let mut transform = LogToMetric::new(config);
 
-        assert_eq!(transform.transform(event), None);
+        assert_eq!(transform.transform_one(event), None);
     }
 
     #[test]
@@ -588,12 +632,13 @@ mod tests {
         let mut transform = LogToMetric::new(config);
 
         let mut output = Vec::new();
-        transform.transform_into(&mut output, event);
+        transform.transform(&mut output, event);
         assert_eq!(2, output.len());
         assert_eq!(
             output.pop().unwrap().into_metric(),
             Metric {
                 name: "exception_total".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -604,6 +649,7 @@ mod tests {
             output.pop().unwrap().into_metric(),
             Metric {
                 name: "status".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -625,6 +671,7 @@ mod tests {
             type = "counter"
             field = "backtrace"
             name = "{{service}}_exception_total"
+            namespace = "{{host}}"
             "#,
         );
 
@@ -641,12 +688,13 @@ mod tests {
         let mut transform = LogToMetric::new(config);
 
         let mut output = Vec::new();
-        transform.transform_into(&mut output, event);
+        transform.transform(&mut output, event);
         assert_eq!(2, output.len());
         assert_eq!(
             output.pop().unwrap().into_metric(),
             Metric {
                 name: "xyz_exception_total".into(),
+                namespace: Some("local".into()),
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -657,6 +705,7 @@ mod tests {
             output.pop().unwrap().into_metric(),
             Metric {
                 name: "local_abc_status_set".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -680,12 +729,13 @@ mod tests {
 
         let event = create_event("user_ip", "1.2.3.4");
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform(event).unwrap();
+        let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
             Metric {
                 name: "unique_user_ip".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -708,12 +758,13 @@ mod tests {
 
         let event = create_event("response_time", "2.5");
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform(event).unwrap();
+        let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
             Metric {
                 name: "response_time".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -738,12 +789,13 @@ mod tests {
 
         let event = create_event("response_time", "2.5");
         let mut transform = LogToMetric::new(config);
-        let metric = transform.transform(event).unwrap();
+        let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
             metric.into_metric(),
             Metric {
                 name: "response_time".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,

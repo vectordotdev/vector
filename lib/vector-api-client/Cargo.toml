@@ -1,6 +1,6 @@
 [package]
 name = "vector-api-client"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 publish = false
@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 
 # Serde
-serde = { version = "1.0.116", features = ["derive"] }
+serde = { version = "1.0.117", features = ["derive"] }
 serde_json = { version = "1.0.33", features = ["raw_value"] }
 
 # Error handling
@@ -28,6 +28,6 @@ tokio-tungstenite = "0.11.0"
 
 # External libs
 weak-table = "0.3.0"
-url = "2.1.1"
+url = "2.2.0"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 chrono = { version = "0.4.6", features = ["serde"] }

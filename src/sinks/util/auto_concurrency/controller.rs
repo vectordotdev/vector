@@ -192,7 +192,7 @@ impl<L> Controller<L> {
             && inner.reached_limit
             && !inner.had_back_pressure
             && current_rtt.is_some()
-            && current_rtt.unwrap() <= past_rtt
+            && current_rtt.unwrap() <= past_rtt + threshold / 10.0
         {
             // Increase (additive) the current concurrency limit
             self.semaphore.add_permits(1);
@@ -237,13 +237,13 @@ where
             .map(|resp| self.logic.should_retry_response(resp));
         let is_back_pressure = match &response_action {
             Ok(action) => matches!(action, RetryAction::Retry(_)),
-            Err(err) => {
-                if let Some(err) = err.downcast_ref::<L::Error>() {
-                    self.logic.is_retriable_error(err)
-                } else if err.downcast_ref::<Elapsed>().is_some() {
+            Err(error) => {
+                if let Some(error) = error.downcast_ref::<L::Error>() {
+                    self.logic.is_retriable_error(error)
+                } else if error.downcast_ref::<Elapsed>().is_some() {
                     true
                 } else {
-                    unreachable!("Unhandled error response! {:?}", err)
+                    unreachable!("Unhandled error response! {:?}", error)
                 }
             }
         };

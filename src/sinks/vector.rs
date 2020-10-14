@@ -2,12 +2,11 @@ use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::proto,
     internal_events::VectorEventSent,
-    sinks::util::{tcp::TcpSink, StreamSinkOld},
-    tls::{MaybeTlsSettings, TlsConfig},
+    sinks::util::tcp::TcpSinkConfig,
+    tls::TlsConfig,
     Event,
 };
 use bytes::{BufMut, Bytes, BytesMut};
-use futures01::{stream::iter_ok, Sink};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -17,12 +16,6 @@ use snafu::Snafu;
 pub struct VectorSinkConfig {
     pub address: String,
     pub tls: Option<TlsConfig>,
-}
-
-impl VectorSinkConfig {
-    pub fn new(address: String) -> Self {
-        Self { address, tls: None }
-    }
 }
 
 #[derive(Debug, Snafu)]
@@ -37,7 +30,15 @@ inventory::submit! {
     SinkDescription::new::<VectorSinkConfig>("vector")
 }
 
-impl GenerateConfig for VectorSinkConfig {}
+impl GenerateConfig for VectorSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            address: "127.0.0.1:5000".to_string(),
+            tls: None,
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "vector")]
@@ -46,22 +47,8 @@ impl SinkConfig for VectorSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let uri = self.address.parse::<http::Uri>()?;
-
-        let host = uri.host().ok_or(BuildError::MissingHost)?.to_string();
-        let port = uri.port_u16().ok_or(BuildError::MissingPort)?;
-
-        let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
-
-        let sink = TcpSink::new(host, port, cx.resolver(), tls);
-        let healthcheck = sink.healthcheck();
-        let sink = StreamSinkOld::new(sink, cx.acker())
-            .with_flat_map(move |event| iter_ok(encode_event(event)));
-
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        let sink_config = TcpSinkConfig::new(self.address.clone(), self.tls.clone());
+        sink_config.build(cx, encode_event)
     }
 
     fn input_type(&self) -> DataType {
@@ -93,4 +80,12 @@ fn encode_event(event: Event) -> Option<Bytes> {
     event.encode(&mut out).unwrap();
 
     Some(out.into())
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::VectorSinkConfig>();
+    }
 }

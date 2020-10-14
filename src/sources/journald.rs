@@ -100,7 +100,7 @@ impl SourceConfig for JournaldConfig {
         let include_units = match (!self.units.is_empty(), !self.include_units.is_empty()) {
             (true, true) => return Err(BuildError::BothUnitsAndIncludeUnits.into()),
             (true, false) => {
-                warn!("The `units` setting is deprecated, use `include_units` instead");
+                warn!("The `units` setting is deprecated, use `include_units` instead.");
                 &self.units
             }
             (false, _) => &self.include_units,
@@ -167,10 +167,10 @@ impl JournaldConfig {
         // Retrieve the saved checkpoint, and use it to seek forward in the journald log
         let cursor = match checkpointer.get().await {
             Ok(cursor) => cursor,
-            Err(err) => {
+            Err(error) => {
                 error!(
-                    message = "Could not retrieve saved journald checkpoint",
-                    error = %err
+                    message = "Could not retrieve saved journald checkpoint.",
+                    %error
                 );
                 None
             }
@@ -182,7 +182,6 @@ impl JournaldConfig {
             include_units,
             exclude_units,
             channel: out,
-            shutdown: shutdown.clone(),
             checkpointer,
             batch_size,
             remap_priority,
@@ -197,7 +196,9 @@ impl JournaldConfig {
             .instrument(info_span!("journald-server"))
             .boxed()
             .compat()
-            .select(shutdown.map(move |_| close()))
+            .select(Box::new(
+                shutdown.map(move |_| close()).unit_error().boxed().compat(),
+            ))
             .map(|_| ())
             .map_err(|_| ()),
         ))
@@ -322,7 +323,6 @@ struct JournaldServer<J, T> {
     include_units: HashSet<String>,
     exclude_units: HashSet<String>,
     channel: T,
-    shutdown: ShutdownSignal,
     checkpointer: Checkpointer,
     batch_size: usize,
     remap_priority: bool,
@@ -342,15 +342,12 @@ where
 
             for _ in 0..self.batch_size {
                 let text = match self.journal.next().await {
-                    None => {
-                        let _ = self.shutdown.compat().await;
-                        return;
-                    }
+                    None => return,
                     Some(Ok(text)) => text,
-                    Some(Err(err)) => {
+                    Some(Err(error)) => {
                         error!(
-                            message = "Could not read from journald source",
-                            error = %err,
+                            message = "Could not read from journald source.",
+                            %error,
                         );
                         break;
                     }
@@ -380,7 +377,7 @@ where
 
                 match channel.send(record).compat().await {
                     Ok(_) => {}
-                    Err(()) => error!(message = "Could not send journald log"),
+                    Err(()) => error!(message = "Could not send journald log."),
                 }
             }
 
@@ -401,14 +398,15 @@ where
 
 fn decode_record(text: &str, remap: bool) -> Result<Record, JsonError> {
     let mut record = serde_json::from_str::<JsonValue>(&text)?;
-    // journalctl will output non-ASCII messages using an array
-    // of integers. Look for those messages and re-parse them.
-    record.get_mut("MESSAGE").and_then(|message| {
-        message
-            .as_array()
-            .and_then(|v| decode_array(&v))
-            .map(|decoded| *message = decoded)
-    });
+    // journalctl will output non-ASCII values using an array
+    // of integers. Look for those values and re-parse them.
+    if let Some(record) = record.as_object_mut() {
+        for (_, value) in record.iter_mut() {
+            if let Some(decoded) = value.as_array().and_then(|v| decode_array(&v)) {
+                *value = decoded;
+            }
+        }
+    }
     if remap {
         record.get_mut("PRIORITY").map(remap_priority);
     }
@@ -568,6 +566,7 @@ mod tests {
 {"_SYSTEMD_UNIT":"badunit.service","MESSAGE":[194,191,72,101,108,108,111,63],"__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140003","PRIORITY":"5"}
 {"_SYSTEMD_UNIT":"stdout","MESSAGE":"Missing timestamp","__CURSOR":"3","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"2"}
 {"_SYSTEMD_UNIT":"stdout","MESSAGE":"Different timestamps","__CURSOR":"4","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"3"}
+{"_SYSTEMD_UNIT":"syslog.service","MESSAGE":"Non-ASCII in other field","__CURSOR":"5","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"3","SYSLOG_RAW":[194,191,87,111,114,108,100,63]}
 "#;
 
     struct FakeJournal {
@@ -663,7 +662,7 @@ mod tests {
     #[tokio::test]
     async fn reads_journal() {
         let received = run_journal(&[], &[], None).await;
-        assert_eq!(received.len(), 5);
+        assert_eq!(received.len(), 6);
         assert_eq!(
             message(&received[0]),
             Value::Bytes("System Initialization".into())
@@ -690,7 +689,7 @@ mod tests {
     #[tokio::test]
     async fn excludes_units() {
         let received = run_journal(&[], &["unit.service", "badunit.service"], None).await;
-        assert_eq!(received.len(), 3);
+        assert_eq!(received.len(), 4);
         assert_eq!(
             message(&received[0]),
             Value::Bytes("System Initialization".into())
@@ -708,7 +707,7 @@ mod tests {
     #[tokio::test]
     async fn handles_checkpoint() {
         let received = run_journal(&[], &[], Some("1")).await;
-        assert_eq!(received.len(), 4);
+        assert_eq!(received.len(), 5);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
@@ -718,6 +717,16 @@ mod tests {
         let received = run_journal(&["badunit.service"], &[], None).await;
         assert_eq!(received.len(), 1);
         assert_eq!(message(&received[0]), Value::Bytes("¿Hello?".into()));
+    }
+
+    #[tokio::test]
+    async fn parses_array_fields() {
+        let received = run_journal(&["syslog.service"], &[], None).await;
+        assert_eq!(received.len(), 1);
+        assert_eq!(
+            received[0].as_log()["SYSLOG_RAW"],
+            Value::Bytes("¿World?".into())
+        );
     }
 
     #[tokio::test]

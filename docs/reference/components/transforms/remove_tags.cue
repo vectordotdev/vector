@@ -1,17 +1,17 @@
 package metadata
 
 components: transforms: remove_tags: {
-	title:             "Remove Tags"
-	short_description: "Accepts metric events and allows you to remove one or more metric tags."
+	title: "Remove Tags"
 
 	classes: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
-		function:      "schema"
 	}
 
-	features: {}
+	features: {
+		shape: {}
+	}
 
 	support: {
 		platforms: {

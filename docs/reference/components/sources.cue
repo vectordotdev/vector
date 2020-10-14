@@ -3,31 +3,22 @@ package metadata
 components: sources: [Name=string]: {
 	kind: "source"
 
-	classes: {
-		// The behavior function for this source. This is used as a filter to help
-		// users find components that serve a function.
-		function: "collect" | "receive" | "test"
-	}
-
-	features: {
-		checkpoint: enabled: bool
-		multiline: enabled:  bool
-	}
-
 	configuration: {
-		if features.checkpoint.enabled {
-			data_dir: {
-				common:      false
-				description: "The directory used to persist file checkpoint positions. By default, the [global `data_dir` option][docs.global-options#data_dir] is used. Please make sure the Vector project has write permissions to this dir."
-				required:    false
-				type: string: {
-					default: null
-					examples: ["/var/lib/vector"]
+		if sources[Name].features.collect != _|_ {
+			if sources[Name].features.collect.checkpoint.enabled {
+				data_dir: {
+					common:      false
+					description: "The directory used to persist file checkpoint positions. By default, the [global `data_dir` option][docs.global-options#data_dir] is used. Please make sure the Vector project has write permissions to this dir."
+					required:    false
+					type: string: {
+						default: null
+						examples: ["/var/lib/vector"]
+					}
 				}
 			}
 		}
 
-		if features.multiline.enabled {
+		if sources[Name].features.multiline.enabled {
 			multiline: {
 				common:      false
 				description: "Multiline parsing configuration. If not specified, multiline parsing is disabled."
@@ -68,13 +59,36 @@ components: sources: [Name=string]: {
 				}
 			}
 		}
+
+		if sources[Name].features.collect != _|_ {
+			if sources[Name].features.collect.tls != _|_ {
+				if sources[Name].features.collect.tls.enabled {
+					tls: configuration._tls_connect & {_args: {
+						can_enable:             sources[Name].features.collect.tls.can_enable
+						can_verify_certificate: sources[Name].features.collect.tls.can_enable
+						can_verify_hostname:    sources[Name].features.collect.tls.can_verify_hostname
+						enabled_default:        sources[Name].features.collect.tls.enabled_default
+					}}
+				}
+			}
+		}
+
+		if sources[Name].features.receive != _|_ {
+			if sources[Name].features.receive.tls.enabled {
+				tls: configuration._tls_accept & {_args: {
+					can_enable:             sources[Name].features.receive.tls.can_enable
+					can_verify_certificate: sources[Name].features.receive.tls.can_enable
+					enabled_default:        sources[Name].features.receive.tls.enabled_default
+				}}
+			}
+		}
 	}
 
 	output: {
 		logs?: [Name=string]: {
 			fields: {
 				_current_timestamp: {
-					description: "The exact time the event was ingested into Vector."
+					description: string | *"The exact time the event was ingested into Vector."
 					required:    true
 					type: timestamp: {}
 				}
@@ -95,26 +109,50 @@ components: sources: [Name=string]: {
 	}
 
 	how_it_works: {
-		if features.checkpoint.enabled {
-			checkpointing: {
-				title: "Checkpointing"
-				body: #"""
-					Vector checkpoints the current read position after each
-					successful read. This ensures that Vector resumes where it left
-					off if restarted, preventing data from being read twice. The
-					checkpoint positions are stored in the data directory which is
-					specified via the global `data_dir` option, but can be overridden
-					via the `data_dir` option in the file source directly.
-					"""#
+		_tls: {
+			title: "Transport Layer Security (TLS)"
+			body:  """
+				  Vector uses [Openssl](\(urls.openssl)) for TLS protocols. You can
+				  adjust TLS behavior via the `tls.*` options.
+				  """
+		}
+
+		if sources[Name].features.collect != _|_ {
+			if sources[Name].features.collect.checkpoint.enabled {
+				checkpointing: {
+					title: "Checkpointing"
+					body: """
+						Vector checkpoints the current read position after each
+						successful read. This ensures that Vector resumes where it left
+						off if restarted, preventing data from being read twice. The
+						checkpoint positions are stored in the data directory which is
+						specified via the global `data_dir` option, but can be overridden
+						via the `data_dir` option in the file source directly.
+						"""
+				}
 			}
 		}
 
 		context: {
 			title: "Context"
-			body: #"""
+			body:  """
 				By default, the `\( Name )` source will augment events with helpful
 				context keys as shown in the "Output" section.
-				"""#
+				"""
+		}
+
+		if sources[Name].features.collect != _|_ {
+			if sources[Name].features.collect.tls != _|_ {
+				if sources[Name].features.collect.tls.enabled {
+					tls: _tls
+				}
+			}
+		}
+
+		if sources[Name].features.receive != _|_ {
+			if sources[Name].features.receive.tls.enabled {
+				tls: _tls
+			}
 		}
 	}
 }

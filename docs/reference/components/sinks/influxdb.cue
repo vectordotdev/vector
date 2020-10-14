@@ -1,6 +1,30 @@
 package metadata
 
 components: sinks: _influxdb: {
+	features: {
+		send: {
+			tls: enabled: false
+			to: {
+				name:     "InfluxDB"
+				thing:    "an \(name) database"
+				url:      urls.influxdb
+				versions: null
+
+				interface: {
+					socket: {
+						api: {
+							title: "Influx HTTP API"
+							url:   urls.influxdb_http_api_v2
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "optional"
+					}
+				}
+			}
+		}
+	}
+
 	configuration: {
 		bucket: {
 			description: "The destination bucket for writes into InfluxDB 2."
@@ -12,6 +36,7 @@ components: sinks: _influxdb: {
 			}
 		}
 		consistency: {
+			category:    "Persistence"
 			common:      true
 			description: "Sets the write consistency for the point for InfluxDB 1."
 			groups: ["v1"]
@@ -39,16 +64,8 @@ components: sinks: _influxdb: {
 				examples: ["http://localhost:8086/", "https://us-west-2-1.aws.cloud1.influxdata.com", "https://us-west-2-1.aws.cloud2.influxdata.com"]
 			}
 		}
-		namespace: {
-			description: "A prefix that will be added to all metric names."
-			groups: ["v1", "v2"]
-			required: true
-			warnings: []
-			type: string: {
-				examples: ["service"]
-			}
-		}
 		org: {
+			category:    "Auth"
 			description: "Specifies the destination organization for writes into InfluxDB 2."
 			groups: ["v2"]
 			required: true
@@ -58,6 +75,7 @@ components: sinks: _influxdb: {
 			}
 		}
 		password: {
+			category:    "Auth"
 			common:      true
 			description: "Sets the password for authentication if you’ve enabled authentication for the write into InfluxDB 1."
 			groups: ["v1"]
@@ -69,6 +87,7 @@ components: sinks: _influxdb: {
 			}
 		}
 		retention_policy_name: {
+			category:    "Persistence"
 			common:      true
 			description: "Sets the target retention policy for the write into InfluxDB 1."
 			groups: ["v1"]
@@ -91,7 +110,8 @@ components: sinks: _influxdb: {
 			}
 		}
 		token: {
-			description: "[Authentication token][urls.influxdb_authentication_token] for InfluxDB 2."
+			category:    "Auth"
+			description: "[Authentication token](\(urls.influxdb_authentication_token)) for InfluxDB 2."
 			groups: ["v2"]
 			required: true
 			warnings: []
@@ -100,6 +120,7 @@ components: sinks: _influxdb: {
 			}
 		}
 		username: {
+			category:    "Auth"
 			common:      true
 			description: "Sets the username for authentication if you’ve enabled authentication for the write into InfluxDB 1."
 			groups: ["v1"]

@@ -1,17 +1,23 @@
 package metadata
 
 components: transforms: grok_parser: {
-	title:             "Grok Parser"
-	short_description: "Accepts log events and allows you to parse a log field value with [Grok][urls.grok]."
+	title: "Grok Parser"
 
 	classes: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
-		function:      "parse"
 	}
 
-	features: {}
+	features: {
+		parse: {
+			format: {
+				name:     "Grok"
+				url:      urls.grok
+				versions: null
+			}
+		}
+	}
 
 	support: {
 		platforms: {
@@ -25,20 +31,20 @@ components: transforms: grok_parser: {
 
 		requirements: []
 		warnings: [
-			#"""
+			"""
 				Grok is approximately 50% slower than the [`regex_parser` transform][docs.transforms.regex_parser].
 				While this is still plenty fast for most use cases we recommend using the
 				[`regex_parser` transform][docs.transforms.regex_parser] if you are experiencing
 				performance issues.
-				"""#,
+				""",
 		]
 		notices: [
-			#"""
-				Vector uses the Rust [`grok` library][urls.rust_grok_library]. All patterns
-				[listed here][urls.grok_patterns] are supported. It is recommended to use
+			"""
+				Vector uses the Rust [`grok` library](\(urls.rust_grok_library)). All patterns
+				[listed here](\(urls.grok_patterns)) are supported. It is recommended to use
 				maintained patterns when possible since they will be improved over time by
 				the community.
-				"""#,
+				""",
 		]
 	}
 
@@ -61,36 +67,32 @@ components: transforms: grok_parser: {
 			}
 		}
 		pattern: {
-			description: "The [Grok pattern][urls.grok_patterns]"
+			description: "The [Grok pattern](\(urls.grok_patterns))"
 			required:    true
 			warnings: []
 			type: string: {
 				examples: ["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"]
 			}
 		}
-		types: {
-			common:      true
-			description: "Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types."
-			required:    false
-			warnings: []
-			type: object: {
-				examples: [{"status": "int"}, {"duration": "float"}, {"success": "bool"}, {"timestamp": "timestamp|%F"}, {"timestamp": "timestamp|%a %b %e %T %Y"}, {"parent": {"child": "int"}}]
-				options: {}
-			}
-		}
+		types: configuration._types
 	}
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	how_it_works: {
+		available_patterns: {
+			title: "Available Patterns"
+			body:  support.notices[0]
+		}
+
 		testing: {
 			title: "Testing"
-			body: #"""
-				We recommend the [Grok debugger][urls.grok_debugger] for Grok testing.
-				"""#
+			body:  """
+				We recommend the [Grok debugger](\(urls.grok_debugger)) for Grok testing.
+				"""
 		}
 	}
 }

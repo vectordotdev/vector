@@ -12,8 +12,8 @@ impl InternalEvent for StatsdEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,);
-        counter!("bytes_processed", self.byte_size as u64,);
+        counter!("events_processed_total", 1,);
+        counter!("processed_bytes_total", self.byte_size as u64,);
     }
 }
 
@@ -25,12 +25,12 @@ pub struct StatsdInvalidRecord<'a> {
 
 impl InternalEvent for StatsdInvalidRecord<'_> {
     fn emit_logs(&self) {
-        error!(message = "Invalid packet from statsd, discarding.", error = %self.error, text = %self.text);
+        error!(message = "Invalid packet from statsd, discarding.", error = ?self.error, text = %self.text);
     }
 
     fn emit_metrics(&self) {
-        counter!("invalid_record", 1,);
-        counter!("invalid_record_bytes", self.text.len() as u64,);
+        counter!("invalid_record_total", 1,);
+        counter!("invalid_record_bytes_total", self.text.len() as u64,);
     }
 }
 
@@ -66,10 +66,10 @@ impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for StatsdSocketError
             StatsdSocketErrorType::Bind => "Failed to bind to UDP listener socket.",
             StatsdSocketErrorType::Read => "Failed to read UDP datagram.",
         };
-        error!(message, error = %self.error);
+        error!(message, error = ?self.error);
     }
 
     fn emit_metrics(&self) {
-        counter!("socket_errors", 1);
+        counter!("connection_errors_total", 1);
     }
 }
