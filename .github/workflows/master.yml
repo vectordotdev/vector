@@ -19,6 +19,8 @@ on:
       - "Cargo.toml"
       - "Makefile"
       - "rust-toolchain"
+  workflow_dispatch:
+
 
 env:
   AUTOINSTALL: true
