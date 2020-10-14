@@ -60,7 +60,7 @@ components: transforms: lua: {
 							examples: [
 								#"""
                 function (emit)
-                  count = 0 -- initialize state by setting a global variable
+                  -- Custom Lua code here
                 end
                 """#,
 								"init",
@@ -98,16 +98,7 @@ components: transforms: lua: {
 							examples: [
 								#"""
                 function (emit)
-                  emit {
-                    metric = {
-                      name = "event_counter",
-                      kind = "incremental",
-                      timestamp = os.date("!*t"),
-                      counter = {
-                        value = counter
-                      }
-                    }
-                  }
+                  -- Custom Lua code here
                 end
                 """#,
 								"shutdown",
