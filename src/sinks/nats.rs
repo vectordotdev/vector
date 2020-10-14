@@ -111,7 +111,10 @@ impl StreamSink for NatsSink {
 mod integration_tests {
     use super::*;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
-    use std::{sync::{Arc, Mutex}, time::Duration};
+    use std::{
+        sync::{Arc, Mutex},
+        time::Duration,
+    };
 
     #[tokio::test]
     async fn nats_happy() {

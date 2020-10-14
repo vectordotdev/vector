@@ -3,7 +3,7 @@ package metadata
 components: sinks: nats: {
 	title:             "NATS"
 	short_description: "Streams log events to a [NATS][urls.nats] on a NATS subject."
-    long_description: "NATS.io is a simple, secure and high performance open source messaging system for cloud native applications, IoT messaging, and microservices architectures. NATS.io is a Cloud Native Computing Foundation project."
+	long_description:  "NATS.io is a simple, secure and high performance open source messaging system for cloud native applications, IoT messaging, and microservices architectures. NATS.io is a Cloud Native Computing Foundation project."
 
 	classes: {
 		commonly_used: false
@@ -54,11 +54,11 @@ components: sinks: nats: {
 		}
 		subject: {
 			description: "The NATS subject to publish messages to."
-			required: true
+			required:    true
 			warnings: []
 			type: string: {
-                default: null
-                examples: ["foo", "time.us.east", "time.*.east", "time.>", ">"]
+				default: null
+				examples: ["foo", "time.us.east", "time.*.east", "time.>", ">"]
 			}
 		}
 	}
