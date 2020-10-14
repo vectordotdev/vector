@@ -7,7 +7,9 @@ components: sources: prometheus: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
+		development:   "beta"
 		egress_method: "batch"
 		function:      "collect"
 	}
@@ -18,21 +20,34 @@ components: sources: prometheus: {
 		tls: enabled:        false
 	}
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
-	}
-
 	support: {
-		platforms: {
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
+		dependencies: {
+			prometheus_client: {
+				required: true
+				title:    "Prometheus Client"
+				type:     "external"
+				url:      urls.prometheus_client
+				versions: null
+
+				interface: socket: {
+					api: {
+						title: "Prometheus"
+						url:   urls.prometheus_text_based_exposition_format
+					}
+					direction: "outgoing"
+					protocols: ["http"]
+					ssl: "optional"
+				}
 			}
+		}
+
+		platforms: {
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
 		requirements: []
