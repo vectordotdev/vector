@@ -1,6 +1,8 @@
 package metadata
 
 components: sources: aws_kinesis_firehose: {
+	_port: 443
+
 	title:             "AWS Kinesis Firehose"
 	long_description:  "[AWS Kinesis Firehose][urls.aws_kinesis_firehose] is an AWS service that simplifies dealing with streaming data. It allows for ingestion, transformation, and forwarding of events. In addition to publishing events directly to Kinesis Firehose, the service has direct integrations with many AWS services which allow them to directly publish events to a delivery stream."
 	short_description: "Ingests events from AWS Kinesis Firehose via the [AWS Kinesis Firehose HTTP protocol][urls.aws_kinesis_firehose_http_protocol]."
@@ -10,6 +12,23 @@ components: sources: aws_kinesis_firehose: {
 		deployment_roles: ["aggregator"]
 		egress_method: "batch"
 		function:      "receive"
+	}
+
+	dependencies: {
+		aws_kinesis_firehose: {
+			required: true
+			title:    "AWS Kinesis Firehose"
+			type:     "external"
+			url:      urls.aws_kinesis_firehose
+			version:  "any"
+
+			setup: [
+				#"""
+					[Setup a Kinesis Firehose delivery stream][urls.aws_kinesis_firehose_setup]
+					in your preferred AWS region with an HTTP destination.
+					"""#,
+			]
+		}
 	}
 
 	features: {
@@ -77,6 +96,15 @@ components: sources: aws_kinesis_firehose: {
 				examples: ["A94A8FE5CCB19BA61C4C08"]
 			}
 		}
+	}
+
+	input: receive: http: {
+		api: {
+			docs_url: urls.aws_firehose_http_request_spec
+			title:    "AWS Kinesis Firehose HTTP Endpoint Destination"
+		}
+		port: _port
+		ssl:  "required"
 	}
 
 	output: logs: {

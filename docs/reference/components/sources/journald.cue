@@ -106,6 +106,11 @@ components: sources: journald: {
 		}
 	}
 
+	input: collect: binary: {
+		name: "journalctl"
+		permissions: unix: group: "systemd-journal"
+	}
+
 	examples: [
 		{
 			title: "Sample Output"

@@ -1,60 +1,18 @@
 package metadata
 
 components: sources: apache_metrics: {
+	_config_path: "/etc/apache2/httpd.conf"
+	_path:        "/server-status"
+
 	title:             "Apache HTTP Server (HTTPD) Metrics"
-	long_description:  "fill me in"
 	short_description: "Collect metrics from an Apache HTTPD server."
+	long_description:  "TODO: fill me in"
 
 	classes: {
 		commonly_used: false
 		deployment_roles: ["daemon", "sidecar"]
 		egress_method: "batch"
 		function:      "collect"
-	}
-
-	dependencies: {
-		apache: {
-			title:    "Apache HTTP Server (HTTPD)"
-			required: true
-			type:     "external"
-			url:      urls.apache
-			version:  "any"
-
-			interfaces: status_module: {
-				title: "Status Module"
-				url:   urls.apache_mod_status
-				permissions: {}
-			}
-
-			configure: {
-				_path: "/server-status"
-				internal: [
-					#"""
-						Enable the [Apache Status module][urls.apache_mod_status]
-						in your Apache config:
-
-						``` file="/etc/apache2/httpd.conf"
-						<Location "\(_path)">
-						    SetHandler server-status
-						    Require host example.com
-						</Location>
-						```
-						"""#,
-					#"""
-						Optionally enable [`ExtendedStatus` option][urls.apache_extended_status]
-						for more detailed metrics (see [Output](#output)). Note,
-						this defaults to `On` in Apache >= 2.3.6.
-
-						``` file="/etc/apache2/httpd.conf"
-						ExtendedStatus On
-						```
-						"""#,
-				]
-				vector: {
-					endpoints: ["http://localhost:8080\(_path)/?auto"]
-				}
-			}
-		}
 	}
 
 	features: {
@@ -85,6 +43,45 @@ components: sources: apache_metrics: {
 		notices: []
 	}
 
+	dependencies: {
+		apache: {
+			required: true
+			title:    "Apache HTTP Server (HTTPD)"
+			type:     "external"
+			url:      urls.apache
+			version:  "any"
+
+			setup: [
+				#"""
+					[Install the Apache HTTP server][urls.apache_install].
+					"""#,
+				#"""
+					Enable the [Apache Status module][urls.apache_mod_status]
+					in your Apache config:
+
+					```text file="\(_config_path)"
+					<Location "\(_path)">
+					    SetHandler server-status
+					    Require host example.com
+					</Location>
+					```
+					"""#,
+				#"""
+					Optionally enable [`ExtendedStatus` option][urls.apache_extended_status]
+					for more detailed metrics (see [Output](#output)). Note,
+					this defaults to `On` in Apache >= 2.3.6.
+
+					```text file="\(_config_path)"
+					ExtendedStatus On
+					```
+					"""#,
+				#"""
+					Start or reload Apache to apply the config changes.
+					"""#,
+			]
+		}
+	}
+
 	configuration: {
 		endpoints: {
 			description: "mod_status endpoints to scrape metrics from."
@@ -102,6 +99,11 @@ components: sources: apache_metrics: {
 				unit:    "seconds"
 			}
 		}
+	}
+
+	input: collect: http: api: {
+		title:    "Apache HTTP Served Status Module"
+		docs_url: urls.apache_mod_status
 	}
 
 	output: metrics: {

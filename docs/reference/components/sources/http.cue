@@ -85,6 +85,11 @@ components: sources: http: {
 		}
 	}
 
+	input: receive: http: {
+		port: _port
+		ssl:  "required"
+	}
+
 	output: logs: {
 		text: {
 			description: "An individual line from a `text/plain` request"

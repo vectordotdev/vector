@@ -62,6 +62,10 @@ _values: {
 	kind: #ComponentKind
 	let Kind = kind
 
+	configuration: #Schema
+
+	dependencies: #Dependencies
+
 	// `long_description` describes the components with a single paragraph.
 	// It is used for SEO purposes and should be full of relevant keywords.
 	long_description: string
@@ -79,37 +83,6 @@ _values: {
 
 	// `classes` represent the various classifications for this component
 	classes: #Classes & {_args: kind: Kind}
-
-	// `features` describes the various supported features of the component.
-	// Setting these helps to reduce boilerplate.
-	//
-	// For example, the `tls` feature will automatically add the appropriate
-	// `tls` options and `how_it_works` sections.
-	features: #Features & {_args: {egress_method: classes.egress_method, kind: Kind}}
-
-	// `statuses` communicates the various statuses of the component.
-	statuses: #Statuses & {_args: kind: Kind}
-
-	// `support` communicates the varying levels of support of the component.
-	support: #Support & {_args: kind: Kind}
-
-	configuration: #Schema
-
-	if Kind != "source" {
-		input: {
-			logs:    bool
-			metrics: false | #MetricInput
-		}
-	}
-
-	if Kind != "sink" {
-		// `output` documents output of the component. This is very important
-		// as it communicate which events and fields are emitted.
-		output: {
-			logs?:    #LogOutput
-			metrics?: #MetricOutput
-		}
-	}
 
 	// `examples` demonstrates various ways to use the component using an
 	// input, output, and example configuration.
@@ -148,11 +121,38 @@ _values: {
 		}),
 	]
 
+	// `features` describes the various supported features of the component.
+	// Setting these helps to reduce boilerplate.
+	//
+	// For example, the `tls` feature will automatically add the appropriate
+	// `tls` options and `how_it_works` sections.
+	features: #Features & {_args: {egress_method: classes.egress_method, kind: Kind}}
+
 	// `how_it_works` contain sections that further describe the component's
 	// behavior. This is like a mini-manual for the component and should help
 	// answer any obvious questions the user might have. Options can link
 	// to these sections for deeper explanations of behavior.
 	how_it_works: #HowItWorks
+
+	if Kind == "source" {
+		input?: #ExternalInput
+	}
+
+	if Kind != "source" {
+		input: #InternalInput
+	}
+
+	if Kind != "sink" {
+		// `output` documents output of the component. This is very important
+		// as it communicate which events and fields are emitted.
+		output: #InternalOutput
+	}
+
+	// `statuses` communicates the various statuses of the component.
+	statuses: #Statuses & {_args: kind: Kind}
+
+	// `support` communicates the varying levels of support of the component.
+	support: #Support & {_args: kind: Kind}
 }
 
 // `#DeliveryStatus` documents the delivery guarantee.
@@ -162,6 +162,16 @@ _values: {
 // * `best_effort` - We will make a best effort to deliver the event,
 // but the event is not guaranteed to be delivered.
 #DeliveryStatus: "at_least_once" | "best_effort"
+
+#Dependencies: [Name=string]: close({
+	title:    string
+	required: bool
+	type:     "external" | "internal"
+	url:      string
+	version:  string
+
+	setup: [...string]
+})
 
 // `#DeploymentRoles` clarify when a component should be used under
 // certain deployment contexts.
@@ -208,6 +218,48 @@ _values: {
 // * `log` - log event
 // * `metric` - metric event
 #EventType: "log" | "metric"
+
+#ExternalInput: {
+	close({collect: #ExternalInputCollect}) |
+	close({receive: #ExternalInputReceive})
+}
+
+#ExternalInputCollect: {
+	close({binary: #ExternalInputCollectBinary}) |
+	close({file_system: #ExternalInputCollectFileSystem}) |
+	close({http: #ExternalInputCollectHTTP})
+}
+
+#ExternalInputCollectBinary: {
+	name:         string
+	permissions?: #Permissions
+}
+
+#ExternalInputCollectFileSystem: {
+	directory: string
+}
+
+#ExternalInputCollectHTTP: {
+	api: {
+		docs_url: string
+		title:    string
+	}
+	permissions?: #Permissions
+	socket?:      string
+}
+
+#ExternalInputReceive: {
+	close({http: #ExternalInputReceiveHTTP})
+}
+
+#ExternalInputReceiveHTTP: {
+	api?: {
+		docs_url: string
+		title:    string
+	}
+	port: uint16
+	ssl:  "required" | "optional"
+}
 
 #Features: {
 	_args: {
@@ -329,6 +381,16 @@ _values: {
 	}]
 })
 
+#InternalInput: {
+	logs:    bool
+	metrics: false | #MetricInput
+}
+
+#InternalOutput: {
+	logs?:    #LogOutput
+	metrics?: #MetricOutput
+}
+
 #LogEvent: {
 	host?:      string | null
 	message?:   string | null
@@ -397,19 +459,25 @@ _values: {
 #MetricOutput: [Name=string]: close({
 	description:    string
 	relevant_when?: string
-	tags:           #Tags
+	tags:           #MetricTags
 	name:           Name
 	type:           #MetricType
 })
 
-#MetricType: "counter" | "gauge" | "histogram" | "summary"
-
-#Tags: [Name=string]: close({
+#MetricTags: [Name=string]: close({
 	description: string
 	examples: [string, ...]
 	required: bool
 	name:     Name
 })
+
+#MetricType: "counter" | "gauge" | "histogram" | "summary"
+
+#Permissions: {
+	unix: {
+		group: string
+	}
+}
 
 #Platforms: {
 	docker: {

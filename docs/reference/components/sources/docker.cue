@@ -22,41 +22,30 @@ components: sources: docker: {
 
 	dependencies: {
 		docker_engine: {
-			title:    "Docker Engine"
 			required: true
+			title:    "Docker Engine"
 			type:     "external"
 			url:      urls.docker_engine
 			version:  ">= 1.24"
 
-			interfaces: docker_engine_api: {
-				title: "Docker Engine API"
-				url:   urls.docker_engine_api
-				permissions: {
-					docker_group: unix: commands: [
-						"sudo groupadd docker",
-						"sudo usermod -aG docker $USER",
-					]
-				}
-			}
+			setup: [
+				#"""
+					Ensure that [Docker is setup][urls.docker_setup] and running.
+					"""#,
+				#"""
+					Ensure that the Docker Engine is properly exposing logs:
 
-			configuration: {
-				internal: [
-					#"""
-					Ensure that the Docker Engine is exposing logs:
+					```bash
+					docker logs $(docker ps | awk '{ print $1 }')
+					```
 
-				   ```bash
-				   docker logs $(docker ps | awk '{ print $1 }')
-				   ```
-
-				   If you receive an error it's likely that you do not have
-				   the proper Docker logging drivers installed. The Docker
-				   Engine requires either the [`json-file`][urls.docker_logging_driver_json_file] (default)
-				   or [`journald`](docker_logging_driver_journald) Docker
-				   logging driver to be installed.
-				   """#,
-				]
-				vector: {}
-			}
+					If you receive an error it's likely that you do not have
+					the proper Docker logging drivers installed. The Docker
+					Engine requires either the [`json-file`][urls.docker_logging_driver_json_file] (default)
+					or [`journald`](docker_logging_driver_journald) Docker
+					logging driver to be installed.
+					"""#,
+			]
 		}
 	}
 
@@ -158,6 +147,15 @@ components: sources: docker: {
 				default: 1
 			}
 		}
+	}
+
+	input: collect: http: {
+		api: {
+			docs_url: urls.docker_engine_api
+			title:    "Docker Engine API"
+		}
+		permissions: unix: group: "docker"
+		socket: "/var/run/docker.sock"
 	}
 
 	output: logs: {

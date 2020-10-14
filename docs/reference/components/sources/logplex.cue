@@ -63,6 +63,15 @@ components: sources: logplex: {
 		}
 	}
 
+	input: receive: http: {
+		api: {
+			docs_url: urls.logplex_protocol
+			title:    "Logplex Destination"
+		}
+		port: _port
+		ssl:  "optional"
+	}
+
 	output: logs: line: {
 		description: "An individual event from a batch of events received through an HTTP POST request."
 		fields: {

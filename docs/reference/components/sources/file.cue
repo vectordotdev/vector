@@ -178,6 +178,10 @@ components: sources: file: {
 		}
 	}
 
+	input: collect: file_system: {
+		directory: _directory
+	}
+
 	output: logs: line: {
 		description: "An individual line from a file. Lines can be merged using the `multiline` options."
 		fields: {
