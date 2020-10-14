@@ -21,7 +21,6 @@ use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::time::Duration;
-use string_cache::DefaultAtom as Atom;
 
 type MetadataFuture<F, M> = future01::Join<F, future01::FutureResult<M, <F as Future>::Error>>;
 
@@ -37,7 +36,7 @@ enum BuildError {
 pub struct KafkaSinkConfig {
     bootstrap_servers: String,
     topic: String,
-    key_field: Option<Atom>,
+    key_field: Option<String>,
     encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     compression: KafkaCompression,
@@ -70,7 +69,7 @@ pub enum Encoding {
 pub struct KafkaSink {
     producer: FutureProducer,
     topic: Template,
-    key_field: Option<Atom>,
+    key_field: Option<String>,
     encoding: EncodingConfig<Encoding>,
     in_flight: FuturesUnordered<MetadataFuture<Compat<DeliveryFuture>, usize>>,
 
@@ -158,9 +157,7 @@ impl Sink for KafkaSink {
 
         let mut record = FutureRecord::to(&topic).key(&key).payload(&body[..]);
 
-        if let Some(Value::Timestamp(timestamp)) =
-            item.as_log().get(&Atom::from(log_schema().timestamp_key()))
-        {
+        if let Some(Value::Timestamp(timestamp)) = item.as_log().get(log_schema().timestamp_key()) {
             record = record.timestamp(timestamp.timestamp_millis());
         }
 
@@ -259,7 +256,7 @@ async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
 
 fn encode_event(
     mut event: Event,
-    key_field: &Option<Atom>,
+    key_field: &Option<String>,
     encoding: &EncodingConfig<Encoding>,
 ) -> (Vec<u8>, Vec<u8>) {
     let key = key_field
@@ -274,7 +271,7 @@ fn encode_event(
         Encoding::Json => serde_json::to_vec(&event.as_log()).unwrap(),
         Encoding::Text => event
             .as_log()
-            .get(&Atom::from(log_schema().message_key()))
+            .get(log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };
@@ -333,7 +330,7 @@ mod tests {
             &Some("key".into()),
             &EncodingConfigWithDefault {
                 codec: Encoding::Json,
-                except_fields: Some(vec![Atom::from("key")]),
+                except_fields: Some(vec!["key".into()]),
                 ..Default::default()
             }
             .into(),

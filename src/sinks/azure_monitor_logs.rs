@@ -23,7 +23,6 @@ use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use string_cache::DefaultAtom as Atom;
 
 fn default_host() -> String {
     "ods.opinsights.azure.com".into()
@@ -162,7 +161,7 @@ impl HttpSink for AzureMonitorLogsSink {
         let mut log = event.into_log();
         let timestamp_key = log_schema().timestamp_key();
 
-        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(&Atom::from(timestamp_key)) {
+        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(timestamp_key) {
             ts
         } else {
             chrono::Utc::now()

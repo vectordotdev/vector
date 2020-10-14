@@ -9,15 +9,14 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct TokenizerConfig {
-    pub field_names: Vec<Atom>,
-    pub field: Option<Atom>,
+    pub field_names: Vec<String>,
+    pub field: Option<String>,
     pub drop_field: bool,
-    pub types: HashMap<Atom, String>,
+    pub types: HashMap<String, String>,
 }
 
 inventory::submit! {
@@ -33,7 +32,7 @@ impl TransformConfig for TokenizerConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| Atom::from(crate::config::log_schema().message_key()));
+            .unwrap_or_else(|| crate::config::log_schema().message_key().to_string());
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)?;
 
@@ -62,17 +61,17 @@ impl TransformConfig for TokenizerConfig {
 }
 
 pub struct Tokenizer {
-    field_names: Vec<(Atom, Vec<PathComponent>, Conversion)>,
-    field: Atom,
+    field_names: Vec<(String, Vec<PathComponent>, Conversion)>,
+    field: String,
     drop_field: bool,
 }
 
 impl Tokenizer {
     pub fn new(
-        field_names: Vec<Atom>,
-        field: Atom,
+        field_names: Vec<String>,
+        field: String,
         drop_field: bool,
-        types: HashMap<Atom, Conversion>,
+        types: HashMap<String, Conversion>,
     ) -> Self {
         let field_names = field_names
             .into_iter()
@@ -129,7 +128,6 @@ mod tests {
         config::{TransformConfig, TransformContext},
         Event,
     };
-    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn generate_config() {
@@ -144,7 +142,7 @@ mod tests {
         types: &[(&str, &str)],
     ) -> LogEvent {
         let event = Event::from(text);
-        let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<Atom>>();
+        let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<String>>();
         let field = field.map(|f| f.into());
         let mut parser = TokenizerConfig {
             field_names,
@@ -163,26 +161,26 @@ mod tests {
     async fn tokenizer_adds_parsed_field_to_event() {
         let log = parse_log("1234 5678", "status time", None, false, &[]).await;
 
-        assert_eq!(log[&"status".into()], "1234".into());
-        assert_eq!(log[&"time".into()], "5678".into());
-        assert!(log.get(&"message".into()).is_some());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["time"], "5678".into());
+        assert!(log.get("message").is_some());
     }
 
     #[tokio::test]
     async fn tokenizer_does_drop_parsed_field() {
         let log = parse_log("1234 5678", "status time", Some("message"), true, &[]).await;
 
-        assert_eq!(log[&"status".into()], "1234".into());
-        assert_eq!(log[&"time".into()], "5678".into());
-        assert!(log.get(&"message".into()).is_none());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["time"], "5678".into());
+        assert!(log.get("message").is_none());
     }
 
     #[tokio::test]
     async fn tokenizer_does_not_drop_same_name_parsed_field() {
         let log = parse_log("1234 yes", "status message", Some("message"), true, &[]).await;
 
-        assert_eq!(log[&"status".into()], "1234".into());
-        assert_eq!(log[&"message".into()], "yes".into());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["message"], "yes".into());
     }
 
     #[tokio::test]
@@ -196,10 +194,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(log[&"number".into()], Value::Float(42.3));
-        assert_eq!(log[&"flag".into()], Value::Boolean(true));
-        assert_eq!(log[&"code".into()], Value::Integer(1234));
-        assert_eq!(log[&"rest".into()], Value::Bytes("word".into()));
+        assert_eq!(log["number"], Value::Float(42.3));
+        assert_eq!(log["flag"], Value::Boolean(true));
+        assert_eq!(log["code"], Value::Integer(1234));
+        assert_eq!(log["rest"], Value::Bytes("word".into()));
     }
 
     #[tokio::test]
@@ -212,8 +210,8 @@ mod tests {
             &[("code", "integer"), ("who", "string"), ("why", "string")],
         )
         .await;
-        assert_eq!(log[&"code".into()], Value::Integer(1234));
-        assert_eq!(log[&"who".into()], Value::Bytes("-".into()));
-        assert_eq!(log[&"why".into()], Value::Bytes("foo".into()));
+        assert_eq!(log["code"], Value::Integer(1234));
+        assert_eq!(log["who"], Value::Bytes("-".into()));
+        assert_eq!(log["why"], Value::Bytes("foo".into()));
     }
 }
