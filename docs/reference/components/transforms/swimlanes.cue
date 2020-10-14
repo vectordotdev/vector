@@ -7,16 +7,14 @@ components: transforms: swimlanes: {
 
 	classes: {
 		commonly_used: false
+		development:   "beta"
+		egress_method: "stream"
 		function:      "route"
 	}
 
-	statuses: {
-		development: "beta"
-	}
+	features: {}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -28,6 +26,7 @@ components: transforms: swimlanes: {
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {
@@ -35,27 +34,32 @@ components: transforms: swimlanes: {
 			description: "A table of swimlane identifiers to logical conditions representing the filter of the swimlane. Each swimlane can then be referenced as an input by other components with the name `<transform_name>.<swimlane_id>`."
 			required:    true
 			warnings: []
-			type: object: components._conditions
+			type: object: configuration._conditions
 		}
 	}
 
-  examples: log: [
-    {
-      title: "Split by log level"
-      configuration: {
-        lanes: {
-          debug: "level.eq": "debug"
-          info: "level.eq": "info"
-          warn: "level.eq": "warn"
-          error: "level.eq": "error"
-        }
-      }
-      input: {
-        level: "info"
-      }
-      output: {
-        level: "info"
-      }
-    }
-  ]
+	input: {
+		logs:    true
+		metrics: false
+	}
+
+	examples: [
+		{
+			title: "Split by log level"
+			configuration: {
+				lanes: {
+					debug: "level.eq": "debug"
+					info: "level.eq":  "info"
+					warn: "level.eq":  "warn"
+					error: "level.eq": "error"
+				}
+			}
+			input: log: {
+				level: "info"
+			}
+			output: log: {
+				level: "info"
+			}
+		},
+	]
 }
