@@ -7,6 +7,8 @@ components: sinks: aws_cloudwatch_metrics: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "batch"
 		function:      "transmit"
 		service_providers: ["AWS"]
@@ -30,11 +32,6 @@ components: sinks: aws_cloudwatch_metrics: {
 		healthcheck: enabled: true
 		request: enabled:     false
 		tls: enabled:         false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
 	}
 
 	support: {
@@ -73,15 +70,6 @@ components: sinks: aws_cloudwatch_metrics: {
 	}
 
 	configuration: {
-		endpoint: {
-			common:      false
-			description: "Custom endpoint for use with AWS-compatible services. Providing a value for this option will make `region` moot."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["127.0.0.0:5000/path/to/service"]
-			}
-		}
 		namespace: {
 			description: "A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other."
 			required:    true

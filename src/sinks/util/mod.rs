@@ -13,7 +13,7 @@ pub mod tcp;
 #[cfg(test)]
 pub mod test;
 pub mod udp;
-#[cfg(all(feature = "sinks-socket", unix))]
+#[cfg(all(any(feature = "sinks-socket", feature = "sinks-statsd"), unix))]
 pub mod unix;
 pub mod uri;
 

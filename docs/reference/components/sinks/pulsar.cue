@@ -7,6 +7,8 @@ components: sinks: pulsar: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "stream"
 		function:      "transmit"
 		service_providers: []
@@ -23,11 +25,6 @@ components: sinks: pulsar: {
 		healthcheck: enabled: true
 		request: enabled:     false
 		tls: enabled:         false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
 	}
 
 	support: {

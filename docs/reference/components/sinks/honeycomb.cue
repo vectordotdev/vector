@@ -7,6 +7,8 @@ components: sinks: honeycomb: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "batch"
 		function:      "transmit"
 		service_providers: ["Honeycomb"]
@@ -34,11 +36,6 @@ components: sinks: honeycomb: {
 			timeout_secs:               60
 		}
 		tls: enabled: false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
 	}
 
 	support: {

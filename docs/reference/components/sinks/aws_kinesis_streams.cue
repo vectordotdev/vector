@@ -7,6 +7,8 @@ components: sinks: aws_kinesis_streams: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "stable"
 		egress_method: "batch"
 		function:      "transmit"
 		service_providers: ["AWS"]
@@ -44,11 +46,6 @@ components: sinks: aws_kinesis_streams: {
 		tls: enabled: false
 	}
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "stable"
-	}
-
 	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
@@ -65,15 +62,6 @@ components: sinks: aws_kinesis_streams: {
 	}
 
 	configuration: {
-		endpoint: {
-			common:      false
-			description: "Custom endpoint for use with AWS-compatible services. Providing a value for this option will make `region` moot."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["127.0.0.0:5000/path/to/service"]
-			}
-		}
 		partition_key_field: {
 			common:      true
 			description: "The log field used as the Kinesis record's partition key value."

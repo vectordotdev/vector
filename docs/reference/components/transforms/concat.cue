@@ -7,15 +7,12 @@ components: transforms: concat: {
 
 	classes: {
 		commonly_used: false
+		development:   "stable"
 		egress_method: "stream"
 		function:      "schema"
 	}
 
 	features: {}
-
-	statuses: {
-		development: "beta"
-	}
 
 	support: {
 		platforms: {

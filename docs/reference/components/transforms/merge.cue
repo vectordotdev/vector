@@ -7,15 +7,12 @@ components: transforms: merge: {
 
 	classes: {
 		commonly_used: false
+		development:   "beta"
 		egress_method: "stream"
 		function:      "aggregate"
 	}
 
 	features: {}
-
-	statuses: {
-		development: "beta"
-	}
 
 	support: {
 		platforms: {

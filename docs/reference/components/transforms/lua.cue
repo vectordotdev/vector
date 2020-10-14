@@ -6,18 +6,27 @@ components: transforms: lua: {
 	long_description:  "Accepts log and metric events and allows you to transform events with a full embedded [Lua][urls.lua] engine."
 
 	classes: {
-		commonly_used: true
+		commonly_used: false
+		development:   "beta"
 		egress_method: "stream"
 		function:      "program"
 	}
 
 	features: {}
 
-	statuses: {
-		development: "beta"
-	}
-
 	support: {
+		dependencies: {
+			lua: {
+				required: true
+				title:    "AWS IMDS v2"
+				type:     "internal"
+				url:      urls.lua
+				versions: "5.3"
+
+				interface: ffi: {}
+			}
+		}
+
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -29,11 +38,7 @@ components: transforms: lua: {
 
 		requirements: []
 		warnings: []
-		notices: [
-			#"""
-				Vector embeds Lua `5.3`.
-				"""#,
-		]
+		notices: []
 	}
 
 	configuration: {

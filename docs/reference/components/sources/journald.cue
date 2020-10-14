@@ -7,7 +7,9 @@ components: sources: journald: {
 
 	classes: {
 		commonly_used: true
+		delivery:      "at_least_once"
 		deployment_roles: ["daemon"]
+		development:   "beta"
 		egress_method: "batch"
 		function:      "collect"
 	}
@@ -18,12 +20,21 @@ components: sources: journald: {
 		tls: enabled:        false
 	}
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
-	}
-
 	support: {
+		dependencies: {
+			journald: {
+				required: true
+				title:    "JournalD"
+				type:     "external"
+				url:      urls.journald
+				versions: null
+
+				interface: binary: {
+					name: "journalctl"
+					permissions: unix: group: "systemd-journal"
+				}
+			}
+		}
 
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
@@ -34,15 +45,7 @@ components: sources: journald: {
 			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: [
-			#"""
-				The `journalctl` binary is required, this is the interface Vector uses to retrieve JournalD logs. See the ["Communication Strategy" section][docs.sources.journald#communication-strategy] for more info.
-				"""#,
-			#"""
-				The Vector user must be part of the `systemd-journal` group in order to execute the `journalctl` binary. See the ["User Permissions" section][docs.sources.journald#user-permissions] for more info.
-				"""#,
-		]
-
+		requirements: []
 		warnings: []
 		notices: []
 	}
@@ -142,19 +145,4 @@ components: sources: journald: {
 			}]
 		},
 	]
-
-	how_it_works: {
-		"communication-strategy": {
-			title: "Communication Strategy"
-			body: #"""
-				Vector's journald source uses the `journalctl` utility program to read data from the journald log files. This program reads the journald binary log files and outputs structured records that Vector reads and converts into events. Vector must have permissions to execute this program and read the files in the journald log spool directories.
-				"""#
-		}
-		"user-permissions": {
-			title: "User Permissions"
-			body: #"""
-				Journald stores the log spool in files that are only accessible to members of the `systemd-journal` group. In order for Vector to read these files, it must either be run with the `systemd-journal` group privileges or the permissions on the journal directory on files must be modified to allow Vector access.
-				"""#
-		}
-	}
 }

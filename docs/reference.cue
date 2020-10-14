@@ -5,6 +5,10 @@
 
 package metadata
 
+import (
+	"strings"
+)
+
 _values: {
 	current_timestamp: "2020-10-10T17:07:36.452332Z"
 	local_host:        "my-host.local"
@@ -24,11 +28,16 @@ _values: {
 	// less commonly used, components.
 	commonly_used: bool
 
+	if Args.kind == "source" || Args.kind == "sink" {
+		delivery: #DeliveryStatus
+	}
+
 	if Args.kind == "source" {
 		// `deployment_roles` clarify when the component should be used under
 		// different deployment contexts.
 		deployment_roles: [#DeploymentRole, ...]
 	}
+	development: #DevelopmentStatus
 
 	// `egress_method` documents how the component outputs events.
 	egress_method: #EgressMethod
@@ -58,6 +67,8 @@ _values: {
 	kind: #ComponentKind
 	let Kind = kind
 
+	configuration: #Schema
+
 	// `long_description` describes the components with a single paragraph.
 	// It is used for SEO purposes and should be full of relevant keywords.
 	long_description: string
@@ -75,37 +86,6 @@ _values: {
 
 	// `classes` represent the various classifications for this component
 	classes: #Classes & {_args: kind: Kind}
-
-	// `features` describes the various supported features of the component.
-	// Setting these helps to reduce boilerplate.
-	//
-	// For example, the `tls` feature will automatically add the appropriate
-	// `tls` options and `how_it_works` sections.
-	features: #Features & {_args: {egress_method: classes.egress_method, kind: Kind}}
-
-	// `statuses` communicates the various statuses of the component.
-	statuses: #Statuses & {_args: kind: Kind}
-
-	// `support` communicates the varying levels of support of the component.
-	support: #Support & {_args: kind: Kind}
-
-	configuration: #Schema
-
-	if Kind != "source" {
-		input: {
-			logs:    bool
-			metrics: false | #MetricInput
-		}
-	}
-
-	if Kind != "sink" {
-		// `output` documents output of the component. This is very important
-		// as it communicate which events and fields are emitted.
-		output: {
-			logs?:    #LogOutput
-			metrics?: #MetricOutput
-		}
-	}
 
 	// `examples` demonstrates various ways to use the component using an
 	// input, output, and example configuration.
@@ -144,11 +124,31 @@ _values: {
 		}),
 	]
 
+	// `features` describes the various supported features of the component.
+	// Setting these helps to reduce boilerplate.
+	//
+	// For example, the `tls` feature will automatically add the appropriate
+	// `tls` options and `how_it_works` sections.
+	features: #Features & {_args: {egress_method: classes.egress_method, kind: Kind}}
+
 	// `how_it_works` contain sections that further describe the component's
 	// behavior. This is like a mini-manual for the component and should help
 	// answer any obvious questions the user might have. Options can link
 	// to these sections for deeper explanations of behavior.
 	how_it_works: #HowItWorks
+
+	if Kind != "source" {
+		input: #Input
+	}
+
+	if Kind != "sink" {
+		// `output` documents output of the component. This is very important
+		// as it communicate which events and fields are emitted.
+		output: #Output
+	}
+
+	// `support` communicates the varying levels of support of the component.
+	support: #Support & {_args: kind: Kind}
 }
 
 // `#DeliveryStatus` documents the delivery guarantee.
@@ -158,6 +158,18 @@ _values: {
 // * `best_effort` - We will make a best effort to deliver the event,
 // but the event is not guaranteed to be delivered.
 #DeliveryStatus: "at_least_once" | "best_effort"
+
+#Dependencies: [Name=string]: close({
+	title:    string
+	required: bool
+	type:     "external" | "internal"
+	url:      string
+	versions: string | null
+
+	interface: #Interface
+
+	setup: [...string]
+})
 
 // `#DeploymentRoles` clarify when a component should be used under
 // certain deployment contexts.
@@ -204,6 +216,44 @@ _values: {
 // * `log` - log event
 // * `metric` - metric event
 #EventType: "log" | "metric"
+
+#Interface: {
+	close({binary: #InterfaceBinary}) |
+	close({ffi: close({})}) |
+	close({file_system: #InterfaceFileSystem}) |
+	close({socket: #InterfaceSocket}) |
+	close({stdin: close({})})
+}
+
+#InterfaceBinary: {
+	name:         string
+	permissions?: #Permissions
+}
+
+#InterfaceFileSystem: {
+	directory: string
+}
+
+#InterfaceSocket: {
+	api?: {
+		title: string
+		url:   string
+	}
+	direction: "incoming" | "outgoing"
+
+	if direction == "outgoing" {
+		network_hops?: uint8
+		permissions?:  #Permissions
+	}
+
+	if direction == "incoming" {
+		port: uint16
+	}
+
+	protocols: [#Protocol, ...]
+	socket?: string
+	ssl:     "disabled" | "required" | "optional"
+}
 
 #Features: {
 	_args: {
@@ -325,6 +375,11 @@ _values: {
 	}]
 })
 
+#Input: {
+	logs:    bool
+	metrics: false | #MetricInput
+}
+
 #LogEvent: {
 	host?:      string | null
 	message?:   string | null
@@ -393,19 +448,30 @@ _values: {
 #MetricOutput: [Name=string]: close({
 	description:    string
 	relevant_when?: string
-	tags:           #Tags
+	tags:           #MetricTags
 	name:           Name
 	type:           #MetricType
 })
 
-#MetricType: "counter" | "gauge" | "histogram" | "summary"
-
-#Tags: [Name=string]: close({
+#MetricTags: [Name=string]: close({
 	description: string
 	examples: [string, ...]
 	required: bool
 	name:     Name
 })
+
+#MetricType: "counter" | "gauge" | "histogram" | "summary"
+
+#Output: {
+	logs?:    #LogOutput
+	metrics?: #MetricOutput
+}
+
+#Permissions: {
+	unix: {
+		group: string
+	}
+}
 
 #Platforms: {
 	"aarch64-unknown-linux-gnu":  bool
@@ -416,7 +482,24 @@ _values: {
 	"x86_64-unknown-linux-musl":  bool
 }
 
+#Protocol: "http" | "tcp" | "udp" | "unix"
+
 #Schema: [Name=string]: {
+	// `category` allows you to group options into categories.
+	//
+	// For example, all of the `*_key` options might be grouped under the
+	// "Context" category to make generated configuration examples easier to
+	// read.
+	category?: string
+
+	if strings.HasSuffix(name, "_key") {
+		category: "Mapping"
+	}
+
+	if type.object != _|_ {
+		category: strings.ToTitle(name)
+	}
+
 	// `desription` describes the option in a succinct fashion. Usually 1 to
 	// 2 sentences.
 	description: string
@@ -465,19 +548,10 @@ _values: {
 	type: #Type & {_args: "required": required}
 }
 
-#Statuses: {
-	_args: kind: string
-	let Args = _args
-
-	if Args.kind == "source" || Args.kind == "sink" {
-		delivery: #DeliveryStatus
-	}
-
-	development: #DevelopmentStatus
-}
-
 #Support: {
 	_args: kind: string
+
+	dependencies: #Dependencies
 
 	// `platforms` describes which platforms this component is available on.
 	//

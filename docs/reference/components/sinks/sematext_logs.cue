@@ -7,6 +7,8 @@ components: sinks: sematext_logs: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "batch"
 		function:      "transmit"
 		service_providers: ["Sematext"]
@@ -36,11 +38,6 @@ components: sinks: sematext_logs: {
 		tls: enabled: false
 	}
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
-	}
-
 	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
@@ -56,38 +53,7 @@ components: sinks: sematext_logs: {
 		notices: []
 	}
 
-	configuration: {
-		endpoint: {
-			common:      false
-			description: "The endpoint that will be used to send logs to. This option is required if `region` is not set."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["http://127.0.0.1", "http://example.com"]
-			}
-		}
-		region: {
-			description:   "The region destination to send metrics to. This option is required if `endpoint` is not set."
-			required:      true
-			relevant_when: "`endpoint` is not set"
-			warnings: []
-			type: string: {
-				enum: {
-					us: "United States"
-					eu: "Europe"
-				}
-				examples: [ "us"]
-			}
-		}
-		token: {
-			description: "The token that will be used to write to Sematext."
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["${SEMATEXT_TOKEN}", "some-sematext-token"]
-			}
-		}
-	}
+	configuration: sinks._sematext.configuration
 
 	input: {
 		logs:    true

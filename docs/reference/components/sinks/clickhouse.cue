@@ -7,6 +7,8 @@ components: sinks: clickhouse: {
 
 	classes: {
 		commonly_used: true
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "batch"
 		function:      "transmit"
 		service_providers: ["Yandex"]
@@ -44,11 +46,6 @@ components: sinks: clickhouse: {
 			can_verify_hostname:    true
 			enabled_default:        false
 		}
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
 	}
 
 	support: {

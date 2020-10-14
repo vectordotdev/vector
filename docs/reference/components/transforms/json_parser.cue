@@ -6,16 +6,13 @@ components: transforms: json_parser: {
 	long_description:  "Accepts log events and allows you to parse a log field value as JSON."
 
 	classes: {
-		commonly_used: true
+		commonly_used: false
+		development:   "stable"
 		egress_method: "stream"
 		function:      "parse"
 	}
 
 	features: {}
-
-	statuses: {
-		development: "stable"
-	}
 
 	support: {
 		platforms: {

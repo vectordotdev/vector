@@ -1,13 +1,17 @@
 package metadata
 
 components: sources: socket: {
+	_port: 9000
+
 	title:             "Socket"
 	short_description: "Ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket and outputs log events."
 	long_description:  "Ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket and outputs log events."
 
 	classes: {
 		commonly_used: true
+		delivery:      "best_effort"
 		deployment_roles: ["aggregator", "sidecar"]
+		development:   "stable"
 		egress_method: "stream"
 		function:      "receive"
 	}
@@ -23,12 +27,24 @@ components: sources: socket: {
 		}
 	}
 
-	statuses: {
-		delivery:    "best_effort"
-		development: "stable"
-	}
-
 	support: {
+		dependencies: {
+			socket_client: {
+				required: true
+				title:    "Socket Client"
+				type:     "external"
+				url:      urls.prometheus_client
+				versions: null
+
+				interface: socket: {
+					direction: "incoming"
+					port:      _port
+					protocols: ["tcp", "unix", "udp"]
+					ssl: "optional"
+				}
+			}
+		}
+
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -39,12 +55,7 @@ components: sources: socket: {
 		}
 
 		requirements: []
-		warnings: [
-			"""
-				This component exposes a configured port. You must ensure your
-				network allows access to this port.
-				""",
-		]
+		warnings: []
 		notices: []
 	}
 
@@ -55,7 +66,7 @@ components: sources: socket: {
 			required: true
 			warnings: []
 			type: string: {
-				examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
+				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
 			}
 		}
 		host_key: {

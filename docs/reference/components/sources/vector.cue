@@ -1,13 +1,17 @@
 package metadata
 
 components: sources: vector: {
+	_port: 9000
+
 	title:             "Vector"
 	short_description: "Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs log and metric events."
 	long_description:  "Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs log and metric events."
 
 	classes: {
 		commonly_used: false
+		delivery:      "best_effort"
 		deployment_roles: ["aggregator"]
+		development:   "beta"
 		egress_method: "stream"
 		function:      "receive"
 	}
@@ -23,12 +27,23 @@ components: sources: vector: {
 		}
 	}
 
-	statuses: {
-		delivery:    "best_effort"
-		development: "beta"
-	}
-
 	support: {
+		dependencies: {
+			vector_client: {
+				required: true
+				title:    "Vector Client"
+				type:     "external"
+				url:      urls.vector_sink
+				versions: null
+
+				interface: socket: {
+					port: _port
+					protocols: ["tcp"]
+					ssl: "optional"
+				}
+			}
+		}
+
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -38,13 +53,8 @@ components: sources: vector: {
 			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: [
-		]
-		warnings: [
-			"""
-				This component exposes a configured port. You must ensure your network allows access to this port.
-				""",
-		]
+		requirements: []
+		warnings: []
 		notices: []
 	}
 
@@ -54,7 +64,7 @@ components: sources: vector: {
 			required:    true
 			warnings: []
 			type: string: {
-				examples: ["0.0.0.0:9000", "systemd", "systemd#1"]
+				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#1"]
 			}
 		}
 		shutdown_timeout_secs: {

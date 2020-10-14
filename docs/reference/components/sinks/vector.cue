@@ -7,6 +7,8 @@ components: sinks: vector: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "best_effort"
+		development:   "beta"
 		egress_method: "stream"
 		function:      "transmit"
 		service_providers: []
@@ -25,11 +27,6 @@ components: sinks: vector: {
 			can_verify_hostname:    true
 			enabled_default:        false
 		}
-	}
-
-	statuses: {
-		delivery:    "best_effort"
-		development: "beta"
 	}
 
 	support: {

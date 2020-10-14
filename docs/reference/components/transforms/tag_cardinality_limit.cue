@@ -6,16 +6,13 @@ components: transforms: tag_cardinality_limit: {
 	long_description:  "Accepts metric events and allows you to limit the cardinality of metric tags to prevent downstream disruption of metrics services."
 
 	classes: {
-		commonly_used: true
+		commonly_used: false
+		development:   "beta"
 		egress_method: "stream"
 		function:      "filter"
 	}
 
 	features: {}
-
-	statuses: {
-		development: "beta"
-	}
 
 	support: {
 		platforms: {

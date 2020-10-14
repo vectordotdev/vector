@@ -1,13 +1,17 @@
 package metadata
 
 components: sources: file: {
+	_directory: "/var/log"
+
 	title:             "File"
 	long_description:  ""
 	short_description: "Collect logs by tailing one more files."
 
 	classes: {
 		commonly_used: true
+		delivery:      "best_effort"
 		deployment_roles: ["daemon", "sidecar"]
+		development:   "stable"
 		egress_method: "stream"
 		function:      "collect"
 	}
@@ -18,12 +22,40 @@ components: sources: file: {
 		tls: enabled:        false
 	}
 
-	statuses: {
-		delivery:    "best_effort"
-		development: "beta"
-	}
-
 	support: {
+		dependencies: {
+			file_system: {
+				required: true
+				title:    "File System"
+				type:     "external"
+				url:      urls.file_system
+				versions: null
+
+				interface: file_system: {
+					directory: _directory
+				}
+
+				setup: [
+					#"""
+						Ensure that [Docker is setup][urls.docker_setup] and running.
+						"""#,
+					#"""
+						Ensure that the Docker Engine is properly exposing logs:
+
+						```bash
+						docker logs $(docker ps | awk '{ print $1 }')
+						```
+
+						If you receive an error it's likely that you do not have
+						the proper Docker logging drivers installed. The Docker
+						Engine requires either the [`json-file`][urls.docker_logging_driver_json_file] (default)
+						or [`journald`](docker_logging_driver_journald) Docker
+						logging driver to be installed.
+						"""#,
+				]
+			}
+		}
+
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -45,7 +77,7 @@ components: sources: file: {
 			required:    false
 			type: array: {
 				default: null
-				items: type: string: examples: ["/var/log/nginx/*.[0-9]*.log"]
+				items: type: string: examples: ["\(_directory)/apache/*.[0-9]*.log"]
 			}
 		}
 		file_key: {
@@ -113,7 +145,7 @@ components: sources: file: {
 			type: string: default: "host"
 		}
 		ignore_older: {
-			common:      false
+			common:      true
 			description: "Ignore files with a data modification date that does not exceed this age."
 			required:    false
 			type: uint: {
@@ -125,7 +157,7 @@ components: sources: file: {
 		include: {
 			description: "Array of file patterns to include. [Globbing](#globbing) is supported."
 			required:    true
-			type: array: items: type: string: examples: ["/var/log/nginx/*.log"]
+			type: array: items: type: string: examples: ["\(_directory)/apache/*.log"]
 		}
 		max_line_bytes: {
 			common:      false
@@ -137,6 +169,7 @@ components: sources: file: {
 			}
 		}
 		max_read_bytes: {
+			category:    "Reading"
 			common:      false
 			description: "An approximate limit on the amount of data read from a single file at a given time."
 			required:    false
@@ -147,6 +180,7 @@ components: sources: file: {
 			}
 		}
 		oldest_first: {
+			category:    "Reading"
 			common:      false
 			description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files."
 			required:    false
@@ -156,6 +190,7 @@ components: sources: file: {
 			common:      false
 			description: "Timeout from reaching `eof` after which file will be removed from filesystem, unless new data is written in the meantime. If not specified, files will not be removed."
 			required:    false
+			warnings: ["Vector's process must have permission to delete files."]
 			type: uint: {
 				default: null
 				examples: [0, 5, 60]
@@ -176,7 +211,7 @@ components: sources: file: {
 			file: {
 				description: "The absolute path of originating file."
 				required:    true
-				type: string: examples: ["/var/log/apache/access.log"]
+				type: string: examples: ["\(_directory)/apache/access.log"]
 			}
 			host: fields._local_host
 			message: {
@@ -190,11 +225,11 @@ components: sources: file: {
 
 	examples: [
 		{
-			_file: "/var/log/apache/access.log"
+			_file: "\(_directory)/apache/access.log"
 			_line: "53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"
 			title: "Apache Access Log"
 			configuration: {
-				include: ["/var/logs/**/*.log"]
+				include: ["\(_directory)/**/*.log"]
 			}
 			input: """
 				```text filename="\(_file)"
