@@ -1,10 +1,11 @@
 use crate::config;
-use human_format;
 use prettytable::{format, Table};
 use structopt::StructOpt;
 use url::Url;
-use vector_api_client::gql::TopologyQueryExt;
-use vector_api_client::{connect_subscription_client, gql::HealthQueryExt, Client};
+use vector_api_client::{
+    gql::{HealthQueryExt, TopologyQueryExt},
+    Client,
+};
 
 trait StatsWriter {
     fn kb(&mut self, n: f64) -> String;
