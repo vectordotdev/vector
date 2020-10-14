@@ -1,41 +1,123 @@
 # https://help.github.com/articles/about-codeowners/
 
-/distribution/ @a-rodin
+/PRIVACY.md @binarylogic @jamtur01
+/LICENSE @binarylogic @jamtur01
+/CONTRIBUTING.md @binarylogic @jamtur01
+/CODE_OF_CONDUCT.md @binarylogic @jamtur01
+/NOTICE @binarylogic @jamtur01
+/SECURITY.md @binarylogic @jamtur01
+
+/skaffold/ @MOZGIII
+/skaffold.yaml @MOZGIII
+/kustomization.yaml @MOZGIII
+
+/docs/reference/components/sinks/*_metrics.cue @lukesteensen
+/docs/reference/components/sinks/aws_kinesis_streams.cue @jszwedko
+/docs/reference/components/sinks/aws_s3.cue @jszwedko
+/docs/reference/components/sinks/console.cue @lukesteensen
+/docs/reference/components/sinks/gcp @bruceg
+/docs/reference/components/sinks/http.cue @jszwedko
+/docs/reference/components/sinks/humio_logs.cue @jszwedko
+/docs/reference/components/sinks/splunk_hec.cue @ktff
+/docs/reference/components/sinks/kafka.cue @lukesteensen
+/docs/reference/components/sinks/prometheus.cue @lukesteensen
+/docs/reference/components/sinks/splunk_hec.cue @lukesteensen
+/docs/reference/components/sinks/statsd.cue @lukesteensen
+/docs/reference/components/sinks/tcp.cue @bruceg @lukesteensen
+
+/docs/reference/components/sources/apache_metrics/ @jszwedko
+/docs/reference/components/sources/docker.cue @fanatid
+/docs/reference/components/sources/generator.cue @bruceg
+/docs/reference/components/sources/host_metrics.cue @bruceg
+/docs/reference/components/sources/journald.cue @bruceg
+/docs/reference/components/sources/stdin.cue @bruceg
+/docs/reference/components/sources/syslog.cue @lukesteensen
+/docs/reference/components/sources/tcp.cue @bruceg
+/docs/reference/components/sources/udp.cue @bruceg
+/docs/reference/components/sources/vector.cue @lukesteensen
+/docs/reference/components/sources/kubernetes_* @MOZGIII @JeanMertz
+/docs/reference/components/sources/splunk_hec.cue @ktff
+
+/docs/reference/components/transforms/add_tags.cue @lukesteensen
+/docs/reference/components/transforms/ansi_stripper.cue @JeanMertz
+/docs/reference/components/transforms/coercer.cue @bruceg
+/docs/reference/components/transforms/filter.cue @bruceg
+/docs/reference/components/transforms/field_filter.cue @lukesteensen
+/docs/reference/components/transforms/geoip.cue @lukesteensen
+/docs/reference/components/transforms/grok_parser.cue @lukesteensen
+/docs/reference/components/transforms/log_to_metric.cue @lukesteensen
+/docs/reference/components/transforms/merge.cue @MOZGIII
+/docs/reference/components/transforms/regex_parser.cue @lukesteensen
+/docs/reference/components/transforms/remap.cue @JeanMertz @FungusHumungus
+/docs/reference/components/transforms/remove_tags.cue @lukesteensen
+/docs/reference/components/transforms/sampler.cue @lukesteensen
+/docs/reference/components/transforms/split.cue @lukesteensen
+/docs/reference/components/transforms/tokenzier.cue @lukesteensen
+
+/distribution/ @hoverbear @jamtur01
+/distribution/docker/ @MOZGIII
+/distribution/helm/ @MOZGIII
+/distribution/kubernetes/ @MOZGIII
+
+/lib/file-source/src/paths_provider/mod.rs @MOZGIII
+/lib/file-source/src/paths_provider/glob.rs @MOZGIII
+/lib/k8s-test-framework/ @MOZGIII @JeanMertz
+/lib/k8s-e2e-tests/ @MOZGIII @JeanMertz
+/lib/prometheus-parser/ @juchiast
+/lib/vector-wasm/ @hoverbear @JeanMertz
 
 /proto/ @lukesteensen
 
-/scripts/build-* @a-rodin
-/scripts/ci-docker-images/ @a-rodin
-/scripts/check-* @a-rodin
-/scripts/docker-* @a-rodin
-/scripts/generate* @binarylogic
-/scripts/package-* @a-rodin
-/scripts/release-* @a-rodin
-/scripts/upgrade-* @a-rodin
+/scripts/build-* @hoverbear
+/scripts/ci-docker-images/ @hoverbear @jamtur01
+/scripts/check-docs.sh @binarylogic @jamtur01
+/scripts/check-* @jamtur01
+/scripts/docker-* @jamtur01
+/scripts/environment/* @hoverbear @jamtur01
+/scripts/load-meta.rb @binarylogic @jamtur01
+/scripts/package-* @jamtur01
+/scripts/release-* @hoverbear
+/scripts/upgrade-* @hoverbear
+/scripts/*docker* @MOZGIII
 /scripts/ci-setup-minikube.sh @MOZGIII
+/scripts/environment/setup-helm.sh @MOZGIII
+/scripts/release-helm.sh @MOZGIII
+/scripts/deploy-kubernetes-test.sh @MOZGIII @JeanMertz
+/scripts/test-e2e-kubernetes.sh @MOZGIII @JeanMertz
+/scripts/kubernetes-yaml.sh @MOZGIII
+/scripts/kubernetes-yaml/ @MOZGIII
 
-/src/buffers/ @a-rodin
-
-/src/generate.rs @Jeffail
-/src/list.rs @Jeffail
 /src/metrics.rs @lukesteensen
 /src/main.rs @lukesteensen
-/src/region.rs @LucioFranco
-/src/runtime.rs @LucioFranco
+/src/region.rs @bruceg
 /src/template.rs @lukesteensen
-/src/tls.rs @bruceg
-/src/trace.rs @LucioFranco
+/src/tls @bruceg
 /src/types.rs @bruceg
+/src/line_agg.rs @MOZGIII
+/src/signal.rs @ktff
+/src/validate.rs @ktff
+/src/heartbeat.rs @ktff
+
+/src/buffers/ @lukesteensen
+
+/src/event/merge.rs @MOZGIII
+/src/event/merge_state.rs @MOZGIII
+/src/event/discriminant.rs @MOZGIII
+
+/src/internal_events/ @JeanMertz
+
+/src/kubernetes/ @MOZGIII @JeanMertz
+
+/src/mapping/ @JeanMertz @FungusHumungus
 
 /src/sinks/*_metrics.rs @lukesteensen
-/src/sinks/aws_kinesis_streams.rs @LucioFranco
-/src/sinks/aws_s3.rs @LucioFranco
-/src/sinks/blackhole.rs @LucioFranco
-/src/sinks/clickhouse.rs @a-rodin
+/src/sinks/aws_kinesis_streams.rs @jszwedko
+/src/sinks/aws_s3.rs @jszwedko
 /src/sinks/console.rs @lukesteensen
-/src/sinks/elasticsearch.rs @LucioFranco
 /src/sinks/gcp @bruceg
-/src/sinks/http.rs @LucioFranco
+/src/sinks/http.rs @jszwedko
+/src/sinks/humio_logs.rs @jszwedko
+/src/sinks/splunk_hec.rs @ktff
 /src/sinks/kafka.rs @lukesteensen
 /src/sinks/prometheus.rs @lukesteensen
 /src/sinks/splunk_hec.rs @lukesteensen
@@ -44,44 +126,50 @@
 /src/sinks/tcp.rs @lukesteensen
 /src/sinks/util/auto_concurrency @bruceg
 
-/src/sources/docker.rs @LucioFranco
-/src/sources/file/mod.rs @LucioFranco
-/src/sources/file/line_agg.rs @MOZGIII
+/src/sources/apache_metrics/ @jszwedko
+/src/sources/aws_kinesis_firehose/ @jszwedko
+/src/sources/docker.rs @fanatid
 /src/sources/generator.rs @bruceg
+/src/sources/host_metrics.rs @bruceg
 /src/sources/journald.rs @bruceg
-/src/sources/kafka.rs @a-rodin
 /src/sources/stdin.rs @bruceg
 /src/sources/syslog.rs @lukesteensen
 /src/sources/tcp.rs @bruceg
 /src/sources/udp.rs @bruceg
 /src/sources/vector.rs @lukesteensen
+/src/sources/util/multiline_config.rs @MOZGIII @JeanMertz
+/src/sources/kubernetes_logs/ @MOZGIII @JeanMertz
+/src/sources/splunk_hec.rs @ktff
 
 /src/topology/ @lukesteensen
 
-/src/transforms/add_fields.rs @LucioFranco
 /src/transforms/add_tags.rs @lukesteensen
-/src/transforms/ansi_stripper.rs @lukesteensen
+/src/transforms/ansi_stripper.rs @JeanMertz
+/src/transforms/aws_cloudwatch_logs_subscription_parser.rs @jszwedko
 /src/transforms/coercer.rs @bruceg
 /src/transforms/filter.rs @bruceg
 /src/transforms/field_filter.rs @lukesteensen
 /src/transforms/geoip.rs @lukesteensen
 /src/transforms/grok_parser.rs @lukesteensen
-/src/transforms/json_parser.rs @LucioFranco
 /src/transforms/log_to_metric.rs @lukesteensen
-/src/transforms/lua/ @a-rodin
 /src/transforms/merge.rs @MOZGIII
 /src/transforms/regex_parser.rs @lukesteensen
-/src/transforms/remove_fields.rs @LucioFranco
+/src/transforms/remap.rs @JeanMertz @FungusHumungus
 /src/transforms/remove_tags.rs @lukesteensen
 /src/transforms/sampler.rs @lukesteensen
 /src/transforms/split.rs @lukesteensen
 /src/transforms/tokenzier.rs @lukesteensen
 
-/src/event/merge.rs @MOZGIII
-
-/lib/file-source/src/paths_provider/mod.rs @MOZGIII
-/lib/file-source/src/paths_provider/glob.rs @MOZGIII
+/src/wasm/ @hoverbear @JeanMertz
 
 /tests/buffering.rs @MOZGIII
+/tests/data/wasm/ @hoverbear @JeanMertz
+/tests/shutdown.rs @ktff
+/tests/cli.rs @ktff
 
+/.github/semantic* @binarylogic @jamtur01
+/.github/SUPPORT.md @binarylogic @jamtur01
+/.github/PULL_REQUEST_TEMPLATE.md @binarylogic @jamtur01
+/.github/ISSUE_TEMPLATE/ @binarylogic @jamtur01
 /.github/workflows/e2e.yml @MOZGIII
+/.github/workflows/ @jamtur01

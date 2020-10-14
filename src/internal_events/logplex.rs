@@ -11,7 +11,7 @@ pub struct HerokuLogplexRequestReceived<'a> {
 impl<'a> InternalEvent for HerokuLogplexRequestReceived<'a> {
     fn emit_logs(&self) {
         info!(
-            message = "handling logplex request.",
+            message = "Handling logplex request.",
             msg_count = %self.msg_count,
             frame_id = %self.frame_id,
             drain_token = %self.drain_token,
@@ -20,10 +20,7 @@ impl<'a> InternalEvent for HerokuLogplexRequestReceived<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("requests_received", 1,
-            "component_kind" => "source",
-            "component_type" => "logplex",
-        );
+        counter!("requests_received", 1);
     }
 }
 
@@ -35,17 +32,13 @@ pub struct HerokuLogplexRequestReadError {
 impl InternalEvent for HerokuLogplexRequestReadError {
     fn emit_logs(&self) {
         error!(
-            message = "error reading request body.",
+            message = "Error reading request body.",
             error = ?self.error,
             rate_limit_secs = 10
         );
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "request_read_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "logplex",
-        );
+        counter!("request_read_errors", 1);
     }
 }

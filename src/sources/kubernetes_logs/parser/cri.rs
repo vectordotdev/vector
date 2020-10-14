@@ -5,13 +5,9 @@ use crate::{
         Transform,
     },
 };
-use lazy_static::lazy_static;
 use snafu::{OptionExt, Snafu};
-use string_cache::DefaultAtom as Atom;
 
-lazy_static! {
-    pub static ref MULTILINE_TAG: Atom = Atom::from("multiline_tag");
-}
+pub const MULTILINE_TAG: &str = "multiline_tag";
 
 /// Parser for the CRI log format.
 ///
@@ -24,7 +20,7 @@ lazy_static! {
 ///
 /// [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
 pub struct Cri {
-    // TODO: patch `RegexParser` to expose the concerete type on build.
+    // TODO: patch `RegexParser` to expose the concrete type on build.
     regex_parser: Box<dyn Transform>,
 }
 
@@ -38,7 +34,7 @@ impl Cri {
             rp_config.patterns = vec![pattern.to_owned()];
 
             rp_config.types.insert(
-                event::log_schema().timestamp_key().clone(),
+                crate::config::log_schema().timestamp_key().to_string(),
                 "timestamp|%+".to_owned(),
             );
 
@@ -60,7 +56,7 @@ impl Transform for Cri {
 fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     // Detect if this is a partial event.
     let multiline_tag = log
-        .remove(&MULTILINE_TAG)
+        .remove(MULTILINE_TAG)
         .context(MultilineTagFieldMissing)?;
     let multiline_tag = match multiline_tag {
         Value::Bytes(val) => val,
@@ -71,7 +67,7 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
 
     // For partial messages add a partial event indicator.
     if is_partial {
-        log.insert(event::PARTIAL_STR, true);
+        log.insert(event::PARTIAL, true);
     }
 
     Ok(())

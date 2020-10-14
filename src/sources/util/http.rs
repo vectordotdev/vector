@@ -5,17 +5,14 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
-use bytes05::Bytes;
-use futures::{
-    compat::{AsyncRead01CompatExt, Future01CompatExt, Stream01CompatExt},
-    FutureExt, TryFutureExt, TryStreamExt,
-};
+use async_trait::async_trait;
+use bytes::Bytes;
+use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::Sink;
 use serde::Serialize;
 use std::error::Error;
 use std::fmt;
 use std::net::SocketAddr;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
 use warp::{
     filters::BoxedFilter,
     http::{HeaderMap, StatusCode},
@@ -52,12 +49,9 @@ impl fmt::Debug for RejectShuttingDown {
 }
 impl warp::reject::Reject for RejectShuttingDown {}
 
+#[async_trait]
 pub trait HttpSource: Clone + Send + Sync + 'static {
-    fn build_event(
-        &self,
-        body: bytes05::Bytes,
-        header_map: HeaderMap,
-    ) -> Result<Vec<Event>, ErrorMessage>;
+    fn build_event(&self, body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage>;
 
     fn run(
         self,
@@ -78,7 +72,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             .and(warp::header::headers_cloned())
             .and(warp::body::bytes())
             .and_then(move |headers: HeaderMap, body: Bytes| {
-                info!("Handling http request: {:?}", headers);
+                info!("Handling HTTP request: {:?}", headers);
 
                 let this = self.clone();
                 let out = out.clone();
@@ -94,7 +88,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             out.send_all(futures01::stream::iter_ok(events))
                                 .compat()
                                 .map_err(move |e: futures01::sync::mpsc::SendError<Event>| {
-                                    // can only fail if receiving end disconnected, so we are shuting down,
+                                    // can only fail if receiving end disconnected, so we are shutting down,
                                     // probably not gracefully.
                                     error!("Failed to forward events, downstream is closed");
                                     error!("Tried to send the following event: {:?}", e);
@@ -128,15 +122,14 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             }
         });
 
-        info!(message = "building http server", addr = %address);
+        info!(message = "Building HTTP server", addr = %address);
 
-        let tls = MaybeTlsSettings::from_config(tls, true).unwrap();
-        let incoming = tls.bind(&address).unwrap().incoming();
-
+        let tls = MaybeTlsSettings::from_config(tls, true)?;
         let fut = async move {
+            let listener = tls.bind(&address).await.unwrap();
             let _ = warp::serve(routes)
                 .serve_incoming_with_graceful_shutdown(
-                    incoming.compat().map_ok(|s| s.compat().compat()),
+                    listener.accept_stream(),
                     shutdown.clone().compat().map(|_| ()),
                 )
                 .await;

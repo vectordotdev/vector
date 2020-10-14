@@ -4,6 +4,7 @@ use crate::{
     config::CONFIG_PATHS,
     config::{DataType, TransformContext},
     event::Event,
+    internal_events::{LuaBuildError, LuaEventProcessed, LuaGcTriggered},
     transforms::{
         util::runtime_transform::{RuntimeTransform, Timer},
         Transform,
@@ -14,7 +15,7 @@ use snafu::{ResultExt, Snafu};
 use std::path::PathBuf;
 
 #[derive(Debug, Snafu)]
-enum BuildError {
+pub enum BuildError {
     #[snafu(display("Invalid \"search_dirs\": {}", source))]
     InvalidSearchDirs { source: rlua::Error },
     #[snafu(display("Cannot evaluate Lua code in \"source\": {}", source))]
@@ -54,7 +55,7 @@ pub struct LuaConfig {
 }
 
 fn default_config_paths() -> Vec<PathBuf> {
-    match CONFIG_PATHS.get() {
+    match CONFIG_PATHS.lock().ok() {
         Some(config_paths) => config_paths
             .clone()
             .into_iter()
@@ -216,6 +217,9 @@ impl Lua {
     fn attempt_gc(&mut self) {
         self.invocations_after_gc += 1;
         if self.invocations_after_gc % GC_INTERVAL == 0 {
+            emit!(LuaGcTriggered {
+                used_memory: self.lua.used_memory()
+            });
             let _ = self
                 .lua
                 .gc_collect()
@@ -245,6 +249,7 @@ impl RuntimeTransform for Lua {
     where
         F: FnMut(Event),
     {
+        emit!(LuaEventProcessed);
         let _ = self
             .lua
             .context(|ctx: rlua::Context<'_>| {
@@ -255,7 +260,7 @@ impl RuntimeTransform for Lua {
                 })
             })
             .context(RuntimeErrorHooksProcess)
-            .map_err(|e| error!(error = %e, rate_limit = 30));
+            .map_err(|e| emit!(LuaBuildError { error: e }));
 
         self.attempt_gc();
     }
@@ -344,9 +349,10 @@ mod tests {
             metric::{Metric, MetricKind, MetricValue},
             Event, Value,
         },
-        test_util::runtime,
+        test_util::trace_init,
         transforms::Transform,
     };
+    use futures::compat::Future01CompatExt;
     use futures01::{stream, Stream};
 
     fn from_config(config: &str) -> crate::Result<Lua> {
@@ -355,7 +361,8 @@ mod tests {
 
     #[test]
     fn lua_add_field() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -371,12 +378,13 @@ mod tests {
 
         let event = transform.transform(event).unwrap();
 
-        assert_eq!(event.as_log()[&"hello".into()], "goodbye".into());
+        assert_eq!(event.as_log()["hello"], "goodbye".into());
     }
 
     #[test]
     fn lua_read_field() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -393,12 +401,13 @@ mod tests {
 
         let event = transform.transform(event).unwrap();
 
-        assert_eq!(event.as_log()[&"name".into()], "Bob".into());
+        assert_eq!(event.as_log()["name"], "Bob".into());
     }
 
     #[test]
     fn lua_remove_field() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -414,12 +423,13 @@ mod tests {
         event.as_mut_log().insert("name", "Bob");
         let event = transform.transform(event).unwrap();
 
-        assert!(event.as_log().get(&"name".into()).is_none());
+        assert!(event.as_log().get("name").is_none());
     }
 
     #[test]
     fn lua_drop_event() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -439,7 +449,8 @@ mod tests {
 
     #[test]
     fn lua_duplicate_event() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -461,7 +472,8 @@ mod tests {
 
     #[test]
     fn lua_read_empty_field() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -480,12 +492,13 @@ mod tests {
         let event = Event::new_empty_log();
         let event = transform.transform(event).unwrap();
 
-        assert_eq!(event.as_log()[&"result".into()], "empty".into());
+        assert_eq!(event.as_log()["result"], "empty".into());
     }
 
     #[test]
     fn lua_integer_value() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -498,12 +511,13 @@ mod tests {
         .unwrap();
 
         let event = transform.transform(Event::new_empty_log()).unwrap();
-        assert_eq!(event.as_log()[&"number".into()], Value::Integer(3));
+        assert_eq!(event.as_log()["number"], Value::Integer(3));
     }
 
     #[test]
     fn lua_numeric_value() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -516,12 +530,13 @@ mod tests {
         .unwrap();
 
         let event = transform.transform(Event::new_empty_log()).unwrap();
-        assert_eq!(event.as_log()[&"number".into()], Value::Float(3.14159));
+        assert_eq!(event.as_log()["number"], Value::Float(3.14159));
     }
 
     #[test]
     fn lua_boolean_value() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -534,12 +549,13 @@ mod tests {
         .unwrap();
 
         let event = transform.transform(Event::new_empty_log()).unwrap();
-        assert_eq!(event.as_log()[&"bool".into()], Value::Boolean(true));
+        assert_eq!(event.as_log()["bool"], Value::Boolean(true));
     }
 
     #[test]
     fn lua_non_coercible_value() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -552,12 +568,13 @@ mod tests {
         .unwrap();
 
         let event = transform.transform(Event::new_empty_log()).unwrap();
-        assert_eq!(event.as_log().get(&"junk".into()), None);
+        assert_eq!(event.as_log().get("junk"), None);
     }
 
     #[test]
     fn lua_non_string_key_write() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -578,7 +595,8 @@ mod tests {
 
     #[test]
     fn lua_non_string_key_read() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -591,12 +609,13 @@ mod tests {
         .unwrap();
 
         let event = transform.transform(Event::new_empty_log()).unwrap();
-        assert_eq!(event.as_log().get(&"result".into()), None);
+        assert_eq!(event.as_log().get("result"), None);
     }
 
     #[test]
     fn lua_script_error() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -616,7 +635,8 @@ mod tests {
 
     #[test]
     fn lua_syntax_error() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let err = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -636,7 +656,7 @@ mod tests {
     fn lua_load_file() {
         use std::fs::File;
         use std::io::Write;
-        crate::test_util::trace_init();
+        trace_init();
 
         let dir = tempfile::tempdir().unwrap();
         let mut file = File::create(dir.path().join("script2.lua")).unwrap();
@@ -672,12 +692,13 @@ mod tests {
         let event = Event::new_empty_log();
         let event = transform.transform(event).unwrap();
 
-        assert_eq!(event.as_log()[&"new field".into()], "new value".into());
+        assert_eq!(event.as_log()["new field"], "new value".into());
     }
 
     #[test]
     fn lua_pairs() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -697,13 +718,14 @@ mod tests {
 
         let event = transform.transform(event).unwrap();
 
-        assert_eq!(event.as_log()[&"name".into()], "nameBob".into());
-        assert_eq!(event.as_log()[&"friend".into()], "friendAlice".into());
+        assert_eq!(event.as_log()["name"], "nameBob".into());
+        assert_eq!(event.as_log()["friend"], "friendAlice".into());
     }
 
     #[test]
     fn lua_metric() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let mut transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -736,9 +758,10 @@ mod tests {
         assert_eq!(event, expected);
     }
 
-    #[test]
-    fn lua_multiple_events() {
-        crate::test_util::trace_init();
+    #[tokio::test]
+    async fn lua_multiple_events() {
+        trace_init();
+
         let transform = from_config(
             r#"
             hooks.process = """function (event, emit)
@@ -757,9 +780,7 @@ mod tests {
         let stream =
             Transform::transform_stream(Box::new(transform), Box::new(stream::iter_ok(events)));
 
-        let mut rt = runtime();
-
-        let results = rt.block_on(stream.collect()).unwrap();
+        let results = stream.collect().compat().await.unwrap();
 
         assert_eq!(results.len(), n);
     }

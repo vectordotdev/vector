@@ -1,30 +1,20 @@
 use crate::{
     config::{self, Config, ConfigDiff},
-    event,
     topology::{self, builder::Pieces},
 };
 use colored::*;
 use exitcode::ExitCode;
-use std::{fmt, fs::File, path::PathBuf};
+use std::{fmt, fs::remove_dir_all, path::PathBuf};
 use structopt::StructOpt;
+
+const TEMPORARY_DIRECTORY: &str = "validate_tmp";
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Opts {
-    /// Disables topology check
-    #[structopt(long)]
-    no_topology: bool,
-
     /// Disables environment checks. That includes component checks and health checks.
     #[structopt(long)]
     no_environment: bool,
-
-    /// Shorthand for `--no-topology` and `--no-environment` flags. Just `-n` won't disable anything,
-    /// it needs to be used with `t` for `--no-topology`, and or `e` for `--no-environment` in any order.
-    /// Example:
-    /// `-nte` and `-net` both mean `--no-topology` and `--no-environment`
-    #[structopt(short, parse(from_str = NoCheck::from_str), possible_values = &["","t", "e","et","te"], default_value="")]
-    no: NoCheck,
 
     /// Fail validation on warnings
     #[structopt(short, long)]
@@ -35,42 +25,24 @@ pub struct Opts {
     paths: Vec<PathBuf>,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct NoCheck {
-    topology: bool,
-    environment: bool,
-}
-
-impl NoCheck {
-    fn from_str(s: &str) -> Self {
-        Self {
-            topology: s.find('t').is_some(),
-            environment: s.find('e').is_some(),
-        }
-    }
-}
-
 /// Performs topology, component, and health checks.
 pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
     let mut fmt = Formatter::new(color);
 
     let mut validated = true;
 
-    let config = match validate_config(opts, &mut fmt) {
-        Ok(config) => config,
-        Err(Some(config)) => {
-            validated &= false;
-            config
-        }
-        Err(None) => return exitcode::CONFIG,
+    let mut config = match validate_config(opts, &mut fmt) {
+        Some(config) => config,
+        None => return exitcode::CONFIG,
     };
 
-    if !(opts.no_topology || opts.no.topology) {
-        validated &= validate_topology(opts, &config, &mut fmt);
-    }
-
-    if !(opts.no_environment || opts.no.environment) {
-        validated &= validate_environment(&config, &mut fmt).await;
+    if !opts.no_environment {
+        if let Some(tmp_directory) = create_tmp_directory(&mut config, &mut fmt) {
+            validated &= validate_environment(&config, &mut fmt).await;
+            remove_tmp_directory(tmp_directory);
+        } else {
+            validated = false;
+        }
     }
 
     if validated {
@@ -81,102 +53,26 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
     }
 }
 
-/// Ok if all configs were succesfully validated.
-/// Err Some contains only succesfully validated configs.
-fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Result<Config, Option<Config>> {
+/// Ok if all configs were successfully validated.
+/// Err Some contains only successfully validated configs.
+fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     // Prepare paths
     let paths = if let Some(paths) = config::process_paths(&opts.paths) {
         paths
     } else {
         fmt.error("No config file paths");
-        return Err(None);
+        return None;
     };
 
-    // Validate configuration files
-    let to_valdiate = paths.len();
-    let mut validated = 0;
-    let mut full_config = Config::empty();
-    for config_path in paths {
-        let file = match File::open(&config_path) {
-            Ok(file) => file,
-            Err(error) => {
-                if let std::io::ErrorKind::NotFound = error.kind() {
-                    fmt.error(format!("File {:?} not found", config_path));
-                } else {
-                    fmt.error(format!(
-                        "Failed opening file {:?} with error {:?}",
-                        config_path, error
-                    ));
-                }
-                continue;
-            }
-        };
-
-        trace!(
-            message = "Parsing config.",
-            path = ?config_path
-        );
-
-        let mut sub_failed = |title: String, errors| {
-            fmt.title(title);
-            fmt.sub_error(errors);
-        };
-
-        let mut config = match Config::load(file) {
-            Ok(config) => config,
-            Err(errors) => {
-                sub_failed(format!("Failed to parse {:?}", config_path), errors);
-                continue;
-            }
-        };
-
-        if let Err(errors) = config.expand_macros() {
-            sub_failed(
-                format!("Failed to expand macros in {:?}", config_path),
-                errors,
-            );
-            continue;
-        }
-
-        if let Err(errors) = full_config.append(config) {
-            sub_failed(format!("Failed to merge config {:?}", config_path), errors);
-            continue;
-        }
-
-        validated += 1;
-        fmt.success(format!("Loaded {:?}", &config_path));
-    }
-
-    if to_valdiate == validated {
-        Ok(full_config)
-    } else if validated > 0 {
-        Err(Some(full_config))
-    } else {
-        Err(None)
-    }
-}
-
-fn validate_topology(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool {
-    match config::check(config) {
-        Ok(warnings) => {
-            if warnings.is_empty() {
-                fmt.success("Configuration topology");
-                true
-            } else if opts.deny_warnings {
-                fmt.title("Topology errors");
-                fmt.sub_error(warnings);
-                false
-            } else {
-                fmt.title("Topology warnings");
-                fmt.sub_warning(warnings);
-                fmt.success("Configuration topology");
-                true
-            }
+    match config::load_from_paths(&paths) {
+        Ok(config) => {
+            fmt.success(format!("Loaded {:?}", &paths));
+            Some(config)
         }
         Err(errors) => {
-            fmt.title("Topology errors");
+            fmt.title(format!("Failed to load {:?}", paths));
             fmt.sub_error(errors);
-            false
+            None
         }
     }
 }
@@ -198,7 +94,7 @@ async fn validate_components(
     diff: &ConfigDiff,
     fmt: &mut Formatter,
 ) -> Option<Pieces> {
-    event::LOG_SCHEMA
+    crate::config::LOG_SCHEMA
         .set(config.global.log_schema.clone())
         .expect("Couldn't set schema");
 
@@ -256,6 +152,31 @@ async fn validate_healthchecks(
     validated
 }
 
+/// For data directory that we write to:
+/// 1. Create a tmp directory in it.
+/// 2. Change config to point to that tmp directory.
+fn create_tmp_directory(config: &mut Config, fmt: &mut Formatter) -> Option<PathBuf> {
+    match config
+        .global
+        .resolve_and_make_data_subdir(None, TEMPORARY_DIRECTORY)
+    {
+        Ok(path) => {
+            config.global.data_dir = Some(path.clone());
+            Some(path)
+        }
+        Err(error) => {
+            fmt.error(format!("{}", error));
+            None
+        }
+    }
+}
+
+fn remove_tmp_directory(path: PathBuf) {
+    if let Err(error) = remove_dir_all(&path) {
+        error!(message = "Failed to remove temporary directory.", path = ?path, error = %error);
+    }
+}
+
 struct Formatter {
     /// Width of largest printed line
     max_line_width: usize,
@@ -292,7 +213,7 @@ impl Formatter {
         }
     }
 
-    /// Final confirmation that validation process was succesfull.
+    /// Final confirmation that validation process was successful.
     fn validated(&self) {
         println!("{:-^width$}", "", width = self.max_line_width);
         if self.color {
@@ -342,14 +263,6 @@ impl Formatter {
         I::Item: fmt::Display,
     {
         self.sub(self.error_intro.clone(), errors)
-    }
-
-    /// A list of warnings that go with a title.
-    fn sub_warning<I: IntoIterator>(&mut self, warnings: I)
-    where
-        I::Item: fmt::Display,
-    {
-        self.sub(self.warning_intro.clone(), warnings)
     }
 
     fn sub<I: IntoIterator>(&mut self, intro: impl AsRef<str>, msgs: I)

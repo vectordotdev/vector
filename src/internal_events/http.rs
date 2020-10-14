@@ -10,21 +10,15 @@ pub struct HTTPEventsReceived {
 impl InternalEvent for HTTPEventsReceived {
     fn emit_logs(&self) {
         trace!(
-            message = "sending events.",
+            message = "Sending events.",
             events_count = %self.events_count,
             byte_size = %self.byte_size,
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", self.events_count as u64,
-            "component_kind" => "source",
-            "component_type" => "http",
-        );
-        counter!("bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "http",
-        );
+        counter!("events_processed", self.events_count as u64);
+        counter!("bytes_processed", self.byte_size as u64);
     }
 }
 
@@ -37,18 +31,14 @@ pub struct HTTPBadRequest<'a> {
 impl<'a> InternalEvent for HTTPBadRequest<'a> {
     fn emit_logs(&self) {
         warn!(
-            message = "received bad request.",
+            message = "Received bad request.",
             code = %self.error_code,
-            message = %self.error_message,
+            error_message = %self.error_message,
             rate_limit_secs = 10,
         );
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "http_bad_requests", 1,
-            "component_kind" => "source",
-            "component_type" => "http",
-        );
+        counter!("http_bad_requests", 1);
     }
 }

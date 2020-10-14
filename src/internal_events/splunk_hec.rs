@@ -1,7 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
 use serde_json::Error;
-use string_cache::DefaultAtom as Atom;
 
 #[cfg(feature = "sources-splunk_hec")]
 pub(crate) use self::source::*;
@@ -13,16 +12,8 @@ pub(crate) struct SplunkEventSent {
 
 impl InternalEvent for SplunkEventSent {
     fn emit_metrics(&self) {
-        counter!(
-            "events_processed", 1,
-            "component_kind" => "sink",
-            "component_type" => "splunk_hec",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "sink",
-            "component_type" => "splunk_hec",
-        );
+        counter!("events_processed", 1);
+        counter!("bytes_processed", self.byte_size as u64);
     }
 }
 
@@ -34,64 +25,52 @@ pub(crate) struct SplunkEventEncodeError {
 impl InternalEvent for SplunkEventEncodeError {
     fn emit_logs(&self) {
         error!(
-            message = "error encoding Splunk HEC event to json.",
+            message = "Error encoding Splunk HEC event to JSON.",
             error = ?self.error,
             rate_limit_secs = 30,
         );
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "encode_errors", 1,
-            "component_kind" => "sink",
-            "component_type" => "splunk_hec",
-        );
+        counter!("encode_errors", 1);
     }
 }
 
 #[derive(Debug)]
-pub struct SplunkSourceTypeMissingKeys {
-    pub keys: Vec<Atom>,
+pub struct SplunkSourceTypeMissingKeys<'a> {
+    pub keys: &'a [String],
 }
 
-impl InternalEvent for SplunkSourceTypeMissingKeys {
+impl<'a> InternalEvent for SplunkSourceTypeMissingKeys<'a> {
     fn emit_logs(&self) {
         warn!(
-            message = "failed to render template for sourcetype, leaving empty",
+            message = "Failed to render template for sourcetype, leaving empty.",
             missing_keys = ?self.keys,
             rate_limit_secs = 30,
         )
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "sourcetype_missing_keys", 1,
-            "component_kind" => "sink",
-            "component_type" => "splunk_hec",
-        );
+        counter!("sourcetype_missing_keys", 1);
     }
 }
 
 #[derive(Debug)]
-pub struct SplunkSourceMissingKeys {
-    pub keys: Vec<Atom>,
+pub struct SplunkSourceMissingKeys<'a> {
+    pub keys: &'a [String],
 }
 
-impl InternalEvent for SplunkSourceMissingKeys {
+impl<'a> InternalEvent for SplunkSourceMissingKeys<'a> {
     fn emit_logs(&self) {
         warn!(
-            message = "failed to render template for source, leaving empty",
+            message = "Failed to render template for source, leaving empty.",
             missing_keys = ?self.keys,
             rate_limit_secs = 30,
         )
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "source_missing_keys", 1,
-            "component_kind" => "sink",
-            "component_type" => "splunk_hec",
-        );
+        counter!("source_missing_keys", 1);
     }
 }
 
@@ -106,15 +85,11 @@ mod source {
 
     impl InternalEvent for SplunkHECEventReceived {
         fn emit_logs(&self) {
-            trace!(message = "received one event.");
+            trace!(message = "Received one event.");
         }
 
         fn emit_metrics(&self) {
-            counter!(
-                "events_processed", 1,
-                "component_kind" => "source",
-                "component_type" => "splunk_hec",
-            );
+            counter!("events_processed", 1);
         }
     }
 
@@ -126,18 +101,14 @@ mod source {
     impl<'a> InternalEvent for SplunkHECRequestReceived<'a> {
         fn emit_logs(&self) {
             debug!(
-                message = "received one request.",
+                message = "Received one request.",
                 path = %self.path,
                 rate_limit_secs = 10
             );
         }
 
         fn emit_metrics(&self) {
-            counter!(
-                "request_received", 1,
-                "component_kind" => "source",
-                "component_type" => "splunk_hec",
-            );
+            counter!("request_received", 1);
         }
     }
 
@@ -149,7 +120,7 @@ mod source {
     impl InternalEvent for SplunkHECRequestBodyInvalid {
         fn emit_logs(&self) {
             error!(
-                message = "invalid request body.",
+                message = "Invalid request body.",
                 error = %self.error,
                 rate_limit_secs = 10
             );
@@ -166,18 +137,14 @@ mod source {
     impl InternalEvent for SplunkHECRequestError {
         fn emit_logs(&self) {
             error!(
-                message = "error processing request.",
+                message = "Error processing request.",
                 error = %self.error,
                 rate_limit_secs = 10
             );
         }
 
         fn emit_metrics(&self) {
-            counter!(
-                "request_errors", 1,
-                "component_kind" => "source",
-                "component_type" => "splunk_hec",
-            );
+            counter!("request_errors", 1);
         }
     }
 }

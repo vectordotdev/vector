@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GlobalOptions},
+    config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     Event, Pipeline,
@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tokio::net::UdpSocket;
 use tokio_util::{codec::BytesCodec, udp::UdpFramed};
-use tracing::field;
 
 pub mod parser;
 
@@ -23,9 +22,16 @@ struct StatsdConfig {
     address: SocketAddr,
 }
 
+inventory::submit! {
+    SourceDescription::new::<StatsdConfig>("statsd")
+}
+
+impl GenerateConfig for StatsdConfig {}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "statsd")]
-impl crate::config::SourceConfig for StatsdConfig {
-    fn build(
+impl SourceConfig for StatsdConfig {
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -45,7 +51,7 @@ impl crate::config::SourceConfig for StatsdConfig {
 }
 
 fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> super::Source {
-    let out = out.sink_map_err(|e| error!("error sending metric: {:?}", e));
+    let out = out.sink_map_err(|e| error!("Error sending metric: {:?}", e));
 
     Box::new(
         async move {
@@ -54,8 +60,8 @@ fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> super::S
                 .await?;
 
             info!(
-                message = "listening.",
-                addr = &field::display(addr),
+                message = "Listening.",
+                addr = %addr,
                 r#type = "udp"
             );
 
@@ -92,7 +98,7 @@ fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> super::S
                 .forward(out.sink_compat())
                 .await;
 
-            info!("finished sending");
+            info!("Finished sending");
             Ok(())
         }
         .boxed()
@@ -128,20 +134,21 @@ mod test {
         let in_addr = next_addr();
         let out_addr = next_addr();
 
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source("in", StatsdConfig { address: in_addr });
         config.add_sink(
             "out",
             &["in"],
             PrometheusSinkConfig {
                 address: out_addr,
-                namespace: "vector".into(),
+                namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
+                quantiles: vec![],
                 flush_period_secs: 1,
             },
         );
 
-        let (topology, _crash) = start_topology(config, false).await;
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
         let bind_addr = next_addr();
         let socket = std::net::UdpSocket::bind(&bind_addr).unwrap();
@@ -207,7 +214,7 @@ mod test {
         assert_eq!(milliglork_count * 3, milliglork_sum);
 
         // Set test
-        // Flush could have occured
+        // Flush could have occurred
         assert!(parse_count(&lines, "vector_set") <= 2);
 
         // Flush test
@@ -237,7 +244,7 @@ mod test {
             // Check rested
             assert_eq!(parse_count(&lines, "vector_set"), 0);
 
-            // Recheck that set is also reseted------------
+            // Re-check that set is also reset------------
 
             socket.send_to(b"set:0|s\nset:1|s\n", &in_addr).unwrap();
             // Space things out slightly to try to avoid dropped packets

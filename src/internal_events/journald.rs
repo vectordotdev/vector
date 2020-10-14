@@ -8,18 +8,12 @@ pub(crate) struct JournaldEventReceived {
 
 impl InternalEvent for JournaldEventReceived {
     fn emit_logs(&self) {
-        trace!(message = "received line.", byte_size = %self.byte_size);
+        trace!(message = "Received line.", byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-                 "component_kind" => "source",
-                 "component_name" => "journald",
-        );
-        counter!("bytes_processed", self.byte_size as u64,
-                 "component_kind" => "source",
-                 "component_name" => "journald",
-        );
+        counter!("events_processed", 1);
+        counter!("bytes_processed", self.byte_size as u64);
     }
 }
 
@@ -35,13 +29,7 @@ impl InternalEvent for JournaldInvalidRecord {
     }
 
     fn emit_metrics(&self) {
-        counter!("invalid_record", 1,
-                 "component_kind" => "source",
-                 "component_name" => "journald",
-        );
-        counter!("invalid_record_bytes", self.text.len() as u64,
-                 "component_kind" => "source",
-                 "component_name" => "journald",
-        );
+        counter!("invalid_record", 1);
+        counter!("invalid_record_bytes", self.text.len() as u64);
     }
 }

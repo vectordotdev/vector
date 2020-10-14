@@ -1,9 +1,8 @@
 use crate::{
-    config::{self, GlobalOptions},
-    hyper::body_to_bytes,
+    config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     internal_events::{
-        PrometheusEventReceived, PrometheusHttpError, PrometheusParseError,
-        PrometheusRequestCompleted,
+        PrometheusErrorResponse, PrometheusEventReceived, PrometheusHttpError,
+        PrometheusParseError, PrometheusRequestCompleted,
     },
     shutdown::ShutdownSignal,
     Event, Pipeline,
@@ -23,7 +22,9 @@ pub mod parser;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 struct PrometheusConfig {
-    hosts: Vec<String>,
+    // Deprecated name
+    #[serde(alias = "hosts")]
+    endpoints: Vec<String>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
 }
@@ -32,20 +33,27 @@ pub fn default_scrape_interval_secs() -> u64 {
     15
 }
 
+inventory::submit! {
+    SourceDescription::new::<PrometheusConfig>("prometheus")
+}
+
+impl GenerateConfig for PrometheusConfig {}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "prometheus")]
-impl crate::config::SourceConfig for PrometheusConfig {
-    fn build(
+impl SourceConfig for PrometheusConfig {
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let mut urls = Vec::new();
-        for host in self.hosts.iter() {
-            let base_uri = host.parse::<http::Uri>().context(super::UriParseError)?;
-            urls.push(format!("{}metrics", base_uri));
-        }
+        let urls = self
+            .endpoints
+            .iter()
+            .map(|s| s.parse::<http::Uri>().context(super::UriParseError))
+            .collect::<Result<Vec<http::Uri>, super::BuildError>>()?;
         Ok(prometheus(urls, self.scrape_interval_secs, shutdown, out))
     }
 
@@ -59,11 +67,14 @@ impl crate::config::SourceConfig for PrometheusConfig {
 }
 
 fn prometheus(
-    urls: Vec<String>,
+    urls: Vec<http::Uri>,
     interval: u64,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
+    let out = out
+        .sink_map_err(|e| error!("error sending metric: {:?}", e))
+        .sink_compat();
     let task = tokio::time::interval(Duration::from_secs(interval))
         .take_until(shutdown.compat())
         .map(move |_| stream::iter(urls.clone()))
@@ -79,35 +90,67 @@ fn prometheus(
             let start = Instant::now();
             client
                 .request(request)
-                .and_then(|response| body_to_bytes(response.into_body()))
+                .and_then(|response| async move {
+                    let (header, body) = response.into_parts();
+                    let body = hyper::body::to_bytes(body).await?;
+                    Ok((header, body))
+                })
                 .into_stream()
                 .filter_map(move |response| {
                     future::ready(match response {
-                        Ok(body) => {
+                        Ok((header, body)) if header.status == hyper::StatusCode::OK => {
                             emit!(PrometheusRequestCompleted {
                                 start,
                                 end: Instant::now()
                             });
 
                             let byte_size = body.len();
-                            let packet = String::from_utf8_lossy(&body);
-                            let metrics = parser::parse(&packet)
-                                .map_err(|error| {
-                                    emit!(PrometheusParseError { error });
-                                })
-                                .unwrap_or_default();
+                            let body = String::from_utf8_lossy(&body);
 
-                            if !metrics.is_empty() {
-                                emit!(PrometheusEventReceived {
-                                    byte_size,
-                                    count: metrics.len()
-                                });
+                            match parser::parse(&body) {
+                                Ok(metrics) => {
+                                    emit!(PrometheusEventReceived {
+                                        byte_size,
+                                        count: metrics.len(),
+                                    });
+                                    Some(stream::iter(metrics).map(Event::Metric).map(Ok))
+                                }
+                                Err(error) => {
+                                    if url.path() == "/" {
+                                        // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
+                                        warn!(
+                                            message = "No path is set on the endpoint and we got a parse error, did you mean to use /metrics? This behavior changed in version 0.11.",
+                                            endpoint = %url
+                                        );
                             }
-
-                            Some(stream::iter(metrics).map(Event::Metric).map(Ok))
+                                    emit!(PrometheusParseError {
+                                        error,
+                                        url: url.clone(),
+                                        body,
+                                    });
+                                    None
+                                }
+                            }
+                        }
+                        Ok((header, _)) => {
+                            if header.status == hyper::StatusCode::NOT_FOUND && url.path() == "/" {
+                                // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
+                                warn!(
+                                    message = "No path is set on the endpoint and we got a 404, did you mean to use /metrics? This behavior changed in version 0.11.",
+                                    endpoint = %url
+                                );
+                            }
+                            emit!(PrometheusErrorResponse {
+                                code: header.status,
+                                url: url.clone(),
+                            });
+                            None
                         }
                         Err(error) => {
-                            emit!(PrometheusHttpError { error });
+                            emit!(PrometheusHttpError {
+                                error,
+                                url: url.clone(),
+                            });
                             None
                         }
                     })
@@ -115,10 +158,7 @@ fn prometheus(
                 .flatten()
         })
         .flatten()
-        .forward(
-            out.sink_map_err(|e| error!("error sending metric: {:?}", e))
-                .sink_compat(),
-        )
+        .forward(out)
         .inspect(|_| info!("finished sending"));
 
     Box::new(task.boxed().compat())
@@ -130,14 +170,15 @@ mod test {
     use super::*;
     use crate::{
         config,
-        hyper::body_to_bytes,
         sinks::prometheus::PrometheusSinkConfig,
         test_util::{next_addr, start_topology},
         Error,
     };
     use futures::compat::Future01CompatExt;
-    use hyper::service::{make_service_fn, service_fn};
-    use hyper::{Body, Client, Response, Server};
+    use hyper::{
+        service::{make_service_fn, service_fn},
+        {Body, Client, Response, Server},
+    };
     use pretty_assertions::assert_eq;
     use tokio::time::{delay_for, Duration};
 
@@ -187,11 +228,11 @@ mod test {
             }
         });
 
-        let mut config = config::Config::empty();
+        let mut config = config::Config::builder();
         config.add_source(
             "in",
             PrometheusConfig {
-                hosts: vec![format!("http://{}", in_addr)],
+                endpoints: vec![format!("http://{}", in_addr)],
                 scrape_interval_secs: 1,
             },
         );
@@ -200,13 +241,14 @@ mod test {
             &["in"],
             PrometheusSinkConfig {
                 address: out_addr,
-                namespace: "vector".into(),
+                namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
+                quantiles: vec![],
                 flush_period_secs: 1,
             },
         );
 
-        let (topology, _crash) = start_topology(config, false).await;
+        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
         delay_for(Duration::from_secs(1)).await;
 
         let response = Client::new()
@@ -215,7 +257,7 @@ mod test {
             .unwrap();
         assert!(response.status().is_success());
 
-        let body = body_to_bytes(response.into_body()).await.unwrap();
+        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
         let lines = std::str::from_utf8(&body)
             .unwrap()
             .lines()

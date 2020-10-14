@@ -3,7 +3,6 @@ use std::{
     collections::BTreeMap,
     hash::{Hash, Hasher},
 };
-use string_cache::DefaultAtom as Atom;
 
 // TODO: if we had `Value` implement `Eq` and `Hash`, the implementation here
 // would be much easier. The issue is with `f64` type. We should consider using
@@ -13,8 +12,8 @@ use string_cache::DefaultAtom as Atom;
 // See also: https://internals.rust-lang.org/t/f32-f64-should-implement-hash/5436/32
 
 /// An event discriminant identifies a distinguishable subset of events.
-/// Intended for disecting streams of events to substreams, for instance to
-/// be able to allocate a buffer per substream.
+/// Intended for dissecting streams of events to sub-streams, for instance to
+/// be able to allocate a buffer per sub-stream.
 /// Implements `PartialEq`, `Eq` and `Hash` to enable use as a `HashMap` key.
 #[derive(Debug, Clone)]
 pub struct Discriminant {
@@ -24,7 +23,7 @@ pub struct Discriminant {
 impl Discriminant {
     /// Create a new Discriminant from the `LogEvent` and an ordered slice of
     /// fields to include into a discriminant value.
-    pub fn from_log_event(event: &LogEvent, discriminant_fields: &[Atom]) -> Self {
+    pub fn from_log_event(event: &LogEvent, discriminant_fields: &[impl AsRef<str>]) -> Self {
         let values: Vec<Option<Value>> = discriminant_fields
             .iter()
             .map(|discriminant_field| event.get(discriminant_field).cloned())
@@ -174,7 +173,7 @@ mod tests {
         let mut event_2 = event_1.clone();
         event_2.insert("irrelevant", "does not matter if it's different");
 
-        let discriminant_fields = vec![Atom::from("hostname"), Atom::from("container_id")];
+        let discriminant_fields = vec!["hostname".to_string(), "container_id".to_string()];
 
         let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
         let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
@@ -191,7 +190,7 @@ mod tests {
         let mut event_2 = event_1.clone();
         event_2.insert("container_id", "def");
 
-        let discriminant_fields = vec![Atom::from("hostname"), Atom::from("container_id")];
+        let discriminant_fields = vec!["hostname".to_string(), "container_id".to_string()];
 
         let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
         let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
@@ -209,7 +208,7 @@ mod tests {
         event_2.insert("b", "b");
         event_2.insert("a", "a");
 
-        let discriminant_fields = vec![Atom::from("a"), Atom::from("b")];
+        let discriminant_fields = vec!["a".to_string(), "b".to_string()];
 
         let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
         let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
@@ -227,7 +226,7 @@ mod tests {
         event_2.insert("nested.b", "b");
         event_2.insert("nested.a", "a");
 
-        let discriminant_fields = vec![Atom::from("nested")];
+        let discriminant_fields = vec!["nested".to_string()];
 
         let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
         let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
@@ -245,7 +244,7 @@ mod tests {
         event_2.insert("array[1]", "b");
         event_2.insert("array[0]", "a");
 
-        let discriminant_fields = vec![Atom::from("array")];
+        let discriminant_fields = vec!["array".to_string()];
 
         let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
         let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
@@ -260,7 +259,7 @@ mod tests {
         event_1.insert("nested.a", "a"); // `nested` is a `Value::Map`
         let event_2 = LogEvent::default(); // empty event
 
-        let discriminant_fields = vec![Atom::from("nested")];
+        let discriminant_fields = vec!["nested".to_string()];
 
         let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
         let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
@@ -276,7 +275,7 @@ mod tests {
         let mut event_2 = LogEvent::default();
         event_2.insert("nested", "x"); // `nested` is a `Value::String`
 
-        let discriminant_fields = vec![Atom::from("nested")];
+        let discriminant_fields = vec!["nested".to_string()];
 
         let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
         let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
@@ -308,7 +307,7 @@ mod tests {
             LogEvent::default()
         };
 
-        let discriminant_fields = vec![Atom::from("hostname"), Atom::from("container_id")];
+        let discriminant_fields = vec!["hostname".to_string(), "container_id".to_string()];
 
         let mut process_event = |event| {
             let discriminant = Discriminant::from_log_event(&event, &discriminant_fields);
@@ -354,7 +353,7 @@ mod tests {
             assert_eq!(process_event(event), 1);
         }
 
-        // Now assert the amount of events processed per descriminant.
+        // Now assert the amount of events processed per discriminant.
         assert_eq!(process_event(event_stream_1), 2);
         assert_eq!(process_event(event_stream_2), 2);
         assert_eq!(process_event(event_stream_3), 2);

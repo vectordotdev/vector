@@ -5,19 +5,21 @@
 
 #![deny(missing_docs)]
 
-use crate::event::{self, Event};
-use crate::internal_events::{KubernetesLogsEventAnnotationFailed, KubernetesLogsEventReceived};
+use crate::event::Event;
+use crate::internal_events::{
+    FileSourceInternalEventsEmitter, KubernetesLogsEventAnnotationFailed,
+    KubernetesLogsEventReceived,
+};
 use crate::kubernetes as k8s;
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     dns::Resolver,
     shutdown::ShutdownSignal,
     sources,
     transforms::Transform,
     Pipeline,
 };
-use bytes05::Bytes;
-use evmap10::{self as evmap};
+use bytes::Bytes;
 use file_source::{FileServer, FileServerShutdown, Fingerprinter};
 use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
 use k8s_openapi::api::core::v1::Pod;
@@ -63,14 +65,26 @@ pub struct Config {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<Config>(COMPONENT_NAME)
+    SourceDescription::new::<Config>(COMPONENT_NAME)
+}
+
+impl GenerateConfig for Config {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(&Self {
+            self_node_name: default_self_node_name_env_template(),
+            auto_partial_merge: true,
+            ..Default::default()
+        })
+        .unwrap()
+    }
 }
 
 const COMPONENT_NAME: &str = "kubernetes_logs";
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "kubernetes_logs")]
 impl SourceConfig for Config {
-    fn build(
+    async fn build(
         &self,
         name: &str,
         globals: &GlobalOptions,
@@ -80,13 +94,13 @@ impl SourceConfig for Config {
         let source = Source::new(self, Resolver, globals, name)?;
 
         // TODO: this is a workaround for the legacy futures 0.1.
-        // When the core is updated to futures 0.3 this should be simplied
+        // When the core is updated to futures 0.3 this should be simplified
         // significantly.
         let out = futures::compat::Compat01As03Sink::new(out);
         let fut = source.run(out, shutdown);
         let fut = fut.map(|result| {
             result.map_err(|error| {
-                error!(message = "source future failed", ?error);
+                error!(message = "Source future failed", ?error);
             })
         });
         let fut = Box::pin(fut);
@@ -189,20 +203,57 @@ impl Source {
         let annotator = PodMetadataAnnotator::new(state_reader, fields_spec);
 
         // TODO: maybe some of the parameters have to be configurable.
+
+        // The 16KB is the maximum size of the payload at single line for both
+        // docker and CRI log formats.
+        // We take a double of that to account for metadata and padding, and to
+        // have a power of two rounding. Line splitting is countered at the
+        // parsers, see the `partial_events_merger` logic.
         let max_line_bytes = 32 * 1024; // 32 KiB
         let file_server = FileServer {
+            // Use our special paths provider.
             paths_provider,
+            // This is the default value for the read buffer size.
             max_read_bytes: 2048,
-            start_at_beginning: true,
+            // We want to use checkpoining mechanism, and resume from where we
+            // left off.
+            start_at_beginning: false,
+            // We're now aware of the use cases that would require specifying
+            // the starting point in time since when we should collect the logs,
+            // so we just disable it. If users ask, we can expose it. There may
+            // be other, more sound ways for users considering the use of this
+            // option to solvce their use case, so take consideration.
             ignore_before: None,
+            // Max line length to expect during regular log reads, see the
+            // explanation above.
             max_line_bytes,
+            // The directory where to keep the checkpoints.
             data_dir,
+            // This value specifies not exactly the globbing, but interval
+            // between the polling the files to watch from the `paths_provider`.
+            // This is quite efficient, yet might still create some load of the
+            // file system, so this call is 10 times larger than the default for
+            // the files.
             glob_minimum_cooldown: Duration::from_secs(10),
+            // The shape of the log files is well-known in the Kubernetes
+            // environment, so we pick the a specially crafted fingerprinter
+            // for the log files.
             fingerprinter: Fingerprinter::FirstLineChecksum {
+                // Max line length to expect during fingerprinting, see the
+                // explanation above.
                 max_line_length: max_line_bytes,
             },
+            // We expect the files distribution to not be a concern because of
+            // the way we pick files for gathering: for each container, only the
+            // last log file is currently picked. Thus there's no need for
+            // ordering, as each logical log stream is guaranteed to start with
+            // just one file, makis it impossible to interleave with other
+            // relevant log lines in the absense of such relevant log lines.
             oldest_first: false,
+            // We do not remove the log files, `kubelet` is responsible for it.
             remove_after: None,
+            // The standard emitter.
+            emitter: FileSourceInternalEventsEmitter,
         };
 
         let (file_source_tx, file_source_rx) =
@@ -285,12 +336,13 @@ fn create_event(line: Bytes, file: &str) -> Event {
     let mut event = Event::from(line);
 
     // Add source type.
-    event
-        .as_mut_log()
-        .insert(event::log_schema().source_type_key(), COMPONENT_NAME);
+    event.as_mut_log().insert(
+        crate::config::log_schema().source_type_key(),
+        COMPONENT_NAME.to_owned(),
+    );
 
     // Add file.
-    event.as_mut_log().insert(FILE_KEY, file);
+    event.as_mut_log().insert(FILE_KEY, file.to_owned());
 
     event
 }
@@ -298,5 +350,13 @@ fn create_event(line: Bytes, file: &str) -> Event {
 /// This function returns the default value for `self_node_name` variable
 /// as it should be at the generated config file.
 fn default_self_node_name_env_template() -> String {
-    format!("${{{}}}", SELF_NODE_NAME_ENV_KEY)
+    format!("${{{}}}", SELF_NODE_NAME_ENV_KEY.to_owned())
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::Config>();
+    }
 }

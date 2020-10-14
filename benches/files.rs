@@ -1,7 +1,6 @@
-use bytes05::Bytes;
+use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 use futures::{compat::Future01CompatExt, stream, SinkExt, StreamExt};
-use futures01::Future;
 use std::convert::TryInto;
 use std::path::PathBuf;
 use tempfile::tempdir;
@@ -43,7 +42,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                 source.include.push(input.clone());
                 source.data_dir = Some(data_dir);
 
-                let mut config = config::Config::empty();
+                let mut config = config::Config::builder();
                 config.add_source("in", source);
                 config.add_sink(
                     "out",
@@ -52,12 +51,13 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                         path: output.try_into().unwrap(),
                         idle_timeout_secs: None,
                         encoding: sinks::file::Encoding::Text.into(),
+                        compression: sinks::file::Compression::None,
                     },
                 );
 
                 let mut rt = runtime();
-                let (topology, input) = rt.block_on_std(async move {
-                    let (topology, _crash) = start_topology(config, false).await;
+                let (topology, input) = rt.block_on(async move {
+                    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
 
                     let mut options = OpenOptions::new();
                     options.create(true).write(true);
@@ -71,7 +71,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                 (rt, topology, input)
             },
             |(mut rt, topology, input)| {
-                rt.block_on_std(async move {
+                rt.block_on(async move {
                     let lines = random_lines(line_size).take(num_lines).map(|mut line| {
                         line.push('\n');
                         Ok(Bytes::from(line))
@@ -80,7 +80,6 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
 
                     topology.stop().compat().await.unwrap();
                 });
-                rt.shutdown_now().wait().unwrap();
             },
         )
     })

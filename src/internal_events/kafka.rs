@@ -8,20 +8,12 @@ pub struct KafkaEventReceived {
 
 impl InternalEvent for KafkaEventReceived {
     fn emit_logs(&self) {
-        trace!(message = "received one event.", rate_limit_secs = 10);
+        trace!(message = "Received one event.", rate_limit_secs = 10);
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "events_processed", 1,
-            "component_kind" => "source",
-            "component_type" => "kafka",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "kafka",
-        );
+        counter!("events_processed", 1);
+        counter!("bytes_processed", self.byte_size as u64);
     }
 }
 
@@ -32,15 +24,11 @@ pub struct KafkaOffsetUpdateFailed {
 
 impl InternalEvent for KafkaOffsetUpdateFailed {
     fn emit_logs(&self) {
-        error!(message = "unable to update consumer offset.", error = %self.error);
+        error!(message = "Unable to update consumer offset.", error = %self.error);
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "consumer_offset_updates_failed", 1,
-            "component_kind" => "source",
-            "component_type" => "kafka",
-        );
+        counter!("consumer_offset_updates_failed", 1);
     }
 }
 
@@ -51,15 +39,11 @@ pub struct KafkaEventFailed {
 
 impl InternalEvent for KafkaEventFailed {
     fn emit_logs(&self) {
-        error!(message = "failed to read message.", error = %self.error);
+        error!(message = "Failed to read message.", error = %self.error);
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "events_failed", 1,
-            "component_kind" => "source",
-            "component_type" => "kafka",
-        );
+        counter!("events_failed", 1);
     }
 }
 
@@ -70,6 +54,6 @@ pub struct KafkaKeyExtractionFailed<'a> {
 
 impl InternalEvent for KafkaKeyExtractionFailed<'_> {
     fn emit_logs(&self) {
-        error!(message = "failed to extract key.", key_field = %self.key_field);
+        error!(message = "Failed to extract key.", key_field = %self.key_field);
     }
 }

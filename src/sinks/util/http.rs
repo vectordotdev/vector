@@ -1,7 +1,6 @@
 use super::{
-    retries2::{RetryAction, RetryLogic},
-    service2::{TowerBatchedSink, TowerRequestSettings},
-    sink, Batch,
+    retries::{RetryAction, RetryLogic},
+    sink, Batch, TowerBatchedSink, TowerRequestSettings,
 };
 use crate::{
     buffers::Acker,
@@ -9,7 +8,7 @@ use crate::{
     event::Event,
     tls::{tls_connector_builder, MaybeTlsSettings},
 };
-use bytes05::{Buf, Bytes};
+use bytes::{Buf, Bytes};
 use futures::future::BoxFuture;
 use futures01::{Async, AsyncSink, Poll as Poll01, Sink, StartSend};
 use http::header::HeaderValue;
@@ -26,7 +25,7 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tower03::Service;
+use tower::Service;
 use tracing::Span;
 use tracing_futures::Instrument;
 
@@ -246,14 +245,14 @@ where
                 .insert("User-Agent", self.user_agent.clone());
         }
 
-        debug!(message = "sending request.", uri = %request.uri(), method = %request.method());
+        debug!(message = "Sending request.", uri = %request.uri(), method = %request.method());
 
         let response = self.client.request(request);
 
         let fut = async move {
             let res = response.await?;
             debug!(
-                    message = "response.",
+                    message = "Response.",
                     status = ?res.status(),
                     version = ?res.version(),
             );
@@ -358,7 +357,7 @@ impl RetryLogic for HttpRetryLogic {
         let status = response.status();
 
         match status {
-            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("Too many requests".into()),
+            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
@@ -400,13 +399,14 @@ impl Auth {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_util::runtime;
-    use bytes05::Buf;
-    use futures::future::ready;
-    use futures01::{Future, Stream};
-    use hyper::service::{make_service_fn, service_fn};
-    use hyper::{Body, Response, Server, Uri};
-    use tower03::Service;
+    use crate::test_util::next_addr;
+    use futures::{compat::Future01CompatExt, future::ready};
+    use futures01::Stream;
+    use hyper::{
+        service::{make_service_fn, service_fn},
+        {Body, Response, Server, Uri},
+    };
+    use tower::Service;
 
     #[test]
     fn util_http_retry_logic() {
@@ -427,9 +427,9 @@ mod test {
             .is_not_retryable());
     }
 
-    #[test]
-    fn util_http_it_makes_http_requests() {
-        let addr = crate::test_util::next_addr();
+    #[tokio::test]
+    async fn util_http_it_makes_http_requests() {
+        let addr = next_addr();
         let resolver = Resolver;
 
         let uri = format!("http://{}:{}/", addr.ip(), addr.port())
@@ -465,23 +465,16 @@ mod test {
             async move { Ok::<_, std::convert::Infallible>(svc) }
         });
 
-        let mut rt = runtime();
-
-        rt.spawn_std(async move {
+        tokio::spawn(async move {
             if let Err(e) = Server::bind(&addr).serve(new_service).await {
                 eprintln!("server error: {}", e);
             }
         });
 
-        rt.block_on_std(async move {
-            tokio::time::delay_for(std::time::Duration::from_millis(50)).await;
-            service.call(request).await
-        })
-        .unwrap();
+        tokio::time::delay_for(std::time::Duration::from_millis(50)).await;
+        service.call(request).await.unwrap();
 
-        let _ = rt.shutdown_now();
-
-        let (body, _rest) = rx.into_future().wait().unwrap();
+        let (body, _rest) = rx.into_future().compat().await.unwrap();
         assert_eq!(body.unwrap(), "hello");
     }
 }

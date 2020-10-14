@@ -82,7 +82,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_reader_inifinite() {
+    async fn test_reader_infinite() {
         let mut command = Command::new("bash");
         command.arg("-c");
         command.arg(r#"NUM=0; while true; do echo "Line $NUM"; NUM=$((NUM+=1)); sleep 0.01; done"#);
@@ -108,7 +108,7 @@ mod tests {
             // is desirable in the real-life usage to read-up the whole stdout
             // buffer.
             if expected_num > 200 {
-                panic!("went too far without stop being effective");
+                panic!("Went too far without stop being effective");
             }
 
             // Bump the expected num for the next iteration.

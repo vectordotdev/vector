@@ -7,6 +7,8 @@ set -euo pipefail
 #
 #   Run E2E tests for Kubernetes.
 
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
 random-string() {
   local CHARS="abcdefghijklmnopqrstuvwxyz0123456789"
   # shellcheck disable=SC2034
@@ -89,7 +91,7 @@ if [[ -z "${CONTAINER_IMAGE:-}" ]]; then
   else
     # Package a .deb file to build a docker container, unless skipped.
     if [[ -z "${SKIP_PACKAGE_DEB:-}" ]]; then
-      make package-deb-x86_64 USE_CONTAINER="${PACKAGE_DEB_USE_CONTAINER:-"docker"}"
+      make package-deb-x86_64
     fi
 
     # Prepare test image parameters.
@@ -123,7 +125,8 @@ fi
 export CONTAINER_IMAGE
 
 # Set the deployment command for integration tests.
-export KUBE_TEST_DEPLOY_COMMAND="scripts/deploy-kubernetes-test.sh"
+KUBE_TEST_DEPLOY_COMMAND="$(pwd)/scripts/deploy-kubernetes-test.sh"
+export KUBE_TEST_DEPLOY_COMMAND
 
 # Prepare args.
 CARGO_TEST_ARGS=()
@@ -132,10 +135,12 @@ if [[ -n "${SCOPE:-}" && "$SCOPE" != '""' ]]; then
 fi
 
 # Run the tests.
+cd lib/k8s-e2e-tests
 cargo test \
-  --test kubernetes-e2e \
+  --tests \
+  --no-fail-fast \
   --no-default-features \
-  --features kubernetes-e2e-tests \
+  --features all \
   -- \
   --nocapture \
   --test-threads 1 \

@@ -1,8 +1,7 @@
-use super::controller::Controller;
-use super::future::ResponseFuture;
-use crate::sinks::util::retries2::RetryLogic;
+use super::{controller::Controller, future::ResponseFuture, AutoConcurrencySettings};
+use crate::sinks::util::retries::RetryLogic;
 
-use tower03::Service;
+use tower::Service;
 
 use futures::{future::BoxFuture, ready};
 use std::{
@@ -32,10 +31,15 @@ enum State {
 
 impl<S, L> AutoConcurrencyLimit<S, L> {
     /// Create a new automated concurrency limiter.
-    pub(crate) fn new(inner: S, logic: L, in_flight_limit: Option<usize>) -> Self {
+    pub(crate) fn new(
+        inner: S,
+        logic: L,
+        in_flight_limit: Option<usize>,
+        options: AutoConcurrencySettings,
+    ) -> Self {
         AutoConcurrencyLimit {
             inner,
-            controller: Arc::new(Controller::new(in_flight_limit, logic)),
+            controller: Arc::new(Controller::new(in_flight_limit, options, logic)),
             state: State::Empty,
         }
     }
@@ -71,7 +75,7 @@ where
             // Take the permit.
             State::Ready(permit) => permit,
             // whoopsie!
-            _ => panic!("max requests in-flight; poll_ready must be called first"),
+            _ => panic!("Maximum requests in-flight; poll_ready must be called first"),
         };
 
         self.controller.start_request();
@@ -112,16 +116,20 @@ impl fmt::Debug for State {
 
 #[cfg(test)]
 mod tests {
-    use super::super::controller::{ControllerStatistics, Inner};
-    use super::super::AutoConcurrencyLimitLayer;
+    use super::super::{
+        controller::{ControllerStatistics, Inner},
+        AutoConcurrencyLimitLayer,
+    };
     use super::*;
     use crate::assert_downcast_matches;
     use snafu::Snafu;
-    use std::sync::{Mutex, MutexGuard};
-    use std::time::Duration;
+    use std::{
+        sync::{Mutex, MutexGuard},
+        time::Duration,
+    };
     use tokio::time::{advance, pause};
     use tokio_test::{assert_pending, assert_ready_ok};
-    use tower_test03::{
+    use tower_test::{
         assert_request_eq,
         mock::{
             self, future::ResponseFuture as MockResponseFuture, Handle, Mock, SendResponse, Spawn,
@@ -160,7 +168,14 @@ mod tests {
 
     impl TestService {
         fn start() -> Self {
-            let layer = AutoConcurrencyLimitLayer::new(None, TestRetryLogic);
+            let layer = AutoConcurrencyLimitLayer::new(
+                None,
+                AutoConcurrencySettings {
+                    decrease_ratio: 0.5,
+                    ..Default::default()
+                },
+                TestRetryLogic,
+            );
             let (service, handle) = mock::spawn_layer(layer);
             let controller = Arc::clone(&service.get_ref().controller);
             let inner = Arc::clone(&controller.inner);

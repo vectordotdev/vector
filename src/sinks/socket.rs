@@ -1,7 +1,7 @@
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::util::{encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding},
     tls::TlsConfig,
 };
@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 pub struct SocketSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
+    pub encoding: EncodingConfig<Encoding>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -25,8 +26,10 @@ pub enum Mode {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<SocketSinkConfig>("socket")
+    SinkDescription::new::<SocketSinkConfig>("socket")
 }
+
+impl GenerateConfig for SocketSinkConfig {}
 
 impl SocketSinkConfig {
     pub fn make_tcp_config(
@@ -34,43 +37,29 @@ impl SocketSinkConfig {
         encoding: EncodingConfig<Encoding>,
         tls: Option<TlsConfig>,
     ) -> Self {
-        TcpSinkConfig {
-            address,
+        SocketSinkConfig {
+            mode: Mode::Tcp(TcpSinkConfig { address, tls }),
             encoding,
-            tls,
         }
-        .into()
     }
 
     pub fn make_basic_tcp_config(address: String) -> Self {
-        TcpSinkConfig::new(address, EncodingConfig::from(Encoding::Text)).into()
+        Self::make_tcp_config(address, EncodingConfig::from(Encoding::Text), None)
     }
 }
 
-impl From<TcpSinkConfig> for SocketSinkConfig {
-    fn from(config: TcpSinkConfig) -> Self {
-        Self {
-            mode: Mode::Tcp(config),
-        }
-    }
-}
-
-impl From<UdpSinkConfig> for SocketSinkConfig {
-    fn from(config: UdpSinkConfig) -> Self {
-        Self {
-            mode: Mode::Udp(config),
-        }
-    }
-}
-
+#[async_trait::async_trait]
 #[typetag::serde(name = "socket")]
 impl SinkConfig for SocketSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         match &self.mode {
-            Mode::Tcp(config) => config.build(cx),
-            Mode::Udp(config) => config.build(cx),
+            Mode::Tcp(config) => config.build(cx, self.encoding.clone()),
+            Mode::Udp(config) => config.build(cx, self.encoding.clone()),
             #[cfg(unix)]
-            Mode::Unix(config) => config.build(cx),
+            Mode::Unix(config) => config.build(cx, self.encoding.clone()),
         }
     }
 
@@ -89,32 +78,34 @@ mod test {
     use crate::{
         config::SinkContext,
         event::Event,
-        test_util::{next_addr, random_lines_with_stream, runtime, CountReceiver},
+        test_util::{next_addr, next_addr_v6, random_lines_with_stream, trace_init, CountReceiver},
     };
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
+    use futures::{
+        future,
+        stream::{self, StreamExt},
+    };
     use serde_json::Value;
-    use std::net::UdpSocket;
+    use std::{
+        net::{SocketAddr, UdpSocket},
+        time::Duration,
+    };
+    use tokio::{net::TcpListener, time::timeout};
+    use tokio_util::codec::{FramedRead, LinesCodec};
 
-    #[test]
-    fn udp_message() {
-        crate::test_util::trace_init();
-        let addr = next_addr();
+    async fn test_udp(addr: SocketAddr) {
         let receiver = UdpSocket::bind(addr).unwrap();
 
         let config = SocketSinkConfig {
             mode: Mode::Udp(UdpSinkConfig {
                 address: addr.to_string(),
-                encoding: Encoding::Json.into(),
             }),
+            encoding: Encoding::Json.into(),
         };
-        let mut rt = runtime();
         let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).unwrap();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let event = Event::from("raw log line");
-        let pump = sink.send(event);
-        rt.block_on(pump).unwrap();
+        sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let mut buf = [0; 256];
         let (size, _src_addr) = receiver
@@ -129,68 +120,89 @@ mod test {
         assert_eq!(message, &Value::String("raw log line".into()));
     }
 
-    #[test]
-    fn tcp_stream() {
-        crate::test_util::trace_init();
+    #[tokio::test]
+    async fn udp_ipv4() {
+        trace_init();
+
+        test_udp(next_addr()).await;
+    }
+
+    #[tokio::test]
+    async fn udp_ipv6() {
+        trace_init();
+
+        test_udp(next_addr_v6()).await;
+    }
+
+    #[tokio::test]
+    async fn tcp_stream() {
+        trace_init();
+
         let addr = next_addr();
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
                 address: addr.to_string(),
-                encoding: Encoding::Json.into(),
                 tls: None,
             }),
+            encoding: Encoding::Json.into(),
         };
-        let mut rt = runtime();
-        rt.block_on_std(async move {
-            let context = SinkContext::new_test();
-            let (sink, _healthcheck) = config.build(context).unwrap();
 
-            let mut receiver = CountReceiver::receive_lines(addr);
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
 
-            let (lines, events) = random_lines_with_stream(10, 100);
-            let _ = sink.send_all(events).compat().await.unwrap();
+        let mut receiver = CountReceiver::receive_lines(addr);
 
-            // Wait for output to connect
-            receiver.connected().await;
+        let (lines, events) = random_lines_with_stream(10, 100);
+        sink.run(events).await.unwrap();
 
-            let output = receiver.wait().await;
-            assert_eq!(lines.len(), output.len());
-            for (source, received) in lines.iter().zip(output) {
-                let json = serde_json::from_str::<Value>(&received).expect("Invalid JSON");
-                let received = json.get("message").unwrap().as_str().unwrap();
-                assert_eq!(source, received);
-            }
-        });
+        // Wait for output to connect
+        receiver.connected().await;
+
+        let output = receiver.await;
+        assert_eq!(lines.len(), output.len());
+        for (source, received) in lines.iter().zip(output) {
+            let json = serde_json::from_str::<Value>(&received).expect("Invalid JSON");
+            let received = json.get("message").unwrap().as_str().unwrap();
+            assert_eq!(source, received);
+        }
     }
 
-    // This is a test that checks that we properly receieve all events in the
+    // This is a test that checks that we properly receive all events in the
     // case of a proper server side write side shutdown.
     //
-    // This test basically sends 10 events, shutsdown the server and forces a
+    // This test basically sends 10 events, shuts down the server and forces a
     // reconnect. It then forces another 10 events through and we should get a
     // total of 20 events.
     //
     // If this test hangs that means somewhere we are not collecting the correct
     // events.
-    #[cfg(feature = "sources-tls")]
-    #[test]
-    fn tcp_stream_detects_disconnect() {
-        use crate::tls::{MaybeTlsSettings, TlsConfig, TlsOptions};
-        use futures01::{Async, Stream};
-        use std::io::{ErrorKind, Read};
-        use std::net::Shutdown;
-        use std::sync::{
-            atomic::{AtomicUsize, Ordering},
-            Arc,
+    #[cfg(all(feature = "sources-tls", feature = "listenfd"))]
+    #[tokio::test]
+    async fn tcp_stream_detects_disconnect() {
+        use crate::tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
+        use futures::{compat::Sink01CompatExt, future, FutureExt, SinkExt, StreamExt};
+        use std::{
+            net::Shutdown,
+            pin::Pin,
+            sync::{
+                atomic::{AtomicUsize, Ordering},
+                Arc,
+            },
+            task::Poll,
+        };
+        use tokio::{
+            io::AsyncRead,
+            net::TcpStream,
+            task::yield_now,
+            time::{interval, Duration},
         };
 
-        crate::test_util::trace_init();
+        trace_init();
 
         let addr = next_addr();
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
                 address: addr.to_string(),
-                encoding: Encoding::Text.into(),
                 tls: Some(TlsConfig {
                     enabled: Some(true),
                     options: TlsOptions {
@@ -201,17 +213,19 @@ mod test {
                     },
                 }),
             }),
+            encoding: Encoding::Text.into(),
         };
-        let mut rt = runtime();
         let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).unwrap();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+        let mut sink = sink.into_futures01sink().sink_compat();
 
         let msg_counter = Arc::new(AtomicUsize::new(0));
         let msg_counter1 = Arc::clone(&msg_counter);
         let conn_counter = Arc::new(AtomicUsize::new(0));
         let conn_counter1 = Arc::clone(&conn_counter);
 
-        let (mut close_tx, mut close_rx) = tokio01::sync::mpsc::unbounded_channel::<()>();
+        let (close_tx, close_rx) = tokio::sync::oneshot::channel::<()>();
+        let mut close_rx = Some(close_rx.map(|x| x.unwrap()));
 
         let config = Some(TlsConfig {
             enabled: Some(true),
@@ -221,76 +235,135 @@ mod test {
                 ..Default::default()
             },
         });
-        let stream = MaybeTlsSettings::from_config(&config, true).unwrap();
 
         // Only accept two connections.
-        let fut = stream
-            .bind(&addr)
-            .unwrap()
-            .incoming()
-            .take(2)
-            .for_each(move |mut socket| {
-                conn_counter1.fetch_add(1, Ordering::SeqCst);
-                loop {
-                    if let Ok(Async::Ready(_)) = close_rx.poll() {
-                        socket.get_ref().unwrap().shutdown(Shutdown::Write).unwrap();
-                    }
+        let jh = tokio::spawn(async move {
+            let tls = MaybeTlsSettings::from_config(&config, true).unwrap();
+            let listener = tls.bind(&addr).await.unwrap();
+            listener
+                .accept_stream()
+                .take(2)
+                .for_each(|connection| {
+                    let mut close_rx = close_rx.take();
 
-                    let mut buf = vec![0u8; 11];
-                    match socket.read(&mut buf) {
-                        Err(error) if error.kind() == ErrorKind::WouldBlock => {}
-                        Err(error) => panic!("{}", error),
-                        Ok(n) => {
-                            if n == 0 {
-                                break;
-                            } else {
-                                msg_counter1.fetch_add(1, Ordering::SeqCst);
+                    conn_counter1.fetch_add(1, Ordering::SeqCst);
+                    let msg_counter1 = Arc::clone(&msg_counter1);
+
+                    let mut stream: MaybeTlsIncomingStream<TcpStream> = connection.unwrap();
+                    future::poll_fn(move |cx| loop {
+                        if let Some(fut) = close_rx.as_mut() {
+                            if let Poll::Ready(()) = fut.poll_unpin(cx) {
+                                stream.get_ref().unwrap().shutdown(Shutdown::Write).unwrap();
+                                close_rx = None;
                             }
                         }
-                    };
-                }
-                Ok(())
-            });
-        let jh = rt.spawn_handle_std(fut.compat());
+
+                        return match Pin::new(&mut stream).poll_read(cx, &mut [0u8; 11]) {
+                            Poll::Ready(Ok(n)) => {
+                                if n == 0 {
+                                    Poll::Ready(())
+                                } else {
+                                    msg_counter1.fetch_add(1, Ordering::SeqCst);
+                                    continue;
+                                }
+                            }
+                            Poll::Ready(Err(error)) => panic!("{}", error),
+                            Poll::Pending => Poll::Pending,
+                        };
+                    })
+                })
+                .await;
+        });
 
         let (_, events) = random_lines_with_stream(10, 10);
-        let pump = sink.send_all(events);
-        let (sink, _) = rt.block_on(pump).unwrap();
+        let mut events = events.map(Ok);
+        sink.send_all(&mut events).await.unwrap();
 
         // Loop and check for 10 events, we should always get 10 events. Once,
         // we have 10 events we can tell the server to shutdown to simulate the
         // remote shutting down on an idle connection.
-        for _ in 0..100 {
-            let amnt = msg_counter.load(Ordering::SeqCst);
+        interval(Duration::from_millis(100))
+            .take(500)
+            .take_while(|_| future::ready(msg_counter.load(Ordering::SeqCst) != 10))
+            .for_each(|_| future::ready(()))
+            .await;
+        close_tx.send(()).unwrap();
 
-            if amnt == 10 {
-                close_tx.try_send(()).unwrap();
-                break;
-            }
+        // Close connection in spawned future
+        yield_now().await;
 
-            // Some CI machines are very slow, be generous.
-            std::thread::sleep(std::time::Duration::from_millis(500));
-        }
         assert_eq!(msg_counter.load(Ordering::SeqCst), 10);
         assert_eq!(conn_counter.load(Ordering::SeqCst), 1);
 
         // Send another 10 events
         let (_, events) = random_lines_with_stream(10, 10);
-        let pump = sink.send_all(events);
-        let pump = rt.block_on(pump).unwrap();
-
-        // Some CI machines are very slow, be generous.
-        std::thread::sleep(std::time::Duration::from_secs(2));
-
-        // Drop the connection to allow the server to fully read from the buffer
-        // and exit.
-        drop(pump);
+        let mut events = events.map(Ok);
+        sink.send_all(&mut events).await.unwrap();
+        drop(sink);
 
         // Wait for server task to be complete.
-        let _ = rt.block_on_std(jh).unwrap();
+        let _ = jh.await.unwrap();
 
-        // Check that there are exacty 20 events.
+        // Check that there are exactly 20 events.
         assert_eq!(msg_counter.load(Ordering::SeqCst), 20);
         assert_eq!(conn_counter.load(Ordering::SeqCst), 2);
+    }
+
+    /// Tests whether socket recovers from a hard disconnect.
+    #[tokio::test]
+    async fn reconnect() {
+        trace_init();
+
+        let addr = next_addr();
+        let config = SocketSinkConfig {
+            mode: Mode::Tcp(TcpSinkConfig {
+                address: addr.to_string(),
+                tls: None,
+            }),
+            encoding: Encoding::Text.into(),
+        };
+
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+        let (_, events) = random_lines_with_stream(1000, 10000);
+        let _ = tokio::spawn(sink.run(events));
+
+        // First listener
+        let mut count = 20usize;
+        TcpListener::bind(addr)
+            .await
+            .unwrap()
+            .next()
+            .await
+            .unwrap()
+            .map(|socket| FramedRead::new(socket, LinesCodec::new()))
+            .unwrap()
+            .map(|x| x.unwrap())
+            .take_while(|_| {
+                future::ready(if count > 0 {
+                    count -= 1;
+                    true
+                } else {
+                    false
+                })
+            })
+            .collect::<Vec<_>>()
+            .await;
+
+        // Disconnect
+        if cfg!(windows) {
+            // Gives Windows time to release the addr port.
+            tokio::time::delay_for(Duration::from_secs(1)).await;
+        }
+
+        // Second listener
+        // If this doesn't succeed then the sink hanged.
+        assert!(timeout(
+            Duration::from_secs(5),
+            CountReceiver::receive_lines(addr).connected()
+        )
+        .await
+        .is_ok());
     }
 }

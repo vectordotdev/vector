@@ -13,20 +13,19 @@
 //! does not match, we will add a default label `{agent="vector"}`.
 
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
-    runtime::FutureExt,
     sinks::util::{
         buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
-        service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, UriSerde,
+        BatchConfig, BatchSettings, TowerRequestConfig, UriSerde,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
 use derivative::Derivative;
+use futures::FutureExt;
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -67,12 +66,18 @@ enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<LokiConfig>("loki")
+    SinkDescription::new::<LokiConfig>("loki")
 }
 
+impl GenerateConfig for LokiConfig {}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "loki")]
 impl SinkConfig for LokiConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         if self.labels.is_empty() {
             return Err("`labels` must include at least one label.".into());
         }
@@ -96,9 +101,12 @@ impl SinkConfig for LokiConfig {
         )
         .sink_map_err(|e| error!("Fatal loki sink error: {}", e));
 
-        let healthcheck = healthcheck(self.clone(), client).boxed_compat();
+        let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -116,7 +124,6 @@ impl HttpSink for LokiConfig {
     type Output = serde_json::Value;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-        self.encoding.apply_rules(&mut event);
         let mut labels = Vec::new();
 
         for (key, template) in &self.labels {
@@ -133,24 +140,23 @@ impl HttpSink for LokiConfig {
             }
         }
 
-        let timestamp = match event.as_log().get(&event::log_schema().timestamp_key()) {
+        let timestamp = match event.as_log().get(log_schema().timestamp_key()) {
             Some(event::Value::Timestamp(ts)) => ts.timestamp_nanos(),
             _ => chrono::Utc::now().timestamp_nanos(),
         };
 
         if self.remove_timestamp {
-            event
-                .as_mut_log()
-                .remove(&event::log_schema().timestamp_key());
+            event.as_mut_log().remove(log_schema().timestamp_key());
         }
 
+        self.encoding.apply_rules(&mut event);
         let event = match &self.encoding.codec() {
             Encoding::Json => serde_json::to_string(&event.as_log().all_fields())
                 .expect("json encoding should never fail"),
 
             Encoding::Text => event
                 .as_log()
-                .get(&event::log_schema().message_key())
+                .get(log_schema().message_key())
                 .map(Value::to_string_lossy)
                 .unwrap_or_default(),
         };
@@ -243,16 +249,44 @@ mod tests {
             ("label2".to_string(), "some-static-label".to_string())
         );
     }
+
+    #[test]
+    fn use_label_from_dropped_fields() {
+        let (config, _cx) = load_sink::<LokiConfig>(
+            r#"
+            endpoint = "http://localhost:3100"
+            labels.bar = "{{ foo }}"
+            encoding.codec = "json"
+            encoding.except_fields = ["foo"]
+        "#,
+        )
+        .unwrap();
+
+        let mut e1 = Event::from("hello world");
+
+        e1.as_mut_log().insert("foo", "bar");
+
+        let record = config.encode_event(e1).unwrap();
+
+        let expected_line = serde_json::to_string(&serde_json::json!({
+            "message": "hello world",
+        }))
+        .unwrap();
+
+        assert_eq!(record.event.event, expected_line);
+
+        assert_eq!(record.labels[0], ("bar".to_string(), "bar".to_string()));
+    }
 }
 
-#[cfg(feature = "docker")]
+#[cfg(feature = "loki-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::config::SinkConfig;
-    use crate::sinks::util::test::load_sink;
-    use crate::template::Template;
-    use crate::Event;
+    use crate::{
+        config::SinkConfig, sinks::util::test::load_sink, template::Template,
+        test_util::random_lines, Event,
+    };
     use bytes::Bytes;
     use futures::compat::Future01CompatExt;
     use futures01::Sink;
@@ -276,14 +310,13 @@ mod integration_tests {
 
         *test_name = Template::try_from(stream.to_string()).unwrap();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
-        let lines = crate::test_util::random_lines(100)
-            .take(10)
-            .collect::<Vec<_>>();
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
 
         let events = lines.clone().into_iter().map(Event::from);
         let _ = sink
+            .into_futures01sink()
             .send_all(futures01::stream::iter_ok(events))
             .compat()
             .await
@@ -314,13 +347,14 @@ mod integration_tests {
 
         *test_name = Template::try_from(stream.to_string()).unwrap();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
-        let events = crate::test_util::random_lines(100)
+        let events = random_lines(100)
             .take(10)
             .map(Event::from)
             .collect::<Vec<_>>();
         let _ = sink
+            .into_futures01sink()
             .send_all(futures01::stream::iter_ok(events.clone()))
             .compat()
             .await
@@ -347,11 +381,9 @@ mod integration_tests {
         )
         .unwrap();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
-        let lines = crate::test_util::random_lines(100)
-            .take(10)
-            .collect::<Vec<_>>();
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
 
         let mut events = lines
             .clone()
@@ -370,6 +402,7 @@ mod integration_tests {
         }
 
         let _ = sink
+            .into_futures01sink()
             .send_all(futures01::stream::iter_ok(events))
             .compat()
             .await

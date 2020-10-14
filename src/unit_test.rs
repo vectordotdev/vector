@@ -1,10 +1,6 @@
-use crate::{
-    config::{self, Config},
-    event,
-    topology::unit_test::UnitTest,
-};
+use crate::config;
 use colored::*;
-use std::{fs::File, path::PathBuf};
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -15,41 +11,7 @@ pub struct Opts {
     paths: Vec<PathBuf>,
 }
 
-fn build_tests(i: usize, path: &PathBuf) -> Result<Vec<UnitTest>, Vec<String>> {
-    let file = match File::open(path) {
-        Ok(f) => f,
-        Err(error) => {
-            if let std::io::ErrorKind::NotFound = error.kind() {
-                return Err(vec![format!(
-                    "Config file not found in path '{}'",
-                    path.to_str().unwrap_or("")
-                )]);
-            } else {
-                return Err(vec![format!(
-                    "Could not open file '{}': {}",
-                    path.to_str().unwrap_or(""),
-                    error
-                )]);
-            }
-        }
-    };
-
-    let mut config = match Config::load(file) {
-        Err(load_errs) => {
-            return Err(load_errs);
-        }
-        Ok(c) => c,
-    };
-    if i == 0 {
-        event::LOG_SCHEMA
-            .set(config.global.log_schema.clone())
-            .expect("Couldn't set schema");
-    }
-
-    crate::topology::unit_test::build_unit_tests(&mut config)
-}
-
-pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
+pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let mut failed_files: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
     let mut inspected_files: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
 
@@ -57,13 +19,13 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         std::process::exit(exitcode::CONFIG);
     });
 
-    for (i, p) in paths.iter().enumerate() {
-        let path_str = p.to_str().unwrap_or("");
+    for (i, path) in paths.iter().enumerate() {
+        let path_str = path.to_str().unwrap_or("");
         if i > 0 {
             println!();
         }
         println!("Running {} tests", path_str);
-        match build_tests(i, p) {
+        match config::build_unit_tests(path.clone()).await {
             Ok(mut tests) => {
                 let mut aggregated_test_errors = Vec::new();
                 let mut aggregated_test_inspections = Vec::new();

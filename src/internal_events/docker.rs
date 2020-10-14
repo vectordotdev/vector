@@ -12,21 +12,15 @@ pub struct DockerEventReceived<'a> {
 impl<'a> InternalEvent for DockerEventReceived<'a> {
     fn emit_logs(&self) {
         trace!(
-            message = "received one event.",
+            message = "Received one event.",
             byte_size = %self.byte_size,
             container_id = %self.container_id
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-                 "component_kind" => "source",
-                 "component_name" => "docker",
-        );
-        counter!("bytes_processed", self.byte_size as u64,
-                 "component_kind" => "source",
-                 "component_name" => "docker",
-        );
+        counter!("events_processed", 1);
+        counter!("bytes_processed", self.byte_size as u64);
     }
 }
 
@@ -39,17 +33,14 @@ pub struct DockerContainerEventReceived<'a> {
 impl<'a> InternalEvent for DockerContainerEventReceived<'a> {
     fn emit_logs(&self) {
         debug!(
-            message = "received one container event.",
+            message = "Received one container event.",
             container_id = %self.container_id,
             action = %self.action
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("container_events_processed", 1,
-                 "component_kind" => "source",
-                 "component_name" => "docker",
-        );
+        counter!("container_events_processed", 1);
     }
 }
 
@@ -61,16 +52,13 @@ pub struct DockerContainerWatch<'a> {
 impl<'a> InternalEvent for DockerContainerWatch<'a> {
     fn emit_logs(&self) {
         info!(
-            message = "started watching for logs of container.",
+            message = "Started watching for logs of container.",
             container_id = %self.container_id,
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("containers_watched", 1,
-                 "component_kind" => "source",
-                 "component_name" => "docker",
-        );
+        counter!("containers_watched", 1);
     }
 }
 
@@ -82,16 +70,13 @@ pub struct DockerContainerUnwatch<'a> {
 impl<'a> InternalEvent for DockerContainerUnwatch<'a> {
     fn emit_logs(&self) {
         info!(
-            message = "stoped watching for logs of container.",
+            message = "Stopped watching for logs of container.",
             container_id = %self.container_id,
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("containers_unwatched", 1,
-                 "component_kind" => "source",
-                 "component_name" => "docker",
-        );
+        counter!("containers_unwatched", 1);
     }
 }
 
@@ -104,7 +89,7 @@ pub struct DockerCommunicationError<'a> {
 impl<'a> InternalEvent for DockerCommunicationError<'a> {
     fn emit_logs(&self) {
         error!(
-            message = "error in communication with docker daemon.",
+            message = "Error in communication with docker daemon.",
             error = %self.error,
             container_id = ?self.container_id,
             rate_limit_secs = 10
@@ -112,10 +97,7 @@ impl<'a> InternalEvent for DockerCommunicationError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("communication_error", 1,
-                 "component_kind" => "source",
-                 "component_name" => "docker",
-        );
+        counter!("communication_errors", 1);
     }
 }
 
@@ -128,7 +110,7 @@ pub struct DockerContainerMetadataFetchFailed<'a> {
 impl<'a> InternalEvent for DockerContainerMetadataFetchFailed<'a> {
     fn emit_logs(&self) {
         error!(
-            message = "failed fetching container metadata.",
+            message = "Failed to fetch container metadata.",
             error = %self.error,
             container_id = ?self.container_id,
             rate_limit_secs = 10
@@ -136,10 +118,7 @@ impl<'a> InternalEvent for DockerContainerMetadataFetchFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("container_metadata_fetch_failed", 1,
-                 "component_kind" => "source",
-                 "component_name" => "docker",
-        );
+        counter!("container_metadata_fetch_errors", 1);
     }
 }
 
@@ -152,7 +131,7 @@ pub struct DockerTimestampParseFailed<'a> {
 impl<'a> InternalEvent for DockerTimestampParseFailed<'a> {
     fn emit_logs(&self) {
         error!(
-            message = "failed parsing timestamp as rfc3339 timestamp.",
+            message = "Failed to parse timestamp as rfc3339 timestamp.",
             error = %self.error,
             container_id = ?self.container_id,
             rate_limit_secs = 10
@@ -160,10 +139,7 @@ impl<'a> InternalEvent for DockerTimestampParseFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("timestamp_parse_errors", 1,
-                 "component_kind" => "source",
-                 "component_name" => "docker",
-        );
+        counter!("timestamp_parse_errors", 1);
     }
 }
 
@@ -176,7 +152,7 @@ pub struct DockerLoggingDriverUnsupported<'a> {
 impl<'a> InternalEvent for DockerLoggingDriverUnsupported<'a> {
     fn emit_logs(&self) {
         error!(
-            message = r#"docker engine is not using either `jsonfile` or `journald`
+            message = r#"Docker engine is not using either `jsonfile` or `journald`
                 logging driver. Please enable one of these logging drivers
                 to get logs from the docker daemon."#,
             error = %self.error,
@@ -186,9 +162,6 @@ impl<'a> InternalEvent for DockerLoggingDriverUnsupported<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("logging_driver_errors", 1,
-                 "component_kind" => "source",
-                 "component_name" => "docker",
-        );
+        counter!("logging_driver_errors", 1);
     }
 }

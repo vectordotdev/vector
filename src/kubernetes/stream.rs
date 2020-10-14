@@ -3,7 +3,7 @@
 use super::multi_response_decoder::MultiResponseDecoder;
 use crate::internal_events::kubernetes::stream as internal_events;
 use async_stream::try_stream;
-use bytes05::Buf;
+use bytes::Buf;
 use futures::pin_mut;
 use futures::stream::Stream;
 use hyper::body::HttpBody as Body;
@@ -21,7 +21,7 @@ where
     try_stream! {
         let mut decoder: MultiResponseDecoder<T> = MultiResponseDecoder::new();
 
-        debug!(message = "streaming the HTTP body");
+        debug!(message = "Streaming the HTTP body");
 
         pin_mut!(body);
         while let Some(buf) = body.data().await {
@@ -44,14 +44,14 @@ pub enum Error<ReadError>
 where
     ReadError: std::error::Error + 'static,
 {
-    /// An error occured while reading the response body.
+    /// An error occurred while reading the response body.
     #[snafu(display("reading the data chunk failed"))]
     Reading {
         /// The error we got while reading.
         source: ReadError,
     },
 
-    /// An error occured while parsing the response body.
+    /// An error occurred while parsing the response body.
     #[snafu(display("data parsing failed"))]
     Parsing {
         /// Response parsing error.
@@ -70,7 +70,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util;
+    use crate::test_util::trace_init;
     use futures::StreamExt;
     use k8s_openapi::{api::core::v1::Pod, WatchResponse};
 
@@ -81,11 +81,11 @@ mod tests {
         hyper::body::Body::wrap_stream(in_stream)
     }
 
-    #[test]
-    fn test_body() {
-        test_util::trace_init();
-        test_util::block_on_std(async move {
-            let data = r#"{
+    #[tokio::test]
+    async fn test_body() {
+        trace_init();
+
+        let data = r#"{
                 "type": "ADDED",
                 "object": {
                     "kind": "Pod",
@@ -95,75 +95,71 @@ mod tests {
                     }
                 }
             }"#;
-            let chunks: Vec<Result<_, std::io::Error>> = vec![Ok(data)];
-            let sample_body = hyper_body_from_chunks(chunks);
+        let chunks: Vec<Result<_, std::io::Error>> = vec![Ok(data)];
+        let sample_body = hyper_body_from_chunks(chunks);
 
-            let out_stream = body::<_, WatchResponse<Pod>>(sample_body);
-            pin_mut!(out_stream);
+        let out_stream = body::<_, WatchResponse<Pod>>(sample_body);
+        pin_mut!(out_stream);
 
-            assert!(out_stream.next().await.unwrap().is_ok());
-            assert!(out_stream.next().await.is_none());
-        })
+        assert!(out_stream.next().await.unwrap().is_ok());
+        assert!(out_stream.next().await.is_none());
     }
 
-    #[test]
-    fn test_body_passes_reading_error() {
-        test_util::trace_init();
-        test_util::block_on_std(async move {
-            let err = std::io::Error::new(std::io::ErrorKind::Other, "test error");
-            let chunks: Vec<Result<_, std::io::Error>> = vec![Err(err)];
-            let sample_body = hyper_body_from_chunks(chunks);
+    #[tokio::test]
+    async fn test_body_passes_reading_error() {
+        trace_init();
 
-            let out_stream = body::<_, WatchResponse<Pod>>(sample_body);
-            pin_mut!(out_stream);
+        let err = std::io::Error::new(std::io::ErrorKind::Other, "test error");
+        let chunks: Vec<Result<_, std::io::Error>> = vec![Err(err)];
+        let sample_body = hyper_body_from_chunks(chunks);
 
-            {
-                let err = out_stream.next().await.unwrap().unwrap_err();
-                assert!(matches!(err, Error::Reading { source: hyper::Error { .. } }));
-            }
+        let out_stream = body::<_, WatchResponse<Pod>>(sample_body);
+        pin_mut!(out_stream);
 
-            assert!(out_stream.next().await.is_none());
-        })
+        {
+            let err = out_stream.next().await.unwrap().unwrap_err();
+            assert!(matches!(err, Error::Reading { source: hyper::Error { .. } }));
+        }
+
+        assert!(out_stream.next().await.is_none());
     }
 
-    #[test]
-    fn test_body_passes_parsing_error() {
-        test_util::trace_init();
-        test_util::block_on_std(async move {
-            let chunks: Vec<Result<_, std::io::Error>> = vec![Ok("qwerty")];
-            let sample_body = hyper_body_from_chunks(chunks);
+    #[tokio::test]
+    async fn test_body_passes_parsing_error() {
+        trace_init();
 
-            let out_stream = body::<_, WatchResponse<Pod>>(sample_body);
-            pin_mut!(out_stream);
+        let chunks: Vec<Result<_, std::io::Error>> = vec![Ok("qwerty")];
+        let sample_body = hyper_body_from_chunks(chunks);
 
-            {
-                let err = out_stream.next().await.unwrap().unwrap_err();
-                assert!(matches!(err, Error::Parsing { source: ResponseError::Json(_) }));
-            }
+        let out_stream = body::<_, WatchResponse<Pod>>(sample_body);
+        pin_mut!(out_stream);
 
-            assert!(out_stream.next().await.is_none());
-        })
+        {
+            let err = out_stream.next().await.unwrap().unwrap_err();
+            assert!(matches!(err, Error::Parsing { source: ResponseError::Json(_) }));
+        }
+
+        assert!(out_stream.next().await.is_none());
     }
 
-    #[test]
-    fn test_body_uses_finish() {
-        test_util::trace_init();
-        test_util::block_on_std(async move {
-            let chunks: Vec<Result<_, std::io::Error>> = vec![Ok("{")];
-            let sample_body = hyper_body_from_chunks(chunks);
+    #[tokio::test]
+    async fn test_body_uses_finish() {
+        trace_init();
 
-            let out_stream = body::<_, WatchResponse<Pod>>(sample_body);
-            pin_mut!(out_stream);
+        let chunks: Vec<Result<_, std::io::Error>> = vec![Ok("{")];
+        let sample_body = hyper_body_from_chunks(chunks);
 
-            {
-                let err = out_stream.next().await.unwrap().unwrap_err();
-                assert!(matches!(
-                    err,
-                    Error::UnparsedDataUponCompletion { data } if data == vec![b'{']
-                ));
-            }
+        let out_stream = body::<_, WatchResponse<Pod>>(sample_body);
+        pin_mut!(out_stream);
 
-            assert!(out_stream.next().await.is_none());
-        })
+        {
+            let err = out_stream.next().await.unwrap().unwrap_err();
+            assert!(matches!(
+                err,
+                Error::UnparsedDataUponCompletion { data } if data == vec![b'{']
+            ));
+        }
+
+        assert!(out_stream.next().await.is_none());
     }
 }

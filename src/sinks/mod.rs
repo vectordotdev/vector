@@ -1,7 +1,14 @@
-use futures01::{Future, Sink};
+use crate::Event;
+use futures::{
+    compat::{Compat, Future01CompatExt},
+    future::BoxFuture,
+    StreamExt, TryFutureExt,
+};
+use futures01::Stream;
 use snafu::Snafu;
+use std::fmt;
 
-pub mod streaming_sink;
+pub mod util;
 
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
 pub mod aws_cloudwatch_logs;
@@ -13,6 +20,8 @@ pub mod aws_kinesis_firehose;
 pub mod aws_kinesis_streams;
 #[cfg(feature = "sinks-aws_s3")]
 pub mod aws_s3;
+#[cfg(feature = "sinks-azure_monitor_logs")]
+pub mod azure_monitor_logs;
 #[cfg(feature = "sinks-blackhole")]
 pub mod blackhole;
 #[cfg(feature = "sinks-clickhouse")]
@@ -51,8 +60,8 @@ pub mod papertrail;
 pub mod prometheus;
 #[cfg(feature = "sinks-pulsar")]
 pub mod pulsar;
-#[cfg(feature = "sinks-sematext_logs")]
-pub mod sematext_logs;
+#[cfg(feature = "sinks-sematext")]
+pub mod sematext;
 #[cfg(feature = "sinks-socket")]
 pub mod socket;
 #[cfg(feature = "sinks-splunk_hec")]
@@ -62,13 +71,12 @@ pub mod statsd;
 #[cfg(feature = "sinks-vector")]
 pub mod vector;
 
-pub mod util;
+pub enum VectorSink {
+    Futures01Sink(Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + Send + 'static>),
+    Stream(Box<dyn util::StreamSink + Send>),
+}
 
-use crate::Event;
-
-pub type RouterSink = Box<dyn Sink<SinkItem = Event, SinkError = ()> + 'static + Send>;
-
-pub type Healthcheck = Box<dyn Future<Item = (), Error = crate::Error> + Send>;
+pub type Healthcheck = BoxFuture<'static, crate::Result<()>>;
 
 /// Common build errors
 #[derive(Debug, Snafu)]
@@ -88,4 +96,36 @@ pub enum BuildError {
 pub enum HealthcheckError {
     #[snafu(display("Unexpected status: {}", status))]
     UnexpectedStatus { status: ::http::StatusCode },
+}
+
+impl VectorSink {
+    pub async fn run<S>(mut self, input: S) -> Result<(), ()>
+    where
+        S: futures::Stream<Item = Event> + Send + 'static,
+    {
+        match self {
+            Self::Futures01Sink(sink) => {
+                // Convert stream03 to stream01 instead of sink01 to sink03 to avoid close issues with Compat01as03Sink
+                // See https://github.com/timberio/vector/issues/4256
+                let inner = Compat::new(Box::pin(input.map(Ok)));
+                inner.forward(sink).compat().map_ok(|_| ()).await
+            }
+            Self::Stream(ref mut s) => s.run(Box::pin(input)).await,
+        }
+    }
+
+    pub fn into_futures01sink(
+        self,
+    ) -> Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + Send + 'static> {
+        match self {
+            Self::Futures01Sink(sink) => sink,
+            _ => panic!("Failed type coercion, {:?} is not a Futures01Sink", self),
+        }
+    }
+}
+
+impl fmt::Debug for VectorSink {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("VectorSink").finish()
+    }
 }

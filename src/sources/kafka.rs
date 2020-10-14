@@ -1,6 +1,6 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::{self, Event},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    event::{Event, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::KafkaAuthConfig,
     shutdown::ShutdownSignal,
@@ -73,12 +73,15 @@ fn default_auto_offset_reset() -> String {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<KafkaSourceConfig>("kafka")
+    SourceDescription::new::<KafkaSourceConfig>("kafka")
 }
 
+impl_generate_config_from_default!(KafkaSourceConfig);
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "kafka")]
 impl SourceConfig for KafkaSourceConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -126,12 +129,15 @@ fn kafka_source(
 
                             let payload = match msg.payload() {
                                 None => return Err(()), // skip messages with empty payload
-                                Some(payload) => Bytes::from(payload),
+                                Some(payload) => payload,
                             };
                             let mut event = Event::new_empty_log();
                             let log = event.as_mut_log();
 
-                            log.insert(event::log_schema().message_key().clone(), payload);
+                            log.insert(
+                                log_schema().message_key(),
+                                Value::from(Bytes::from(payload.to_owned())),
+                            );
 
                             // Extract timestamp from kafka message
                             let timestamp = msg
@@ -139,16 +145,19 @@ fn kafka_source(
                                 .to_millis()
                                 .and_then(|millis| Utc.timestamp_millis_opt(millis).latest())
                                 .unwrap_or_else(Utc::now);
-                            log.insert(event::log_schema().timestamp_key().clone(), timestamp);
+                            log.insert(log_schema().timestamp_key(), timestamp);
 
                             // Add source type
-                            log.insert(event::log_schema().source_type_key(), "kafka");
+                            log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
 
                             if let Some(key_field) = &key_field {
                                 match msg.key() {
                                     None => (),
                                     Some(key) => {
-                                        log.insert(key_field.clone(), key);
+                                        log.insert(
+                                            key_field,
+                                            Value::from(String::from_utf8_lossy(key).to_string()),
+                                        );
                                     }
                                 }
                             }
@@ -223,6 +232,11 @@ mod test {
     use super::{kafka_source, KafkaSourceConfig};
     use crate::{shutdown::ShutdownSignal, Pipeline};
 
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<KafkaSourceConfig>();
+    }
+
     fn make_config() -> KafkaSourceConfig {
         KafkaSourceConfig {
             bootstrap_servers: "localhost:9092".to_string(),
@@ -257,20 +271,19 @@ mod test {
 #[cfg(feature = "kafka-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use super::{kafka_source, KafkaSourceConfig};
+    use super::*;
     use crate::{
-        event,
         shutdown::ShutdownSignal,
-        test_util::{collect_n, random_string, runtime},
+        test_util::{collect_n, random_string},
         Pipeline,
     };
     use chrono::Utc;
+    use futures::compat::Future01CompatExt;
     use rdkafka::{
         config::ClientConfig,
         producer::{FutureProducer, FutureRecord},
         util::Timeout,
     };
-    use string_cache::DefaultAtom as Atom;
 
     const BOOTSTRAP_SERVER: &str = "localhost:9092";
 
@@ -292,9 +305,9 @@ mod integration_test {
         }
     }
 
-    #[test]
     #[ignore]
-    fn kafka_source_consume_event() {
+    #[tokio::test]
+    async fn kafka_source_consume_event() {
         let topic = format!("test-topic-{}", random_string(10));
         println!("Test topic name: {}", topic);
         let group_id = format!("test-group-{}", random_string(10));
@@ -313,33 +326,33 @@ mod integration_test {
             ..Default::default()
         };
 
-        let mut rt = runtime();
         println!("Sending event...");
-        rt.block_on_std(send_event(
+        send_event(
             topic.clone(),
             "my key",
             "my message",
             now.timestamp_millis(),
-        ));
+        )
+        .await;
+
         println!("Receiving event...");
         let (tx, rx) = Pipeline::new_test();
-        rt.spawn(kafka_source(&config, ShutdownSignal::noop(), tx).unwrap());
-        let events = rt.block_on(collect_n(rx, 1)).ok().unwrap();
+        tokio::spawn(
+            kafka_source(&config, ShutdownSignal::noop(), tx)
+                .unwrap()
+                .compat(),
+        );
+        let events = collect_n(rx, 1).await.unwrap();
+
         assert_eq!(
-            events[0].as_log()[&event::log_schema().message_key()],
+            events[0].as_log()[log_schema().message_key()],
             "my message".into()
         );
+        assert_eq!(events[0].as_log()["message_key"], "my key".into());
         assert_eq!(
-            events[0].as_log()[&Atom::from("message_key")],
-            "my key".into()
-        );
-        assert_eq!(
-            events[0].as_log()[event::log_schema().source_type_key()],
+            events[0].as_log()[log_schema().source_type_key()],
             "kafka".into()
         );
-        assert_eq!(
-            events[0].as_log()[event::log_schema().timestamp_key()],
-            now.into()
-        );
+        assert_eq!(events[0].as_log()[log_schema().timestamp_key()], now.into());
     }
 }

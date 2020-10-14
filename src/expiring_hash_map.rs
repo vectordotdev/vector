@@ -80,6 +80,13 @@ where
         Some((value, expired))
     }
 
+    /// Return an iterator over keys and values of ExpiringHashMap. Useful for
+    /// processing all values in ExpiringHashMap irrespective of expiration. This
+    /// may be required for processing shutdown or other operations.
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&K, &mut V)> {
+        self.map.iter_mut().map(|(k, (v, _delayed_key))| (k, v))
+    }
+
     /// Check whether the [`ExpiringHashMap`] is empty.
     /// If it's empty, the `next_expired` function immediately resolves to
     /// [`None`]. Be aware that this may cause a spinlock behaviour if the
@@ -245,9 +252,9 @@ mod tests {
     }
 
     // TODO: rewrite this test with tokio::time::clock when it's available.
-    // For now we just wait for an actal second. We should just scroll time instead.
+    // For now we just wait for an actual second. We should just scroll time instead.
     // In theory, this is only possible when the runtime timer used in the
-    // underlying delay queue and the means by which we fresse/adjust time are
+    // underlying delay queue and the means by which we freeze/adjust time are
     // working together.
     #[tokio::test]
     async fn next_expired_wakes_and_becomes_ready_when_value_ttl_expires() {

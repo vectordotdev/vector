@@ -1,17 +1,17 @@
 use crate::{
-    event::{self, Event},
-    internal_events::{UdpEventReceived, UdpSocketError},
+    event::Event,
+    internal_events::{SocketEventReceived, SocketMode, SocketReceiveError},
     shutdown::ShutdownSignal,
     sources::Source,
     Pipeline,
 };
-use bytes05::BytesMut;
+use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use string_cache::DefaultAtom as Atom;
+
 use tokio::net::UdpSocket;
 use tokio_util::codec::Decoder;
 
@@ -22,7 +22,7 @@ pub struct UdpConfig {
     pub address: SocketAddr,
     #[serde(default = "default_max_length")]
     pub max_length: usize,
-    pub host_key: Option<Atom>,
+    pub host_key: Option<String>,
 }
 
 fn default_max_length() -> usize {
@@ -42,18 +42,18 @@ impl UdpConfig {
 pub fn udp(
     address: SocketAddr,
     max_length: usize,
-    host_key: Atom,
+    host_key: String,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
-    let mut out = out.sink_map_err(|e| error!("error sending event: {:?}", e));
+    let mut out = out.sink_map_err(|e| error!("Error sending event: {:?}", e));
 
     Box::new(
         async move {
             let mut socket = UdpSocket::bind(&address)
                 .await
-                .expect("failed to bind to udp listener socket");
-            info!(message = "listening.", %address);
+                .expect("Failed to bind to udp listener socket");
+            info!(message = "Listening.", %address);
 
             let mut shutdown = shutdown.compat();
             let mut buf = BytesMut::with_capacity(max_length);
@@ -62,7 +62,10 @@ pub fn udp(
                 tokio::select! {
                     recv = socket.recv_from(&mut buf) => {
                         let (byte_size, address) = recv.map_err(|error| {
-                            emit!(UdpSocketError { error });
+                            emit!(SocketReceiveError {
+                                error,
+                                mode: SocketMode::Udp
+                            });
                         })?;
 
                         let mut payload = buf.split_to(byte_size);
@@ -75,12 +78,12 @@ pub fn udp(
 
                             event
                                 .as_mut_log()
-                                .insert(event::log_schema().source_type_key(), "socket");
+                                .insert(crate::config::log_schema().source_type_key(), Bytes::from("socket"));
                             event
                                 .as_mut_log()
                                 .insert(host_key.clone(), address.to_string());
 
-                            emit!(UdpEventReceived { byte_size });
+                            emit!(SocketEventReceived { byte_size,mode:SocketMode::Udp });
 
                             tokio::select!{
                                 result = out.send(event).compat() => {

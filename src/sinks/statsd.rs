@@ -1,88 +1,85 @@
+#[cfg(unix)]
+use crate::sinks::util::unix::{UnixService, UnixSinkConfig};
 use crate::{
-    buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::metric::{MetricKind, MetricValue, StatisticKind},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::Event,
+    internal_events::StatsdInvalidMetricReceived,
+    sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
     sinks::util::{
-        service2::TowerCompat, BatchConfig, BatchSettings, BatchSink, Buffer, Compression,
+        tcp::{TcpService, TcpSinkConfig},
+        udp::{UdpService, UdpSinkConfig},
     },
 };
 use futures::{future, FutureExt, TryFutureExt};
 use futures01::{stream, Sink};
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
-use std::collections::BTreeMap;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
-use std::task::{Context, Poll};
-use tower03::{Service, ServiceBuilder};
 
-#[derive(Debug, Snafu)]
-enum BuildError {
-    #[snafu(display("failed to bind to udp listener socket, error = {:?}", source))]
-    SocketBindError { source: std::io::Error },
-}
+use std::collections::BTreeMap;
+use std::fmt::Display;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::task::{Context, Poll};
+use tower::{Service, ServiceBuilder};
 
 pub struct StatsdSvc {
     client: Client,
 }
 
-pub struct Client {
-    socket: UdpSocket,
-    address: SocketAddr,
-}
-
-impl Client {
-    pub fn new(address: SocketAddr) -> crate::Result<Self> {
-        let from = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
-        let socket = UdpSocket::bind(&from).context(SocketBindError)?;
-        Ok(Client { socket, address })
-    }
-
-    pub fn send(&self, buf: &[u8]) -> usize {
-        self.socket
-            .send_to(buf, &self.address)
-            .map_err(|e| error!("error sending datagram: {:?}", e))
-            .unwrap_or_default()
-    }
+enum Client {
+    Tcp(TcpService),
+    Udp(UdpService),
+    #[cfg(unix)]
+    Unix(UnixService),
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
+// TODO: add back when serde-rs/serde#1358 is addressed
+// #[serde(deny_unknown_fields)]
 pub struct StatsdSinkConfig {
-    pub namespace: String,
-    #[serde(default = "default_address")]
-    pub address: SocketAddr,
+    pub namespace: Option<String>,
+    #[serde(flatten)]
+    pub mode: Mode,
     #[serde(default)]
     pub batch: BatchConfig,
 }
 
-pub fn default_address() -> SocketAddr {
-    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8125)
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+pub enum Mode {
+    Tcp(TcpSinkConfig),
+    Udp(UdpSinkConfig),
+    #[cfg(unix)]
+    Unix(UnixSinkConfig),
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<StatsdSinkConfig>("statsd")
+    SinkDescription::new::<StatsdSinkConfig>("statsd")
 }
 
+fn default_address() -> SocketAddr {
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8125)
+}
+
+impl GenerateConfig for StatsdSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(&Self {
+            namespace: None,
+            batch: Default::default(),
+            mode: Mode::Udp(UdpSinkConfig {
+                address: default_address().to_string(),
+            }),
+        })
+        .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "statsd")]
 impl SinkConfig for StatsdSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
-        let sink = StatsdSvc::new(self.clone(), cx.acker())?;
-        let healthcheck = StatsdSvc::healthcheck(self.clone()).boxed().compat();
-        Ok((sink, Box::new(healthcheck)))
-    }
-
-    fn input_type(&self) -> DataType {
-        DataType::Metric
-    }
-
-    fn sink_type(&self) -> &'static str {
-        "statsd"
-    }
-}
-
-impl StatsdSvc {
-    pub fn new(config: StatsdSinkConfig, acker: Acker) -> crate::Result<super::RouterSink> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         // 1432 bytes is a recommended packet size to fit into MTU
         // https://github.com/statsd/statsd/blob/master/docs/metric_types.md#multi-metric-packets
         // However we need to leave some space for +1 extra trailing event in the buffer.
@@ -92,28 +89,47 @@ impl StatsdSvc {
             .bytes(1300)
             .events(1000)
             .timeout(1)
-            .parse_config(config.batch)?;
-        let namespace = config.namespace.clone();
+            .parse_config(self.batch)?;
+        let namespace = self.namespace.clone();
 
-        let client = Client::new(config.address)?;
+        let (client, healthcheck) = match &self.mode {
+            Mode::Tcp(config) => {
+                let (service, healthcheck) = config.build_service(cx.clone())?;
+                (Client::Tcp(service), healthcheck)
+            }
+            Mode::Udp(config) => {
+                let (service, healthcheck) = config.build_service(cx.clone())?;
+                (Client::Udp(service), healthcheck)
+            }
+            #[cfg(unix)]
+            Mode::Unix(config) => {
+                let (service, healthcheck) = config.build_service()?;
+                (Client::Unix(service), healthcheck)
+            }
+        };
         let service = StatsdSvc { client };
 
-        let svc = ServiceBuilder::new().service(service);
-
         let sink = BatchSink::new(
-            TowerCompat::new(svc),
+            ServiceBuilder::new().service(service),
             Buffer::new(batch.size, Compression::None),
             batch.timeout,
-            acker,
+            cx.acker(),
         )
         .sink_map_err(|e| error!("Fatal statsd sink error: {}", e))
-        .with_flat_map(move |event| stream::iter_ok(encode_event(event, &namespace)));
+        .with_flat_map(move |event| stream::iter_ok(encode_event(event, namespace.as_deref())));
 
-        Ok(Box::new(sink))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
-    async fn healthcheck(_config: StatsdSinkConfig) -> crate::Result<()> {
-        Ok(())
+    fn input_type(&self) -> DataType {
+        DataType::Metric
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "statsd"
     }
 }
 
@@ -132,72 +148,71 @@ fn encode_tags(tags: &BTreeMap<String, String>) -> String {
     parts.join(",")
 }
 
-fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
+fn push_event<V: Display>(
+    buf: &mut Vec<String>,
+    metric: &Metric,
+    val: V,
+    metric_type: &str,
+    sample_rate: Option<u32>,
+) {
+    buf.push(format!("{}:{}|{}", metric.name, val, metric_type));
+
+    if let Some(sample_rate) = sample_rate {
+        if sample_rate != 1 {
+            buf.push(format!("@{}", 1.0 / f64::from(sample_rate)))
+        }
+    };
+
+    if let Some(t) = &metric.tags {
+        buf.push(format!("#{}", encode_tags(t)));
+    };
+}
+
+fn encode_event(event: Event, namespace: Option<&str>) -> Option<Vec<u8>> {
     let mut buf = Vec::new();
 
     let metric = event.as_metric();
-    match metric.kind {
-        MetricKind::Incremental => match &metric.value {
-            MetricValue::Counter { value } => {
-                buf.push(format!("{}:{}", metric.name, value));
-                buf.push("c".to_string());
-                if let Some(t) = &metric.tags {
-                    buf.push(format!("#{}", encode_tags(t)));
-                };
-            }
-            MetricValue::Gauge { value } => {
-                buf.push(format!("{}:{:+}", metric.name, value));
-                buf.push("g".to_string());
-                if let Some(t) = &metric.tags {
-                    buf.push(format!("#{}", encode_tags(t)));
-                };
-            }
-            MetricValue::Distribution {
-                values,
-                sample_rates,
-                statistic,
-            } => {
-                let metric_type = match statistic {
-                    StatisticKind::Histogram => "h",
-                    StatisticKind::Summary => "d",
-                };
-                for (val, sample_rate) in values.iter().zip(sample_rates.iter()) {
-                    buf.push(format!("{}:{}", metric.name, val));
-                    buf.push(metric_type.to_string());
-                    if *sample_rate != 1 {
-                        buf.push(format!("@{}", 1.0 / f64::from(*sample_rate)));
-                    };
-                    if let Some(t) = &metric.tags {
-                        buf.push(format!("#{}", encode_tags(t)));
-                    };
+    match &metric.value {
+        MetricValue::Counter { value } => {
+            push_event(&mut buf, &metric, value, "c", None);
+        }
+        MetricValue::Gauge { value } => {
+            match metric.kind {
+                MetricKind::Incremental => {
+                    push_event(&mut buf, &metric, format!("{:+}", value), "g", None)
                 }
-            }
-            MetricValue::Set { values } => {
-                for val in values {
-                    buf.push(format!("{}:{}", metric.name, val));
-                    buf.push("s".to_string());
-                    if let Some(t) = &metric.tags {
-                        buf.push(format!("#{}", encode_tags(t)));
-                    };
-                }
-            }
-            _ => {}
-        },
-        MetricKind::Absolute => {
-            if let MetricValue::Gauge { value } = &metric.value {
-                buf.push(format!("{}:{}", metric.name, value));
-                buf.push("g".to_string());
-                if let Some(t) = &metric.tags {
-                    buf.push(format!("#{}", encode_tags(t)));
-                };
+                MetricKind::Absolute => push_event(&mut buf, &metric, value, "g", None),
             };
         }
-    }
+        MetricValue::Distribution {
+            values,
+            sample_rates,
+            statistic,
+        } => {
+            let metric_type = match statistic {
+                StatisticKind::Histogram => "h",
+                StatisticKind::Summary => "d",
+            };
+            for (val, sample_rate) in values.iter().zip(sample_rates.iter()) {
+                push_event(&mut buf, &metric, val, metric_type, Some(*sample_rate));
+            }
+        }
+        MetricValue::Set { values } => {
+            for val in values {
+                push_event(&mut buf, &metric, val, "s", None);
+            }
+        }
+        _ => {
+            emit!(StatsdInvalidMetricReceived {
+                value: &metric.value,
+                kind: &metric.kind,
+            });
 
-    let mut message: String = buf.join("|");
-    if !namespace.is_empty() {
-        message = format!("{}.{}", namespace, message);
+            return None;
+        }
     };
+
+    let message = encode_namespace(namespace, '.', buf.join("|"));
 
     let mut body: Vec<u8> = message.into_bytes();
     body.push(b'\n');
@@ -207,20 +222,25 @@ fn encode_event(event: Event, namespace: &str) -> Option<Vec<u8>> {
 
 impl Service<Vec<u8>> for StatsdSvc {
     type Response = ();
-    type Error = tokio::io::Error;
-    type Future = future::Ready<Result<(), Self::Error>>;
+    type Error = crate::Error;
+    type Future = future::BoxFuture<'static, Result<(), Self::Error>>;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        match &mut self.client {
+            Client::Tcp(service) => service.poll_ready(cx).map_err(Into::into),
+            Client::Udp(service) => service.poll_ready(cx).map_err(Into::into),
+            #[cfg(unix)]
+            Client::Unix(service) => service.poll_ready(cx).map_err(Into::into),
+        }
     }
 
-    fn call(&mut self, mut frame: Vec<u8>) -> Self::Future {
-        // remove trailing delimiter
-        if let Some(b'\n') = frame.last() {
-            frame.pop();
-        };
-        self.client.send(frame.as_ref());
-        future::ok(())
+    fn call(&mut self, frame: Vec<u8>) -> Self::Future {
+        match &mut self.client {
+            Client::Tcp(service) => service.call(frame.into()).err_into().boxed(),
+            Client::Udp(service) => service.call(frame.into()).err_into().boxed(),
+            #[cfg(unix)]
+            Client::Unix(service) => service.call(frame.into()).err_into().boxed(),
+        }
     }
 }
 
@@ -228,19 +248,23 @@ impl Service<Vec<u8>> for StatsdSvc {
 mod test {
     use super::*;
     use crate::{
-        buffers::Acker,
         event::{metric::MetricKind, metric::MetricValue, metric::StatisticKind, Metric},
-        test_util::{collect_n, runtime},
+        test_util::*,
         Event,
     };
-    use bytes05::Bytes;
-    use futures::compat::{Future01CompatExt, Sink01CompatExt};
-    use futures::{SinkExt, StreamExt, TryStreamExt};
-    use futures01::{sync::mpsc, Sink};
+    use bytes::Bytes;
+    use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt, TryStreamExt};
+    use futures01::sync::mpsc;
     use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
+
     #[cfg(feature = "sources-statsd")]
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<StatsdSinkConfig>();
+    }
 
     fn tags() -> BTreeMap<String, String> {
         vec![
@@ -271,9 +295,26 @@ mod test {
             value: MetricValue::Counter { value: 1.5 },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, "").unwrap();
+        let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
+    }
+
+    #[cfg(feature = "sources-statsd")]
+    #[test]
+    fn test_encode_absolute_counter() {
+        let metric1 = Metric {
+            name: "counter".to_owned(),
+            timestamp: None,
+            tags: None,
+            kind: MetricKind::Absolute,
+            value: MetricValue::Counter { value: 1.5 },
+        };
+        let event = Event::Metric(metric1);
+        let frame = &encode_event(event, None).unwrap();
+        // The statsd parser will parse the counter as Incremental,
+        // so we can't compare it with the parsed value.
+        assert_eq!("counter:1.5|c\n", from_utf8(&frame).unwrap());
     }
 
     #[cfg(feature = "sources-statsd")]
@@ -287,7 +328,23 @@ mod test {
             value: MetricValue::Gauge { value: -1.5 },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, "").unwrap();
+        let frame = &encode_event(event, None).unwrap();
+        let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
+        assert_eq!(metric1, metric2);
+    }
+
+    #[cfg(feature = "sources-statsd")]
+    #[test]
+    fn test_encode_absolute_gauge() {
+        let metric1 = Metric {
+            name: "gauge".to_owned(),
+            timestamp: None,
+            tags: Some(tags()),
+            kind: MetricKind::Absolute,
+            value: MetricValue::Gauge { value: 1.5 },
+        };
+        let event = Event::Metric(metric1.clone());
+        let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
@@ -307,7 +364,7 @@ mod test {
             },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, "").unwrap();
+        let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
@@ -325,71 +382,73 @@ mod test {
             },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, "").unwrap();
+        let frame = &encode_event(event, None).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
 
-    #[test]
-    fn test_send_to_statsd() {
-        crate::test_util::trace_init();
+    #[tokio::test]
+    async fn test_send_to_statsd() {
+        trace_init();
 
-        let mut rt = runtime();
-        rt.block_on_std(async move {
-            let config = StatsdSinkConfig {
-                namespace: "vector".into(),
-                address: default_address(),
-                batch: BatchConfig {
-                    max_bytes: Some(512),
-                    timeout_secs: Some(1),
-                    ..Default::default()
+        let addr = next_addr();
+
+        let config = StatsdSinkConfig {
+            namespace: Some("vector".into()),
+            batch: BatchConfig {
+                max_bytes: Some(512),
+                timeout_secs: Some(1),
+                ..Default::default()
+            },
+            mode: Mode::Udp(UdpSinkConfig {
+                address: addr.to_string(),
+            }),
+        };
+
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+
+        let events = vec![
+            Event::Metric(Metric {
+                name: "counter".to_owned(),
+                timestamp: None,
+                tags: Some(tags()),
+                kind: MetricKind::Incremental,
+                value: MetricValue::Counter { value: 1.5 },
+            }),
+            Event::Metric(Metric {
+                name: "histogram".to_owned(),
+                timestamp: None,
+                tags: None,
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![2.0],
+                    sample_rates: vec![100],
+                    statistic: StatisticKind::Histogram,
                 },
-            };
-            let sink = StatsdSvc::new(config, Acker::Null).unwrap();
+            }),
+        ];
+        let (tx, rx) = mpsc::channel(1);
 
-            let events = vec![
-                Event::Metric(Metric {
-                    name: "counter".to_owned(),
-                    timestamp: None,
-                    tags: Some(tags()),
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Counter { value: 1.5 },
-                }),
-                Event::Metric(Metric {
-                    name: "histogram".to_owned(),
-                    timestamp: None,
-                    tags: None,
-                    kind: MetricKind::Incremental,
-                    value: MetricValue::Distribution {
-                        values: vec![2.0],
-                        sample_rates: vec![100],
-                        statistic: StatisticKind::Histogram
-                    },
-                }),
-            ];
-            let (tx, rx) = mpsc::channel(1);
-
-            let socket = UdpSocket::bind(default_address()).await.unwrap();
-            tokio::spawn(async move {
-                UdpFramed::new(socket, BytesCodec::new())
-                    .map_err(|e| error!("error reading line: {:?}", e))
-                    .map_ok(|(bytes, _addr)| bytes.freeze())
-                    .forward(
-                        tx.sink_compat()
-                            .sink_map_err(|e| error!("error sending event: {:?}", e)),
-                    )
-                    .await
-                    .unwrap()
-            });
-
-            let stream = stream::iter_ok(events);
-            let _ = sink.send_all(stream).compat().await.unwrap();
-
-            let messages = collect_n(rx, 1).compat().await.ok().unwrap();
-            assert_eq!(
-                messages[0],
-                Bytes::from("vector.counter:1.5|c|#empty_tag:,normal_tag:value,true_tag\nvector.histogram:2|h|@0.01"),
-            );
+        let socket = UdpSocket::bind(addr).await.unwrap();
+        tokio::spawn(async move {
+            UdpFramed::new(socket, BytesCodec::new())
+                .map_err(|e| error!("Error reading line: {:?}", e))
+                .map_ok(|(bytes, _addr)| bytes.freeze())
+                .forward(
+                    tx.sink_compat()
+                        .sink_map_err(|e| error!("Error sending event: {:?}", e)),
+                )
+                .await
+                .unwrap()
         });
+
+        sink.run(stream::iter(events)).await.unwrap();
+
+        let messages = collect_n(rx, 1).await.unwrap();
+        assert_eq!(
+            messages[0],
+            Bytes::from("vector.counter:1.5|c|#empty_tag:,normal_tag:value,true_tag\nvector.histogram:2|h|@0.01\n"),
+        );
     }
 }

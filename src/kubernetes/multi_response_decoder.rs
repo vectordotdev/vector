@@ -96,7 +96,7 @@ mod tests {
             (WatchResponse::Ok(actual_event), WatchResponse::Ok(expected_event)) => {
                 assert_eq!(actual_event, expected_event)
             }
-            _ => panic!("expected an event, got something else"),
+            _ => panic!("Expected an event, got something else"),
         }
     }
 
@@ -119,7 +119,7 @@ mod tests {
     }
 
     #[test]
-    fn test_rubblish() {
+    fn test_rubbish() {
         let mut dec = MultiResponseDecoder::<TO>::new();
 
         {
@@ -443,7 +443,7 @@ mod tests {
 
         // Simulate processing a huge number of items.
         for _ in 0..100_000 {
-            // Take random amout of bytes from the chunks iter and prepare the
+            // Take random amount of bytes from the chunks iter and prepare the
             // next chunk.
             let to_take = rand::random::<usize>() % (chunk.len() * max_chunks_per_iter);
             let next_chunk = (&mut chunks).take(to_take).cloned().collect::<Box<_>>();
@@ -458,7 +458,7 @@ mod tests {
         // to blow first.
         assert!(dec.pending_data.capacity() <= chunk.len() * 100);
 
-        // Ensure that response buffer never grows beyond it's capacitty limit.
+        // Ensure that response buffer never grows beyond it's capacity limit.
         // Capacity limit is set based on heuristics about `Vec` internals, and
         // is adjusted to be as low as possible.
         assert!(dec.responses_buffer.capacity() <= (max_chunks_per_iter + 2).next_power_of_two());
@@ -489,7 +489,7 @@ mod tests {
             };
             match actual_to {
                 WatchResponse::Ok(actual_event) => assert_eq!(actual_event, expected_event),
-                _ => panic!("expected an event, got something else"),
+                _ => panic!("Expected an event, got something else"),
             }
         }
 

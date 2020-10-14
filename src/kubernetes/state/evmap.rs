@@ -1,8 +1,8 @@
-//! A state implementation backed by [`evmap10`].
+//! A state implementation backed by [`evmap`].
 
 use crate::kubernetes::{debounce::Debounce, hash_value::HashValue};
 use async_trait::async_trait;
-use evmap10::WriteHandle;
+use evmap::WriteHandle;
 use futures::future::BoxFuture;
 use k8s_openapi::{apimachinery::pkg::apis::meta::v1::ObjectMeta, Metadata};
 use std::time::Duration;
@@ -44,8 +44,8 @@ where
     /// Debounced `flush`.
     /// When a number of flush events arrive un a row, we buffer them such that
     /// only the last one in the chain is propagated.
-    /// This is intended to improve the state behaivor at resync - by delaying
-    /// the `flush` proparagion, we maximize the time `evmap` remains populated,
+    /// This is intended to improve the state behavior at re-sync - by delaying
+    /// the `flush` propagation, we maximize the time `evmap` remains populated,
     /// ideally allowing a single transition from non-populated to populated
     /// state.
     fn debounced_flush(&mut self) {
@@ -86,7 +86,7 @@ where
     }
 
     async fn resync(&mut self) {
-        // By omiting the flush here, we cache the results from the
+        // By omitting the flush here, we cache the results from the
         // previous run until flush is issued when the new events
         // begin arriving, reducing the time during which the state
         // has no data.
@@ -151,7 +151,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_without_debounce() {
-        let (state_reader, state_writer) = evmap10::new();
+        let (state_reader, state_writer) = evmap::new();
         let mut state_writer = Writer::new(state_writer, None);
 
         assert_eq!(state_reader.is_empty(), true);
@@ -170,7 +170,7 @@ mod tests {
         // Due to https://github.com/tokio-rs/tokio/issues/2090 we're not
         // pausing the time.
 
-        let (state_reader, state_writer) = evmap10::new();
+        let (state_reader, state_writer) = evmap::new();
         let flush_debounce_timeout = Duration::from_millis(100);
         let mut state_writer = Writer::new(state_writer, Some(flush_debounce_timeout));
 

@@ -115,11 +115,8 @@ mod test {
         Lua::new().context(|ctx| {
             let event = ctx.load(lua_event).eval::<Event>().unwrap();
             let log = event.as_log();
-            assert_eq!(log[&"field".into()], Value::Bytes("example".into()));
-            assert_eq!(
-                log[&"nested.field".into()],
-                Value::Bytes("another example".into())
-            );
+            assert_eq!(log["field"], Value::Bytes("example".into()));
+            assert_eq!(log["nested.field"], Value::Bytes("another example".into()));
         });
     }
 
@@ -153,26 +150,6 @@ mod test {
     fn from_lua_missing_log_and_metric() {
         let lua_event = r#"{
             some_field: {}
-        }"#;
-        Lua::new().context(|ctx| ctx.load(lua_event).eval::<Event>().unwrap());
-    }
-
-    #[test]
-    #[should_panic]
-    fn from_lua_both_log_and_metric() {
-        let lua_event = r#"{
-            log = {
-                field = "example",
-                nested = {
-                    field = "another example"
-                }
-            },
-            metric = {
-                name = "example counter",
-                counter = {
-                    value = 0.57721566
-                }
-            }
         }"#;
         Lua::new().context(|ctx| ctx.load(lua_event).eval::<Event>().unwrap());
     }

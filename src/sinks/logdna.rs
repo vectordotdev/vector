@@ -1,14 +1,13 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{self, Event},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
     sinks::util::{
-        encoding::EncodingConfigWithDefault,
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
-        service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, UriSerde,
+        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
     },
 };
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::Sink;
 use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
@@ -24,7 +23,9 @@ const PATH: &str = "/logs/ingest";
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LogdnaConfig {
     api_key: String,
-    host: Option<UriSerde>,
+    // Deprecated name
+    #[serde(alias = "host")]
+    endpoint: Option<UriSerde>,
 
     hostname: String,
     mac: Option<String>,
@@ -38,6 +39,7 @@ pub struct LogdnaConfig {
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
     default_app: Option<String>,
+    default_env: Option<String>,
 
     #[serde(default)]
     batch: BatchConfig,
@@ -47,8 +49,10 @@ pub struct LogdnaConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<LogdnaConfig>("logdna")
+    SinkDescription::new::<LogdnaConfig>("logdna")
 }
+
+impl GenerateConfig for LogdnaConfig {}
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
@@ -58,9 +62,13 @@ pub enum Encoding {
     Default,
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "logdna")]
 impl SinkConfig for LogdnaConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch_settings = BatchSettings::default()
             .bytes(bytesize::mib(10u64))
@@ -78,9 +86,12 @@ impl SinkConfig for LogdnaConfig {
         )
         .sink_map_err(|e| error!("Fatal logdna sink error: {}", e));
 
-        let healthcheck = healthcheck(self.clone(), client).boxed().compat();
+        let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -97,14 +108,15 @@ impl HttpSink for LogdnaConfig {
     type Input = serde_json::Value;
     type Output = Vec<BoxedRawValue>;
 
-    fn encode_event(&self, event: Event) -> Option<Self::Input> {
+    fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+        self.encoding.apply_rules(&mut event);
         let mut log = event.into_log();
 
         let line = log
-            .remove(&event::log_schema().message_key())
-            .unwrap_or_else(|| "".into());
+            .remove(crate::config::log_schema().message_key())
+            .unwrap_or_else(|| String::from("").into());
         let timestamp = log
-            .remove(&event::log_schema().timestamp_key())
+            .remove(crate::config::log_schema().timestamp_key())
             .unwrap_or_else(|| chrono::Utc::now().into());
 
         let mut map = serde_json::map::Map::new();
@@ -112,12 +124,23 @@ impl HttpSink for LogdnaConfig {
         map.insert("line".to_string(), json!(line));
         map.insert("timestamp".to_string(), json!(timestamp));
 
-        if let Some(app) = log.remove(&"app".into()) {
+        if let Some(env) = log.remove("env") {
+            map.insert("env".to_string(), json!(env));
+        }
+
+        if let Some(app) = log.remove("app") {
             map.insert("app".to_string(), json!(app));
         }
 
-        if let Some(file) = log.remove(&"file".into()) {
+        if let Some(file) = log.remove("file") {
             map.insert("file".to_string(), json!(file));
+        }
+
+        if !map.contains_key("env") {
+            map.insert(
+                "env".to_string(),
+                json!(self.default_env.as_deref().unwrap_or("production")),
+            );
         }
 
         if !map.contains_key("app") && !map.contains_key("file") {
@@ -188,7 +211,7 @@ impl HttpSink for LogdnaConfig {
 
 impl LogdnaConfig {
     fn build_uri(&self, query: &str) -> Uri {
-        let host: Uri = self.host.clone().unwrap_or_else(|| HOST.clone()).into();
+        let host: Uri = self.endpoint.clone().unwrap_or_else(|| HOST.clone()).into();
 
         let uri = format!("{}{}?{}", host, PATH, query);
 
@@ -218,12 +241,13 @@ async fn healthcheck(config: LogdnaConfig, mut client: HttpClient) -> crate::Res
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::SinkConfig;
-    use crate::event::Event;
-    use crate::sinks::util::test::{build_test_server, load_sink};
-    use crate::test_util;
-    use futures::compat::Future01CompatExt;
-    use futures01::{Sink, Stream};
+    use crate::{
+        config::SinkConfig,
+        event::Event,
+        sinks::util::test::{build_test_server, load_sink},
+        test_util::{next_addr, random_lines, trace_init},
+    };
+    use futures::{stream, StreamExt};
     use serde_json::json;
 
     #[test]
@@ -232,17 +256,23 @@ mod tests {
             r#"
             api_key = "mylogtoken"
             hostname = "vector"
+            default_env = "acceptance"
+            codec.except_fields = ["magic"]
         "#,
         )
         .unwrap();
 
         let mut event1 = Event::from("hello world");
         event1.as_mut_log().insert("app", "notvector");
+        event1.as_mut_log().insert("magic", "vector");
 
         let mut event2 = Event::from("hello world");
         event2.as_mut_log().insert("file", "log.txt");
 
         let event3 = Event::from("hello world");
+
+        let mut event4 = Event::from("hello world");
+        event4.as_mut_log().insert("env", "staging");
 
         let event1_out = config.encode_event(event1).unwrap();
         let event1_out = event1_out.as_object().unwrap();
@@ -250,15 +280,20 @@ mod tests {
         let event2_out = event2_out.as_object().unwrap();
         let event3_out = config.encode_event(event3).unwrap();
         let event3_out = event3_out.as_object().unwrap();
+        let event4_out = config.encode_event(event4).unwrap();
+        let event4_out = event4_out.as_object().unwrap();
 
         assert_eq!(event1_out.get("app").unwrap(), &json!("notvector"));
         assert_eq!(event2_out.get("file").unwrap(), &json!("log.txt"));
         assert_eq!(event3_out.get("app").unwrap(), &json!("vector"));
+        assert_eq!(event3_out.get("env").unwrap(), &json!("acceptance"));
+        assert_eq!(event4_out.get("env").unwrap(), &json!("staging"));
     }
 
     #[tokio::test]
     async fn smoke() {
-        crate::test_util::trace_init();
+        trace_init();
+
         let (mut config, cx) = load_sink::<LogdnaConfig>(
             r#"
             api_key = "mylogtoken"
@@ -271,20 +306,20 @@ mod tests {
         .unwrap();
 
         // Make sure we can build the config
-        let _ = config.build(cx.clone()).unwrap();
+        let _ = config.build(cx.clone()).await.unwrap();
 
-        let addr = test_util::next_addr();
+        let addr = next_addr();
         // Swap out the host so we can force send it
         // to our local server
-        let host = format!("http://{}", addr).parse::<http::Uri>().unwrap();
-        config.host = Some(host.into());
+        let endpoint = format!("http://{}", addr).parse::<http::Uri>().unwrap();
+        config.endpoint = Some(endpoint.into());
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
-        let (rx, _trigger, server) = build_test_server(addr);
+        let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 
-        let lines = test_util::random_lines(100).take(10).collect::<Vec<_>>();
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
         let mut events = Vec::new();
 
         // Create 10 events where the first one contains custom
@@ -301,13 +336,12 @@ mod tests {
             events.push(event);
         }
 
-        let pump = sink.send_all(futures01::stream::iter_ok(events));
-        let _ = pump.compat().await.unwrap();
+        sink.run(stream::iter(events)).await.unwrap();
 
-        let output = rx.take(1).wait().collect::<Result<Vec<_>, _>>().unwrap();
+        let output = rx.next().await.unwrap();
 
-        let request = &output[0].0;
-        let body: serde_json::Value = serde_json::from_slice(&output[0].1[..]).unwrap();
+        let request = &output.0;
+        let body: serde_json::Value = serde_json::from_slice(&output.1[..]).unwrap();
 
         let query = request.uri.query().unwrap();
         assert!(query.contains("hostname=vector"));
@@ -328,6 +362,7 @@ mod tests {
             let line = line.as_object().unwrap();
 
             assert_eq!(line.get("app").unwrap(), &json!("vector"));
+            assert_eq!(line.get("env").unwrap(), &json!("production"));
             assert_eq!(line.get("line").unwrap(), &json!(lines[i]));
 
             if i == 0 {

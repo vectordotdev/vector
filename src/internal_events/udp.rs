@@ -2,44 +2,23 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct UdpEventReceived {
-    pub byte_size: usize,
+pub struct UdpSendIncomplete {
+    pub data_size: usize,
+    pub sent: usize,
 }
 
-impl InternalEvent for UdpEventReceived {
+impl InternalEvent for UdpSendIncomplete {
     fn emit_logs(&self) {
-        trace!(message = "received one event.");
+        error!(
+            message = "Could not send all data in one UDP packet; dropping some data.",
+            data_size = self.data_size,
+            sent = self.sent,
+            dropped = self.data_size - self.sent,
+            rate_limit_secs = 30,
+        );
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "source",
-            "component_type" => "socket",
-            "mode" => "udp",
-        );
-        counter!("bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "socket",
-            "mode" => "udp",
-        );
-    }
-}
-
-#[derive(Debug)]
-pub struct UdpSocketError {
-    pub error: std::io::Error,
-}
-
-impl InternalEvent for UdpSocketError {
-    fn emit_logs(&self) {
-        error!(message = "error reading datagram.", error = %self.error);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("socket_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "socket",
-            "mode" => "udp",
-        );
+        counter!("udp_send_errors", 1);
     }
 }

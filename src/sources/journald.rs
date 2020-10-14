@@ -1,17 +1,13 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event,
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{JournaldEventReceived, JournaldInvalidRecord},
     shutdown::ShutdownSignal,
     Pipeline,
 };
+use bytes::Bytes;
 use chrono::TimeZone;
-use futures::{
-    compat::Future01CompatExt,
-    executor::block_on,
-    future::{select, Either, FutureExt, TryFutureExt},
-};
+use futures::{compat::Future01CompatExt, ready, FutureExt, Stream, StreamExt, TryFutureExt};
 use futures01::{future, Future, Sink};
 use lazy_static::lazy_static;
 use nix::{
@@ -21,29 +17,35 @@ use nix::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Error as JsonError, Value as JsonValue};
 use snafu::{ResultExt, Snafu};
-use std::collections::{HashMap, HashSet};
-use std::fs::{File, OpenOptions};
-use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
-use std::iter::FromIterator;
-use std::path::PathBuf;
-use std::process::{Child, ChildStdout, Command, Stdio};
-use std::str::FromStr;
-use string_cache::DefaultAtom as Atom;
-use tokio::{
-    task::spawn_blocking,
-    time::{delay_for, Duration},
+use std::{
+    collections::{HashMap, HashSet},
+    io::SeekFrom,
+    iter::FromIterator,
+    path::PathBuf,
+    pin::Pin,
+    process::Stdio,
+    str::FromStr,
+    task::{Context, Poll},
 };
-use tracing::{dispatcher, field};
+
+use tokio::{
+    fs::{File, OpenOptions},
+    io::{self, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
+    process::{ChildStdout, Command},
+};
+use tracing_futures::Instrument;
 
 const DEFAULT_BATCH_SIZE: usize = 16;
 
+const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
+const CURSOR: &str = "__CURSOR";
+const HOSTNAME: &str = "_HOSTNAME";
+const MESSAGE: &str = "MESSAGE";
+const SYSTEMD_UNIT: &str = "_SYSTEMD_UNIT";
+const SOURCE_TIMESTAMP: &str = "_SOURCE_REALTIME_TIMESTAMP";
+const RECEIVED_TIMESTAMP: &str = "__REALTIME_TIMESTAMP";
+
 lazy_static! {
-    static ref CURSOR: Atom = Atom::from("__CURSOR");
-    static ref HOSTNAME: Atom = Atom::from("_HOSTNAME");
-    static ref MESSAGE: Atom = Atom::from("MESSAGE");
-    static ref SYSTEMD_UNIT: Atom = Atom::from("_SYSTEMD_UNIT");
-    static ref SOURCE_TIMESTAMP: Atom = Atom::from("_SOURCE_REALTIME_TIMESTAMP");
-    static ref RECEIVED_TIMESTAMP: Atom = Atom::from("__REALTIME_TIMESTAMP");
     static ref JOURNALCTL: PathBuf = "journalctl".into();
 }
 
@@ -78,11 +80,14 @@ inventory::submit! {
     SourceDescription::new::<JournaldConfig>("journald")
 }
 
-type Record = HashMap<Atom, String>;
+impl_generate_config_from_default!(JournaldConfig);
 
+type Record = HashMap<String, String>;
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "journald")]
 impl SourceConfig for JournaldConfig {
-    fn build(
+    async fn build(
         &self,
         name: &str,
         globals: &GlobalOptions,
@@ -112,8 +117,13 @@ impl SourceConfig for JournaldConfig {
             return Err(BuildError::DuplicatedUnit { unit }.into());
         }
 
-        let checkpointer = Checkpointer::new(data_dir)
-            .map_err(|err| format!("Unable to open checkpoint file: {}", err))?;
+        let mut checkpoint = data_dir;
+        checkpoint.push(CHECKPOINT_FILENAME);
+        let checkpointer = Checkpointer::new(checkpoint.clone())
+            .await
+            .map_err(|error| {
+                format!("Unable to open checkpoint file {:?}: {}", checkpoint, error)
+            })?;
 
         self.source::<Journalctl>(
             out,
@@ -124,6 +134,7 @@ impl SourceConfig for JournaldConfig {
             batch_size,
             self.remap_priority,
         )
+        .await
     }
 
     fn output_type(&self) -> DataType {
@@ -136,7 +147,7 @@ impl SourceConfig for JournaldConfig {
 }
 
 impl JournaldConfig {
-    fn source<J>(
+    async fn source<J>(
         &self,
         out: Pipeline,
         shutdown: ShutdownSignal,
@@ -154,60 +165,58 @@ impl JournaldConfig {
             .with(|record: Record| future::ok(create_event(record)));
 
         // Retrieve the saved checkpoint, and use it to seek forward in the journald log
-        let cursor = match checkpointer.get() {
+        let cursor = match checkpointer.get().await {
             Ok(cursor) => cursor,
             Err(err) => {
                 error!(
                     message = "Could not retrieve saved journald checkpoint",
-                    error = field::display(&err)
+                    error = %err
                 );
                 None
             }
         };
 
         let (journal, close) = J::new(self, cursor)?;
+        let journald_server = JournaldServer {
+            journal: Box::pin(journal),
+            include_units,
+            exclude_units,
+            channel: out,
+            shutdown: shutdown.clone(),
+            checkpointer,
+            batch_size,
+            remap_priority,
+        };
 
-        Ok(Box::new(future::lazy(move || {
-            info!(message = "Starting journald server.",);
-
-            let journald_server = JournaldServer {
-                journal,
-                include_units,
-                exclude_units,
-                channel: out,
-                shutdown: shutdown.clone(),
-                checkpointer,
-                batch_size,
-                remap_priority,
-            };
-            let span = info_span!("journald-server");
-            let dispatcher = dispatcher::get_default(|d| d.clone());
-            spawn_blocking(move || {
-                dispatcher::with_default(&dispatcher, || span.in_scope(|| journald_server.run()))
-            })
+        Ok(Box::new(
+            async move {
+                info!(message = "Starting journald server.",);
+                journald_server.run().await;
+                Ok(())
+            }
+            .instrument(info_span!("journald-server"))
             .boxed()
             .compat()
-            .map_err(|error| error!(message="Journald server unexpectedly stopped.",%error))
             .select(shutdown.map(move |_| close()))
             .map(|_| ())
-            .map_err(|_| ())
-        })))
+            .map_err(|_| ()),
+        ))
     }
 }
 
 fn create_event(record: Record) -> Event {
     let mut log = LogEvent::from_iter(record);
     // Convert some journald-specific field names into Vector standard ones.
-    if let Some(message) = log.remove(&MESSAGE) {
-        log.insert(event::log_schema().message_key().clone(), message);
+    if let Some(message) = log.remove(MESSAGE) {
+        log.insert(log_schema().message_key(), message);
     }
-    if let Some(host) = log.remove(&HOSTNAME) {
-        log.insert(event::log_schema().host_key().clone(), host);
+    if let Some(host) = log.remove(HOSTNAME) {
+        log.insert(log_schema().host_key(), host);
     }
     // Translate the timestamp, and so leave both old and new names.
     if let Some(timestamp) = log
-        .get(&SOURCE_TIMESTAMP)
-        .or_else(|| log.get(&RECEIVED_TIMESTAMP))
+        .get(&*SOURCE_TIMESTAMP)
+        .or_else(|| log.get(RECEIVED_TIMESTAMP))
     {
         if let Value::Bytes(timestamp) = timestamp {
             if let Ok(timestamp) = String::from_utf8_lossy(timestamp).parse::<u64>() {
@@ -215,15 +224,12 @@ fn create_event(record: Record) -> Event {
                     (timestamp / 1_000_000) as i64,
                     (timestamp % 1_000_000) as u32 * 1_000,
                 );
-                log.insert(
-                    event::log_schema().timestamp_key().clone(),
-                    Value::Timestamp(timestamp),
-                );
+                log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
             }
         }
     }
     // Add source type
-    log.try_insert(event::log_schema().source_type_key(), "journald");
+    log.try_insert(log_schema().source_type_key(), Bytes::from("journald"));
 
     log.into()
 }
@@ -238,11 +244,11 @@ fn fixup_unit(unit: &str) -> String {
     }
 }
 
-/// A `JournalSource` is a data source that works as an `Iterator`
+/// A `JournalSource` is a data source that works as a `Stream`
 /// producing lines that resemble journald JSON format records. These
-/// trait functions is an addition to the standard iteration methods for
+/// trait functions is an addition to the standard stream methods for
 /// initializing the source.
-trait JournalSource: Iterator<Item = Result<String, io::Error>> + Sized {
+trait JournalSource: Stream<Item = io::Result<String>> + Sized {
     /// (source, close_underlying_stream)
     fn new(
         config: &JournaldConfig,
@@ -250,10 +256,10 @@ trait JournalSource: Iterator<Item = Result<String, io::Error>> + Sized {
     ) -> crate::Result<(Self, Box<dyn FnOnce() + Send>)>;
 }
 
+#[pin_project::pin_project]
 struct Journalctl {
-    #[allow(dead_code)]
-    child: Child,
-    stdout: BufReader<ChildStdout>,
+    #[pin]
+    inner: io::Split<BufReader<ChildStdout>>,
 }
 
 impl JournalSource for Journalctl {
@@ -282,12 +288,13 @@ impl JournalSource for Journalctl {
         }
 
         let mut child = command.spawn().context(JournalctlSpawn)?;
-        let stdout = child.stdout.take().unwrap();
-        let stdout = BufReader::new(stdout);
+        let stdout = BufReader::new(child.stdout.take().unwrap());
 
         let pid = Pid::from_raw(child.id() as i32);
         Ok((
-            Journalctl { child, stdout },
+            Journalctl {
+                inner: stdout.split(b'\n'),
+            },
             Box::new(move || {
                 // Signal the child process to terminate so that the
                 // blocking future can be unblocked sooner rather
@@ -298,20 +305,20 @@ impl JournalSource for Journalctl {
     }
 }
 
-impl Iterator for Journalctl {
-    type Item = Result<String, io::Error>;
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut line = Vec::<u8>::new();
-        match self.stdout.read_until(b'\n', &mut line) {
-            Ok(0) => None,
-            Ok(_) => Some(Ok(String::from_utf8_lossy(&line).into())),
-            Err(err) => Some(Err(err)),
-        }
+impl Stream for Journalctl {
+    type Item = io::Result<String>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
+        Poll::Ready(match ready!(self.project().inner.poll_next(cx)) {
+            Some(Ok(segment)) => Some(Ok(String::from_utf8_lossy(&segment).into())),
+            Some(Err(err)) => Some(Err(err)),
+            None => None,
+        })
     }
 }
 
 struct JournaldServer<J, T> {
-    journal: J,
+    journal: Pin<Box<J>>,
     include_units: HashSet<String>,
     exclude_units: HashSet<String>,
     channel: T,
@@ -326,27 +333,24 @@ where
     J: JournalSource,
     T: Sink<SinkItem = Record, SinkError = ()>,
 {
-    pub fn run(mut self) {
-        let timeout = Duration::from_millis(500); // arbitrary timeout
+    pub async fn run(mut self) {
         let channel = &mut self.channel;
-        let mut shutdown = self.shutdown.compat();
 
         loop {
             let mut saw_record = false;
-            let mut at_end = false;
             let mut cursor: Option<String> = None;
 
             for _ in 0..self.batch_size {
-                let text = match self.journal.next() {
+                let text = match self.journal.next().await {
                     None => {
-                        at_end = true;
-                        break;
+                        let _ = self.shutdown.compat().await;
+                        return;
                     }
                     Some(Ok(text)) => text,
                     Some(Err(err)) => {
                         error!(
                             message = "Could not read from journald source",
-                            error = field::display(&err),
+                            error = %err,
                         );
                         break;
                     }
@@ -359,13 +363,13 @@ where
                         continue;
                     }
                 };
-                if let Some(tmp) = record.remove(&CURSOR) {
+                if let Some(tmp) = record.remove(&*CURSOR) {
                     cursor = Some(tmp);
                 }
 
                 saw_record = true;
 
-                let unit = record.get(&SYSTEMD_UNIT);
+                let unit = record.get(&*SYSTEMD_UNIT);
                 if filter_unit(unit, &self.include_units, &self.exclude_units) {
                     continue;
                 }
@@ -374,7 +378,7 @@ where
                     byte_size: text.len()
                 });
 
-                match channel.send(record).wait() {
+                match channel.send(record).compat().await {
                     Ok(_) => {}
                     Err(()) => error!(message = "Could not send journald log"),
                 }
@@ -382,24 +386,13 @@ where
 
             if saw_record {
                 if let Some(cursor) = cursor {
-                    if let Err(err) = self.checkpointer.set(&cursor) {
+                    if let Err(error) = self.checkpointer.set(&cursor).await {
                         error!(
                             message = "Could not set journald checkpoint.",
-                            error = field::display(&err)
+                            %error,
+                            filename = ?self.checkpointer.filename,
                         );
                     }
-                }
-            }
-
-            if at_end {
-                // This works only if run inside tokio context since we are using
-                // tokio's Timer. Outside of such context, this will panic on the first
-                // call. Also since we are using block_on here and wait in the above code,
-                // this should be run in it's own thread. `spawn_blocking` fulfills
-                // all of these requirements.
-                match block_on(select(shutdown, delay_for(timeout))) {
-                    Either::Left((_, _)) => return,
-                    Either::Right((_, future)) => shutdown = future,
                 }
             }
         }
@@ -470,33 +463,34 @@ fn filter_unit(
     }
 }
 
-const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
-
 struct Checkpointer {
     file: File,
+    filename: PathBuf,
 }
 
 impl Checkpointer {
-    fn new(mut filename: PathBuf) -> Result<Self, io::Error> {
-        filename.push(CHECKPOINT_FILENAME);
+    async fn new(filename: PathBuf) -> Result<Self, io::Error> {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
-            .open(filename)?;
-        Ok(Checkpointer { file })
+            .open(&filename)
+            .await?;
+        Ok(Checkpointer { file, filename })
     }
 
-    fn set(&mut self, token: &str) -> Result<(), io::Error> {
-        self.file.seek(SeekFrom::Start(0))?;
-        self.file.write_all(format!("{}\n", token).as_bytes())?;
+    async fn set(&mut self, token: &str) -> Result<(), io::Error> {
+        self.file.seek(SeekFrom::Start(0)).await?;
+        self.file
+            .write_all(format!("{}\n", token).as_bytes())
+            .await?;
         Ok(())
     }
 
-    fn get(&mut self) -> Result<Option<String>, io::Error> {
+    async fn get(&mut self) -> Result<Option<String>, io::Error> {
         let mut buf = Vec::<u8>::new();
-        self.file.seek(SeekFrom::Start(0))?;
-        self.file.read_to_end(&mut buf)?;
+        self.file.seek(SeekFrom::Start(0)).await?;
+        self.file.read_to_end(&mut buf).await?;
         match buf.len() {
             0 => Ok(None),
             _ => {
@@ -513,43 +507,44 @@ impl Checkpointer {
 #[cfg(test)]
 mod checkpointer_tests {
     use super::*;
-    use core::fmt::Debug;
-    use std::fs::File;
-    use std::io::Read;
-    use std::path::Path;
     use tempfile::tempdir;
-
-    fn open_read_close<F: AsRef<Path> + Debug>(path: F) -> Vec<u8> {
-        let mut file = File::open(&path).unwrap_or_else(|_| panic!("Could not open {:?}", path));
-        let mut buf = Vec::<u8>::new();
-        file.read_to_end(&mut buf)
-            .unwrap_or_else(|_| panic!("Could not read {:?}", path));
-        buf
-    }
+    use tokio::fs::read_to_string;
 
     #[test]
-    fn journald_checkpointer_works() {
+    fn generate_config() {
+        crate::test_util::test_generate_config::<JournaldConfig>();
+    }
+
+    #[tokio::test]
+    async fn journald_checkpointer_works() {
         let tempdir = tempdir().unwrap();
         let mut filename = tempdir.path().to_path_buf();
         filename.push(CHECKPOINT_FILENAME);
-        let mut checkpointer =
-            Checkpointer::new(tempdir.path().to_path_buf()).expect("Creating checkpointer failed!");
+        let mut checkpointer = Checkpointer::new(filename.clone())
+            .await
+            .expect("Creating checkpointer failed!");
 
-        assert!(checkpointer.get().unwrap().is_none());
+        assert!(checkpointer.get().await.unwrap().is_none());
 
         checkpointer
             .set("first test")
+            .await
             .expect("Setting checkpoint failed");
-        assert_eq!(checkpointer.get().unwrap().unwrap(), "first test");
-        let contents = open_read_close(&filename);
-        assert!(String::from_utf8_lossy(&contents).starts_with("first test\n"));
+        assert_eq!(checkpointer.get().await.unwrap().unwrap(), "first test");
+        let contents = read_to_string(filename.clone())
+            .await
+            .unwrap_or_else(|_| panic!("Failed to read: {:?}", filename));
+        assert!(contents.starts_with("first test\n"));
 
         checkpointer
             .set("second")
+            .await
             .expect("Setting checkpoint failed");
-        assert_eq!(checkpointer.get().unwrap().unwrap(), "second");
-        let contents = open_read_close(&filename);
-        assert!(String::from_utf8_lossy(&contents).starts_with("second\n"));
+        assert_eq!(checkpointer.get().await.unwrap().unwrap(), "second");
+        let contents = read_to_string(filename.clone())
+            .await
+            .unwrap_or_else(|_| panic!("Failed to read: {:?}", filename));
+        assert!(contents.starts_with("second\n"));
     }
 }
 
@@ -557,13 +552,16 @@ mod checkpointer_tests {
 mod tests {
     use super::*;
     use crate::Pipeline;
-    use futures01::stream::Stream;
+    use futures01::stream::Stream as _;
     use std::{
-        io::{self, BufReader, Cursor},
+        io::{BufRead, BufReader, Cursor},
         iter::FromIterator,
     };
     use tempfile::tempdir;
-    use tokio::time::timeout;
+    use tokio::{
+        io,
+        time::{delay_for, timeout, Duration},
+    };
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}
@@ -576,9 +574,8 @@ mod tests {
         reader: BufReader<Cursor<&'static str>>,
     }
 
-    impl Iterator for FakeJournal {
-        type Item = Result<String, io::Error>;
-        fn next(&mut self) -> Option<Self::Item> {
+    impl FakeJournal {
+        fn next(&mut self) -> Option<io::Result<String>> {
             let mut line = String::new();
             match self.reader.read_line(&mut line) {
                 Ok(0) => None,
@@ -588,6 +585,14 @@ mod tests {
                 }
                 Err(err) => Some(Err(err)),
             }
+        }
+    }
+
+    impl Stream for FakeJournal {
+        type Item = io::Result<String>;
+
+        fn poll_next(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Option<Self::Item>> {
+            Poll::Ready(Pin::into_inner(self).next())
         }
     }
 
@@ -616,13 +621,19 @@ mod tests {
         let (tx, rx) = Pipeline::new_test();
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
         let tempdir = tempdir().unwrap();
-        let mut checkpointer =
-            Checkpointer::new(tempdir.path().to_path_buf()).expect("Creating checkpointer failed!");
+        let mut filename = tempdir.path().to_path_buf();
+        filename.push(CHECKPOINT_FILENAME);
+        let mut checkpointer = Checkpointer::new(filename)
+            .await
+            .expect("Creating checkpointer failed!");
         let include_units = HashSet::<String>::from_iter(iunits.iter().map(|&s| s.into()));
         let exclude_units = HashSet::<String>::from_iter(xunits.iter().map(|&s| s.into()));
 
         if let Some(cursor) = cursor {
-            checkpointer.set(cursor).expect("Could not set checkpoint");
+            checkpointer
+                .set(cursor)
+                .await
+                .expect("Could not set checkpoint");
         }
 
         let config = JournaldConfig::default();
@@ -636,6 +647,7 @@ mod tests {
                 DEFAULT_BATCH_SIZE,
                 true,
             )
+            .await
             .expect("Creating journald source failed");
         tokio::spawn(source.compat());
 
@@ -657,7 +669,7 @@ mod tests {
             Value::Bytes("System Initialization".into())
         );
         assert_eq!(
-            received[0].as_log()[event::log_schema().source_type_key()],
+            received[0].as_log()[log_schema().source_type_key()],
             "journald".into()
         );
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140001000));
@@ -739,11 +751,11 @@ mod tests {
     }
 
     fn message(event: &Event) -> Value {
-        event.as_log()[&event::log_schema().message_key()].clone()
+        event.as_log()[log_schema().message_key()].clone()
     }
 
     fn timestamp(event: &Event) -> Value {
-        event.as_log()[&event::log_schema().timestamp_key()].clone()
+        event.as_log()[log_schema().timestamp_key()].clone()
     }
 
     fn value_ts(secs: i64, usecs: u32) -> Value {
@@ -751,6 +763,6 @@ mod tests {
     }
 
     fn priority(event: &Event) -> Value {
-        event.as_log()[&"PRIORITY".into()].clone()
+        event.as_log()["PRIORITY"].clone()
     }
 }

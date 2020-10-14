@@ -1,0 +1,7 @@
+[advisories]
+ignore = [
+    # net2: `net2` crate has been deprecated; use `socket2` instead
+    "RUSTSEC-2020-0016",
+    # failure: failure is officially deprecated/unmaintained
+    "RUSTSEC-2020-0036",
+]

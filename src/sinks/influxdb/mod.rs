@@ -1,20 +1,17 @@
 pub mod logs;
 pub mod metrics;
 
-pub(self) use super::{Healthcheck, RouterSink};
-
-use crate::sinks::util::http::HttpClient;
+use crate::sinks::util::{encode_namespace, http::HttpClient};
 use chrono::{DateTime, Utc};
-use futures::TryFutureExt;
-use futures01::Future;
+use futures::FutureExt;
 use http::{StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use snafu::Snafu;
 use std::collections::{BTreeMap, HashMap};
-use tower03::Service;
+use tower::Service;
 
-pub enum Field {
+pub(in crate::sinks) enum Field {
     /// string
     String(String),
     /// float
@@ -28,7 +25,7 @@ pub enum Field {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum ProtocolVersion {
+pub(in crate::sinks) enum ProtocolVersion {
     V1,
     V2,
 }
@@ -156,21 +153,22 @@ fn healthcheck(
 
     let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
-    let healthcheck = client
-        .call(request)
-        .compat()
-        .map_err(|err| err.into())
-        .and_then(|response| match response.status() {
-            StatusCode::OK => Ok(()),
-            StatusCode::NO_CONTENT => Ok(()),
-            other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
-        });
-
-    Ok(Box::new(healthcheck))
+    Ok(async move {
+        client
+            .call(request)
+            .await
+            .map_err(|err| err.into())
+            .and_then(|response| match response.status() {
+                StatusCode::OK => Ok(()),
+                StatusCode::NO_CONTENT => Ok(()),
+                other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
+            })
+    }
+    .boxed())
 }
 
 // https://v2.docs.influxdata.com/v2.0/reference/syntax/line-protocol/
-fn influx_line_protocol(
+pub(in crate::sinks) fn influx_line_protocol(
     protocol_version: ProtocolVersion,
     measurement: String,
     metric_type: &str,
@@ -276,7 +274,7 @@ fn encode_string(key: String, output: &mut String) {
     }
 }
 
-fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
+pub(in crate::sinks) fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     if let Some(ts) = timestamp {
         ts.timestamp_nanos()
     } else {
@@ -284,15 +282,11 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     }
 }
 
-fn encode_namespace(namespace: &str, name: &str) -> String {
-    if !namespace.is_empty() {
-        format!("{}.{}", namespace, name)
-    } else {
-        name.to_string()
-    }
-}
-
-fn encode_uri(endpoint: &str, path: &str, pairs: &[(&str, Option<String>)]) -> crate::Result<Uri> {
+pub(in crate::sinks) fn encode_uri(
+    endpoint: &str,
+    path: &str,
+    pairs: &[(&str, Option<String>)],
+) -> crate::Result<Uri> {
     let mut serializer = url::form_urlencoded::Serializer::new(String::new());
 
     for pair in pairs {
@@ -319,11 +313,13 @@ fn encode_uri(endpoint: &str, path: &str, pairs: &[(&str, Option<String>)]) -> c
 pub mod test_util {
     use super::*;
     use chrono::offset::TimeZone;
+    use std::fs::File;
+    use std::io::Read;
 
     pub(crate) const ORG: &str = "my-org";
     pub(crate) const BUCKET: &str = "my-bucket";
     pub(crate) const TOKEN: &str = "my-token";
-    pub(crate) const DATABASE: &str = "my-database";
+    pub(crate) const DATABASE: &str = "testdb";
 
     pub(crate) fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
@@ -370,35 +366,74 @@ pub mod test_util {
         (measurement, split[0], split[1].to_string(), split[2])
     }
 
-    pub(crate) fn onboarding_v2() {
-        crate::test_util::runtime().block_on_std(async {
-            let mut body = std::collections::HashMap::new();
-            body.insert("username", "my-user");
-            body.insert("password", "my-password");
-            body.insert("org", ORG);
-            body.insert("bucket", BUCKET);
-            body.insert("token", TOKEN);
+    pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest::Response {
+        let mut test_ca = Vec::<u8>::new();
+        File::open("tests/data/Vector_CA.crt")
+            .unwrap()
+            .read_to_end(&mut test_ca)
+            .unwrap();
+        let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
 
-            let client = reqwest::Client::builder()
-                .danger_accept_invalid_certs(true)
-                .build()
-                .unwrap();
+        let client = reqwest::Client::builder()
+            .add_root_certificate(test_ca)
+            .build()
+            .unwrap();
 
-            let res = client
-                .post("http://localhost:9999/api/v2/setup")
-                .json(&body)
-                .header("accept", "application/json")
-                .send()
-                .await
-                .unwrap();
+        client
+            .get(&format!("{}/query", endpoint))
+            .query(&[("q", query)])
+            .send()
+            .await
+            .unwrap()
+    }
 
-            let status = res.status();
+    pub(crate) async fn onboarding_v1(endpoint: &str) {
+        let status = query_v1(endpoint, &format!("create database {}", DATABASE))
+            .await
+            .status();
+        assert!(
+            status == http::StatusCode::OK,
+            format!("UnexpectedStatus: {}", status)
+        );
+    }
 
-            assert!(
-                status == StatusCode::CREATED || status == StatusCode::UNPROCESSABLE_ENTITY,
-                format!("UnexpectedStatus: {}", status)
-            );
-        });
+    pub(crate) async fn cleanup_v1(endpoint: &str) {
+        let status = query_v1(endpoint, &format!("drop database {}", DATABASE))
+            .await
+            .status();
+        assert!(
+            status == http::StatusCode::OK,
+            format!("UnexpectedStatus: {}", status)
+        );
+    }
+
+    pub(crate) async fn onboarding_v2() {
+        let mut body = std::collections::HashMap::new();
+        body.insert("username", "my-user");
+        body.insert("password", "my-password");
+        body.insert("org", ORG);
+        body.insert("bucket", BUCKET);
+        body.insert("token", TOKEN);
+
+        let client = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()
+            .unwrap();
+
+        let res = client
+            .post("http://localhost:9999/api/v2/setup")
+            .json(&body)
+            .header("accept", "application/json")
+            .send()
+            .await
+            .unwrap();
+
+        let status = res.status();
+
+        assert!(
+            status == StatusCode::CREATED || status == StatusCode::UNPROCESSABLE_ENTITY,
+            format!("UnexpectedStatus: {}", status)
+        );
     }
 }
 
@@ -656,12 +691,6 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_namespace() {
-        assert_eq!(encode_namespace("services", "status"), "services.status");
-        assert_eq!(encode_namespace("", "status"), "status")
-    }
-
-    #[test]
     fn test_encode_uri_valid() {
         let uri = encode_uri(
             "http://localhost:9999",
@@ -733,13 +762,11 @@ mod integration_tests {
             InfluxDB1Settings, InfluxDB2Settings,
         },
         sinks::util::http::HttpClient,
-        test_util::runtime,
     };
 
-    #[test]
-    fn influxdb2_healthchecks_ok() {
-        let mut rt = runtime();
-        onboarding_v2();
+    #[tokio::test]
+    async fn influxdb2_healthchecks_ok() {
+        onboarding_v2().await;
 
         let cx = SinkContext::new_test();
         let endpoint = "http://localhost:9999".to_string();
@@ -751,15 +778,15 @@ mod integration_tests {
         });
         let client = HttpClient::new(cx.resolver(), None).unwrap();
 
-        let healthcheck =
-            healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client).unwrap();
-        rt.block_on(healthcheck).unwrap();
+        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+            .unwrap()
+            .await
+            .unwrap();
     }
 
-    #[test]
-    fn influxdb2_healthchecks_fail() {
-        let mut rt = runtime();
-        onboarding_v2();
+    #[tokio::test]
+    async fn influxdb2_healthchecks_fail() {
+        onboarding_v2().await;
 
         let cx = SinkContext::new_test();
         let endpoint = "http://not_exist:9999".to_string();
@@ -771,14 +798,14 @@ mod integration_tests {
         });
         let client = HttpClient::new(cx.resolver(), None).unwrap();
 
-        let healthcheck =
-            healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client).unwrap();
-        rt.block_on(healthcheck).unwrap_err();
+        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+            .unwrap()
+            .await
+            .unwrap_err();
     }
 
-    #[test]
-    fn influxdb1_healthchecks_ok() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn influxdb1_healthchecks_ok() {
         let cx = SinkContext::new_test();
         let endpoint = "http://localhost:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {
@@ -791,14 +818,14 @@ mod integration_tests {
         let influxdb2_settings = None;
         let client = HttpClient::new(cx.resolver(), None).unwrap();
 
-        let healthcheck =
-            healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client).unwrap();
-        rt.block_on(healthcheck).unwrap();
+        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+            .unwrap()
+            .await
+            .unwrap();
     }
 
-    #[test]
-    fn influxdb1_healthchecks_fail() {
-        let mut rt = runtime();
+    #[tokio::test]
+    async fn influxdb1_healthchecks_fail() {
         let cx = SinkContext::new_test();
         let endpoint = "http://not_exist:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {
@@ -811,8 +838,9 @@ mod integration_tests {
         let influxdb2_settings = None;
         let client = HttpClient::new(cx.resolver(), None).unwrap();
 
-        let healthcheck =
-            healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client).unwrap();
-        rt.block_on(healthcheck).unwrap_err();
+        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+            .unwrap()
+            .await
+            .unwrap_err();
     }
 }

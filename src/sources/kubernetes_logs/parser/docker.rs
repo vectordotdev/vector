@@ -1,18 +1,15 @@
 use crate::{
+    config::log_schema,
     event::{self, Event, LogEvent, Value},
     internal_events::KubernetesLogsDockerFormatParseFailed,
     transforms::Transform,
 };
 use chrono::{DateTime, Utc};
-use lazy_static::lazy_static;
 use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
-use string_cache::DefaultAtom as Atom;
 
-lazy_static! {
-    pub static ref TIME: Atom = Atom::from("time");
-    pub static ref LOG: Atom = Atom::from("log");
-}
+pub const TIME: &str = "time";
+pub const LOG: &str = "log";
 
 /// Parser for the docker log format.
 ///
@@ -34,7 +31,7 @@ impl Transform for Docker {
 
 /// Parses `message` as json object and removes it.
 fn parse_json(log: &mut LogEvent) -> Option<()> {
-    let to_parse = log.remove(&event::log_schema().message_key())?.as_bytes();
+    let to_parse = log.remove(log_schema().message_key())?.as_bytes();
 
     match serde_json::from_slice(to_parse.as_ref()) {
         Ok(JsonValue::Object(object)) => {
@@ -54,25 +51,22 @@ const DOCKER_MESSAGE_SPLIT_THRESHOLD: usize = 16 * 1024; // 16 Kib
 
 fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     // Parse and rename timestamp.
-    let time = log.remove(&TIME).context(TimeFieldMissing)?;
+    let time = log.remove(&*TIME).context(TimeFieldMissing)?;
     let time = match time {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::TimeValueUnexpectedType),
     };
     let time = DateTime::parse_from_rfc3339(String::from_utf8_lossy(time.as_ref()).as_ref())
         .context(TimeParsing)?;
-    log.insert(
-        event::log_schema().timestamp_key(),
-        time.with_timezone(&Utc),
-    );
+    log.insert(log_schema().timestamp_key(), time.with_timezone(&Utc));
 
     // Parse message, remove trailing newline and detect if it's partial.
-    let message = log.remove(&LOG).context(LogFieldMissing)?;
+    let message = log.remove(&*LOG).context(LogFieldMissing)?;
     let mut message = match message {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::LogValueUnexpectedType),
     };
-    // Here we apply out heuristics to detect if messge is partial.
+    // Here we apply out heuristics to detect if message is partial.
     // Partial messages are only split in docker at the maximum message length
     // (`DOCKER_MESSAGE_SPLIT_THRESHOLD`).
     // Thus, for a message to be partial it also has to have exactly that
@@ -88,11 +82,11 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
         message.truncate(message.len() - 1);
         is_partial = false;
     };
-    log.insert(event::log_schema().message_key(), message);
+    log.insert(log_schema().message_key(), message);
 
     // For partial messages add a partial event indicator.
     if is_partial {
-        log.insert(event::PARTIAL_STR, true);
+        log.insert(&*event::PARTIAL, true);
     }
 
     Ok(())
@@ -109,9 +103,7 @@ enum NormalizationError {
 
 #[cfg(test)]
 pub mod tests {
-    use super::super::test_util;
-    use super::Docker;
-    use crate::event::LogEvent;
+    use super::{super::test_util, *};
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()

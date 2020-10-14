@@ -4,6 +4,7 @@ use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::discriminant::Discriminant,
     event::{Event, LogEvent},
+    internal_events::{ReduceEventProcessed, ReduceStaleEventFlushed},
 };
 use async_stream::stream;
 use futures::{
@@ -15,7 +16,6 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
 use std::time::{Duration, Instant};
-use string_cache::DefaultAtom as Atom;
 
 mod merge_strategy;
 
@@ -47,9 +47,12 @@ inventory::submit! {
     TransformDescription::new::<ReduceConfig>("reduce")
 }
 
+impl_generate_config_from_default!(ReduceConfig);
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let t = Reduce::new(self)?;
         Ok(Box::new(t))
     }
@@ -140,7 +143,7 @@ impl ReduceState {
 pub struct Reduce {
     expire_after: Duration,
     flush_period: Duration,
-    identifier_fields: Vec<Atom>,
+    identifier_fields: Vec<String>,
     merge_strategies: IndexMap<String, MergeStrategy>,
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
     ends_when: Option<Box<dyn Condition>>,
@@ -154,12 +157,7 @@ impl Reduce {
             None
         };
 
-        let identifier_fields = config
-            .identifier_fields
-            .clone()
-            .into_iter()
-            .map(Atom::from)
-            .collect();
+        let identifier_fields = config.identifier_fields.clone().into_iter().collect();
 
         Ok(Reduce {
             expire_after: Duration::from_millis(config.expire_after_ms.unwrap_or(30000)),
@@ -180,6 +178,7 @@ impl Reduce {
         }
         for k in &flush_discriminants {
             if let Some(t) = self.reduce_merge_states.remove(k) {
+                emit!(ReduceStaleEventFlushed);
                 output.push(Event::from(t.flush()));
             }
         }
@@ -230,6 +229,8 @@ impl Transform for Reduce {
             }
         }
 
+        emit!(ReduceEventProcessed);
+
         self.flush_into(output);
     }
 
@@ -265,7 +266,7 @@ impl Transform for Reduce {
                       me.transform_into(&mut output, event);
                       false
                     }
-                    Some(Err(())) => panic!("unexpected error reading channel"),
+                    Some(Err(())) => panic!("Unexpected error reading channel"),
                   }
                 }
             };
@@ -293,7 +294,12 @@ mod test {
     use serde_json::json;
 
     #[test]
-    fn reduce_from_condition() {
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ReduceConfig>();
+    }
+
+    #[tokio::test]
+    async fn reduce_from_condition() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
 identifier_fields = [ "request_id" ]
@@ -304,6 +310,7 @@ identifier_fields = [ "request_id" ]
         )
         .unwrap()
         .build(TransformContext::new_test())
+        .await
         .unwrap();
 
         let mut outputs = Vec::new();
@@ -331,13 +338,10 @@ identifier_fields = [ "request_id" ]
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 1".into()
         );
-        assert_eq!(
-            outputs.first().unwrap().as_log()[&"counter".into()],
-            Value::from(8)
-        );
+        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(8));
 
         outputs.clear();
 
@@ -350,21 +354,18 @@ identifier_fields = [ "request_id" ]
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 2".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"extra_field".into()],
+            outputs.first().unwrap().as_log()["extra_field"],
             "value1".into()
         );
-        assert_eq!(
-            outputs.first().unwrap().as_log()[&"counter".into()],
-            Value::from(7)
-        );
+        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(7));
     }
 
-    #[test]
-    fn reduce_merge_strategies() {
+    #[tokio::test]
+    async fn reduce_merge_strategies() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
 identifier_fields = [ "request_id" ]
@@ -379,6 +380,7 @@ merge_strategies.baz = "max"
         )
         .unwrap()
         .build(TransformContext::new_test())
+        .await
         .unwrap();
 
         let mut outputs = Vec::new();
@@ -410,22 +412,22 @@ merge_strategies.baz = "max"
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 1".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"foo".into()],
+            outputs.first().unwrap().as_log()["foo"],
             "first foo second foo".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"bar".into()],
+            outputs.first().unwrap().as_log()["bar"],
             Value::Array(vec!["first bar".into(), 2.into(), "third bar".into()]),
         );
-        assert_eq!(outputs.first().unwrap().as_log()[&"baz".into()], 3.into(),);
+        assert_eq!(outputs.first().unwrap().as_log()["baz"], 3.into(),);
     }
 
-    #[test]
-    fn missing_identifier() {
+    #[tokio::test]
+    async fn missing_identifier() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
 identifier_fields = [ "request_id" ]
@@ -436,6 +438,7 @@ identifier_fields = [ "request_id" ]
         )
         .unwrap()
         .build(TransformContext::new_test())
+        .await
         .unwrap();
 
         let mut outputs = Vec::new();
@@ -463,13 +466,10 @@ identifier_fields = [ "request_id" ]
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 1".into()
         );
-        assert_eq!(
-            outputs.first().unwrap().as_log()[&"counter".into()],
-            Value::from(8)
-        );
+        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(8));
 
         outputs.clear();
 
@@ -481,21 +481,18 @@ identifier_fields = [ "request_id" ]
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 2".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"extra_field".into()],
+            outputs.first().unwrap().as_log()["extra_field"],
             "value1".into()
         );
-        assert_eq!(
-            outputs.first().unwrap().as_log()[&"counter".into()],
-            Value::from(7)
-        );
+        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(7));
     }
 
-    #[test]
-    fn arrays() {
+    #[tokio::test]
+    async fn arrays() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
 identifier_fields = [ "request_id" ]
@@ -509,6 +506,7 @@ merge_strategies.bar = "concat"
         )
         .unwrap()
         .build(TransformContext::new_test())
+        .await
         .unwrap();
 
         let mut outputs = Vec::new();
@@ -540,13 +538,13 @@ merge_strategies.bar = "concat"
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"foo".into()],
+            outputs.first().unwrap().as_log()["foo"],
             json!([[1, 3], [5, 7], "done"]).into()
         );
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"bar".into()],
+            outputs.first().unwrap().as_log()["bar"],
             json!([1, 3, 5, 7, "done"]).into()
         );
 
@@ -567,11 +565,11 @@ merge_strategies.bar = "concat"
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"foo".into()],
+            outputs.first().unwrap().as_log()["foo"],
             json!([[2, 4], [6, 8], "done"]).into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"bar".into()],
+            outputs.first().unwrap().as_log()["bar"],
             json!([2, 4, 6, 8, "done"]).into()
         );
     }

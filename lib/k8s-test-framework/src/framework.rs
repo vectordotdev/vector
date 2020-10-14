@@ -22,12 +22,14 @@ impl Framework {
     pub async fn vector(
         &self,
         namespace: &str,
-        custom_resource: &str,
+        helm_chart: &str,
+        config: vector::Config<'_>,
     ) -> Result<up_down::Manager<vector::CommandBuilder>> {
         let mut manager = vector::manager(
             self.interface.deploy_vector_command.as_str(),
             namespace,
-            custom_resource,
+            helm_chart,
+            config,
         )?;
         manager.up().await?;
         Ok(manager)
@@ -66,7 +68,7 @@ impl Framework {
         exec_tail(&self.interface.kubectl_command, namespace, resource, file)
     }
 
-    /// Wait for a set of `resources` in a specified `namespace` to acheive
+    /// Wait for a set of `resources` in a specified `namespace` to achieve
     /// `wait_for` state.
     /// Use `extra` to pass additional arguments to `kubectl`.
     pub async fn wait<'a>(
@@ -86,7 +88,7 @@ impl Framework {
         .await
     }
 
-    /// Wait for a set of `resources` in any namespace to acheive `wait_for`
+    /// Wait for a set of `resources` in any namespace to achieve `wait_for`
     /// state.
     /// Use `extra` to pass additional arguments to `kubectl`.
     pub async fn wait_all_namespaces<'a>(

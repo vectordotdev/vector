@@ -5,7 +5,7 @@
 //! developer as executable commands, rather than using a rust interface to talk
 //! to k8s cluster directly.
 //! This enables very trivial troubleshooting and allows us to use the same
-//! deployment mechanisms that we use for prodcution - effectively giving us
+//! deployment mechanisms that we use for production - effectively giving us
 //! the opportunity to test e2e: not just the code layer, but also the
 //! deployment configuration.
 
@@ -17,12 +17,14 @@
 
 mod exec_tail;
 pub mod framework;
+mod helm_values_file;
 pub mod interface;
 mod lock;
 mod log_lookup;
 pub mod namespace;
 mod reader;
 mod resource_file;
+mod temp_file;
 pub mod test_pod;
 mod up_down;
 mod util;

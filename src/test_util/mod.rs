@@ -1,33 +1,37 @@
 use crate::{
-    config::{Config, ConfigDiff},
-    event::LogEvent,
-    runtime::Runtime,
+    config::{Config, ConfigDiff, GenerateConfig},
     topology::{self, RunningTopology},
     trace, Event,
 };
+use flate2::read::GzDecoder;
 use futures::{
-    compat::Stream01CompatExt, stream, FutureExt as _, SinkExt, Stream, StreamExt, TryFutureExt,
-    TryStreamExt,
+    compat::Stream01CompatExt, future, ready, stream, task::noop_waker_ref, FutureExt, SinkExt,
+    Stream, StreamExt, TryStreamExt,
 };
-use futures01::{
-    future, stream as stream01, sync::mpsc, try_ready, Async, Future, Poll, Stream as Stream01,
-};
+use futures01::{sync::mpsc, Stream as Stream01};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
+use portpicker::pick_unused_port;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::{
     collections::HashMap,
     convert::Infallible,
     fs::File,
+    future::Future,
     io::Read,
-    iter, mem,
-    net::{Shutdown, SocketAddr},
+    iter,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr},
     path::{Path, PathBuf},
-    sync::atomic::{AtomicUsize, Ordering},
-    sync::Arc,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    task::{Context, Poll},
 };
 use tokio::{
     io::{AsyncRead, AsyncWrite, Result as IoResult},
     net::{TcpListener, TcpStream},
+    runtime,
     sync::oneshot,
     task::JoinHandle,
     time::{delay_for, Duration, Instant},
@@ -41,80 +45,50 @@ macro_rules! assert_downcast_matches {
     ($e:expr, $t:ty, $v:pat) => {{
         match $e.downcast_ref::<$t>() {
             Some($v) => (),
-            got => panic!("assertion failed: got wrong error variant {:?}", got),
+            got => panic!("Assertion failed: got wrong error variant {:?}", got),
         }
     }};
 }
 
 #[macro_export]
-macro_rules! assert_within {
-    // Adapted from std::assert_eq
-    ($expr:expr, $low:expr, $high:expr) => ({
-        match (&$expr, &$low, &$high) {
-            (expr, low, high) => {
-                if *expr < *low {
-                    panic!(
-                        r#"assertion failed: `(expr < low)`
-expr: {} = `{:?}`,
- low: `{:?}`"#,
-                        stringify!($expr),
-                        &*expr,
-                        &*low
-                    );
-                }
-                if *expr > *high {
-                    panic!(
-                        r#"assertion failed: `(expr > high)`
-expr: {} = `{:?}`,
-high: `{:?}`"#,
-                        stringify!($expr),
-                        &*expr,
-                        &*high
-                    );
-                }
-            }
+macro_rules! log_event {
+    ($($key:expr => $value:expr),*  $(,)?) => {
+        {
+            let mut event = Event::Log(LogEvent::default());
+            let log = event.as_mut_log();
+            $(
+                log.insert($key, $value);
+            )*
+            event
         }
-    });
-    ($expr:expr, $low:expr, $high:expr, $($arg:tt)+) => ({
-        match (&$expr, &$low, &$high) {
-            (expr, low, high) => {
-                if *expr < *low {
-                    panic!(
-                        r#"assertion failed: `(expr < low)`
-expr: {} = `{:?}`,
- low: `{:?}`
-{}"#,
-                        stringify!($expr),
-                        &*expr,
-                        &*low,
-                        format_args!($($arg)+)
-                    );
-                }
-                if *expr > *high {
-                    panic!(
-                        r#"assertion failed: `(expr > high)`
-expr: {} = `{:?}`,
-high: `{:?}`
-{}"#,
-                        stringify!($expr),
-                        &*expr,
-                        &*high,
-                        format_args!($($arg)+)
-                    );
-                }
-            }
-        }
-    });
-
+    };
 }
 
-static NEXT_PORT: AtomicUsize = AtomicUsize::new(1234);
+pub fn test_generate_config<T>()
+where
+    for<'de> T: GenerateConfig + serde::Deserialize<'de>,
+{
+    let cfg = T::generate_config().to_string();
+    toml::from_str::<T>(&cfg).expect("Invalid config generated");
+}
+
+pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
+    let test_file = match File::open(path) {
+        Ok(file) => file,
+        Err(e) => return Err(e.into()),
+    };
+    let value: serde_json::Value = serde_json::from_reader(test_file)?;
+    Ok(value)
+}
 
 pub fn next_addr() -> SocketAddr {
-    use std::net::{IpAddr, Ipv4Addr};
-
-    let port = NEXT_PORT.fetch_add(1, Ordering::AcqRel) as u16;
+    let port = pick_unused_port().unwrap();
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port)
+}
+
+pub fn next_addr_v6() -> SocketAddr {
+    let port = pick_unused_port().unwrap();
+    SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), port)
 }
 
 pub fn trace_init() {
@@ -158,11 +132,17 @@ pub async fn send_lines_tls(
     addr: SocketAddr,
     host: String,
     lines: impl Iterator<Item = String>,
+    ca: impl Into<Option<&Path>>,
 ) -> Result<(), Infallible> {
     let stream = TcpStream::connect(&addr).await.unwrap();
 
     let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
-    connector.set_verify(SslVerifyMode::NONE);
+    if let Some(ca) = ca.into() {
+        connector.set_ca_file(ca).unwrap();
+    } else {
+        connector.set_verify(SslVerifyMode::NONE);
+    }
+
     let config = connector.build().configure().unwrap();
 
     let stream = tokio_openssl::connect(config, &host, stream).await.unwrap();
@@ -192,35 +172,29 @@ pub fn temp_dir() -> PathBuf {
 pub fn random_lines_with_stream(
     len: usize,
     count: usize,
-) -> (Vec<String>, impl Stream01<Item = Event, Error = ()>) {
+) -> (Vec<String>, impl Stream<Item = Event>) {
     let lines = (0..count).map(|_| random_string(len)).collect::<Vec<_>>();
-    let stream = stream01::iter_ok(lines.clone().into_iter().map(Event::from));
+    let stream = stream::iter(lines.clone()).map(Event::from);
     (lines, stream)
+}
+
+fn random_events_with_stream_generic<F>(
+    count: usize,
+    generator: F,
+) -> (Vec<Event>, impl Stream<Item = Event>)
+where
+    F: Fn() -> Event,
+{
+    let events = (0..count).map(|_| generator()).collect::<Vec<_>>();
+    let stream = stream::iter(events.clone());
+    (events, stream)
 }
 
 pub fn random_events_with_stream(
     len: usize,
     count: usize,
-) -> (Vec<Event>, impl Stream01<Item = Event, Error = ()>) {
+) -> (Vec<Event>, impl Stream<Item = Event>) {
     random_events_with_stream_generic(count, move || Event::from(random_string(len)))
-}
-
-pub fn random_nested_events_with_stream(
-    len: usize,
-    breadth: usize,
-    depth: usize,
-    count: usize,
-) -> (Vec<Event>, impl Stream01<Item = Event, Error = ()>) {
-    random_events_with_stream_generic(count, move || {
-        let mut log = LogEvent::default();
-
-        let tree = random_pseudonested_map(len, breadth, depth);
-        for (k, v) in tree.into_iter() {
-            log.insert(k, v);
-        }
-
-        Event::Log(log)
-    })
 }
 
 pub fn random_string(len: usize) -> String {
@@ -249,16 +223,27 @@ pub fn random_maps(
     iter::repeat(()).map(move |_| random_map(max_size, field_len))
 }
 
-pub fn collect_n<T>(mut rx: mpsc::Receiver<T>, n: usize) -> impl Future<Item = Vec<T>, Error = ()> {
-    let mut events = Vec::new();
+pub async fn collect_n<T>(rx: mpsc::Receiver<T>, n: usize) -> Result<Vec<T>, ()> {
+    rx.compat().take(n).try_collect().await
+}
 
-    future::poll_fn(move || {
-        while events.len() < n {
-            let e = try_ready!(rx.poll()).unwrap();
-            events.push(e);
+pub async fn collect_ready<S>(rx: S) -> Result<Vec<S::Item>, ()>
+where
+    S: Stream01<Item = Event, Error = ()>,
+{
+    let mut rx = rx.compat();
+
+    let waker = noop_waker_ref();
+    let mut cx = Context::from_waker(waker);
+
+    let mut vec = Vec::new();
+    loop {
+        match rx.poll_next_unpin(&mut cx) {
+            Poll::Ready(Some(Ok(item))) => vec.push(item),
+            Poll::Ready(Some(Err(()))) => return Err(()),
+            Poll::Ready(None) | Poll::Pending => return Ok(vec),
         }
-        Ok(Async::Ready(mem::replace(&mut events, Vec::new())))
-    })
+    }
 }
 
 pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
@@ -269,190 +254,126 @@ pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     output.lines().map(|s| s.to_owned()).collect()
 }
 
-pub fn block_on<F, R, E>(future: F) -> Result<R, E>
-where
-    F: Send + 'static + Future<Item = R, Error = E>,
-    R: Send + 'static,
-    E: Send + 'static,
-{
-    let mut rt = runtime();
-
-    rt.block_on(future)
+pub fn lines_from_gzip_file<P: AsRef<Path>>(path: P) -> Vec<String> {
+    trace!(message = "Reading gzip file.", path = %path.as_ref().display());
+    let mut file = File::open(path).unwrap();
+    let mut gzip_bytes = Vec::new();
+    file.read_to_end(&mut gzip_bytes).unwrap();
+    let mut output = String::new();
+    GzDecoder::new(&gzip_bytes[..])
+        .read_to_string(&mut output)
+        .unwrap();
+    output.lines().map(|s| s.to_owned()).collect()
 }
 
-pub fn block_on_std<F>(future: F) -> F::Output
-where
-    F: std::future::Future + Send + 'static,
-    F::Output: Send + 'static,
-{
-    let mut rt = runtime();
-
-    rt.block_on_std(future)
-}
-
-pub fn runtime() -> Runtime {
-    Runtime::single_threaded().unwrap()
-}
-
-pub fn basic_scheduler_block_on_std<F>(future: F) -> F::Output
-where
-    F: std::future::Future + Send + 'static,
-    F::Output: Send + 'static,
-{
-    // `tokio::time::advance` is not work on threaded scheduler
-    // `tokio_compat::runtime::current_thread` use `basic_scheduler`
-    // Example: https://pastebin.com/7fK4nxEW
-    tokio_compat::runtime::current_thread::Builder::new()
+pub fn runtime() -> runtime::Runtime {
+    runtime::Builder::new()
+        .threaded_scheduler()
+        .enable_all()
         .build()
         .unwrap()
-        // This is limit of `compat`, otherwise we get error: `no Task is currently running`
-        .block_on(future.never_error().boxed().compat())
-        .unwrap()
 }
 
-pub async fn wait_for<F, Fut>(mut f: F)
+// Wait for a Future to resolve, or the duration to elapse (will panic)
+pub async fn wait_for_duration<F, Fut>(mut f: F, duration: Duration)
 where
     F: FnMut() -> Fut,
-    Fut: std::future::Future<Output = bool> + Send + 'static,
+    Fut: Future<Output = bool> + Send + 'static,
 {
     let started = Instant::now();
     while !f().await {
         delay_for(Duration::from_millis(5)).await;
-        if started.elapsed().as_secs() > 5 {
-            panic!("timed out while waiting");
+        if started.elapsed() > duration {
+            panic!("Timed out while waiting");
         }
     }
 }
 
+// Wait for 5 seconds
+pub async fn wait_for<F, Fut>(f: F)
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = bool> + Send + 'static,
+{
+    wait_for_duration(f, Duration::from_secs(5)).await
+}
+
+// Wait (for 5 secs) for a TCP socket to be reachable
 pub async fn wait_for_tcp(addr: SocketAddr) {
     wait_for(|| async move { TcpStream::connect(addr).await.is_ok() }).await
 }
 
-pub fn wait_for_sync(mut f: impl FnMut() -> bool) {
-    let wait = std::time::Duration::from_millis(5);
-    let limit = std::time::Duration::from_secs(5);
-    let mut attempts = 0;
-    while !f() {
-        std::thread::sleep(wait);
-        attempts += 1;
-        if attempts * wait > limit {
-            panic!("timed out while waiting");
-        }
-    }
+// Allows specifying a custom duration to wait for a TCP socket to be reachable
+pub async fn wait_for_tcp_duration(addr: SocketAddr, duration: Duration) {
+    wait_for_duration(
+        || async move { TcpStream::connect(addr).await.is_ok() },
+        duration,
+    )
+    .await
 }
 
-pub fn wait_for_atomic_usize_sync<T, F>(val: T, unblock: F)
+pub async fn wait_for_atomic_usize<T, F>(value: T, unblock: F)
 where
     T: AsRef<AtomicUsize>,
     F: Fn(usize) -> bool,
 {
-    let val = val.as_ref();
-    wait_for_sync(|| unblock(val.load(Ordering::SeqCst)))
+    let value = value.as_ref();
+    wait_for(|| {
+        let result = unblock(value.load(Ordering::SeqCst));
+        future::ready(result)
+    })
+    .await
 }
 
-#[derive(Debug)]
-pub struct CollectN<S>
+// Retries a func every `retry` duration until given an Ok(T); panics after `until` elapses
+pub async fn retry_until<'a, F, Fut, T, E>(mut f: F, retry: Duration, until: Duration) -> T
 where
-    S: Stream01,
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, E>> + Send + 'a,
 {
-    stream: Option<S>,
-    remaining: usize,
-    items: Option<Vec<S::Item>>,
-}
-
-impl<S: Stream01> CollectN<S> {
-    pub fn new(s: S, n: usize) -> Self {
-        Self {
-            stream: Some(s),
-            remaining: n,
-            items: Some(Vec::new()),
+    let started = Instant::now();
+    while started.elapsed() < until {
+        match f().await {
+            Ok(res) => return res,
+            Err(_) => tokio::time::delay_for(retry).await,
         }
     }
+    panic!("Timeout")
 }
 
-impl<S> Future for CollectN<S>
-where
-    S: Stream01,
-{
-    type Item = (S, Vec<S::Item>);
-    type Error = S::Error;
+#[cfg(test)]
+mod tests {
+    use super::retry_until;
+    use std::{
+        sync::{Arc, RwLock},
+        time::Duration,
+    };
 
-    fn poll(&mut self) -> Poll<(S, Vec<S::Item>), S::Error> {
-        let stream = self.stream.take();
-        if stream.is_none() {
-            panic!("Stream is missing");
+    // helper which errors the first 3x, and succeeds on the 4th
+    async fn retry_until_helper(count: Arc<RwLock<i32>>) -> Result<(), ()> {
+        if *count.read().unwrap() < 3 {
+            let mut c = count.write().unwrap();
+            *c += 1;
+            return Err(());
         }
-        let mut stream = stream.unwrap();
-
-        loop {
-            if self.remaining == 0 {
-                return Ok(Async::Ready((stream, self.items.take().unwrap())));
-            }
-            match stream.poll() {
-                Ok(Async::Ready(Some(e))) => {
-                    self.items.as_mut().unwrap().push(e);
-                    self.remaining -= 1;
-                }
-                Ok(Async::Ready(None)) => {
-                    return Ok(Async::Ready((stream, self.items.take().unwrap())));
-                }
-                Ok(Async::NotReady) => {
-                    self.stream.replace(stream);
-                    return Ok(Async::NotReady);
-                }
-                Err(e) => {
-                    return Err(e);
-                }
-            }
-        }
+        Ok(())
     }
-}
 
-#[derive(Debug)]
-pub struct CollectCurrent<S>
-where
-    S: Stream01,
-{
-    stream: Option<S>,
-}
+    #[tokio::test]
+    async fn retry_until_before_timeout() {
+        let count = Arc::new(RwLock::new(0));
+        let func = || {
+            let count = Arc::clone(&count);
+            retry_until_helper(count)
+        };
 
-impl<S: Stream01> CollectCurrent<S> {
-    pub fn new(s: S) -> Self {
-        Self { stream: Some(s) }
-    }
-}
-
-impl<S> Future for CollectCurrent<S>
-where
-    S: Stream01,
-{
-    type Item = (S, Vec<S::Item>);
-    type Error = S::Error;
-
-    fn poll(&mut self) -> Poll<(S, Vec<S::Item>), S::Error> {
-        if let Some(mut stream) = self.stream.take() {
-            let mut items = vec![];
-
-            loop {
-                match stream.poll() {
-                    Ok(Async::Ready(Some(e))) => items.push(e),
-                    Ok(Async::Ready(None)) | Ok(Async::NotReady) => {
-                        return Ok(Async::Ready((stream, items)));
-                    }
-                    Err(e) => {
-                        return Err(e);
-                    }
-                }
-            }
-        } else {
-            panic!("Future already completed");
-        }
+        retry_until(func, Duration::from_millis(10), Duration::from_secs(1)).await;
     }
 }
 
 pub struct CountReceiver<T> {
     count: Arc<AtomicUsize>,
-    trigger: oneshot::Sender<()>,
+    trigger: Option<oneshot::Sender<()>>,
     connected: Option<oneshot::Receiver<()>>,
     handle: JoinHandle<Vec<T>>,
 }
@@ -462,22 +383,17 @@ impl<T: Send + 'static> CountReceiver<T> {
         self.count.load(Ordering::Relaxed)
     }
 
-    /// Succeds once first connection has been made.
+    /// Succeeds once first connection has been made.
     pub async fn connected(&mut self) {
         if let Some(tripwire) = self.connected.take() {
             tripwire.await.unwrap();
         }
     }
 
-    pub async fn wait(self) -> Vec<T> {
-        let _ = self.trigger.send(());
-        self.handle.await.unwrap()
-    }
-
     fn new<F, Fut>(make_fut: F) -> CountReceiver<T>
     where
         F: FnOnce(Arc<AtomicUsize>, oneshot::Receiver<()>, oneshot::Sender<()>) -> Fut,
-        Fut: std::future::Future<Output = Vec<T>> + Send + 'static,
+        Fut: Future<Output = Vec<T>> + Send + 'static,
     {
         let count = Arc::new(AtomicUsize::new(0));
         let (trigger, tripwire) = oneshot::channel();
@@ -485,10 +401,24 @@ impl<T: Send + 'static> CountReceiver<T> {
 
         CountReceiver {
             count: Arc::clone(&count),
-            trigger,
+            trigger: Some(trigger),
             connected: Some(connected),
             handle: tokio::spawn(make_fut(count, tripwire, trigger_connected)),
         }
+    }
+}
+
+impl<T> Future for CountReceiver<T> {
+    type Output = Vec<T>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+        if let Some(trigger) = this.trigger.take() {
+            let _ = trigger.send(());
+        }
+
+        let result = ready!(this.handle.poll_unpin(cx));
+        Poll::Ready(result.unwrap())
     }
 }
 
@@ -571,56 +501,12 @@ impl CountReceiver<Event> {
     }
 }
 
-fn random_events_with_stream_generic<F>(
-    count: usize,
-    generator: F,
-) -> (Vec<Event>, impl Stream01<Item = Event, Error = ()>)
-where
-    F: Fn() -> Event,
-{
-    let events = (0..count).map(|_| generator()).collect::<Vec<_>>();
-    let stream = stream01::iter_ok(events.clone().into_iter());
-    (events, stream)
-}
-
-fn random_pseudonested_map(len: usize, breadth: usize, depth: usize) -> HashMap<String, String> {
-    if breadth == 0 || depth == 0 {
-        return HashMap::new();
-    }
-
-    if depth == 1 {
-        let mut leaf = HashMap::new();
-        leaf.insert(random_string(len), random_string(len));
-        return leaf;
-    }
-
-    let mut tree = HashMap::new();
-    for _ in 0..breadth {
-        let prefix = random_string(len);
-        let subtree = random_pseudonested_map(len, breadth, depth - 1);
-
-        let subtree: HashMap<String, String> = subtree
-            .into_iter()
-            .map(|(mut key, value)| {
-                key.insert(0, '.');
-                key.insert_str(0, &prefix[..]);
-                (key, value)
-            })
-            .collect();
-
-        for (key, value) in subtree.into_iter() {
-            tree.insert(key, value);
-        }
-    }
-    tree
-}
-
 pub async fn start_topology(
     config: Config,
     require_healthy: bool,
 ) -> (RunningTopology, mpsc::UnboundedReceiver<()>) {
     let diff = ConfigDiff::initial(&config);
-    let pieces = topology::validate(&config, &diff).await.unwrap();
+    let pieces = topology::build_or_log_errors(&config, &diff).await.unwrap();
     topology::start_validated(config, diff, pieces, require_healthy)
         .await
         .unwrap()

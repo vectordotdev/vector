@@ -1,13 +1,13 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     event::proto,
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     Event, Pipeline,
 };
-use bytes05::{Bytes, BytesMut};
+use bytes::{Bytes, BytesMut};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::LengthDelimitedCodec;
@@ -37,12 +37,15 @@ impl VectorConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<VectorConfig>("vector")
+    SourceDescription::new::<VectorConfig>("vector")
 }
 
+impl GenerateConfig for VectorConfig {}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "vector")]
 impl SourceConfig for VectorConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -101,14 +104,15 @@ mod test {
             Metric,
         },
         sinks::vector::VectorSinkConfig,
-        test_util::{next_addr, runtime, wait_for_tcp, CollectCurrent},
+        test_util::{collect_ready, next_addr, wait_for_tcp},
         tls::{TlsConfig, TlsOptions},
         Event, Pipeline,
     };
-    use futures01::{stream, Future, Sink};
+    use futures::{compat::Future01CompatExt, stream};
     use std::net::SocketAddr;
+    use tokio::time::{delay_for, Duration};
 
-    fn stream_test(addr: SocketAddr, source: VectorConfig, sink: VectorSinkConfig) {
+    async fn stream_test(addr: SocketAddr, source: VectorConfig, sink: VectorSinkConfig) {
         let (tx, rx) = Pipeline::new_test();
 
         let server = source
@@ -118,13 +122,14 @@ mod test {
                 ShutdownSignal::noop(),
                 tx,
             )
-            .unwrap();
-        let mut rt = runtime();
-        rt.spawn(server);
-        rt.block_on_std(async move { wait_for_tcp(addr).await });
+            .await
+            .unwrap()
+            .compat();
+        tokio::spawn(server);
+        wait_for_tcp(addr).await;
 
         let cx = SinkContext::new_test();
-        let (sink, _) = sink.build(cx).unwrap();
+        let (sink, _) = sink.build(cx).await.unwrap();
 
         let events = vec![
             Event::from("test"),
@@ -144,18 +149,16 @@ mod test {
             }),
         ];
 
-        let _ = rt
-            .block_on(sink.send_all(stream::iter_ok(events.clone().into_iter())))
-            .unwrap();
+        sink.run(stream::iter(events.clone())).await.unwrap();
 
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        delay_for(Duration::from_millis(50)).await;
 
-        let (_, output) = CollectCurrent::new(rx).wait().unwrap();
+        let output = collect_ready(rx).await.unwrap();
         assert_eq!(events, output);
     }
 
-    #[test]
-    fn it_works_with_vector_sink() {
+    #[tokio::test]
+    async fn it_works_with_vector_sink() {
         let addr = next_addr();
         stream_test(
             addr,
@@ -164,11 +167,12 @@ mod test {
                 address: format!("localhost:{}", addr.port()),
                 tls: None,
             },
-        );
+        )
+        .await;
     }
 
-    #[test]
-    fn it_works_with_vector_sink_tls() {
+    #[tokio::test]
+    async fn it_works_with_vector_sink_tls() {
         let addr = next_addr();
         stream_test(
             addr,
@@ -193,6 +197,7 @@ mod test {
                     },
                 }),
             },
-        );
+        )
+        .await;
     }
 }

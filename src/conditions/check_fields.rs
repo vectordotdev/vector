@@ -9,7 +9,6 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 use std::str::FromStr;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Clone, Derivative)]
 #[serde(untagged)]
@@ -35,7 +34,7 @@ pub trait CheckFieldsPredicate: std::fmt::Debug + Send + Sync {
 
 #[derive(Debug, Clone)]
 struct EqualsPredicate {
-    target: Atom,
+    target: String,
     arg: CheckFieldsPredicateArg,
 }
 
@@ -45,7 +44,7 @@ impl EqualsPredicate {
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         Ok(Box::new(Self {
-            target: target.into(),
+            target,
             arg: arg.clone(),
         }))
     }
@@ -74,14 +73,15 @@ impl CheckFieldsPredicate for EqualsPredicate {
                     _ => false,
                 },
             }),
-            Event::Metric(m) => m
-                .tags
-                .as_ref()
-                .and_then(|t| t.get(self.target.as_ref()))
-                .map_or(false, |v| match &self.arg {
-                    CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.as_bytes(),
-                    _ => false,
-                }),
+            Event::Metric(m) => {
+                m.tags
+                    .as_ref()
+                    .and_then(|t| t.get(&self.target))
+                    .map_or(false, |v| match &self.arg {
+                        CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.as_bytes(),
+                        _ => false,
+                    })
+            }
         }
     }
 }
@@ -90,7 +90,7 @@ impl CheckFieldsPredicate for EqualsPredicate {
 
 #[derive(Debug, Clone)]
 struct ContainsPredicate {
-    target: Atom,
+    target: String,
     arg: Vec<String>,
 }
 
@@ -101,11 +101,11 @@ impl ContainsPredicate {
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         match arg {
             CheckFieldsPredicateArg::String(s) => Ok(Box::new(Self {
-                target: target.into(),
+                target,
                 arg: vec![s.clone()],
             })),
             CheckFieldsPredicateArg::VecString(ss) => Ok(Box::new(Self {
-                target: target.into(),
+                target,
                 arg: ss.clone(),
             })),
             _ => Err("contains predicate requires a string or list of string argument".to_owned()),
@@ -129,7 +129,7 @@ impl CheckFieldsPredicate for ContainsPredicate {
 
 #[derive(Debug, Clone)]
 struct StartsWithPredicate {
-    target: Atom,
+    target: String,
     arg: Vec<String>,
 }
 
@@ -140,11 +140,11 @@ impl StartsWithPredicate {
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         match arg {
             CheckFieldsPredicateArg::String(s) => Ok(Box::new(Self {
-                target: target.into(),
+                target,
                 arg: vec![s.clone()],
             })),
             CheckFieldsPredicateArg::VecString(ss) => Ok(Box::new(Self {
-                target: target.into(),
+                target,
                 arg: ss.clone(),
             })),
             _ => {
@@ -170,7 +170,7 @@ impl CheckFieldsPredicate for StartsWithPredicate {
 
 #[derive(Debug, Clone)]
 struct EndsWithPredicate {
-    target: Atom,
+    target: String,
     arg: Vec<String>,
 }
 
@@ -181,11 +181,11 @@ impl EndsWithPredicate {
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         match arg {
             CheckFieldsPredicateArg::String(s) => Ok(Box::new(Self {
-                target: target.into(),
+                target,
                 arg: vec![s.clone()],
             })),
             CheckFieldsPredicateArg::VecString(ss) => Ok(Box::new(Self {
-                target: target.into(),
+                target,
                 arg: ss.clone(),
             })),
             _ => Err("ends_with predicate requires a string argument".to_owned()),
@@ -209,7 +209,7 @@ impl CheckFieldsPredicate for EndsWithPredicate {
 
 #[derive(Debug, Clone)]
 struct NotEqualsPredicate {
-    target: Atom,
+    target: String,
     arg: Vec<String>,
 }
 
@@ -219,7 +219,7 @@ impl NotEqualsPredicate {
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         Ok(Box::new(Self {
-            target: target.into(),
+            target,
             arg: match arg {
                 CheckFieldsPredicateArg::String(s) => vec![s.clone()],
                 CheckFieldsPredicateArg::VecString(ss) => ss.clone(),
@@ -244,7 +244,7 @@ impl CheckFieldsPredicate for NotEqualsPredicate {
             Event::Metric(m) => m
                 .tags
                 .as_ref()
-                .and_then(|t| t.get(self.target.as_ref()))
+                .and_then(|t| t.get(&self.target))
                 .map_or(false, |v| {
                     !self.arg.iter().any(|s| v.as_bytes() == s.as_bytes())
                 }),
@@ -256,7 +256,7 @@ impl CheckFieldsPredicate for NotEqualsPredicate {
 
 #[derive(Debug, Clone)]
 struct RegexPredicate {
-    target: Atom,
+    target: String,
     regex: Regex,
 }
 
@@ -271,7 +271,6 @@ impl RegexPredicate {
         };
         let regex = Regex::new(&pattern)
             .map_err(|error| format!("Invalid regex \"{}\": {}", pattern, error))?;
-        let target = target.into();
         Ok(Box::new(Self { target, regex }))
     }
 }
@@ -286,7 +285,7 @@ impl CheckFieldsPredicate for RegexPredicate {
             Event::Metric(metric) => metric
                 .tags
                 .as_ref()
-                .and_then(|tags| tags.get(self.target.as_ref()))
+                .and_then(|tags| tags.get(&self.target))
                 .map_or(false, |field| self.regex.is_match(field)),
         }
     }
@@ -296,7 +295,7 @@ impl CheckFieldsPredicate for RegexPredicate {
 
 #[derive(Debug, Clone)]
 struct ExistsPredicate {
-    target: Atom,
+    target: String,
     arg: bool,
 }
 
@@ -306,10 +305,7 @@ impl ExistsPredicate {
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         match arg {
-            CheckFieldsPredicateArg::Boolean(b) => Ok(Box::new(Self {
-                target: target.into(),
-                arg: *b,
-            })),
+            CheckFieldsPredicateArg::Boolean(b) => Ok(Box::new(Self { target, arg: *b })),
             _ => Err("exists predicate requires a boolean argument".to_owned()),
         }
     }
@@ -322,7 +318,7 @@ impl CheckFieldsPredicate for ExistsPredicate {
             Event::Metric(m) => m
                 .tags
                 .as_ref()
-                .map_or(false, |t| t.contains_key(self.target.as_ref())),
+                .map_or(false, |t| t.contains_key(&self.target)),
         }) == self.arg
     }
 }
@@ -331,7 +327,7 @@ impl CheckFieldsPredicate for ExistsPredicate {
 
 #[derive(Debug, Clone)]
 struct IpCidrPredicate {
-    target: Atom,
+    target: String,
     cidrs: Vec<IpCidr>,
 }
 
@@ -354,7 +350,6 @@ impl IpCidrPredicate {
             Ok(v) => v,
             Err(e) => return Err(format!("Invalid IP CIDR: {}", e)),
         };
-        let target = target.into();
         Ok(Box::new(Self { target, cidrs }))
     }
 }
@@ -399,6 +394,48 @@ impl CheckFieldsPredicate for NegatePredicate {
 
 //------------------------------------------------------------------------------
 
+#[derive(Debug, Clone)]
+struct LengthEqualsPredicate {
+    target: String,
+    arg: i64,
+}
+
+impl LengthEqualsPredicate {
+    pub fn new(
+        target: String,
+        arg: &CheckFieldsPredicateArg,
+    ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+        match arg {
+            CheckFieldsPredicateArg::Integer(i) => {
+                if *i < 0 {
+                    return Err("length_eq predicate integer cannot be negative".to_owned());
+                }
+
+                Ok(Box::new(Self { target, arg: *i }))
+            }
+            _ => Err("length_eq predicate requires an integer argument".to_owned()),
+        }
+    }
+}
+
+impl CheckFieldsPredicate for LengthEqualsPredicate {
+    fn check(&self, event: &Event) -> bool {
+        match event {
+            Event::Log(l) => l.get(&self.target).map_or(false, |v| {
+                let len = match v {
+                    Value::Array(value) => value.len(),
+                    value => value.to_string_lossy().len(),
+                };
+
+                len as i64 == self.arg
+            }),
+            _ => false,
+        }
+    }
+}
+
+//------------------------------------------------------------------------------
+
 fn build_predicate(
     predicate: &str,
     target: String,
@@ -420,6 +457,7 @@ fn build_predicate(
         "exists" => ExistsPredicate::new(target, arg),
         "regex" => RegexPredicate::new(target, arg),
         "ip_cidr_contains" => IpCidrPredicate::new(target, arg),
+        "length_eq" => LengthEqualsPredicate::new(target, arg),
         _ if predicate.starts_with("not_") => NegatePredicate::new(&predicate[4..], target, arg),
         _ => Err(format!("predicate type '{}' not recognized", predicate)),
     }
@@ -477,6 +515,8 @@ inventory::submit! {
     ConditionDescription::new::<CheckFieldsConfig>("check_fields")
 }
 
+impl_generate_config_from_default!(CheckFieldsConfig);
+
 #[typetag::serde(name = "check_fields")]
 impl ConditionConfig for CheckFieldsConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
@@ -530,6 +570,11 @@ impl Condition for CheckFields {
 mod test {
     use super::*;
     use crate::Event;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<CheckFieldsConfig>();
+    }
 
     #[test]
     fn check_predicate_errors() {
@@ -1040,6 +1085,33 @@ mod test {
             cond.check_with_context(&event),
             Err("predicates failed: [ bar.exists: false ]".to_owned())
         );
+    }
+
+    #[test]
+    fn check_field_length_eq() {
+        let mut preds: IndexMap<String, CheckFieldsPredicateArg> = IndexMap::new();
+        preds.insert("foo.length_eq".into(), CheckFieldsPredicateArg::Integer(10));
+        preds.insert("bar.length_eq".into(), CheckFieldsPredicateArg::Integer(4));
+
+        let cond = CheckFieldsConfig { predicates: preds }.build().unwrap();
+
+        let mut event = Event::from("");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ foo.length_eq: 10, bar.length_eq: 4 ]".to_owned())
+        );
+
+        event.as_mut_log().insert("foo", "helloworld");
+        assert_eq!(cond.check(&event), false);
+        assert_eq!(
+            cond.check_with_context(&event),
+            Err("predicates failed: [ bar.length_eq: 4 ]".to_owned())
+        );
+
+        event.as_mut_log().insert("bar", vec![0, 1, 2, 3]);
+        assert_eq!(cond.check(&event), true);
+        assert_eq!(cond.check_with_context(&event), Ok(()));
     }
 
     #[test]
