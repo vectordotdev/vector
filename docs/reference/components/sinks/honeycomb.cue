@@ -7,6 +7,8 @@ components: sinks: honeycomb: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "batch"
 		function:      "transmit"
 		service_providers: ["Honeycomb"]
@@ -36,21 +38,14 @@ components: sinks: honeycomb: {
 		tls: enabled: false
 	}
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
-	}
-
 	support: {
 		platforms: {
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
-			}
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
 		requirements: []
