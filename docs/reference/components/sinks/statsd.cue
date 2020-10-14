@@ -60,6 +60,19 @@ components: sinks: statsd: {
 				default: "127.0.0.1:8125"
 			}
 		}
+		mode: {
+			description: "The type of socket to use."
+			groups: ["tcp", "udp", "unix"]
+			required: true
+			warnings: []
+			type: string: {
+				enum: {
+					tcp:  "TCP Socket."
+					udp:  "UDP Socket."
+					unix: "Unix Domain Socket."
+				}
+			}
+		}
 		namespace: {
 			common:      true
 			description: "A prefix that will be added to all metric names."
@@ -68,6 +81,15 @@ components: sinks: statsd: {
 			type: string: {
 				default: null
 				examples: ["service"]
+			}
+		}
+		path: {
+			description: "The unix socket path. *This should be absolute path*."
+			groups: ["unix"]
+			required: true
+			warnings: []
+			type: string: {
+				examples: ["/path/to/socket"]
 			}
 		}
 	}
