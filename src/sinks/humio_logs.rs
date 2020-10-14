@@ -7,7 +7,6 @@ use crate::{
     template::Template,
 };
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
 
 const HOST: &str = "https://cloud.humio.com";
 
@@ -27,7 +26,7 @@ pub struct HumioLogsConfig {
     event_type: Option<Template>,
 
     #[serde(default = "default_host_key")]
-    pub host_key: Atom,
+    pub host_key: String,
 
     #[serde(default)]
     pub compression: Compression,
@@ -39,13 +38,15 @@ pub struct HumioLogsConfig {
     batch: BatchConfig,
 }
 
-fn default_host_key() -> Atom {
-    crate::config::LogSchema::default().host_key().clone()
+fn default_host_key() -> String {
+    crate::config::LogSchema::default().host_key().to_string()
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<HumioLogsConfig>("humio_logs")
+    SinkDescription::new::<HumioLogsConfig>("humio_logs")
 }
+
+impl_generate_config_from_default!(HumioLogsConfig);
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
@@ -110,6 +111,11 @@ mod tests {
     use crate::sinks::util::{http::HttpSink, test::load_sink};
     use chrono::Utc;
     use serde::Deserialize;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<HumioLogsConfig>();
+    }
 
     #[derive(Deserialize, Debug)]
     struct HecEventJson {
@@ -286,7 +292,7 @@ mod integration_tests {
                 max_events: Some(1),
                 ..Default::default()
             },
-            host_key: log_schema().host_key().clone(),
+            host_key: log_schema().host_key().to_string(),
             ..Default::default()
         }
     }

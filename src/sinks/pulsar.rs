@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
 };
@@ -63,8 +63,10 @@ struct PulsarSink {
 type SendFuture = Box<dyn Future<Item = CommandSendReceipt, Error = PulsarError> + 'static + Send>;
 
 inventory::submit! {
-    SinkDescription::new_without_default::<PulsarSinkConfig>("pulsar")
+    SinkDescription::new::<PulsarSinkConfig>("pulsar")
 }
+
+impl GenerateConfig for PulsarSinkConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "pulsar")]
@@ -193,7 +195,7 @@ fn encode_event(mut item: Event, encoding: &EncodingConfig<Encoding>) -> crate::
     Ok(match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&log)?,
         Encoding::Text => log
-            .get(&log_schema().message_key())
+            .get(log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     })
@@ -203,7 +205,6 @@ fn encode_event(mut item: Event, encoding: &EncodingConfig<Encoding>) -> crate::
 mod tests {
     use super::*;
     use std::collections::HashMap;
-    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn pulsar_event_json() {
@@ -235,7 +236,7 @@ mod tests {
             evt,
             &EncodingConfigWithDefault {
                 codec: Encoding::Json,
-                except_fields: Some(vec![Atom::from("key")]),
+                except_fields: Some(vec!["key".into()]),
                 ..Default::default()
             }
             .into(),
