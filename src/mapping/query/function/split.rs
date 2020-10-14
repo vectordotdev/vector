@@ -43,19 +43,19 @@ impl Function for SplitFn {
             Value::Array(
                 iter.map(|sub| Value::Bytes(sub.to_string().into()))
                     .collect(),
-            ).into()
+            )
+            .into()
         };
 
-        match self.pattern.execute(ctx)?.into() {
-            Value::Bytes(path) => {
+        match self.pattern.execute(ctx)? {
+            QueryValue::Value(Value::Bytes(path)) => {
                 let pattern = String::from_utf8_lossy(&path).into_owned();
                 Ok(match limit {
                     Some(limit) => to_value(Box::new(string.splitn(limit, &pattern))),
                     None => to_value(Box::new(string.split(&pattern))),
                 })
             }
-            pattern@Value::Map(_) => {
-                let mut regex = DynamicRegex::try_from(pattern)?;
+            QueryValue::Regex(mut regex) => {
                 let regex = regex.compile()?;
                 Ok(match &limit {
                     Some(ref limit) => to_value(Box::new(regex.splitn(&string, *limit))),
@@ -70,17 +70,20 @@ impl Function for SplitFn {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
                 required: true,
             },
             Parameter {
                 keyword: "pattern",
-                accepts: |v| matches!(v, Value::Bytes(_)) || matches!(v, Value::Map(_)),
+                accepts: |v| {
+                    matches!(v, QueryValue::Value(Value::Bytes(_))
+                             | QueryValue::Regex(_))
+                },
                 required: true,
             },
             Parameter {
                 keyword: "limit",
-                accepts: |v| matches!(v, Value::Integer(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Integer(_))),
                 required: false,
             },
         ]
@@ -106,8 +109,8 @@ impl TryFrom<ArgumentList> for SplitFn {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mapping::query::dynamic_regex::DynamicRegex;
     use crate::mapping::query::path::Path;
-    use std::collections::BTreeMap;
 
     #[test]
     fn check_split() {
@@ -160,11 +163,12 @@ mod tests {
                 ])),
                 SplitFn::new(
                     Box::new(Path::from(vec![vec!["foo"]])),
-                    Box::new(Literal::from(Value::from({
-                        let mut map = BTreeMap::new();
-                        map.insert("pattern".to_string(), Value::from(" "));
-                        map
-                    }))),
+                    Box::new(Literal::from(QueryValue::from(DynamicRegex::new(
+                        " ".to_string(),
+                        false,
+                        false,
+                        false,
+                    )))),
                     Some(Box::new(Literal::from(Value::from(2)))),
                 ),
             ),
@@ -184,12 +188,12 @@ mod tests {
                 ])),
                 SplitFn::new(
                     Box::new(Path::from(vec![vec!["foo"]])),
-                    Box::new(Literal::from(Value::from({
-                        let mut map = BTreeMap::new();
-                        map.insert("pattern".to_string(), Value::from("a"));
-                        map.insert("flags".to_string(), Value::from(vec![Value::from("i")]));
-                        map
-                    }))),
+                    Box::new(Literal::from(QueryValue::from(DynamicRegex::new(
+                        "a".to_string(),
+                        false,
+                        true,
+                        false,
+                    )))),
                     None,
                 ),
             ),

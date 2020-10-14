@@ -7,8 +7,10 @@ use crate::{
             self,
             arithmetic::Arithmetic,
             arithmetic::Operator,
+            dynamic_regex::DynamicRegex,
             function::{Argument, ArgumentList, FunctionSignature, NotFn},
             path::Path as QueryPath,
+            query_value::QueryValue,
             Literal,
         },
         Assignment, Deletion, Function, IfStatement, Mapping, MergeFn, Noop, OnlyFields, Result,
@@ -19,7 +21,7 @@ use pest::{
     iterators::{Pair, Pairs},
     Parser,
 };
-use std::{collections::BTreeMap, str::FromStr};
+use std::{collections::BTreeMap, convert::TryFrom, str::FromStr};
 
 // If this macro triggers, it means the parser syntax file (grammar.pest) was
 // updated in unexpected, and unsupported ways.
@@ -335,7 +337,9 @@ fn regex_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
             );
             map.insert("flags".to_string(), Value::from(flags));
 
-            Ok(Box::new(Literal::from(Value::from(map))))
+            let regex = DynamicRegex::try_from(Value::from(map))?;
+
+            Ok(Box::new(Literal::from(QueryValue::from(regex))))
         }
         _ => unexpected_parser_sytax!(pair),
     }
@@ -1262,12 +1266,12 @@ mod tests {
                     "foo".to_string(),
                     Box::new(SplitFn::new(
                         Box::new(QueryPath::from("bar")),
-                        Box::new(Literal::from(Value::from({
-                            let mut map = BTreeMap::new();
-                            map.insert("pattern".to_string(), Value::from("a"));
-                            map.insert("flags".to_string(), Value::from(vec![Value::from("i")]));
-                            map
-                        }))),
+                        Box::new(Literal::from(QueryValue::from(DynamicRegex::new(
+                            "a".to_string(),
+                            false,
+                            true,
+                            false,
+                        )))),
                         Some(Box::new(Literal::from(Value::from(2)))),
                     )),
                 ))]),

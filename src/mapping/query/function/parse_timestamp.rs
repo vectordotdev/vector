@@ -38,11 +38,14 @@ impl Function for ParseTimestampFn {
             Ok(v) => {
                 let value = v.into();
                 match value {
-                    Value::Bytes(_) => conversion.convert(value).map(Into::into).map_err(|e| e.to_string()),
+                    Value::Bytes(_) => conversion
+                        .convert(value)
+                        .map(Into::into)
+                        .map_err(|e| e.to_string()),
                     Value::Timestamp(_) => Ok(value.into()),
                     _ => unexpected_type!(value),
                 }
-            },
+            }
             Err(err) => Err(err),
         };
 
@@ -65,17 +68,17 @@ impl Function for ParseTimestampFn {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_) | Value::Timestamp(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_)) | QueryValue::Value(Value::Timestamp(_))),
                 required: true,
             },
             Parameter {
                 keyword: "format",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                accepts: |v| matches!(v, Value::Bytes(_) | Value::Timestamp(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_)) | QueryValue::Value(Value::Timestamp(_))),
                 required: false,
             },
         ]

@@ -33,12 +33,20 @@ impl Function for ToTimestampFn {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Integer(_) | Value::Bytes(_) | Value::Timestamp(_)),
+                accepts: |v| {
+                    matches!(v, QueryValue::Value(Value::Integer(_))
+                                      | QueryValue::Value(Value::Bytes(_))
+                                      | QueryValue::Value(Value::Timestamp(_)))
+                },
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                accepts: |v| matches!(v, Value::Integer(_) | Value::Bytes(_) | Value::Timestamp(_)),
+                accepts: |v| {
+                    matches!(v, QueryValue::Value(Value::Integer(_))
+                                      | QueryValue::Value(Value::Bytes(_))
+                                      | QueryValue::Value(Value::Timestamp(_)))
+                },
                 required: false,
             },
         ]

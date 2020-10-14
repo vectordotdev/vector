@@ -62,17 +62,17 @@ impl Function for SliceFn {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_) | Value::Array(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_)) | QueryValue::Value(Value::Array(_))),
                 required: true,
             },
             Parameter {
                 keyword: "start",
-                accepts: |v| matches!(v, Value::Integer(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Integer(_))),
                 required: true,
             },
             Parameter {
                 keyword: "end",
-                accepts: |v| matches!(v, Value::Integer(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Integer(_))),
                 required: false,
             },
         ]

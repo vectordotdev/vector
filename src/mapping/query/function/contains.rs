@@ -50,17 +50,17 @@ impl Function for ContainsFn {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
                 required: true,
             },
             Parameter {
                 keyword: "substring",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
                 required: true,
             },
             Parameter {
                 keyword: "case_sensitive",
-                accepts: |v| matches!(v, Value::Boolean(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Boolean(_))),
                 required: false,
             },
         ]

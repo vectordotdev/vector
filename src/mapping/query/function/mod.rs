@@ -19,7 +19,6 @@ use std::str::FromStr;
 mod prelude {
     pub(super) use super::{is_scalar_value, ArgumentList, Parameter};
     pub(super) use crate::event::{Event, Value};
-    pub(super) use crate::mapping::query::dynamic_regex::DynamicRegex;
     pub(super) use crate::mapping::query::query_value::QueryValue;
     pub(super) use crate::mapping::query::Function;
     #[cfg(test)]
@@ -153,7 +152,7 @@ pub(in crate::mapping) struct Parameter {
 
     /// The parser calls this method to determine if a given argument value is
     /// accepted by the parameter.
-    pub accepts: fn(&Value) -> bool,
+    pub accepts: fn(&QueryValue) -> bool,
 
     /// Whether or not this is a required parameter.
     ///
@@ -247,27 +246,28 @@ impl Function for Argument {
         let value = self.resolver.execute(ctx)?;
 
         // Ask the parameter if it accepts the given value.
-        if let QueryValue::Value(ref value) = value {
-            if !(self.parameter.accepts)(&value) {
-                return Err(format!(
-                    "invalid argument type '{}' for parameter '{}'",
-                    value.kind(),
-                    self.parameter.keyword
-                ));
-            }
+        if !(self.parameter.accepts)(&value) {
+            return Err(format!(
+                "invalid argument type '{}' for parameter '{}'",
+                value.kind(),
+                self.parameter.keyword
+            ));
         }
 
         Ok(value)
     }
 }
 
-fn is_scalar_value(value: &Value) -> bool {
+fn is_scalar_value(value: &QueryValue) -> bool {
     match value {
-        Value::Integer(_)
-        | Value::Float(_)
-        | Value::Bytes(_)
-        | Value::Boolean(_)
-        | Value::Timestamp(_) => true,
-        Value::Map(_) | Value::Array(_) | Value::Null => false,
+        QueryValue::Value(value) => match value {
+            Value::Integer(_)
+            | Value::Float(_)
+            | Value::Bytes(_)
+            | Value::Boolean(_)
+            | Value::Timestamp(_) => true,
+            Value::Map(_) | Value::Array(_) | Value::Null => false,
+        },
+        _ => false,
     }
 }

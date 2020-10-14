@@ -78,17 +78,20 @@ impl Function for TruncateFn {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
                 required: true,
             },
             Parameter {
                 keyword: "limit",
-                accepts: |v| matches!(v, Value::Integer(_) | Value::Float(_)),
+                accepts: |v| {
+                    matches!(v, QueryValue::Value(Value::Integer(_))
+                                      | QueryValue::Value(Value::Float(_)))
+                },
                 required: true,
             },
             Parameter {
                 keyword: "ellipsis",
-                accepts: |v| matches!(v, Value::Boolean(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Boolean(_))),
                 required: false,
             },
         ]

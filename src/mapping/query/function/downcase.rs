@@ -14,18 +14,16 @@ impl DowncaseFn {
 
 impl Function for DowncaseFn {
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
-        match self.query.execute(ctx)?.into() {
-            Value::Bytes(bytes) => {
-                Ok(Value::Bytes(String::from_utf8_lossy(&bytes).to_lowercase().into()).into())
-            }
-            value => unexpected_type!(value),
-        }
+        let bytes = required!(ctx, self.query, Value::Bytes(v) => v);
+        Ok(QueryValue::from_value(
+            String::from_utf8_lossy(&bytes).to_lowercase(),
+        ))
     }
 
     fn parameters() -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_)),
+            accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
             required: true,
         }]
     }

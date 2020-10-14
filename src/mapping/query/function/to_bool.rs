@@ -29,7 +29,7 @@ impl Function for ToBooleanFn {
                         .map_err(|e| e.to_string()),
                     _ => unexpected_type!(value),
                 }
-            },
+            }
             Err(err) => Err(err),
         }
         .or_else(|err| match &self.default {
@@ -42,12 +42,22 @@ impl Function for ToBooleanFn {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Integer(_) | Value::Float(_) | Value::Bytes(_) | Value::Boolean(_)),
+                accepts: |v| {
+                    matches!(v, QueryValue::Value(Value::Integer(_))
+                             | QueryValue::Value(Value::Float(_))
+                             | QueryValue::Value(Value::Bytes(_))
+                             | QueryValue::Value(Value::Boolean(_)))
+                },
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                accepts: |v| matches!(v, Value::Integer(_) | Value::Float(_) | Value::Bytes(_) | Value::Boolean(_)),
+                accepts: |v| {
+                    matches!(v, QueryValue::Value(Value::Integer(_))
+                             | QueryValue::Value(Value::Float(_))
+                             | QueryValue::Value(Value::Bytes(_))
+                             | QueryValue::Value(Value::Boolean(_)))
+                },
                 required: false,
             },
         ]
