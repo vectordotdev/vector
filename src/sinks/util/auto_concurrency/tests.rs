@@ -315,20 +315,28 @@ impl fmt::Debug for Statistics {
 
 impl Statistics {
     fn start_request(&mut self, now: Instant) {
-        self.drop_old_requests(now);
+        self.prune_old_requests(now);
         self.requests.push_back(now);
         self.rate.add(self.requests.len(), now.into());
         self.in_flight.adjust(1, now.into());
     }
 
     fn end_request(&mut self, now: Instant, completed: bool) {
-        self.drop_old_requests(now);
+        self.prune_old_requests(now);
         self.rate.add(self.requests.len(), now.into());
         self.in_flight.adjust(-1, now.into());
         self.completed += completed as usize;
     }
 
-    fn drop_old_requests(&mut self, now: Instant) {
+    /// Prune any requests that are more than one second old. The
+    /// `requests` deque is used to track the rate at which requests are
+    /// being issued. As such, it needs to be pruned of old requests any
+    /// time a request status changes. Since all requests are inserted
+    /// in chronological order, this function simply looks at the head
+    /// of the deque and pops off all entries that are more than one
+    /// second old. In this way, the length is always equal to the
+    /// number of requests per second.
+    fn prune_old_requests(&mut self, now: Instant) {
         let then = now - Duration::from_secs(1);
         while let Some(&first) = self.requests.get(0) {
             if first > then {
