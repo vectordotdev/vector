@@ -78,8 +78,8 @@ struct HttpSourceAuth {
 }
 
 impl HttpSourceAuth {
-    pub fn is_valid(&self, header: Option<String>) -> Result<(), ErrorMessage> {
-        match (&self.token, &header) {
+    pub fn is_valid(&self, header: &Option<String>) -> Result<(), ErrorMessage> {
+        match (&self.token, header) {
             (Some(token1), Some(token2)) => {
                 if token1 == token2 {
                     Ok(())
@@ -130,7 +130,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 let out = out.clone();
 
                 let body_size = body.len();
-                let events = match auth.is_valid(auth_header) {
+                let events = match auth.is_valid(&auth_header) {
                     Ok(()) => self.build_event(body, headers),
                     Err(err) => Err(err),
                 };
