@@ -3,13 +3,15 @@ package metadata
 components: sources: splunk_hec: {
 	_port: 8080
 
-	title:             "Splunk HEC"
+	title:             "Splunk HTTP Event Collector (HEC)"
 	short_description: "Ingests data through the [Splunk HTTP Event Collector protocol][urls.splunk_hec_protocol] and outputs log events."
 	long_description:  "The [Splunk HTTP Event Collector (HEC)][urls.splunk_hec] is a fast and efficient way to send data to Splunk Enterprise and Splunk Cloud. Notably, HEC enables you to send data over HTTP (or HTTPS) directly to Splunk Enterprise or Splunk Cloud from your application."
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["aggregator"]
+		development:   "beta"
 		egress_method: "batch"
 		function:      "receive"
 	}
@@ -25,29 +27,37 @@ components: sources: splunk_hec: {
 		}
 	}
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
-	}
-
 	support: {
-		platforms: {
-			docker: ports: [_port]
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
+		dependencies: {
+			splunk_hec_client: {
+				required: true
+				title:    "Splunk HEC Client"
+				type:     "external"
+				url:      urls.splunk_hec
+				versions: null
+
+				interface: socket: {
+					api: {
+						title: "Splunk HEC"
+						url:   urls.splunk_hec_protocol
+					}
+					port: _port
+					protocols: ["http"]
+					ssl: "optional"
+				}
 			}
 		}
 
-		requirements: [
-			"""
-				This component exposes a configured port. You must ensure your network allows access to this port.
-				""",
-		]
+		platforms: {
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
+		}
+
+		requirements: []
 		warnings: []
 		notices: []
 	}

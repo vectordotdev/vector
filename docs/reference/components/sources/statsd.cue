@@ -9,7 +9,9 @@ components: sources: statsd: {
 
 	classes: {
 		commonly_used: false
+		delivery:      "best_effort"
 		deployment_roles: ["aggregator"]
+		development:   "stable"
 		egress_method: "stream"
 		function:      "receive"
 	}
@@ -20,29 +22,37 @@ components: sources: statsd: {
 		tls: enabled:        false
 	}
 
-	statuses: {
-		delivery:    "best_effort"
-		development: "stable"
-	}
-
 	support: {
-		platforms: {
-			docker: ports: [_port]
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
+		dependencies: {
+			statsd_client: {
+				required: true
+				title:    "StatsD Client"
+				type:     "external"
+				url:      urls.statsd
+				versions: null
+
+				interface: socket: {
+					api: {
+						title: "StatsD"
+						url:   urls.statsd_udp_protocol
+					}
+					port: _port
+					protocols: ["udp"]
+					ssl: "optional"
+				}
 			}
 		}
 
-		requirements: [
-			"""
-				This component exposes a configured port. You must ensure your network allows access to this port.
-				""",
-		]
+		platforms: {
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
+		}
+
+		requirements: []
 		warnings: []
 		notices: []
 	}
@@ -69,12 +79,13 @@ components: sources: statsd: {
 		timestamps: {
 			title: "Timestamps"
 			body: #"""
-				StatsD protocol does not provide support for sending metric timestamps. You'll
-				notice that each parsed metric is assigned a `null` timestamp, which is a
-				special value which means "a real time metric", i.e. not a historical one. Normally such
-				`null` timestamps will be substituted by current time by downstream sinks or
-				3rd party services during sending/ingestion. See the [metric][docs.data-model.metric]
-				data model page for more info.
+				StatsD protocol does not provide support for sending metric
+				timestamps. You'll notice that each parsed metric is assigned a
+				`null` timestamp, which is a special value which means "a real
+				time metric", i.e. not a historical one. Normally such `null`
+				timestamps will be substituted by current time by downstream
+				sinks or 3rd party services during sending/ingestion. See the
+				[metric][docs.data-model.metric] data model page for more info.
 				"""#
 		}
 	}

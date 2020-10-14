@@ -41,7 +41,7 @@ impl InternalEvent for PrometheusRequestCompleted {
 #[derive(Debug)]
 pub struct PrometheusParseError<'a> {
     pub error: ParserError,
-    pub url: String,
+    pub url: http::Uri,
     pub body: Cow<'a, str>,
 }
 
@@ -63,7 +63,7 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
 #[derive(Debug)]
 pub struct PrometheusErrorResponse {
     pub code: hyper::StatusCode,
-    pub url: String,
+    pub url: http::Uri,
 }
 
 impl InternalEvent for PrometheusErrorResponse {
@@ -79,7 +79,7 @@ impl InternalEvent for PrometheusErrorResponse {
 #[derive(Debug)]
 pub struct PrometheusHttpError {
     pub error: hyper::Error,
-    pub url: String,
+    pub url: http::Uri,
 }
 
 impl InternalEvent for PrometheusHttpError {
