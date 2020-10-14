@@ -2,8 +2,8 @@ use crate::{
     config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
-    sources::util::TcpSource,
-    tls::TlsConfig,
+    sources::util::{SocketListenAddr, TcpSource},
+    tls::{MaybeTlsSettings, TlsConfig},
     Event, Pipeline,
 };
 use bytes::Bytes;
@@ -35,8 +35,15 @@ struct UdpConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 struct TcpConfig {
-    address: SocketAddr,
+    address: SocketListenAddr,
+    #[serde(default)]
     tls: Option<TlsConfig>,
+    #[serde(default = "default_shutdown_timeout_secs")]
+    pub shutdown_timeout_secs: u64,
+}
+
+fn default_shutdown_timeout_secs() -> u64 {
+    30
 }
 
 inventory::submit! {
@@ -55,12 +62,21 @@ impl SourceConfig for StatsdConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let source = match self {
-            StatsdConfig::Udp(config) => statsd_udp(config.clone(), shutdown, out).boxed(),
-            StatsdConfig::Tcp(config) => statsd_tcp(config.clone(), shutdown, out).boxed(),
-        };
-
-        Ok(Box::new(source.compat()))
+        match self {
+            StatsdConfig::Udp(config) => Ok(Box::new(
+                statsd_udp(config.clone(), shutdown, out).boxed().compat(),
+            )),
+            StatsdConfig::Tcp(config) => {
+                let tls = MaybeTlsSettings::from_config(&config.tls, true)?;
+                StatsdTcpSource.run(
+                    config.address,
+                    config.shutdown_timeout_secs,
+                    tls,
+                    shutdown,
+                    out,
+                )
+            }
+        }
     }
 
     fn output_type(&self) -> crate::config::DataType {
@@ -118,10 +134,6 @@ async fn statsd_udp(config: UdpConfig, shutdown: ShutdownSignal, out: Pipeline) 
         .forward(out.sink_compat())
         .await;
 
-    Ok(())
-}
-
-async fn statsd_tcp(config: TcpConfig, shutdown: ShutdownSignal, out: Pipeline) -> Result<(), ()> {
     Ok(())
 }
 
