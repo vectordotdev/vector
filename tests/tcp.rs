@@ -6,7 +6,6 @@
 
 use approx::assert_relative_eq;
 use futures::compat::Future01CompatExt;
-use tokio::net::TcpListener;
 use vector::{
     config, sinks, sources,
     test_util::{
@@ -271,33 +270,4 @@ async fn reconnect() {
     let output_lines = output_lines.await;
     assert!(num_lines >= 2);
     assert!(output_lines.iter().all(|line| input_lines.contains(line)))
-}
-
-#[tokio::test]
-async fn healthcheck() {
-    trace_init();
-
-    let addr = next_addr();
-    let resolver = vector::dns::Resolver;
-
-    let _listener = TcpListener::bind(&addr).await.unwrap();
-
-    let healthcheck = vector::sinks::util::tcp::tcp_healthcheck(
-        addr.ip().to_string(),
-        addr.port(),
-        resolver,
-        None.into(),
-    );
-
-    assert!(healthcheck.await.is_ok());
-
-    let bad_addr = next_addr();
-    let bad_healthcheck = vector::sinks::util::tcp::tcp_healthcheck(
-        bad_addr.ip().to_string(),
-        bad_addr.port(),
-        resolver,
-        None.into(),
-    );
-
-    assert!(bad_healthcheck.await.is_err());
 }
