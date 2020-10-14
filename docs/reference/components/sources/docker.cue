@@ -219,8 +219,8 @@ components: sources: docker: {
 			input: """
 				 ```json
 				 {
-				   "stream": \(_stream),
-				   "message": \(_message)
+				   "stream": "\(_stream)",
+				   "message": "\(_message)"
 				 }
 				```
 				"""
