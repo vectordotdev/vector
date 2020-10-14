@@ -896,6 +896,7 @@ mod integration_tests {
                 ..Default::default()
             }),
             quantiles: default_summary_quantiles(),
+            tags: None,
         };
 
         let events: Vec<_> = (0..10).map(create_event).collect();
