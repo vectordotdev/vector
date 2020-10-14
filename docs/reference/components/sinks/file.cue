@@ -31,11 +31,6 @@ components: sinks: file: {
 		tls: enabled:         false
 	}
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "stable"
-	}
-
 	support: {
 		input_types: ["log"]
 
