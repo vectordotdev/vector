@@ -61,7 +61,9 @@ impl SourceConfig for StatsdConfig {
                     .boxed()
                     .compat(),
             )),
-            _ => unreachable!(),
+            StatsdConfig::Tcp(config) => Ok(Box::new(
+                statsd_tcp(config.clone(), shutdown, out).boxed().compat(),
+            )),
         }
     }
 
@@ -120,6 +122,10 @@ async fn statsd_udp(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -
         .forward(out.sink_compat())
         .await;
 
+    Ok(())
+}
+
+async fn statsd_tcp(config: TcpConfig, shutdown: ShutdownSignal, out: Pipeline) -> Result<(), ()> {
     Ok(())
 }
 
