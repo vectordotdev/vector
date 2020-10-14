@@ -25,7 +25,7 @@ functionality:
 
 1. Manually implement new component as config facade over one existing component
 2. Manually implement new component as config facade over one source and one
-   parsing transform
+   codec transform
 3. Manually implement new component as config expanding to arbitrary pipeline of
    components
 4. Automatically derive new component from data describing arbitrary pipeline of
