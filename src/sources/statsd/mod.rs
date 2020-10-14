@@ -55,16 +55,12 @@ impl SourceConfig for StatsdConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        match self {
-            StatsdConfig::Udp(config) => Ok(Box::new(
-                statsd_udp(config.address.clone(), shutdown, out)
-                    .boxed()
-                    .compat(),
-            )),
-            StatsdConfig::Tcp(config) => Ok(Box::new(
-                statsd_tcp(config.clone(), shutdown, out).boxed().compat(),
-            )),
-        }
+        let source = match self {
+            StatsdConfig::Udp(config) => statsd_udp(config.clone(), shutdown, out).boxed(),
+            StatsdConfig::Tcp(config) => statsd_tcp(config.clone(), shutdown, out).boxed(),
+        };
+
+        Ok(Box::new(source.compat()))
     }
 
     fn output_type(&self) -> crate::config::DataType {
@@ -76,16 +72,16 @@ impl SourceConfig for StatsdConfig {
     }
 }
 
-async fn statsd_udp(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> Result<(), ()> {
+async fn statsd_udp(config: UdpConfig, shutdown: ShutdownSignal, out: Pipeline) -> Result<(), ()> {
     let out = out.sink_map_err(|e| error!("Error sending metric: {:?}", e));
 
-    let socket = UdpSocket::bind(&addr)
+    let socket = UdpSocket::bind(&config.address)
         .map_err(|error| emit!(StatsdSocketError::bind(error)))
         .await?;
 
     info!(
         message = "Listening.",
-        addr = %addr,
+        addr = %config.address,
         r#type = "udp"
     );
 
