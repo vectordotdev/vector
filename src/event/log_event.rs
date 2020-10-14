@@ -186,7 +186,10 @@ impl TryInto<serde_json::Value> for LogEvent {
     }
 }
 
-impl<T> std::ops::Index<T> for LogEvent where T: AsRef<str> {
+impl<T> std::ops::Index<T> for LogEvent
+where
+    T: AsRef<str>,
+{
     type Output = Value;
 
     fn index(&self, key: T) -> &Value {
@@ -196,7 +199,10 @@ impl<T> std::ops::Index<T> for LogEvent where T: AsRef<str> {
 }
 
 impl<K, V> Extend<(K, V)> for LogEvent
-where K: AsRef<str>, V: Into<Value> {
+where
+    K: AsRef<str>,
+    V: Into<Value>,
+{
     fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
         for (k, v) in iter {
             self.insert(k.as_ref(), v.into());
