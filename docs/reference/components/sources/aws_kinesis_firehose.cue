@@ -13,26 +13,13 @@ components: sources: aws_kinesis_firehose: {
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "batch"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: {
-			enabled:                true
-			can_enable:             true
-			can_verify_certificate: true
-			enabled_default:        false
-		}
-	}
-
-	support: {
-		dependencies: {
-			aws_kinesis_firehose: {
-				required: true
+		multiline: enabled: false
+		receive: {
+			from: {
 				title:    "AWS Kinesis Firehose"
-				type:     "external"
 				url:      urls.aws_kinesis_firehose
 				versions: null
 
@@ -55,8 +42,16 @@ components: sources: aws_kinesis_firehose: {
 						"""#,
 				]
 			}
-		}
 
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				enabled_default:        false
+			}}
+	}
+
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true

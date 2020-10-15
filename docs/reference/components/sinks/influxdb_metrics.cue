@@ -10,37 +10,38 @@ components: sinks: influxdb_metrics: {
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
-		function:      "transmit"
 		service_providers: ["InfluxData"]
 	}
 
 	features: {
-		batch: {
-			enabled:      true
-			common:       false
-			max_bytes:    null
-			max_events:   20
-			timeout_secs: 1
-		}
 		buffer: enabled:      false
-		compression: enabled: false
-		encoding: codec: enabled: false
 		healthcheck: enabled: true
-		request: {
-			enabled:                    true
-			in_flight_limit:            5
-			rate_limit_duration_secs:   1
-			rate_limit_num:             5
-			retry_initial_backoff_secs: 1
-			retry_max_duration_secs:    10
-			timeout_secs:               60
-		}
-		tls: {
-			enabled:                true
-			can_enable:             true
-			can_verify_certificate: true
-			can_verify_hostname:    true
-			enabled_default:        true
+		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				max_bytes:    null
+				max_events:   20
+				timeout_secs: 1
+			}
+			compression: enabled: false
+			encoding: codec: enabled: false
+			request: {
+				enabled:                    true
+				in_flight_limit:            5
+				rate_limit_duration_secs:   1
+				rate_limit_num:             5
+				retry_initial_backoff_secs: 1
+				retry_max_duration_secs:    10
+				timeout_secs:               60
+			}
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        true
+			}
 		}
 	}
 

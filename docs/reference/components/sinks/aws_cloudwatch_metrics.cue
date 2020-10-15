@@ -10,28 +10,29 @@ components: sinks: aws_cloudwatch_metrics: {
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
-		function:      "transmit"
 		service_providers: ["AWS"]
 	}
 
 	features: {
-		batch: {
-			enabled:      true
-			common:       false
-			max_bytes:    null
-			max_events:   20
-			timeout_secs: 1
-		}
-		buffer: enabled: false
-		compression: {
-			enabled: true
-			default: null
-			gzip:    true
-		}
-		encoding: codec: enabled: false
+		buffer: enabled:      false
 		healthcheck: enabled: true
-		request: enabled:     false
-		tls: enabled:         false
+		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				max_bytes:    null
+				max_events:   20
+				timeout_secs: 1
+			}
+			compression: {
+				enabled: true
+				default: null
+				gzip:    true
+			}
+			encoding: codec: enabled: false
+			request: enabled: false
+			tls: enabled:     false
+		}
 	}
 
 	support: {

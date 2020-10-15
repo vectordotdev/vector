@@ -8,10 +8,11 @@ components: transforms: swimlanes: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
-		function:      "route"
 	}
 
-	features: {}
+	features: {
+		route: {}
+	}
 
 	support: {
 		platforms: {

@@ -8,10 +8,17 @@ components: transforms: grok_parser: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
-		function:      "parse"
 	}
 
-	features: {}
+	features: {
+		parse: {
+			format: {
+				title:    "Grok"
+				url:      urls.grok
+				versions: null
+			}
+		}
+	}
 
 	support: {
 		platforms: {

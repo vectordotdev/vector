@@ -9,10 +9,11 @@ components: transforms: add_fields: {
 		development:   "stable"
 		development:   "stable"
 		egress_method: "stream"
-		function:      "schema"
 	}
 
-	features: {}
+	features: {
+		shape: {}
+	}
 
 	support: {
 		platforms: {

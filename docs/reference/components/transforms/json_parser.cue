@@ -8,10 +8,17 @@ components: transforms: json_parser: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
-		function:      "parse"
 	}
 
-	features: {}
+	features: {
+		parse: {
+			format: {
+				title:    "JSON"
+				url:      urls.json
+				versions: null
+			}
+		}
+	}
 
 	support: {
 		platforms: {

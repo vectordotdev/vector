@@ -4,7 +4,7 @@ components: sources: http: {
 	_port: 80
 
 	title:             "HTTP"
-	short_description: "Receive logs through the HTTP protocol."
+	short_description: "Receives logs through the HTTP protocol."
 
 	classes: {
 		commonly_used: false
@@ -12,26 +12,13 @@ components: sources: http: {
 		deployment_roles: ["aggregator", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: {
-			enabled:                true
-			can_enable:             false
-			can_verify_certificate: true
-			enabled_default:        false
-		}
-	}
-
-	support: {
-		dependencies: {
-			http_client: {
-				required: true
+		multiline: enabled: false
+		receive: {
+			from: {
 				title:    "HTTP Client"
-				type:     "external"
 				url:      urls.http_client
 				versions: null
 
@@ -44,8 +31,17 @@ components: sources: http: {
 					}
 				}
 			}
-		}
 
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				enabled_default:        false
+			}
+		}
+	}
+
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true

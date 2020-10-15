@@ -13,21 +13,13 @@ components: sources: statsd: {
 		deployment_roles: ["aggregator"]
 		development:   "stable"
 		egress_method: "stream"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
-
-	support: {
-		dependencies: {
-			statsd_client: {
-				required: true
+		multiline: enabled: false
+		receive: {
+			from: {
 				title:    "StatsD Client"
-				type:     "external"
 				url:      urls.statsd
 				versions: null
 
@@ -41,8 +33,12 @@ components: sources: statsd: {
 					ssl: "optional"
 				}
 			}
-		}
 
+			tls: enabled: false
+		}
+	}
+
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true

@@ -5,23 +5,6 @@ components: {
 		kind: string
 		let Kind = kind
 
-		features: {
-			if Kind == "source" || Kind == "sink" {
-				tls: {
-					enabled: bool
-
-					if enabled {
-						can_enable:             bool
-						can_verify_certificate: bool
-						if kind == "sink" {
-							can_verify_hostname: bool
-						}
-						enabled_default: bool
-					}
-				}
-			}
-		}
-
 		configuration: {
 			_conditions: {
 				examples: [
@@ -138,6 +121,82 @@ components: {
 				}
 			}
 
+			_tls: {
+				_args: {
+					can_enable:          bool
+					can_verify_hostname: bool | *false
+					enabled_default:     bool
+				}
+				let Args = _args
+
+				common:      false
+				description: "Configures the TLS options for connections from this source."
+				required:    false
+				type: object: options: {
+					if Args.can_enable {
+						enabled: {
+							common:      false
+							description: "Require TLS for incoming connections. If this is set, an identity certificate is also required."
+							required:    false
+							type: bool: default: Args.enabled_default
+						}
+					}
+
+					ca_file: {
+						common:      false
+						description: "Absolute path to an additional CA certificate file, in DER or PEM format (X.509), or an in-line CA certificate in PEM format."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["/path/to/certificate_authority.crt"]
+						}
+					}
+					crt_file: {
+						common:      false
+						description: "Absolute path to a certificate file used to identify this server, in DER or PEM format (X.509) or PKCS#12, or an in-line certificate in PEM format. If this is set, and is not a PKCS#12 archive, `key_file` must also be set. This is required if `enabled` is set to `true`."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["/path/to/host_certificate.crt"]
+						}
+					}
+					key_file: {
+						common:      false
+						description: "Absolute path to a private key file used to identify this server, in DER or PEM format (PKCS#8), or an in-line private key in PEM format."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["/path/to/host_certificate.key"]
+						}
+					}
+					key_pass: {
+						common:      false
+						description: "Pass phrase used to unlock the encrypted key file. This has no effect unless `key_file` is set."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+						}
+					}
+
+					verify_certificate: {
+						common:      false
+						description: "If `true`, Vector will require a TLS certificate from the connecting host and terminate the connection if the certificate is not valid. If `false` (the default), Vector will not request a certificate from the client."
+						required:    false
+						type: bool: default: false
+					}
+
+					if Args.can_verify_hostname {
+						verify_hostname: {
+							common:      false
+							description: "If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote host name."
+							required:    false
+							type: bool: default: true
+						}
+					}
+				}
+			}
+
 			_types: {
 				common:      true
 				description: "Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types."
@@ -146,83 +205,6 @@ components: {
 				type: object: {
 					examples: [{"status": "int"}, {"duration": "float"}, {"success": "bool"}, {"timestamp": "timestamp|%F"}, {"timestamp": "timestamp|%a %b %e %T %Y"}, {"parent": {"child": "int"}}]
 					options: {}
-				}
-			}
-
-			if (Kind == "source" || Kind == "sink") {
-				if features.tls.enabled {
-					tls: {
-						common:      false
-						description: "Configures the TLS options for connections from this source."
-						required:    false
-						type: object: options: {
-							if features.tls.can_enable {
-								enabled: {
-									common:      false
-									description: "Require TLS for incoming connections. If this is set, an identity certificate is also required."
-									required:    false
-									type: bool: default: features.tls.enabled_default
-								}
-							}
-
-							ca_file: {
-								common:      false
-								description: "Absolute path to an additional CA certificate file, in DER or PEM format (X.509), or an in-line CA certificate in PEM format."
-								required:    false
-								type: string: {
-									default: null
-									examples: ["/path/to/certificate_authority.crt"]
-								}
-							}
-							crt_file: {
-								common:      false
-								description: "Absolute path to a certificate file used to identify this server, in DER or PEM format (X.509) or PKCS#12, or an in-line certificate in PEM format. If this is set, and is not a PKCS#12 archive, `key_file` must also be set. This is required if `enabled` is set to `true`."
-								required:    false
-								type: string: {
-									default: null
-									examples: ["/path/to/host_certificate.crt"]
-								}
-							}
-							key_file: {
-								common:      false
-								description: "Absolute path to a private key file used to identify this server, in DER or PEM format (PKCS#8), or an in-line private key in PEM format."
-								required:    false
-								type: string: {
-									default: null
-									examples: ["/path/to/host_certificate.key"]
-								}
-							}
-							key_pass: {
-								common:      false
-								description: "Pass phrase used to unlock the encrypted key file. This has no effect unless `key_file` is set."
-								required:    false
-								type: string: {
-									default: null
-									examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
-								}
-							}
-
-							if features.tls.enabled_default {
-								verify_certificate: {
-									common:      false
-									description: "If `true`, Vector will require a TLS certificate from the connecting host and terminate the connection if the certificate is not valid. If `false` (the default), Vector will not request a certificate from the client."
-									required:    false
-									type: bool: default: false
-								}
-							}
-
-							if kind == "sink" {
-								if features.tls.can_verify_hostname {
-									verify_hostname: {
-										common:      false
-										description: "If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote host name."
-										required:    false
-										type: bool: default: true
-									}
-								}
-							}
-						}
-					}
 				}
 			}
 
@@ -300,16 +282,17 @@ components: {
 		}
 
 		how_it_works: {
-			if (Kind == "source" || Kind == "sink") {
-				if features.tls.enabled {
-					tls: {
-						title: "Transport Layer Security (TLS)"
-						body: #"""
+			if (Kind == "source") {
+				if components["\(Kind)s"][Name].features.receive != _|_ {
+					if components["\(Kind)s"][Name].features.receive.tls.enabled {
+						tls: {
+							title: "Transport Layer Security (TLS)"
+							body: #"""
                   Vector uses [Openssl][urls.openssl] for TLS protocols. You can
                   adjust TLS behavior via the `tls.*` options.
                   """#
-					}
-				}
+						}
+					}}
 			}
 		}
 	}}

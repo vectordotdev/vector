@@ -19,21 +19,13 @@ components: sources: docker: {
 		deployment_roles: ["daemon"]
 		development:   "beta"
 		egress_method: "stream"
-		function:      "collect"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  true
-		tls: enabled:        false
-	}
-
-	support: {
-		dependencies: {
-			docker_engine: {
-				required: true
+		collect: {
+			checkpoint: enabled: false
+			from: {
 				title:    "Docker Engine"
-				type:     "external"
 				url:      urls.docker_engine
 				versions: ">= 1.24"
 
@@ -69,7 +61,10 @@ components: sources: docker: {
 				]
 			}
 		}
+		multiline: enabled: true
+	}
 
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true

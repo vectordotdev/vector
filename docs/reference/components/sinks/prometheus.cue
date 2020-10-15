@@ -10,17 +10,18 @@ components: sinks: prometheus: {
 		delivery:      "best_effort"
 		development:   "beta"
 		egress_method: "aggregate"
-		function:      "transmit"
 		service_providers: []
 	}
 
 	features: {
 		buffer: enabled:      false
-		compression: enabled: false
-		encoding: codec: enabled: false
 		healthcheck: enabled: false
-		request: enabled:     false
-		tls: enabled:         false
+		send: {
+			compression: enabled: false
+			encoding: codec: enabled: false
+			request: enabled: false
+			tls: enabled:     false
+		}
 	}
 
 	support: {

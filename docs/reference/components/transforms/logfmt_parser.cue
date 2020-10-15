@@ -8,10 +8,17 @@ components: transforms: logfmt_parser: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
-		function:      "parse"
 	}
 
-	features: {}
+	features: {
+		parse: {
+			format: {
+				title:    "Logfmt"
+				url:      urls.logfmt
+				versions: null
+			}
+		}
+	}
 
 	support: {
 		platforms: {

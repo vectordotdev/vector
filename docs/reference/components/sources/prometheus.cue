@@ -11,21 +11,13 @@ components: sources: prometheus: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
-		function:      "collect"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
-
-	support: {
-		dependencies: {
-			prometheus_client: {
-				required: true
+		collect: {
+			checkpoint: enabled: false
+			from: {
 				title:    "Prometheus Client"
-				type:     "external"
 				url:      urls.prometheus_client
 				versions: null
 
@@ -40,7 +32,10 @@ components: sources: prometheus: {
 				}
 			}
 		}
+		multiline: enabled: false
+	}
 
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true

@@ -156,6 +156,7 @@ urls: {
 	iso3166_2:                                                "https://en.wikipedia.org/wiki/ISO_3166-2"
 	jemalloc:                                                 "https://github.com/jemalloc/jemalloc"
 	journald:                                                 "https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html"
+	json:                                                     "https://en.wikipedia.org/wiki/JSON"
 	json_types:                                               "https://en.wikipedia.org/wiki/JSON#Data_types_and_syntax"
 	kafka:                                                    "https://kafka.apache.org/"
 	kafka_partitioning_docs:                                  "https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Partitioningandbootstrapping"

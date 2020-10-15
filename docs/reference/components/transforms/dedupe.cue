@@ -8,10 +8,11 @@ components: transforms: dedupe: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
-		function:      "filter"
 	}
 
-	features: {}
+	features: {
+		filter: {}
+	}
 
 	support: {
 		platforms: {

@@ -10,29 +10,30 @@ components: sinks: azure_monitor_logs: {
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
-		function:      "transmit"
 		service_providers: ["Azure"]
 	}
 
 	features: {
-		batch: {
-			enabled:      true
-			common:       false
-			max_bytes:    30000000
-			max_events:   null
-			timeout_secs: 1
-		}
 		buffer: enabled:      true
-		compression: enabled: false
-		encoding: codec: enabled: false
 		healthcheck: enabled: true
-		request: enabled:     false
-		tls: {
-			enabled:                true
-			can_enable:             true
-			can_verify_certificate: true
-			can_verify_hostname:    true
-			enabled_default:        true
+		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				max_bytes:    30000000
+				max_events:   null
+				timeout_secs: 1
+			}
+			compression: enabled: false
+			encoding: codec: enabled: false
+			request: enabled: false
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        true
+			}
 		}
 	}
 

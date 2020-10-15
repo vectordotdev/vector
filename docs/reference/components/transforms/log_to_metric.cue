@@ -7,11 +7,12 @@ components: transforms: log_to_metric: {
 	classes: {
 		commonly_used: false
 		development:   "stable"
-		function:      "convert"
 		egress_method: "batch"
 	}
 
-	features: {}
+	features: {
+		convert: {}
+	}
 
 	support: {
 		platforms: {

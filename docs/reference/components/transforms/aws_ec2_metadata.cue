@@ -8,29 +8,19 @@ components: transforms: aws_ec2_metadata: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
-		function:      "enrich"
 	}
 
-	features: {}
-
-	support: {
-		dependencies: {
-			aws_imds_v2: {
-				required: true
-				title:    "AWS IMDS v2"
-				type:     "external"
-				url:      urls.apache
+	features: {
+		enrich: {
+			from: {
+				title:    "AWS EC2 Instance Metadata"
+				url:      urls.aws_ec2_instance_metadata
 				versions: ">= 2"
-
-				interface: socket: {
-					direction:    "outgoing"
-					network_hops: 2
-					protocols: ["http"]
-					ssl: "disabled"
-				}
 			}
 		}
+	}
 
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -40,7 +30,15 @@ components: transforms: aws_ec2_metadata: {
 			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: []
+		requirements: [
+			#"""
+				Running this transform within Docker on EC2 requires 2 network hops. Users must raise this limit:
+
+				```bash
+				aws ec2 modify-instance-metadata-options --instance-id <ID> --http-endpoint enabled --http-put-response-hop-limit 2
+				```
+				"""#,
+		]
 		warnings: []
 		notices: []
 	}

@@ -12,21 +12,13 @@ components: sources: file: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "stable"
 		egress_method: "stream"
-		function:      "collect"
 	}
 
 	features: {
-		checkpoint: enabled: true
-		multiline: enabled:  true
-		tls: enabled:        false
-	}
-
-	support: {
-		dependencies: {
-			file_system: {
-				required: true
+		collect: {
+			checkpoint: enabled: true
+			from: {
 				title:    "File System"
-				type:     "external"
 				url:      urls.file_system
 				versions: null
 
@@ -54,7 +46,10 @@ components: sources: file: {
 				]
 			}
 		}
+		multiline: enabled: true
+	}
 
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true

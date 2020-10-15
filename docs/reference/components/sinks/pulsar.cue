@@ -10,21 +10,22 @@ components: sinks: pulsar: {
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "stream"
-		function:      "transmit"
 		service_providers: []
 	}
 
 	features: {
 		buffer: enabled:      false
-		compression: enabled: false
-		encoding: codec: {
-			enabled: true
-			default: "text"
-			enum: ["text", "json"]
-		}
 		healthcheck: enabled: true
-		request: enabled:     false
-		tls: enabled:         false
+		send: {
+			compression: enabled: false
+			encoding: codec: {
+				enabled: true
+				default: "text"
+				enum: ["text", "json"]
+			}
+			request: enabled: false
+			tls: enabled:     false
+		}
 	}
 
 	support: {

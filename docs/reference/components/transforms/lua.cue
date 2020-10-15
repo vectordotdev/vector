@@ -8,24 +8,19 @@ components: transforms: lua: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
-		function:      "program"
 	}
 
-	features: {}
-
-	support: {
-		dependencies: {
-			lua: {
-				required: true
-				title:    "AWS IMDS v2"
-				type:     "internal"
-				url:      urls.lua
-				versions: "5.3"
-
-				interface: ffi: {}
+	features: {
+		program: {
+			runtime: {
+				title:   "Lua"
+				url:     urls.lua
+				version: "5.3"
 			}
 		}
+	}
 
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true

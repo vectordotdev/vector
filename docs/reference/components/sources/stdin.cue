@@ -10,28 +10,24 @@ components: sources: stdin: {
 		deployment_roles: ["sidecar"]
 		development:   "stable"
 		egress_method: "stream"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
-
-	support: {
-		dependencies: {
-			stdin_client: {
-				required: true
+		multiline: enabled: false
+		receive: {
+			from: {
 				title:    "STDIN Client"
-				type:     "external"
 				url:      urls.stdin
 				versions: null
 
 				interface: stdin: {}
 			}
-		}
 
+			tls: enabled: false
+		}
+	}
+
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
