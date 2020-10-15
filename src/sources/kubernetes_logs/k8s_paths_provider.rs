@@ -85,6 +85,16 @@ fn extract_excluded_containers_for_pod<'a>(pod: &'a Pod) -> impl Iterator<Item =
     })
 }
 
+fn build_container_exclusion_patterns<'a>(
+    pod_logs_dir: &'a str,
+    containers: impl Iterator<Item = &'a str> + 'a,
+) -> impl Iterator<Item = glob::Pattern> + 'a {
+    containers.filter_map(move |container| {
+        let escaped_container_name = glob::Pattern::escape(container);
+        glob::Pattern::new(&[pod_logs_dir, &escaped_container_name, "**"].join("/")).ok()
+    })
+}
+
 fn list_pod_log_paths<'a, G, GI>(mut glob_impl: G, pod: &Pod) -> impl Iterator<Item = PathBuf> + 'a
 where
     G: FnMut(&str) -> GI + 'a,
@@ -140,8 +150,8 @@ fn exclude_paths<'a>(
 #[cfg(test)]
 mod tests {
     use super::{
-        exclude_paths, extract_excluded_containers_for_pod, extract_pod_logs_directory,
-        list_pod_log_paths,
+        build_container_exclusion_patterns, exclude_paths, extract_excluded_containers_for_pod,
+        extract_pod_logs_directory, list_pod_log_paths,
     };
     use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
     use std::path::PathBuf;
@@ -414,6 +424,48 @@ mod tests {
                 actual_paths, expected_paths,
                 "failed for patterns {:?}",
                 &str_patterns
+            )
+        }
+    }
+
+    #[test]
+    fn test_build_container_exclusion_patterns() {
+        let cases = vec![
+            // No excluded containers - no exclusion patterns.
+            (
+                "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid",
+                vec![],
+                vec![],
+            ),
+            // Ensure the paths are concatenated correctly and look good.
+            (
+                "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid",
+                vec!["container1", "container2"],
+                vec![
+                    "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/container1/**",
+                    "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/container2/**",
+                ],
+            ),
+            // Ensure control characters are escaped properly.
+            (
+                "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid",
+                vec!["*[]"],
+                vec!["/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/[*][[][]]/**"],
+            ),
+        ];
+
+        for (pod_logs_dir, containers, expected_patterns) in cases {
+            let actual_patterns: Vec<_> =
+                build_container_exclusion_patterns(pod_logs_dir, containers.clone().into_iter())
+                    .collect();
+            let expected_patterns: Vec<_> = expected_patterns
+                .into_iter()
+                .map(|pattern| glob::Pattern::new(pattern).unwrap())
+                .collect();
+            assert_eq!(
+                actual_patterns, expected_patterns,
+                "failed for dir {:?} and containers {:?}",
+                &pod_logs_dir, &containers,
             )
         }
     }
