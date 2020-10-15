@@ -1,30 +1,47 @@
 package metadata
 
 components: sinks: pulsar: {
-	title:             "Apache Pulsar"
-	short_description: "Streams log events to [Apache Pulsar][urls.pulsar] via the [Pulsar protocol][urls.pulsar_protocol]."
-	long_description:  "[Pulsar][urls.pulsar] is a multi-tenant, high-performance solution for server-to-server messaging. Pulsar was originally developed by Yahoo, it is under the stewardship of the Apache Software Foundation. It is an excellent tool for streaming logs and metrics data."
+	title:       "Apache Pulsar"
+	description: "[Pulsar][urls.pulsar] is a multi-tenant, high-performance solution for server-to-server messaging. Pulsar was originally developed by Yahoo, it is under the stewardship of the Apache Software Foundation. It is an excellent tool for streaming logs and metrics data."
 
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "stream"
-		function:      "transmit"
 		service_providers: []
 	}
 
 	features: {
 		buffer: enabled:      false
-		compression: enabled: false
-		encoding: codec: {
-			enabled: true
-			default: "text"
-			enum: ["text", "json"]
-		}
 		healthcheck: enabled: true
-		request: enabled:     false
-		tls: enabled:         false
+		send: {
+			compression: enabled: false
+			encoding: codec: {
+				enabled: true
+				default: "text"
+				enum: ["text", "json"]
+			}
+			request: enabled: false
+			tls: enabled:     false
+			to: {
+				name:     "Apache Pulsar"
+				url:      urls.pulsar
+				versions: null
+
+				interface: {
+					socket: {
+						api: {
+							title: "Pulsar protocol"
+							url:   urls.pulsar_protocol
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "disabled"
+					}
+				}
+			}
+		}
 	}
 
 	support: {

@@ -3,9 +3,8 @@ package metadata
 components: sources: statsd: {
 	_port: 8126
 
-	title:             "StatsD"
-	short_description: "Ingests data through the [StatsD UDP protocol][urls.statsd_udp_protocol] and outputs metric events."
-	long_description:  "[StatsD][urls.statsd] is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy][urls.etsy] in Node."
+	title:       "StatsD"
+	description: "[StatsD][urls.statsd] is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy][urls.etsy] in Node."
 
 	classes: {
 		commonly_used: false
@@ -13,21 +12,13 @@ components: sources: statsd: {
 		deployment_roles: ["aggregator"]
 		development:   "stable"
 		egress_method: "stream"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
-
-	support: {
-		dependencies: {
-			statsd_client: {
-				required: true
-				title:    "StatsD Client"
-				type:     "external"
+		multiline: enabled: false
+		receive: {
+			from: {
+				name:     "StatsD client"
 				url:      urls.statsd
 				versions: null
 
@@ -41,8 +32,12 @@ components: sources: statsd: {
 					ssl: "optional"
 				}
 			}
-		}
 
+			tls: enabled: false
+		}
+	}
+
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true

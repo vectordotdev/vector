@@ -1,18 +1,23 @@
 package metadata
 
 components: transforms: json_parser: {
-	title:             "JSON Parser"
-	short_description: "Accepts log events and allows you to parse a log field value as JSON."
-	long_description:  "Accepts log events and allows you to parse a log field value as JSON."
+	title: "JSON Parser"
 
 	classes: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
-		function:      "parse"
 	}
 
-	features: {}
+	features: {
+		parse: {
+			format: {
+				name:     "JSON"
+				url:      urls.json
+				versions: null
+			}
+		}
+	}
 
 	support: {
 		platforms: {

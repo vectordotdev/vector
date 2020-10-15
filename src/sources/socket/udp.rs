@@ -11,7 +11,7 @@ use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use string_cache::DefaultAtom as Atom;
+
 use tokio::net::UdpSocket;
 use tokio_util::codec::Decoder;
 
@@ -22,7 +22,7 @@ pub struct UdpConfig {
     pub address: SocketAddr,
     #[serde(default = "default_max_length")]
     pub max_length: usize,
-    pub host_key: Option<Atom>,
+    pub host_key: Option<String>,
 }
 
 fn default_max_length() -> usize {
@@ -42,7 +42,7 @@ impl UdpConfig {
 pub fn udp(
     address: SocketAddr,
     max_length: usize,
-    host_key: Atom,
+    host_key: String,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {

@@ -1,38 +1,55 @@
 package metadata
 
 components: sinks: azure_monitor_logs: {
-	title:             "Azure Monitor Logs"
-	short_description: "Batches log events to [Azure Monitor's][urls.azure_monitor] logs via the [REST endpoint][urls.azure_monitor_logs_endpoints]."
-	long_description:  "[Azure Monitor][urls.azure_monitor] is a service in Azure that provides performance and availability monitoring for applications and services in Azure, other cloud environments, or on-premises. Azure Monitor collects data from multiple sources into a common data platform where it can be analyzed for trends and anomalies."
+	title:       "Azure Monitor Logs"
+	description: "[Azure Monitor][urls.azure_monitor] is a service in Azure that provides performance and availability monitoring for applications and services in Azure, other cloud environments, or on-premises. Azure Monitor collects data from multiple sources into a common data platform where it can be analyzed for trends and anomalies."
 
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
-		function:      "transmit"
 		service_providers: ["Azure"]
 	}
 
 	features: {
-		batch: {
-			enabled:      true
-			common:       false
-			max_bytes:    30000000
-			max_events:   null
-			timeout_secs: 1
-		}
 		buffer: enabled:      true
-		compression: enabled: false
-		encoding: codec: enabled: false
 		healthcheck: enabled: true
-		request: enabled:     false
-		tls: {
-			enabled:                true
-			can_enable:             true
-			can_verify_certificate: true
-			can_verify_hostname:    true
-			enabled_default:        true
+		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				max_bytes:    30000000
+				max_events:   null
+				timeout_secs: 1
+			}
+			compression: enabled: false
+			encoding: codec: enabled: false
+			request: enabled: false
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        true
+			}
+			to: {
+				name:     "Azure Monitor"
+				url:      urls.azure_monitor
+				versions: null
+
+				interface: {
+					socket: {
+						api: {
+							title: "Azure Monitor logs API"
+							url:   urls.azure_monitor_logs_endpoints
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "required"
+					}
+				}
+			}
 		}
 	}
 

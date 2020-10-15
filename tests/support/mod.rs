@@ -18,7 +18,7 @@ use std::{
         Arc, Mutex,
     },
 };
-use string_cache::DefaultAtom as Atom;
+
 use tracing::{error, info};
 use vector::config::{
     DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
@@ -193,7 +193,7 @@ impl Transform for MockTransform {
         match &mut event {
             Event::Log(log) => {
                 let mut v = log
-                    .get(&Atom::from(vector::config::log_schema().message_key()))
+                    .get(vector::config::log_schema().message_key())
                     .unwrap()
                     .to_string_lossy();
                 v.push_str(&self.suffix);

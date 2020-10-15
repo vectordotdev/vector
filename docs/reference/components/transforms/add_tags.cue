@@ -1,19 +1,18 @@
 package metadata
 
 components: transforms: add_tags: {
-	title:             "Add Tags"
-	short_description: "Accepts metric events and allows you to add one or more metric tags."
-	long_description:  "Accepts metric events and allows you to add one or more metric tags."
+	title: "Add Tags"
 
 	classes: {
 		commonly_used: false
 		development:   "stable"
 		development:   "stable"
 		egress_method: "stream"
-		function:      "schema"
 	}
 
-	features: {}
+	features: {
+		shape: {}
+	}
 
 	support: {
 		platforms: {

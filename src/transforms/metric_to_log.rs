@@ -11,12 +11,11 @@ use crate::{
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct MetricToLogConfig {
-    pub host_tag: Option<Atom>,
+    pub host_tag: Option<String>,
 }
 
 inventory::submit! {
@@ -46,18 +45,18 @@ impl TransformConfig for MetricToLogConfig {
 }
 
 pub struct MetricToLog {
-    timestamp_key: Atom,
-    host_tag: Atom,
+    timestamp_key: String,
+    host_tag: String,
 }
 
 impl MetricToLog {
-    pub fn new(host_tag: Option<Atom>) -> Self {
+    pub fn new(host_tag: Option<String>) -> Self {
         Self {
-            timestamp_key: Atom::from("timestamp"),
-            host_tag: Atom::from(format!(
+            timestamp_key: "timestamp".into(),
+            host_tag: format!(
                 "tags.{}",
-                host_tag.unwrap_or_else(|| Atom::from(log_schema().host_key()))
-            )),
+                host_tag.unwrap_or_else(|| log_schema().host_key().to_string())
+            ),
         }
     }
 }
@@ -107,7 +106,7 @@ mod tests {
 
     fn do_transform(metric: Metric) -> Option<LogEvent> {
         let event = Event::Metric(metric);
-        let mut transformer = MetricToLog::new(Some(Atom::from("host")));
+        let mut transformer = MetricToLog::new(Some("host".into()));
 
         transformer.transform(event).map(|event| event.into_log())
     }

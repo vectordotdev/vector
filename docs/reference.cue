@@ -42,11 +42,6 @@ _values: {
 	// `egress_method` documents how the component outputs events.
 	egress_method: #EgressMethod
 
-	// `function` specifies the functions behavior categories. This helps
-	// with component filtering. Each component type will allow different
-	// functions.
-	function: string
-
 	if Args.kind == "sink" {
 		// `service_providers` specify the service providers that support
 		// and host this service. This helps users find relevant sinks.
@@ -69,12 +64,9 @@ _values: {
 
 	configuration: #Schema
 
-	// `long_description` describes the components with a single paragraph.
+	// `description` describes the components with a single paragraph.
 	// It is used for SEO purposes and should be full of relevant keywords.
-	long_description: string
-
-	// `short_description` describes the component in one sentence.
-	short_description: string
+	description?: =~"[.]$"
 
 	// `title` is the human friendly title for the component.
 	//
@@ -164,18 +156,6 @@ _values: {
 // * `best_effort` - We will make a best effort to deliver the event,
 // but the event is not guaranteed to be delivered.
 #DeliveryStatus: "at_least_once" | "best_effort"
-
-#Dependencies: [Name=string]: close({
-	title:    string
-	required: bool
-	type:     "external" | "internal"
-	url:      string
-	versions: string | null
-
-	interface: #Interface
-
-	setup: [...string]
-})
 
 // `#DeploymentRoles` clarify when a component should be used under
 // certain deployment contexts.
@@ -268,7 +248,95 @@ _values: {
 	}
 	let Args = _args
 
-	if Args.kind == "sink" && Args.egress_method == "batch" {
+	if Args.kind == "source" {
+		collect?: #FeaturesCollect
+		receive?: #FeaturesReceive & {_args: {kind: Args.kind}}
+
+		// `multiline` should be enabled for sources that offer the ability
+		// to merge multiple lines together.
+		multiline: close({
+			enabled: bool
+		})
+	}
+
+	if Args.kind == "transform" {
+		convert?: close({})
+		enrich?:  #FeaturesEnrich
+		filter?:  close({})
+		parse?:   #FeaturesParse
+		program?: #FeaturesProgram
+		reduce?:  close({})
+		route?:   close({})
+		shape?:   close({})
+	}
+
+	if Args.kind == "sink" {
+		// `buffer` describes how the component buffers data.
+		buffer: close({
+			enabled: bool | string
+		})
+
+		// `healtcheck` notes if a component offers a healthcheck on boot.
+		healthcheck: close({
+			enabled: bool
+		})
+
+		exposes?: close({})
+		send?:    #FeaturesSend & {_args: Args}
+	}
+}
+
+#FeaturesCollect: {
+	// `checkpoint` describes how the component checkpoints its read
+	// position.
+	checkpoint: close({
+		enabled: bool
+	})
+
+	from?: #Service
+}
+
+#FeaturesEnrich: {
+	from: close({
+		name:     string
+		url:      string
+		versions: string | null
+	})
+}
+
+#FeaturesParse: {
+	format: close({
+		name:     string
+		url:      string
+		versions: string | null
+	})
+}
+
+#FeaturesProgram: {
+	runtime: #Runtime
+}
+
+#FeaturesReceive: {
+	_args: {
+		kind: string
+	}
+	let Args = _args
+
+	from?: #Service
+
+	// `tls` describes if the component secures network communication
+	// via TLS.
+	tls: #FeaturesTLS & {_args: {kind: Args.kind}}
+}
+
+#FeaturesSend: {
+	_args: {
+		egress_method: string
+		kind:          string
+	}
+	let Args = _args
+
+	if Args.egress_method == "batch" {
 		// `batch` describes how the component batches data. This is only
 		// relevant if a component has an `egress_method` of "batch".
 		batch: close({
@@ -280,95 +348,65 @@ _values: {
 		})
 	}
 
-	if Args.kind == "sink" {
-		// `buffer` describes how the component buffers data.
-		buffer: close({
-			enabled: bool | string
-		})
-	}
+	// `compression` describes how the component compresses data.
+	compression: {
+		enabled: bool
 
-	if Args.kind == "source" {
-		// `checkpoint` describes how the component checkpoints its read
-		// position.
-		checkpoint: close({
-			enabled: bool
-		})
-	}
-
-	if Args.kind == "sink" {
-		// `compression` describes how the component compresses data.
-		compression: {
-			enabled: bool
-
-			if enabled == true {
-				default: #CompressionAlgorithm
-				algorithm: ["none", "gzip"]
-				level: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-			}
+		if enabled == true {
+			default: #CompressionAlgorithm
+			algorithm: ["none", "gzip"]
+			level: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 		}
 	}
 
-	if Args.kind == "sink" {
-		// `encoding` describes how the component encodes data.
-		encoding: {
-			codec: {
-				enabled: bool
-
-				if enabled {
-					default: #EncodingCodec | null
-					enum:    [#EncodingCodec, ...] | null
-				}
-			}
-		}
-	}
-
-	if Args.kind == "sink" {
-		// `healtcheck` notes if a component offers a healthcheck on boot.
-		healthcheck: close({
-			enabled: bool
-		})
-	}
-
-	if Args.kind == "source" {
-		// `multiline` should be enabled for sources that offer the ability
-		// to merge multiple lines together.
-		multiline: close({
-			enabled: bool
-		})
-	}
-
-	if Args.kind == "sink" {
-		// `request` describes how the component issues and manages external
-		// requests.
-		request: {
+	// `encoding` describes how the component encodes data.
+	encoding: {
+		codec: {
 			enabled: bool
 
 			if enabled {
-				in_flight_limit:            uint8
-				rate_limit_duration_secs:   uint8
-				rate_limit_num:             uint8
-				retry_initial_backoff_secs: uint8
-				retry_max_duration_secs:    uint8
-				timeout_secs:               uint8
+				default: #EncodingCodec | null
+				enum:    [#EncodingCodec, ...] | null
 			}
 		}
 	}
 
-	if Args.kind == "source" || Args.kind == "sink" {
-		// `tls` describes if the component secures network communication
-		// via TLS.
-		tls: {
-			enabled: bool
+	// `request` describes how the component issues and manages external
+	// requests.
+	request: {
+		enabled: bool
 
-			if enabled {
-				can_enable:             bool
-				can_verify_certificate: bool
-				if Args.kind == "sink" {
-					can_verify_hostname: bool
-				}
-				enabled_default: bool
-			}
+		if enabled {
+			in_flight_limit:            uint8
+			rate_limit_duration_secs:   uint8
+			rate_limit_num:             uint16
+			retry_initial_backoff_secs: uint8
+			retry_max_duration_secs:    uint8
+			timeout_secs:               uint8
 		}
+	}
+
+	// `tls` describes if the component secures network communication
+	// via TLS.
+	tls: #FeaturesTLS & {_args: {kind: Args.kind}}
+
+	to?: #Service
+}
+
+#FeaturesTLS: {
+	_args: {
+		kind: string
+	}
+	let Args = _args
+	enabled: bool
+
+	if enabled {
+		can_enable:             bool
+		can_verify_certificate: bool
+		if Args.kind == "sink" {
+			can_verify_hostname: bool
+		}
+		enabled_default: bool
 	}
 }
 
@@ -491,6 +529,22 @@ _values: {
 
 #Protocol: "http" | "tcp" | "udp" | "unix"
 
+#Runtime: {
+	name:    string
+	url:     string
+	version: string
+}
+
+#Service: {
+	name:     string
+	url:      string
+	versions: string | null
+
+	interface: #Interface
+
+	setup: [...string]
+}
+
 #Schema: [Name=string]: {
 	// `category` allows you to group options into categories.
 	//
@@ -557,8 +611,6 @@ _values: {
 
 #Support: {
 	_args: kind: string
-
-	dependencies: #Dependencies
 
 	// `platforms` describes which platforms this component is available on.
 	//

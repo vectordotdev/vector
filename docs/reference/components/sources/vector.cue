@@ -3,9 +3,7 @@ package metadata
 components: sources: vector: {
 	_port: 9000
 
-	title:             "Vector"
-	short_description: "Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs log and metric events."
-	long_description:  "Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs log and metric events."
+	title: "Vector"
 
 	classes: {
 		commonly_used: false
@@ -13,26 +11,13 @@ components: sources: vector: {
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "stream"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: {
-			enabled:                true
-			can_enable:             true
-			can_verify_certificate: true
-			enabled_default:        false
-		}
-	}
-
-	support: {
-		dependencies: {
-			vector_client: {
-				required: true
-				title:    "Vector Client"
-				type:     "external"
+		multiline: enabled: false
+		receive: {
+			from: {
+				name:     "Vector sink"
 				url:      urls.vector_sink
 				versions: null
 
@@ -42,8 +27,17 @@ components: sources: vector: {
 					ssl: "optional"
 				}
 			}
-		}
 
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				enabled_default:        false
+			}
+		}
+	}
+
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
