@@ -26,7 +26,11 @@ inventory::submit! {
     SinkDescription::new::<BlackholeConfig>("blackhole")
 }
 
-impl GenerateConfig for BlackholeConfig {}
+impl GenerateConfig for BlackholeConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self { print_amount: 1000 }).unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "blackhole")]
@@ -99,6 +103,11 @@ impl StreamSink for BlackholeSink {
 mod tests {
     use super::*;
     use crate::test_util::random_events_with_stream;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<BlackholeConfig>();
+    }
 
     #[tokio::test]
     async fn blackhole() {
