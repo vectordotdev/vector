@@ -65,6 +65,7 @@ async fn simple() -> Result<(), Box<dyn std::error::Error>> {
             "test-pod",
             "echo MARKER",
             vec![],
+            vec![],
         ))?)
         .await?;
     framework
@@ -147,6 +148,7 @@ async fn partial_merge() -> Result<(), Box<dyn std::error::Error>> {
             "test-pod",
             &format!("echo {}", test_message),
             vec![],
+            vec![],
         ))?)
         .await?;
     framework
@@ -209,6 +211,7 @@ async fn preexisting() -> Result<(), Box<dyn std::error::Error>> {
             "test-vector-test-pod",
             "test-pod",
             "echo MARKER",
+            vec![],
             vec![],
         ))?)
         .await?;
@@ -313,6 +316,7 @@ async fn multiple_lines() -> Result<(), Box<dyn std::error::Error>> {
             "test-pod",
             &format!("echo -e {}", test_messages.join(r"\\n")),
             vec![],
+            vec![],
         ))?)
         .await?;
     framework
@@ -395,6 +399,7 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
             "test-pod",
             "echo MARKER",
             vec![("label1", "hello"), ("label2", "world")],
+            vec![],
         ))?)
         .await?;
     framework
@@ -492,6 +497,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             "test-pod-excluded",
             "echo EXCLUDED_MARKER",
             vec![("vector.dev/exclude", "true")],
+            vec![],
         ))?)
         .await?;
     framework
@@ -508,6 +514,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             "test-vector-test-pod",
             "test-pod-control",
             "echo CONTROL_MARKER",
+            vec![],
             vec![],
         ))?)
         .await?;
@@ -664,6 +671,7 @@ kubernetesLogsSource:
                     name,
                     "echo EXCLUDED_MARKER",
                     label_set,
+                    vec![],
                 ))?)
                 .await?,
         );
@@ -686,6 +694,7 @@ kubernetesLogsSource:
             "test-vector-test-pod",
             "test-pod-control",
             "echo CONTROL_MARKER",
+            vec![],
             vec![],
         ))?)
         .await?;
@@ -833,6 +842,7 @@ async fn multiple_ns() -> Result<(), Box<dyn std::error::Error>> {
                 "test-pod",
                 "echo MARKER",
                 vec![],
+                vec![],
             ))?)
             .await?;
         framework
@@ -920,6 +930,7 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
             "test-vector-test-pod",
             "test-pod",
             "echo MARKER",
+            vec![],
             vec![],
         ))?)
         .await?;
