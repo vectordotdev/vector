@@ -1,52 +1,65 @@
 package metadata
 
 components: sinks: humio_logs: {
-	title:             "Humio Logs"
-	short_description: "Batches log events to [Humio][urls.humio] via the [HEC API][urls.humio_hec]."
-	long_description:  "[Humio][urls.humio] is a time-series logging and aggregation platform for unrestricted, comprehensive event analysis, On-Premises or in the Cloud. With 1TB/day of raw log ingest/node, in-memory stream processing, and live, shareable dashboards and alerts, you can instantly and in real-time explore, monitor, and visualize any system’s data."
-
+	title: "Humio Logs"
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "batch"
-		function:      "transmit"
 		service_providers: ["Humio"]
 	}
 
 	features: {
-		batch: {
-			enabled:      true
-			common:       false
-			max_bytes:    1049000
-			max_events:   null
-			timeout_secs: 1
-		}
-		buffer: enabled: true
-		compression: {
-			enabled: true
-			default: null
-			gzip:    true
-		}
-		encoding: codec: {
-			enabled: true
-			default: null
-			enum: ["json", "text"]
-		}
+		buffer: enabled:      true
 		healthcheck: enabled: true
-		request: {
-			enabled:                    true
-			in_flight_limit:            10
-			rate_limit_duration_secs:   1
-			rate_limit_num:             10
-			retry_initial_backoff_secs: 1
-			retry_max_duration_secs:    10
-			timeout_secs:               60
-		}
-		tls: enabled: false
-	}
+		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				max_bytes:    1049000
+				max_events:   null
+				timeout_secs: 1
+			}
+			compression: {
+				enabled: true
+				default: null
+				gzip:    true
+			}
+			encoding: codec: {
+				enabled: true
+				default: null
+				enum: ["json", "text"]
+			}
+			request: {
+				enabled:                    true
+				in_flight_limit:            10
+				rate_limit_duration_secs:   1
+				rate_limit_num:             10
+				retry_initial_backoff_secs: 1
+				retry_max_duration_secs:    10
+				timeout_secs:               60
+			}
+			tls: enabled: false
+			to: {
+				name:     "Humio"
+				thing:    "a \(name) database"
+				url:      urls.humio
+				versions: null
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
+				interface: {
+					socket: {
+						api: {
+							title: "Humio Splunk HEC API"
+							url:   urls.humio_hec
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "disabled"
+					}
+				}
+			}
+		}
 	}
 
 	support: {
