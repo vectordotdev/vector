@@ -12,8 +12,13 @@ use windows_service::{
 const SERVICE_NAME: &str = "vector";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 
+const NO_ERROR: u32 = 0;
+const ERROR_FAIL_SHUTDOWN: u32 = 351;
+
 pub mod service_control {
-    use windows_service::service::{ServiceErrorControl, ServiceInfo, ServiceStartType};
+    use windows_service::service::{
+        ServiceErrorControl, ServiceExitCode, ServiceInfo, ServiceStartType, ServiceStatus,
+    };
     use windows_service::{
         service::{ServiceAccess, ServiceState},
         service_manager::{ServiceManager, ServiceManagerAccess},
@@ -24,7 +29,7 @@ pub mod service_control {
         WindowsServiceDoesNotExist, WindowsServiceInstall, WindowsServiceRestart,
         WindowsServiceStart, WindowsServiceStop, WindowsServiceUninstall,
     };
-    use crate::vector_windows::SERVICE_TYPE;
+    use crate::vector_windows::{NO_ERROR, SERVICE_TYPE};
     use std::ffi::OsString;
     use std::fmt;
     use std::time::Duration;
@@ -79,10 +84,10 @@ pub mod service_control {
         Restart,
     }
 
-    #[derive(Debug, Copy, Clone, PartialEq)]
+    #[derive(Debug, Clone, PartialEq)]
     enum PollStatus {
-        NoTimeout,
-        Timeout(ServiceState),
+        NoTimeout(ServiceStatus),
+        Timeout(ServiceStatus),
     }
 
     impl fmt::Display for ControlAction {
@@ -179,25 +184,16 @@ pub mod service_control {
         if service_status.current_state == ServiceState::StartPending
             || service_status.current_state == ServiceState::Running
         {
-            service.stop().context(Service)?;
+            service.stop()?;
         }
 
-        let timeout = Duration::from_secs(10);
-        let poll_status = poll_state(
+        let service_status = ensure_state(
             &service,
             ServiceState::Stopped,
-            timeout,
+            Duration::from_secs(10),
             Duration::from_secs(1),
         )?;
-
-        if let PollStatus::Timeout(state) = poll_status {
-            return Err(Error::PollTimeout {
-                state,
-                expected_state: ServiceState::Stopped,
-                timeout,
-            }
-            .into());
-        }
+        handle_service_exit_code(service_status.exit_code);
 
         service.start(&[] as &[OsString]).context(Service)?;
         emit!(WindowsServiceRestart {
@@ -254,22 +250,13 @@ pub mod service_control {
             });
         }
 
-        let timeout = Duration::from_secs(10);
-        let poll_status = poll_state(
+        let service_status = ensure_state(
             &service,
             ServiceState::Stopped,
-            timeout,
+            Duration::from_secs(10),
             Duration::from_secs(1),
         )?;
-
-        if let PollStatus::Timeout(state) = poll_status {
-            return Err(Error::PollTimeout {
-                state,
-                expected_state: ServiceState::Stopped,
-                timeout,
-            }
-            .into());
-        }
+        handle_service_exit_code(service_status.exit_code);
 
         service.delete().context(Service)?;
 
@@ -299,6 +286,20 @@ pub mod service_control {
         Ok(service)
     }
 
+    fn handle_service_exit_code(exit_code: windows_service::service::ServiceExitCode) {
+        debug!(message="Service stopped.", exit_code = ?exit_code);
+
+        match exit_code {
+            ServiceExitCode::Win32(ec) if ec != NO_ERROR => {
+                warn!(message = "Service stopped with error", exit_code = ec);
+            }
+            ServiceExitCode::ServiceSpecific(ec) => {
+                warn!(message = "Service stopped with error", exit_code = ec);
+            }
+            _ => {}
+        };
+    }
+
     fn poll_state(
         service: &windows_service::service::Service,
         state: ServiceState,
@@ -311,7 +312,7 @@ pub mod service_control {
         let poll_status = loop {
             let service_status = service.query_status()?;
             if service_status.current_state == state {
-                break PollStatus::NoTimeout;
+                break PollStatus::NoTimeout(service_status);
             }
             debug!(
                 "Waiting for service to transition to state {:?}... {}",
@@ -321,13 +322,32 @@ pub mod service_control {
 
             wait_time += wait_hint;
             if wait_time >= timeout {
-                break PollStatus::Timeout(service_status.current_state);
+                break PollStatus::Timeout(service_status);
             }
 
             std::thread::sleep(wait_hint);
         };
 
         Ok(poll_status)
+    }
+
+    fn ensure_state(
+        service: &windows_service::service::Service,
+        state: ServiceState,
+        timeout: Duration,
+        wait_hint: Duration,
+    ) -> crate::Result<ServiceStatus> {
+        let poll_status = poll_state(&service, state, timeout, wait_hint)?;
+
+        match poll_status {
+            PollStatus::Timeout(status) => Err(Error::PollTimeout {
+                state: status.current_state,
+                expected_state: state,
+                timeout,
+            }
+            .into()),
+            PollStatus::NoTimeout(status) => Ok(status),
+        }
     }
 }
 
@@ -342,8 +362,6 @@ pub fn run() -> Result<()> {
 }
 
 fn run_service(_arguments: Vec<OsString>) -> Result<()> {
-    const ERROR_FAIL_SHUTDOWN: u32 = 351;
-
     let (shutdown_tx, shutdown_rx) = mpsc::channel();
 
     let event_handler = move |control_event| -> ServiceControlHandlerResult {
@@ -371,7 +389,7 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
                 service_type: SERVICE_TYPE,
                 current_state: ServiceState::Running,
                 controls_accepted: ServiceControlAccept::STOP,
-                exit_code: ServiceExitCode::Win32(0),
+                exit_code: ServiceExitCode::Win32(NO_ERROR),
                 checkpoint: 0,
                 wait_hint: Duration::default(),
                 process_id: None,
@@ -383,7 +401,7 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
             rt.block_on(async move {
                 shutdown_rx.recv().unwrap();
                 match topology.stop().compat().await {
-                    Ok(()) => ServiceExitCode::NO_ERROR,
+                    Ok(()) => ServiceExitCode::Win32(NO_ERROR),
                     Err(_) => ServiceExitCode::Win32(ERROR_FAIL_SHUTDOWN),
                 }
             })
