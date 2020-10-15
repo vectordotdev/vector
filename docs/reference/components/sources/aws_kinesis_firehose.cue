@@ -19,6 +19,7 @@ components: sources: aws_kinesis_firehose: {
 		receive: {
 			from: {
 				name:     "AWS Kinesis Firehose"
+				thing:    "a \(name) stream"
 				url:      urls.aws_kinesis_firehose
 				versions: null
 

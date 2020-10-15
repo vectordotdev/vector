@@ -18,7 +18,8 @@ components: sources: logplex: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				name:     "Heroku Logplex"
+				name:     "Heroku"
+				thing:    "a \(name) app"
 				url:      urls.logplex
 				versions: null
 

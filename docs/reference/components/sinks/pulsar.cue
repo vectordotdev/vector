@@ -26,6 +26,7 @@ components: sinks: pulsar: {
 			tls: enabled:     false
 			to: {
 				name:     "Apache Pulsar"
+				thing:    "an \(name) cluster"
 				url:      urls.pulsar
 				versions: null
 

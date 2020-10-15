@@ -202,7 +202,8 @@ _values: {
 	close({ffi: close({})}) |
 	close({file_system: #InterfaceFileSystem}) |
 	close({socket: #InterfaceSocket}) |
-	close({stdin: close({})})
+	close({stdin: close({})}) |
+	close({stdout: close({})})
 }
 
 #InterfaceBinary: {
@@ -530,10 +531,11 @@ _values: {
 
 #Service: {
 	name:     string
+	thing:    string
 	url:      string
 	versions: string | null
 
-	interface: #Interface
+	interface?: #Interface
 
 	setup: [...string]
 }
