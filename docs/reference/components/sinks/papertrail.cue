@@ -84,14 +84,14 @@ components: sinks: papertrail: {
 	how_it_works: {
 		setup: {
 			title: "Setup"
-			body: #"""
+			body: """
 				1. Register for a free account at [Papertrailapp.com](https://papertrailapp.com/signup?plan=free)
 
 				2. [Create a Log Destination](https://papertrailapp.com/destinations/new) to get a Log Destination
 				and ensure that TCP is enabled.
 
 				3. Set the log destination as the `endpoint` option and start shipping your logs!
-				"""#
+				"""
 		}
 	}
 }

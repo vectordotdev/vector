@@ -65,17 +65,17 @@ components: sinks: aws_cloudwatch_metrics: {
 
 		requirements: []
 		warnings: [
-			#"""
+			"""
 				Gauge values are persisted between flushes. On Vector start up each
 				gauge is assumed to have zero, 0.0, value, that can be updated
 				explicitly by the consequent absolute, not delta, gauge observation,
 				or by delta increments/decrements. Delta gauges are considered an
 				advanced feature useful in a distributed setting, however they
 				should be used with care.
-				"""#,
+				""",
 		]
 		notices: [
-			#"""
+			"""
 				CloudWatch Metrics types are organized not by their semantics, but
 				by storage properties:
 
@@ -84,7 +84,7 @@ components: sinks: aws_cloudwatch_metrics: {
 
 				In Vector only the latter is used to allow lossless statistics
 				calculations on CloudWatch side.
-				"""#,
+				""",
 		]
 	}
 

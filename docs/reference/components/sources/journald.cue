@@ -130,11 +130,11 @@ components: sources: journald: {
 		{
 			title: "Sample Output"
 			configuration: {}
-			input: #"""
+			input: """
 				```text
 				2019-07-26 20:30:27 reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s
 				```
-				"""#
+				"""
 			output: [{
 				log: {
 					timestamp:                _values.current_timestamp

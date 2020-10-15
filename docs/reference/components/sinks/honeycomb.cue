@@ -98,12 +98,12 @@ components: sinks: honeycomb: {
 	how_it_works: {
 		setup: {
 			title: "Setup"
-			body: #"""
+			body: """
 				1. Register for a free account at [honeycomb.io][urls.honeycomb_signup]
 
 				2. Once registered, create a new dataset and when presented with log shippers select the
 				curl option and use the key provided with the curl example.
-				"""#
+				"""
 		}
 	}
 }

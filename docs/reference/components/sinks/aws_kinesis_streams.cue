@@ -109,7 +109,7 @@ components: sinks: aws_kinesis_streams: {
 	how_it_works: {
 		partitioning: {
 			title: "Partitioning"
-			body: #"""
+			body: """
 				By default, Vector issues random 16 byte values for each
 				[Kinesis record's partition key][urls.aws_kinesis_partition_key], evenly
 				distributing records across your Kinesis partitions. Depending on your use case
@@ -118,30 +118,30 @@ components: sinks: aws_kinesis_streams: {
 				presents an alternate field on your event to use as the partition key value instead.
 				This is useful if you have a field already on your event, and it also pairs
 				nicely with the [`add_fields` transform][docs.transforms.add_fields].
-				"""#
+				"""
 			sub_sections: [
 				{
 					title: "Missing partition keys"
-					body: #"""
+					body: """
 						Kenesis requires a value for the partition key and therefore if the key is
 						missing or the value is blank the event will be dropped and a
 						[`warning` level log event][docs.monitoring#logs] will be logged. As such,
 						the field specified in the `partition_key_field` option should always contain
 						a value.
-						"""#
+						"""
 				},
 				{
 					title: "Partition keys that exceed 256 characters"
-					body: #"""
+					body: """
 						If the value provided exceeds the maximum allowed length of 256 characters
 						Vector will slice the value and use the first 256 characters.
-						"""#
+						"""
 				},
 				{
 					title: "Non-string partition keys"
-					body: #"""
+					body: """
 						Vector will coerce the value into a string.
-						"""#
+						"""
 				},
 			]
 		}

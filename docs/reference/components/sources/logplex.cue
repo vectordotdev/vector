@@ -34,14 +34,14 @@ components: sources: logplex: {
 				}
 
 				setup: [
-					#"""
+					"""
 						Create a [Heroku log drain][urls.heroku_http_log_drain] that
 						points to your Vector instance's address:
 
 						```bash
 						heroku drains:add https://<user>:<pass>@<address> -a <app>
 						```
-						"""#,
+						""",
 				]
 			}
 

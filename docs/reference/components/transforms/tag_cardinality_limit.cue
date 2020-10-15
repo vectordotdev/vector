@@ -90,7 +90,7 @@ components: transforms: tag_cardinality_limit: {
 	how_it_works: {
 		intended_usage: {
 			title: "Intended Usage"
-			body: #"""
+			body: """
 				This transform is intended to be used as a protection mechanism to prevent
 				upstream mistakes. Such as a developer accidentally adding a `request_id`
 				tag. When this is happens, it is recommended to fix the upstream error as soon
@@ -98,12 +98,12 @@ components: transforms: tag_cardinality_limit: {
 				will be erased when Vector is restarted. This will cause new tag values to pass
 				through until the cardinality limit is reached again. For normal usage this
 				should not be a common problem since Vector processes are normally long-lived.
-				"""#
+				"""
 		}
 
 		memory_utilization: {
 			title: "Failed Parsing"
-			body: #"""
+			body: """
 				This transform stores in memory a copy of the key for every tag on every metric
 				event seen by this transform.  In mode `exact`, a copy of every distinct
 				value *for each key* is also kept in memory, until `value_limit` distinct values
@@ -144,17 +144,17 @@ components: transforms: tag_cardinality_limit: {
 				for you.   Remember when converting from `value_limit` to the 'm' value to plug
 				into the calculator that `value_limit` is in bytes, and 'm' is often presented
 				in bits (1/8 of a byte).
-				"""#
+				"""
 		}
 
 		restarts: {
 			title: "Restarts"
-			body: #"""
+			body: """
 				This transform's cache is held in memory, and therefore, restarting Vector
 				will reset the cache. This means that new values will be passed through until
 				the cardinality limit is reached again. See [intended usage](#intended-usage)
 				for more info.
-				"""#
+				"""
 		}
 	}
 }

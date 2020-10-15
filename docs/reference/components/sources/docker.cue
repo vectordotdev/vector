@@ -42,10 +42,10 @@ components: sources: docker: {
 				}
 
 				setup: [
-					#"""
+					"""
 						Ensure that [Docker is setup][urls.docker_setup] and running.
-						"""#,
-					#"""
+						""",
+					"""
 						Ensure that the Docker Engine is properly exposing logs:
 
 						```bash
@@ -57,7 +57,7 @@ components: sources: docker: {
 						Engine requires either the [`json-file`][urls.docker_logging_driver_json_file] (default)
 						or [`journald`](docker_logging_driver_journald) Docker
 						logging driver to be installed.
-						"""#,
+						""",
 				]
 			}
 		}
@@ -76,14 +76,14 @@ components: sources: docker: {
 
 		requirements: []
 		warnings: [
-			#"""
+			"""
 				Collecting logs directly from the Docker Engine is known to have
 				performance problems for very large setups. If you have a large
 				setup, please consider alternative collection methods, such as the
 				Docker [`syslog`][urls.docker_logging_driver_syslog] or
 				[Docker `journald` driver][urls.docker_logging_driver_journald]
 				drivers.
-				"""#,
+				""",
 		]
 		notices: []
 	}
@@ -233,7 +233,7 @@ components: sources: docker: {
 	how_it_works: {
 		message_merging: {
 			title: "Merging Split Messages"
-			body: #"""
+			body: """
 				Docker, by default, will split log messages that exceed 16kb. This can be a
 				rather frustrating problem because it produces malformed log messages that are
 				difficult to work with. Vector's `docker` source solves this by default,
@@ -241,7 +241,7 @@ components: sources: docker: {
 				off via the `auto_partial_merge` option. Furthermore, you can adjust the marker
 				that we use to determine if an event is partial via the
 				`partial_event_marker_field` option.
-				"""#
+				"""
 		}
 	}
 }
