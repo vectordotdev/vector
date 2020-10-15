@@ -357,8 +357,8 @@ _values: {
 
 		if enabled == true {
 			default: #CompressionAlgorithm
-			algorithm: [#CompressionAlgorithm, ...]
-			level: [#CompressionLevel, ...]
+			algorithms: [#CompressionAlgorithm, ...]
+			levels: [#CompressionLevel, ...]
 		}
 	}
 
