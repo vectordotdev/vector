@@ -114,9 +114,9 @@ components: sources: journald: {
 				}
 				timestamp: fields._current_timestamp
 				"*": {
-					common:        false
-					description:   "Any Journald field"
-					required:      false
+					common:      false
+					description: "Any Journald field"
+					required:    false
 					type: string: examples: ["/usr/sbin/ntpd", "c36e9ea52800a19d214cb71b53263a28"]
 				}
 			}
