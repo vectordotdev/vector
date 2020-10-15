@@ -56,7 +56,7 @@ impl ConcatMerger {
 impl ReduceValueMerger for ConcatMerger {
     fn add(&mut self, v: Value) -> Result<(), String> {
         if let Value::Bytes(b) = v {
-            self.v.extend(&[b' ']);
+            self.v.extend(&[b'\n']);
             self.v.extend_from_slice(&b);
             Ok(())
         } else {
@@ -489,7 +489,7 @@ mod test {
         );
         assert_eq!(
             merge("foo".into(), "bar".into(), &MergeStrategy::Concat),
-            Ok("foo bar".into())
+            Ok("foo\nbar".into())
         );
         assert!(merge("foo".into(), 42.into(), &MergeStrategy::Concat).is_err());
         assert!(merge("foo".into(), 4.2.into(), &MergeStrategy::Concat).is_err());

@@ -159,13 +159,13 @@
   [[tests.outputs]]
     extract_from = "reduce_strats"
     [[tests.outputs.conditions]]
-      "message.equals" = "first message value second message value third message value"
+      "message.equals" = "first message value\nsecond message value\nthird message value"
       "host.equals" = "host1"
       "request_id.equals" = "1"
       "counter.equals" = 21
       "timestamp_end.exists" = true
     [[tests.outputs.conditions]]
-      "message.equals" = "other reduce one other reduce two other reduce three"
+      "message.equals" = "other reduce one\nother reduce two\nother reduce three"
       "host.equals" = "host3"
       "request_id.equals" = "2"
       "counter.equals" = 20
