@@ -9,12 +9,20 @@ components: sinks: http: {
 		commonly_used: true
 		function:      "transmit"
 		service_providers: []
+		delivery:      "at_least_once"
+		development:   "stable"
+		egress_method: "batch"
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 
 	features: {
 		batch: {
 			enabled:      true
-			common:       true
+			common:       false
 			max_bytes:    1049000
 			max_events:   null
 			timeout_secs: 1
@@ -25,19 +33,17 @@ components: sinks: http: {
 			default: null
 			gzip:    true
 		}
-		encoding: {
+		encoding: codec: {
 			enabled: true
 			default: null
-			json:    null
-			ndjson:  null
-			text:    null
+			enum: ["json", "ndjson", "text"]
 		}
 		healthcheck: enabled: true
 		request: {
 			enabled:                    true
 			in_flight_limit:            10
 			rate_limit_duration_secs:   1
-			rate_limit_num:             9000000000000000000
+			rate_limit_num:             1000
 			retry_initial_backoff_secs: 1
 			retry_max_duration_secs:    10
 			timeout_secs:               30
@@ -51,14 +57,7 @@ components: sinks: http: {
 		}
 	}
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "stable"
-	}
-
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -70,6 +69,7 @@ components: sinks: http: {
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {
