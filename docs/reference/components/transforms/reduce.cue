@@ -101,7 +101,7 @@ components: transforms: reduce: {
 						type: string: {
 							enum: {
 								array:   "Each value is appended to an array."
-								concat:  "Concatenate each string value (delimited with a space)."
+								concat:  "Concatenate each string value (delimited with a newline)."
 								discard: "Discard all but the first value found."
 								sum:     "Sum all numeric values."
 								max:     "The maximum of all numeric values."
