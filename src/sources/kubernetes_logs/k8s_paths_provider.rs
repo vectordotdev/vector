@@ -6,7 +6,6 @@ use super::path_helpers::build_pod_logs_directory;
 use crate::kubernetes as k8s;
 use evmap::ReadHandle;
 use file_source::paths_provider::PathsProvider;
-use glob::Pattern;
 use k8s_openapi::api::core::v1::Pod;
 use std::path::PathBuf;
 
@@ -14,14 +13,14 @@ use std::path::PathBuf;
 /// the k8s API.
 pub struct K8sPathsProvider {
     pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
-    exclude_paths: Vec<Pattern>,
+    exclude_paths: Vec<glob::Pattern>,
 }
 
 impl K8sPathsProvider {
     /// Create a new [`K8sPathsProvider`].
     pub fn new(
         pods_state_reader: ReadHandle<String, k8s::state::evmap::Value<Pod>>,
-        exclude_paths: Vec<Pattern>,
+        exclude_paths: Vec<glob::Pattern>,
     ) -> Self {
         Self {
             pods_state_reader,
@@ -146,7 +145,7 @@ fn real_glob(pattern: &str) -> impl Iterator<Item = PathBuf> {
 
 fn exclude_paths<'a>(
     iter: impl Iterator<Item = PathBuf> + 'a,
-    patterns: impl AsRef<[Pattern]> + 'a,
+    patterns: impl AsRef<[glob::Pattern]> + 'a,
 ) -> impl Iterator<Item = PathBuf> + 'a {
     iter.filter(move |path| {
         !patterns.as_ref().iter().any(|pattern| {
