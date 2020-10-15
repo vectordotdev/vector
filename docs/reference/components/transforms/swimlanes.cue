@@ -39,7 +39,7 @@ components: transforms: swimlanes: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	examples: [

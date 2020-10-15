@@ -57,7 +57,7 @@ components: transforms: logfmt_parser: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	how_it_works: {

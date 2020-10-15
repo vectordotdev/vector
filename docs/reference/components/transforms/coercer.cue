@@ -31,7 +31,7 @@ components: transforms: coercer: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	configuration: {

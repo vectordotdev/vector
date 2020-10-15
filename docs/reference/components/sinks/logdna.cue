@@ -147,6 +147,6 @@ components: sinks: logdna: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }

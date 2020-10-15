@@ -121,6 +121,6 @@ components: sinks: humio_logs: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }

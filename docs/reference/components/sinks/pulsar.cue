@@ -111,6 +111,6 @@ components: sinks: pulsar: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }

@@ -87,7 +87,7 @@ components: transforms: regex_parser: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	examples: [

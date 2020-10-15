@@ -151,6 +151,6 @@ components: sinks: http: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }

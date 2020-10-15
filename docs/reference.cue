@@ -425,7 +425,7 @@ _values: {
 
 #Input: {
 	logs:    bool
-	metrics: false | #MetricInput
+	metrics: #MetricInput | null
 }
 
 #LogEvent: {

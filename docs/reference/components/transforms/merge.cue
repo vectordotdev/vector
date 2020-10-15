@@ -76,7 +76,7 @@ components: transforms: merge: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	examples: [

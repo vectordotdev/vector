@@ -67,7 +67,7 @@ components: transforms: split: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	examples: [

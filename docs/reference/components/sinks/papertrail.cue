@@ -78,7 +78,7 @@ components: sinks: papertrail: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	how_it_works: {

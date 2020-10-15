@@ -62,6 +62,6 @@ components: transforms: sampler: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }

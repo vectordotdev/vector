@@ -116,7 +116,7 @@ components: transforms: reduce: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	examples: [
