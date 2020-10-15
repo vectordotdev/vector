@@ -270,15 +270,15 @@ impl SourceShutdownCoordinator {
 
     /// Returned future will finish once all sources have finished.
     pub fn shutdown_tripwire(&self) -> future::BoxFuture<'static, ()> {
-        let mut futures = Vec::with_capacity(self.shutdown_complete_tripwires.len());
-        for tripwire in self.shutdown_complete_tripwires.values() {
-            futures.push(tripwire.clone().then(crate::stream::tripwire_handler));
-        }
+        let futures = self
+            .shutdown_complete_tripwires
+            .values()
+            .cloned()
+            .map(|tripwire| tripwire.then(crate::stream::tripwire_handler).boxed());
 
-        Box::pin(async move {
-            future::join_all(futures).await;
-            info!("All sources have finished.")
-        })
+        future::join_all(futures)
+            .map(|_| info!("All sources have finished."))
+            .boxed()
     }
 
     fn shutdown_source_complete(
