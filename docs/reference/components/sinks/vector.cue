@@ -1,47 +1,54 @@
 package metadata
 
 components: sinks: vector: {
-	title:             "Vector"
-	short_description: "Streams log and metric events to another downstream [`vector` source][docs.sources.vector]."
-	long_description:  "Streams log and metric events to another downstream [`vector` source][docs.sources.vector]."
+	title: "Vector"
 
 	classes: {
 		commonly_used: false
+		delivery:      "best_effort"
+		development:   "beta"
 		egress_method: "stream"
-		function:      "transmit"
 		service_providers: []
 	}
 
 	features: {
 		buffer: enabled:      true
-		compression: enabled: false
-		encoding: codec: enabled: false
 		healthcheck: enabled: true
-		request: enabled:     false
-		tls: {
-			enabled:                true
-			can_enable:             true
-			can_verify_certificate: true
-			can_verify_hostname:    true
-			enabled_default:        false
-		}
-	}
+		send: {
+			compression: enabled: false
+			encoding: codec: enabled: false
+			request: enabled: false
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
+			to: {
+				name:     "Vector source"
+				url:      urls.vector_source
+				versions: null
 
-	statuses: {
-		delivery:    "best_effort"
-		development: "beta"
+				interface: {
+					socket: {
+						direction: "outgoing"
+						protocols: ["tcp"]
+						ssl: "optional"
+					}
+				}
+			}
+		}
 	}
 
 	support: {
 		platforms: {
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
-			}
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
 		requirements: []

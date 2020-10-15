@@ -1,38 +1,32 @@
 package metadata
 
 components: sources: host_metrics: {
-	title:             "Host Metrics"
-	long_description:  "The host metrics source examines system data sources on the local system and generates metrics describing utilization of various system resources."
-	short_description: "Gather host-based metrics."
+	title:       "Host Metrics"
+	description: "The host metrics source examines system data sources on the local system and generates metrics describing utilization of various system resources."
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["daemon"]
+		development:   "beta"
 		egress_method: "batch"
-		function:      "collect"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
+		collect: {
+			checkpoint: enabled: false
+		}
+		multiline: enabled: false
 	}
 
 	support: {
 		platforms: {
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
-			}
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
 		notices: []

@@ -16,7 +16,6 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
 use std::time::{Duration, Instant};
-use string_cache::DefaultAtom as Atom;
 
 mod merge_strategy;
 
@@ -144,7 +143,7 @@ impl ReduceState {
 pub struct Reduce {
     expire_after: Duration,
     flush_period: Duration,
-    identifier_fields: Vec<Atom>,
+    identifier_fields: Vec<String>,
     merge_strategies: IndexMap<String, MergeStrategy>,
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
     ends_when: Option<Box<dyn Condition>>,
@@ -158,12 +157,7 @@ impl Reduce {
             None
         };
 
-        let identifier_fields = config
-            .identifier_fields
-            .clone()
-            .into_iter()
-            .map(Atom::from)
-            .collect();
+        let identifier_fields = config.identifier_fields.clone().into_iter().collect();
 
         Ok(Reduce {
             expire_after: Duration::from_millis(config.expire_after_ms.unwrap_or(30000)),
@@ -344,13 +338,10 @@ identifier_fields = [ "request_id" ]
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 1".into()
         );
-        assert_eq!(
-            outputs.first().unwrap().as_log()[&"counter".into()],
-            Value::from(8)
-        );
+        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(8));
 
         outputs.clear();
 
@@ -363,17 +354,14 @@ identifier_fields = [ "request_id" ]
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 2".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"extra_field".into()],
+            outputs.first().unwrap().as_log()["extra_field"],
             "value1".into()
         );
-        assert_eq!(
-            outputs.first().unwrap().as_log()[&"counter".into()],
-            Value::from(7)
-        );
+        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(7));
     }
 
     #[tokio::test]
@@ -424,18 +412,18 @@ merge_strategies.baz = "max"
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 1".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"foo".into()],
+            outputs.first().unwrap().as_log()["foo"],
             "first foo second foo".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"bar".into()],
+            outputs.first().unwrap().as_log()["bar"],
             Value::Array(vec!["first bar".into(), 2.into(), "third bar".into()]),
         );
-        assert_eq!(outputs.first().unwrap().as_log()[&"baz".into()], 3.into(),);
+        assert_eq!(outputs.first().unwrap().as_log()["baz"], 3.into(),);
     }
 
     #[tokio::test]
@@ -478,13 +466,10 @@ identifier_fields = [ "request_id" ]
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 1".into()
         );
-        assert_eq!(
-            outputs.first().unwrap().as_log()[&"counter".into()],
-            Value::from(8)
-        );
+        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(8));
 
         outputs.clear();
 
@@ -496,17 +481,14 @@ identifier_fields = [ "request_id" ]
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 2".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"extra_field".into()],
+            outputs.first().unwrap().as_log()["extra_field"],
             "value1".into()
         );
-        assert_eq!(
-            outputs.first().unwrap().as_log()[&"counter".into()],
-            Value::from(7)
-        );
+        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(7));
     }
 
     #[tokio::test]
@@ -556,13 +538,13 @@ merge_strategies.bar = "concat"
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"foo".into()],
+            outputs.first().unwrap().as_log()["foo"],
             json!([[1, 3], [5, 7], "done"]).into()
         );
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"bar".into()],
+            outputs.first().unwrap().as_log()["bar"],
             json!([1, 3, 5, 7, "done"]).into()
         );
 
@@ -583,11 +565,11 @@ merge_strategies.bar = "concat"
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"foo".into()],
+            outputs.first().unwrap().as_log()["foo"],
             json!([[2, 4], [6, 8], "done"]).into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"bar".into()],
+            outputs.first().unwrap().as_log()["bar"],
             json!([2, 4, 6, 8, "done"]).into()
         );
     }

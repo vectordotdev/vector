@@ -1,64 +1,76 @@
 package metadata
 
 components: sinks: aws_kinesis_streams: {
-	title:             "AWS Kinesis Data Streams"
-	short_description: "Batches log events to [Amazon Web Service's Kinesis Data Stream service][urls.aws_kinesis_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html)."
-	long_description:  "[Amazon Kinesis Data Streams][urls.aws_kinesis_streams] is a scalable and durable real-time data streaming service that can continuously capture gigabytes of data per second from hundreds of thousands of sources. Making it an excellent candidate for streaming logs and metrics data."
+	title:       "AWS Kinesis Data Streams"
+	description: "[Amazon Kinesis Data Streams][urls.aws_kinesis_streams] is a scalable and durable real-time data streaming service that can continuously capture gigabytes of data per second from hundreds of thousands of sources. Making it an excellent candidate for streaming logs and metrics data."
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "stable"
 		egress_method: "batch"
-		function:      "transmit"
 		service_providers: ["AWS"]
 	}
 
 	features: {
-		batch: {
-			enabled:      true
-			common:       false
-			max_bytes:    5000000
-			max_events:   500
-			timeout_secs: 1
-		}
-		buffer: enabled: true
-		compression: {
-			enabled: true
-			default: null
-			gzip:    true
-		}
-		encoding: codec: {
-			enabled: true
-			default: null
-			enum: ["json", "text"]
-		}
+		buffer: enabled:      true
 		healthcheck: enabled: true
-		request: {
-			enabled:                    true
-			in_flight_limit:            5
-			rate_limit_duration_secs:   1
-			rate_limit_num:             5
-			retry_initial_backoff_secs: 1
-			retry_max_duration_secs:    10
-			timeout_secs:               30
-		}
-		tls: enabled: false
-	}
+		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				max_bytes:    5000000
+				max_events:   500
+				timeout_secs: 1
+			}
+			compression: {
+				enabled: true
+				default: null
+				gzip:    true
+			}
+			encoding: codec: {
+				enabled: true
+				default: null
+				enum: ["json", "text"]
+			}
+			request: {
+				enabled:                    true
+				in_flight_limit:            5
+				rate_limit_duration_secs:   1
+				rate_limit_num:             5
+				retry_initial_backoff_secs: 1
+				retry_max_duration_secs:    10
+				timeout_secs:               30
+			}
+			tls: enabled: false
+			to: {
+				name:     "AWS Kinesis Data Streams"
+				url:      urls.aws_kinesis_streams
+				versions: null
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "stable"
+				interface: {
+					socket: {
+						api: {
+							title: "AWS Kinesis Data Streams API"
+							url:   urls.aws_kinesis_streams_api
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "required"
+					}
+				}
+			}
+		}
 	}
 
 	support: {
 		platforms: {
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
-			}
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
 		requirements: []

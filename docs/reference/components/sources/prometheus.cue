@@ -1,38 +1,47 @@
 package metadata
 
 components: sources: prometheus: {
-	title:             "Prometheus"
-	short_description: "Ingests data through the [Prometheus text exposition format][urls.prometheus_text_based_exposition_format] and outputs metric events."
-	long_description:  "[Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
+	title:       "Prometheus"
+	description: "[Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
+		development:   "beta"
 		egress_method: "batch"
-		function:      "collect"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
+		collect: {
+			checkpoint: enabled: false
+			from: {
+				name:     "Prometheus client"
+				url:      urls.prometheus_client
+				versions: null
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
+				interface: socket: {
+					api: {
+						title: "Prometheus"
+						url:   urls.prometheus_text_based_exposition_format
+					}
+					direction: "outgoing"
+					protocols: ["http"]
+					ssl: "optional"
+				}
+			}
+		}
+		multiline: enabled: false
 	}
 
 	support: {
 		platforms: {
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
-			}
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
 		requirements: []

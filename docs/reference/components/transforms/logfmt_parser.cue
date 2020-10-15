@@ -1,32 +1,32 @@
 package metadata
 
 components: transforms: logfmt_parser: {
-	title:             "Logfmt Parser"
-	short_description: "Accepts log events and allows you to parse a log field's value in the [logfmt][urls.logfmt] format."
-	long_description:  "Accepts log events and allows you to parse a log field's value in the [logfmt][urls.logfmt] format."
+	title: "Logfmt Parser"
 
 	classes: {
-		commonly_used: true
+		commonly_used: false
+		development:   "beta"
 		egress_method: "stream"
-		function:      "parse"
 	}
 
-	features: {}
-
-	statuses: {
-		development: "beta"
+	features: {
+		parse: {
+			format: {
+				name:     "Logfmt"
+				url:      urls.logfmt
+				versions: null
+			}
+		}
 	}
 
 	support: {
 		platforms: {
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
-			}
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
 		requirements: []

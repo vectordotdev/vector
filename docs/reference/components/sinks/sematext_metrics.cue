@@ -1,48 +1,44 @@
 package metadata
 
 components: sinks: sematext_metrics: {
-	title:             "Sematext Metrics"
-	short_description: "Batches metric events to [Sematext][urls.sematext] to the [Sematext monitoring][urls.sematext_monitoring] service."
-	long_description:  "[Sematext][urls.sematext] is a hosted monitoring platform for metrics based on InfluxDB. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time."
+	title:       "Sematext Metrics"
+	description: "[Sematext][urls.sematext] is a hosted monitoring platform for metrics based on InfluxDB. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time."
 
 	classes: {
 		commonly_used: false
-		function:      "transmit"
+		delivery:      "at_least_once"
+		development:   "beta"
 		service_providers: ["Sematext"]
 		egress_method: "batch"
 	}
 
 	features: {
-		batch: {
-			enabled:      true
-			common:       false
-			max_bytes:    30000000
-			max_events:   null
-			timeout_secs: 1
-		}
 		buffer: enabled:      true
-		compression: enabled: false
-		encoding: codec: enabled: false
 		healthcheck: enabled: true
-		request: enabled:     false
-		tls: enabled:         false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
+		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				max_bytes:    30000000
+				max_events:   null
+				timeout_secs: 1
+			}
+			compression: enabled: false
+			encoding: codec: enabled: false
+			request: enabled: false
+			tls: enabled:     false
+			to: sinks._sematext.features.send.to
+		}
 	}
 
 	support: {
 		platforms: {
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
-			}
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
 		requirements: []

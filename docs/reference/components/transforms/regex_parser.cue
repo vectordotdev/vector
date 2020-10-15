@@ -1,32 +1,32 @@
 package metadata
 
 components: transforms: regex_parser: {
-	title:             "Regex Parser"
-	short_description: "Accepts log events and allows you to parse a log field's value with a [Regular Expression][urls.regex]."
-	long_description:  "Accepts log events and allows you to parse a log field's value with a [Regular Expression][urls.regex]."
+	title: "Regex Parser"
 
 	classes: {
-		commonly_used: true
+		commonly_used: false
+		development:   "stable"
 		egress_method: "stream"
-		function:      "parse"
 	}
 
-	features: {}
-
-	statuses: {
-		development: "stable"
+	features: {
+		parse: {
+			format: {
+				name:     "regular expressions"
+				url:      urls.regex
+				versions: null
+			}
+		}
 	}
 
 	support: {
 		platforms: {
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
-			}
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
 		requirements: []

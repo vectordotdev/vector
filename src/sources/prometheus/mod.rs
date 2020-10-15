@@ -46,11 +46,11 @@ impl SourceConfig for PrometheusConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let mut urls = Vec::new();
-        for host in self.endpoints.iter() {
-            let base_uri = host.parse::<http::Uri>().context(super::UriParseError)?;
-            urls.push(format!("{}metrics", base_uri));
-        }
+        let urls = self
+            .endpoints
+            .iter()
+            .map(|s| s.parse::<http::Uri>().context(super::UriParseError))
+            .collect::<Result<Vec<http::Uri>, super::BuildError>>()?;
         Ok(prometheus(urls, self.scrape_interval_secs, shutdown, out))
     }
 
@@ -64,7 +64,7 @@ impl SourceConfig for PrometheusConfig {
 }
 
 fn prometheus(
-    urls: Vec<String>,
+    urls: Vec<http::Uri>,
     interval: u64,
     shutdown: ShutdownSignal,
     out: Pipeline,
@@ -113,6 +113,13 @@ fn prometheus(
                                     Some(stream::iter(metrics).map(Event::Metric).map(Ok))
                                 }
                                 Err(error) => {
+                                    if url.path() == "/" {
+                                        // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
+                                        warn!(
+                                            message = "No path is set on the endpoint and we got a parse error, did you mean to use /metrics? This behavior changed in version 0.11.",
+                                            endpoint = %url
+                                        );
+                            }
                                     emit!(PrometheusParseError {
                                         error,
                                         url: url.clone(),
@@ -123,6 +130,13 @@ fn prometheus(
                             }
                         }
                         Ok((header, _)) => {
+                            if header.status == hyper::StatusCode::NOT_FOUND && url.path() == "/" {
+                                // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
+                                warn!(
+                                    message = "No path is set on the endpoint and we got a 404, did you mean to use /metrics? This behavior changed in version 0.11.",
+                                    endpoint = %url
+                                );
+                            }
                             emit!(PrometheusErrorResponse {
                                 code: header.status,
                                 url: url.clone(),

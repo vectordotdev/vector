@@ -1,56 +1,64 @@
 package metadata
 
 components: sinks: logdna: {
-	title:             "LogDNA"
-	short_description: "Batches log events to [LogDna][urls.logdna]'s HTTP Ingestion API."
-	long_description:  "[LogDNA][urls.logdna] is a log management system that allows engineering and DevOps to aggregate all system, server, and application logs into one platform. Collect, monitor, store, tail, and search application logs in with one command-line or web interface."
+	title:       "LogDNA"
+	description: "[LogDNA][urls.logdna] is a log management system that allows engineering and DevOps to aggregate all system, server, and application logs into one platform. Collect, monitor, store, tail, and search application logs in with one command-line or web interface."
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "batch"
-		function:      "transmit"
 		service_providers: ["LogDNA"]
 	}
 
 	features: {
-		batch: {
-			enabled:      true
-			common:       false
-			max_bytes:    10490000
-			max_events:   null
-			timeout_secs: 1
-		}
 		buffer: enabled:      true
-		compression: enabled: false
-		encoding: codec: enabled: false
 		healthcheck: enabled: true
-		request: {
-			enabled:                    true
-			in_flight_limit:            5
-			rate_limit_duration_secs:   1
-			rate_limit_num:             5
-			retry_initial_backoff_secs: 1
-			retry_max_duration_secs:    10
-			timeout_secs:               60
-		}
-		tls: enabled: false
-	}
+		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				max_bytes:    10490000
+				max_events:   null
+				timeout_secs: 1
+			}
+			compression: enabled: false
+			encoding: codec: enabled: false
+			request: {
+				enabled:                    true
+				in_flight_limit:            5
+				rate_limit_duration_secs:   1
+				rate_limit_num:             5
+				retry_initial_backoff_secs: 1
+				retry_max_duration_secs:    10
+				timeout_secs:               60
+			}
+			tls: enabled: false
+			to: {
+				name:     "LogDNA"
+				url:      urls.logdna
+				versions: null
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
+				interface: {
+					socket: {
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "required"
+					}
+				}
+			}
+		}
 	}
 
 	support: {
 		platforms: {
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
-			}
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
 		requirements: []

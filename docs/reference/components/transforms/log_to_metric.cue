@@ -1,33 +1,26 @@
 package metadata
 
 components: transforms: log_to_metric: {
-	title:             "Log to Metric"
-	short_description: "Accepts log events and allows you to convert logs into one or more metrics."
-	long_description:  "Accepts log events and allows you to convert logs into one or more metrics."
+	title: "Log to Metric"
 
 	classes: {
-		commonly_used: true
-		function:      "convert"
+		commonly_used: false
+		development:   "stable"
 		egress_method: "batch"
 	}
 
 	features: {
-	}
-
-	statuses: {
-		development: "stable"
+		convert: {}
 	}
 
 	support: {
 		platforms: {
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
-			}
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
 		requirements: []

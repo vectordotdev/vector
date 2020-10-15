@@ -3,39 +3,59 @@ package metadata
 components: sources: file: {
 	_directory: "/var/log"
 
-	title:             "File"
-	long_description:  ""
-	short_description: "Collect logs by tailing one more files."
+	title: "File"
 
 	classes: {
 		commonly_used: true
+		delivery:      "best_effort"
 		deployment_roles: ["daemon", "sidecar"]
+		development:   "stable"
 		egress_method: "stream"
-		function:      "collect"
 	}
 
 	features: {
-		checkpoint: enabled: true
-		multiline: enabled:  true
-		tls: enabled:        false
-	}
+		collect: {
+			checkpoint: enabled: true
+			from: {
+				name:     "file system"
+				url:      urls.file_system
+				versions: null
 
-	statuses: {
-		delivery:    "best_effort"
-		development: "stable"
+				interface: file_system: {
+					directory: _directory
+				}
+
+				setup: [
+					#"""
+						Ensure that [Docker is setup][urls.docker_setup] and running.
+						"""#,
+					#"""
+						Ensure that the Docker Engine is properly exposing logs:
+
+						```bash
+						docker logs $(docker ps | awk '{ print $1 }')
+						```
+
+						If you receive an error it's likely that you do not have
+						the proper Docker logging drivers installed. The Docker
+						Engine requires either the [`json-file`][urls.docker_logging_driver_json_file] (default)
+						or [`journald`](docker_logging_driver_journald) Docker
+						logging driver to be installed.
+						"""#,
+				]
+			}
+		}
+		multiline: enabled: true
 	}
 
 	support: {
 		platforms: {
-			docker: volumes: [_directory]
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
-			}
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
 		requirements: []

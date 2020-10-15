@@ -28,19 +28,19 @@ _values: {
 	// less commonly used, components.
 	commonly_used: bool
 
+	if Args.kind == "source" || Args.kind == "sink" {
+		delivery: #DeliveryStatus
+	}
+
 	if Args.kind == "source" {
 		// `deployment_roles` clarify when the component should be used under
 		// different deployment contexts.
 		deployment_roles: [#DeploymentRole, ...]
 	}
+	development: #DevelopmentStatus
 
 	// `egress_method` documents how the component outputs events.
 	egress_method: #EgressMethod
-
-	// `function` specifies the functions behavior categories. This helps
-	// with component filtering. Each component type will allow different
-	// functions.
-	function: string
 
 	if Args.kind == "sink" {
 		// `service_providers` specify the service providers that support
@@ -62,12 +62,11 @@ _values: {
 	kind: #ComponentKind
 	let Kind = kind
 
-	// `long_description` describes the components with a single paragraph.
-	// It is used for SEO purposes and should be full of relevant keywords.
-	long_description: string
+	configuration: #Schema
 
-	// `short_description` describes the component in one sentence.
-	short_description: string
+	// `description` describes the components with a single paragraph.
+	// It is used for SEO purposes and should be full of relevant keywords.
+	description?: =~"[.]$"
 
 	// `title` is the human friendly title for the component.
 	//
@@ -79,37 +78,6 @@ _values: {
 
 	// `classes` represent the various classifications for this component
 	classes: #Classes & {_args: kind: Kind}
-
-	// `features` describes the various supported features of the component.
-	// Setting these helps to reduce boilerplate.
-	//
-	// For example, the `tls` feature will automatically add the appropriate
-	// `tls` options and `how_it_works` sections.
-	features: #Features & {_args: {egress_method: classes.egress_method, kind: Kind}}
-
-	// `statuses` communicates the various statuses of the component.
-	statuses: #Statuses & {_args: kind: Kind}
-
-	// `support` communicates the varying levels of support of the component.
-	support: #Support & {_args: kind: Kind}
-
-	configuration: #Schema
-
-	if Kind != "source" {
-		input: {
-			logs:    bool
-			metrics: false | #MetricInput
-		}
-	}
-
-	if Kind != "sink" {
-		// `output` documents output of the component. This is very important
-		// as it communicate which events and fields are emitted.
-		output: {
-			logs?:    #LogOutput
-			metrics?: #MetricOutput
-		}
-	}
 
 	// `examples` demonstrates various ways to use the component using an
 	// input, output, and example configuration.
@@ -148,11 +116,31 @@ _values: {
 		}),
 	]
 
+	// `features` describes the various supported features of the component.
+	// Setting these helps to reduce boilerplate.
+	//
+	// For example, the `tls` feature will automatically add the appropriate
+	// `tls` options and `how_it_works` sections.
+	features: #Features & {_args: {egress_method: classes.egress_method, kind: Kind}}
+
 	// `how_it_works` contain sections that further describe the component's
 	// behavior. This is like a mini-manual for the component and should help
 	// answer any obvious questions the user might have. Options can link
 	// to these sections for deeper explanations of behavior.
 	how_it_works: #HowItWorks
+
+	if Kind != "source" {
+		input: #Input
+	}
+
+	if Kind != "sink" {
+		// `output` documents output of the component. This is very important
+		// as it communicate which events and fields are emitted.
+		output: #Output
+	}
+
+	// `support` communicates the varying levels of support of the component.
+	support: #Support & {_args: kind: Kind}
 }
 
 // `#DeliveryStatus` documents the delivery guarantee.
@@ -209,6 +197,44 @@ _values: {
 // * `metric` - metric event
 #EventType: "log" | "metric"
 
+#Interface: {
+	close({binary: #InterfaceBinary}) |
+	close({ffi: close({})}) |
+	close({file_system: #InterfaceFileSystem}) |
+	close({socket: #InterfaceSocket}) |
+	close({stdin: close({})})
+}
+
+#InterfaceBinary: {
+	name:         string
+	permissions?: #Permissions
+}
+
+#InterfaceFileSystem: {
+	directory: string
+}
+
+#InterfaceSocket: {
+	api?: {
+		title: string
+		url:   string
+	}
+	direction: "incoming" | "outgoing"
+
+	if direction == "outgoing" {
+		network_hops?: uint8
+		permissions?:  #Permissions
+	}
+
+	if direction == "incoming" {
+		port: uint16
+	}
+
+	protocols: [#Protocol, ...]
+	socket?: string
+	ssl:     "disabled" | "required" | "optional"
+}
+
 #Features: {
 	_args: {
 		egress_method: string
@@ -216,7 +242,95 @@ _values: {
 	}
 	let Args = _args
 
-	if Args.kind == "sink" && Args.egress_method == "batch" {
+	if Args.kind == "source" {
+		collect?: #FeaturesCollect
+		receive?: #FeaturesReceive & {_args: {kind: Args.kind}}
+
+		// `multiline` should be enabled for sources that offer the ability
+		// to merge multiple lines together.
+		multiline: close({
+			enabled: bool
+		})
+	}
+
+	if Args.kind == "transform" {
+		convert?: close({})
+		enrich?:  #FeaturesEnrich
+		filter?:  close({})
+		parse?:   #FeaturesParse
+		program?: #FeaturesProgram
+		reduce?:  close({})
+		route?:   close({})
+		shape?:   close({})
+	}
+
+	if Args.kind == "sink" {
+		// `buffer` describes how the component buffers data.
+		buffer: close({
+			enabled: bool | string
+		})
+
+		// `healtcheck` notes if a component offers a healthcheck on boot.
+		healthcheck: close({
+			enabled: bool
+		})
+
+		exposes?: close({})
+		send?:    #FeaturesSend & {_args: Args}
+	}
+}
+
+#FeaturesCollect: {
+	// `checkpoint` describes how the component checkpoints its read
+	// position.
+	checkpoint: close({
+		enabled: bool
+	})
+
+	from?: #Service
+}
+
+#FeaturesEnrich: {
+	from: close({
+		name:     string
+		url:      string
+		versions: string | null
+	})
+}
+
+#FeaturesParse: {
+	format: close({
+		name:     string
+		url:      string
+		versions: string | null
+	})
+}
+
+#FeaturesProgram: {
+	runtime: #Runtime
+}
+
+#FeaturesReceive: {
+	_args: {
+		kind: string
+	}
+	let Args = _args
+
+	from?: #Service
+
+	// `tls` describes if the component secures network communication
+	// via TLS.
+	tls: #FeaturesTLS & {_args: {kind: Args.kind}}
+}
+
+#FeaturesSend: {
+	_args: {
+		egress_method: string
+		kind:          string
+	}
+	let Args = _args
+
+	if Args.egress_method == "batch" {
 		// `batch` describes how the component batches data. This is only
 		// relevant if a component has an `egress_method` of "batch".
 		batch: close({
@@ -228,94 +342,64 @@ _values: {
 		})
 	}
 
-	if Args.kind == "sink" {
-		// `buffer` describes how the component buffers data.
-		buffer: close({
-			enabled: bool | string
-		})
-	}
+	// `compression` describes how the component compresses data.
+	compression: {
+		enabled: bool
 
-	if Args.kind == "source" {
-		// `checkpoint` describes how the component checkpoints its read
-		// position.
-		checkpoint: close({
-			enabled: bool
-		})
-	}
-
-	if Args.kind == "sink" {
-		// `compression` describes how the component compresses data.
-		compression: {
-			enabled: bool
-
-			if enabled == true {
-				default: "gzip" | null
-				gzip:    bool
-			}
+		if enabled == true {
+			default: "gzip" | null
+			gzip:    bool
 		}
 	}
 
-	if Args.kind == "sink" {
-		// `encoding` describes how the component encodes data.
-		encoding: {
-			codec: {
-				enabled: bool
-
-				if enabled {
-					default: #EncodingCodec | null
-					enum:    [#EncodingCodec, ...] | null
-				}
-			}
-		}
-	}
-
-	if Args.kind == "sink" {
-		// `healtcheck` notes if a component offers a healthcheck on boot.
-		healthcheck: close({
-			enabled: bool
-		})
-	}
-
-	if Args.kind == "source" {
-		// `multiline` should be enabled for sources that offer the ability
-		// to merge multiple lines together.
-		multiline: close({
-			enabled: bool
-		})
-	}
-
-	if Args.kind == "sink" {
-		// `request` describes how the component issues and manages external
-		// requests.
-		request: {
+	// `encoding` describes how the component encodes data.
+	encoding: {
+		codec: {
 			enabled: bool
 
 			if enabled {
-				in_flight_limit:            uint8
-				rate_limit_duration_secs:   uint8
-				rate_limit_num:             uint8
-				retry_initial_backoff_secs: uint8
-				retry_max_duration_secs:    uint8
-				timeout_secs:               uint8
+				default: #EncodingCodec | null
+				enum:    [#EncodingCodec, ...] | null
 			}
 		}
 	}
 
-	if Args.kind == "source" || Args.kind == "sink" {
-		// `tls` describes if the component secures network communication
-		// via TLS.
-		tls: {
-			enabled: bool
+	// `request` describes how the component issues and manages external
+	// requests.
+	request: {
+		enabled: bool
 
-			if enabled {
-				can_enable:             bool
-				can_verify_certificate: bool
-				if Args.kind == "sink" {
-					can_verify_hostname: bool
-				}
-				enabled_default: bool
-			}
+		if enabled {
+			in_flight_limit:            uint8
+			rate_limit_duration_secs:   uint8
+			rate_limit_num:             uint16
+			retry_initial_backoff_secs: uint8
+			retry_max_duration_secs:    uint8
+			timeout_secs:               uint8
 		}
+	}
+
+	// `tls` describes if the component secures network communication
+	// via TLS.
+	tls: #FeaturesTLS & {_args: {kind: Args.kind}}
+
+	to?: #Service
+}
+
+#FeaturesTLS: {
+	_args: {
+		kind: string
+	}
+	let Args = _args
+	enabled: bool
+
+	if enabled {
+		can_enable:             bool
+		can_verify_certificate: bool
+		if Args.kind == "sink" {
+			can_verify_hostname: bool
+		}
+		enabled_default: bool
 	}
 }
 
@@ -328,6 +412,11 @@ _values: {
 		body:  string
 	}]
 })
+
+#Input: {
+	logs:    bool
+	metrics: false | #MetricInput
+}
 
 #LogEvent: {
 	host?:      string | null
@@ -397,33 +486,56 @@ _values: {
 #MetricOutput: [Name=string]: close({
 	description:    string
 	relevant_when?: string
-	tags:           #Tags
+	tags:           #MetricTags
 	name:           Name
 	type:           #MetricType
 })
 
-#MetricType: "counter" | "gauge" | "histogram" | "summary"
-
-#Tags: [Name=string]: close({
+#MetricTags: [Name=string]: close({
 	description: string
 	examples: [string, ...]
 	required: bool
 	name:     Name
 })
 
+#MetricType: "counter" | "gauge" | "histogram" | "summary"
+
+#Output: {
+	logs?:    #LogOutput
+	metrics?: #MetricOutput
+}
+
+#Permissions: {
+	unix: {
+		group: string
+	}
+}
+
 #Platforms: {
-	docker: {
-		ports?: [uint16, ...]
-		volumes?: [string, ...]
-	}
-	triples: {
-		"aarch64-unknown-linux-gnu":  bool
-		"aarch64-unknown-linux-musl": bool
-		"x86_64-apple-darwin":        bool
-		"x86_64-pc-windows-msv":      bool
-		"x86_64-unknown-linux-gnu":   bool
-		"x86_64-unknown-linux-musl":  bool
-	}
+	"aarch64-unknown-linux-gnu":  bool
+	"aarch64-unknown-linux-musl": bool
+	"x86_64-apple-darwin":        bool
+	"x86_64-pc-windows-msv":      bool
+	"x86_64-unknown-linux-gnu":   bool
+	"x86_64-unknown-linux-musl":  bool
+}
+
+#Protocol: "http" | "tcp" | "udp" | "unix"
+
+#Runtime: {
+	name:    string
+	url:     string
+	version: string
+}
+
+#Service: {
+	name:     string
+	url:      string
+	versions: string | null
+
+	interface: #Interface
+
+	setup: [...string]
 }
 
 #Schema: [Name=string]: {
@@ -488,17 +600,6 @@ _values: {
 	// `types` sets the option's value type. External tagging is used since
 	// each type has its own set of fields.
 	type: #Type & {_args: "required": required}
-}
-
-#Statuses: {
-	_args: kind: string
-	let Args = _args
-
-	if Args.kind == "source" || Args.kind == "sink" {
-		delivery: #DeliveryStatus
-	}
-
-	development: #DevelopmentStatus
 }
 
 #Support: {
