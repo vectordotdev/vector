@@ -31,6 +31,7 @@ components: sinks: socket: {
 			}
 			to: {
 				name:     "socket receiver"
+				thing:    "a \(name)"
 				url:      urls.socket
 				versions: null
 

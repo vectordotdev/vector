@@ -18,6 +18,7 @@ components: sources: socket: {
 		receive: {
 			from: {
 				name:     "socket client"
+				thing:    "a \(name)"
 				url:      urls.prometheus_client
 				versions: null
 
