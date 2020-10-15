@@ -27,10 +27,10 @@ components: sources: file: {
 				}
 
 				setup: [
-					#"""
-						Ensure that [Docker is setup][urls.docker_setup] and running.
-						"""#,
-					#"""
+					"""
+						Ensure that [Docker is setup](\(urls.docker_setup)) and running.
+						""",
+					"""
 						Ensure that the Docker Engine is properly exposing logs:
 
 						```bash
@@ -39,10 +39,10 @@ components: sources: file: {
 
 						If you receive an error it's likely that you do not have
 						the proper Docker logging drivers installed. The Docker
-						Engine requires either the [`json-file`][urls.docker_logging_driver_json_file] (default)
+						Engine requires either the [`json-file`](\(urls.docker_logging_driver_json_file)) (default)
 						or [`journald`](docker_logging_driver_journald) Docker
 						logging driver to be installed.
-						"""#,
+						""",
 				]
 			}
 		}
@@ -96,7 +96,7 @@ components: sources: file: {
 						default: "checksum"
 						enum: {
 							checksum:         "Read `bytes` bytes from the head of the file to uniquely identify files via a checksum."
-							device_and_inode: "Uses the [device and inode][urls.inode] to unique identify files."
+							device_and_inode: "Uses the [device and inode](\(urls.inode)) to unique identify files."
 						}
 						examples: ["checksum", "device_and_inode"]
 					}
@@ -242,7 +242,7 @@ components: sources: file: {
 	how_it_works: {
 		autodiscover: {
 			title: "Autodiscovery"
-			body: #"""
+			body: """
 				Vector will continually look for new files matching any of your
 				include patterns. The frequency is controlled via the
 				`glob_minimum_cooldown` option. If a new file is added that matches
@@ -250,12 +250,12 @@ components: sources: file: {
 				maintains a unique list of files and will not tail a file more than
 				once, even if it matches multiple patterns. You can read more about
 				how we identify files in the Identification section.
-				"""#
+				"""
 		}
 
 		compressed_files: {
 			title: "Compressed Files"
-			body: #"""
+			body: """
 				Vector will transparently detect files which have been compressed
 				using Gzip and decompress them for reading. This detection process
 				looks for the unique sequence of bytes in the Gzip header and does
@@ -270,22 +270,22 @@ components: sources: file: {
 				this reason, users should take care to allow Vector to fully
 				process anycompressed files before shutting the process down or moving the
 				files to another location on disk.
-				"""#
+				"""
 		}
 
 		file_deletion: {
 			title: "File Deletion"
-			body: #"""
+			body: """
 				When a watched file is deleted, Vector will maintain its open file
 				handle and continue reading until it reaches `EOF`. When a file is
 				no longer findable in the `includes` option and the reader has
 				reached `EOF`, that file's reader is discarded.
-				"""#
+				"""
 		}
 
 		file_read_order: {
 			title: "File Read Order"
-			body: #"""
+			body: """
 				By default, Vector attempts to allocate its read bandwidth fairly
 				across all of the files it's currently watching. This prevents a
 				single very busy file from starving other independent files from
@@ -319,12 +319,12 @@ components: sources: file: {
 				you're dealing with a single logical log stream or if you value
 				per-stream ordering over fairness across streams, consider setting
 				the `oldest_first` option to true.
-				"""#
+				"""
 		}
 
 		file_rotation: {
 			title: "File Rotation"
-			body: #"""
+			body: """
 				Vector supports tailing across a number of file rotation strategies.
 				The default behavior of `logrotate` is simply to move the old log
 				file and create a new one. This requires no special configuration of
@@ -343,12 +343,12 @@ components: sources: file: {
 				read it uncompressed to identify it, and then ensure it has all of
 				the data, including any written in a gap between Vector's last read
 				and the actual rotation event.
-				"""#
+				"""
 		}
 
 		fingerprint: {
 			title: "fingerprint"
-			body: #"""
+			body: """
 				By default, Vector identifies files by creating a
 				[cyclic redundancy check](urls.crc) (CRC) on the first 256 bytes of
 				the file. This serves as a fingerprint to uniquely identify the file.
@@ -358,34 +358,34 @@ components: sources: file: {
 				This strategy avoids the common pitfalls of using device and inode
 				names since inode names can be reused across files. This enables
 				Vector to properly tail files across various rotation strategies.
-				"""#
+				"""
 		}
 
 		globbing: {
 			title: "Globbing"
-			body: #"""
-				[Globbing][urls.globbing] is supported in all provided file paths,
+			body:  """
+				[Globbing](\(urls.globbing)) is supported in all provided file paths,
 				files will be autodiscovered continually at a rate defined by the
 				`glob_minimum_cooldown` option.
-				"""#
+				"""
 		}
 
 		line_delimiters: {
 			title: "Line Delimiters"
-			body: #"""
+			body: """
 				Each line is read until a new line delimiter (the `0xA` byte) or `EOF`
 				is found.
-				"""#
+				"""
 		}
 
 		multiline_messages: {
 			title: "Multiline Messages"
-			body: #"""
+			body: """
 				Sometimes a single log event will appear as multiple log lines. To
 				handle this, Vector provides a set of `multiline` options. These
 				options were carefully thought through and will allow you to solve the
 				simplest and most complex cases. Let's look at a few examples:
-				"""#
+				"""
 			sub_sections: [
 				{
 					title: "Example 1: Ruy Exceptions"
@@ -462,7 +462,7 @@ components: sources: file: {
 				},
 				{
 					title: "Example 3: Line Continuations"
-					body: ##"""
+					body: #"""
 						Activity logs from services such as Elasticsearch typically begin
 						with a timestamp, followed by information on the specific
 						activity, as in this example:
@@ -496,14 +496,14 @@ components: sources: file: {
 						* `condition_pattern`, set to `^\[[0-9]{4}-[0-9]{2}-[0-9]{2}`,
 							tells Vector to continue aggregating up until a line starts with
 							a timestamp sequence.
-						"""##
+						"""#
 				},
 			]
 		}
 
 		read_position: {
 			title: "Read Position"
-			body: #"""
+			body: """
 				By default, Vector will read new data only for newly discovered
 				files, similar to the `tail` command. You can read from the
 				beginning of the file by setting the `start_at_beginning` option to
@@ -511,7 +511,7 @@ components: sources: file: {
 
 				Previously discovered files will be checkpointed](#checkpointing),
 				and the read position will resume from the last checkpoint.
-				"""#
+				"""
 		}
 	}
 }

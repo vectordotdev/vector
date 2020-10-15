@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: prometheus: {
 	title:       "Prometheus"
-	description: "[Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
+	description: "[Prometheus](\(urls.prometheus)) is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
 
 	classes: {
 		commonly_used: true
@@ -29,22 +29,22 @@ components: sinks: prometheus: {
 		}
 
 		requirements: [
-			#"""
-				[Prometheus][urls.prometheus] version `>= 1.0` is required.
-				"""#,
+			"""
+				[Prometheus](\(urls.prometheus)) version `>= 1.0` is required.
+				""",
 		]
 		warnings: [
-			#"""
+			"""
 				High cardinality metric names and labels are discouraged by
 				Prometheus as they can provide performance and reliability
 				problems. You should consider alternative strategies to reduce
 				the cardinality. Vector offers a [`tag_cardinality_limit` transform][docs.transforms.tag_cardinality_limit]
 				as a way to protect against this.
-				"""#,
-			#"""
+				""",
+			"""
 				This component exposes a configured port. You must ensure your
 				network allows access to this port.
-				"""#,
+				""",
 		]
 		notices: []
 	}
@@ -80,7 +80,7 @@ components: sinks: prometheus: {
 		}
 		namespace: {
 			common:      true
-			description: "A prefix that will be added to all metric names.\nIt should follow Prometheus [naming conventions][urls.prometheus_metric_naming]."
+			description: "A prefix that will be added to all metric names.\nIt should follow Prometheus [naming conventions](\(urls.prometheus_metric_naming))."
 			required:    false
 			warnings: []
 			type: string: {
@@ -128,11 +128,11 @@ components: sinks: prometheus: {
 					host: _host
 				}
 			}
-			output: #"""
+			output: """
 				# HELP \(_name) \(_name)
 				# TYPE \(_name) counter
 				\(_name) \(_value)
-				"""#
+				"""
 		},
 		{
 			_host:  _values.local_host
@@ -149,11 +149,11 @@ components: sinks: prometheus: {
 					host: _host
 				}
 			}
-			output: #"""
+			output: """
 				# HELP \(_name) \(_name)
 				# TYPE \(_name) gauge
 				\(_name) \(_value)
-				"""#
+				"""
 		},
 		{
 			_host: _values.local_host
@@ -172,7 +172,7 @@ components: sinks: prometheus: {
 					host: _host
 				}
 			}
-			output: #"""
+			output: """
 				# HELP \(_name) \(_name)
 				# TYPE \(_name) histogram
 				\(_name)_bucket{le="0.005"} 0
@@ -189,7 +189,7 @@ components: sinks: prometheus: {
 				\(_name)_bucket{le="+Inf"} 0
 				\(_name)_sum 0.789
 				\(_name)_count 2
-				"""#
+				"""
 		},
 	]
 
@@ -199,7 +199,7 @@ components: sinks: prometheus: {
 			body: #"""
 				Choosing the appropriate buckets for Prometheus histograms is a complicated
 				point of discussion. The [Histograms and Summaries Prometheus \
-				guide][urls.prometheus_histograms_guide] provides a good overview of histograms,
+				guide](\(urls.prometheus_histograms_guide)) provides a good overview of histograms,
 				buckets, summaries, and how you should think about configuring them. The buckets
 				you choose should align with your known range and distribution of values as
 				well as how you plan to report on them. The aforementioned guide provides
@@ -208,7 +208,7 @@ components: sinks: prometheus: {
 			sub_sections: [
 				{
 					title: "Default Buckets"
-					body: #"""
+					body: """
 						The `buckets` option defines the global default buckets for histograms:
 
 						```toml
@@ -226,21 +226,21 @@ components: sinks: prometheus: {
 						If this is not the case you should adjust your metric or buckets to coincide.
 
 						</Alert>
-						"""#
+						"""
 				},
 			]
 		}
 
 		memory_usage: {
 			title: "Memory Usage"
-			body: #"""
+			body: """
 				Like other Prometheus instances, the `<%= component.name %>` sink aggregates
 				metrics in memory which keeps the memory footprint to a minimum if Prometheus
 				fails to scrape the Vector instance over an extended period of time. The
 				downside is that data will be lost if Vector is restarted. This is by design of
 				Prometheus' pull model approach, but is worth noting if restart Vector
 				frequently.
-				"""#
+				"""
 		}
 	}
 }

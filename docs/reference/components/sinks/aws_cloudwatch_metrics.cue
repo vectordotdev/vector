@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: aws_cloudwatch_metrics: {
 	title:       "AWS Cloudwatch Metrics"
-	description: "[Amazon CloudWatch][urls.aws_cloudwatch] is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in the form of logs and metrics from a single platform."
+	description: "[Amazon CloudWatch](\(urls.aws_cloudwatch)) is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in the form of logs and metrics from a single platform."
 
 	classes: {
 		commonly_used: false
@@ -65,17 +65,17 @@ components: sinks: aws_cloudwatch_metrics: {
 
 		requirements: []
 		warnings: [
-			#"""
+			"""
 				Gauge values are persisted between flushes. On Vector start up each
 				gauge is assumed to have zero, 0.0, value, that can be updated
 				explicitly by the consequent absolute, not delta, gauge observation,
 				or by delta increments/decrements. Delta gauges are considered an
 				advanced feature useful in a distributed setting, however they
 				should be used with care.
-				"""#,
+				""",
 		]
 		notices: [
-			#"""
+			"""
 				CloudWatch Metrics types are organized not by their semantics, but
 				by storage properties:
 
@@ -84,7 +84,7 @@ components: sinks: aws_cloudwatch_metrics: {
 
 				In Vector only the latter is used to allow lossless statistics
 				calculations on CloudWatch side.
-				"""#,
+				""",
 		]
 	}
 

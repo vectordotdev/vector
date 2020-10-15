@@ -90,7 +90,7 @@ components: {
 					}
 					"*.ip_cidr_contains": {
 						common:      false
-						description: "Checks whether an IP field is contained within a given [IP CIDR][urls.cidr] (works with IPv4 and IPv6). This may be a single string or a list of strings, in which case this evaluates to true if the IP field is contained within any of the CIDRs in the list."
+						description: "Checks whether an IP field is contained within a given [IP CIDR](\(urls.cidr)) (works with IPv4 and IPv6). This may be a single string or a list of strings, in which case this evaluates to true if the IP field is contained within any of the CIDRs in the list."
 						required:    false
 						warnings: []
 						type: string: {
@@ -100,7 +100,7 @@ components: {
 					}
 					"*.regex": {
 						common:      true
-						description: "Checks whether a string field matches a [regular expression][urls.regex]. Vector uses the [documented Rust Regex syntax][urls.rust_regex_syntax]. Note that this condition is considerably more expensive than a regular string match (such as `starts_with` or `contains`) so the use of those conditions are preferred where possible."
+						description: "Checks whether a string field matches a [regular expression](\(urls.regex)). Vector uses the [documented Rust Regex syntax](\(urls.rust_regex_syntax)). Note that this condition is considerably more expensive than a regular string match (such as `starts_with` or `contains`) so the use of those conditions are preferred where possible."
 						required:    false
 						warnings: []
 						type: string: {
@@ -287,10 +287,10 @@ components: {
 					if components["\(Kind)s"][Name].features.receive.tls.enabled {
 						tls: {
 							title: "Transport Layer Security (TLS)"
-							body: #"""
-                  Vector uses [Openssl][urls.openssl] for TLS protocols. You can
+							body:  """
+                  Vector uses [Openssl](\(urls.openssl)) for TLS protocols. You can
                   adjust TLS behavior via the `tls.*` options.
-                  """#
+                  """
 						}
 					}}
 			}

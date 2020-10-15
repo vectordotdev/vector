@@ -2,7 +2,7 @@ package metadata
 
 components: transforms: aws_cloudwatch_logs_subscription_parser: {
 	title:       "AWS CloudWatch Logs Subscription Parser"
-	description: "[AWS CloudWatch Logs Subscription events][urls.aws_cloudwatch_logs_subscriptions] allow you to forward [AWS CloudWatch Logs][urls.aws_cloudwatch_logs] to external systems. Through the subscriiption, you can: call a Lambda, send to AWS Kinesis, or send to AWS Kinesis Firehose (which can then be forwarded to many destinations)."
+	description: "[AWS CloudWatch Logs Subscription events](\(urls.aws_cloudwatch_logs_subscriptions)) allow you to forward [AWS CloudWatch Logs](\(urls.aws_cloudwatch_logs)) to external systems. Through the subscriiption, you can: call a Lambda, send to AWS Kinesis, or send to AWS Kinesis Firehose (which can then be forwarded to many destinations)."
 
 	classes: {
 		commonly_used: false
@@ -150,7 +150,7 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 	how_it_works: {
 		structured_events: {
 			title: "Structured Log Events"
-			body:  "Note that the events themselves are not parsed. If they are structured data, you will typically want to pass them through a [parsing transform][urls.vector_parsing_transforms]."
+			body:  "Note that the events themselves are not parsed. If they are structured data, you will typically want to pass them through a [parsing transform](\(urls.vector_parsing_transforms))."
 		}
 	}
 }

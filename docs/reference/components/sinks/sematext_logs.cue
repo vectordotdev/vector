@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: sematext_logs: {
 	title:       "Sematext Logs"
-	description: "[Sematext][urls.sematext] is a hosted monitoring platform based on Elasticsearch. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time."
+	description: "[Sematext](\(urls.sematext)) is a hosted monitoring platform based on Elasticsearch. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time."
 
 	classes: {
 		commonly_used: false
@@ -64,12 +64,12 @@ components: sinks: sematext_logs: {
 	how_it_works: {
 		setup: {
 			title: "Setup"
-			body: #"""
-				1. Register for a free account at [Sematext.com][urls.sematext_registration]
+			body:  """
+				1. Register for a free account at [Sematext.com](\(urls.sematext_registration))
 
-				2. [Create a Logs App][urls.sematext_create_logs_app] to get a Logs Token
-				for [Sematext Logs][urls.sematext_logsense]
-				"""#
+				2. [Create a Logs App](\(urls.sematext_create_logs_app)) to get a Logs Token
+				for [Sematext Logs](\(urls.sematext_logsense))
+				"""
 		}
 	}
 }

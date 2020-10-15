@@ -68,7 +68,7 @@ components: transforms: reduce: {
 		}
 		merge_strategies: {
 			common: false
-			description: #"""
+			description: """
 				A map of field names to custom merge strategies. For each
 				field specified this strategy will be used for combining
 				events rather than the default behavior.
@@ -81,7 +81,7 @@ components: transforms: reduce: {
 				   `[field-name]_end` is added with the last received
 				   timestamp value.
 				3. Numeric values are summed.
-				"""#
+				"""
 			required: false
 			warnings: []
 			type: object: {

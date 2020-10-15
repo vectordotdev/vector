@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: logdna: {
 	title:       "LogDNA"
-	description: "[LogDNA][urls.logdna] is a log management system that allows engineering and DevOps to aggregate all system, server, and application logs into one platform. Collect, monitor, store, tail, and search application logs in with one command-line or web interface."
+	description: "[LogDNA](\(urls.logdna)) is a log management system that allows engineering and DevOps to aggregate all system, server, and application logs into one platform. Collect, monitor, store, tail, and search application logs in with one command-line or web interface."
 
 	classes: {
 		commonly_used: false

@@ -9,7 +9,7 @@ components: sinks: [Name=string]: {
 		configuration: {
 			assume_role: {
 				common:      false
-				description: "The ARN of an [IAM role][urls.aws_iam_role] to assume at startup."
+				description: "The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup."
 				required:    false
 				type: string: {
 					default: null
@@ -28,7 +28,7 @@ components: sinks: [Name=string]: {
 			}
 
 			region: {
-				description: "The [AWS region][urls.aws_regions] of the target service. If `endpoint` is provided it will override this value since the endpoint includes the region."
+				description: "The [AWS region](\(urls.aws_regions)) of the target service. If `endpoint` is provided it will override this value since the endpoint includes the region."
 				required:    true
 				type: string: {
 					examples: ["us-east-1"]

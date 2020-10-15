@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: aws_kinesis_firehose: {
 	title:       "AWS Kinesis Firehose"
-	description: "[Amazon Kinesis Data Firehose][urls.aws_kinesis_firehose] is a fully managed service for delivering real-time streaming data to destinations such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon Elasticsearch Service (Amazon ES), and Splunk."
+	description: "[Amazon Kinesis Data Firehose](\(urls.aws_kinesis_firehose)) is a fully managed service for delivering real-time streaming data to destinations such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon Elasticsearch Service (Amazon ES), and Splunk."
 
 	classes: {
 		commonly_used: false
@@ -82,7 +82,7 @@ components: sinks: aws_kinesis_firehose: {
 
 	configuration: {
 		stream_name: {
-			description: "The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target Kinesis Firehose delivery stream."
+			description: "The [stream name](\(urls.aws_cloudwatch_logs_stream_name)) of the target Kinesis Firehose delivery stream."
 			required:    true
 			warnings: []
 			type: string: {

@@ -85,13 +85,13 @@ components: transforms: json_parser: {
 	how_it_works: {
 		invalid_json: {
 			title: "Invalid JSON"
-			body: #"""
+			body: """
 				If the value for the specified `field` is not valid JSON you can control keeping
 				or discarding the event with the `drop_invalid` option. Setting it to `true` will
 				discard the event and drop it entirely. Setting it to `false` will keep the
 				event and pass it through. Note that passing through the event could cause
 				problems and violate assumptions about the structure of your event.
-				"""#
+				"""
 		}
 
 		merge_conflicts: {
@@ -100,13 +100,13 @@ components: transforms: json_parser: {
 			sub_sections: [
 				{
 					title: "Key Conflicts"
-					body: #"""
+					body: """
 						Any key present in the decoded JSON will override existing keys in the event.
-						"""#
+						"""
 				},
 				{
 					title: "Object Conflicts"
-					body: #"""
+					body: """
 						If the decoded JSON includes nested fields it will be _deep_ merged into the
 						event. For example, given the following event:
 
@@ -131,7 +131,7 @@ components: transforms: json_parser: {
 						```
 
 						Notice that the `parent.child1` key was preserved.
-						"""#
+						"""
 				},
 			]
 		}
