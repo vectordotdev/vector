@@ -339,7 +339,7 @@ _values: {
 			if enabled {
 				in_flight_limit:            uint8
 				rate_limit_duration_secs:   uint8
-				rate_limit_num:             uint8
+				rate_limit_num:             uint16
 				retry_initial_backoff_secs: uint8
 				retry_max_duration_secs:    uint8
 				timeout_secs:               uint8
