@@ -102,13 +102,12 @@ impl Transform for AddFields {
         emit!(AddFieldsEventProcessed);
 
         for (key, value_or_template) in self.fields.clone() {
-            let key_string = key.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
             let value = match value_or_template {
                 TemplateOrValue::Template(v) => match v.render_string(&event) {
                     Ok(v) => v,
                     Err(_) => {
                         emit!(AddFieldsTemplateRenderingError {
-                            field: &format!("{}", &key),
+                            field: &format!("{}", key),
                         });
                         continue;
                     }
@@ -117,17 +116,21 @@ impl Transform for AddFields {
                 TemplateOrValue::Value(v) => v,
             };
             if self.overwrite {
-                if event.as_mut_log().insert(&key_string, value).is_some() {
+                if event
+                    .as_mut_log()
+                    .insert_path(key.clone().into(), value)
+                    .is_some()
+                {
                     emit!(AddFieldsFieldOverwritten {
-                        field: &format!("{}", &key),
+                        field: &format!("{}", key),
                     });
                 }
-            } else if event.as_mut_log().contains(&key_string) {
+            } else if event.as_mut_log().contains(&key.to_string()) {
                 emit!(AddFieldsFieldNotOverwritten {
-                    field: &format!("{}", &key),
+                    field: &format!("{}", key),
                 });
             } else {
-                event.as_mut_log().insert(&key_string, value);
+                event.as_mut_log().insert_path(key.clone().into(), value);
             }
         }
 

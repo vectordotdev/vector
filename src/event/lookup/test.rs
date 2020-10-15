@@ -6,9 +6,9 @@ const SUFFICIENTLY_COMPLEX: &str =
 lazy_static::lazy_static! {
     static ref SUFFICIENTLY_DECOMPOSED: [Segment; 9] = [
         Segment::field(r#"regular"#.to_string()),
-        Segment::field(r#""quoted""#.to_string()),
-        Segment::field(r#""quoted but spaces""#.to_string()),
-        Segment::field(r#""quoted.but.periods""#.to_string()),
+        Segment::quoted_field(r#"quoted"#.to_string()),
+        Segment::quoted_field(r#"quoted but spaces"#.to_string()),
+        Segment::quoted_field(r#"quoted.but.periods"#.to_string()),
         Segment::field(r#"lookup"#.to_string()),
         Segment::index(0),
         Segment::field(r#"nested_lookup"#.to_string()),
@@ -151,7 +151,9 @@ fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<String> {
     let mut buf = Vec::new();
     test_file.read_to_end(&mut buf)?;
     let string = String::from_utf8(buf).unwrap();
-    Ok(string)
+
+    // Trim newlines at end, as most editors add them automatically.
+    Ok(string.trim_end().to_owned())
 }
 
 // This test iterates over the `tests/data/fixtures/lookup` folder and ensures the lookup parsed,

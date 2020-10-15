@@ -1,7 +1,8 @@
 [transforms.add_timestamp]
   inputs = []
   type = "add_fields"
-  fields."@timestamp" = 123
+  fields.'"@timestamp"' = 123
+  fields.foo.'"@timestamp"' = 456
 [[tests]]
   name = "add_timestamp"
   [tests.input]
@@ -12,6 +13,7 @@
     extract_from = "add_timestamp"
     [[tests.outputs.conditions]]
       "@timestamp.equals" = 123
+      "foo.@timestamp.equals" = 456
 
 [transforms.add_fields_nested]
   inputs = []

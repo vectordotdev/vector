@@ -42,42 +42,63 @@ static TOKEN_ERR: &str = "unexpected token sequence";
 #[grammar = "./mapping/parser/grammar.pest"]
 pub(crate) struct MappingParser;
 
-fn target_path_from_pair(pair: Pair<Rule>) -> Result<String> {
+fn path_from_pair(pair: Pair<Rule>) -> Result<String> {
     let mut segments = Vec::new();
     for segment in pair.into_inner() {
-        match segment.as_rule() {
-            Rule::path_segment => segments.push(segment.as_str().to_string()),
-            Rule::quoted_path_segment => {
-                segments.push(quoted_path_from_pair(segment)?.replace(".", "\\."))
+        for part in segment.into_inner() {
+            match part.as_rule() {
+                Rule::path_field => segments.push(part.as_str().to_string()),
+                Rule::path_field_quoted => {
+                    segments.push(quoted_path_from_pair(part)?.replace(".", "\\."))
+                }
+                Rule::path_index => segments
+                    .last_mut()
+                    .expect("field before index")
+                    .push_str(part.as_str()),
+                _ => unexpected_parser_sytax!(part),
             }
-            Rule::target_path => return target_path_from_pair(segment),
-            _ => unexpected_parser_sytax!(segment),
         }
     }
+
     Ok(segments.join("."))
 }
 
 fn quoted_path_from_pair(pair: Pair<Rule>) -> Result<String> {
-    let (first, mut other) = split_inner_rules_from_pair(pair)?;
-    let base = inner_quoted_string_escaped_from_pair(first)?;
-    Ok(match other.next() {
-        Some(pair) => base + pair.as_str(),
-        None => base,
-    })
+    let first = pair.into_inner().next().ok_or(TOKEN_ERR)?;
+    inner_quoted_string_escaped_from_pair(first)
 }
 
 fn path_segments_from_pair(pair: Pair<Rule>) -> Result<Vec<Vec<String>>> {
     let mut segments = Vec::new();
     for segment in pair.into_inner() {
         match segment.as_rule() {
-            Rule::path_segment => segments.push(vec![segment.as_str().to_string()]),
-            Rule::quoted_path_segment => segments.push(vec![quoted_path_from_pair(segment)?]),
+            Rule::path_segment => {
+                for segment in segment.into_inner() {
+                    match segment.as_rule() {
+                        Rule::path_field => segments.push(vec![segment.as_str().to_string()]),
+                        Rule::path_field_quoted => {
+                            segments.push(vec![quoted_path_from_pair(segment)?])
+                        }
+                        Rule::path_index => segments
+                            .last_mut()
+                            .expect("field before index")
+                            .last_mut()
+                            .expect("field before index")
+                            .push_str(segment.as_str()),
+                        _ => unexpected_parser_sytax!(segment),
+                    }
+                }
+            }
             Rule::path_coalesce => {
                 let mut options = Vec::new();
                 for option in segment.into_inner() {
                     match option.as_rule() {
-                        Rule::path_segment => options.push(option.as_str().to_string()),
-                        Rule::quoted_path_segment => options.push(quoted_path_from_pair(option)?),
+                        Rule::path_field => options.push(option.as_str().to_string()),
+                        Rule::path_field_quoted => options.push(quoted_path_from_pair(option)?),
+                        Rule::path_index => options
+                            .last_mut()
+                            .expect("field before index")
+                            .push_str(option.as_str()),
                         _ => unexpected_parser_sytax!(option),
                     }
                 }
@@ -382,7 +403,9 @@ fn query_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
             let v = pair.as_str() == "true";
             Box::new(Literal::from(Value::from(v)))
         }
-        Rule::dot_path => Box::new(QueryPath::from(path_segments_from_pair(pair)?)),
+        Rule::dot_query_path => Box::new(QueryPath::from(path_segments_from_pair(
+            pair.into_inner().next().ok_or(TOKEN_ERR)?,
+        )?)),
         Rule::group => query_arithmetic_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?,
         Rule::query_function => query_function_from_pairs(pair.into_inner())?,
         _ => unexpected_parser_sytax!(pair),
@@ -404,7 +427,9 @@ fn if_statement_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn Function>> 
 
 fn merge_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     let (first, mut other) = split_inner_rules_from_pair(pair)?;
-    let to_path = target_path_from_pair(first)?;
+    let target_path = first.into_inner().next().ok_or(TOKEN_ERR)?;
+
+    let to_path = path_from_pair(target_path)?;
     let query2 = query_arithmetic_from_pair(other.next().ok_or(TOKEN_ERR)?)?;
     let deep = match other.next() {
         None => None,
@@ -425,7 +450,13 @@ fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
 
 fn paths_from_pair(pair: Pair<Rule>) -> Result<Vec<String>> {
     pair.into_inner()
-        .map(target_path_from_pair)
+        .map(|pair| {
+            pair.into_inner()
+                .next()
+                .ok_or(TOKEN_ERR)
+                .map_err(str::to_owned)
+                .and_then(path_from_pair)
+        })
         .collect::<Result<Vec<_>>>()
 }
 
@@ -433,7 +464,14 @@ fn statement_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
         Rule::assignment => {
             let mut inner_rules = pair.into_inner();
-            let path = target_path_from_pair(inner_rules.next().ok_or(TOKEN_ERR)?)?;
+            let target_path = inner_rules
+                .next()
+                .ok_or(TOKEN_ERR)?
+                .into_inner()
+                .next()
+                .ok_or(TOKEN_ERR)?;
+
+            let path = path_from_pair(target_path)?;
             let query = query_arithmetic_from_pair(inner_rules.next().ok_or(TOKEN_ERR)?)?;
             Ok(Box::new(Assignment::new(path, query)))
         }
@@ -516,13 +554,14 @@ mod tests {
     fn check_parser_errors() {
         let cases = vec![
             (".foo = {\"bar\"}", vec![" 1:8\n", "= expected query"]),
+            (". = \"bar\"", vec![" 1:2\n", "= expected path_segment"]),
             (
-                ". = \"bar\"",
-                vec![" 1:2\n", "= expected path_field_name or quoted_path_segment"],
+                ".@ = \"bar\"",
+                vec![" 1:2\n", "= expected path_segment"],
             ),
             (
                 ".foo = !",
-                vec![" 1:9\n", "= expected dot_path, ident, group, boolean, null, string, integer, float, or not_operator"],
+                vec![" 1:9\n", "= expected dot_query_path, ident, group, boolean, null, string, integer, float, or not_operator"],
             ),
             (
                 ".foo = to_string",
@@ -532,7 +571,7 @@ mod tests {
                 "foo = \"bar\"",
                 vec![
                     " 1:1\n",
-                    "= expected if_statement, target_path, or function",
+                    "= expected dot_target_path, if_statement, or function",
                 ],
             ),
             (
@@ -542,7 +581,7 @@ mod tests {
             (".foo.bar = \"baz\" +", vec![" 1:19", "= expected query"]),
             (
                 ".foo.bar = .foo.(bar |)",
-                vec![" 1:23\n", "= expected path_field_name or quoted_path_segment"],
+                vec![" 1:23\n", "= expected path_field or path_field_quoted"],
             ),
             (
                 "if .foo > 0 { .foo = \"bar\" } else",
@@ -552,7 +591,7 @@ mod tests {
                 r#"if .foo { }"#,
                 vec![
                     " 1:11\n",
-                    "= expected if_statement, target_path, or function",
+                    "= expected dot_target_path, if_statement, or function",
                 ],
             ),
             (
@@ -566,15 +605,15 @@ mod tests {
             ),
             (
                 r#"only_fields(.foo,)"#,
-                vec![" 1:18\n", "= expected target_path"],
+                vec![" 1:18\n", "= expected dot_query_path"],
             ),
             (
                 r#"only_fields()"#,
-                vec![" 1:13\n", "= expected target_path"],
+                vec![" 1:13\n", "= expected dot_query_path"],
             ),
             (
                 r#"only_fields(,)"#,
-                vec![" 1:13\n", "= expected target_path"],
+                vec![" 1:13\n", "= expected dot_query_path"],
             ),
             (
                 ".foo = to_string(\"bar\",)",
@@ -589,7 +628,7 @@ mod tests {
             (
                 // Same here as above.
                 r#".foo."invalid \k escape".sequence = "foo""#,
-                vec![" 1:6\n", "= expected path_field_name or quoted_path_segment"],
+                vec![" 1:6\n", "= expected path_segment"],
             ),
         ];
 

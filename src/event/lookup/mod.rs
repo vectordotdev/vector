@@ -3,7 +3,7 @@ mod segment;
 mod test;
 
 use crate::{
-    event::Value,
+    event::{PathComponent, Value},
     mapping::parser::{MappingParser, Rule},
 };
 use pest::{iterators::Pair, Parser};
@@ -52,11 +52,15 @@ impl Display for Lookup {
         while let Some(segment) = next {
             match segment {
                 Segment::Field(_) => match maybe_next {
-                    Some(next) if next.is_field() => write!(f, r#"{}."#, segment)?,
+                    Some(next) if !next.is_index() => write!(f, r#"{}."#, segment)?,
                     None | Some(_) => write!(f, "{}", segment)?,
                 },
+                Segment::QuotedField(_) => match maybe_next {
+                    Some(next) if !next.is_index() => write!(f, r#""{}"."#, segment)?,
+                    None | Some(_) => write!(f, r#""{}""#, segment)?,
+                },
                 Segment::Index(_) => match maybe_next {
-                    Some(next) if next.is_field() => write!(f, r#"[{}]."#, segment)?,
+                    Some(next) if !next.is_index() => write!(f, r#"[{}]."#, segment)?,
                     None | Some(_) => write!(f, "[{}]", segment)?,
                 },
             }
@@ -144,7 +148,7 @@ impl FromStr for Lookup {
     type Err = crate::Error;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
-        let mut pairs = MappingParser::parse(Rule::lookup, input)?;
+        let mut pairs = MappingParser::parse(Rule::target_path, input)?;
         let pair = pairs.next().ok_or("No tokens found.")?;
         Self::try_from(pair)
     }
@@ -180,6 +184,12 @@ impl From<string_cache::DefaultAtom> for Lookup {
         Self {
             segments: vec![Segment::field(input.to_string())],
         }
+    }
+}
+
+impl From<Lookup> for Vec<PathComponent> {
+    fn from(lookup: Lookup) -> Self {
+        lookup.segments.into_iter().map(Into::into).collect()
     }
 }
 

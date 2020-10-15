@@ -2,8 +2,38 @@ mapping = _{ SOI ~ statement ~ (NEWLINE+ ~ statement)* ~ NEWLINE* ~ EOI }
 
 statement = _{ assignment | function | if_statement }
 
-assignment = { target_path ~ "=" ~ query_arithmetic }
+assignment = { dot_target_path ~ "=" ~ query_arithmetic }
 
+///////////
+// PATHS //
+///////////
+
+// Query path with coalesce support: `.foo.(bar | "@baz")[3]`
+query_segment = _{ (path_segment | path_coalesce) }
+query_path = ${ query_segment ~ ("." ~ query_segment)*  }
+dot_query_path = ${ "." ~ query_path }
+
+// Target path without coalesce support: `.foo.bar."@baz"[3]`
+target_segment = _{ path_segment }
+target_path = ${ target_segment ~ ("." ~ target_segment)* }
+dot_target_path = ${ "." ~ target_path }
+
+// Grouping of path segments: `foo.bar."@baz"[3]`
+path_segment = !{ path_field_kind ~ path_index* }
+path_coalesce = !{ "(" ~ path_field_kind ~ ("|" ~ path_field_kind)+ ~ ")" }
+
+// Field names, regular and quoted: `baz`, `"@baz"`
+path_field_kind = _{ (path_field | path_field_quoted) }
+path_field = { (ASCII_ALPHA | "_" | "-" )+ }
+path_field_quoted = { "\"" ~ inner_quoted_string ~ "\"" }
+
+// Array indexing: `foo[2]`
+path_index = ${ "[" ~ inner_path_index ~ "]" }
+inner_path_index = { ASCII_DIGIT+ }
+
+////////////////
+// STATEMENTS //
+////////////////
 
 if_statement = {
     "if" ~ query_arithmetic ~ "{" ~ NEWLINE* ~
@@ -13,47 +43,21 @@ if_statement = {
     NEWLINE* ~ "}" )?
 }
 
-// Used by `src/event/lookup.rs`
-lookup = { (path_segment | quoted_path_segment) ~ ("." ~ (path_segment | quoted_path_segment))* }
+///////////////
+// FUNCTIONS //
+///////////////
 
-// Paths
-path_index =$ { "[" ~ inner_path_index ~ "]" }
-inner_path_index = { '0'..'9'+ }
-path_segment = ${ path_field_name ~ path_index* }
-//path_field_name = { (ASCII_ALPHA | "_" | "-" | "@" )+ }
-path_field_name = { (ASCII_ALPHA | "_" | "-" )+ }
-quoted_path_segment = ${ "\"" ~ inner_quoted_string ~ "\"" ~ path_index* }
-
-target_path = @{ ("." ~ (path_segment | quoted_path_segment))+ }
-
-// Functions
 function = {
     deletion |
     only_fields |
     merge
 }
 
-deletion = { "del(" ~ target_paths ~ ")" }
-only_fields = { "only_fields(" ~ target_paths ~ ")" }
-merge = { "merge(" ~ target_path ~ "," ~ query_arithmetic ~ ("," ~ query_arithmetic)? ~ ")" }
-
-// One or more path arguments for a given function.
-//
-// Can be used to parse functions that take one or more paths, e.g.:
-//
-// my_func = { "my_func(" ~ target_paths ~ ")" }
-// => my_func(.bar, .baz)
-//
-target_paths = _{ target_path ~ ("," ~ target_path)* }
-
-// Queries
-path_coalesce = !{ "(" ~ (path_segment | quoted_path_segment) ~ ("|" ~ (path_segment | quoted_path_segment))+ ~ ")" }
-
-dot_path = ${ ("." ~ (path_segment | quoted_path_segment | path_coalesce))+ }
+deletion = { "del(" ~ dot_query_path ~ ("," ~ dot_query_path)* ~ ")" }
+only_fields = { "only_fields(" ~ dot_query_path ~ ("," ~ dot_query_path)* ~ ")" }
+merge = { "merge(" ~ dot_query_path ~ "," ~ query_arithmetic ~ ("," ~ query_arithmetic)? ~ ")" }
 
 ident = @{ ASCII_ALPHANUMERIC ~ ( ASCII_ALPHANUMERIC | "_" )* }
-
-// Functions
 
 query_function = ${ ident ~ "(" ~ inner_function? ~ ")"  }
 
@@ -67,7 +71,9 @@ positional_item = { query_arithmetic }
 
 keyword_item = { ident ~ "=" ~ query_arithmetic }
 
-// end: Functions
+////////////////
+// PRIMITIVES //
+////////////////
 
 group = { "(" ~ query_arithmetic ~ ")" }
 
@@ -101,7 +107,11 @@ float = @{
 
 not_operator = { "!" ~ query_leaf }
 
-query_leaf = _{ not_operator | value | dot_path | group | query_function }
+///////////
+// QUERY //
+///////////
+
+query_leaf = _{ not_operator | value | dot_query_path | group | query_function }
 
 // Arithmetic, broken down into tiers in order to support operator precedence.
 // Operators of the same tier are resolved from left to right.
@@ -121,5 +131,9 @@ arithmetic_operator_boolean = { "||" | "&&" }
 query_arithmetic_boolean = { query_arithmetic_compare ~ (arithmetic_operator_boolean ~ query_arithmetic_compare)* }
 
 query_arithmetic = _{ query_arithmetic_boolean }
+
+///////////
+// OTHER //
+///////////
 
 WHITESPACE = _{ " " | "\t" }
