@@ -12,7 +12,7 @@ components: transforms: logfmt_parser: {
 	features: {
 		parse: {
 			format: {
-				title:    "Logfmt"
+				name:     "Logfmt"
 				url:      urls.logfmt
 				versions: null
 			}

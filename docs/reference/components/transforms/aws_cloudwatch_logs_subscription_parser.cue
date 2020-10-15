@@ -13,7 +13,7 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 	features: {
 		parse: {
 			format: {
-				title:    "AWS CloudWatch Logs Subscription events"
+				name:     "AWS CloudWatch Logs subscription events"
 				url:      urls.aws_cloudwatch_logs_subscriptions
 				versions: null
 			}

@@ -12,7 +12,7 @@ components: transforms: aws_ec2_metadata: {
 	features: {
 		enrich: {
 			from: {
-				title:    "AWS EC2 Instance Metadata"
+				name:     "AWS EC2 Instance Metadata"
 				url:      urls.aws_ec2_instance_metadata
 				versions: ">= 2"
 			}
