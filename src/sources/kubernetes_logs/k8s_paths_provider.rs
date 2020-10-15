@@ -95,9 +95,15 @@ where
 }
 
 fn real_glob(pattern: &str) -> impl Iterator<Item = PathBuf> {
-    glob::glob(pattern)
-        .expect("the pattern is supposed to always be correct")
-        .flat_map(|paths| paths.into_iter())
+    glob::glob_with(
+        pattern,
+        glob::MatchOptions {
+            require_literal_separator: true,
+            ..Default::default()
+        },
+    )
+    .expect("the pattern is supposed to always be correct")
+    .flat_map(|paths| paths.into_iter())
 }
 
 fn exclude_paths<'a>(
