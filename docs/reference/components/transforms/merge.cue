@@ -8,10 +8,11 @@ components: transforms: merge: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
-		function:      "aggregate"
 	}
 
-	features: {}
+	features: {
+		reduce: {}
+	}
 
 	support: {
 		platforms: {

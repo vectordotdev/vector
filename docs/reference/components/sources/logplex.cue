@@ -13,26 +13,13 @@ components: sources: logplex: {
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "batch"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: {
-			enabled:                true
-			can_enable:             true
-			can_verify_certificate: true
-			enabled_default:        false
-		}
-	}
-
-	support: {
-		dependencies: {
-			logpex: {
-				required: true
+		multiline: enabled: false
+		receive: {
+			from: {
 				title:    "Heroku"
-				type:     "external"
 				url:      urls.logplex
 				versions: null
 
@@ -57,8 +44,17 @@ components: sources: logplex: {
 						"""#,
 				]
 			}
-		}
 
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				enabled_default:        false
+			}
+		}
+	}
+
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true

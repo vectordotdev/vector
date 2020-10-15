@@ -7,53 +7,49 @@ components: sinks: http: {
 
 	classes: {
 		commonly_used: true
-		function:      "transmit"
 		service_providers: []
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
 	}
 
-	input: {
-		logs:    true
-		metrics: false
-	}
-
 	features: {
-		batch: {
-			enabled:      true
-			common:       false
-			max_bytes:    1049000
-			max_events:   null
-			timeout_secs: 1
-		}
-		buffer: enabled: true
-		compression: {
-			enabled: true
-			default: null
-			gzip:    true
-		}
-		encoding: codec: {
-			enabled: true
-			default: null
-			enum: ["json", "ndjson", "text"]
-		}
+		buffer: enabled:      true
 		healthcheck: enabled: true
-		request: {
-			enabled:                    true
-			in_flight_limit:            10
-			rate_limit_duration_secs:   1
-			rate_limit_num:             1000
-			retry_initial_backoff_secs: 1
-			retry_max_duration_secs:    10
-			timeout_secs:               30
-		}
-		tls: {
-			enabled:                true
-			can_enable:             false
-			can_verify_certificate: true
-			can_verify_hostname:    true
-			enabled_default:        false
+		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				max_bytes:    1049000
+				max_events:   null
+				timeout_secs: 1
+			}
+			compression: {
+				enabled: true
+				default: null
+				gzip:    true
+			}
+			encoding: codec: {
+				enabled: true
+				default: null
+				enum: ["json", "ndjson", "text"]
+			}
+			request: {
+				enabled:                    true
+				in_flight_limit:            10
+				rate_limit_duration_secs:   1
+				rate_limit_num:             1000
+				retry_initial_backoff_secs: 1
+				retry_max_duration_secs:    10
+				timeout_secs:               30
+			}
+			tls: {
+				enabled:                true
+				can_enable:             false
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
 		}
 	}
 
@@ -137,5 +133,10 @@ components: sinks: http: {
 				examples: ["https://10.22.212.22:9000/endpoint"]
 			}
 		}
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 }

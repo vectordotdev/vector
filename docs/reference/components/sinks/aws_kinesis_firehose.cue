@@ -10,40 +10,41 @@ components: sinks: aws_kinesis_firehose: {
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
-		function:      "transmit"
 		service_providers: ["AWS"]
 	}
 
 	features: {
-		batch: {
-			enabled:      true
-			common:       false
-			max_bytes:    4000000
-			max_events:   500
-			timeout_secs: 1
-		}
-		buffer: enabled: true
-		compression: {
-			enabled: true
-			default: null
-			gzip:    true
-		}
-		encoding: codec: {
-			enabled: true
-			default: null
-			enum: ["json", "text"]
-		}
+		buffer: enabled:      true
 		healthcheck: enabled: true
-		request: {
-			enabled:                    true
-			in_flight_limit:            5
-			rate_limit_duration_secs:   1
-			rate_limit_num:             5
-			retry_initial_backoff_secs: 1
-			retry_max_duration_secs:    10
-			timeout_secs:               30
+		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				max_bytes:    4000000
+				max_events:   500
+				timeout_secs: 1
+			}
+			compression: {
+				enabled: true
+				default: null
+				gzip:    true
+			}
+			encoding: codec: {
+				enabled: true
+				default: null
+				enum: ["json", "text"]
+			}
+			request: {
+				enabled:                    true
+				in_flight_limit:            5
+				rate_limit_duration_secs:   1
+				rate_limit_num:             5
+				retry_initial_backoff_secs: 1
+				retry_max_duration_secs:    10
+				timeout_secs:               30
+			}
+			tls: enabled: false
 		}
-		tls: enabled: false
 	}
 
 	support: {
