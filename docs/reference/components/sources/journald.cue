@@ -117,7 +117,10 @@ components: sources: journald: {
 					common:      false
 					description: "Any Journald field"
 					required:    false
-					type: string: examples: ["/usr/sbin/ntpd", "c36e9ea52800a19d214cb71b53263a28"]
+					type: string: {
+						default: null
+						examples: ["/usr/sbin/ntpd", "c36e9ea52800a19d214cb71b53263a28"]
+					}
 				}
 			}
 		}
