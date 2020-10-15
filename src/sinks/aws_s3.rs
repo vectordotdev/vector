@@ -57,7 +57,7 @@ pub struct S3SinkConfig {
         default
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
-    #[serde(default = "Compression::default_gzip")]
+    #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(default)]
     pub batch: BatchConfig,
@@ -511,7 +511,7 @@ mod tests {
             "date".into(),
             None,
             false,
-            Compression::Gzip,
+            Compression::gzip_default(),
             "bucket".into(),
             S3Options::default(),
         );
@@ -522,7 +522,7 @@ mod tests {
             "date".into(),
             None,
             true,
-            Compression::Gzip,
+            Compression::gzip_default(),
             "bucket".into(),
             S3Options::default(),
         );
@@ -627,7 +627,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let config = S3SinkConfig {
-            compression: Compression::Gzip,
+            compression: Compression::gzip_default(),
             filename_time_format: Some("%s%f".into()),
             ..config(10000).await
         };
