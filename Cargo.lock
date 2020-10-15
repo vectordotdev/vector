@@ -6270,6 +6270,7 @@ dependencies = [
  "sha-1 0.9.1",
  "sha2",
  "sha3",
+ "slab",
  "smpl_jwt",
  "snafu",
  "stream-cancel",
