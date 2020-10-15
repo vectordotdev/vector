@@ -208,6 +208,15 @@ components: {
 				}
 			}
 
+			if Kind != "source" {
+				inputs: {
+					description: "A list of upstream [source](\(urls.vector_sources)) or [transform](\(urls.vector_transforms)) IDs. See [configuration](\(urls.vector_configuration)) for more info."
+					required:    true
+					sort:        -1
+					type: string: examples: ["my-source-or-transform-id"]
+				}
+			}
+
 			"type": {
 				description: "The component type. This is a required field for all components and tells Vector which component to use."
 				required:    true
