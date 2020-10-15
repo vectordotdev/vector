@@ -82,6 +82,38 @@ impl SourceConfig for ApacheMetricsConfig {
     }
 }
 
+trait UriExt {
+    fn to_sanitized_string(&self) -> String;
+}
+
+impl UriExt for http::Uri {
+    fn to_sanitized_string(&self) -> String {
+        let mut s = String::new();
+
+        if let Some(scheme) = self.scheme() {
+            s.push_str(scheme.as_str());
+            s.push_str("://");
+        }
+
+        if let Some(host) = self.host() {
+            s.push_str(host);
+        }
+
+        if let Some(port) = self.port() {
+            s.push_str(":");
+            s.push_str(port.as_str());
+        }
+
+        s.push_str(self.path());
+
+        if let Some(query) = self.query() {
+            s.push_str(query);
+        }
+
+        s
+    }
+}
+
 fn apache_metrics(
     urls: Vec<http::Uri>,
     interval: u64,
@@ -99,20 +131,14 @@ fn apache_metrics(
         .map(move |url| {
             let https = HttpsConnector::new().expect("TLS initialization failed");
             let client = Client::builder().build(https);
-            let sanitized_url = sanitize_uri(url.clone())
-                .map_err(|e| {
-                    warn!(message = "Could not sanitize endpoint.", error = %e, rate_limit_secs = 10);
-                })
-                .ok();
+            let sanitized_url = url.to_sanitized_string();
 
             let request = Request::get(&url)
                 .body(Body::empty())
                 .expect("error creating request");
 
             let mut tags: BTreeMap<String, String> = BTreeMap::new();
-            if let Some(sanitized_url) = sanitized_url {
-                tags.insert("endpoint".into(), sanitized_url.to_string());
-            }
+            tags.insert("endpoint".into(), sanitized_url.to_string());
             if let Some(host) = url.host() {
                 tags.insert("host".into(), host.into());
             }
@@ -153,7 +179,7 @@ fn apache_metrics(
                                     Err(e) => {
                                         emit!(ApacheMetricsParseError {
                                             error: e,
-                                            url: url.clone(),
+                                            url: &sanitized_url,
                                         });
                                         None
                                     }
@@ -169,7 +195,7 @@ fn apache_metrics(
                         Ok((header, _)) => {
                             emit!(ApacheMetricsErrorResponse {
                                 code: header.status,
-                                url: url.clone(),
+                                url: &sanitized_url,
                             });
                             Some(
                                 stream::iter(vec![Metric {
@@ -186,7 +212,7 @@ fn apache_metrics(
                         Err(error) => {
                             emit!(ApacheMetricsHttpError {
                                 error,
-                                url: url.clone()
+                                url: &sanitized_url
                             });
                             Some(
                                 stream::iter(vec![Metric {
@@ -209,24 +235,6 @@ fn apache_metrics(
         .inspect(|_| info!("finished sending"));
 
     Box::new(task.boxed().compat())
-}
-
-/// Removes the username/password bits from the given URI
-fn sanitize_uri(u: http::Uri) -> Result<http::Uri, http::Error> {
-    let mut parts: http::uri::Parts = u.into();
-
-    if let Some(authority) = parts.authority {
-        let address = match (authority.host(), authority.port()) {
-            (host, Some(port)) => format!("{}:{}", host, port),
-            (host, None) => host.to_string(),
-        };
-
-        let authority = address.parse::<http::uri::Authority>()?;
-
-        parts.authority = Some(authority);
-    }
-
-    parts.try_into().map_err(Into::into)
 }
 
 #[cfg(test)]
