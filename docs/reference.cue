@@ -292,7 +292,7 @@ _values: {
 
 #FeaturesEnrich: {
 	from: close({
-		title:    string
+		name:     string
 		url:      string
 		versions: string | null
 	})
@@ -300,7 +300,7 @@ _values: {
 
 #FeaturesParse: {
 	format: close({
-		title:    string
+		name:     string
 		url:      string
 		versions: string | null
 	})
@@ -523,7 +523,7 @@ _values: {
 #Protocol: "http" | "tcp" | "udp" | "unix"
 
 #Runtime: {
-	title:   string
+	name:    string
 	url:     string
 	version: string
 }

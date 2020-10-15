@@ -12,7 +12,7 @@ components: transforms: grok_parser: {
 	features: {
 		parse: {
 			format: {
-				title:    "Grok"
+				name:     "Grok"
 				url:      urls.grok
 				versions: null
 			}
