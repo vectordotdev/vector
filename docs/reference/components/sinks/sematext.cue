@@ -1,6 +1,23 @@
 package metadata
 
 components: sinks: _sematext: {
+	features: {
+		send: {
+			to: {
+				name:     "Sematext"
+				url:      urls.sematext
+				versions: null
+
+				interface: {
+					socket: {
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "required"
+					}
+				}
+			}
+		}
+	}
 	configuration: {
 		endpoint: {
 			common:        false

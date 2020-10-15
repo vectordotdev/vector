@@ -3,8 +3,7 @@ package metadata
 components: sources: vector: {
 	_port: 9000
 
-	title:             "Vector"
-	short_description: "Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs log and metric events."
+	title: "Vector"
 
 	classes: {
 		commonly_used: false
@@ -18,7 +17,7 @@ components: sources: vector: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				title:    "Vector Client"
+				name:     "Vector sink"
 				url:      urls.vector_sink
 				versions: null
 
