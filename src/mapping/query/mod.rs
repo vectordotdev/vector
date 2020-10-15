@@ -4,7 +4,7 @@ use crate::{
 };
 
 pub mod arithmetic;
-pub mod dynamic_regex;
+pub mod regex;
 pub mod function;
 pub mod path;
 pub mod query_value;

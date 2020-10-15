@@ -1,4 +1,4 @@
-use super::dynamic_regex::DynamicRegex;
+use super::regex::Regex;
 use crate::event::Value;
 
 #[derive(PartialEq, Debug, Clone)]
@@ -6,7 +6,7 @@ pub(in crate::mapping) enum QueryValue {
     Value(Value),
 
     #[allow(dead_code)]
-    Regex(DynamicRegex),
+    Regex(Regex),
 }
 
 impl QueryValue {
@@ -28,8 +28,8 @@ impl From<Value> for QueryValue {
     }
 }
 
-impl From<DynamicRegex> for QueryValue {
-    fn from(value: DynamicRegex) -> Self {
+impl From<Regex> for QueryValue {
+    fn from(value: Regex) -> Self {
         Self::Regex(value)
     }
 }

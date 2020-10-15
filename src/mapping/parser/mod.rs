@@ -7,7 +7,7 @@ use crate::{
             self,
             arithmetic::Arithmetic,
             arithmetic::Operator,
-            dynamic_regex::DynamicRegex,
+            regex::Regex,
             function::{Argument, ArgumentList, FunctionSignature, NotFn},
             path::Path as QueryPath,
             query_value::QueryValue,
@@ -21,7 +21,7 @@ use pest::{
     iterators::{Pair, Pairs},
     Parser,
 };
-use std::{collections::BTreeMap, convert::TryFrom, str::FromStr};
+use std::str::FromStr;
 
 // If this macro triggers, it means the parser syntax file (grammar.pest) was
 // updated in unexpected, and unsupported ways.
@@ -317,27 +317,23 @@ fn regex_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
     match pair.as_rule() {
         Rule::regex => {
             let mut inner = pair.into_inner();
-            let regex = inner.next().ok_or(TOKEN_ERR)?;
-            let flags = inner
+            let pattern = inner.next().ok_or(TOKEN_ERR)?.as_str();
+            let (global, insensitive, multiline) = inner
                 .next()
                 .map(|flags| {
                     flags
                         .as_str()
                         .chars()
-                        .map(|c| Value::from(c.to_string()))
-                        .collect()
+                        .fold((false, false, false), |(g, i, m), flag| match flag {
+                            'g' => (true, i, m),
+                            'i' => (g, true, m),
+                            'm' => (g, i, true),
+                            _ => (g, i, m),
+                        })
                 })
-                .unwrap_or_else(Vec::new);
+                .unwrap_or((false, false, false));
 
-            let mut map = BTreeMap::new();
-            map.insert(
-                "pattern".to_string(),
-                Value::from(regex.as_str().to_owned()),
-            );
-            map.insert("flags".to_string(), Value::from(flags));
-
-            let mut regex = DynamicRegex::try_from(Value::from(map))?;
-            regex.compile()?;
+            let regex = Regex::new(pattern.into(), multiline, insensitive, global)?;
 
             Ok(Box::new(Literal::from(QueryValue::from(regex))))
         }
@@ -1266,11 +1262,12 @@ mod tests {
                     "foo".to_string(),
                     Box::new(SplitFn::new(
                         Box::new(QueryPath::from("bar")),
-                        Box::new(Literal::from(QueryValue::from({
-                            let mut regex = DynamicRegex::new("a".to_string(), false, true, false);
-                            regex.compile().unwrap();
-                            regex
-                        }))),
+                        Box::new(Literal::from(QueryValue::from(Regex::new(
+                            "a".to_string(),
+                            false,
+                            true,
+                            false,
+                        ).unwrap()))),
                         Some(Box::new(Literal::from(Value::from(2)))),
                     )),
                 ))]),

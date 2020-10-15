@@ -55,13 +55,10 @@ impl Function for SplitFn {
                     None => to_value(Box::new(string.split(&pattern))),
                 })
             }
-            QueryValue::Regex(mut regex) => {
-                let regex = regex.compile()?;
-                Ok(match &limit {
-                    Some(ref limit) => to_value(Box::new(regex.splitn(&string, *limit))),
-                    None => to_value(Box::new(regex.split(&string))),
-                })
-            }
+            QueryValue::Regex(regex) => Ok(match &limit {
+                Some(ref limit) => to_value(Box::new(regex.regex().splitn(&string, *limit))),
+                None => to_value(Box::new(regex.regex().split(&string))),
+            }),
             _ => Err("invalid pattern".to_string()),
         }
     }
@@ -109,7 +106,7 @@ impl TryFrom<ArgumentList> for SplitFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapping::query::dynamic_regex::DynamicRegex;
+    use crate::mapping::query::regex::Regex;
     use crate::mapping::query::path::Path;
 
     #[test]
@@ -163,12 +160,9 @@ mod tests {
                 ])),
                 SplitFn::new(
                     Box::new(Path::from(vec![vec!["foo"]])),
-                    Box::new(Literal::from(QueryValue::from(DynamicRegex::new(
-                        " ".to_string(),
-                        false,
-                        false,
-                        false,
-                    )))),
+                    Box::new(Literal::from(QueryValue::from(
+                        Regex::new(" ".to_string(), false, false, false).unwrap(),
+                    ))),
                     Some(Box::new(Literal::from(Value::from(2)))),
                 ),
             ),
@@ -188,12 +182,9 @@ mod tests {
                 ])),
                 SplitFn::new(
                     Box::new(Path::from(vec![vec!["foo"]])),
-                    Box::new(Literal::from(QueryValue::from(DynamicRegex::new(
-                        "a".to_string(),
-                        false,
-                        true,
-                        false,
-                    )))),
+                    Box::new(Literal::from(QueryValue::from(
+                        Regex::new("a".to_string(), false, true, false).unwrap(),
+                    ))),
                     None,
                 ),
             ),

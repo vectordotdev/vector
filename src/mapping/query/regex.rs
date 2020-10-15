@@ -3,23 +3,28 @@ use bytes::Bytes;
 use std::{collections::BTreeMap, convert::TryFrom, string::ToString};
 
 #[derive(Debug, Clone)]
-pub struct DynamicRegex {
+pub struct Regex {
     pattern: String,
     multiline: bool,
     insensitive: bool,
     global: bool,
-    compiled: Option<Result<regex::Regex>>,
+    compiled: regex::Regex,
 }
 
-impl DynamicRegex {
-    pub fn new(pattern: String, multiline: bool, insensitive: bool, global: bool) -> Self {
-        Self {
+impl Regex {
+    pub fn new(pattern: String, multiline: bool, insensitive: bool, global: bool) -> Result<Self> {
+        let compiled = Self::compile(&pattern, multiline, insensitive)?;
+        Ok(Self {
             pattern,
             multiline,
             insensitive,
             global,
-            compiled: None,
-        }
+            compiled,
+        })
+    }
+
+    pub fn regex(&self) -> &regex::Regex {
+        &self.compiled
     }
 
     #[allow(dead_code)]
@@ -27,27 +32,21 @@ impl DynamicRegex {
         self.global
     }
 
-    pub fn compile(&mut self) -> Result<&regex::Regex> {
-        // These are needed to avoid lifetime issues of using
-        // self within the ensuing closure.
-        let pattern = &self.pattern;
-        let insensitive = self.insensitive;
-        let multiline = self.multiline;
-
-        let res = self.compiled.get_or_insert_with(|| {
-            regex::RegexBuilder::new(pattern)
-                .case_insensitive(insensitive)
-                .multi_line(multiline)
-                .build()
-                .map_err(|err| format!("invalid regex {}", err))
-        });
-
-        res.as_ref().clone().map_err(ToString::to_string)
+    fn compile(
+        pattern: &str,
+        multiline: bool,
+        insensitive: bool
+    ) -> Result<regex::Regex> {
+        regex::RegexBuilder::new(pattern)
+            .case_insensitive(insensitive)
+            .multi_line(multiline)
+            .build()
+            .map_err(|err| format!("invalid regex {}", err))
     }
 
     fn from_bytes(bytes: bytes::Bytes) -> Result<Self> {
         let pattern = String::from_utf8_lossy(&bytes);
-        Ok(DynamicRegex::new(pattern.to_string(), false, false, false))
+        Regex::new(pattern.to_string(), false, false, false)
     }
 
     fn from_map(map: BTreeMap<String, Value>) -> Result<Self> {
@@ -75,14 +74,14 @@ impl DynamicRegex {
             Some(_) => return Err("regular expression flags is not an array".to_string()),
         };
 
-        Ok(DynamicRegex::new(pattern, multiline, insensitive, global))
+        Regex::new(pattern, multiline, insensitive, global)
     }
 }
 
 /// Our dynamic regex equality shouldn't rely on the compiled value
 /// as this is largely an implementation detail.
 /// Plus regex::Regex doesn't implement PartialEq.
-impl PartialEq for DynamicRegex {
+impl PartialEq for Regex {
     fn eq(&self, other: &Self) -> bool {
         self.pattern == other.pattern
             && self.multiline == other.multiline
@@ -91,7 +90,7 @@ impl PartialEq for DynamicRegex {
     }
 }
 
-impl TryFrom<Value> for DynamicRegex {
+impl TryFrom<Value> for Regex {
     type Error = String;
 
     /// Create a regex from a String or a Map containing fields :
@@ -99,15 +98,15 @@ impl TryFrom<Value> for DynamicRegex {
     /// flags   - flags including i => Case insensitive, g => Global, m => Multiline.
     fn try_from(value: Value) -> Result<Self> {
         match value {
-            Value::Map(map) => DynamicRegex::from_map(map),
-            Value::Bytes(bytes) => DynamicRegex::from_bytes(bytes),
+            Value::Map(map) => Regex::from_map(map),
+            Value::Bytes(bytes) => Regex::from_bytes(bytes),
             _ => Err("regular expression should be a map or a string".to_string()),
         }
     }
 }
 
-impl From<DynamicRegex> for Value {
-    fn from(regex: DynamicRegex) -> Self {
+impl From<Regex> for Value {
+    fn from(regex: Regex) -> Self {
         let mut map = BTreeMap::new();
         map.insert("pattern".to_string(), Value::from(regex.pattern));
 
@@ -133,12 +132,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn create_regex() {
+        let regex = Regex::new("abba".to_string(), false, false, false).unwrap();
+
+        // Test our regex is working case sensitively.
+        assert!(regex.regex().is_match("abba"));
+    }
+
+    #[test]
     fn create_regex_from_string() {
         let value = Value::from("abba");
-        let mut regex = DynamicRegex::try_from(value).unwrap();
+        let regex = Regex::try_from(value).unwrap();
 
-        // Test our regex is working case insensitively.
-        assert!(regex.compile().unwrap().is_match("abba"));
+        // Test our regex is working case sensitively.
+        assert!(regex.regex().is_match("abba"));
+        assert!(!regex.regex().is_match("aBBa"));
     }
 
     #[test]
@@ -148,9 +156,9 @@ mod tests {
         map.insert("flags".to_string(), Value::from(vec![Value::from("i")]));
         let value = Value::from(map);
 
-        let mut regex = DynamicRegex::try_from(value).unwrap();
+        let regex = Regex::try_from(value).unwrap();
 
         // Test our regex is working case insensitively.
-        assert!(regex.compile().unwrap().is_match("AbBa"));
+        assert!(regex.regex().is_match("AbBa"));
     }
 }
