@@ -90,7 +90,7 @@ struct AwsS3Config {
     assume_role: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct SqsConfig {
     region: Region,
@@ -248,9 +248,8 @@ impl SqsIngestor {
         })
     }
 
-    async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
+    async fn run(self, out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut interval = time::interval(self.poll_interval).map(|_| ());
-        let mut shutdown = shutdown.compat();
 
         loop {
             select! {
@@ -424,7 +423,155 @@ struct S3Object {
     key: String,
 }
 
+#[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
-mod tests {
+mod integration_tests {
     use super::*;
+    use crate::test_util::{collect_n, random_lines};
+    use pretty_assertions::assert_eq;
+    use rusoto_s3::PutObjectRequest;
+
+    #[tokio::test]
+    async fn s3_process_message() {
+        let s3 = s3_client();
+        let sqs = sqs_client();
+
+        let queue = create_queue(&sqs).await;
+        let bucket = create_bucket(&s3, &queue).await;
+
+        let config = config(&queue).await;
+
+        let key = uuid::Uuid::new_v4().to_string();
+
+        let logs: Vec<String> = random_lines(100).take(10).collect();
+
+        s3.put_object(PutObjectRequest {
+            bucket: bucket.clone(),
+            key: key.clone(),
+            body: Some(rusoto_core::ByteStream::from(logs.join("\n").into_bytes())),
+            ..Default::default()
+        })
+        .await
+        .expect("Could not put object");
+
+        let (tx, rx) = Pipeline::new_test();
+        tokio::spawn(async move {
+            config
+                .build(
+                    "default",
+                    &GlobalOptions::default(),
+                    ShutdownSignal::noop(),
+                    tx,
+                )
+                .await
+                .unwrap()
+                .compat()
+                .await
+                .unwrap()
+        });
+
+        let events = collect_n(rx, logs.len()).await.unwrap();
+
+        assert_eq!(logs.len(), events.len());
+        for (i, event) in events.iter().enumerate() {
+            let message: String = logs[i].to_owned();
+
+            let log = event.as_log();
+            assert_eq!(log["message"], message.as_str().into());
+            assert_eq!(log["bucket"], bucket.as_str().into());
+            assert_eq!(log["object"], key.as_str().into());
+            assert_eq!(log["region"], "us-east-1".into());
+        }
+    }
+
+    async fn config(queue_name: &str) -> AwsS3Config {
+        AwsS3Config {
+            strategy: Strategy::Sqs,
+            sqs: Some(SqsConfig {
+                queue_name: queue_name.to_string(),
+                region: Region::Custom {
+                    name: "minio".to_owned(),
+                    endpoint: "http://localhost:4566".to_owned(),
+                },
+                poll_secs: 1,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
+
+    /// creates a new SQS queue
+    ///
+    /// returns the queue name
+    async fn create_queue(client: &SqsClient) -> String {
+        use rusoto_sqs::CreateQueueRequest;
+
+        let queue_name = uuid::Uuid::new_v4().to_string();
+
+        client
+            .create_queue(CreateQueueRequest {
+                queue_name: queue_name.clone(),
+                ..Default::default()
+            })
+            .await
+            .expect("Could not create queue");
+
+        queue_name
+    }
+
+    /// creates a new bucket with notifications to given SQS queue
+    ///
+    /// returns the bucket name
+    async fn create_bucket(client: &S3Client, queue_name: &str) -> String {
+        use rusoto_s3::{
+            CreateBucketRequest, NotificationConfiguration,
+            PutBucketNotificationConfigurationRequest, QueueConfiguration,
+        };
+
+        let bucket_name = uuid::Uuid::new_v4().to_string();
+
+        client
+            .create_bucket(CreateBucketRequest {
+                bucket: bucket_name.clone(),
+                ..Default::default()
+            })
+            .await
+            .expect("Could not create bucket");
+
+        client
+            .put_bucket_notification_configuration(PutBucketNotificationConfigurationRequest {
+                bucket: bucket_name.clone(),
+                notification_configuration: NotificationConfiguration {
+                    queue_configurations: Some(vec![QueueConfiguration {
+                        events: vec!["s3:ObjectCreated:*".to_string()],
+                        queue_arn: format!("arn:aws:sqs:us-east-1:000000000000:{}", queue_name),
+                        ..Default::default()
+                    }]),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .await
+            .expect("Could not create bucket notification");
+
+        bucket_name
+    }
+
+    fn s3_client() -> S3Client {
+        let region = Region::Custom {
+            name: "minio".to_owned(),
+            endpoint: "http://localhost:4566".to_owned(),
+        };
+
+        S3Client::new(region)
+    }
+
+    fn sqs_client() -> SqsClient {
+        let region = Region::Custom {
+            name: "minio".to_owned(),
+            endpoint: "http://localhost:4566".to_owned(),
+        };
+
+        SqsClient::new(region)
+    }
 }
