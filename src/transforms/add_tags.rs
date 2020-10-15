@@ -1,8 +1,8 @@
-use super::Transform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{AddTagsEventProcessed, AddTagsTagNotOverwritten, AddTagsTagOverwritten},
+    transforms::{Transform, FunctionTransform},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -30,8 +30,8 @@ impl GenerateConfig for AddTagsConfig {}
 #[async_trait::async_trait]
 #[typetag::serde(name = "add_tags")]
 impl TransformConfig for AddTagsConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(AddTags::new(self.tags.clone(), self.overwrite)))
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
+        Ok(Transform::function(AddTags::new(self.tags.clone(), self.overwrite)))
     }
 
     fn input_type(&self) -> DataType {
@@ -53,8 +53,8 @@ impl AddTags {
     }
 }
 
-impl Transform for AddTags {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for AddTags {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         emit!(AddTagsEventProcessed);
 
         if !self.tags.is_empty() {
@@ -83,7 +83,7 @@ impl Transform for AddTags {
             }
         }
 
-        Some(event)
+        output.push(event)
     }
 }
 
@@ -93,7 +93,6 @@ mod tests {
     use crate::{
         event::metric::{Metric, MetricKind, MetricValue},
         event::Event,
-        transforms::Transform,
     };
     use indexmap::IndexMap;
     use std::collections::BTreeMap;

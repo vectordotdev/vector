@@ -1,8 +1,9 @@
-use super::{BuildError, Transform};
+use super::{BuildError};
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{ConcatEventProcessed, ConcatSubstringError, ConcatSubstringSourceMissing},
+    transforms::{Transform, FunctionTransform},
 };
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
@@ -26,7 +27,7 @@ impl GenerateConfig for ConcatConfig {}
 #[async_trait::async_trait]
 #[typetag::serde(name = "concat")]
 impl TransformConfig for ConcatConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
         let joiner: String = match self.joiner.clone() {
             None => " ".into(),
             Some(var) => var,
@@ -119,7 +120,7 @@ impl Concat {
     }
 }
 
-impl Transform for Concat {
+impl FunctionTransform for Concat {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         emit!(ConcatEventProcessed);
 
@@ -200,7 +201,7 @@ impl Transform for Concat {
 mod tests {
     use super::Concat;
     use super::Substring;
-    use crate::{event::Event, transforms::Transform};
+    use crate::{event::Event};
 
     #[test]
     fn concat_to_from() {

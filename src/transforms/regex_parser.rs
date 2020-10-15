@@ -1,4 +1,3 @@
-use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
@@ -7,6 +6,7 @@ use crate::{
         RegexParserMissingField, RegexParserTargetExists,
     },
     types::{parse_check_conversion_map, Conversion},
+    transforms::{Transform, FunctionTransform},
 };
 use bytes::Bytes;
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
@@ -43,8 +43,8 @@ impl_generate_config_from_default!(RegexParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        RegexParser::build(&self)
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
+        RegexParser::build(&self).map(Transform::from)
     }
 
     fn input_type(&self) -> DataType {
@@ -136,7 +136,7 @@ impl CompiledRegex {
 }
 
 impl RegexParser {
-    pub fn build(config: &RegexParserConfig) -> crate::Result<Box<dyn Transform>> {
+    pub fn build(config: &RegexParserConfig) -> crate::Result<Transform> {
         let field = config
             .field
             .clone()
@@ -234,7 +234,7 @@ impl RegexParser {
     }
 }
 
-impl Transform for RegexParser {
+impl FunctionTransform for RegexParser {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
         let value = log.get(&self.field).map(|s| s.as_bytes());

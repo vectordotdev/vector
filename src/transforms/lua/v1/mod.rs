@@ -2,7 +2,7 @@ use crate::{
     config::{DataType, TransformContext},
     event::{Event, Value},
     internal_events::{LuaEventProcessed, LuaGcTriggered, LuaScriptError},
-    transforms::Transform,
+    transforms::{Transform, FunctionTransform},
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -28,11 +28,8 @@ pub struct LuaConfig {
 // possible configuration options for `transforms` section, but such internal name should not
 // be exposed to users.
 impl LuaConfig {
-    pub fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Lua::new(&self.source, self.search_dirs.clone()).map(|l| {
-            let b: Box<dyn Transform> = Box::new(l);
-            b
-        })
+    pub fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
+        Lua::new(&self.source, self.search_dirs.clone())
     }
 
     pub fn input_type(&self) -> DataType {
@@ -128,10 +125,10 @@ impl Lua {
     }
 }
 
-impl Transform for Lua {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl FunctionTransform for Lua {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         match self.process(event) {
-            Ok(event) => event,
+            Ok(event) => output.push(event),
             Err(error) => {
                 emit!(LuaScriptError { error });
                 None
@@ -223,7 +220,6 @@ mod tests {
     use super::{format_error, Lua};
     use crate::{
         event::{Event, Value},
-        transforms::Transform,
     };
 
     #[test]

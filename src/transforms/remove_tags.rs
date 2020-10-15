@@ -1,8 +1,8 @@
-use super::Transform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     internal_events::RemoveTagsEventProcessed,
     Event,
+    transforms::{Transform, FunctionTransform},
 };
 use serde::{Deserialize, Serialize};
 
@@ -25,7 +25,7 @@ impl GenerateConfig for RemoveTagsConfig {}
 #[async_trait::async_trait]
 #[typetag::serde(name = "remove_tags")]
 impl TransformConfig for RemoveTagsConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
         Ok(Box::new(RemoveTags::new(self.tags.clone())))
     }
 
@@ -48,8 +48,8 @@ impl RemoveTags {
     }
 }
 
-impl Transform for RemoveTags {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for RemoveTags {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         emit!(RemoveTagsEventProcessed);
 
         let tags = &mut event.as_mut_metric().tags;
@@ -65,17 +65,16 @@ impl Transform for RemoveTags {
             }
         }
 
-        Some(event)
+        output.push(event);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::RemoveTags;
+    use super::*;
     use crate::{
         event::metric::{Metric, MetricKind, MetricValue},
         event::Event,
-        transforms::Transform,
     };
 
     #[test]

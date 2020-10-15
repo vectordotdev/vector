@@ -3,6 +3,7 @@ use crate::{
     transforms::{
         regex_parser::{RegexParser, RegexParserConfig},
         Transform,
+        FunctionTransform,
     },
 };
 use snafu::{OptionExt, Snafu};
@@ -21,7 +22,7 @@ pub const MULTILINE_TAG: &str = "multiline_tag";
 /// [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
 pub struct Cri {
     // TODO: patch `RegexParser` to expose the concrete type on build.
-    regex_parser: Box<dyn Transform>,
+    regex_parser: Transform,
 }
 
 impl Cri {
@@ -45,8 +46,8 @@ impl Cri {
     }
 }
 
-impl Transform for Cri {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl FunctionTransform for Cri {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let mut event = self.regex_parser.transform(event)?;
         normalize_event(event.as_mut_log()).ok()?;
         Some(event)

@@ -68,7 +68,7 @@ pub struct UnitTest {
 }
 
 struct UnitTestTransform {
-    transform: Box<dyn Transform>,
+    transform: Transform,
     next: Vec<String>,
 }
 

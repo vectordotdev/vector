@@ -1,8 +1,8 @@
-use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     types::{parse_conversion_map, Conversion},
+    transforms::{Transform, FunctionTransform},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -25,14 +25,14 @@ impl_generate_config_from_default!(LogfmtConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().into());
         let conversions = parse_conversion_map(&self.types)?;
 
-        Ok(Box::new(Logfmt {
+        Ok(Transform::from(Logfmt {
             field,
             drop_field: self.drop_field,
             conversions,
@@ -58,8 +58,8 @@ pub struct Logfmt {
     conversions: HashMap<String, Conversion>,
 }
 
-impl Transform for Logfmt {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for Logfmt {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 
         let mut drop_field = self.drop_field;
@@ -104,7 +104,7 @@ impl Transform for Logfmt {
             );
         };
 
-        Some(event)
+        output.push(event);
     }
 }
 

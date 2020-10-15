@@ -1,9 +1,9 @@
-use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{CoercerConversionFailed, CoercerEventProcessed},
     types::{parse_conversion_map, Conversion},
+    transforms::{Transform, FunctionTransform},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -26,9 +26,9 @@ impl_generate_config_from_default!(CoercerConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
         let types = parse_conversion_map(&self.types)?;
-        Ok(Box::new(Coercer {
+        Ok(Transform::from(Coercer {
             types,
             drop_unspecified: self.drop_unspecified,
         }))
@@ -52,8 +52,8 @@ pub struct Coercer {
     drop_unspecified: bool,
 }
 
-impl Transform for Coercer {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl FunctionTransform for Coercer {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let mut log = event.into_log();
         emit!(CoercerEventProcessed);
         if self.drop_unspecified {

@@ -230,7 +230,7 @@ pub struct TransformOuter {
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug + Send + Sync {
-    async fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn transforms::Transform>>;
+    async fn build(&self, cx: TransformContext) -> crate::Result<transforms::Transform>;
 
     fn input_type(&self) -> DataType;
 

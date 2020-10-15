@@ -16,7 +16,6 @@ use crate::{
     dns::Resolver,
     shutdown::ShutdownSignal,
     sources,
-    transforms::Transform,
     Pipeline,
 };
 use bytes::Bytes;

@@ -1,4 +1,3 @@
-use super::Transform;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
@@ -6,6 +5,7 @@ use crate::{
     },
     event::Event,
     internal_events::{SamplerEventDiscarded, SamplerEventProcessed},
+    transforms::{Transform, FunctionTransform},
 };
 use regex::RegexSet; // TODO: use regex::bytes
 use serde::{Deserialize, Serialize};
@@ -29,12 +29,13 @@ impl GenerateConfig for SamplerConfig {}
 #[async_trait::async_trait]
 #[typetag::serde(name = "sampler")]
 impl TransformConfig for SamplerConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(RegexSet::new(&self.pass_list)
-            .map::<Box<dyn Transform>, _>(|regex_set| {
-                Box::new(Sampler::new(self.rate, self.key_field.clone(), regex_set))
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
+        RegexSet::new(&self.pass_list)
+            .map(|regex_set| {
+                Sampler::new(self.rate, self.key_field.clone(), regex_set)
             })
-            .context(super::InvalidRegex)?)
+            .map(Transform::from)
+            .context(super::InvalidRegex)
     }
 
     fn input_type(&self) -> DataType {
@@ -67,7 +68,7 @@ impl Sampler {
     }
 }
 
-impl Transform for Sampler {
+impl FunctionTransform for Sampler {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let message = event
             .as_log()
@@ -98,7 +99,6 @@ impl Transform for Sampler {
 mod tests {
     use super::*;
     use crate::event::Event;
-    use crate::transforms::Transform;
     use approx::assert_relative_eq;
     use regex::RegexSet;
 

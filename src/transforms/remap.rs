@@ -1,9 +1,10 @@
-use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{RemapEventProcessed, RemapFailedMapping},
     mapping::{parser::parse as parse_mapping, Mapping},
+    transforms::{Transform, FunctionTransform},
+    Result,
 };
 use serde::{Deserialize, Serialize};
 
@@ -24,8 +25,8 @@ impl_generate_config_from_default!(RemapConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(Remap::new(self.clone())?))
+    async fn build(&self, _cx: TransformContext) -> Result<Transform> {
+        Remap::new(self.clone()).map(Transform::from)
     }
 
     fn input_type(&self) -> DataType {
@@ -56,7 +57,7 @@ impl Remap {
     }
 }
 
-impl Transform for Remap {
+impl FunctionTransform for Remap {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         emit!(RemapEventProcessed);
 

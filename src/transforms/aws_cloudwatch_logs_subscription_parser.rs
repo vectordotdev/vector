@@ -9,6 +9,7 @@ use crate::{
         AwsCloudwatchLogsSubscriptionParserEventProcessed,
         AwsCloudwatchLogsSubscriptionParserFailedParse,
     },
+    transforms::{FunctionTransform}
 };
 use chrono::{serde::ts_milliseconds, DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -28,8 +29,8 @@ inventory::submit! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_cloudwatch_logs_subscription_parser")]
 impl TransformConfig for AwsCloudwatchLogsSubscriptionParserConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(AwsCloudwatchLogsSubscriptionParser::from(
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
+        Ok(Transform::from(AwsCloudwatchLogsSubscriptionParser::from(
             self.clone(),
         )))
     }
@@ -66,13 +67,8 @@ impl From<AwsCloudwatchLogsSubscriptionParserConfig> for AwsCloudwatchLogsSubscr
     }
 }
 
-impl Transform for AwsCloudwatchLogsSubscriptionParser {
-    fn transform(&mut self, _event: Event) -> Option<Event> {
-        // required for trait, but transform_into is used instead
-        unimplemented!()
-    }
-
-    fn transform_into(&mut self, output: &mut Vec<Event>, event: Event) {
+impl FunctionTransform for AwsCloudwatchLogsSubscriptionParser {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let log = event.as_log();
 
         emit!(AwsCloudwatchLogsSubscriptionParserEventProcessed);
@@ -157,7 +153,7 @@ struct AwsCloudWatchLogEvent {
 #[cfg(test)]
 mod test {
     use super::{AwsCloudwatchLogsSubscriptionParser, AwsCloudwatchLogsSubscriptionParserConfig};
-    use crate::{event::Event, event::LogEvent, log_event, transforms::Transform};
+    use crate::{event::Event, event::LogEvent, log_event};
     use chrono::{TimeZone, Utc};
     use pretty_assertions::assert_eq;
 

@@ -1,7 +1,7 @@
 use super::{cri::Cri, docker::Docker};
 use crate::{
     event::{Event, Value},
-    transforms::Transform,
+    transforms::{FunctionTransform},
 };
 
 pub enum Picker {
@@ -16,8 +16,8 @@ impl Picker {
     }
 }
 
-impl Transform for Picker {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl FunctionTransform for Picker {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         match self {
             Picker::Init => {
                 let message = event
@@ -45,7 +45,7 @@ impl Transform for Picker {
 #[cfg(test)]
 mod tests {
     use super::super::{cri, docker, test_util};
-    use super::{Picker, Transform};
+    use super::{Picker};
     use crate::{event::LogEvent, Event};
 
     /// Picker has to work for all test cases for underlying parsers.

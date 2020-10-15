@@ -64,35 +64,27 @@ pub mod tokenizer;
 #[cfg(feature = "wasm")]
 pub mod wasm;
 
-use futures01::Stream;
+pub enum Transform {
+    Function(Box<dyn FunctionTransform>),
+    Stream(Box<dyn StreamTransform>),
+}
 
-pub trait Transform: Send {
-    fn transform(&mut self, event: Event) -> Option<Event>;
-
-    fn transform_into(&mut self, output: &mut Vec<Event>, event: Event) {
-        if let Some(transformed) = self.transform(event) {
-            output.push(transformed);
-        }
+impl Transform {
+    fn function(v: dyn FunctionTransform) -> Self {
+        Transform::Function(Box::from(v))
     }
-
-    fn transform_stream(
-        self: Box<Self>,
-        input_rx: Box<dyn Stream<Item = Event, Error = ()> + Send>,
-    ) -> Box<dyn Stream<Item = Event, Error = ()> + Send>
-    where
-        Self: 'static,
-    {
-        let mut me = self;
-        Box::new(
-            input_rx
-                .map(move |event| {
-                    let mut output = Vec::with_capacity(1);
-                    me.transform_into(&mut output, event);
-                    futures01::stream::iter_ok(output.into_iter())
-                })
-                .flatten(),
-        )
+    fn stream(v: dyn StreamTransform) -> Self {
+        Transform::Stream(Box::from(v))
     }
+}
+
+pub trait FunctionTransform {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event);
+}
+
+pub trait StreamTransform {
+    fn transform(self: Box<Self>, stream: Box<dyn futures::Stream<Item=Event>>)
+        -> Box<dyn futures::Stream<Item=Event>>;
 }
 
 #[derive(Debug, Snafu)]

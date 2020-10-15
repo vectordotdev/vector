@@ -1,4 +1,3 @@
-use super::Transform;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
@@ -7,6 +6,7 @@ use crate::{
     event::{self, Event, LogEvent},
     internal_events::{MetricToLogEventProcessed, MetricToLogFailedSerialize},
     types::Conversion,
+    transforms::{Transform, FunctionTransform},
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -27,8 +27,8 @@ impl GenerateConfig for MetricToLogConfig {}
 #[async_trait::async_trait]
 #[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(MetricToLog::new(self.host_tag.clone())))
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
+        MetricToLog::new(self.host_tag.clone()).map(Transform::from)
     }
 
     fn input_type(&self) -> DataType {
@@ -61,12 +61,12 @@ impl MetricToLog {
     }
 }
 
-impl Transform for MetricToLog {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl FunctionTransform for MetricToLog {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let metric = event.into_metric();
         emit!(MetricToLogEventProcessed);
 
-        serde_json::to_value(&metric)
+        let retval = serde_json::to_value(&metric)
             .map_err(|error| emit!(MetricToLogFailedSerialize { error }))
             .ok()
             .and_then(|value| match value {
@@ -90,7 +90,8 @@ impl Transform for MetricToLog {
                     Some(log.into())
                 }
                 _ => None,
-            })
+            });
+        output.extend(retval.into_iter())
     }
 }
 

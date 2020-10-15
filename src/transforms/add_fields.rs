@@ -1,4 +1,3 @@
-use super::Transform;
 use crate::serde::Fields;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
@@ -8,6 +7,7 @@ use crate::{
         AddFieldsEventProcessed, AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten,
         AddFieldsTemplateRenderingError,
     },
+    transforms::{Transform, FunctionTransform},
     template::Template,
 };
 use indexmap::IndexMap;
@@ -56,13 +56,13 @@ impl GenerateConfig for AddFieldsConfig {}
 #[async_trait::async_trait]
 #[typetag::serde(name = "add_fields")]
 impl TransformConfig for AddFieldsConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
         let all_fields = self.fields.clone().all_fields().collect::<IndexMap<_, _>>();
         let mut fields = IndexMap::with_capacity(all_fields.len());
         for (key, value) in all_fields {
             fields.insert(Lookup::from_str(&key)?, Value::try_from(value)?);
         }
-        Ok(Box::new(AddFields::new(fields, self.overwrite)?))
+        Ok(Transform::function(AddFields::new(fields, self.overwrite)?))
     }
 
     fn input_type(&self) -> DataType {
@@ -99,8 +99,8 @@ impl AddFields {
     }
 }
 
-impl Transform for AddFields {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for AddFields {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         emit!(AddFieldsEventProcessed);
 
         for (key, value_or_template) in self.fields.clone() {
@@ -133,7 +133,7 @@ impl Transform for AddFields {
             }
         }
 
-        Some(event)
+        output.push(event)
     }
 }
 

@@ -1,7 +1,8 @@
-use super::Transform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
+    transforms::{Transform, FunctionTransform},
+    Result,
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -34,7 +35,7 @@ impl GenerateConfig for GeoipConfig {}
 #[async_trait::async_trait]
 #[typetag::serde(name = "geoip")]
 impl TransformConfig for GeoipConfig {
-    async fn build(&self, _cx: TransformContext) -> Result<Box<dyn Transform>, crate::Error> {
+    async fn build(&self, _cx: TransformContext) -> Result<Transform> {
         let reader = maxminddb::Reader::open_readfile(self.database.clone())?;
         Ok(Box::new(Geoip::new(
             reader,
@@ -96,8 +97,8 @@ struct City<'a> {
     postal_code: &'a str,
 }
 
-impl Transform for Geoip {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for Geoip {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let mut isp: ISP = Default::default();
         let mut city: City = Default::default();
         let target_field = self.target.clone();
@@ -175,7 +176,7 @@ impl Transform for Geoip {
             event.as_mut_log().insert(target_field, json_value);
         }
 
-        Some(event)
+        output.push(event);
     }
 }
 
@@ -186,7 +187,6 @@ mod tests {
     use crate::{
         event::Event,
         transforms::json_parser::{JsonParser, JsonParserConfig},
-        transforms::Transform,
     };
     use std::collections::HashMap;
 

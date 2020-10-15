@@ -1,4 +1,3 @@
-use super::Transform;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
@@ -13,6 +12,7 @@ use crate::{
     },
     template::{Template, TemplateError},
     Event,
+    transforms::{Transform, FunctionTransform}
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -95,8 +95,8 @@ impl GenerateConfig for LogToMetricConfig {}
 #[async_trait::async_trait]
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(LogToMetric::new(self.clone())))
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
+        Ok(Transform::function(LogToMetric::new(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -303,19 +303,12 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
     }
 }
 
-impl Transform for LogToMetric {
-    // Only used in tests
-    fn transform(&mut self, event: Event) -> Option<Event> {
-        emit!(LogToMetricEventProcessed);
-        let mut output = Vec::new();
-        self.transform_into(&mut output, event);
-        output.pop()
-    }
-
-    fn transform_into(&mut self, output: &mut Vec<Event>, event: Event) {
+impl FunctionTransform for LogToMetric {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         for config in self.config.metrics.iter() {
             match to_metric(&config, &event) {
                 Ok(metric) => {
+                    emit!(LogToMetricEventProcessed);
                     output.push(Event::Metric(metric));
                 }
                 Err(TransformError::FieldNotFound { field }) => emit!(LogToMetricFieldNotFound {
@@ -345,7 +338,6 @@ mod tests {
         config::log_schema,
         event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
         event::Event,
-        transforms::Transform,
     };
     use chrono::{offset::TimeZone, DateTime, Utc};
 

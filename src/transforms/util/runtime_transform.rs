@@ -1,11 +1,14 @@
-use crate::{event::Event, stream::VecStreamExt, transforms::Transform};
+use crate::{
+    event::Event,
+    stream::VecStreamExt,
+    transforms::{StreamTransform, FunctionTransform},
+};
 use futures::{
     compat::Stream01CompatExt,
     future,
     stream::{self, BoxStream},
     FutureExt, StreamExt, TryStreamExt,
 };
-use futures01::Stream;
 use std::time::Duration;
 
 /// A structure representing user-defined timer.
@@ -57,27 +60,26 @@ enum Message {
     Timer(Timer),
 }
 
-impl<T> Transform for T
+impl<T> FunctionTransform for T
 where
     T: RuntimeTransform + Send,
 {
     // used only in config tests (cannot be put behind `#[cfg(test)`])
-    fn transform(&mut self, event: Event) -> Option<Event> {
-        let mut out = Vec::new();
-        self.transform_into(&mut out, event);
-        assert!(out.len() <= 1);
-        out.into_iter().next()
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+        let mut maybe = None;
+        self.hook_process(event, |event| maybe = Some(event));
+        maybe
     }
+}
 
-    // used only in config tests (cannot be put behind `#[cfg(test)]`)
-    fn transform_into(&mut self, output: &mut Vec<Event>, event: Event) {
-        self.hook_process(event, |event| output.push(event));
-    }
-
-    fn transform_stream(
+impl<T> StreamTransform for T
+where
+    T: RuntimeTransform + Send,
+{
+    fn transform(
         mut self: Box<Self>,
-        input_rx: Box<dyn Stream<Item = Event, Error = ()> + Send>,
-    ) -> Box<dyn Stream<Item = Event, Error = ()> + Send>
+        input_rx: BoxStream<Event>,
+    ) -> BoxStream<Event>
     where
         Self: 'static,
     {

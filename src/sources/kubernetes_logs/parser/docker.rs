@@ -2,7 +2,7 @@ use crate::{
     config::log_schema,
     event::{self, Event, LogEvent, Value},
     internal_events::KubernetesLogsDockerFormatParseFailed,
-    transforms::Transform,
+    transforms::{FunctionTransform},
 };
 use chrono::{DateTime, Utc};
 use serde_json::Value as JsonValue;
@@ -20,12 +20,12 @@ pub const LOG: &str = "log";
 #[derive(Debug)]
 pub struct Docker;
 
-impl Transform for Docker {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for Docker {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let log = event.as_mut_log();
         parse_json(log)?;
         normalize_event(log).ok()?;
-        Some(event)
+        output.push(event);
     }
 }
 

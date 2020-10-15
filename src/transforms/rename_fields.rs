@@ -1,4 +1,3 @@
-use super::Transform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
@@ -6,6 +5,7 @@ use crate::{
     internal_events::{
         RenameFieldsEventProcessed, RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten,
     },
+    transforms::{Transform, FunctionTransform},
     serde::Fields,
 };
 use indexmap::map::IndexMap;
@@ -32,7 +32,7 @@ impl GenerateConfig for RenameFieldsConfig {}
 #[async_trait::async_trait]
 #[typetag::serde(name = "rename_fields")]
 impl TransformConfig for RenameFieldsConfig {
-    async fn build(&self, _exec: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _exec: TransformContext) -> crate::Result<Transform> {
         let mut fields = IndexMap::default();
         for (key, value) in self.fields.clone().all_fields() {
             fields.insert(
@@ -65,7 +65,7 @@ impl RenameFields {
     }
 }
 
-impl Transform for RenameFields {
+impl FunctionTransform for RenameFields {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         emit!(RenameFieldsEventProcessed);
 

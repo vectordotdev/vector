@@ -1,9 +1,9 @@
-use super::Transform;
-use crate::event::Lookup;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     internal_events::{RemoveFieldsEventProcessed, RemoveFieldsFieldMissing},
     Event,
+    event::Lookup,
+    transforms::{Transform, FunctionTransform},
 };
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
@@ -29,11 +29,11 @@ impl GenerateConfig for RemoveFieldsConfig {}
 #[async_trait::async_trait]
 #[typetag::serde(name = "remove_fields")]
 impl TransformConfig for RemoveFieldsConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(RemoveFields {
-            fields: self.fields.clone(),
-            drop_empty: self.drop_empty.unwrap_or(false),
-        }))
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
+        RemoveFields::new(
+            self.fields.clone(),
+        self.drop_empty.unwrap_or(false),
+        ).map(Transform::from)
     }
 
     fn input_type(&self) -> DataType {
@@ -63,7 +63,7 @@ impl RemoveFields {
     }
 }
 
-impl Transform for RemoveFields {
+impl FunctionTransform for RemoveFields {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         emit!(RemoveFieldsEventProcessed);
 
@@ -85,7 +85,7 @@ impl Transform for RemoveFields {
 #[cfg(test)]
 mod tests {
     use super::RemoveFields;
-    use crate::{event::Event, transforms::Transform};
+    use crate::{event::Event};
 
     #[test]
     fn remove_fields() {

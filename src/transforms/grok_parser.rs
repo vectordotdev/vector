@@ -1,4 +1,3 @@
-use super::Transform;
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, PathComponent, PathIter},
@@ -7,6 +6,7 @@ use crate::{
         GrokParserMissingField,
     },
     types::{parse_conversion_map, Conversion},
+    transforms::{Transform, FunctionTransform},
 };
 use grok::Pattern;
 use serde::{Deserialize, Serialize};
@@ -40,7 +40,7 @@ impl_generate_config_from_default!(GrokParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "grok_parser")]
 impl TransformConfig for GrokParserConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
@@ -52,8 +52,8 @@ impl TransformConfig for GrokParserConfig {
 
         Ok(grok
             .compile(&self.pattern, true)
-            .map::<Box<dyn Transform>, _>(|p| {
-                Box::new(GrokParser {
+            .map(|p| {
+                Transform::stateless(GrokParser {
                     pattern: p,
                     field: field.clone(),
                     drop_field: self.drop_field,
@@ -85,8 +85,8 @@ pub struct GrokParser {
     paths: HashMap<String, Vec<PathComponent>>,
 }
 
-impl Transform for GrokParser {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl FunctionTransform for GrokParser {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let mut event = event.into_log();
         let value = event.get(&self.field).map(|s| s.to_string_lossy());
         emit!(GrokParserEventProcessed);

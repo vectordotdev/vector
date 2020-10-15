@@ -1,10 +1,10 @@
-use super::Transform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     internal_events::{
         TagCardinalityLimitEventProcessed, TagCardinalityLimitRejectingEvent,
         TagCardinalityLimitRejectingTag, TagCardinalityValueLimitReached,
     },
+    transforms::{Transform, FunctionTransform},
     Event,
 };
 use bloom::{BloomFilter, ASMS};
@@ -74,8 +74,8 @@ impl GenerateConfig for TagCardinalityLimitConfig {}
 #[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(TagCardinalityLimit::new(self.clone())))
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
+        Ok(Transform::from(TagCardinalityLimit::new(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -192,7 +192,7 @@ impl TagCardinalityLimit {
     }
 }
 
-impl Transform for TagCardinalityLimit {
+impl FunctionTransform for TagCardinalityLimit {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         emit!(TagCardinalityLimitEventProcessed);
         match event.as_mut_metric().tags {
@@ -236,7 +236,7 @@ impl Transform for TagCardinalityLimit {
 mod tests {
     use super::{LimitExceededAction, TagCardinalityLimit, TagCardinalityLimitConfig};
     use crate::transforms::tag_cardinality_limit::{default_cache_size, BloomFilterConfig, Mode};
-    use crate::{event::metric, event::Event, event::Metric, transforms::Transform};
+    use crate::{event::metric, event::Event, event::Metric};
     use std::collections::BTreeMap;
 
     fn make_metric(tags: BTreeMap<String, String>) -> Event {

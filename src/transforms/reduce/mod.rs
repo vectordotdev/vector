@@ -1,10 +1,10 @@
-use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::discriminant::Discriminant,
     event::{Event, LogEvent},
     internal_events::{ReduceEventProcessed, ReduceStaleEventFlushed},
+    transforms::{StreamTransform, FunctionTransform, Transform}
 };
 use async_stream::stream;
 use futures::{
@@ -52,9 +52,8 @@ impl_generate_config_from_default!(ReduceConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        let t = Reduce::new(self)?;
-        Ok(Box::new(t))
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
+        Reduce::new(self).map(Transform::from)
     }
 
     fn input_type(&self) -> DataType {
@@ -191,15 +190,8 @@ impl Reduce {
     }
 }
 
-impl Transform for Reduce {
-    // Only used in tests
-    fn transform(&mut self, event: Event) -> Option<Event> {
-        let mut output = Vec::new();
-        self.transform_into(&mut output, event);
-        output.pop()
-    }
-
-    fn transform_into(&mut self, output: &mut Vec<Event>, event: Event) {
+impl FunctionTransform for Reduce {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let ends_here = self
             .ends_when
             .as_ref()
@@ -233,8 +225,10 @@ impl Transform for Reduce {
 
         self.flush_into(output);
     }
+}
 
-    fn transform_stream(
+impl StreamTransform for Reduce {
+    fn transform(
         self: Box<Self>,
         input_rx: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
     ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>

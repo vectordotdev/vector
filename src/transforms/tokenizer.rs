@@ -1,10 +1,10 @@
 use super::util::tokenize::parse;
-use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
     internal_events::{TokenizerConvertFailed, TokenizerEventProcessed, TokenizerFieldMissing},
     types::{parse_check_conversion_map, Conversion},
+    transforms::{Transform, FunctionTransform},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -28,7 +28,7 @@ impl_generate_config_from_default!(TokenizerConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "tokenizer")]
 impl TransformConfig for TokenizerConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
@@ -39,12 +39,12 @@ impl TransformConfig for TokenizerConfig {
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| **f == *field);
 
-        Ok(Box::new(Tokenizer::new(
+        Tokenizer::new(
             self.field_names.clone(),
             field,
             drop_field,
             types,
-        )))
+        ).map(Transform::from)
     }
 
     fn input_type(&self) -> DataType {
@@ -90,7 +90,7 @@ impl Tokenizer {
     }
 }
 
-impl Transform for Tokenizer {
+impl FunctionTransform for Tokenizer {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 

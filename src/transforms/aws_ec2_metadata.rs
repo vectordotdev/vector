@@ -1,8 +1,8 @@
-use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     sinks::util::http::HttpClient,
+    transforms::{Transform, FunctionTransform},
 };
 use bytes::Bytes;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
@@ -102,7 +102,7 @@ impl_generate_config_from_default!(Ec2Metadata);
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
-    async fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, cx: TransformContext) -> crate::Result<Transform> {
         let (read, write) = evmap::new();
 
         // Check if the namespace is set to `""` which should mean that we do
@@ -147,7 +147,7 @@ impl TransformConfig for Ec2Metadata {
             .instrument(info_span!("aws_ec2_metadata: worker")),
         );
 
-        Ok(Box::new(Ec2MetadataTransform { state: read }))
+        Ok(Transform::from(Ec2MetadataTransform { state: read }))
     }
 
     fn input_type(&self) -> DataType {
@@ -163,7 +163,7 @@ impl TransformConfig for Ec2Metadata {
     }
 }
 
-impl Transform for Ec2MetadataTransform {
+impl FunctionTransform for Ec2MetadataTransform {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
 

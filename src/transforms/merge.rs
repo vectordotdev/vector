@@ -1,9 +1,9 @@
-use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::discriminant::Discriminant,
     event::merge_state::LogEventMergeState,
     event::{self, Event},
+    transforms::{Transform, FunctionTransform},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
@@ -50,7 +50,7 @@ impl Default for MergeConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "merge")]
 impl TransformConfig for MergeConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
         Ok(Box::new(Merge::from(self.clone())))
     }
 
@@ -86,8 +86,8 @@ impl From<MergeConfig> for Merge {
     }
 }
 
-impl Transform for Merge {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl FunctionTransform for Merge {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let mut event = event.into_log();
 
         // Prepare an event's discriminant.
@@ -143,7 +143,6 @@ impl Transform for Merge {
 mod test {
     use super::{Merge, MergeConfig};
     use crate::event::{self, Event};
-    use crate::transforms::Transform;
 
     #[test]
     fn generate_config() {

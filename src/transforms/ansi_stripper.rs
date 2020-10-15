@@ -1,4 +1,3 @@
-use super::Transform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Value,
@@ -7,6 +6,8 @@ use crate::{
         ANSIStripperFieldMissing,
     },
     Event,
+    Result,
+    transforms::{Transform, FunctionTransform},
 };
 use serde::{Deserialize, Serialize};
 
@@ -25,13 +26,13 @@ impl GenerateConfig for AnsiStripperConfig {}
 #[async_trait::async_trait]
 #[typetag::serde(name = "ansi_stripper")]
 impl TransformConfig for AnsiStripperConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> Result<Transform> {
         let field = self
             .field
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().into());
 
-        Ok(Box::new(AnsiStripper { field }))
+        Ok(Transform::from(AnsiStripper { field }))
     }
 
     fn input_type(&self) -> DataType {
@@ -51,7 +52,7 @@ pub struct AnsiStripper {
     field: String,
 }
 
-impl Transform for AnsiStripper {
+impl FunctionTransform for AnsiStripper {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
 
@@ -80,7 +81,6 @@ mod tests {
     use super::AnsiStripper;
     use crate::{
         event::{Event, Value},
-        transforms::Transform,
     };
 
     macro_rules! assert_foo_bar {

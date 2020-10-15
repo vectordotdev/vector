@@ -1,8 +1,8 @@
-use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
+    transforms::{Transform, FunctionTransform}
 };
 use serde::{Deserialize, Serialize};
 
@@ -21,8 +21,8 @@ impl GenerateConfig for FilterConfig {}
 #[async_trait::async_trait]
 #[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(Filter::new(self.condition.build()?)))
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
+        Filter::new(self.condition.build()?).map(Transform::function)
     }
 
     fn input_type(&self) -> DataType {
@@ -48,8 +48,8 @@ impl Filter {
     }
 }
 
-impl Transform for Filter {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl FunctionTransform for Filter {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         if self.condition.check(&event) {
             Some(event)
         } else {

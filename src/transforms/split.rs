@@ -1,9 +1,9 @@
-use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{SplitConvertFailed, SplitEventProcessed, SplitFieldMissing},
     types::{parse_check_conversion_map, Conversion},
+    transforms::{Transform, FunctionTransform},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -28,7 +28,7 @@ impl_generate_config_from_default!(SplitConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "split")]
 impl TransformConfig for SplitConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
@@ -94,8 +94,8 @@ impl Split {
     }
 }
 
-impl Transform for Split {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for Split {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
@@ -122,7 +122,7 @@ impl Transform for Split {
 
         emit!(SplitEventProcessed);
 
-        Some(event)
+        output.push(event);
     }
 }
 

@@ -88,8 +88,8 @@ struct TimerConfig {
 // possible configuration options for `transforms` section, but such internal name should not
 // be exposed to users.
 impl LuaConfig {
-    pub fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Lua::new(&self).map(|lua| Box::new(lua) as Box<dyn Transform>)
+    pub fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
+        Lua::new(&self)
     }
 
     pub fn input_type(&self) -> DataType {

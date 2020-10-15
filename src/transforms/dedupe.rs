@@ -1,4 +1,3 @@
-use super::Transform;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
@@ -6,6 +5,7 @@ use crate::{
     },
     event::{Event, Value},
     internal_events::{DedupeEventDiscarded, DedupeEventProcessed},
+    transforms::{Transform, FunctionTransform},
 };
 use bytes::Bytes;
 use lru::LruCache;
@@ -81,8 +81,8 @@ impl GenerateConfig for DedupeConfig {}
 #[async_trait::async_trait]
 #[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(Dedupe::new(self.fill_default())))
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
+        Ok(Dedupe::new(self.fill_default()).map(Transform::from))
     }
 
     fn input_type(&self) -> DataType {
@@ -182,8 +182,8 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
     }
 }
 
-impl Transform for Dedupe {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl FunctionTransform for Dedupe {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         emit!(DedupeEventProcessed);
         let cache_entry = build_cache_entry(&event, &self.config.fields);
         if self.cache.put(cache_entry, true).is_some() {
@@ -199,7 +199,7 @@ impl Transform for Dedupe {
 mod tests {
     use super::Dedupe;
     use crate::transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig};
-    use crate::{event::Event, event::Value, transforms::Transform};
+    use crate::{event::Event, event::Value};
     use std::collections::BTreeMap;
 
     fn make_match_transform(num_events: usize, fields: Vec<String>) -> Dedupe {
