@@ -18,7 +18,8 @@ components: sources: splunk_hec: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				name:     "Splunk HEC client"
+				name:     "Splunk HEC"
+				thing:    "a \(name) client"
 				url:      urls.splunk_hec
 				versions: null
 

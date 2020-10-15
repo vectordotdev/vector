@@ -12,7 +12,8 @@ components: sources: syslog: {
 
 		receive: {
 			from: {
-				name:     "Syslog client"
+				name:     "Syslog"
+				thing:    "a \(name) client"
 				url:      urls.syslog
 				versions: null
 

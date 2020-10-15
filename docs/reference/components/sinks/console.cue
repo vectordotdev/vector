@@ -23,6 +23,14 @@ components: sinks: console: {
 			}
 			request: enabled: false
 			tls: enabled:     false
+			to: {
+				name:     "STDOUT"
+				thing:    "a \(name) stream"
+				url:      urls.stdout
+				versions: null
+
+				interface: stdout: {}
+			}
 		}
 	}
 

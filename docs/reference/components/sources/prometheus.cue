@@ -16,7 +16,8 @@ components: sources: prometheus: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				name:     "Prometheus client"
+				name:     "Prometheus"
+				thing:    "one or more \(name) endpoints"
 				url:      urls.prometheus_client
 				versions: null
 

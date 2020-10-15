@@ -5,7 +5,8 @@ components: sinks: _influxdb: {
 		send: {
 			tls: enabled: false
 			to: {
-				name:     "Influxdb"
+				name:     "InfluxDB"
+				thing:    "an \(name) database"
 				url:      urls.influxdb
 				versions: null
 

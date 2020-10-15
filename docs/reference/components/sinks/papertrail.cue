@@ -32,6 +32,7 @@ components: sinks: papertrail: {
 			}
 			to: {
 				name:     "Papertrail"
+				thing:    "an \(name) account"
 				url:      urls.papertrail
 				versions: null
 

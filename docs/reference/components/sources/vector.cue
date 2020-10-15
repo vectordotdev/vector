@@ -17,7 +17,8 @@ components: sources: vector: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				name:     "Vector sink"
+				name:     "Vector"
+				thing:    "a \(name) sink"
 				url:      urls.vector_sink
 				versions: null
 

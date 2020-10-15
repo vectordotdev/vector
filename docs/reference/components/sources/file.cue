@@ -18,6 +18,7 @@ components: sources: file: {
 			checkpoint: enabled: true
 			from: {
 				name:     "file system"
+				thing:    "one or more files"
 				url:      urls.file_system
 				versions: null
 

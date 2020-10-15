@@ -25,6 +25,7 @@ components: sources: docker: {
 			checkpoint: enabled: false
 			from: {
 				name:     "Docker Engine"
+				thing:    "the \(name)"
 				url:      urls.docker_engine
 				versions: ">= 1.24"
 

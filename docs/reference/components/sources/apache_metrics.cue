@@ -20,6 +20,7 @@ components: sources: apache_metrics: {
 			checkpoint: enabled: false
 			from: {
 				name:     "Apache HTTP server (HTTPD)"
+				thing:    "an \(name)"
 				url:      urls.apache
 				versions: null
 

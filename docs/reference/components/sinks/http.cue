@@ -51,6 +51,7 @@ components: sinks: http: {
 			}
 			to: {
 				name:     "HTTP server"
+				thing:    "an \(name)"
 				url:      urls.http_server
 				versions: null
 

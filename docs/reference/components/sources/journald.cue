@@ -17,6 +17,7 @@ components: sources: journald: {
 			checkpoint: enabled: true
 			from: {
 				name:     "JournalD"
+				thing:    name
 				url:      urls.journald
 				versions: null
 

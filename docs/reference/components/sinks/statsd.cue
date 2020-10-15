@@ -16,6 +16,7 @@ components: sinks: statsd: {
 			tls:     sinks.socket.features.send.tls
 			to: {
 				name:     "Statsd receiver"
+				thing:    "a \(name)"
 				url:      urls.statsd
 				versions: null
 
