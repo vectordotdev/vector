@@ -718,7 +718,7 @@ mod integration_tests {
         run_insert_tests(
             ElasticSearchConfig {
                 auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
-                endpoint: "http://localhost:4571".into(),
+                endpoint: "http://localhost:4566".into(),
                 ..config()
             },
             false,

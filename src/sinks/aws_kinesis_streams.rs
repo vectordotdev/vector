@@ -393,7 +393,7 @@ mod integration_tests {
 
         let region = Region::Custom {
             name: "localstack".into(),
-            endpoint: "http://localhost:4568".into(),
+            endpoint: "http://localhost:4566".into(),
         };
 
         ensure_stream(region.clone(), stream.clone()).await;
@@ -401,7 +401,7 @@ mod integration_tests {
         let config = KinesisSinkConfig {
             stream_name: stream.clone(),
             partition_key_field: None,
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
             encoding: Encoding::Text.into(),
             compression: Compression::None,
             batch: BatchConfig {
@@ -489,6 +489,13 @@ mod integration_tests {
             Ok(_) => (),
             Err(e) => panic!("Unable to check the stream {:?}", e),
         };
+
+        // Wait for localstack to persist stream, otherwise it returns ResourceNotFound errors
+        // during PutRecords
+        //
+        // I initially tried using `wait_for` with `DescribeStream` but localstack would
+        // successfully return the stream before it was able to accept PutRecords requests
+        delay_for(Duration::from_secs(1)).await;
     }
 
     fn gen_stream() -> String {
