@@ -329,7 +329,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 }
 
-#[cfg(all(test, feature = "transforms-json_parser", feature = "sinks-console"))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -367,6 +367,7 @@ mod tests {
         assert!(errors.is_empty());
     }
 
+    #[cfg(all(feature = "transforms-json_parser", feature = "sinks-console"))]
     #[test]
     fn generate_basic() {
         assert_eq!(
