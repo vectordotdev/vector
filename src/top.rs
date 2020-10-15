@@ -68,7 +68,7 @@ pub struct Opts {
     url: Option<Url>,
 
     #[structopt(short, long)]
-    humanize: bool,
+    human: bool,
 }
 
 async fn print_topology(client: &Client, mut formatter: Box<dyn StatsWriter>) -> Result<(), ()> {
