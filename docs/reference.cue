@@ -149,6 +149,8 @@ _values: {
 // * `gzip` - gzip compression applied
 #CompressionAlgorithm: "none" | "gzip"
 
+#CompressionLevel: "none" | "fast" | "default" | "best" | >=0 & <=9
+
 // `#DeliveryStatus` documents the delivery guarantee.
 //
 // * `at_least_once` - The event will be delivered at least once and
@@ -354,8 +356,8 @@ _values: {
 
 		if enabled == true {
 			default: #CompressionAlgorithm
-			algorithm: ["none", "gzip"]
-			level: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+			algorithm: [#CompressionAlgorithm, ...]
+			level: [#CompressionLevel, ...]
 		}
 	}
 
