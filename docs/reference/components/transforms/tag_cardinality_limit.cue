@@ -88,6 +88,62 @@ components: transforms: tag_cardinality_limit: {
 		}
 	}
 
+	examples: [
+		{
+			title: "Drop high-cardinality tag"
+			context: """
+				In this example we'll demonstrate how to drop a
+				high-cardinality tag named `user_id`. Notice that the
+				second metric's `user_id` tag has been removed. That's
+				because it exceeded the `value_limit`.
+				"""
+			configuration: {
+				fields: {
+					value_limit:           1
+					limit_exceeded_action: "drop_tag"
+				}
+			}
+			input: [
+				{metric: {
+					name: "logins"
+					counter: {
+						value: 2.0
+					}
+					tags: {
+						user_id: "user_id_1"
+					}
+				}},
+				{metric: {
+					name: "logins"
+					counter: {
+						value: 2.0
+					}
+					tags: {
+						user_id: "user_id_2"
+					}
+				}},
+			]
+			output: [
+				{metric: {
+					name: "logins"
+					counter: {
+						value: 2.0
+					}
+					tags: {
+						user_id: "user_id_1"
+					}
+				}},
+				{metric: {
+					name: "logins"
+					counter: {
+						value: 2.0
+					}
+					tags: {}
+				}},
+			]
+		},
+	]
+
 	how_it_works: {
 		intended_usage: {
 			title: "Intended Usage"

@@ -83,7 +83,8 @@ _values: {
 	// input, output, and example configuration.
 	examples: [
 		...close({
-			title: string
+			title:    string
+			context?: string
 			"configuration": {
 				for k, v in configuration {
 					"\( k )"?: _ | *null
@@ -103,13 +104,7 @@ _values: {
 			}
 
 			if Kind != "sink" {
-				if classes.egress_method == "batch" {
-					output: [#Event, ...] | null
-				}
-
-				if classes.egress_method == "stream" {
-					output: #Event | null
-				}
+				output: #Event | [#Event, ...] | null
 			}
 
 			notes?: string
