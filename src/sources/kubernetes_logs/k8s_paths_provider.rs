@@ -95,7 +95,10 @@ fn build_container_exclusion_patterns<'a>(
     })
 }
 
-fn list_pod_log_paths<'a, G, GI>(mut glob_impl: G, pod: &Pod) -> impl Iterator<Item = PathBuf> + 'a
+fn list_pod_log_paths<'a, G, GI>(
+    mut glob_impl: G,
+    pod: &'a Pod,
+) -> impl Iterator<Item = PathBuf> + 'a
 where
     G: FnMut(&str) -> GI + 'a,
     GI: Iterator<Item = PathBuf> + 'a,
@@ -106,7 +109,9 @@ where
             let dir = dir
                 .to_str()
                 .expect("non-utf8 path to pod logs dir is not supported");
-            glob_impl(
+
+            // Run the glob to get a list of unfiltered paths.
+            let path_iter = glob_impl(
                 // We seek to match the paths like
                 // `<pod_logs_dir>/<container_name>/<n>.log` - paths managed by
                 // the `kubelet` as part of Kubernetes core logging
@@ -114,7 +119,16 @@ where
                 // In some setups, there will also be paths like
                 // `<pod_logs_dir>/<hash>.log` - those we want to skip.
                 &[dir, "*/*.log"].join("/"),
-            )
+            );
+
+            // Extract the containers to exclude, then build patters from them
+            // and cache the results into a Vec.
+            let excluded_containers = extract_excluded_containers_for_pod(pod);
+            let exclusion_patterns: Vec<_> =
+                build_container_exclusion_patterns(dir, excluded_containers).collect();
+
+            // Return paths filtered with container exclusion.
+            exclude_paths(path_iter, exclusion_patterns)
         })
 }
 
@@ -297,13 +311,28 @@ mod tests {
     #[test]
     fn test_list_pod_log_paths() {
         let cases = vec![
-            // Pod exists and has some containers that write logs.
+            // Pod exists and has some containers that write logs, and some of
+            // the containers are excluded.
             (
                 Pod {
                     metadata: ObjectMeta {
                         namespace: Some("sandbox0-ns".to_owned()),
                         name: Some("sandbox0-name".to_owned()),
                         uid: Some("sandbox0-uid".to_owned()),
+                        annotations: Some(
+                            vec![
+                                (
+                                    with_container_exclusion_annotation_prefix("excluded1"),
+                                    "true".to_owned(),
+                                ),
+                                (
+                                    with_container_exclusion_annotation_prefix("excluded2"),
+                                    "true".to_owned(),
+                                ),
+                            ]
+                            .into_iter()
+                            .collect(),
+                        ),
                         ..ObjectMeta::default()
                     },
                     ..Pod::default()
@@ -316,7 +345,9 @@ mod tests {
                     vec![
                         "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/container1/qwe.log",
                         "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/container2/qwe.log",
+                        "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/excluded1/qwe.log",
                         "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/container3/qwe.log",
+                        "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/excluded2/qwe.log",
                     ],
                 )],
                 // Expected result.
