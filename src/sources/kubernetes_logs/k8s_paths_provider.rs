@@ -106,10 +106,10 @@ fn real_glob(pattern: &str) -> impl Iterator<Item = PathBuf> {
 
 fn exclude_paths<'a>(
     iter: impl Iterator<Item = PathBuf> + 'a,
-    patterns: &'a [Pattern],
+    patterns: impl AsRef<[Pattern]> + 'a,
 ) -> impl Iterator<Item = PathBuf> + 'a {
     iter.filter(move |path| {
-        !patterns.iter().any(|pattern| {
+        !patterns.as_ref().iter().any(|pattern| {
             pattern.matches_path_with(
                 path,
                 glob::MatchOptions {
