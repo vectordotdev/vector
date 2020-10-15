@@ -51,7 +51,7 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 	}
 
 	output: logs: line: {
-		description: "One event will be published per logEvent in the subscription message."
+		description: "One event will be published per log event in the subscription message."
 		fields: {
 			timestamp: {
 				description: "The timestamp of the log event."
