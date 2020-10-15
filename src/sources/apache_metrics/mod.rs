@@ -86,6 +86,8 @@ impl SourceConfig for ApacheMetricsConfig {
 
 trait UriExt {
     fn to_sanitized_string(&self) -> String;
+
+    fn sanitized_authority(&self) -> String;
 }
 
 impl UriExt for http::Uri {
@@ -97,6 +99,20 @@ impl UriExt for http::Uri {
             s.push_str("://");
         }
 
+        s.push_str(&self.sanitized_authority());
+
+        s.push_str(self.path());
+
+        if let Some(query) = self.query() {
+            s.push_str(query);
+        }
+
+        s
+    }
+
+    fn sanitized_authority(&self) -> String {
+        let mut s = String::new();
+
         if let Some(host) = self.host() {
             s.push_str(host);
         }
@@ -104,12 +120,6 @@ impl UriExt for http::Uri {
         if let Some(port) = self.port() {
             s.push_str(":");
             s.push_str(port.as_str());
-        }
-
-        s.push_str(self.path());
-
-        if let Some(query) = self.query() {
-            s.push_str(query);
         }
 
         s
@@ -141,9 +151,7 @@ fn apache_metrics(
 
             let mut tags: BTreeMap<String, String> = BTreeMap::new();
             tags.insert("endpoint".into(), sanitized_url.to_string());
-            if let Some(host) = url.host() {
-                tags.insert("host".into(), host.into());
-            }
+            tags.insert("host".into(), url.sanitized_authority());
 
             let start = Instant::now();
             let namespace = namespace.clone();
@@ -315,7 +323,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         let (tx, rx) = Pipeline::new_test();
 
         let source = ApacheMetricsConfig {
-            endpoints: vec![format!("http://foo:bar@{}", in_addr)],
+            endpoints: vec![format!("http://foo:bar@{}/metrics", in_addr)],
             scrape_interval_secs: 1,
             namespace: "custom".to_string(),
         }
@@ -345,7 +353,10 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
                 match &m.tags {
                     Some(tags) => {
-                        assert_eq!(tags.get("endpoint"), Some(&format!("http://{}/", in_addr)));
+                        assert_eq!(
+                            tags.get("endpoint"),
+                            Some(&format!("http://{}/metrics", in_addr))
+                        );
                         assert_eq!(tags.get("host"), Some(&format!("{}", in_addr)));
                     }
                     None => error!("no tags for metric {:?}", m),
