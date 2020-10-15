@@ -334,6 +334,40 @@ mod tests {
     use super::*;
 
     #[test]
+    fn generate_all() {
+        let mut errors = Vec::new();
+
+        for name in SourceDescription::types() {
+            let param = format!("{}//", name);
+            let cfg = generate_example(true, &param).unwrap();
+            if let Err(error) = toml::from_str::<crate::config::ConfigBuilder>(&cfg) {
+                errors.push((param, error));
+            }
+        }
+
+        for name in TransformDescription::types() {
+            let param = format!("/{}/", name);
+            let cfg = generate_example(true, &param).unwrap();
+            if let Err(error) = toml::from_str::<crate::config::ConfigBuilder>(&cfg) {
+                errors.push((param, error));
+            }
+        }
+
+        for name in SinkDescription::types() {
+            let param = format!("//{}", name);
+            let cfg = generate_example(true, &param).unwrap();
+            if let Err(error) = toml::from_str::<crate::config::ConfigBuilder>(&cfg) {
+                errors.push((param, error));
+            }
+        }
+
+        for (component, error) in &errors {
+            println!("{:?} : {}", component, error);
+        }
+        assert!(errors.is_empty());
+    }
+
+    #[test]
     fn generate_basic() {
         assert_eq!(
             generate_example(true, "stdin/json_parser/console"),
