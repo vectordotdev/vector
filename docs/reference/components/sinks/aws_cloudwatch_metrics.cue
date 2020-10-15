@@ -1,9 +1,8 @@
 package metadata
 
 components: sinks: aws_cloudwatch_metrics: {
-	title:             "AWS Cloudwatch Metrics"
-	short_description: "Streams metric events to [Amazon Web Service's CloudWatch Metrics service][urls.aws_cloudwatch_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html)."
-	long_description:  "[Amazon CloudWatch][urls.aws_cloudwatch] is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in the form of logs and metrics from a single platform."
+	title:       "AWS Cloudwatch Metrics"
+	description: "[Amazon CloudWatch][urls.aws_cloudwatch] is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in the form of logs and metrics from a single platform."
 
 	classes: {
 		commonly_used: false
@@ -32,6 +31,23 @@ components: sinks: aws_cloudwatch_metrics: {
 			encoding: codec: enabled: false
 			request: enabled: false
 			tls: enabled:     false
+			to: {
+				name:     "AWS Cloudwatch Metrics"
+				url:      urls.aws_cloudwatch_metrics
+				versions: null
+
+				interface: {
+					socket: {
+						api: {
+							title: "AWS Cloudwatch metrics API"
+							url:   urls.aws_cloudwatch_metrics_api
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "required"
+					}
+				}
+			}
 		}
 	}
 

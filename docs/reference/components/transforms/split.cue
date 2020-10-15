@@ -1,8 +1,7 @@
 package metadata
 
 components: transforms: split: {
-	title:             "Split"
-	short_description: "Accepts log events and allows you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
+	title: "Split"
 
 	classes: {
 		commonly_used: false

@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: vector: {
-	title:             "Vector"
-	short_description: "Streams log and metric events to another downstream [`vector` source][docs.sources.vector]."
+	title: "Vector"
 
 	classes: {
 		commonly_used: false
@@ -25,6 +24,19 @@ components: sinks: vector: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
+			}
+			to: {
+				name:     "Vector source"
+				url:      urls.vector_source
+				versions: null
+
+				interface: {
+					socket: {
+						direction: "outgoing"
+						protocols: ["tcp"]
+						ssl: "optional"
+					}
+				}
 			}
 		}
 	}

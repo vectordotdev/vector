@@ -1,8 +1,7 @@
 package metadata
 
 components: sinks: socket: {
-	title:             "Socket"
-	short_description: "Streams log events to a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket."
+	title: "Socket"
 
 	classes: {
 		commonly_used: true
@@ -29,6 +28,19 @@ components: sinks: socket: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
+			}
+			to: {
+				name:     "socket receiver"
+				url:      urls.socket
+				versions: null
+
+				interface: {
+					socket: {
+						direction: "outgoing"
+						protocols: ["tcp", "udp", "unix"]
+						ssl: "required"
+					}
+				}
 			}
 		}
 	}

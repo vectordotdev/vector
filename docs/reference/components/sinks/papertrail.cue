@@ -1,9 +1,8 @@
 package metadata
 
 components: sinks: papertrail: {
-	title:             "Papertrail"
-	short_description: "Streams log events to [Papertrail][urls.papertrail] via [Syslog][urls.papertrail_syslog]."
-	long_description:  "[Papertrail][urls.papertrail] is a web-based log aggregation application used by developers and IT team to search and view logs in real time."
+	title:       "Papertrail"
+	description: "[Papertrail][urls.papertrail] is a web-based log aggregation application used by developers and IT team to search and view logs in real time."
 
 	classes: {
 		commonly_used: false
@@ -30,6 +29,23 @@ components: sinks: papertrail: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        true
+			}
+			to: {
+				name:     "Papertrail"
+				url:      urls.papertrail
+				versions: null
+
+				interface: {
+					socket: {
+						api: {
+							title: "Syslog"
+							url:   urls.syslog
+						}
+						direction: "outgoing"
+						protocols: ["tcp"]
+						ssl: "required"
+					}
+				}
 			}
 		}
 	}

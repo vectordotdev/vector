@@ -64,12 +64,9 @@ _values: {
 
 	configuration: #Schema
 
-	// `long_description` describes the components with a single paragraph.
+	// `description` describes the components with a single paragraph.
 	// It is used for SEO purposes and should be full of relevant keywords.
-	long_description?: =~"[.]$"
-
-	// `short_description` describes the component in one sentence.
-	short_description: =~"[.]$"
+	description?: =~"[.]$"
 
 	// `title` is the human friendly title for the component.
 	//
@@ -278,7 +275,8 @@ _values: {
 			enabled: bool
 		})
 
-		{send: #FeaturesSend & {_args: Args}}
+		exposes?: close({})
+		send?:    #FeaturesSend & {_args: Args}
 	}
 }
 
@@ -384,6 +382,8 @@ _values: {
 	// `tls` describes if the component secures network communication
 	// via TLS.
 	tls: #FeaturesTLS & {_args: {kind: Args.kind}}
+
+	to?: #Service
 }
 
 #FeaturesTLS: {
@@ -529,7 +529,7 @@ _values: {
 }
 
 #Service: {
-	title:    string
+	name:     string
 	url:      string
 	versions: string | null
 

@@ -1,9 +1,8 @@
 package metadata
 
 components: sinks: aws_kinesis_firehose: {
-	title:             "AWS Kinesis Firehose"
-	short_description: "Batches log events to [Amazon Web Service's Kinesis Data Firehose][urls.aws_kinesis_firehose] via the [`PutRecordBatch` API endpoint](https://docs.aws.amazon.com/firehose/latest/APIReference/API_PutRecordBatch.html)."
-	long_description:  "[Amazon Kinesis Data Firehose][urls.aws_kinesis_firehose] is a fully managed service for delivering real-time streaming data to destinations such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon Elasticsearch Service (Amazon ES), and Splunk."
+	title:       "AWS Kinesis Firehose"
+	description: "[Amazon Kinesis Data Firehose][urls.aws_kinesis_firehose] is a fully managed service for delivering real-time streaming data to destinations such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon Elasticsearch Service (Amazon ES), and Splunk."
 
 	classes: {
 		commonly_used: false
@@ -44,6 +43,23 @@ components: sinks: aws_kinesis_firehose: {
 				timeout_secs:               30
 			}
 			tls: enabled: false
+			to: {
+				name:     "AWS Kinesis Firehose"
+				url:      urls.aws_kinesis_firehose
+				versions: null
+
+				interface: {
+					socket: {
+						api: {
+							title: "AWS Kinesis Firehose API"
+							url:   urls.aws_kinesis_firehose_api
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "required"
+					}
+				}
+			}
 		}
 	}
 

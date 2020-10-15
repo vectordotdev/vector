@@ -3,8 +3,7 @@ package metadata
 components: sources: http: {
 	_port: 80
 
-	title:             "HTTP"
-	short_description: "Receives logs through the HTTP protocol."
+	title: "HTTP"
 
 	classes: {
 		commonly_used: false
@@ -18,7 +17,7 @@ components: sources: http: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				title:    "HTTP Client"
+				name:     "HTTP client"
 				url:      urls.http_client
 				versions: null
 

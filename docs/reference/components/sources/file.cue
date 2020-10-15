@@ -3,8 +3,7 @@ package metadata
 components: sources: file: {
 	_directory: "/var/log"
 
-	title:             "File"
-	short_description: "Collect logs by tailing one more files."
+	title: "File"
 
 	classes: {
 		commonly_used: true
@@ -18,7 +17,7 @@ components: sources: file: {
 		collect: {
 			checkpoint: enabled: true
 			from: {
-				title:    "File System"
+				name:     "file system"
 				url:      urls.file_system
 				versions: null
 

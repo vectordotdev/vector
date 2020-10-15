@@ -1,9 +1,8 @@
 package metadata
 
 components: sinks: datadog_logs: {
-	title:             "Datadog Logs"
-	short_description: "Streams log events to [Datadog's][urls.datadog] logs via the [TCP endpoint][urls.datadog_logs_endpoints]."
-	long_description:  "[Datadog][urls.datadog] is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform."
+	title:       "Datadog Logs"
+	description: "[Datadog][urls.datadog] is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform."
 
 	classes: {
 		commonly_used: false
@@ -30,6 +29,23 @@ components: sinks: datadog_logs: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        true
+			}
+			to: {
+				name:     "Datadog Logs"
+				url:      urls.datadog_logs
+				versions: null
+
+				interface: {
+					socket: {
+						api: {
+							title: "Datadog logs API"
+							url:   urls.datadog_logs_endpoints
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "required"
+					}
+				}
 			}
 		}
 	}

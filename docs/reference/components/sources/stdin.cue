@@ -1,8 +1,7 @@
 package metadata
 
 components: sources: stdin: {
-	title:             "STDIN"
-	short_description: "Ingests data through [standard input (STDIN)][urls.stdin] and outputs log events."
+	title: "STDIN"
 
 	classes: {
 		commonly_used: false
@@ -16,7 +15,7 @@ components: sources: stdin: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				title:    "STDIN Client"
+				name:     "STDIN client"
 				url:      urls.stdin
 				versions: null
 

@@ -1,9 +1,8 @@
 package metadata
 
 components: sinks: logdna: {
-	title:             "LogDNA"
-	short_description: "Batches log events to [LogDna][urls.logdna]'s HTTP Ingestion API."
-	long_description:  "[LogDNA][urls.logdna] is a log management system that allows engineering and DevOps to aggregate all system, server, and application logs into one platform. Collect, monitor, store, tail, and search application logs in with one command-line or web interface."
+	title:       "LogDNA"
+	description: "[LogDNA][urls.logdna] is a log management system that allows engineering and DevOps to aggregate all system, server, and application logs into one platform. Collect, monitor, store, tail, and search application logs in with one command-line or web interface."
 
 	classes: {
 		commonly_used: false
@@ -36,6 +35,19 @@ components: sinks: logdna: {
 				timeout_secs:               60
 			}
 			tls: enabled: false
+			to: {
+				name:     "LogDNA"
+				url:      urls.logdna
+				versions: null
+
+				interface: {
+					socket: {
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "required"
+					}
+				}
+			}
 		}
 	}
 

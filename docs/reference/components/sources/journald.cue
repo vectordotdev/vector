@@ -1,9 +1,8 @@
 package metadata
 
 components: sources: journald: {
-	title:             "Journald"
-	short_description: "Ingests data through [Systemd's][urls.systemd] [Journald][urls.journald] utility and outputs log events."
-	long_description:  "[Journald][urls.journald] is a utility for accessing log data across a variety of system services. It was introduced with [Systemd][urls.systemd] to help system administrators collect, access, and route log data."
+	title:       "Journald"
+	description: "[Journald][urls.journald] is a utility for accessing log data across a variety of system services. It was introduced with [Systemd][urls.systemd] to help system administrators collect, access, and route log data."
 
 	classes: {
 		commonly_used: true
@@ -17,7 +16,7 @@ components: sources: journald: {
 		collect: {
 			checkpoint: enabled: true
 			from: {
-				title:    "JournalD"
+				name:     "JournalD"
 				url:      urls.journald
 				versions: null
 

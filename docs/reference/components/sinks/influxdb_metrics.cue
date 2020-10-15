@@ -1,9 +1,8 @@
 package metadata
 
 components: sinks: influxdb_metrics: {
-	title:             "InfluxDB Metrics"
-	short_description: "Batches metric events to [InfluxDB][urls.influxdb] using [v1][urls.influxdb_http_api_v1] or [v2][urls.influxdb_http_api_v2] HTTP API."
-	long_description:  "[InfluxDB][urls.influxdb] is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics."
+	title:       "InfluxDB Metrics"
+	description: "[InfluxDB][urls.influxdb] is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics."
 
 	classes: {
 		commonly_used: false
@@ -35,13 +34,8 @@ components: sinks: influxdb_metrics: {
 				retry_max_duration_secs:    10
 				timeout_secs:               60
 			}
-			tls: {
-				enabled:                true
-				can_enable:             true
-				can_verify_certificate: true
-				can_verify_hostname:    true
-				enabled_default:        true
-			}
+			tls: sinks._influxdb.features.send.tls
+			to:  sinks._influxdb.features.send.to
 		}
 	}
 
