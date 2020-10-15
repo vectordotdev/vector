@@ -1,9 +1,8 @@
 package metadata
 
 components: sinks: prometheus: {
-	title:             "Prometheus"
-	short_description: "Exposes metric events to [Prometheus][urls.prometheus] metrics service."
-	long_description:  "[Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
+	title:       "Prometheus"
+	description: "[Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
 
 	classes: {
 		commonly_used: true
@@ -16,12 +15,7 @@ components: sinks: prometheus: {
 	features: {
 		buffer: enabled:      false
 		healthcheck: enabled: false
-		send: {
-			compression: enabled: false
-			encoding: codec: enabled: false
-			request: enabled: false
-			tls: enabled:     false
-		}
+		exposes: {}
 	}
 
 	support: {

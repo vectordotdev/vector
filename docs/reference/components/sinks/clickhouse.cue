@@ -1,9 +1,8 @@
 package metadata
 
 components: sinks: clickhouse: {
-	title:             "Clickhouse"
-	short_description: "Batches log events to [Clickhouse][urls.clickhouse] via the [`HTTP` Interface][urls.clickhouse_http]."
-	long_description:  "[ClickHouse][urls.clickhouse] is an open-source column-oriented database management system that manages extremely large volumes of data, including non-aggregated data, in a stable and sustainable manner and allows generating custom data reports in real time. The system is linearly scalable and can be scaled up to store and process trillions of rows and petabytes of data. This makes it an best-in-class storage for logs and metrics data."
+	title:       "Clickhouse"
+	description: "[ClickHouse][urls.clickhouse] is an open-source column-oriented database management system that manages extremely large volumes of data, including non-aggregated data, in a stable and sustainable manner and allows generating custom data reports in real time. The system is linearly scalable and can be scaled up to store and process trillions of rows and petabytes of data. This makes it an best-in-class storage for logs and metrics data."
 
 	classes: {
 		commonly_used: true
@@ -45,6 +44,23 @@ components: sinks: clickhouse: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
+			}
+			to: {
+				name:     "Clickhouse"
+				url:      urls.clickhouse
+				versions: null
+
+				interface: {
+					socket: {
+						api: {
+							title: "Clickhouse HTTP API"
+							url:   urls.clickhouse_http
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "optional"
+					}
+				}
 			}
 		}
 	}

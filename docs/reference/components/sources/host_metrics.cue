@@ -1,9 +1,8 @@
 package metadata
 
 components: sources: host_metrics: {
-	title:             "Host Metrics"
-	long_description:  "The host metrics source examines system data sources on the local system and generates metrics describing utilization of various system resources."
-	short_description: "Gather host-based metrics."
+	title:       "Host Metrics"
+	description: "The host metrics source examines system data sources on the local system and generates metrics describing utilization of various system resources."
 
 	classes: {
 		commonly_used: false

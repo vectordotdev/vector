@@ -1,9 +1,8 @@
 package metadata
 
 components: sinks: sematext_logs: {
-	title:             "Sematext Logs"
-	short_description: "Batches log events to [Sematext][urls.sematext] via the [Elasticsearch API][urls.sematext_es]."
-	long_description:  "[Sematext][urls.sematext] is a hosted monitoring platform based on Elasticsearch. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time."
+	title:       "Sematext Logs"
+	description: "[Sematext][urls.sematext] is a hosted monitoring platform based on Elasticsearch. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time."
 
 	classes: {
 		commonly_used: false
@@ -36,6 +35,7 @@ components: sinks: sematext_logs: {
 				timeout_secs:               60
 			}
 			tls: enabled: false
+			to: sinks._sematext.features.send.to
 		}
 	}
 

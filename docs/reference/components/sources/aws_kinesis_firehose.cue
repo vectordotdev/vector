@@ -3,9 +3,8 @@ package metadata
 components: sources: aws_kinesis_firehose: {
 	_port: 443
 
-	title:             "AWS Kinesis Firehose"
-	long_description:  "[AWS Kinesis Firehose][urls.aws_kinesis_firehose] is an AWS service that simplifies dealing with streaming data. It allows for ingestion, transformation, and forwarding of events. In addition to publishing events directly to Kinesis Firehose, the service has direct integrations with many AWS services which allow them to directly publish events to a delivery stream."
-	short_description: "Ingests events from AWS Kinesis Firehose via the [AWS Kinesis Firehose HTTP protocol][urls.aws_kinesis_firehose_http_protocol]."
+	title:       "AWS Kinesis Firehose"
+	description: "[AWS Kinesis Firehose][urls.aws_kinesis_firehose] is an AWS service that simplifies dealing with streaming data. It allows for ingestion, transformation, and forwarding of events. In addition to publishing events directly to Kinesis Firehose, the service has direct integrations with many AWS services which allow them to directly publish events to a delivery stream."
 
 	classes: {
 		commonly_used: false
@@ -19,7 +18,7 @@ components: sources: aws_kinesis_firehose: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				title:    "AWS Kinesis Firehose"
+				name:     "AWS Kinesis Firehose"
 				url:      urls.aws_kinesis_firehose
 				versions: null
 
