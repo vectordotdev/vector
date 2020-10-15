@@ -4,7 +4,7 @@ components: sources: statsd: {
 	_port: 8126
 
 	title:       "StatsD"
-	description: "[StatsD][urls.statsd] is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy][urls.etsy] in Node."
+	description: "[StatsD](\(urls.statsd)) is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy](\(urls.etsy)) in Node."
 
 	classes: {
 		commonly_used: false
@@ -74,7 +74,7 @@ components: sources: statsd: {
 	how_it_works: {
 		timestamps: {
 			title: "Timestamps"
-			body: #"""
+			body: """
 				StatsD protocol does not provide support for sending metric
 				timestamps. You'll notice that each parsed metric is assigned a
 				`null` timestamp, which is a special value which means "a real
@@ -82,7 +82,7 @@ components: sources: statsd: {
 				timestamps will be substituted by current time by downstream
 				sinks or 3rd party services during sending/ingestion. See the
 				[metric][docs.data-model.metric] data model page for more info.
-				"""#
+				"""
 		}
 	}
 }

@@ -115,7 +115,7 @@ components: sinks: _influxdb: {
 			}
 		}
 		token: {
-			description: "[Authentication token][urls.influxdb_authentication_token] for InfluxDB 2."
+			description: "[Authentication token](\(urls.influxdb_authentication_token)) for InfluxDB 2."
 			groups: ["v2"]
 			required: true
 			warnings: []

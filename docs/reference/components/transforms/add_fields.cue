@@ -79,13 +79,13 @@ components: transforms: add_fields: {
 			sub_sections: [
 				{
 					title: "Key Conflicts"
-					body: #"""
+					body: """
 						Keys specified in this transform will replace existing keys.
-						"""#
+						"""
 				},
 				{
 					title: "Nested Key Conflicts"
-					body: #"""
+					body: """
 						Nested keys are added in a _deep_ fashion. They will not replace any ancestor
 						objects. For example, given the following `log` event:
 
@@ -117,18 +117,18 @@ components: transforms: add_fields: {
 						```
 
 						Notice that `parent.child1` field was preserved.
-						"""#
+						"""
 				},
 			]
 		}
 		types: {
 			title: "Types"
-			body: #"""
+			body: """
 				All supported [configuration value types][docs.configuration#types] are
 				accepted. This includes primitive types (`string`, `int`, `float`, `boolean`)
 				and special types, such as [arrays](#arrays) and
 				[nested fields](#nested-fields).
-				"""#
+				"""
 		}
 	}
 }

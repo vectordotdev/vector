@@ -131,9 +131,9 @@ components: sources: socket: {
 
 	examples: [
 		{
-			_line: #"""
+			_line: """
 				2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
-				"""#
+				"""
 			title: "Socket line"
 			configuration: {}
 			input: """
