@@ -162,7 +162,7 @@ impl Reduce {
         Ok(Reduce {
             expire_after: Duration::from_millis(config.expire_after_ms.unwrap_or(30000)),
             flush_period: Duration::from_millis(config.flush_period_ms.unwrap_or(1000)),
-            group_by: group_by,
+            group_by,
             merge_strategies: config.merge_strategies.clone(),
             reduce_merge_states: HashMap::new(),
             ends_when,
