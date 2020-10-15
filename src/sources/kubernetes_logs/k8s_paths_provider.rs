@@ -69,6 +69,22 @@ fn extract_pod_logs_directory(pod: &Pod) -> Option<PathBuf> {
     Some(build_pod_logs_directory(&namespace, &name, &uid))
 }
 
+const CONTAINER_EXCLUSION_ANNOTATION_PREFIX: &str = "vector.dev/exclude-containers/by-name/";
+const CONTAINER_EXCLUSION_ANNOTATION_EXPECTED_VALUE: &str = "true";
+
+fn extract_excluded_containers_for_pod<'a>(pod: &'a Pod) -> impl Iterator<Item = &'a str> + 'a {
+    let metadata = &pod.metadata;
+    metadata.annotations.iter().flat_map(|annotations| {
+        annotations.iter().filter_map(|(key, value)| {
+            let container_name = key.strip_prefix(CONTAINER_EXCLUSION_ANNOTATION_PREFIX)?;
+            if value != CONTAINER_EXCLUSION_ANNOTATION_EXPECTED_VALUE {
+                return None;
+            }
+            Some(container_name)
+        })
+    })
+}
+
 fn list_pod_log_paths<'a, G, GI>(mut glob_impl: G, pod: &Pod) -> impl Iterator<Item = PathBuf> + 'a
 where
     G: FnMut(&str) -> GI + 'a,
@@ -123,9 +139,20 @@ fn exclude_paths<'a>(
 
 #[cfg(test)]
 mod tests {
-    use super::{exclude_paths, extract_pod_logs_directory, list_pod_log_paths};
+    use super::{
+        exclude_paths, extract_excluded_containers_for_pod, extract_pod_logs_directory,
+        list_pod_log_paths,
+    };
     use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
     use std::path::PathBuf;
+
+    fn with_container_exclusion_annotation_prefix(container: &str) -> String {
+        format!(
+            "{}{}",
+            super::CONTAINER_EXCLUSION_ANNOTATION_PREFIX,
+            container
+        )
+    }
 
     #[test]
     fn test_extract_pod_logs_directory() {
@@ -183,6 +210,77 @@ mod tests {
                 extract_pod_logs_directory(&pod),
                 expected.map(PathBuf::from)
             );
+        }
+    }
+
+    #[test]
+    fn test_extract_excluded_containers_for_pod() {
+        let cases = vec![
+            // No annotations.
+            (Pod::default(), vec![]),
+            // Empty annotations.
+            (
+                Pod {
+                    metadata: ObjectMeta {
+                        annotations: Some(vec![].into_iter().collect()),
+                        ..ObjectMeta::default()
+                    },
+                    ..Pod::default()
+                },
+                vec![],
+            ),
+            // Irrelevant annotations.
+            (
+                Pod {
+                    metadata: ObjectMeta {
+                        annotations: Some(
+                            vec![("some-other-annotation".to_owned(), "some value".to_owned())]
+                                .into_iter()
+                                .collect(),
+                        ),
+                        ..ObjectMeta::default()
+                    },
+                    ..Pod::default()
+                },
+                vec![],
+            ),
+            // Annotations with right/wrong values.
+            (
+                Pod {
+                    metadata: ObjectMeta {
+                        annotations: Some(
+                            vec![
+                                (
+                                    with_container_exclusion_annotation_prefix("container1"),
+                                    "true".to_owned(),
+                                ),
+                                (
+                                    with_container_exclusion_annotation_prefix("container2"),
+                                    "false".to_owned(),
+                                ),
+                                (
+                                    with_container_exclusion_annotation_prefix("container3"),
+                                    "qwerty".to_owned(),
+                                ),
+                                (
+                                    with_container_exclusion_annotation_prefix("container4"),
+                                    "true".to_owned(),
+                                ),
+                            ]
+                            .into_iter()
+                            .collect(),
+                        ),
+                        ..ObjectMeta::default()
+                    },
+                    ..Pod::default()
+                },
+                vec!["container1", "container4"],
+            ),
+        ];
+
+        for (pod, expected) in cases {
+            let actual: Vec<&str> = extract_excluded_containers_for_pod(&pod).collect();
+            assert_eq!(actual, expected);
         }
     }
 
