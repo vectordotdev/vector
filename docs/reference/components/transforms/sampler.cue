@@ -8,10 +8,11 @@ components: transforms: sampler: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
-		function:      "filter"
 	}
 
-	features: {}
+	features: {
+		filter: {}
+	}
 
 	support: {
 		platforms: {

@@ -7,12 +7,12 @@ components: transforms: coercer: {
 
 	classes: {
 		commonly_used: false
-		function:      "schema"
 		development:   "stable"
 		egress_method: "stream"
 	}
 
 	features: {
+		shape: {}
 	}
 
 	support: {

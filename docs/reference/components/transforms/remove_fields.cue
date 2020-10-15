@@ -8,10 +8,11 @@ components: transforms: remove_fields: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
-		function:      "schema"
 	}
 
-	features: {}
+	features: {
+		shape: {}
+	}
 
 	support: {
 		platforms: {

@@ -11,21 +11,13 @@ components: sources: journald: {
 		deployment_roles: ["daemon"]
 		development:   "beta"
 		egress_method: "batch"
-		function:      "collect"
 	}
 
 	features: {
-		checkpoint: enabled: true
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
-
-	support: {
-		dependencies: {
-			journald: {
-				required: true
+		collect: {
+			checkpoint: enabled: true
+			from: {
 				title:    "JournalD"
-				type:     "external"
 				url:      urls.journald
 				versions: null
 
@@ -35,7 +27,10 @@ components: sources: journald: {
 				}
 			}
 		}
+		multiline: enabled: false
+	}
 
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true

@@ -9,21 +9,22 @@ components: sinks: console: {
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "stream"
-		function:      "test"
 		service_providers: []
 	}
 
 	features: {
 		buffer: enabled:      false
-		compression: enabled: false
-		encoding: codec: {
-			enabled: true
-			default: null
-			enum: ["json", "text"]
-		}
 		healthcheck: enabled: true
-		request: enabled:     false
-		tls: enabled:         false
+		send: {
+			compression: enabled: false
+			encoding: codec: {
+				enabled: true
+				default: null
+				enum: ["json", "text"]
+			}
+			request: enabled: false
+			tls: enabled:     false
+		}
 	}
 
 	support: {

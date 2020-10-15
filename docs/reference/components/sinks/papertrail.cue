@@ -10,26 +10,27 @@ components: sinks: papertrail: {
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "stream"
-		function:      "transmit"
 		service_providers: ["Papertrail"]
 	}
 
 	features: {
 		buffer: enabled:      true
-		compression: enabled: false
-		encoding: codec: {
-			enabled: true
-			default: null
-			enum: ["json", "text"]
-		}
 		healthcheck: enabled: true
-		request: enabled:     false
-		tls: {
-			enabled:                true
-			can_enable:             true
-			can_verify_certificate: true
-			can_verify_hostname:    true
-			enabled_default:        true
+		send: {
+			compression: enabled: false
+			encoding: codec: {
+				enabled: true
+				default: null
+				enum: ["json", "text"]
+			}
+			request: enabled: false
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        true
+			}
 		}
 	}
 

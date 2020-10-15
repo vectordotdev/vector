@@ -8,10 +8,17 @@ components: transforms: regex_parser: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
-		function:      "parse"
 	}
 
-	features: {}
+	features: {
+		parse: {
+			format: {
+				title:    "Regular Expressions"
+				url:      urls.regex
+				versions: null
+			}
+		}
+	}
 
 	support: {
 		platforms: {

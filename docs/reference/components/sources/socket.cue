@@ -12,26 +12,13 @@ components: sources: socket: {
 		deployment_roles: ["aggregator", "sidecar"]
 		development:   "stable"
 		egress_method: "stream"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: {
-			enabled:                true
-			can_enable:             true
-			can_verify_certificate: true
-			enabled_default:        false
-		}
-	}
-
-	support: {
-		dependencies: {
-			socket_client: {
-				required: true
+		multiline: enabled: false
+		receive: {
+			from: {
 				title:    "Socket Client"
-				type:     "external"
 				url:      urls.prometheus_client
 				versions: null
 
@@ -42,8 +29,17 @@ components: sources: socket: {
 					ssl: "optional"
 				}
 			}
-		}
 
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				enabled_default:        false
+			}
+		}
+	}
+
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
