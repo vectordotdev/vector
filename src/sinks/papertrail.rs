@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSink,
@@ -11,6 +11,7 @@ use crate::{
 use bytes::Bytes;
 use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
+
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -22,8 +23,10 @@ pub struct PapertrailConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<PapertrailConfig>("papertrail")
+    SinkDescription::new::<PapertrailConfig>("papertrail")
 }
+
+impl GenerateConfig for PapertrailConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "papertrail")]
@@ -94,7 +97,7 @@ fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>)
     let message = match encoding.codec() {
         Encoding::Json => serde_json::to_string(&log).unwrap(),
         Encoding::Text => log
-            .get(&log_schema().message_key())
+            .get(log_schema().message_key())
             .map(|v| v.to_string_lossy())
             .unwrap_or_default(),
     };
@@ -111,7 +114,6 @@ fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn encode_event_apply_rules() {
@@ -124,7 +126,7 @@ mod tests {
             &EncodingConfig {
                 codec: Encoding::Json,
                 only_fields: None,
-                except_fields: Some(vec![Atom::from("magic")]),
+                except_fields: Some(vec!["magic".into()]),
                 timestamp_format: None,
             },
         )
