@@ -4,7 +4,7 @@ components: sources: syslog: {
 	_port: 514
 
 	title:       "Syslog"
-	description: "[Syslog][urls.syslog] stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is used to collect various device logs from different machines and send them to a central location for monitoring and review."
+	description: "[Syslog](\(urls.syslog)) stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is used to collect various device logs from different machines and send them to a central location for monitoring and review."
 
 	classes: sources.socket.classes
 	features: {
@@ -159,7 +159,7 @@ components: sources: syslog: {
 	how_it_works: {
 		parsing: {
 			title: "Parsing"
-			body: #"""
+			body:  """
 				Vector makes a _best effort_ to parse the various Syslog formats out in the
 				wild. This includes [RFC 6587][urls.syslog_6587], [RFC 5424][urls.syslog_5424],
 				[RFC 3164][urls.syslog_3164], and other common variations (such as the Nginx
@@ -170,9 +170,9 @@ components: sources: syslog: {
 				key. If you find this happening often, we recommend using the
 				[`socket` source][docs.sources.socket] combined with the
 				[`regex_parser` transform][docs.transforms.regex_parser] to implement your own
-				ingestion and parsing scheme. Or, [open an issue][urls.new_feature_request]
+				ingestion and parsing scheme. Or, [open an issue](\(urls.new_feature_request))
 				requesting support for your specific format.
-				"""#
+				"""
 		}
 	}
 }

@@ -4,7 +4,7 @@ components: sources: aws_kinesis_firehose: {
 	_port: 443
 
 	title:       "AWS Kinesis Firehose"
-	description: "[AWS Kinesis Firehose][urls.aws_kinesis_firehose] is an AWS service that simplifies dealing with streaming data. It allows for ingestion, transformation, and forwarding of events. In addition to publishing events directly to Kinesis Firehose, the service has direct integrations with many AWS services which allow them to directly publish events to a delivery stream."
+	description: "[AWS Kinesis Firehose](\(urls.aws_kinesis_firehose)) is an AWS service that simplifies dealing with streaming data. It allows for ingestion, transformation, and forwarding of events. In addition to publishing events directly to Kinesis Firehose, the service has direct integrations with many AWS services which allow them to directly publish events to a delivery stream."
 
 	classes: {
 		commonly_used: false
@@ -35,11 +35,11 @@ components: sources: aws_kinesis_firehose: {
 				}
 
 				setup: [
-					#"""
-						[Setup a Kinesis Firehose delivery stream][urls.aws_kinesis_firehose_setup]
+					"""
+						[Setup a Kinesis Firehose delivery stream](\(urls.aws_kinesis_firehose_setup))
 						in your preferred AWS region. Point the endpoint to your
 						Vector instance's address.
-						"""#,
+						""",
 				]
 			}
 
@@ -74,12 +74,12 @@ components: sources: aws_kinesis_firehose: {
 		}
 		access_key: {
 			common: true
-			description: #"""
+			description: """
 					AWS Kinesis Firehose can be configured to pass along an access
 					key to authenticate requests. If configured, `access_key` should
 					be set to the same value. If not specified, vector will treat
 					all requests as authenticated.
-				"""#
+				"""
 			required: false
 			type: "string": {
 				default: null

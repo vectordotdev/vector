@@ -31,20 +31,20 @@ components: transforms: grok_parser: {
 
 		requirements: []
 		warnings: [
-			#"""
+			"""
 				Grok is approximately 50% slower than the [`regex_parser` transform][docs.transforms.regex_parser].
 				While this is still plenty fast for most use cases we recommend using the
 				[`regex_parser` transform][docs.transforms.regex_parser] if you are experiencing
 				performance issues.
-				"""#,
+				""",
 		]
 		notices: [
-			#"""
-				Vector uses the Rust [`grok` library][urls.rust_grok_library]. All patterns
-				[listed here][urls.grok_patterns] are supported. It is recommended to use
+			"""
+				Vector uses the Rust [`grok` library](\(urls.rust_grok_library)). All patterns
+				[listed here](\(urls.grok_patterns)) are supported. It is recommended to use
 				maintained patterns when possible since they will be improved over time by
 				the community.
-				"""#,
+				""",
 		]
 	}
 
@@ -67,7 +67,7 @@ components: transforms: grok_parser: {
 			}
 		}
 		pattern: {
-			description: "The [Grok pattern][urls.grok_patterns]"
+			description: "The [Grok pattern](\(urls.grok_patterns))"
 			required:    true
 			warnings: []
 			type: string: {
@@ -94,9 +94,9 @@ components: transforms: grok_parser: {
 	how_it_works: {
 		testing: {
 			title: "Testing"
-			body: #"""
-				We recommend the [Grok debugger][urls.grok_debugger] for Grok testing.
-				"""#
+			body:  """
+				We recommend the [Grok debugger](\(urls.grok_debugger)) for Grok testing.
+				"""
 		}
 	}
 }

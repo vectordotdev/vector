@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: pulsar: {
 	title:       "Apache Pulsar"
-	description: "[Pulsar][urls.pulsar] is a multi-tenant, high-performance solution for server-to-server messaging. Pulsar was originally developed by Yahoo, it is under the stewardship of the Apache Software Foundation. It is an excellent tool for streaming logs and metrics data."
+	description: "[Pulsar](\(urls.pulsar)) is a multi-tenant, high-performance solution for server-to-server messaging. Pulsar was originally developed by Yahoo, it is under the stewardship of the Apache Software Foundation. It is an excellent tool for streaming logs and metrics data."
 
 	classes: {
 		commonly_used: false

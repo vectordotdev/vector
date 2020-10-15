@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: sematext_metrics: {
 	title:       "Sematext Metrics"
-	description: "[Sematext][urls.sematext] is a hosted monitoring platform for metrics based on InfluxDB. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time."
+	description: "[Sematext](\(urls.sematext)) is a hosted monitoring platform for metrics based on InfluxDB. Providing powerful monitoring and management solutions to monitor and observe your apps in real-time."
 
 	classes: {
 		commonly_used: false
@@ -43,12 +43,12 @@ components: sinks: sematext_metrics: {
 
 		requirements: []
 		warnings: [
-			#"""
-				[Sematext monitoring][urls.sematext_monitoring] only accepts metrics which contain a single value.
+			"""
+				[Sematext monitoring](\(urls.sematext_monitoring)) only accepts metrics which contain a single value.
 				Therefore, only `counter` and `gauge` metrics are supported. If you'd like to ingest other
 				metric types please consider using the [`metric_to_log` transform][docs.transforms.metric_to_log]
 				with the `sematext_logs` sink.
-				"""#,
+				""",
 		]
 		notices: []
 	}
@@ -70,10 +70,10 @@ components: sinks: sematext_metrics: {
 	how_it_works: {
 		metric_types: {
 			title: "Metric Namespaces"
-			body: #"""
+			body: """
 				All metrics are sent with a namespace. If no namespace is included with the metric, the metric name becomes
 				the namespace and the metric is named `value`.
-				"""#
+				"""
 		}
 	}
 }
