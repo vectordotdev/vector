@@ -69,7 +69,7 @@ components: transforms: add_fields: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	how_it_works: {

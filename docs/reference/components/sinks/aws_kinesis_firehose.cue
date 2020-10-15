@@ -93,6 +93,6 @@ components: sinks: aws_kinesis_firehose: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }

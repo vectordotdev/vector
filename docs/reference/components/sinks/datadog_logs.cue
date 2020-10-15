@@ -88,7 +88,7 @@ components: sinks: datadog_logs: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	how_it_works: {

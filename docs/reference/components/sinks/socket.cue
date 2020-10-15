@@ -97,6 +97,6 @@ components: sinks: socket: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }

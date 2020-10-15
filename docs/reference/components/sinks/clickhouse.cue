@@ -162,6 +162,6 @@ components: sinks: clickhouse: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }

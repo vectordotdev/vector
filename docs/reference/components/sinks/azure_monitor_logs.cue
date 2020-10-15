@@ -118,6 +118,6 @@ components: sinks: azure_monitor_logs: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }

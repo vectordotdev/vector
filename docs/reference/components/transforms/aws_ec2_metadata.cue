@@ -77,7 +77,7 @@ components: transforms: aws_ec2_metadata: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	output: logs: log: {
