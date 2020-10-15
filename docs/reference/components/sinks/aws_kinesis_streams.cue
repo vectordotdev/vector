@@ -109,7 +109,7 @@ components: sinks: aws_kinesis_streams: {
 	how_it_works: {
 		partitioning: {
 			title: "Partitioning"
-			body: """
+			body:  """
 				By default, Vector issues random 16 byte values for each
 				[Kinesis record's partition key](\(urls.aws_kinesis_partition_key)), evenly
 				distributing records across your Kinesis partitions. Depending on your use case

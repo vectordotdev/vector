@@ -64,7 +64,7 @@ components: sinks: sematext_logs: {
 	how_it_works: {
 		setup: {
 			title: "Setup"
-			body: """
+			body:  """
 				1. Register for a free account at [Sematext.com](\(urls.sematext_registration))
 
 				2. [Create a Logs App](\(urls.sematext_create_logs_app)) to get a Logs Token

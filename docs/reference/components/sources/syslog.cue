@@ -159,7 +159,7 @@ components: sources: syslog: {
 	how_it_works: {
 		parsing: {
 			title: "Parsing"
-			body: """
+			body:  """
 				Vector makes a _best effort_ to parse the various Syslog formats out in the
 				wild. This includes [RFC 6587][urls.syslog_6587], [RFC 5424][urls.syslog_5424],
 				[RFC 3164][urls.syslog_3164], and other common variations (such as the Nginx

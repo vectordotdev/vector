@@ -287,7 +287,7 @@ components: {
 					if components["\(Kind)s"][Name].features.receive.tls.enabled {
 						tls: {
 							title: "Transport Layer Security (TLS)"
-							body: """
+							body:  """
                   Vector uses [Openssl](\(urls.openssl)) for TLS protocols. You can
                   adjust TLS behavior via the `tls.*` options.
                   """

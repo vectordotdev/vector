@@ -363,7 +363,7 @@ components: sources: file: {
 
 		globbing: {
 			title: "Globbing"
-			body: """
+			body:  """
 				[Globbing](\(urls.globbing)) is supported in all provided file paths,
 				files will be autodiscovered continually at a rate defined by the
 				`glob_minimum_cooldown` option.

@@ -64,7 +64,7 @@ components: sinks: influxdb_logs: {
 	how_it_works: {
 		mapping: {
 			title: "Mapping Log Fields"
-			body: """
+			body:  """
 				InfluxDB uses [line protocol](\(urls.influxdb_line_protocol)) to write data points. It is a text-based format that provides the measurement, tag set, field set, and timestamp of a data point.
 
 				A `Log Event` event contains an arbitrary set of fields (key/value pairs) that describe the event.

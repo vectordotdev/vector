@@ -94,7 +94,7 @@ components: transforms: grok_parser: {
 	how_it_works: {
 		testing: {
 			title: "Testing"
-			body: """
+			body:  """
 				We recommend the [Grok debugger](\(urls.grok_debugger)) for Grok testing.
 				"""
 		}

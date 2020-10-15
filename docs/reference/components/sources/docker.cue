@@ -1,7 +1,7 @@
 package metadata
 
 components: sources: docker: {
-	title: "Docker"
+	title:       "Docker"
 	description: """
 		[Docker](\(urls.docker)) is an open platform for developing, shipping, and running
 		applications and services. Docker enables you to separate your services from
@@ -113,13 +113,13 @@ components: sources: docker: {
 			}
 		}
 		include_labels: {
-			common: true
+			common:      true
 			description: """
 				A list of container object labels to match against when
 				filtering running containers. This should follow the
 				described label's synatx in [docker object labels docs](\(urls.docker_object_labels)).
 				"""
-			required: false
+			required:    false
 			type: array: {
 				default: null
 				items: type: string: examples: ["com.example.vendor=Timber Inc.", "com.example.name=Vector"]

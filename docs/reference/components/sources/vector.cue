@@ -88,7 +88,7 @@ components: sources: vector: {
 	how_it_works: {
 		encoding: {
 			title: "Encoding"
-			body: """
+			body:  """
 				Data is encoded via Vector's [event protobuf](\(urls.event_proto))
 				before it is sent over the wire.
 				"""

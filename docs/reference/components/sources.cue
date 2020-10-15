@@ -113,7 +113,7 @@ components: sources: [Name=string]: {
 
 		context: {
 			title: "Context"
-			body: """
+			body:  """
 				By default, the `\( Name )` source will augment events with helpful
 				context keys as shown in the "Output" section.
 				"""

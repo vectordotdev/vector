@@ -63,7 +63,7 @@ components: transforms: logfmt_parser: {
 	how_it_works: {
 		key_value_parsing: {
 			title: "Key/Value Parsing"
-			body: """
+			body:  """
 				This transform can be used for key/value parsing. [Logfmt](\(urls.logfmt)) refers
 				to a _loosely_ defined spec that parses a key/value pair delimited by a `=`
 				character. This section, and it's keywords, is primarily added to assist users
@@ -94,7 +94,7 @@ components: transforms: logfmt_parser: {
 
 		format_specification: {
 			title: "Format Specification"
-			body: """
+			body:  """
 				[Logfmt](\(urls.logfmt)) is, unfortunately, a very loosely defined format. There
 				is no official specification for the format and Vector makes a best effort to
 				parse key/value pairs delimited with a `=`. It works by splitting the `field`'s

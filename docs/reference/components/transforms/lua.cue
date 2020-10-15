@@ -417,7 +417,7 @@ components: transforms: lua: {
 	how_it_works: {
 		event_data_model: {
 			title: "Event Data Model"
-			body: """
+			body:  """
 				The `process` hook takes an `event` as its first argument.
 				Events are represented as [tables](\(urls.lua_table)) in Lua
 				and follow Vector's data model exactly. Please refer to
@@ -427,7 +427,7 @@ components: transforms: lua: {
 			sub_sections: [
 				{
 					title: "Type Mappings"
-					body: """
+					body:  """
 						The correspondence between Vector's [data types][docs.about.data-model.log#types] and Lua data type is summarized
 						by the following table:
 
@@ -477,7 +477,7 @@ components: transforms: lua: {
 		}
 		learning_lua: {
 			title: "Learning Lua"
-			body: """
+			body:  """
 				In order to write non-trivial transforms in Lua, one has to have
 				basic understanding of Lua. Because Lua is an easy to learn
 				language, reading a few first chapters of
@@ -487,7 +487,7 @@ components: transforms: lua: {
 		}
 		search_dirs: {
 			title: "Search Directories"
-			body: """
+			body:  """
 				Vector provides a `search_dirs` option that allows you to specify
 				absolute paths that will be searched when using the
 				[Lua `require` function](\(urls.lua_require)). If this option is not
