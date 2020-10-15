@@ -193,7 +193,7 @@ impl Source {
         );
         let reflector_process = reflector.run();
 
-        let paths_provider = K8sPathsProvider::new(state_reader.clone());
+        let paths_provider = K8sPathsProvider::new(state_reader.clone(), vec![]);
         let annotator = PodMetadataAnnotator::new(state_reader, fields_spec);
 
         // TODO: maybe some of the parameters have to be configurable.
