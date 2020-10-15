@@ -30,10 +30,10 @@ components: transforms: tag_cardinality_limit: {
 
 	configuration: {
 		cache_size_per_tag: {
-			common:      false
-			description: "The size of the cache in bytes to use to detect duplicate tags. The bigger the cache the less likely it is to have a 'false positive' or a case where we allow a new value for tag even after we have reached the configured limits."
+			common:        false
+			description:   "The size of the cache in bytes to use to detect duplicate tags. The bigger the cache the less likely it is to have a 'false positive' or a case where we allow a new value for tag even after we have reached the configured limits."
 			relevant_when: "mode = \"probabilistic\""
-			required:    false
+			required:      false
 			warnings: []
 			type: uint: {
 				default: 5120000
