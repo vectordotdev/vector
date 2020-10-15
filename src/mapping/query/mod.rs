@@ -4,10 +4,10 @@ use crate::{
 };
 
 pub mod arithmetic;
-pub mod regex;
 pub mod function;
 pub mod path;
 pub mod query_value;
+pub mod regex;
 
 use query_value::QueryValue;
 

@@ -7,10 +7,10 @@ use crate::{
             self,
             arithmetic::Arithmetic,
             arithmetic::Operator,
-            regex::Regex,
             function::{Argument, ArgumentList, FunctionSignature, NotFn},
             path::Path as QueryPath,
             query_value::QueryValue,
+            regex::Regex,
             Literal,
         },
         Assignment, Deletion, Function, IfStatement, Mapping, MergeFn, Noop, OnlyFields, Result,
@@ -1262,12 +1262,9 @@ mod tests {
                     "foo".to_string(),
                     Box::new(SplitFn::new(
                         Box::new(QueryPath::from("bar")),
-                        Box::new(Literal::from(QueryValue::from(Regex::new(
-                            "a".to_string(),
-                            false,
-                            true,
-                            false,
-                        ).unwrap()))),
+                        Box::new(Literal::from(QueryValue::from(
+                            Regex::new("a".to_string(), false, true, false).unwrap(),
+                        ))),
                         Some(Box::new(Literal::from(Value::from(2)))),
                     )),
                 ))]),

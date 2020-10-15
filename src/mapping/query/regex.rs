@@ -32,11 +32,7 @@ impl Regex {
         self.global
     }
 
-    fn compile(
-        pattern: &str,
-        multiline: bool,
-        insensitive: bool
-    ) -> Result<regex::Regex> {
+    fn compile(pattern: &str, multiline: bool, insensitive: bool) -> Result<regex::Regex> {
         regex::RegexBuilder::new(pattern)
             .case_insensitive(insensitive)
             .multi_line(multiline)
