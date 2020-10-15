@@ -4,7 +4,7 @@ components: sources: http: {
 	_port: 80
 
 	title:             "HTTP"
-	short_description: "Receive logs through the HTTP protocol"
+	short_description: "Receive logs through the HTTP protocol."
 
 	classes: {
 		commonly_used: false
