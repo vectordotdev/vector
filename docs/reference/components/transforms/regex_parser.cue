@@ -12,7 +12,7 @@ components: transforms: regex_parser: {
 	features: {
 		parse: {
 			format: {
-				title:    "Regular Expressions"
+				name:     "regular expressions"
 				url:      urls.regex
 				versions: null
 			}

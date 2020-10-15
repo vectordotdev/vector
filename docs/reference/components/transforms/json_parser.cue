@@ -12,7 +12,7 @@ components: transforms: json_parser: {
 	features: {
 		parse: {
 			format: {
-				title:    "JSON"
+				name:     "JSON"
 				url:      urls.json
 				versions: null
 			}

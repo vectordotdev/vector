@@ -12,7 +12,7 @@ components: transforms: lua: {
 	features: {
 		program: {
 			runtime: {
-				title:   "Lua"
+				name:    "Lua"
 				url:     urls.lua
 				version: "5.3"
 			}
