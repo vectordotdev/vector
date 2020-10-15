@@ -77,6 +77,9 @@ where
     extract_pod_logs_directory(pod)
         .into_iter()
         .flat_map(move |dir| {
+            let dir = dir
+                .to_str()
+                .expect("non-utf8 path to pod logs dir is not supported");
             glob_impl(
                 // We seek to match the paths like
                 // `<pod_logs_dir>/<container_name>/<n>.log` - paths managed by
@@ -84,12 +87,7 @@ where
                 // architecture.
                 // In some setups, there will also be paths like
                 // `<pod_logs_dir>/<hash>.log` - those we want to skip.
-                &[
-                    dir.to_str()
-                        .expect("non-utf8 path to pod logs dir is not supported"),
-                    "*/*.log",
-                ]
-                .join("/"),
+                &[dir, "*/*.log"].join("/"),
             )
         })
 }
