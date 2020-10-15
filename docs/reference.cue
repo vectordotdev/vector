@@ -143,6 +143,14 @@ _values: {
 	support: #Support & {_args: kind: Kind}
 }
 
+// `#CompressionAlgorithm` specified data compression algorithm.
+//
+// * `none` - compression is not applied
+// * `gzip` - gzip compression applied
+#CompressionAlgorithm: "none" | "gzip"
+
+#CompressionLevel: "none" | "fast" | "default" | "best" | >=0 & <=9
+
 // `#DeliveryStatus` documents the delivery guarantee.
 //
 // * `at_least_once` - The event will be delivered at least once and
@@ -202,7 +210,8 @@ _values: {
 	close({ffi: close({})}) |
 	close({file_system: #InterfaceFileSystem}) |
 	close({socket: #InterfaceSocket}) |
-	close({stdin: close({})})
+	close({stdin: close({})}) |
+	close({stdout: close({})})
 }
 
 #InterfaceBinary: {
@@ -347,8 +356,9 @@ _values: {
 		enabled: bool
 
 		if enabled == true {
-			default: "gzip" | null
-			gzip:    bool
+			default: #CompressionAlgorithm
+			algorithms: [#CompressionAlgorithm, ...]
+			levels: [#CompressionLevel, ...]
 		}
 	}
 
@@ -530,10 +540,11 @@ _values: {
 
 #Service: {
 	name:     string
+	thing:    string
 	url:      string
 	versions: string | null
 
-	interface: #Interface
+	interface?: #Interface
 
 	setup: [...string]
 }

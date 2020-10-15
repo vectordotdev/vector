@@ -141,6 +141,7 @@ urls: {
 	honeycomb:                                                "https://honeycomb.io"
 	honeycomb_batch:                                          "https://docs.honeycomb.io/api/events/#batched-events"
 	honeycomb_signup:                                         "https://ui.honeycomb.io/signup"
+	host:                                                     "https://en.wikipedia.org/wiki/Host_(network)"
 	http:                                                     "https://www.w3.org/Protocols/"
 	http_client:                                              "https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol#Client_request"
 	http_server:                                              "https://en.wikipedia.org/wiki/Web_server"

@@ -886,7 +886,7 @@ mod tests {
         trace_init();
 
         let message = "one_simple_text_event";
-        let (sink, source) = start(Encoding::Text, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Text, Compression::gzip_default()).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
@@ -925,7 +925,7 @@ mod tests {
         trace_init();
 
         let message = "one_simple_json_event";
-        let (sink, source) = start(Encoding::Json, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
@@ -942,7 +942,7 @@ mod tests {
         trace_init();
 
         let n = 200;
-        let (sink, source) = start(Encoding::Json, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let messages = (0..n)
             .map(|i| format!("multiple_simple_json_event{}", i))
@@ -963,7 +963,7 @@ mod tests {
     async fn json_event() {
         trace_init();
 
-        let (sink, source) = start(Encoding::Json, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("greeting", "hello");
@@ -984,7 +984,7 @@ mod tests {
     async fn line_to_message() {
         trace_init();
 
-        let (sink, source) = start(Encoding::Json, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("line", "hello");
@@ -1040,7 +1040,7 @@ mod tests {
 
         let message = "no_authorization";
         let (source, address) = source_with(None).await;
-        let (sink, health) = sink(address, Encoding::Text, Compression::Gzip).await;
+        let (sink, health) = sink(address, Encoding::Text, Compression::gzip_default()).await;
         assert!(health.await.is_ok());
 
         let event = channel_n(vec![message], sink, source).await.remove(0);

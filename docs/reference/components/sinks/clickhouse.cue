@@ -26,7 +26,8 @@ components: sinks: clickhouse: {
 			compression: {
 				enabled: true
 				default: "gzip"
-				gzip:    true
+				algorithms: ["none", "gzip"]
+				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 			}
 			encoding: codec: enabled: false
 			request: {
@@ -47,6 +48,7 @@ components: sinks: clickhouse: {
 			}
 			to: {
 				name:     "Clickhouse"
+				thing:    "a \(name) database"
 				url:      urls.clickhouse
 				versions: null
 

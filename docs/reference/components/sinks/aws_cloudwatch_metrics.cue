@@ -25,14 +25,16 @@ components: sinks: aws_cloudwatch_metrics: {
 			}
 			compression: {
 				enabled: true
-				default: null
-				gzip:    true
+				default: "none"
+				algorithms: ["none", "gzip"]
+				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 			}
 			encoding: codec: enabled: false
 			request: enabled: false
 			tls: enabled:     false
 			to: {
-				name:     "AWS Cloudwatch Metrics"
+				name:     "AWS Cloudwatch metrics"
+				thing:    "an \(name) namespace"
 				url:      urls.aws_cloudwatch_metrics
 				versions: null
 
