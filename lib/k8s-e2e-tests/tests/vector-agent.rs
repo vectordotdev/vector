@@ -832,7 +832,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
             "test-vector-test-pod",
             "test-pod",
             vec![],
-            vec![("vector.dev/exclude-containers/by-name/excluded", "true")],
+            vec![("vector.dev/exclude-containers", "excluded")],
             vec![
                 make_test_container("excluded", "echo EXCLUDED_MARKER"),
                 make_test_container("control", "echo CONTROL_MARKER"),
