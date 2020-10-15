@@ -33,7 +33,16 @@ components: transforms: swimlanes: {
 			description: "A table of swimlane identifiers to logical conditions representing the filter of the swimlane. Each swimlane can then be referenced as an input by other components with the name `<transform_name>.<swimlane_id>`."
 			required:    true
 			warnings: []
-			type: object: configuration._conditions
+			type: object: {
+				options: {
+					"*": {
+						description: "test"
+						required:    true
+						warnings: []
+						type: object: configuration._conditions
+					}
+				}
+			}
 		}
 	}
 
