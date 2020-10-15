@@ -50,11 +50,19 @@ const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
+    /// Specifies the label selector to filter `Pod`s with, to be used in
+    /// addition to the built-in `vector.dev/exclude` filter.
+    extra_label_selector: String,
+
     /// The `name` of the Kubernetes `Node` that Vector runs at.
     /// Required to filter the `Pod`s to only include the ones with the log
     /// files accessible locally.
     #[serde(default = "default_self_node_name_env_template")]
     self_node_name: String,
+
+    /// Specifies the field selector to filter `Pod`s with, to be used in
+    /// addition to the built-in `Node` filter.
+    extra_field_selector: String,
 
     /// Automatically merge partial events.
     #[serde(default = "crate::serde::default_true")]
@@ -121,10 +129,11 @@ impl SourceConfig for Config {
 #[derive(Clone)]
 struct Source {
     client: k8s::client::Client,
-    self_node_name: String,
     data_dir: PathBuf,
     auto_partial_merge: bool,
     fields_spec: pod_metadata_annotator::FieldsSpec,
+    field_selector: String,
+    label_selector: String,
 }
 
 impl Source {
@@ -134,22 +143,8 @@ impl Source {
         globals: &GlobalOptions,
         name: &str,
     ) -> crate::Result<Self> {
-        let self_node_name = if config.self_node_name.is_empty()
-            || config.self_node_name == default_self_node_name_env_template()
-        {
-            std::env::var(SELF_NODE_NAME_ENV_KEY).map_err(|_| {
-                format!(
-                    "self_node_name config value or {} env var is not set",
-                    SELF_NODE_NAME_ENV_KEY
-                )
-            })?
-        } else {
-            config.self_node_name.clone()
-        };
-        info!(
-            message = "obtained Kubernetes Node name to collect logs for (self)",
-            ?self_node_name
-        );
+        let field_selector = prepare_field_selector(config)?;
+        let label_selector = prepare_label_selector(config);
 
         let k8s_config = k8s::client::config::Config::in_cluster()?;
         let client = k8s::client::Client::new(k8s_config, resolver)?;
@@ -158,10 +153,11 @@ impl Source {
 
         Ok(Self {
             client,
-            self_node_name,
             data_dir,
             auto_partial_merge: config.auto_partial_merge,
             fields_spec: config.annotation_fields.clone(),
+            field_selector,
+            label_selector,
         })
     }
 
@@ -172,14 +168,12 @@ impl Source {
     {
         let Self {
             client,
-            self_node_name,
             data_dir,
             auto_partial_merge,
             fields_spec,
+            field_selector,
+            label_selector,
         } = self;
-
-        let field_selector = format!("spec.nodeName={}", self_node_name);
-        let label_selector = "vector.dev/exclude!=true".to_owned();
 
         let watcher = k8s::api_watcher::ApiWatcher::new(client, Pod::watch_pod_for_all_namespaces);
         let watcher = k8s::instrumenting_watcher::InstrumentingWatcher::new(watcher);
@@ -353,10 +347,118 @@ fn default_self_node_name_env_template() -> String {
     format!("${{{}}}", SELF_NODE_NAME_ENV_KEY.to_owned())
 }
 
+/// This function construct the effective field selector to use, based on
+/// the specified configuration.
+fn prepare_field_selector(config: &Config) -> crate::Result<String> {
+    let self_node_name = if config.self_node_name.is_empty()
+        || config.self_node_name == default_self_node_name_env_template()
+    {
+        std::env::var(SELF_NODE_NAME_ENV_KEY).map_err(|_| {
+            format!(
+                "self_node_name config value or {} env var is not set",
+                SELF_NODE_NAME_ENV_KEY
+            )
+        })?
+    } else {
+        config.self_node_name.clone()
+    };
+    info!(
+        message = "obtained Kubernetes Node name to collect logs for (self)",
+        ?self_node_name
+    );
+
+    let field_selector = format!("spec.nodeName={}", self_node_name);
+
+    if config.extra_field_selector.is_empty() {
+        return Ok(field_selector);
+    }
+
+    Ok(format!(
+        "{},{}",
+        field_selector, config.extra_field_selector
+    ))
+}
+
+/// This function construct the effective label selector to use, based on
+/// the specified configuration.
+fn prepare_label_selector(config: &Config) -> String {
+    const BUILT_IN: &str = "vector.dev/exclude!=true";
+
+    if config.extra_label_selector.is_empty() {
+        return BUILT_IN.to_string();
+    }
+
+    format!("{},{}", BUILT_IN, config.extra_label_selector)
+}
+
 #[cfg(test)]
-mod test {
+mod tests {
+    use super::Config;
+
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<super::Config>();
+        crate::test_util::test_generate_config::<Config>();
+    }
+
+    #[test]
+    fn prepare_field_selector() {
+        let cases = vec![
+            // We're not testing `Config::default()` or empty `self_node_name`
+            // as passing env vars in the concurrent tests is diffucult.
+            (
+                Config {
+                    self_node_name: "qwe".to_owned(),
+                    ..Default::default()
+                },
+                "spec.nodeName=qwe",
+            ),
+            (
+                Config {
+                    self_node_name: "qwe".to_owned(),
+                    extra_field_selector: "".to_owned(),
+                    ..Default::default()
+                },
+                "spec.nodeName=qwe",
+            ),
+            (
+                Config {
+                    self_node_name: "qwe".to_owned(),
+                    extra_field_selector: "foo=bar".to_owned(),
+                    ..Default::default()
+                },
+                "spec.nodeName=qwe,foo=bar",
+            ),
+        ];
+
+        for (input, expected) in cases {
+            let output = super::prepare_field_selector(&input).unwrap();
+            assert_eq!(expected, output, "expected left, actual right");
+        }
+    }
+
+    #[test]
+    fn prepare_label_selector() {
+        let cases = vec![
+            (Config::default(), "vector.dev/exclude!=true"),
+            (
+                Config {
+                    extra_label_selector: "".to_owned(),
+                    ..Default::default()
+                },
+                "vector.dev/exclude!=true",
+            ),
+            (
+                Config {
+                    extra_label_selector: "qwe".to_owned(),
+                    ..Default::default()
+                },
+                "vector.dev/exclude!=true,qwe",
+            ),
+        ];
+
+        for (input, expected) in cases {
+            let output = super::prepare_label_selector(&input);
+            assert_eq!(expected, output, "expected left, actual right");
+        }
     }
 }
