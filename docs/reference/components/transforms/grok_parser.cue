@@ -40,8 +40,8 @@ components: transforms: grok_parser: {
 		]
 		notices: [
 			"""
-				Vector uses the Rust [`grok` library][urls.rust_grok_library]. All patterns
-				[listed here][urls.grok_patterns] are supported. It is recommended to use
+				Vector uses the Rust [`grok` library](\(urls.rust_grok_library)). All patterns
+				[listed here](\(urls.grok_patterns)) are supported. It is recommended to use
 				maintained patterns when possible since they will be improved over time by
 				the community.
 				""",
@@ -67,7 +67,7 @@ components: transforms: grok_parser: {
 			}
 		}
 		pattern: {
-			description: "The [Grok pattern][urls.grok_patterns]"
+			description: "The [Grok pattern](\(urls.grok_patterns))"
 			required:    true
 			warnings: []
 			type: string: {
@@ -95,7 +95,7 @@ components: transforms: grok_parser: {
 		testing: {
 			title: "Testing"
 			body: """
-				We recommend the [Grok debugger][urls.grok_debugger] for Grok testing.
+				We recommend the [Grok debugger](\(urls.grok_debugger)) for Grok testing.
 				"""
 		}
 	}

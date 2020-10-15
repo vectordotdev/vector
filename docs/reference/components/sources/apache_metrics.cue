@@ -38,10 +38,10 @@ components: sources: apache_metrics: {
 
 				setup: [
 					"""
-						[Install the Apache HTTP server][urls.apache_install].
+						[Install the Apache HTTP server](\(urls.apache_install)).
 						""",
 					"""
-						Enable the [Apache Status module][urls.apache_mod_status]
+						Enable the [Apache Status module](\(urls.apache_mod_status))
 						in your Apache config:
 
 						```text file="\(_config_path)"
@@ -52,7 +52,7 @@ components: sources: apache_metrics: {
 						```
 						""",
 					"""
-						Optionally enable [`ExtendedStatus` option][urls.apache_extended_status]
+						Optionally enable [`ExtendedStatus` option](\(urls.apache_extended_status))
 						for more detailed metrics (see [Output](#output)). Note,
 						this defaults to `On` in Apache >= 2.3.6.
 

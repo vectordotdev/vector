@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: datadog_logs: {
 	title:       "Datadog Logs"
-	description: "[Datadog][urls.datadog] is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform."
+	description: "[Datadog](\(urls.datadog)) is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform."
 
 	classes: {
 		commonly_used: false

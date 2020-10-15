@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: aws_kinesis_streams: {
 	title:       "AWS Kinesis Data Streams"
-	description: "[Amazon Kinesis Data Streams][urls.aws_kinesis_streams] is a scalable and durable real-time data streaming service that can continuously capture gigabytes of data per second from hundreds of thousands of sources. Making it an excellent candidate for streaming logs and metrics data."
+	description: "[Amazon Kinesis Data Streams](\(urls.aws_kinesis_streams)) is a scalable and durable real-time data streaming service that can continuously capture gigabytes of data per second from hundreds of thousands of sources. Making it an excellent candidate for streaming logs and metrics data."
 
 	classes: {
 		commonly_used: false
@@ -92,7 +92,7 @@ components: sinks: aws_kinesis_streams: {
 			}
 		}
 		stream_name: {
-			description: "The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target Kinesis Logs stream."
+			description: "The [stream name](\(urls.aws_cloudwatch_logs_stream_name)) of the target Kinesis Logs stream."
 			required:    true
 			warnings: []
 			type: string: {
@@ -111,7 +111,7 @@ components: sinks: aws_kinesis_streams: {
 			title: "Partitioning"
 			body: """
 				By default, Vector issues random 16 byte values for each
-				[Kinesis record's partition key][urls.aws_kinesis_partition_key], evenly
+				[Kinesis record's partition key](\(urls.aws_kinesis_partition_key)), evenly
 				distributing records across your Kinesis partitions. Depending on your use case
 				this might not be sufficient since random distribution does not preserve order.
 				To override this, you can supply the `partition_key_field` option. This option

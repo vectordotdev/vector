@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: influxdb_logs: {
 	title:       "InfluxDB Logs"
-	description: "[InfluxDB][urls.influxdb] is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics."
+	description: "[InfluxDB](\(urls.influxdb)) is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics."
 
 	classes: {
 		commonly_used: false
@@ -65,7 +65,7 @@ components: sinks: influxdb_logs: {
 		mapping: {
 			title: "Mapping Log Fields"
 			body: """
-				InfluxDB uses [line protocol][urls.influxdb_line_protocol] to write data points. It is a text-based format that provides the measurement, tag set, field set, and timestamp of a data point.
+				InfluxDB uses [line protocol](\(urls.influxdb_line_protocol)) to write data points. It is a text-based format that provides the measurement, tag set, field set, and timestamp of a data point.
 
 				A `Log Event` event contains an arbitrary set of fields (key/value pairs) that describe the event.
 

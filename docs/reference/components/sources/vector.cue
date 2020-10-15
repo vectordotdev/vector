@@ -89,7 +89,7 @@ components: sources: vector: {
 		encoding: {
 			title: "Encoding"
 			body: """
-				Data is encoded via Vector's [event protobuf][urls.event_proto]
+				Data is encoded via Vector's [event protobuf](\(urls.event_proto))
 				before it is sent over the wire.
 				"""
 		}

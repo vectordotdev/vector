@@ -3,7 +3,7 @@ package metadata
 components: sources: docker: {
 	title: "Docker"
 	description: """
-		[Docker][urls.docker] is an open platform for developing, shipping, and running
+		[Docker](\(urls.docker)) is an open platform for developing, shipping, and running
 		applications and services. Docker enables you to separate your services from
 		your infrastructure so you can ship quickly. With Docker, you can manage your
 		infrastructure in the same ways you manage your services. By taking advantage
@@ -43,7 +43,7 @@ components: sources: docker: {
 
 				setup: [
 					"""
-						Ensure that [Docker is setup][urls.docker_setup] and running.
+						Ensure that [Docker is setup](\(urls.docker_setup)) and running.
 						""",
 					"""
 						Ensure that the Docker Engine is properly exposing logs:
@@ -54,7 +54,7 @@ components: sources: docker: {
 
 						If you receive an error it's likely that you do not have
 						the proper Docker logging drivers installed. The Docker
-						Engine requires either the [`json-file`][urls.docker_logging_driver_json_file] (default)
+						Engine requires either the [`json-file`](\(urls.docker_logging_driver_json_file)) (default)
 						or [`journald`](docker_logging_driver_journald) Docker
 						logging driver to be installed.
 						""",
@@ -80,8 +80,8 @@ components: sources: docker: {
 				Collecting logs directly from the Docker Engine is known to have
 				performance problems for very large setups. If you have a large
 				setup, please consider alternative collection methods, such as the
-				Docker [`syslog`][urls.docker_logging_driver_syslog] or
-				[Docker `journald` driver][urls.docker_logging_driver_journald]
+				Docker [`syslog`](\(urls.docker_logging_driver_syslog)) or
+				[Docker `journald` driver](\(urls.docker_logging_driver_journald))
 				drivers.
 				""",
 		]
@@ -117,7 +117,7 @@ components: sources: docker: {
 			description: """
 				A list of container object labels to match against when
 				filtering running containers. This should follow the
-				described label's synatx in [docker object labels docs][urls.docker_object_labels].
+				described label's synatx in [docker object labels docs](\(urls.docker_object_labels)).
 				"""
 			required: false
 			type: array: {
@@ -180,7 +180,7 @@ components: sources: docker: {
 					type: string: examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
 				}
 				stream: {
-					description: "The [standard stream][urls.standard_streams] that the log was collected from."
+					description: "The [standard stream](\(urls.standard_streams)) that the log was collected from."
 					required:    true
 					type: string: enum: {
 						stdout: "The STDOUT stream"

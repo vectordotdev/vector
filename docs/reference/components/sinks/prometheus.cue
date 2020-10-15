@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: prometheus: {
 	title:       "Prometheus"
-	description: "[Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
+	description: "[Prometheus](\(urls.prometheus)) is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
 
 	classes: {
 		commonly_used: true
@@ -30,7 +30,7 @@ components: sinks: prometheus: {
 
 		requirements: [
 			"""
-				[Prometheus][urls.prometheus] version `>= 1.0` is required.
+				[Prometheus](\(urls.prometheus)) version `>= 1.0` is required.
 				""",
 		]
 		warnings: [
@@ -80,7 +80,7 @@ components: sinks: prometheus: {
 		}
 		namespace: {
 			common:      true
-			description: "A prefix that will be added to all metric names.\nIt should follow Prometheus [naming conventions][urls.prometheus_metric_naming]."
+			description: "A prefix that will be added to all metric names.\nIt should follow Prometheus [naming conventions](\(urls.prometheus_metric_naming))."
 			required:    false
 			warnings: []
 			type: string: {
@@ -199,7 +199,7 @@ components: sinks: prometheus: {
 			body: #"""
 				Choosing the appropriate buckets for Prometheus histograms is a complicated
 				point of discussion. The [Histograms and Summaries Prometheus \
-				guide][urls.prometheus_histograms_guide] provides a good overview of histograms,
+				guide](\(urls.prometheus_histograms_guide)) provides a good overview of histograms,
 				buckets, summaries, and how you should think about configuring them. The buckets
 				you choose should align with your known range and distribution of values as
 				well as how you plan to report on them. The aforementioned guide provides

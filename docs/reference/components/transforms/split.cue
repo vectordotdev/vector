@@ -54,7 +54,7 @@ components: transforms: split: {
 		}
 		separator: {
 			common:      true
-			description: "The separator to split the field on. If no separator is given, it will split on all whitespace. 'Whitespace' is defined according to the terms of the [Unicode Derived Core Property `White_Space`][urls.unicode_whitespace]."
+			description: "The separator to split the field on. If no separator is given, it will split on all whitespace. 'Whitespace' is defined according to the terms of the [Unicode Derived Core Property `White_Space`](\(urls.unicode_whitespace))."
 			required:    false
 			warnings: []
 			type: string: {

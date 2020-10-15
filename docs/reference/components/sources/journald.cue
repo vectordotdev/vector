@@ -2,7 +2,7 @@ package metadata
 
 components: sources: journald: {
 	title:       "Journald"
-	description: "[Journald][urls.journald] is a utility for accessing log data across a variety of system services. It was introduced with [Systemd][urls.systemd] to help system administrators collect, access, and route log data."
+	description: "[Journald](\(urls.journald)) is a utility for accessing log data across a variety of system services. It was introduced with [Systemd](\(urls.systemd)) to help system administrators collect, access, and route log data."
 
 	classes: {
 		commonly_used: true

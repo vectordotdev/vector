@@ -28,7 +28,7 @@ components: sources: file: {
 
 				setup: [
 					"""
-						Ensure that [Docker is setup][urls.docker_setup] and running.
+						Ensure that [Docker is setup](\(urls.docker_setup)) and running.
 						""",
 					"""
 						Ensure that the Docker Engine is properly exposing logs:
@@ -39,7 +39,7 @@ components: sources: file: {
 
 						If you receive an error it's likely that you do not have
 						the proper Docker logging drivers installed. The Docker
-						Engine requires either the [`json-file`][urls.docker_logging_driver_json_file] (default)
+						Engine requires either the [`json-file`](\(urls.docker_logging_driver_json_file)) (default)
 						or [`journald`](docker_logging_driver_journald) Docker
 						logging driver to be installed.
 						""",
@@ -96,7 +96,7 @@ components: sources: file: {
 						default: "checksum"
 						enum: {
 							checksum:         "Read `bytes` bytes from the head of the file to uniquely identify files via a checksum."
-							device_and_inode: "Uses the [device and inode][urls.inode] to unique identify files."
+							device_and_inode: "Uses the [device and inode](\(urls.inode)) to unique identify files."
 						}
 						examples: ["checksum", "device_and_inode"]
 					}
@@ -364,7 +364,7 @@ components: sources: file: {
 		globbing: {
 			title: "Globbing"
 			body: """
-				[Globbing][urls.globbing] is supported in all provided file paths,
+				[Globbing](\(urls.globbing)) is supported in all provided file paths,
 				files will be autodiscovered continually at a rate defined by the
 				`glob_minimum_cooldown` option.
 				"""

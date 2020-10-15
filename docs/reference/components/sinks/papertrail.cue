@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: papertrail: {
 	title:       "Papertrail"
-	description: "[Papertrail][urls.papertrail] is a web-based log aggregation application used by developers and IT team to search and view logs in real time."
+	description: "[Papertrail](\(urls.papertrail)) is a web-based log aggregation application used by developers and IT team to search and view logs in real time."
 
 	classes: {
 		commonly_used: false
