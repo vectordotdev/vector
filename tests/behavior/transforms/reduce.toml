@@ -90,6 +90,7 @@
     "message" = "concat"
     "other_value" = "array"
     "another" = "concat_newline"
+    "concat_array" = "concat"
 
   [transforms.reduce_strats.ends_when]
     "test_end_message.exists" = true
@@ -124,6 +125,8 @@
     type = "log"
     [tests.inputs.log_fields]
       message = "other reduce one"
+      "concat_array[0]" = "foo"
+      "concat_array[1]" = "bar"
       request_id = "2"
       host = "host3"
       counter = 11
@@ -144,6 +147,7 @@
     type = "log"
     [tests.inputs.log_fields]
       message = "other reduce two"
+      "concat_array[0]" = "baz"
       other_value = "1"
       request_id = "2"
       host = "host5"
@@ -171,6 +175,9 @@
       "timestamp_end.exists" = true
     [[tests.outputs.conditions]]
       "message.equals" = "other reduce one other reduce two other reduce three"
+      "concat_array[0].equals" = "foo"
+      "concat_array[1].equals" = "bar"
+      "concat_array[2].equals" = "baz"
       "host.equals" = "host3"
       "request_id.equals" = "2"
       "counter.equals" = 20
