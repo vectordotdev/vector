@@ -77,4 +77,18 @@ components: sinks: [Name=string]: {
 			}
 		}
 	}
+
+	how_it_works: {
+		if !sinks[Name].features.healthcheck.enabled {
+			healthchecks: {
+				title: "Healthchecks"
+				body: """
+					Health checks ensure that the downstream service is
+					accessible and ready to accept data. This check is performed
+					upon sink initialization. You can disable this check by
+					setting the `healthcheck` option to `false`.
+					"""
+			}
+		}
+	}
 }
