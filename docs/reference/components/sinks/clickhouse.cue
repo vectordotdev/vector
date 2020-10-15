@@ -10,41 +10,42 @@ components: sinks: clickhouse: {
 		delivery:      "at_least_once"
 		development:   "beta"
 		egress_method: "batch"
-		function:      "transmit"
 		service_providers: ["Yandex"]
 	}
 
 	features: {
-		batch: {
-			enabled:      true
-			common:       false
-			max_bytes:    1049000
-			max_events:   null
-			timeout_secs: 1
-		}
-		buffer: enabled: true
-		compression: {
-			enabled: true
-			default: "gzip"
-			gzip:    true
-		}
-		encoding: codec: enabled: false
+		buffer: enabled:      true
 		healthcheck: enabled: true
-		request: {
-			enabled:                    true
-			in_flight_limit:            5
-			rate_limit_duration_secs:   1
-			rate_limit_num:             5
-			retry_initial_backoff_secs: 1
-			retry_max_duration_secs:    10
-			timeout_secs:               30
-		}
-		tls: {
-			enabled:                true
-			can_enable:             false
-			can_verify_certificate: true
-			can_verify_hostname:    true
-			enabled_default:        false
+		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				max_bytes:    1049000
+				max_events:   null
+				timeout_secs: 1
+			}
+			compression: {
+				enabled: true
+				default: "gzip"
+				gzip:    true
+			}
+			encoding: codec: enabled: false
+			request: {
+				enabled:                    true
+				in_flight_limit:            5
+				rate_limit_duration_secs:   1
+				rate_limit_num:             5
+				retry_initial_backoff_secs: 1
+				retry_max_duration_secs:    10
+				timeout_secs:               30
+			}
+			tls: {
+				enabled:                true
+				can_enable:             false
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
 		}
 	}
 

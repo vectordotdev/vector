@@ -4,13 +4,15 @@ components: sinks: [Name=string]: {
 	kind: "sink"
 
 	features: {
-		encoding: {
-			codec: {
-				enabled: bool
+		send: {
+			encoding: {
+				codec: {
+					enabled: bool
 
-				if enabled {
-					default: #EncodingCodec | null
-					enum:    [#EncodingCodec, ...] | null
+					if enabled {
+						default: #EncodingCodec | null
+						enum:    [#EncodingCodec, ...] | null
+					}
 				}
 			}
 		}
@@ -21,11 +23,11 @@ components: sinks: [Name=string]: {
 			description: "Configures the encoding specific sink behavior."
 			required:    true
 			type: object: options: {
-				if features.encoding.codec.enabled {
+				if features.send.encoding.codec.enabled {
 					codec: {
 						description: "The encoding codec used to serialize the events before outputting."
 						required:    true
-						type: string: examples: features.encoding.codec.enum
+						type: string: examples: features.send.encoding.codec.enum
 					}
 				}
 
@@ -61,6 +63,15 @@ components: sinks: [Name=string]: {
 						}
 					}
 				}
+			}
+		}
+
+		if sinks[Name].features.send != _|_ {
+			if sinks[Name].features.send.tls.enabled {
+				tls: configuration._tls & {_args: {
+					can_enable:      sinks[Name].features.send.tls.can_enable
+					enabled_default: sinks[Name].features.send.tls.enabled_default
+				}}
 			}
 		}
 	}

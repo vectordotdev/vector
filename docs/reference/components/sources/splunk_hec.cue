@@ -13,26 +13,13 @@ components: sources: splunk_hec: {
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "batch"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: {
-			enabled:                true
-			can_enable:             true
-			can_verify_certificate: true
-			enabled_default:        false
-		}
-	}
-
-	support: {
-		dependencies: {
-			splunk_hec_client: {
-				required: true
+		multiline: enabled: false
+		receive: {
+			from: {
 				title:    "Splunk HEC Client"
-				type:     "external"
 				url:      urls.splunk_hec
 				versions: null
 
@@ -46,8 +33,17 @@ components: sources: splunk_hec: {
 					ssl: "optional"
 				}
 			}
-		}
 
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				enabled_default:        false
+			}
+		}
+	}
+
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
