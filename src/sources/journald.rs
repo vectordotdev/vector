@@ -197,7 +197,6 @@ impl JournaldConfig {
             .instrument(info_span!("journald-server"))
             .boxed()
             .compat()
-            // .select(shutdown.map(move |_| close()))
             .select(Box::new(
                 shutdown.map(move |_| close()).unit_error().boxed().compat(),
             ))
