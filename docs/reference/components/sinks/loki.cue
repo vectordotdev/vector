@@ -10,25 +10,28 @@ components: sinks: loki: {
 		delivery:      "at_least_once"
 		development:   "beta"
 		function:      "transmit"
+		egress_method: "batch"
 		service_providers: ["Grafana"]
+	}
+
+	input: {
+		logs:    true
+		metrics: false
 	}
 
 	features: {
 		batch: {
 			enabled:      true
 			common:       false
-			max_bytes:    102400
 			max_events:   100000
+			max_bytes:    null
 			timeout_secs: 1
 		}
-		buffer: enabled:      true
-		compression: enabled: false
-		encoding: {
+		buffer: enabled: true
+		encoding: codec: {
 			enabled: true
-			default: null
-			json:    null
-			ndjson:  null
-			text:    null
+			default: "json"
+			enum: ["json", "text"]
 		}
 		healthcheck: enabled: true
 		request: {
@@ -50,8 +53,6 @@ components: sinks: loki: {
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -63,6 +64,7 @@ components: sinks: loki: {
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {
