@@ -47,6 +47,7 @@ components: sinks: clickhouse: {
 			}
 			to: {
 				name:     "Clickhouse"
+				thing:    "a \(name) database"
 				url:      urls.clickhouse
 				versions: null
 

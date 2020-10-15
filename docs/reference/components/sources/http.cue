@@ -18,6 +18,7 @@ components: sources: http: {
 		receive: {
 			from: {
 				name:     "HTTP client"
+				thing:    "an \(name)"
 				url:      urls.http_client
 				versions: null
 

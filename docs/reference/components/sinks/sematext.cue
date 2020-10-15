@@ -5,6 +5,7 @@ components: sinks: _sematext: {
 		send: {
 			to: {
 				name:     "Sematext"
+				thing:    "a \(name) account"
 				url:      urls.sematext
 				versions: null
 

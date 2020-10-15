@@ -27,6 +27,7 @@ components: sinks: vector: {
 			}
 			to: {
 				name:     "Vector source"
+				thing:    "a \(name)"
 				url:      urls.vector_source
 				versions: null
 

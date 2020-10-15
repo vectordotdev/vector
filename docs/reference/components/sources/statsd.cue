@@ -18,7 +18,8 @@ components: sources: statsd: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				name:     "StatsD client"
+				name:     "StatsD"
+				thing:    "a \(name) client"
 				url:      urls.statsd
 				versions: null
 
