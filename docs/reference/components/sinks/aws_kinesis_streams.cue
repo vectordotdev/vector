@@ -1,9 +1,8 @@
 package metadata
 
 components: sinks: aws_kinesis_streams: {
-	title:             "AWS Kinesis Data Streams"
-	short_description: "Batches log events to [Amazon Web Service's Kinesis Data Stream service][urls.aws_kinesis_streams] via the [`PutRecords` API endpoint](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html)."
-	long_description:  "[Amazon Kinesis Data Streams][urls.aws_kinesis_streams] is a scalable and durable real-time data streaming service that can continuously capture gigabytes of data per second from hundreds of thousands of sources. Making it an excellent candidate for streaming logs and metrics data."
+	title:       "AWS Kinesis Data Streams"
+	description: "[Amazon Kinesis Data Streams][urls.aws_kinesis_streams] is a scalable and durable real-time data streaming service that can continuously capture gigabytes of data per second from hundreds of thousands of sources. Making it an excellent candidate for streaming logs and metrics data."
 
 	classes: {
 		commonly_used: false
@@ -44,6 +43,23 @@ components: sinks: aws_kinesis_streams: {
 				timeout_secs:               30
 			}
 			tls: enabled: false
+			to: {
+				name:     "AWS Kinesis Data Streams"
+				url:      urls.aws_kinesis_streams
+				versions: null
+
+				interface: {
+					socket: {
+						api: {
+							title: "AWS Kinesis Data Streams API"
+							url:   urls.aws_kinesis_streams_api
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "required"
+					}
+				}
+			}
 		}
 	}
 

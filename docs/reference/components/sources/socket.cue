@@ -3,8 +3,7 @@ package metadata
 components: sources: socket: {
 	_port: 9000
 
-	title:             "Socket"
-	short_description: "Ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket and outputs log events."
+	title: "Socket"
 
 	classes: {
 		commonly_used: true
@@ -18,7 +17,7 @@ components: sources: socket: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				title:    "Socket Client"
+				name:     "socket client"
 				url:      urls.prometheus_client
 				versions: null
 

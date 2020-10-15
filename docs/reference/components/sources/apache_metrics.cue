@@ -4,8 +4,7 @@ components: sources: apache_metrics: {
 	_config_path: "/etc/apache2/httpd.conf"
 	_path:        "/server-status"
 
-	title:             "Apache HTTP Server (HTTPD) Metrics"
-	short_description: "Collect metrics from an Apache HTTPD server."
+	title: "Apache HTTP Server (HTTPD) Metrics"
 
 	classes: {
 		commonly_used: false
@@ -20,7 +19,7 @@ components: sources: apache_metrics: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				title:    "Apache HTTP Server (HTTPD)"
+				name:     "Apache HTTP server (HTTPD)"
 				url:      urls.apache
 				versions: null
 

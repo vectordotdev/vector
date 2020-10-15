@@ -1,9 +1,8 @@
 package metadata
 
 components: sinks: honeycomb: {
-	title:             "Honeycomb"
-	short_description: "Batches log events to [Honeycomb][urls.honeycomb] via the [batch events API][urls.honeycomb_batch]."
-	long_description:  "[Honeycomb][urls.honeycomb] provides full stack observability—designed for high cardinality data and collaborative problem solving, enabling engineers to deeply understand and debug production software together."
+	title:       "Honeycomb"
+	description: "[Honeycomb][urls.honeycomb] provides full stack observability—designed for high cardinality data and collaborative problem solving, enabling engineers to deeply understand and debug production software together."
 
 	classes: {
 		commonly_used: false
@@ -36,6 +35,23 @@ components: sinks: honeycomb: {
 				timeout_secs:               60
 			}
 			tls: enabled: false
+			to: {
+				name:     "Honeycomb"
+				url:      urls.honeycomb
+				versions: null
+
+				interface: {
+					socket: {
+						api: {
+							title: "Honeycomb batch events API"
+							url:   urls.honeycomb_batch
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "required"
+					}
+				}
+			}
 		}
 	}
 

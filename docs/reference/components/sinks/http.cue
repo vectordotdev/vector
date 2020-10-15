@@ -1,9 +1,8 @@
 package metadata
 
 components: sinks: http: {
-	title:             "HTTP"
-	short_description: "Batches log events to a generic [HTTP][urls.http] endpoint."
-	long_description:  "Batches log events to a generic [HTTP][urls.http] endpoint."
+	title:       "HTTP"
+	description: "Batches log events to a generic [HTTP][urls.http] endpoint."
 
 	classes: {
 		commonly_used: true
@@ -49,6 +48,19 @@ components: sinks: http: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
+			}
+			to: {
+				name:     "HTTP server"
+				url:      urls.http_server
+				versions: null
+
+				interface: {
+					socket: {
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "optional"
+					}
+				}
 			}
 		}
 	}
