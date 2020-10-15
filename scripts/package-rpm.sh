@@ -30,15 +30,6 @@ echo "Packaging .rpm for $ARCHIVE_NAME"
 echo "TARGET: $TARGET"
 
 #
-# Safeguard
-#
-
-if [[ "$UID" == "0" ]]; then
-  echo "Error: aborting RPM build due to execution as root" >&2
-  exit 1
-fi
-
-#
 # Package
 #
 
@@ -78,6 +69,7 @@ rpmbuild \
   --define "_topdir $RPMBUILD_DIR" \
   --target "$ARCH-redhat-linux" \
   --define "_arch $ARCH" \
+  --nodebuginfo \
   -ba distribution/rpm/vector.spec
 
 #

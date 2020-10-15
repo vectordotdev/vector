@@ -7,14 +7,13 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct LogfmtConfig {
-    pub field: Option<Atom>,
+    pub field: Option<String>,
     pub drop_field: bool,
-    pub types: HashMap<Atom, String>,
+    pub types: HashMap<String, String>,
 }
 
 inventory::submit! {
@@ -30,7 +29,7 @@ impl TransformConfig for LogfmtConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| Atom::from(crate::config::log_schema().message_key()));
+            .unwrap_or_else(|| crate::config::log_schema().message_key().into());
         let conversions = parse_conversion_map(&self.types)?;
 
         Ok(Box::new(Logfmt {
@@ -54,9 +53,9 @@ impl TransformConfig for LogfmtConfig {
 }
 
 pub struct Logfmt {
-    field: Atom,
+    field: String,
     drop_field: bool,
-    conversions: HashMap<Atom, Conversion>,
+    conversions: HashMap<String, Conversion>,
 }
 
 impl Transform for Logfmt {
@@ -68,7 +67,7 @@ impl Transform for Logfmt {
             let pairs = logfmt::parse(value)
                 .into_iter()
                 // Filter out pairs with None value (i.e. non-logfmt data)
-                .filter_map(|logfmt::Pair { key, val }| val.map(|val| (Atom::from(key), val)));
+                .filter_map(|logfmt::Pair { key, val }| val.map(|val| (key, val)));
 
             for (key, val) in pairs {
                 if key == self.field {
@@ -100,7 +99,7 @@ impl Transform for Logfmt {
         } else {
             debug!(
                 message = "Field does not exist.",
-                field = self.field.as_ref(),
+                field = %self.field,
                 rate_limit_secs = 30
             );
         };
@@ -142,26 +141,26 @@ mod tests {
     async fn logfmt_adds_parsed_field_to_event() {
         let log = parse_log("status=1234 time=\"5678\"", false, &[]).await;
 
-        assert_eq!(log[&"status".into()], "1234".into());
-        assert_eq!(log[&"time".into()], "5678".into());
-        assert!(log.get(&"message".into()).is_some());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["time"], "5678".into());
+        assert!(log.get("message").is_some());
     }
 
     #[tokio::test]
     async fn logfmt_does_drop_parsed_field() {
         let log = parse_log("status=1234 time=5678", true, &[]).await;
 
-        assert_eq!(log[&"status".into()], "1234".into());
-        assert_eq!(log[&"time".into()], "5678".into());
-        assert!(log.get(&"message".into()).is_none());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["time"], "5678".into());
+        assert!(log.get("message").is_none());
     }
 
     #[tokio::test]
     async fn logfmt_does_not_drop_same_name_parsed_field() {
         let log = parse_log("status=1234 message=yes", true, &[]).await;
 
-        assert_eq!(log[&"status".into()], "1234".into());
-        assert_eq!(log[&"message".into()], "yes".into());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["message"], "yes".into());
     }
 
     #[tokio::test]
@@ -173,10 +172,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(log[&"number".into()], Value::Float(42.3));
-        assert_eq!(log[&"flag".into()], Value::Boolean(true));
-        assert_eq!(log[&"code".into()], Value::Integer(1234));
-        assert_eq!(log[&"rest".into()], Value::Bytes("word".into()));
+        assert_eq!(log["number"], Value::Float(42.3));
+        assert_eq!(log["flag"], Value::Boolean(true));
+        assert_eq!(log["code"], Value::Integer(1234));
+        assert_eq!(log["rest"], Value::Bytes("word".into()));
     }
 
     #[tokio::test]
@@ -187,36 +186,36 @@ mod tests {
             &[("status", "integer"), ("bytes", "integer")],
         ).await;
 
-        assert_eq!(log[&"at".into()], "info".into());
-        assert_eq!(log[&"method".into()], "GET".into());
-        assert_eq!(log[&"path".into()], "/cart_link".into());
+        assert_eq!(log["at"], "info".into());
+        assert_eq!(log["method"], "GET".into());
+        assert_eq!(log["path"], "/cart_link".into());
         assert_eq!(
-            log[&"request_id".into()],
+            log["request_id"],
             "05726858-c44e-4f94-9a20-37df73be9006".into(),
         );
-        assert_eq!(log[&"fwd".into()], "73.75.38.87".into());
-        assert_eq!(log[&"dyno".into()], "web.1".into());
-        assert_eq!(log[&"connect".into()], "1ms".into());
-        assert_eq!(log[&"service".into()], "22ms".into());
-        assert_eq!(log[&"status".into()], Value::Integer(304));
-        assert_eq!(log[&"bytes".into()], Value::Integer(656));
-        assert_eq!(log[&"protocol".into()], "http".into());
+        assert_eq!(log["fwd"], "73.75.38.87".into());
+        assert_eq!(log["dyno"], "web.1".into());
+        assert_eq!(log["connect"], "1ms".into());
+        assert_eq!(log["service"], "22ms".into());
+        assert_eq!(log["status"], Value::Integer(304));
+        assert_eq!(log["bytes"], Value::Integer(656));
+        assert_eq!(log["protocol"], "http".into());
     }
 
     #[tokio::test]
     async fn logfmt_handles_herokus_weird_octothorpes() {
         let log = parse_log("source=web.1 dyno=heroku.2808254.d97d0ea7-cf3d-411b-b453-d2943a50b456 sample#memory_total=21.00MB sample#memory_rss=21.22MB sample#memory_cache=0.00MB sample#memory_swap=0.00MB sample#memory_pgpgin=348836pages sample#memory_pgpgout=343403pages", true, &[]).await;
 
-        assert_eq!(log[&"source".into()], "web.1".into());
+        assert_eq!(log["source"], "web.1".into());
         assert_eq!(
-            log[&"dyno".into()],
+            log["dyno"],
             "heroku.2808254.d97d0ea7-cf3d-411b-b453-d2943a50b456".into()
         );
-        assert_eq!(log[&"sample#memory_total".into()], "21.00MB".into());
-        assert_eq!(log[&"sample#memory_rss".into()], "21.22MB".into());
-        assert_eq!(log[&"sample#memory_cache".into()], "0.00MB".into());
-        assert_eq!(log[&"sample#memory_swap".into()], "0.00MB".into());
-        assert_eq!(log[&"sample#memory_pgpgin".into()], "348836pages".into());
-        assert_eq!(log[&"sample#memory_pgpgout".into()], "343403pages".into());
+        assert_eq!(log["sample#memory_total"], "21.00MB".into());
+        assert_eq!(log["sample#memory_rss"], "21.22MB".into());
+        assert_eq!(log["sample#memory_cache"], "0.00MB".into());
+        assert_eq!(log["sample#memory_swap"], "0.00MB".into());
+        assert_eq!(log["sample#memory_pgpgin"], "348836pages".into());
+        assert_eq!(log["sample#memory_pgpgout"], "343403pages".into());
     }
 }

@@ -3,7 +3,6 @@ package metadata
 components: sinks: console: {
 	title:             "Console"
 	short_description: "Streams log and metric events to [standard output streams][urls.standard_streams], such as [STDOUT][urls.stdout] and [STDERR][urls.stderr]."
-	long_description:  "Streams log and metric events to [standard output streams][urls.standard_streams], such as [STDOUT][urls.stdout] and [STDERR][urls.stderr]."
 
 	classes: {
 		commonly_used: false

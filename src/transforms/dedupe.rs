@@ -10,13 +10,12 @@ use crate::{
 use bytes::Bytes;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub enum FieldMatchConfig {
     #[serde(rename = "match")]
-    MatchFields(Vec<Atom>),
+    MatchFields(Vec<String>),
     #[serde(rename = "ignore")]
     IgnoreFields(Vec<String>),
     #[serde(skip)]
@@ -123,7 +122,7 @@ type TypeId = u8;
 #[derive(PartialEq, Eq, Hash)]
 enum CacheEntry {
     Match(Vec<Option<(TypeId, Bytes)>>),
-    Ignore(Vec<(Atom, TypeId, Bytes)>),
+    Ignore(Vec<(String, TypeId, Bytes)>),
 }
 
 /// Assigns a unique number to each of the types supported by Event::Value.
@@ -171,11 +170,7 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
 
             for (field_name, value) in event.as_log().all_fields() {
                 if !fields.contains(&field_name) {
-                    entry.push((
-                        Atom::from(field_name),
-                        type_id_for_value(&value),
-                        value.as_bytes(),
-                    ));
+                    entry.push((field_name, type_id_for_value(&value), value.as_bytes()));
                 }
             }
 
@@ -206,9 +201,8 @@ mod tests {
     use crate::transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig};
     use crate::{event::Event, event::Value, transforms::Transform};
     use std::collections::BTreeMap;
-    use string_cache::DefaultAtom as Atom;
 
-    fn make_match_transform(num_events: usize, fields: Vec<Atom>) -> Dedupe {
+    fn make_match_transform(num_events: usize, fields: Vec<String>) -> Dedupe {
         Dedupe::new(DedupeConfig {
             cache: CacheConfig { num_events },
             fields: { FieldMatchConfig::MatchFields(fields) },
@@ -255,12 +249,12 @@ mod tests {
 
         // First event should always be passed through as-is.
         let new_event = transform.transform(event1).unwrap();
-        assert_eq!(new_event.as_log()[&"matched".into()], "some value".into());
+        assert_eq!(new_event.as_log()["matched"], "some value".into());
 
         // Second event differs in matched field so should be outputted even though it
         // has the same value for unmatched field.
         let new_event = transform.transform(event2).unwrap();
-        assert_eq!(new_event.as_log()[&"matched".into()], "some value2".into());
+        assert_eq!(new_event.as_log()["matched"], "some value2".into());
 
         // Third event has the same value for "matched" as first event, so it should be dropped.
         assert_eq!(None, transform.transform(event3));
@@ -287,12 +281,12 @@ mod tests {
 
         // First event should always be passed through as-is.
         let new_event = transform.transform(event1).unwrap();
-        assert_eq!(new_event.as_log()[&"matched1".into()], "some value".into());
+        assert_eq!(new_event.as_log()["matched1"], "some value".into());
 
         // Second event has a different matched field name with the same value, so it should not be
         // considered a dupe
         let new_event = transform.transform(event2).unwrap();
-        assert_eq!(new_event.as_log()[&"matched2".into()], "some value".into());
+        assert_eq!(new_event.as_log()["matched2"], "some value".into());
     }
 
     #[test]
@@ -321,8 +315,8 @@ mod tests {
 
         // First event should always be passed through as-is.
         let new_event = transform.transform(event1).unwrap();
-        assert_eq!(new_event.as_log()[&"matched1".into()], "value1".into());
-        assert_eq!(new_event.as_log()[&"matched2".into()], "value2".into());
+        assert_eq!(new_event.as_log()["matched1"], "value1".into());
+        assert_eq!(new_event.as_log()["matched2"], "value2".into());
 
         // Second event is the same just with different field order, so it shouldn't be outputted.
         assert_eq!(None, transform.transform(event2));
@@ -355,17 +349,17 @@ mod tests {
 
         // First event should always be passed through as-is.
         let new_event = transform.transform(event1).unwrap();
-        assert_eq!(new_event.as_log()[&"matched".into()], "some value".into());
+        assert_eq!(new_event.as_log()["matched"], "some value".into());
 
         // Second event gets outputted because it's not a dupe.  This causes the first
         // Event to be evicted from the cache.
         let new_event = transform.transform(event2).unwrap();
-        assert_eq!(new_event.as_log()[&"matched".into()], "some value2".into());
+        assert_eq!(new_event.as_log()["matched"], "some value2".into());
 
         // Third event is a dupe but gets outputted anyway because the first event has aged
         // out of the cache.
         let new_event = transform.transform(event3).unwrap();
-        assert_eq!(new_event.as_log()[&"matched".into()], "some value".into());
+        assert_eq!(new_event.as_log()["matched"], "some value".into());
     }
 
     #[test]
@@ -391,12 +385,12 @@ mod tests {
 
         // First event should always be passed through as-is.
         let new_event = transform.transform(event1).unwrap();
-        assert_eq!(new_event.as_log()[&"matched".into()], "123".into());
+        assert_eq!(new_event.as_log()["matched"], "123".into());
 
         // Second event should also get passed through even though the string representations of
         // "matched" are the same.
         let new_event = transform.transform(event2).unwrap();
-        assert_eq!(new_event.as_log()[&"matched".into()], 123.into());
+        assert_eq!(new_event.as_log()["matched"], 123.into());
     }
 
     #[test]
@@ -426,7 +420,7 @@ mod tests {
 
         // First event should always be passed through as-is.
         let new_event = transform.transform(event1).unwrap();
-        let res_value = new_event.as_log()[&"matched".into()].clone();
+        let res_value = new_event.as_log()["matched"].clone();
         if let Value::Map(map) = res_value {
             assert_eq!(map.get("key").unwrap(), &Value::from("123"));
         }
@@ -434,7 +428,7 @@ mod tests {
         // Second event should also get passed through even though the string representations of
         // "matched" are the same.
         let new_event = transform.transform(event2).unwrap();
-        let res_value = new_event.as_log()[&"matched".into()].clone();
+        let res_value = new_event.as_log()["matched"].clone();
         if let Value::Map(map) = res_value {
             assert_eq!(map.get("key").unwrap(), &Value::from(123));
         }
@@ -461,10 +455,10 @@ mod tests {
 
         // First event should always be passed through as-is.
         let new_event = transform.transform(event1).unwrap();
-        assert_eq!(new_event.as_log()[&"matched".into()], Value::Null);
+        assert_eq!(new_event.as_log()["matched"], Value::Null);
 
         // Second event should also get passed through as null is different than missing
         let new_event = transform.transform(event2).unwrap();
-        assert_eq!(false, new_event.as_log().contains(&"matched"));
+        assert_eq!(false, new_event.as_log().contains("matched"));
     }
 }

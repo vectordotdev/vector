@@ -3,7 +3,6 @@ package metadata
 components: transforms: grok_parser: {
 	title:             "Grok Parser"
 	short_description: "Accepts log events and allows you to parse a log field value with [Grok][urls.grok]."
-	long_description:  "Accepts log events and allows you to parse a log field value with [Grok][urls.grok]."
 
 	classes: {
 		commonly_used: false

@@ -3,7 +3,6 @@ package metadata
 components: transforms: log_to_metric: {
 	title:             "Log to Metric"
 	short_description: "Accepts log events and allows you to convert logs into one or more metrics."
-	long_description:  "Accepts log events and allows you to convert logs into one or more metrics."
 
 	classes: {
 		commonly_used: false

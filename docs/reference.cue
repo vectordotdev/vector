@@ -71,10 +71,10 @@ _values: {
 
 	// `long_description` describes the components with a single paragraph.
 	// It is used for SEO purposes and should be full of relevant keywords.
-	long_description: string
+	long_description?: =~"[.]$"
 
 	// `short_description` describes the component in one sentence.
-	short_description: string
+	short_description: =~"[.]$"
 
 	// `title` is the human friendly title for the component.
 	//
@@ -339,7 +339,7 @@ _values: {
 			if enabled {
 				in_flight_limit:            uint8
 				rate_limit_duration_secs:   uint8
-				rate_limit_num:             uint8
+				rate_limit_num:             uint16
 				retry_initial_backoff_secs: uint8
 				retry_max_duration_secs:    uint8
 				timeout_secs:               uint8

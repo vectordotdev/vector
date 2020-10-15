@@ -70,6 +70,16 @@ components: sinks: azure_monitor_logs: {
 				examples: ["5ce893d9-2c32-4b6c-91a9-b0887c2de2d6", "97ce69d9-b4be-4241-8dbd-d265edcf06c4"]
 			}
 		}
+		host: {
+			common:      true
+			description: "[Alternative host](https://docs.azure.cn/en-us/articles/guidance/developerdifferences#check-endpoints-in-azure) for dedicated Azure regions."
+			required:    false
+			warnings: []
+			type: string: {
+				default: "ods.opinsights.azure.com"
+				examples: ["ods.opinsights.azure.us", "ods.opinsights.azure.cn"]
+			}
+		}
 		log_type: {
 			description: "The [record type of the data that is being submitted](https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-headers). Can only contain letters, numbers, and underscore (_), and may not exceed 100 characters."
 			required:    true
