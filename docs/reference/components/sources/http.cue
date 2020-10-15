@@ -4,7 +4,7 @@ components: sources: http: {
 	_port: 80
 
 	title:             "HTTP"
-	short_description: "Receive logs through the HTTP protocol."
+	short_description: "Receives logs through the HTTP protocol."
 
 	classes: {
 		commonly_used: false
@@ -34,7 +34,7 @@ components: sources: http: {
 
 			tls: {
 				enabled:                true
-				can_enable:             false
+				can_enable:             true
 				can_verify_certificate: true
 				enabled_default:        false
 			}
