@@ -1,17 +1,17 @@
 package metadata
 
 components: transforms: rename_fields: {
-	title:             "Rename Fields"
-	short_description: "Accepts log events and allows you to rename one or more log fields."
+	title: "Rename Fields"
 
 	classes: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
-		function:      "schema"
 	}
 
-	features: {}
+	features: {
+		shape: {}
+	}
 
 	support: {
 		platforms: {

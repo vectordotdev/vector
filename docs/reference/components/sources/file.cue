@@ -3,8 +3,7 @@ package metadata
 components: sources: file: {
 	_directory: "/var/log"
 
-	title:             "File"
-	short_description: "Collect logs by tailing one more files."
+	title: "File"
 
 	classes: {
 		commonly_used: true
@@ -12,21 +11,13 @@ components: sources: file: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "stable"
 		egress_method: "stream"
-		function:      "collect"
 	}
 
 	features: {
-		checkpoint: enabled: true
-		multiline: enabled:  true
-		tls: enabled:        false
-	}
-
-	support: {
-		dependencies: {
-			file_system: {
-				required: true
-				title:    "File System"
-				type:     "external"
+		collect: {
+			checkpoint: enabled: true
+			from: {
+				name:     "file system"
 				url:      urls.file_system
 				versions: null
 
@@ -54,7 +45,10 @@ components: sources: file: {
 				]
 			}
 		}
+		multiline: enabled: true
+	}
 
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true

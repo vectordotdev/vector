@@ -3,7 +3,6 @@ use crate::{
     event::{Event, Value},
     transforms::Transform,
 };
-use string_cache::DefaultAtom as Atom;
 
 pub enum Picker {
     Init,
@@ -23,7 +22,7 @@ impl Transform for Picker {
             Picker::Init => {
                 let message = event
                     .as_log()
-                    .get(&Atom::from(crate::config::log_schema().message_key()))
+                    .get(crate::config::log_schema().message_key())
                     .expect("message key must be present");
                 let bytes = if let Value::Bytes(bytes) = message {
                     bytes

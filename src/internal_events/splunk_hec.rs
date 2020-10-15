@@ -1,7 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
 use serde_json::Error;
-use string_cache::DefaultAtom as Atom;
 
 #[cfg(feature = "sources-splunk_hec")]
 pub(crate) use self::source::*;
@@ -38,11 +37,11 @@ impl InternalEvent for SplunkEventEncodeError {
 }
 
 #[derive(Debug)]
-pub struct SplunkSourceTypeMissingKeys {
-    pub keys: Vec<Atom>,
+pub struct SplunkSourceTypeMissingKeys<'a> {
+    pub keys: &'a [String],
 }
 
-impl InternalEvent for SplunkSourceTypeMissingKeys {
+impl<'a> InternalEvent for SplunkSourceTypeMissingKeys<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "Failed to render template for sourcetype, leaving empty.",
@@ -57,11 +56,11 @@ impl InternalEvent for SplunkSourceTypeMissingKeys {
 }
 
 #[derive(Debug)]
-pub struct SplunkSourceMissingKeys {
-    pub keys: Vec<Atom>,
+pub struct SplunkSourceMissingKeys<'a> {
+    pub keys: &'a [String],
 }
 
-impl InternalEvent for SplunkSourceMissingKeys {
+impl<'a> InternalEvent for SplunkSourceMissingKeys<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "Failed to render template for source, leaving empty.",

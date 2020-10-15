@@ -9,7 +9,6 @@ use crate::{
 use async_trait::async_trait;
 use futures::{future, stream::BoxStream, FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
 
 pub struct BlackholeSink {
     total_events: usize,
@@ -68,7 +67,7 @@ impl StreamSink for BlackholeSink {
         while let Some(event) = input.next().await {
             let message_len = match event {
                 Event::Log(log) => log
-                    .get(&Atom::from(crate::config::log_schema().message_key()))
+                    .get(crate::config::log_schema().message_key())
                     .map(|v| v.as_bytes().len())
                     .unwrap_or(0),
                 Event::Metric(metric) => {

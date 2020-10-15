@@ -1,13 +1,36 @@
 package metadata
 
 components: sinks: statsd: {
-	title:             "Statsd"
-	short_description: "Streams metric events to [StatsD][urls.statsd] metrics service."
-	long_description:  "[StatsD][urls.statsd] is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy][urls.etsy] in Node."
+	title:       "Statsd"
+	description: "[StatsD][urls.statsd] is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy][urls.etsy] in Node."
 
-	classes:  sinks.socket.classes
-	features: sinks.socket.features
-	support:  sinks.socket.support
+	classes: sinks.socket.classes
+
+	features: {
+		buffer:      sinks.socket.features.buffer
+		healthcheck: sinks.socket.features.healthcheck
+		send: {
+			compression: sinks.socket.features.send.compression
+			encoding: codec: enabled: false
+			request: sinks.socket.features.send.request
+			tls:     sinks.socket.features.send.tls
+			to: {
+				name:     "Statsd receiver"
+				url:      urls.statsd
+				versions: null
+
+				interface: {
+					socket: {
+						direction: "outgoing"
+						protocols: ["tcp", "udp", "unix"]
+						ssl: "required"
+					}
+				}
+			}
+		}
+	}
+
+	support: sinks.socket.support
 
 	input: {
 		logs: false

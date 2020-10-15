@@ -1,6 +1,5 @@
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
 
 pub fn default_true() -> bool {
     true
@@ -32,16 +31,16 @@ pub enum FieldsOrValue<V> {
 pub struct Fields<V>(IndexMap<String, FieldsOrValue<V>>);
 
 impl<V: 'static> Fields<V> {
-    pub fn all_fields(self) -> impl Iterator<Item = (Atom, V)> {
+    pub fn all_fields(self) -> impl Iterator<Item = (String, V)> {
         self.0
             .into_iter()
-            .map(|(k, v)| -> Box<dyn Iterator<Item = (Atom, V)>> {
+            .map(|(k, v)| -> Box<dyn Iterator<Item = (String, V)>> {
                 match v {
                     // boxing is used as a way to avoid incompatible types of the match arms
-                    FieldsOrValue::Value(v) => Box::new(std::iter::once((k.into(), v))),
+                    FieldsOrValue::Value(v) => Box::new(std::iter::once((k, v))),
                     FieldsOrValue::Fields(f) => Box::new(
                         f.all_fields()
-                            .map(move |(nested_k, v)| (format!("{}.{}", k, nested_k).into(), v)),
+                            .map(move |(nested_k, v)| (format!("{}.{}", k, nested_k), v)),
                     ),
                 }
             })

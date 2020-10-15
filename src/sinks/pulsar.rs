@@ -15,7 +15,6 @@ use pulsar::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{collections::HashSet, sync::Arc};
-use string_cache::DefaultAtom as Atom;
 
 type MetadataFuture<F, M> = future::Join<F, future::FutureResult<M, <F as Future>::Error>>;
 
@@ -196,7 +195,7 @@ fn encode_event(mut item: Event, encoding: &EncodingConfig<Encoding>) -> crate::
     Ok(match encoding.codec() {
         Encoding::Json => serde_json::to_vec(&log)?,
         Encoding::Text => log
-            .get(&Atom::from(log_schema().message_key()))
+            .get(log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     })
@@ -206,7 +205,6 @@ fn encode_event(mut item: Event, encoding: &EncodingConfig<Encoding>) -> crate::
 mod tests {
     use super::*;
     use std::collections::HashMap;
-    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn pulsar_event_json() {
@@ -238,7 +236,7 @@ mod tests {
             evt,
             &EncodingConfigWithDefault {
                 codec: Encoding::Json,
-                except_fields: Some(vec![Atom::from("key")]),
+                except_fields: Some(vec!["key".into()]),
                 ..Default::default()
             }
             .into(),

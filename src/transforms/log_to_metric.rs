@@ -19,7 +19,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::num::ParseFloatError;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -30,43 +29,43 @@ pub struct LogToMetricConfig {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub struct CounterConfig {
-    field: Atom,
-    name: Option<Atom>,
+    field: String,
+    name: Option<String>,
     #[serde(default = "default_increment_by_value")]
     increment_by_value: bool,
-    tags: Option<IndexMap<Atom, String>>,
+    tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub struct GaugeConfig {
-    field: Atom,
-    name: Option<Atom>,
-    tags: Option<IndexMap<Atom, String>>,
+    field: String,
+    name: Option<String>,
+    tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub struct SetConfig {
-    field: Atom,
-    name: Option<Atom>,
-    tags: Option<IndexMap<Atom, String>>,
+    field: String,
+    name: Option<String>,
+    tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub struct HistogramConfig {
-    field: Atom,
-    name: Option<Atom>,
-    tags: Option<IndexMap<Atom, String>>,
+    field: String,
+    name: Option<String>,
+    tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub struct SummaryConfig {
-    field: Atom,
-    name: Option<Atom>,
-    tags: Option<IndexMap<Atom, String>>,
+    field: String,
+    name: Option<String>,
+    tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -120,26 +119,28 @@ impl LogToMetric {
 }
 
 enum TransformError {
-    FieldNotFound { field: Atom },
+    FieldNotFound {
+        field: String,
+    },
     TemplateParseError(TemplateError),
-    TemplateRenderError { missing_keys: Vec<String> },
-    ParseFloatError { field: Atom, error: ParseFloatError },
+    TemplateRenderError {
+        missing_keys: Vec<String>,
+    },
+    ParseFloatError {
+        field: String,
+        error: ParseFloatError,
+    },
 }
 
 fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
     let template = Template::try_from(s).map_err(TransformError::TemplateParseError)?;
-    template.render_string(&event).map_err(|missing_keys| {
-        // convert to String to avoid printing Atom in Debug format
-        let missing_keys = missing_keys
-            .into_iter()
-            .map(|k| k.to_string())
-            .collect::<Vec<String>>();
-        TransformError::TemplateRenderError { missing_keys }
-    })
+    template
+        .render_string(&event)
+        .map_err(|missing_keys| TransformError::TemplateRenderError { missing_keys })
 }
 
 fn render_tags(
-    tags: &Option<IndexMap<Atom, String>>,
+    tags: &Option<IndexMap<String, String>>,
     event: &Event,
 ) -> Result<Option<BTreeMap<String, String>>, TransformError> {
     Ok(match tags {
@@ -166,17 +167,17 @@ fn render_tags(
     })
 }
 
-fn parse_field(log: &LogEvent, field: &Atom) -> Result<f64, TransformError> {
+fn parse_field(log: &LogEvent, field: &str) -> Result<f64, TransformError> {
     let value = log
         .get(field)
         .ok_or_else(|| TransformError::FieldNotFound {
-            field: field.clone(),
+            field: field.to_string(),
         })?;
     value
         .to_string_lossy()
         .parse()
         .map_err(|error| TransformError::ParseFloatError {
-            field: field.clone(),
+            field: field.to_string(),
             error,
         })
 }
@@ -185,7 +186,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
     let log = event.as_log();
 
     let timestamp = log
-        .get(&Atom::from(log_schema().timestamp_key()))
+        .get(log_schema().timestamp_key())
         .and_then(Value::as_timestamp)
         .cloned();
 
@@ -317,11 +318,14 @@ impl Transform for LogToMetric {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }
-                Err(TransformError::FieldNotFound { field }) => {
-                    emit!(LogToMetricFieldNotFound { field })
-                }
+                Err(TransformError::FieldNotFound { field }) => emit!(LogToMetricFieldNotFound {
+                    field: field.as_ref()
+                }),
                 Err(TransformError::ParseFloatError { field, error }) => {
-                    emit!(LogToMetricParseFloatError { field, error })
+                    emit!(LogToMetricParseFloatError {
+                        field: field.as_ref(),
+                        error
+                    })
                 }
                 Err(TransformError::TemplateRenderError { missing_keys }) => {
                     emit!(LogToMetricTemplateRenderError { missing_keys })

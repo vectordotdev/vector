@@ -1,9 +1,8 @@
 package metadata
 
 components: sources: host_metrics: {
-	title:             "Host Metrics"
-	long_description:  "The host metrics source examines system data sources on the local system and generates metrics describing utilization of various system resources."
-	short_description: "Gather host-based metrics."
+	title:       "Host Metrics"
+	description: "The host metrics source examines system data sources on the local system and generates metrics describing utilization of various system resources."
 
 	classes: {
 		commonly_used: false
@@ -11,13 +10,13 @@ components: sources: host_metrics: {
 		deployment_roles: ["daemon"]
 		development:   "beta"
 		egress_method: "batch"
-		function:      "collect"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
+		collect: {
+			checkpoint: enabled: false
+		}
+		multiline: enabled: false
 	}
 
 	support: {
