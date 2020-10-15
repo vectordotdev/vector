@@ -2,56 +2,17 @@ use super::batch::{
     err_event_too_large, Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
 };
 use flate2::write::GzEncoder;
-use serde::{Deserialize, Serialize};
 use std::io::Write;
 
+pub mod compression;
 pub mod json;
 pub mod loki;
 pub mod metrics;
 pub mod partition;
 pub mod vec;
 
+pub use compression::{Compression, GZIP_FAST};
 pub use partition::{Partition, PartitionBuffer, PartitionInnerBuffer};
-
-#[derive(Serialize, Deserialize, Debug, Derivative, Copy, Clone, Eq, PartialEq)]
-#[derivative(Default)]
-#[serde(rename_all = "lowercase")]
-pub enum Compression {
-    #[derivative(Default)]
-    None,
-    Gzip,
-}
-
-impl Compression {
-    pub fn default_gzip() -> Compression {
-        Compression::Gzip
-    }
-
-    pub fn content_encoding(&self) -> Option<&'static str> {
-        match self {
-            Self::None => None,
-            Self::Gzip => Some("gzip"),
-        }
-    }
-
-    pub fn extension(&self) -> &'static str {
-        match self {
-            Self::None => "log",
-            Self::Gzip => "log.gz",
-        }
-    }
-}
-
-#[cfg(feature = "rusoto_core")]
-impl From<Compression> for rusoto_core::encoding::ContentEncoding {
-    fn from(compression: Compression) -> Self {
-        match compression {
-            Compression::None => rusoto_core::encoding::ContentEncoding::Identity,
-            // 6 is default, add Gzip level support to vector in future
-            Compression::Gzip => rusoto_core::encoding::ContentEncoding::Gzip(None, 6),
-        }
-    }
-}
 
 #[derive(Debug)]
 pub struct Buffer {
@@ -73,8 +34,12 @@ impl Buffer {
         let buffer = Vec::with_capacity(settings.bytes);
         let inner = match compression {
             Compression::None => InnerBuffer::Plain(buffer),
-            Compression::Gzip => {
-                InnerBuffer::Gzip(GzEncoder::new(buffer, flate2::Compression::fast()))
+            Compression::Gzip(level) => {
+                let level = level.unwrap_or(GZIP_FAST);
+                InnerBuffer::Gzip(GzEncoder::new(
+                    buffer,
+                    flate2::Compression::new(level as u32),
+                ))
             }
         };
         Self {
@@ -198,7 +163,7 @@ mod test {
 
         let buffered = BatchSink::new(
             svc,
-            Buffer::new(batch_size, Compression::Gzip),
+            Buffer::new(batch_size, Compression::gzip_default()),
             timeout,
             acker,
         );

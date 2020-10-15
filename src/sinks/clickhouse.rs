@@ -26,7 +26,7 @@ pub struct ClickhouseConfig {
     pub endpoint: String,
     pub table: String,
     pub database: Option<String>,
-    #[serde(default = "Compression::default_gzip")]
+    #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
