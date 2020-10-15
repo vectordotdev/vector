@@ -1,31 +1,25 @@
 package metadata
 
 components: transforms: lua: {
-	title:             "Lua"
-	short_description: "Accepts log and metric events and allows you to transform events with a full embedded [Lua][urls.lua] engine."
+	title: "Lua"
 
 	classes: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
-		function:      "program"
 	}
 
-	features: {}
-
-	support: {
-		dependencies: {
-			lua: {
-				required: true
-				title:    "AWS IMDS v2"
-				type:     "internal"
-				url:      urls.lua
-				versions: "5.3"
-
-				interface: ffi: {}
+	features: {
+		program: {
+			runtime: {
+				name:    "Lua"
+				url:     urls.lua
+				version: "5.3"
 			}
 		}
+	}
 
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true

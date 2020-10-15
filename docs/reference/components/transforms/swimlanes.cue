@@ -1,17 +1,17 @@
 package metadata
 
 components: transforms: swimlanes: {
-	title:             "Swimlanes"
-	short_description: "Accepts log events and allows you to route events across parallel streams using logical filters."
+	title: "Swimlanes"
 
 	classes: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
-		function:      "route"
 	}
 
-	features: {}
+	features: {
+		route: {}
+	}
 
 	support: {
 		platforms: {

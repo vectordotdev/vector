@@ -3,19 +3,16 @@ package metadata
 components: sources: syslog: {
 	_port: 514
 
-	title:             "Syslog"
-	short_description: "Ingests data through the [Syslog protocol][urls.syslog_5424] and outputs log events."
-	long_description:  "[Syslog][urls.syslog] stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is used to collect various device logs from different machines and send them to a central location for monitoring and review."
+	title:       "Syslog"
+	description: "[Syslog][urls.syslog] stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is used to collect various device logs from different machines and send them to a central location for monitoring and review."
 
-	classes:  sources.socket.classes
-	features: sources.socket.features
+	classes: sources.socket.classes
+	features: {
+		multiline: sources.socket.features.multiline
 
-	support: {
-		dependencies: {
-			syslog_client: {
-				required: true
-				title:    "Syslog Client"
-				type:     "external"
+		receive: {
+			from: {
+				name:     "Syslog client"
 				url:      urls.syslog
 				versions: null
 
@@ -30,8 +27,12 @@ components: sources: syslog: {
 					ssl: "optional"
 				}
 			}
-		}
 
+			tls: sources.socket.features.receive.tls
+		}
+	}
+
+	support: {
 		platforms: sources.socket.support.platforms
 
 		requirements: []

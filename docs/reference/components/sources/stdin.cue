@@ -1,8 +1,7 @@
 package metadata
 
 components: sources: stdin: {
-	title:             "STDIN"
-	short_description: "Ingests data through [standard input (STDIN)][urls.stdin] and outputs log events."
+	title: "STDIN"
 
 	classes: {
 		commonly_used: false
@@ -10,28 +9,24 @@ components: sources: stdin: {
 		deployment_roles: ["sidecar"]
 		development:   "stable"
 		egress_method: "stream"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
-
-	support: {
-		dependencies: {
-			stdin_client: {
-				required: true
-				title:    "STDIN Client"
-				type:     "external"
+		multiline: enabled: false
+		receive: {
+			from: {
+				name:     "STDIN client"
 				url:      urls.stdin
 				versions: null
 
 				interface: stdin: {}
 			}
-		}
 
+			tls: enabled: false
+		}
+	}
+
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true

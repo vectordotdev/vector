@@ -1,9 +1,8 @@
 package metadata
 
 components: sources: journald: {
-	title:             "#{component.title}"
-	short_description: "Ingests data through [Systemd's][urls.systemd] [Journald][urls.journald] utility and outputs log events."
-	long_description:  "[Journald][urls.journald] is a utility for accessing log data across a variety of system services. It was introduced with [Systemd][urls.systemd] to help system administrators collect, access, and route log data."
+	title:       "Journald"
+	description: "[Journald][urls.journald] is a utility for accessing log data across a variety of system services. It was introduced with [Systemd][urls.systemd] to help system administrators collect, access, and route log data."
 
 	classes: {
 		commonly_used: true
@@ -11,21 +10,13 @@ components: sources: journald: {
 		deployment_roles: ["daemon"]
 		development:   "beta"
 		egress_method: "batch"
-		function:      "collect"
 	}
 
 	features: {
-		checkpoint: enabled: true
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
-
-	support: {
-		dependencies: {
-			journald: {
-				required: true
-				title:    "JournalD"
-				type:     "external"
+		collect: {
+			checkpoint: enabled: true
+			from: {
+				name:     "JournalD"
 				url:      urls.journald
 				versions: null
 
@@ -35,7 +26,10 @@ components: sources: journald: {
 				}
 			}
 		}
+		multiline: enabled: false
+	}
 
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -104,6 +98,30 @@ components: sources: journald: {
 			required:    false
 			warnings: []
 			type: bool: default: false
+		}
+	}
+
+	output: logs: {
+		event: {
+			description: "A Journald event"
+			fields: {
+				host: fields._local_host
+				message: {
+					description: "The raw line from the file."
+					required:    true
+					type: string: examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+				}
+				timestamp: fields._current_timestamp
+				"*": {
+					common:      false
+					description: "Any Journald field"
+					required:    false
+					type: string: {
+						default: null
+						examples: ["/usr/sbin/ntpd", "c36e9ea52800a19d214cb71b53263a28"]
+					}
+				}
+			}
 		}
 	}
 

@@ -1,9 +1,8 @@
 package metadata
 
 components: sources: docker: {
-	title:             "Docker"
-	short_description: "Collects logs through the Docker API."
-	long_description: """
+	title: "Docker"
+	description: """
 		[Docker][urls.docker] is an open platform for developing, shipping, and running
 		applications and services. Docker enables you to separate your services from
 		your infrastructure so you can ship quickly. With Docker, you can manage your
@@ -19,21 +18,13 @@ components: sources: docker: {
 		deployment_roles: ["daemon"]
 		development:   "beta"
 		egress_method: "stream"
-		function:      "collect"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  true
-		tls: enabled:        false
-	}
-
-	support: {
-		dependencies: {
-			docker_engine: {
-				required: true
-				title:    "Docker Engine"
-				type:     "external"
+		collect: {
+			checkpoint: enabled: false
+			from: {
+				name:     "Docker Engine"
 				url:      urls.docker_engine
 				versions: ">= 1.24"
 
@@ -69,7 +60,10 @@ components: sources: docker: {
 				]
 			}
 		}
+		multiline: enabled: true
+	}
 
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true

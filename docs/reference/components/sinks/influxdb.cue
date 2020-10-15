@@ -1,6 +1,29 @@
 package metadata
 
 components: sinks: _influxdb: {
+	features: {
+		send: {
+			tls: enabled: false
+			to: {
+				name:     "Influxdb"
+				url:      urls.influxdb
+				versions: null
+
+				interface: {
+					socket: {
+						api: {
+							title: "Influx HTTP API"
+							url:   urls.influxdb_http_api_v2
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "optional"
+					}
+				}
+			}
+		}
+	}
+
 	configuration: {
 		bucket: {
 			description: "The destination bucket for writes into InfluxDB 2."
