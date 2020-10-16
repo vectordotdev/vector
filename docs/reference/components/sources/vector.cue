@@ -3,8 +3,7 @@ package metadata
 components: sources: vector: {
 	_port: 9000
 
-	title:             "Vector"
-	short_description: "Ingests data through another upstream [`vector` sink][docs.sinks.vector] and outputs log and metric events."
+	title: "Vector"
 
 	classes: {
 		commonly_used: false
@@ -12,26 +11,14 @@ components: sources: vector: {
 		deployment_roles: ["aggregator"]
 		development:   "beta"
 		egress_method: "stream"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: {
-			enabled:                true
-			can_enable:             true
-			can_verify_certificate: true
-			enabled_default:        false
-		}
-	}
-
-	support: {
-		dependencies: {
-			vector_client: {
-				required: true
-				title:    "Vector Client"
-				type:     "external"
+		multiline: enabled: false
+		receive: {
+			from: {
+				name:     "Vector"
+				thing:    "a \(name) sink"
 				url:      urls.vector_sink
 				versions: null
 
@@ -41,8 +28,17 @@ components: sources: vector: {
 					ssl: "optional"
 				}
 			}
-		}
 
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				enabled_default:        false
+			}
+		}
+	}
+
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -92,25 +88,25 @@ components: sources: vector: {
 	how_it_works: {
 		encoding: {
 			title: "Encoding"
-			body: #"""
-				Data is encoded via Vector's [event protobuf][urls.event_proto]
+			body:  """
+				Data is encoded via Vector's [event protobuf](\(urls.event_proto))
 				before it is sent over the wire.
-				"""#
+				"""
 		}
 		communication_protocol: {
 			title: "Communication Protocol"
-			body: #"""
+			body: """
 				Upstream Vector instances forward data to downstream Vector
 				instances via the TCP protocol.
-				"""#
+				"""
 		}
 		message_acknowledgement: {
 			title: "Message Acknowledgement"
-			body: #"""
+			body: """
 				Currently, Vector does not perform any application level message
 				acknowledgement. While rare, this means the individual message
 				could be lost.
-				"""#
+				"""
 		}
 
 	}

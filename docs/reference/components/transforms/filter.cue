@@ -1,16 +1,16 @@
 package metadata
 
-components: transforms: remove_fields: {
-	title: "Remove Fields"
+components: transforms: filter: {
+	title: "Filter"
 
 	classes: {
-		commonly_used: false
+		commonly_used: true
 		development:   "stable"
 		egress_method: "stream"
 	}
 
 	features: {
-		shape: {}
+		filter: {}
 	}
 
 	support: {
@@ -29,18 +29,11 @@ components: transforms: remove_fields: {
 	}
 
 	configuration: {
-		drop_empty: {
-			common:      false
-			description: "If set to `true`, after removing fields, remove any parent objects that are now empty."
-			required:    false
-			warnings: []
-			type: bool: default: false
-		}
-		fields: {
-			description: "The log field names to drop."
+		condition: {
+			description: "The set of logical conditions to be matched against every input event. Only messages that pass all conditions will be forwarded."
 			required:    true
 			warnings: []
-			type: array: items: type: string: examples: ["field1", "field2", "parent.child"]
+			type: object: configuration._conditions
 		}
 	}
 
