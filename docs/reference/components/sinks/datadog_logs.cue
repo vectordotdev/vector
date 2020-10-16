@@ -93,17 +93,4 @@ components: sinks: datadog_logs: {
 		logs:    true
 		metrics: null
 	}
-
-	how_it_works: {
-		setup: {
-			title: "Setup"
-			body: """
-				1. Register for a free account at [datadoghq.com](https://www.datadoghq.com/)
-
-				2. Fetch your logs api key by going to the [other](https://app.datadoghq.com/logs/onboarding/other) options
-				and selecting the `fluentd` option, it should then present you an `api_key`. This api key can now be used
-				with Vector!
-				"""
-		}
-	}
 }
