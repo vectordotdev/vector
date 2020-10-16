@@ -308,7 +308,7 @@ _values: {
 #FeaturesParse: {
 	format: close({
 		name:     string
-		url:      string
+		url:      string | null
 		versions: string | null
 	})
 }
