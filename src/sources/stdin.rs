@@ -40,6 +40,8 @@ inventory::submit! {
     SourceDescription::new::<StdinConfig>("stdin")
 }
 
+impl_generate_config_from_default!(StdinConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "stdin")]
 impl SourceConfig for StdinConfig {
@@ -132,6 +134,11 @@ mod tests {
     use std::io::Cursor;
 
     #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<StdinConfig>();
+    }
+
+    #[test]
     fn stdin_create_event() {
         let line = Bytes::from("hello world");
         let host_key = "host".to_string();
@@ -140,8 +147,8 @@ mod tests {
         let event = create_event(line, &host_key, &hostname);
         let log = event.into_log();
 
-        assert_eq!(log[&"host".into()], "Some.Machine".into());
-        assert_eq!(log[&log_schema().message_key()], "hello world".into());
+        assert_eq!(log["host"], "Some.Machine".into());
+        assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "stdin".into());
     }
 
@@ -165,7 +172,7 @@ mod tests {
         assert_eq!(
             Ready(Some("hello world".into())),
             event.map(|event| event
-                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy()))
+                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy()))
         );
 
         let event = rx.poll().unwrap();
@@ -173,7 +180,7 @@ mod tests {
         assert_eq!(
             Ready(Some("hello world again".into())),
             event.map(|event| event
-                .map(|event| event.as_log()[&log_schema().message_key()].to_string_lossy()))
+                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy()))
         );
 
         let event = rx.poll().unwrap();

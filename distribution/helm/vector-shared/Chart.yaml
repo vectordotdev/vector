@@ -1,0 +1,12 @@
+apiVersion: v2
+name: vector-shared
+type: library
+icon: https://vector.dev/press/vector-icon.svg
+description: Shared dependencies of Vector Helm charts
+version: "0.1.0"
+home: https://vector.dev/
+sources:
+  - https://github.com/timberio/vector/
+maintainers:
+  - name: Vector Contributors
+    email: vector@timber.io
