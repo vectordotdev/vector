@@ -43,6 +43,14 @@ components: transforms: aws_ec2_metadata: {
 	}
 
 	configuration: {
+		endpoint: {
+			common:      false
+			description: "Override the default EC2 Metadata endpoint."
+			required:    false
+			type: string: {
+				default: "http://169.254.169.254"
+			}
+		}
 		fields: {
 			common:      true
 			description: "A list of fields to include in each event."
