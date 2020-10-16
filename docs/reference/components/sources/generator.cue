@@ -67,4 +67,6 @@ components: sources: generator: {
 			type: bool: default: false
 		}
 	}
+
+	output: logs: {}
 }
