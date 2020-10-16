@@ -275,7 +275,16 @@ components: {
 				required:    false
 				warnings: []
 				type: object: {
-					examples: [{"status": "int"}, {"duration": "float"}, {"success": "bool"}, {"timestamp": "timestamp|%F"}, {"timestamp": "timestamp|%a %b %e %T %Y"}, {"parent": {"child": "int"}}]
+					examples: [
+						{
+							status:            "int"
+							duration:          "float"
+							success:           "bool"
+							timestamp_iso8601: "timestamp|%F"
+							timestamp_custom:  "timestamp|%a %b %e %T %Y"
+							parent: {"child": "int"}
+						},
+					]
 					options: {}
 				}
 			}
