@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::serde::Fields;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Lookup,
     event::{Event, Value},
     internal_events::{
@@ -48,8 +48,10 @@ pub struct AddFields {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<AddFieldsConfig>("add_fields")
+    TransformDescription::new::<AddFieldsConfig>("add_fields")
 }
+
+impl GenerateConfig for AddFieldsConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "add_fields")]
@@ -215,13 +217,13 @@ mod tests {
         let event = transform.transform(event).unwrap().into_log();
 
         tracing::error!(?event);
-        assert_eq!(event[&"float".into()], 4.5.into());
-        assert_eq!(event[&"int".into()], 4.into());
-        assert_eq!(event[&"string".into()], "thisisastring".into());
-        assert_eq!(event[&"bool".into()], true.into());
-        assert_eq!(event[&"array[0]".into()], 1.into());
-        assert_eq!(event[&"array[1]".into()], 2.into());
-        assert_eq!(event[&"array[2]".into()], 3.into());
-        assert_eq!(event[&"table.key".into()], "value".into());
+        assert_eq!(event["float"], 4.5.into());
+        assert_eq!(event["int"], 4.into());
+        assert_eq!(event["string"], "thisisastring".into());
+        assert_eq!(event["bool"], true.into());
+        assert_eq!(event["array[0]"], 1.into());
+        assert_eq!(event["array[1]"], 2.into());
+        assert_eq!(event["array[2]"], 3.into());
+        assert_eq!(event["table.key"], "value".into());
     }
 }

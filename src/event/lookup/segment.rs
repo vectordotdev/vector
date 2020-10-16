@@ -64,7 +64,7 @@ impl Segment {
         for inner_segment in segment.into_inner() {
             match inner_segment.as_rule() {
                 Rule::path_field_name => {
-                    tracing::trace!(segment = inner_segment.as_str(), rule = ?inner_segment.as_rule(), action = %"push");
+                    tracing::trace!(segment = %inner_segment.as_str(), rule = ?inner_segment.as_rule(), action = %"push");
                     segments.push(Segment::field(inner_segment.as_str().to_owned()))
                 }
                 Rule::path_index => segments.push(Segment::from_path_index(inner_segment)?),
@@ -92,7 +92,7 @@ impl Segment {
         let retval = match segment.as_rule() {
             Rule::inner_path_index => {
                 let index = segment.as_str().parse()?;
-                tracing::trace!(segment = index, rule = ?segment.as_rule(), action = %"push");
+                tracing::trace!(segment = %index, rule = ?segment.as_rule(), action = %"push");
                 Ok(Segment::index(index))
             }
             _ => Err(format!(
@@ -114,7 +114,7 @@ impl Segment {
             .expect("Did not get pair inside quoted_path_segment segment. This is an invariant. Please report it.");
         let retval = match segment.as_rule() {
             Rule::inner_quoted_string => {
-                tracing::trace!(segment = segment.as_str(), rule = ?segment.as_rule(), action = %"push");
+                tracing::trace!(segment = %segment.as_str(), rule = ?segment.as_rule(), action = %"push");
                 Ok(Segment::field(
                     String::from(r#"""#) + segment.as_str() + r#"""#,
                 ))
