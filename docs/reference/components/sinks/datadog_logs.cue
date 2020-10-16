@@ -1,16 +1,10 @@
 package metadata
 
 components: sinks: datadog_logs: {
-	title:       "Datadog Logs"
-	description: "[Datadog](\(urls.datadog)) is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform."
+	title: "Datadog Logs"
 
-	classes: {
-		commonly_used: false
-		delivery:      "at_least_once"
-		development:   "beta"
-		egress_method: "stream"
-		service_providers: ["Datadog"]
-	}
+	description: sinks._datadog.description
+	classes:     sinks._datadog.classes
 
 	features: {
 		buffer: enabled:      true
@@ -54,39 +48,11 @@ components: sinks: datadog_logs: {
 		}
 	}
 
-	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
-		}
-
-		requirements: []
-		warnings: []
-		notices: []
-	}
+	support: support: sinks._datadog.support
 
 	configuration: {
-		api_key: {
-			description: "Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)"
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
-			}
-		}
-		endpoint: {
-			common:      false
-			description: "The endpoint to send logs to."
-			required:    false
-			type: string: {
-				default: "intake.logs.datadoghq.com:10516"
-				examples: ["127.0.0.1:8080", "example.com:12345"]
-			}
-		}
+		api_key:  sinks._datadog.configuration.api_key
+		endpoint: sinks._datadog.configuration.endpoint
 	}
 
 	input: {
