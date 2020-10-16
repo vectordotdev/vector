@@ -52,7 +52,7 @@ components: transforms: log_to_metric: {
 						required: false
 						common:   false
 						warnings: []
-						relevant_when: #"`type` = `"counter"`"#
+						relevant_when: #"type = "counter""#
 						type: bool: {
 							default: false
 						}
